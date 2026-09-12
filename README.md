@@ -7,12 +7,12 @@
     </picture>
   </a>
 </p>
-> **Ratio** is a fork of [opencode](https://github.com/anomalyco/opencode). It is not built by,
+> **Lunos** is a fork of [opencode](https://github.com/anomalyco/opencode). It is not built by,
 > maintained by, or affiliated with the OpenCode team in any way — see
 > [Building on OpenCode](#building-on-opencode) below.
 >
-> The name "Ratio" (Latin: *reason, reckoning*) reflects this fork's EU-sovereignty positioning:
-> an AI coding agent built and operated under European jurisdiction and data-protection standards.
+> The name "Lunos" reflects this fork's EU-sovereignty positioning: an AI coding agent built and
+> operated under European jurisdiction and data-protection standards.
 
 <p align="center">The open source AI coding agent.</p>
 <p align="center">

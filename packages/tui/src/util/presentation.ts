@@ -1,11 +1,11 @@
-// Ratio wordmark (plain-ANSI variant of packages/tui/src/logo.ts — kept in sync manually).
+// Lunos wordmark (plain-ANSI variant of packages/tui/src/logo.ts — kept in sync manually).
 const logo = {
   left: ["", "", "", ""],
   right: [
     "                        ",
-    "█▀▀█ █▀▀█ ▀██▀ ▀██▀ █▀▀█",
-    "█▄▄▀ █▀▀█  ██   ██  █  █",
-    "▀  ▀ ▀  ▀  ▀▀  ▄██▄ ▀▀▀▀",
+    "█    █  █ █▄ █ █▀▀█ █▀▀▀",
+    "█    █  █ █ ▄█ █  █ ▀▀▀█",
+    "█▄▄▄ ▀▄▄▀ ▀  ▀ ▀▀▀▀ ▄▄▄█",
   ],
 }
 

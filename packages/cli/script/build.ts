@@ -9,7 +9,7 @@ import pkg from "../package.json"
 import { modelsData } from "./generate"
 
 const dir = path.resolve(import.meta.dirname, "..")
-const binary = "ratio"
+const binary = "lunos"
 process.chdir(dir)
 
 await rm("dist", { recursive: true, force: true })

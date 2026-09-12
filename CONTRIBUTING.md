@@ -1,12 +1,12 @@
-# Contributing to Ratio
+# Contributing to Lunos
 
-> **Ratio** is a fork of [opencode](https://github.com/anomalyco/opencode), built and operated
+> **Lunos** is a fork of [opencode](https://github.com/anomalyco/opencode), built and operated
 > under EU-sovereignty positioning. It is not affiliated with the OpenCode team — see the
 > [Building on OpenCode](./README.md#building-on-opencode) note in the README. The guidance below
 > is largely inherited from upstream opencode and still references its issue tracker and labels;
-> update it once Ratio has its own contribution workflow.
+> update it once Lunos has its own contribution workflow.
 
-We want to make it easy for you to contribute to Ratio. Here are the most common type of changes that get merged:
+We want to make it easy for you to contribute to Lunos. Here are the most common type of changes that get merged:
 
 - Bug fixes
 - Additional LSPs / Formatters

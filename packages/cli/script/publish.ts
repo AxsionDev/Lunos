@@ -27,12 +27,12 @@ console.log("binaries", binaries)
 const version = Object.values(binaries)[0]
 
 await $`mkdir -p ./dist/${pkg.name}/bin`
-await $`cp ./bin/ratio.cjs ./dist/${pkg.name}/bin/ratio`
+await $`cp ./bin/lunos.cjs ./dist/${pkg.name}/bin/lunos`
 await Bun.file(`./dist/${pkg.name}/package.json`).write(
   JSON.stringify(
     {
       name: pkg.name,
-      bin: { ratio: "./bin/ratio" },
+      bin: { lunos: "./bin/lunos" },
       version,
       license: pkg.license,
       repository: { type: "git", url: "git+https://github.com/anomalyco/opencode.git" },
