@@ -13,7 +13,7 @@
 - **Postinstall:** runs `fix-node-pty` in `packages/core` automatically
 
 ### CLI / Core Product
-- **Path:** `packages/opencode` (entrypoint), `packages/cli` (bin: `lildax`), `packages/tui`
+- **Path:** `packages/opencode` (entrypoint), `packages/cli` (bin: `ratio`), `packages/tui`
 - **Start:** `bun run dev` (root) → `bun run --cwd packages/opencode src/index.ts`
 - **Notes:** this is the actual product; there is no separate "backend URL" to browse to
 
