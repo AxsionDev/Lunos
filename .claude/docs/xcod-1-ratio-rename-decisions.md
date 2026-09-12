@@ -18,18 +18,29 @@ scoped to the repo name, etc.) and is left for the user to decide and execute de
 - Root `package.json`: `name` → `ratio`, `description` updated, `repository`/`homepage` → the fork's
   own repo (kept `anomalyco/opencode` as the upstream reference elsewhere, e.g. README).
 - `README.md` / `CONTRIBUTING.md`: added a Ratio/fork/non-affiliation/EU-positioning note at the top.
+- `packages/cli`'s v2 CLI display name now falls back to `"ratio"` (was `"opencode"`) when no
+  build-time name is injected; its `--help` description says "Ratio 2.0 preview...".
+- Redrew the ASCII wordmark as "RATIO" in all four places it was duplicated: the opentui TUI logo
+  component (`packages/tui/src/logo.ts`), its plain-ANSI counterpart
+  (`packages/tui/src/util/presentation.ts`), and the non-TTY CLI banner
+  (`packages/opencode/src/cli/ui.ts`). Untested visually — box-drawing art built by hand, needs a
+  look in an actual terminal/TUI before shipping.
 
 ## What's explicitly NOT done (needs follow-up, not silently skipped)
 
-- **`packages/opencode`** (the actual compiled TUI/server binary the `install` script downloads)
-  is still built and named `opencode` internally — its `--version` output, TUI splash, and binary
-  filename are untouched. `install` renames the *installed* binary to `ratio` after extraction, but
-  the binary itself doesn't yet identify as Ratio. Until this is addressed, "`ratio --version` prints
-  Ratio branding" (AC) is not actually true — only the install path/command name is.
+- **`packages/opencode`'s actual command name is still `opencode`** — `.scriptName("opencode")`,
+  the `yargs` usage text, and hint strings like `opencode -s <sessionID>` are all untouched
+  on purpose: the wordmark now shows "Ratio" as a brand mark, but the binary you actually type is
+  still `opencode` (same pattern as e.g. VS Code's `code` binary vs. its product name). Doing a
+  full rename here means touching the real invoked command everywhere it's hinted at in help/output
+  text across `packages/opencode` — a much larger, separate change from a cosmetic wordmark swap.
+  Until that happens, "`ratio --version` prints Ratio branding" (AC) is only half true: the splash
+  says Ratio, the `--version` flag just prints a bare semver number (it never printed a product name
+  even before this rename), and the command you invoke is still `opencode`.
 - **No Ratio release artifacts exist.** `install` now points at `github.com/pminev1/Axcode/releases`,
   but nothing is published there — the script is non-functional until a release pipeline exists.
-- **Visual identity** (logo SVGs under `packages/console/app/src/asset/`, desktop/Electron icons,
-  TUI/web banners) — not touched. This needs real design work, not a text rename.
+- **Visual identity assets** (logo SVGs under `packages/console/app/src/asset/`, desktop/Electron
+  icons) — not touched. This needs real design work, not a text rename.
 - **Translated READMEs** (~20 files) still say OpenCode — deliberately left in English-only scope
   for this pass.
 - `bun.lock` still references `lildax` — it only updates via `bun install`, which needs `node_modules`
