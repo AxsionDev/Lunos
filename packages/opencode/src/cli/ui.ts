@@ -2,11 +2,12 @@ import { EOL } from "os"
 import { Schema } from "effect"
 import { logo as glyphs } from "./logo"
 
+// Ratio wordmark, plain (non-TTY) fallback variant of packages/tui/src/logo.ts.
 const wordmark = [
-  `⠀                                ▄     `,
-  `█▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█`,
-  `█  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀`,
-  `▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀`,
+  `                        `,
+  `█▀▀█ █▀▀█ ▀██▀ ▀██▀ █▀▀█`,
+  `█▄▄▀ █▀▀█  ██   ██  █  █`,
+  `▀  ▀ ▀  ▀  ▀▀  ▄██▄ ▀▀▀▀`,
 ]
 
 export class CancelledError extends Schema.TaggedErrorClass<CancelledError>()("UICancelledError", {}) {}

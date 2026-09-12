@@ -1,6 +1,12 @@
+// Ratio wordmark (plain-ANSI variant of packages/tui/src/logo.ts — kept in sync manually).
 const logo = {
-  left: ["                   ", "█▀▀█ █▀▀█ █▀▀█ █▀▀▄", "█__█ █__█ █^^^ █__█", "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀"],
-  right: ["             ▄     ", "█▀▀▀ █▀▀█ █▀▀█ █▀▀█", "█___ █__█ █__█ █^^^", "▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀"],
+  left: ["", "", "", ""],
+  right: [
+    "                        ",
+    "█▀▀█ █▀▀█ ▀██▀ ▀██▀ █▀▀█",
+    "█▄▄▀ █▀▀█  ██   ██  █  █",
+    "▀  ▀ ▀  ▀  ▀▀  ▄██▄ ▀▀▀▀",
+  ],
 }
 
 const reset = "\x1b[0m"
