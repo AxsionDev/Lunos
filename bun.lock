@@ -98,7 +98,7 @@
       "name": "@opencode-ai/cli",
       "version": "1.18.30",
       "bin": {
-        "lildax": "./bin/lildax.cjs",
+        "ratio": "./bin/ratio.cjs",
       },
       "dependencies": {
         "@effect/platform-node": "catalog:",
