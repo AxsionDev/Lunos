@@ -1,4 +1,4 @@
-import type { TuiPlugin, TuiPluginApi, TuiPluginStatus } from "@opencode-ai/plugin/tui"
+import type { TuiPlugin, TuiPluginApi, TuiPluginDiscoverEntry, TuiPluginStatus } from "@opencode-ai/plugin/tui"
 import type { BuiltinTuiPlugin } from "../builtins"
 import { useTerminalDimensions } from "@opentui/solid"
 import { fileURLToPath } from "url"
@@ -132,6 +132,105 @@ function Install(props: { api: TuiPluginApi }) {
   )
 }
 
+function discoverRow(item: TuiPluginDiscoverEntry): DialogSelectOption<string> {
+  return {
+    title: item.name,
+    value: item.spec,
+    category: item.marketplace,
+    description: item.description,
+  }
+}
+
+function Discover(props: { api: TuiPluginApi }) {
+  const [plugins, setPlugins] = createSignal<TuiPluginDiscoverEntry[]>()
+  const [marketplaceCount, setMarketplaceCount] = createSignal(0)
+  const [installing, setInstalling] = createSignal(false)
+
+  props.api.plugins.discover().then((out) => {
+    setMarketplaceCount(out.marketplaceCount)
+    setPlugins([...out.plugins])
+  })
+
+  const rows = createMemo(() => (plugins() ?? []).map(discoverRow))
+  const loading = createMemo(() => plugins() === undefined)
+
+  const install = (spec: string) => {
+    if (installing()) return
+    setInstalling(true)
+    void props.api.plugins
+      .install(spec)
+      .then((out) => {
+        if (!out.ok) {
+          props.api.ui.toast({ variant: "error", message: out.message })
+          if (out.missing) {
+            props.api.ui.toast({
+              variant: "info",
+              message: "Check npm registry/auth settings and try again.",
+            })
+          }
+          return
+        }
+
+        props.api.ui.toast({ variant: "success", message: `Installed ${spec} (local: ${out.dir})` })
+        if (!out.tui) {
+          props.api.ui.toast({
+            variant: "info",
+            message: "Package has no TUI target to load in this app.",
+          })
+          return
+        }
+
+        return props.api.plugins.add(spec).then((ok) => {
+          if (!ok) {
+            props.api.ui.toast({
+              variant: "warning",
+              message: "Installed plugin, but runtime load failed. See console/logs; restart TUI to retry.",
+            })
+            return
+          }
+
+          props.api.ui.toast({ variant: "success", message: `Loaded ${spec} in current session.` })
+        })
+      })
+      .finally(() => {
+        setInstalling(false)
+        show(props.api)
+      })
+  }
+
+  const emptyView = createMemo(() => {
+    if (loading()) return <text fg={props.api.theme.current.textMuted}>Loading plugins…</text>
+    if (marketplaceCount() > 0) return undefined
+    return (
+      <text fg={props.api.theme.current.textMuted}>
+        {"No marketplaces added. Run: lunos marketplace add <owner/repo | url | path>"}
+      </text>
+    )
+  })
+
+  return (
+    <DialogSelect
+      title="Discover plugins"
+      options={rows()}
+      locked={loading() || installing()}
+      emptyView={emptyView()}
+      onSelect={(item) => install(item.value)}
+      actions={[
+        {
+          title: "back",
+          command: "dialog.plugins.discover.back",
+          hidden: loading() || installing(),
+          onTrigger: () => show(props.api),
+        },
+      ]}
+    />
+  )
+}
+
+function showDiscover(api: TuiPluginApi) {
+  api.ui.dialog.replace(() => <Discover api={api} />)
+}
+
 function row(api: TuiPluginApi, item: TuiPluginStatus, width: number): DialogSelectOption<string> {
   return {
     title: item.id,
@@ -222,6 +321,14 @@ function View(props: { api: TuiPluginApi }) {
             showInstall(props.api)
           },
         },
+        {
+          title: "discover",
+          command: "dialog.plugins.discover",
+          hidden: lock(),
+          onTrigger: () => {
+            showDiscover(props.api)
+          },
+        },
       ]}
       onSelect={(item) => {
         setCur(item.value)
@@ -256,8 +363,17 @@ const tui: TuiPlugin = async (api) => {
           showInstall(api)
         },
       },
+      {
+        name: "plugins.discover",
+        title: "Discover plugins",
+        category: "System",
+        namespace: "palette",
+        run() {
+          showDiscover(api)
+        },
+      },
     ],
-    bindings: api.tuiConfig.keybinds.gather("plugins.palette", ["plugins.list", "plugins.install"]),
+    bindings: api.tuiConfig.keybinds.gather("plugins.palette", ["plugins.list", "plugins.install", "plugins.discover"]),
   })
 }
 

@@ -3,14 +3,8 @@ import fs from "fs/promises"
 import path from "path"
 import { parse as parseJsonc } from "jsonc-parser"
 import { Filesystem } from "@/util/filesystem"
-import {
-  createMarketplaceAddTask,
-  listMarketplaces,
-  type MarketplaceCtx,
-  type MarketplaceDeps,
-  type MarketplaceListDeps,
-} from "../../src/cli/cmd/marketplace"
-import type { FetchDeps } from "../../src/marketplace/shared"
+import { createMarketplaceAddTask, listMarketplaces, type MarketplaceDeps } from "../../src/cli/cmd/marketplace"
+import type { FetchDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 
 const validManifest = {

@@ -1,20 +1,25 @@
-import { parse as parseJsonc } from "jsonc-parser"
 import { intro, log, outro, spinner } from "@clack/prompts"
 import { Effect } from "effect"
 
 import { cmd } from "./cmd"
 import { ConfigPaths } from "@/config/paths"
 import { Global } from "@opencode-ai/core/global"
-import { patchDir, patchPluginConfig, type PatchDeps } from "../../plugin/install"
-import { resolveMarketplaceManifest, normalizeSource, type FetchDeps, defaultFetchDeps } from "../../marketplace/shared"
-import type { Marketplace } from "@opencode-ai/core/marketplace"
+import { patchPluginConfig, type PatchDeps } from "../../plugin/install"
+import {
+  resolveMarketplaceManifest,
+  resolveAddedMarketplaces,
+  normalizeSource,
+  defaultMarketplaceListDeps,
+  FIELD,
+  type MarketplaceCtx,
+  type MarketplaceListDeps,
+} from "../../marketplace/shared"
 import { errorMessage } from "../../util/error"
 import { Filesystem } from "@/util/filesystem"
 import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
 import { InstanceRef } from "@/effect/instance-ref"
 
-const FIELD = "marketplace"
 const identity = (spec: string) => spec
 
 type Spin = {
@@ -40,12 +45,6 @@ export type MarketplaceDeps = {
 export type MarketplaceAddInput = {
   source: string
   global?: boolean
-}
-
-export type MarketplaceCtx = {
-  vcs?: string
-  worktree: string
-  directory: string
 }
 
 const defaultMarketplaceDeps: MarketplaceDeps = {
@@ -134,86 +133,12 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
   }
 }
 
-export type MarketplaceListDeps = {
-  exists: (file: string) => Promise<boolean>
-  readText: (file: string) => Promise<string>
-  files: (dir: string, name: "opencode" | "tui") => string[]
-  resolve: FetchDeps
-  global: string
-}
-
-export const defaultMarketplaceListDeps: MarketplaceListDeps = {
-  exists: (file) => Filesystem.exists(file),
-  readText: (file) => Filesystem.readText(file),
-  files: (dir, name) => ConfigPaths.fileInDirectory(dir, name),
-  resolve: defaultFetchDeps,
-  global: Global.Path.config,
-}
-
-async function readSources(dir: string, dep: MarketplaceListDeps) {
-  const files = dep.files(dir, "opencode")
-  for (const file of files) {
-    if (!(await dep.exists(file))) continue
-    const text = await dep.readText(file)
-    const data = parseJsonc(text, [], { allowTrailingComma: true })
-    if (!data || typeof data !== "object" || Array.isArray(data)) return []
-    const list = (data as Record<string, unknown>)[FIELD]
-    if (!Array.isArray(list)) return []
-    return list.filter((item): item is string => typeof item === "string")
-  }
-  return []
-}
-
 export type MarketplaceListEntry = {
   scope: "local" | "global"
   source: string
   name?: string
   plugins?: number
   error?: string
-}
-
-export type ResolvedMarketplace =
-  | { scope: "local" | "global"; source: string; ok: true; manifest: Marketplace.Manifest }
-  | { scope: "local" | "global"; source: string; ok: false; error: string }
-
-// Shared by `marketplace list` (counts/names only) and `plugin list`/`plugin search` (XCOD-11,
-// full plugin rows) so both read the same resolved manifests instead of two parallel fetch paths.
-export async function resolveAddedMarketplaces(
-  ctx: MarketplaceCtx,
-  dep: MarketplaceListDeps = defaultMarketplaceListDeps,
-): Promise<ResolvedMarketplace[]> {
-  const localDir = patchDir({ spec: "", targets: [], vcs: ctx.vcs, worktree: ctx.worktree, directory: ctx.directory })
-  const globalDir = patchDir({
-    spec: "",
-    targets: [],
-    global: true,
-    vcs: ctx.vcs,
-    worktree: ctx.worktree,
-    directory: ctx.directory,
-    config: dep.global,
-  })
-
-  const scopes: Array<{ scope: "local" | "global"; dir: string }> = [
-    { scope: "local", dir: localDir },
-    { scope: "global", dir: globalDir },
-  ]
-
-  const entries: ResolvedMarketplace[] = []
-  for (const { scope, dir } of scopes) {
-    const sources = await readSources(dir, dep)
-    for (const source of sources) {
-      const resolved = await resolveMarketplaceManifest(source, dep.resolve).then(
-        (item) => ({ ok: true as const, item }),
-        (error: unknown) => ({ ok: false as const, error }),
-      )
-      entries.push(
-        resolved.ok
-          ? { scope, source, ok: true, manifest: resolved.item }
-          : { scope, source, ok: false, error: errorMessage(resolved.error) },
-      )
-    }
-  }
-  return entries
 }
 
 export async function listMarketplaces(
