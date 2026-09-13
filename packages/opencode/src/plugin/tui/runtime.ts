@@ -4,6 +4,7 @@ import {
   type TuiDispose,
   type TuiPlugin,
   type TuiPluginApi,
+  type TuiPluginDiscoverResult,
   type TuiPluginInstallResult,
   type TuiPluginModule,
   type TuiPluginMeta,
@@ -29,6 +30,7 @@ import {
 import { PluginLoader } from "@/plugin/loader"
 import { PluginMeta } from "@/plugin/meta"
 import { installPlugin as installModulePlugin, patchPluginConfig, readPluginManifest } from "@/plugin/install"
+import { listPlugins } from "@/plugin/discover"
 import { hasTheme, upsertTheme } from "@opencode-ai/tui/context/theme"
 import { Global } from "@opencode-ai/core/global"
 import { Filesystem } from "@/util/filesystem"
@@ -645,6 +647,9 @@ function pluginApi(runtime: RuntimeState, plugin: PluginEntry, scope: PluginScop
       install(spec, options) {
         return installPluginBySpec(runtime, spec, options?.global)
       },
+      discover() {
+        return discoverPluginsForRuntime(runtime)
+      },
     },
     lifecycle: scope.lifecycle,
   }
@@ -888,6 +893,29 @@ async function addPluginBySpec(state: RuntimeState | undefined, raw: string) {
   return ok
 }
 
+async function discoverPluginsForRuntime(state: RuntimeState | undefined): Promise<TuiPluginDiscoverResult> {
+  if (!state) return { marketplaceCount: 0, plugins: [] }
+
+  const dir = state.api.state.path
+  if (!dir.directory) return { marketplaceCount: 0, plugins: [] }
+
+  const { marketplaceCount, plugins } = await listPlugins({
+    vcs: dir.worktree && dir.worktree !== "/" ? "git" : undefined,
+    worktree: dir.worktree,
+    directory: dir.directory,
+  })
+
+  return {
+    marketplaceCount,
+    plugins: plugins.map((item) => ({
+      name: item.name,
+      marketplace: item.marketplace,
+      description: item.description,
+      spec: item.spec,
+    })),
+  }
+}
+
 async function installPluginBySpec(
   state: RuntimeState | undefined,
   raw: string,
@@ -1024,6 +1052,10 @@ export async function addPlugin(spec: string) {
 
 export async function installPlugin(spec: string, options?: { global?: boolean }) {
   return installPluginBySpec(runtime, spec, options?.global)
+}
+
+export async function discoverPlugins() {
+  return discoverPluginsForRuntime(runtime)
 }
 
 export async function dispose() {

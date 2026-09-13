@@ -327,6 +327,9 @@ export function createTuiApiAdapters(input: Input): Omit<TuiPluginApi, "lifecycl
           message: "plugins.install is only available in plugin context",
         }
       },
+      async discover() {
+        return { marketplaceCount: 0, plugins: [] }
+      },
     },
     theme: {
       get current() {

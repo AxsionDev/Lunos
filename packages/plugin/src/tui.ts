@@ -573,6 +573,18 @@ export type TuiPluginInstallResult =
       missing?: boolean
     }
 
+export type TuiPluginDiscoverEntry = {
+  name: string
+  marketplace: string
+  description?: string
+  spec: string
+}
+
+export type TuiPluginDiscoverResult = {
+  marketplaceCount: number
+  plugins: ReadonlyArray<TuiPluginDiscoverEntry>
+}
+
 export type TuiWorkspace = {
   current: () => string | undefined
   set: (workspaceID?: string) => void
@@ -621,6 +633,7 @@ export type TuiPluginApi = {
     deactivate: (id: string) => Promise<boolean>
     add: (spec: string) => Promise<boolean>
     install: (spec: string, options?: TuiPluginInstallOptions) => Promise<TuiPluginInstallResult>
+    discover: () => Promise<TuiPluginDiscoverResult>
   }
   lifecycle: TuiLifecycle
 }

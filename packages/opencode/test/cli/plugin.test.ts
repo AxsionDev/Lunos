@@ -2,9 +2,8 @@ import { describe, expect, test } from "bun:test"
 import fs from "fs/promises"
 import path from "path"
 import { Filesystem } from "@/util/filesystem"
-import { listPlugins, pluginInstallSpec, searchPlugins } from "../../src/cli/cmd/plug"
-import type { MarketplaceCtx, MarketplaceListDeps } from "../../src/cli/cmd/marketplace"
-import type { FetchDeps } from "../../src/marketplace/shared"
+import { listPlugins, pluginInstallSpec, searchPlugins } from "../../src/plugin/discover"
+import type { FetchDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 
 const manifest = {
