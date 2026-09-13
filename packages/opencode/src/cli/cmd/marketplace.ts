@@ -7,6 +7,7 @@ import { ConfigPaths } from "@/config/paths"
 import { Global } from "@opencode-ai/core/global"
 import { patchDir, patchPluginConfig, type PatchDeps } from "../../plugin/install"
 import { resolveMarketplaceManifest, normalizeSource, type FetchDeps, defaultFetchDeps } from "../../marketplace/shared"
+import type { Marketplace } from "@opencode-ai/core/marketplace"
 import { errorMessage } from "../../util/error"
 import { Filesystem } from "@/util/filesystem"
 import { UI } from "../ui"
@@ -141,7 +142,7 @@ export type MarketplaceListDeps = {
   global: string
 }
 
-const defaultMarketplaceListDeps: MarketplaceListDeps = {
+export const defaultMarketplaceListDeps: MarketplaceListDeps = {
   exists: (file) => Filesystem.exists(file),
   readText: (file) => Filesystem.readText(file),
   files: (dir, name) => ConfigPaths.fileInDirectory(dir, name),
@@ -171,10 +172,16 @@ export type MarketplaceListEntry = {
   error?: string
 }
 
-export async function listMarketplaces(
+export type ResolvedMarketplace =
+  | { scope: "local" | "global"; source: string; ok: true; manifest: Marketplace.Manifest }
+  | { scope: "local" | "global"; source: string; ok: false; error: string }
+
+// Shared by `marketplace list` (counts/names only) and `plugin list`/`plugin search` (XCOD-11,
+// full plugin rows) so both read the same resolved manifests instead of two parallel fetch paths.
+export async function resolveAddedMarketplaces(
   ctx: MarketplaceCtx,
   dep: MarketplaceListDeps = defaultMarketplaceListDeps,
-): Promise<MarketplaceListEntry[]> {
+): Promise<ResolvedMarketplace[]> {
   const localDir = patchDir({ spec: "", targets: [], vcs: ctx.vcs, worktree: ctx.worktree, directory: ctx.directory })
   const globalDir = patchDir({
     spec: "",
@@ -191,7 +198,7 @@ export async function listMarketplaces(
     { scope: "global", dir: globalDir },
   ]
 
-  const entries: MarketplaceListEntry[] = []
+  const entries: ResolvedMarketplace[] = []
   for (const { scope, dir } of scopes) {
     const sources = await readSources(dir, dep)
     for (const source of sources) {
@@ -201,12 +208,24 @@ export async function listMarketplaces(
       )
       entries.push(
         resolved.ok
-          ? { scope, source, name: resolved.item.name, plugins: resolved.item.plugins.length }
-          : { scope, source, error: errorMessage(resolved.error) },
+          ? { scope, source, ok: true, manifest: resolved.item }
+          : { scope, source, ok: false, error: errorMessage(resolved.error) },
       )
     }
   }
   return entries
+}
+
+export async function listMarketplaces(
+  ctx: MarketplaceCtx,
+  dep: MarketplaceListDeps = defaultMarketplaceListDeps,
+): Promise<MarketplaceListEntry[]> {
+  const resolved = await resolveAddedMarketplaces(ctx, dep)
+  return resolved.map((entry) =>
+    entry.ok
+      ? { scope: entry.scope, source: entry.source, name: entry.manifest.name, plugins: entry.manifest.plugins.length }
+      : { scope: entry.scope, source: entry.source, error: entry.error },
+  )
 }
 
 export const MarketplaceAddCommand = effectCmd({
