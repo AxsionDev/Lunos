@@ -135,9 +135,43 @@ Expected { readonly "type": "npm", ... } | { readonly "type": "github", ... }, g
   at ["plugins"][0]["source"]
 ```
 
+## Seed marketplace (community plugins)
+
+`marketplace.json` at the repository root (XCOD-9) is the default community marketplace,
+converted from `packages/web/src/content/docs/ecosystem.mdx`'s "Plugins" table. It's reachable
+at a fixed location — `https://raw.githubusercontent.com/pminev1/Lunos/dev/marketplace.json` —
+for a fresh install to add without hunting for a source, per this doc's manifest-location
+convention above. `ecosystem.mdx` itself is unchanged; the seed manifest is a second,
+structured artifact derived from the same data, not a replacement for the docs page.
+
+Mapping decisions:
+
+- 36 of the table's 38 "Plugins" rows are included, each mapped to a `github` source using
+  the row's linked repository.
+- **2 rows excluded — monorepo subdirectories:** `opencode-daytona`
+  (`daytona/integrations/tree/main/packages/opencode-plugin`) and `@plannotator/opencode`
+  (`backnotprop/plannotator/tree/main/apps/opencode-plugin`) each link to a subdirectory of a
+  larger repository, not a plugin repository root. The `github` source type has no subpath
+  field — `git-subdir` sources are explicitly deferred past v1 (see Overview) — so pointing
+  `repo` at the monorepo root would name the wrong install location. Excluded rather than
+  misrepresented.
+- **"Projects" and "Agents" sections excluded entirely:** those rows (a Discord bot, editor
+  frontends, a mobile client, agent/prompt configs, etc.) aren't installable Lunos/opencode
+  plugins — they're separate tools and integrations built around the ecosystem, which is why
+  `ecosystem.mdx` lists them under different headings in the first place.
+- **`ref` omitted unless the source table states one.** Only one row's link
+  (`opencode-md-table-formatter`, `.../tree/main`) names a branch; that one entry sets
+  `ref: "main"`. For the other 35 included entries, no branch is knowable from the table, and
+  `ref` is optional (defaults to the repository's default branch per the schema) — guessing
+  `"main"` for all of them would fabricate data that's wrong for any repository still on
+  `master`.
+- `category` and `tags` are omitted throughout — `ecosystem.mdx`'s table doesn't carry that
+  data, and the schema doesn't require it.
+
 ## Current in-repo examples
 
 - Valid manifest: `packages/core/test/fixtures/marketplace/valid.json`
 - Malformed manifest (unsupported source type): `packages/core/test/fixtures/marketplace/malformed.json`
+- Seed community marketplace: `marketplace.json` (repository root)
 - Schema and validator: `packages/core/src/marketplace.ts`
 - Tests: `packages/core/test/marketplace.test.ts`
