@@ -168,10 +168,46 @@ Mapping decisions:
 - `category` and `tags` are omitted throughout — `ecosystem.mdx`'s table doesn't carry that
   data, and the schema doesn't require it.
 
+## Marketplace cache (XCOD-13)
+
+Resolved manifests are cached to disk so `lunos marketplace list`, `plugin list`/`search`, and the
+TUI Discover view (XCOD-11, XCOD-12) all read from cache instead of re-fetching independently —
+following the same on-disk cache precedent as `@opencode-ai/core`'s npm plugin install cache
+(`Npm.add`, keyed under `Global.Path.cache`) and its `models-dev` catalog cache (`Hash.fast(source)`
++ file mtime as the freshness clock), rather than inventing a new cache location or format.
+
+- **Location:** `~/.cache/opencode/marketplace/<hash>.json`, one file per added source, where
+  `<hash>` is `Hash.fast(source)` (`packages/core/src/util/hash.ts`, sha1) of the source string
+  exactly as configured (owner/repo shorthand, URL, or normalized local path).
+- **Format:** the resolved `Marketplace.Manifest` JSON as-is — no wrapper object. The file's mtime
+  doubles as `fetchedAt`, so there's nothing else to keep in sync.
+- **Freshness policy (v1):** a cache hit younger than 24 hours is served with no network or file
+  fetch at all. Once it's older than that, the next read attempts one live re-fetch: success
+  rewrites the cache; failure falls back to the existing (now-stale) cached manifest rather than
+  failing the read. This is the "refresh in the background on a timer" policy this manifest-spec's
+  Overview deferred to a later story, implemented lazily on read rather than as a background fiber.
+- **Local `path` sources bypass the cache entirely** and are always read live, mirroring how
+  `resolvePluginTarget` (`packages/opencode/src/plugin/shared.ts`) caches npm plugin installs but
+  reads file-plugin paths straight off disk every time. A local directory/file has no network
+  round-trip to save and can't go "unreachable but last-known-good" the way a URL or GitHub source
+  can.
+- **Explicit refresh:** `lunos marketplace update <name>` (accepts either the configured source or
+  the manifest's declared `name`) bypasses the freshness check and forces a re-fetch. On failure it
+  leaves the on-disk cache untouched and reports the error — the last-known-good manifest keeps
+  being served by `list`/`search`/Discover.
+- **Unreachable sources:** a source that fails its live re-fetch (via the lazy TTL check above, or
+  via `marketplace update`) but has a prior successful cache continues to resolve successfully, with
+  a `stale` field carrying the failure reason. Callers surface this as a visible "refresh failed,
+  showing cache from <time>" indicator rather than silently degrading or erroring the whole command.
+  A source with no successful fetch ever (nothing cached yet) still fails outright — there is no
+  last-known-good to fall back to.
+- **Implementation:** `packages/opencode/src/marketplace/shared.ts` (`resolveWithCache`,
+  `resolveAddedMarketplaces`, `refreshMarketplaceCache`).
+
 ## Current in-repo examples
 
 - Valid manifest: `packages/core/test/fixtures/marketplace/valid.json`
 - Malformed manifest (unsupported source type): `packages/core/test/fixtures/marketplace/malformed.json`
 - Seed community marketplace: `marketplace.json` (repository root)
 - Schema and validator: `packages/core/src/marketplace.ts`
-- Tests: `packages/core/test/marketplace.test.ts`
+- Tests: `packages/core/test/marketplace.test.ts`, `packages/opencode/test/marketplace/shared.test.ts`

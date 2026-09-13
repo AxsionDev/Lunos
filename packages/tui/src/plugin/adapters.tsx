@@ -328,7 +328,7 @@ export function createTuiApiAdapters(input: Input): Omit<TuiPluginApi, "lifecycl
         }
       },
       async discover() {
-        return { marketplaceCount: 0, plugins: [] }
+        return { marketplaceCount: 0, marketplaces: [], plugins: [] }
       },
     },
     theme: {

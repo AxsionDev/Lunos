@@ -5,7 +5,7 @@ import { ConfigPaths } from "@/config/paths"
 import { Global } from "@opencode-ai/core/global"
 import { installPlugin, patchPluginConfig, readPluginManifest } from "../../plugin/install"
 import { resolvePluginTarget } from "../../plugin/shared"
-import { listPlugins, searchPlugins, type PluginListEntry } from "../../plugin/discover"
+import { listPlugins, searchPlugins, type PluginListEntry, type PluginMarketplaceStatus } from "../../plugin/discover"
 import { errorMessage } from "../../util/error"
 import { Filesystem } from "@/util/filesystem"
 import { Process } from "@/util/process"
@@ -184,6 +184,17 @@ function printPlugins(plugins: PluginListEntry[]) {
   }
 }
 
+// Surfaces a marketplace that's serving a stale, last-known-good cache instead of silently listing
+// its plugins as if the source were fully healthy (XCOD-13 AC4).
+function printStaleMarketplaces(marketplaces: PluginMarketplaceStatus[]) {
+  for (const marketplace of marketplaces) {
+    if (!marketplace.stale) continue
+    log.warn(
+      `"${marketplace.name}" refresh failed (${marketplace.stale}) — showing cache from ${new Date(marketplace.fetchedAt).toLocaleString()}`,
+    )
+  }
+}
+
 export const PluginInstallCommand = effectCmd({
   command: "$0 <module>",
   describe: "install plugin and update config",
@@ -246,9 +257,10 @@ export const PluginListCommand = effectCmd({
 
     const ctx = yield* InstanceRef
     if (!ctx) return
-    const { marketplaceCount, plugins } = yield* Effect.promise(() =>
+    const { marketplaceCount, marketplaces, plugins } = yield* Effect.promise(() =>
       listPlugins({ vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }),
     )
+    printStaleMarketplaces(marketplaces)
 
     if (!marketplaceCount) {
       log.warn("No marketplaces added")
@@ -283,9 +295,10 @@ export const PluginSearchCommand = effectCmd({
 
     const ctx = yield* InstanceRef
     if (!ctx) return
-    const { marketplaceCount, plugins } = yield* Effect.promise(() =>
+    const { marketplaceCount, marketplaces, plugins } = yield* Effect.promise(() =>
       searchPlugins(query, { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }),
     )
+    printStaleMarketplaces(marketplaces)
 
     if (!marketplaceCount) {
       log.warn("No marketplaces added")

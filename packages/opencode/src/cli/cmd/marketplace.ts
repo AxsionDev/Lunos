@@ -8,9 +8,14 @@ import { patchPluginConfig, type PatchDeps } from "../../plugin/install"
 import {
   resolveMarketplaceManifest,
   resolveAddedMarketplaces,
+  refreshMarketplaceCache,
+  cacheMarketplaceManifest,
   normalizeSource,
+  sourceKind,
   defaultMarketplaceListDeps,
+  defaultMarketplaceCacheDeps,
   FIELD,
+  type MarketplaceCacheDeps,
   type MarketplaceCtx,
   type MarketplaceListDeps,
 } from "../../marketplace/shared"
@@ -40,6 +45,7 @@ export type MarketplaceDeps = {
   exists: (file: string) => Promise<boolean>
   files: (dir: string, name: "opencode" | "tui") => string[]
   global: string
+  cache: MarketplaceCacheDeps
 }
 
 export type MarketplaceAddInput = {
@@ -62,6 +68,7 @@ const defaultMarketplaceDeps: MarketplaceDeps = {
   exists: (file) => Filesystem.exists(file),
   files: (dir, name) => ConfigPaths.fileInDirectory(dir, name),
   global: Global.Path.config,
+  cache: defaultMarketplaceCacheDeps,
 }
 
 export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: MarketplaceDeps = defaultMarketplaceDeps) {
@@ -82,6 +89,11 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
       return false
     }
     resolve.stop(`Validated "${manifest.item.name}" (${manifest.item.plugins.length} plugin(s))`)
+    // Seed the cache with the manifest already fetched above so the next `list`/`search`/Discover
+    // read is a cache hit rather than fetching this same source again immediately after adding it.
+    // Local path sources bypass the cache entirely (see resolveWithCache), so seeding one would
+    // just be a dead file nothing ever reads.
+    if (sourceKind(source) !== "path") await cacheMarketplaceManifest(source, manifest.item, dep.cache)
 
     const patchDeps: PatchDeps = {
       readText: dep.readText,
@@ -139,6 +151,8 @@ export type MarketplaceListEntry = {
   name?: string
   plugins?: number
   error?: string
+  fetchedAt?: number
+  stale?: string
 }
 
 export async function listMarketplaces(
@@ -148,9 +162,68 @@ export async function listMarketplaces(
   const resolved = await resolveAddedMarketplaces(ctx, dep)
   return resolved.map((entry) =>
     entry.ok
-      ? { scope: entry.scope, source: entry.source, name: entry.manifest.name, plugins: entry.manifest.plugins.length }
+      ? {
+          scope: entry.scope,
+          source: entry.source,
+          name: entry.manifest.name,
+          plugins: entry.manifest.plugins.length,
+          fetchedAt: entry.fetchedAt,
+          stale: entry.stale,
+        }
       : { scope: entry.scope, source: entry.source, error: entry.error },
   )
+}
+
+// Matches the `<name>` argument of `lunos marketplace update <name>` against either the
+// as-configured source string (same identity `add <source>` uses) or the manifest's declared
+// name (what `list`/Discover display), so users can target either the value they typed or the
+// value they see.
+export async function findAddedMarketplace(
+  name: string,
+  ctx: MarketplaceCtx,
+  dep: MarketplaceListDeps = defaultMarketplaceListDeps,
+) {
+  const resolved = await resolveAddedMarketplaces(ctx, dep)
+  const needle = name.trim().toLowerCase()
+  return resolved.find(
+    (entry) => entry.source.toLowerCase() === needle || (entry.ok && entry.manifest.name.toLowerCase() === needle),
+  )
+}
+
+export type MarketplaceUpdateInput = { name: string }
+
+export function createMarketplaceUpdateTask(
+  input: MarketplaceUpdateInput,
+  dep: MarketplaceDeps = defaultMarketplaceDeps,
+  listDep: MarketplaceListDeps = defaultMarketplaceListDeps,
+) {
+  return async (ctx: MarketplaceCtx) => {
+    const match = await findAddedMarketplace(input.name, ctx, listDep)
+    if (!match) {
+      dep.log.error(`No added marketplace matches "${input.name}"`)
+      return false
+    }
+
+    const spin = dep.spinner()
+    spin.start(`Refreshing "${match.source}"...`)
+    const result = await refreshMarketplaceCache(match.source, listDep)
+    if (result.ok) {
+      spin.stop(`Refreshed "${result.manifest.name}" (${result.manifest.plugins.length} plugin(s))`)
+      dep.log.success(`Marketplace "${result.manifest.name}" is up to date`)
+      return true
+    }
+
+    if (result.fetchedAt !== undefined) {
+      spin.stop("Refresh failed", 1)
+      dep.log.error(result.error)
+      dep.log.info(`Still serving the cached copy from ${new Date(result.fetchedAt).toLocaleString()}`)
+      return false
+    }
+
+    spin.stop("Refresh failed", 1)
+    dep.log.error(result.error)
+    return false
+  }
 }
 
 export const MarketplaceAddCommand = effectCmd({
@@ -225,7 +298,12 @@ export const MarketplaceListCommand = effectCmd({
 
     for (const entry of entries) {
       const label = entry.name ? `${entry.name} (${entry.source})` : entry.source
-      const detail = entry.error ? `unreachable: ${entry.error}` : `${entry.plugins} plugin(s)`
+      const updated = entry.fetchedAt ? `updated ${new Date(entry.fetchedAt).toLocaleString()}` : undefined
+      const detail = entry.error
+        ? `unreachable: ${entry.error}`
+        : entry.stale
+          ? `${entry.plugins} plugin(s), refresh failed (${entry.stale}) — showing cache from ${updated}`
+          : `${entry.plugins} plugin(s), ${updated}`
       log.info(`[${entry.scope}] ${label} ${UI.Style.TEXT_DIM}${detail}`)
     }
 
@@ -233,9 +311,50 @@ export const MarketplaceListCommand = effectCmd({
   }),
 })
 
+export const MarketplaceUpdateCommand = effectCmd({
+  command: "update <name>",
+  describe: "force re-fetch a marketplace source, refreshing its cache",
+  builder: (yargs) =>
+    yargs.positional("name", {
+      type: "string",
+      describe: "added source (as configured) or marketplace name",
+    }),
+  handler: Effect.fn("Cli.marketplace.update")(function* (args) {
+    const name = String(args.name ?? "").trim()
+    if (!name) {
+      UI.error("name is required")
+      process.exitCode = 1
+      return
+    }
+
+    UI.empty()
+    intro(`Update marketplace ${name}`)
+
+    const run = createMarketplaceUpdateTask({ name })
+
+    const ctx = yield* InstanceRef
+    if (!ctx) return
+    const ok = yield* Effect.promise(() =>
+      run({
+        vcs: ctx.project.vcs,
+        worktree: ctx.worktree,
+        directory: ctx.directory,
+      }),
+    )
+
+    outro("Done")
+    if (!ok) process.exitCode = 1
+  }),
+})
+
 export const MarketplaceCommand = cmd({
   command: "marketplace",
   describe: "manage plugin marketplace sources",
-  builder: (yargs) => yargs.command(MarketplaceAddCommand).command(MarketplaceListCommand).demandCommand(),
+  builder: (yargs) =>
+    yargs
+      .command(MarketplaceAddCommand)
+      .command(MarketplaceListCommand)
+      .command(MarketplaceUpdateCommand)
+      .demandCommand(),
   async handler() {},
 })

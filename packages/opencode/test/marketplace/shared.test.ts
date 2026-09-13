@@ -1,7 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
 import fs from "fs/promises"
-import { sourceKind, resolveMarketplaceManifest, defaultFetchDeps, type FetchDeps } from "../../src/marketplace/shared"
+import {
+  sourceKind,
+  resolveMarketplaceManifest,
+  resolveAddedMarketplaces,
+  refreshMarketplaceCache,
+  defaultFetchDeps,
+  type FetchDeps,
+  type MarketplaceCacheDeps,
+  type MarketplaceCtx,
+  type MarketplaceListDeps,
+} from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 
 const validManifest = {
@@ -135,5 +145,215 @@ describe("marketplace.shared.resolveMarketplaceManifest", () => {
         }),
       ),
     ).rejects.toThrow()
+  })
+})
+
+describe("marketplace.shared.cache", () => {
+  function cacheDeps(dir: string): MarketplaceCacheDeps {
+    return {
+      dir,
+      mtime: async (file) => {
+        const stat = await fs.stat(file).catch(() => undefined)
+        return stat ? stat.mtimeMs : undefined
+      },
+      readText: (file) => fs.readFile(file, "utf8").catch(() => undefined),
+      write: async (file, text) => {
+        await fs.mkdir(path.dirname(file), { recursive: true })
+        await fs.writeFile(file, text)
+      },
+    }
+  }
+
+  function listDeps(cacheDir: string, resolve: FetchDeps, global = "/unused-global"): MarketplaceListDeps {
+    return {
+      exists: (file) =>
+        fs
+          .access(file)
+          .then(() => true)
+          .catch(() => false),
+      readText: (file) => fs.readFile(file, "utf8"),
+      files: (dir, name) => [path.join(dir, `${name}.jsonc`), path.join(dir, `${name}.json`)],
+      resolve,
+      global,
+      cache: cacheDeps(cacheDir),
+    }
+  }
+
+  async function addSource(worktree: string, source: string) {
+    await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
+    await fs.writeFile(
+      path.join(worktree, ".opencode", "opencode.json"),
+      JSON.stringify({ marketplace: [source] }, null, 2),
+    )
+  }
+
+  function ctx(dir: string): MarketplaceCtx {
+    return { vcs: "git", worktree: dir, directory: dir }
+  }
+
+  test("writes the manifest to disk after the first successful fetch", async () => {
+    await using tmp = await tmpdir()
+    await addSource(tmp.path, "https://example.com/marketplace.json")
+    const cacheDir = path.join(tmp.path, "cache")
+
+    await resolveAddedMarketplaces(
+      ctx(tmp.path),
+      listDeps(cacheDir, { ...defaultFetchDeps, fetchText: async () => JSON.stringify(validManifest) }),
+    )
+
+    const files = await fs.readdir(cacheDir)
+    expect(files.length).toBe(1)
+  })
+
+  test("a second resolve reads from cache instead of fetching again", async () => {
+    await using tmp = await tmpdir()
+    await addSource(tmp.path, "https://example.com/marketplace.json")
+    const cacheDir = path.join(tmp.path, "cache")
+
+    let fetches = 0
+    const deps = listDeps(cacheDir, {
+      ...defaultFetchDeps,
+      fetchText: async () => {
+        fetches++
+        return JSON.stringify(validManifest)
+      },
+    })
+
+    await resolveAddedMarketplaces(ctx(tmp.path), deps)
+    expect(fetches).toBe(1)
+
+    const [entry] = await resolveAddedMarketplaces(ctx(tmp.path), deps)
+    expect(fetches).toBe(1)
+    expect(entry).toMatchObject({ ok: true, source: "https://example.com/marketplace.json" })
+  })
+
+  test("falls back to the stale cache when a refresh attempt fails, with the error visible", async () => {
+    await using tmp = await tmpdir()
+    await addSource(tmp.path, "https://example.com/marketplace.json")
+    const cacheDir = path.join(tmp.path, "cache")
+
+    const okDeps = listDeps(cacheDir, { ...defaultFetchDeps, fetchText: async () => JSON.stringify(validManifest) })
+    await resolveAddedMarketplaces(ctx(tmp.path), okDeps)
+
+    // Age the cache file past the TTL so the next resolve attempts (and fails) a live refresh.
+    const [file] = await fs.readdir(cacheDir)
+    const expired = new Date(Date.now() - 25 * 60 * 60 * 1000)
+    await fs.utimes(path.join(cacheDir, file!), expired, expired)
+
+    const failingDeps = listDeps(cacheDir, {
+      ...defaultFetchDeps,
+      fetchText: async () => {
+        throw new Error("network unreachable")
+      },
+    })
+    const [entry] = await resolveAddedMarketplaces(ctx(tmp.path), failingDeps)
+
+    expect(entry?.ok).toBe(true)
+    if (entry?.ok) {
+      expect(entry.manifest.name).toBe("lunos-community")
+      expect(entry.stale).toContain("network unreachable")
+    }
+  })
+
+  test("fails with no fallback when a source has never been cached", async () => {
+    await using tmp = await tmpdir()
+    await addSource(tmp.path, "https://example.com/marketplace.json")
+    const cacheDir = path.join(tmp.path, "cache")
+
+    const [entry] = await resolveAddedMarketplaces(
+      ctx(tmp.path),
+      listDeps(cacheDir, {
+        ...defaultFetchDeps,
+        fetchText: async () => {
+          throw new Error("404")
+        },
+      }),
+    )
+
+    expect(entry).toEqual({
+      scope: "local",
+      source: "https://example.com/marketplace.json",
+      ok: false,
+      error: expect.stringContaining("404"),
+    })
+  })
+
+  test("refreshMarketplaceCache forces a live fetch even when the cache is still fresh", async () => {
+    await using tmp = await tmpdir()
+    const cacheDir = path.join(tmp.path, "cache")
+    const source = "https://example.com/marketplace.json"
+
+    let fetches = 0
+    const deps = listDeps(cacheDir, {
+      ...defaultFetchDeps,
+      fetchText: async () => {
+        fetches++
+        return JSON.stringify(validManifest)
+      },
+    })
+
+    const first = await refreshMarketplaceCache(source, deps)
+    expect(first.ok).toBe(true)
+    expect(fetches).toBe(1)
+
+    const second = await refreshMarketplaceCache(source, deps)
+    expect(second.ok).toBe(true)
+    expect(fetches).toBe(2) // forced: no TTL short-circuit, unlike resolveAddedMarketplaces
+  })
+
+  test("refreshMarketplaceCache keeps the last-known-good manifest when the re-fetch fails", async () => {
+    await using tmp = await tmpdir()
+    const cacheDir = path.join(tmp.path, "cache")
+    const source = "https://example.com/marketplace.json"
+
+    await refreshMarketplaceCache(
+      source,
+      listDeps(cacheDir, { ...defaultFetchDeps, fetchText: async () => JSON.stringify(validManifest) }),
+    )
+
+    const result = await refreshMarketplaceCache(
+      source,
+      listDeps(cacheDir, {
+        ...defaultFetchDeps,
+        fetchText: async () => {
+          throw new Error("timeout")
+        },
+      }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toContain("timeout")
+      expect(result.fetchedAt).toBeDefined()
+    }
+
+    // The on-disk cache itself was left untouched by the failed refresh — still the prior manifest.
+    const cache = cacheDeps(cacheDir)
+    const files = await fs.readdir(cacheDir)
+    const text = await cache.readText(path.join(cacheDir, files[0]!))
+    expect(JSON.parse(text!).name).toBe("lunos-community")
+  })
+
+  test("local path sources bypass the cache entirely and are always read live", async () => {
+    await using tmp = await tmpdir()
+    const marketplaceDir = path.join(tmp.path, "local-marketplace")
+    await fs.mkdir(marketplaceDir, { recursive: true })
+    await fs.writeFile(path.join(marketplaceDir, "marketplace.json"), JSON.stringify(validManifest))
+    await addSource(tmp.path, marketplaceDir)
+
+    const cacheDir = path.join(tmp.path, "cache")
+    const deps = listDeps(cacheDir, defaultFetchDeps)
+
+    const [first] = await resolveAddedMarketplaces(ctx(tmp.path), deps)
+    expect(first).toMatchObject({ ok: true, manifest: { name: "lunos-community" } })
+    expect(await fs.readdir(cacheDir).catch(() => [])).toEqual([]) // nothing written to the cache
+
+    // Edit the manifest on disk between calls — a cached source would still show the old data.
+    await fs.writeFile(
+      path.join(marketplaceDir, "marketplace.json"),
+      JSON.stringify({ ...validManifest, name: "edited-locally" }),
+    )
+    const [second] = await resolveAddedMarketplaces(ctx(tmp.path), deps)
+    expect(second).toMatchObject({ ok: true, manifest: { name: "edited-locally" } })
   })
 })

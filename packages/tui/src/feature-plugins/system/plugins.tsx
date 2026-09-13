@@ -149,6 +149,15 @@ function Discover(props: { api: TuiPluginApi }) {
   props.api.plugins.discover().then((out) => {
     setMarketplaceCount(out.marketplaceCount)
     setPlugins([...out.plugins])
+    // A source that's fallen back to a stale cache still lists its plugins (last-known-good), but
+    // the toast makes that visible rather than presenting it as a fully healthy marketplace.
+    for (const marketplace of out.marketplaces) {
+      if (!marketplace.stale) continue
+      props.api.ui.toast({
+        variant: "warning",
+        message: `"${marketplace.name}" refresh failed (${marketplace.stale}) — showing cached data`,
+      })
+    }
   })
 
   const rows = createMemo(() => (plugins() ?? []).map(discoverRow))

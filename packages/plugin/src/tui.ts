@@ -580,8 +580,16 @@ export type TuiPluginDiscoverEntry = {
   spec: string
 }
 
+export type TuiPluginMarketplaceStatus = {
+  name: string
+  source: string
+  fetchedAt: number
+  stale?: string
+}
+
 export type TuiPluginDiscoverResult = {
   marketplaceCount: number
+  marketplaces: ReadonlyArray<TuiPluginMarketplaceStatus>
   plugins: ReadonlyArray<TuiPluginDiscoverEntry>
 }
 

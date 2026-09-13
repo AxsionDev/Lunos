@@ -894,12 +894,12 @@ async function addPluginBySpec(state: RuntimeState | undefined, raw: string) {
 }
 
 async function discoverPluginsForRuntime(state: RuntimeState | undefined): Promise<TuiPluginDiscoverResult> {
-  if (!state) return { marketplaceCount: 0, plugins: [] }
+  if (!state) return { marketplaceCount: 0, marketplaces: [], plugins: [] }
 
   const dir = state.api.state.path
-  if (!dir.directory) return { marketplaceCount: 0, plugins: [] }
+  if (!dir.directory) return { marketplaceCount: 0, marketplaces: [], plugins: [] }
 
-  const { marketplaceCount, plugins } = await listPlugins({
+  const { marketplaceCount, marketplaces, plugins } = await listPlugins({
     vcs: dir.worktree && dir.worktree !== "/" ? "git" : undefined,
     worktree: dir.worktree,
     directory: dir.directory,
@@ -907,6 +907,7 @@ async function discoverPluginsForRuntime(state: RuntimeState | undefined): Promi
 
   return {
     marketplaceCount,
+    marketplaces,
     plugins: plugins.map((item) => ({
       name: item.name,
       marketplace: item.marketplace,

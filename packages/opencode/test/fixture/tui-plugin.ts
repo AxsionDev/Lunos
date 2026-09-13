@@ -230,7 +230,7 @@ export function createTuiPluginApi(opts: Opts = {}): HostPluginApi {
         ok: false,
         message: "not implemented in fixture",
       }),
-      discover: async () => ({ marketplaceCount: 0, plugins: [] }),
+      discover: async () => ({ marketplaceCount: 0, marketplaces: [], plugins: [] }),
     },
     lifecycle: {
       signal: ctrl.signal,

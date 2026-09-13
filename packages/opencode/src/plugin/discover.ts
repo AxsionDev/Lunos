@@ -23,8 +23,19 @@ export type PluginListEntry = {
   spec: string
 }
 
+// Per-marketplace cache freshness, summarized once here rather than duplicated onto every
+// PluginListEntry row — surfaced by CLI `plugin list`/`search` and the TUI Discover view so a
+// source that's fallen back to a stale cache is still visible (XCOD-13 AC4).
+export type PluginMarketplaceStatus = {
+  name: string
+  source: string
+  fetchedAt: number
+  stale?: string
+}
+
 export type PluginListResult = {
   marketplaceCount: number
+  marketplaces: PluginMarketplaceStatus[]
   plugins: PluginListEntry[]
 }
 
@@ -33,9 +44,11 @@ export async function listPlugins(
   dep: MarketplaceListDeps = defaultMarketplaceListDeps,
 ): Promise<PluginListResult> {
   const resolved = await resolveAddedMarketplaces(ctx, dep)
+  const marketplaces: PluginMarketplaceStatus[] = []
   const plugins: PluginListEntry[] = []
   for (const entry of resolved) {
     if (!entry.ok) continue
+    marketplaces.push({ name: entry.manifest.name, source: entry.source, fetchedAt: entry.fetchedAt, stale: entry.stale })
     for (const plugin of entry.manifest.plugins) {
       plugins.push({
         name: plugin.name,
@@ -47,7 +60,7 @@ export async function listPlugins(
       })
     }
   }
-  return { marketplaceCount: resolved.length, plugins }
+  return { marketplaceCount: resolved.length, marketplaces, plugins }
 }
 
 export async function searchPlugins(
@@ -55,11 +68,11 @@ export async function searchPlugins(
   ctx: MarketplaceCtx,
   dep: MarketplaceListDeps = defaultMarketplaceListDeps,
 ): Promise<PluginListResult> {
-  const { marketplaceCount, plugins } = await listPlugins(ctx, dep)
+  const { marketplaceCount, marketplaces, plugins } = await listPlugins(ctx, dep)
   const needle = query.trim().toLowerCase()
   const matches = plugins.filter((item) => {
     const haystack = [item.name, item.description ?? "", item.category ?? "", ...(item.tags ?? [])]
     return haystack.some((value) => value.toLowerCase().includes(needle))
   })
-  return { marketplaceCount, plugins: matches }
+  return { marketplaceCount, marketplaces, plugins: matches }
 }

@@ -3,7 +3,7 @@ import fs from "fs/promises"
 import path from "path"
 import { Filesystem } from "@/util/filesystem"
 import { listPlugins, pluginInstallSpec, searchPlugins } from "../../src/plugin/discover"
-import type { FetchDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
+import type { FetchDeps, MarketplaceCacheDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 
 const manifest = {
@@ -35,6 +35,18 @@ function ctx(dir: string): MarketplaceCtx {
   return { vcs: "git", worktree: dir, directory: dir }
 }
 
+function testCacheDeps(dir: string): MarketplaceCacheDeps {
+  return {
+    dir,
+    mtime: async (file) => {
+      const stat = await fs.stat(file).catch(() => undefined)
+      return stat ? stat.mtimeMs : undefined
+    },
+    readText: (file) => Filesystem.readText(file).catch(() => undefined),
+    write: (file, text) => Filesystem.write(file, text),
+  }
+}
+
 function listDeps(global: string, resolve: FetchDeps): MarketplaceListDeps {
   return {
     exists: (file) => Filesystem.exists(file),
@@ -42,6 +54,7 @@ function listDeps(global: string, resolve: FetchDeps): MarketplaceListDeps {
     files: (dir, name) => [path.join(dir, `${name}.jsonc`), path.join(dir, `${name}.json`)],
     resolve,
     global,
+    cache: testCacheDeps(path.join(global, "..", "cache")),
   }
 }
 
@@ -182,5 +195,40 @@ describe("plugin.search", () => {
     const result = await searchPlugins("weather", ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
     expect(result.marketplaceCount).toBe(0)
     expect(result.plugins).toEqual([])
+  })
+})
+
+describe("plugin.list.stale marketplace", () => {
+  test("surfaces a stale marketplace in marketplaces[] while still listing its cached plugins", async () => {
+    await using tmp = await tmpdir()
+    await withMarketplace(tmp.path)
+
+    const global = path.join(tmp.path, "global")
+    const okDeps = listDeps(global, resolveDeps)
+    await listPlugins(ctx(tmp.path), okDeps) // populates the cache
+
+    const cacheDir = path.join(global, "..", "cache")
+    const [cacheEntry] = await fs.readdir(cacheDir)
+    const expired = new Date(Date.now() - 25 * 60 * 60 * 1000)
+    await fs.utimes(path.join(cacheDir, cacheEntry!), expired, expired)
+
+    const failingDeps = listDeps(global, {
+      fetchText: async () => {
+        throw new Error("registry unreachable")
+      },
+      readText: async () => "",
+      stat: async () => undefined,
+    })
+
+    const result = await listPlugins(ctx(tmp.path), failingDeps)
+    expect(result.marketplaces).toEqual([
+      {
+        name: "lunos-community",
+        source: "pminev1/Lunos",
+        fetchedAt: expect.any(Number),
+        stale: expect.stringContaining("registry unreachable"),
+      },
+    ])
+    expect(result.plugins.map((p) => p.name)).toEqual(["weather-widget", "vim-bindings", "no-frills"])
   })
 })
