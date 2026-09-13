@@ -16,6 +16,32 @@ export function createDebouncedSignal<T>(value: T, ms: number): [Accessor<T>, (v
   return [get, debounced]
 }
 
+export function createPulse(enabled: Accessor<boolean>, options: { min?: number; max?: number; periodMs?: number } = {}) {
+  const { min = 0.4, max = 0.95, periodMs = 2600 } = options
+  const mid = (min + max) / 2
+  const [alpha, setAlpha] = createSignal(mid)
+
+  createEffect(
+    on(enabled, (animate) => {
+      if (!animate) {
+        setAlpha(mid)
+        return
+      }
+
+      const start = performance.now()
+      const timer = setInterval(() => {
+        const t = ((performance.now() - start) % periodMs) / periodMs
+        const wave = (1 - Math.cos(t * Math.PI * 2)) / 2
+        setAlpha(min + (max - min) * wave)
+      }, 16)
+
+      onCleanup(() => clearInterval(timer))
+    }),
+  )
+
+  return alpha
+}
+
 export function createFadeIn(show: Accessor<boolean>, enabled: Accessor<boolean>) {
   const [alpha, setAlpha] = createSignal(show() ? 1 : 0)
   let revealed = show()
