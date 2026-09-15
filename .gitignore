@@ -32,3 +32,11 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# .NET
+Lunos.Api/**/bin/
+Lunos.Api/**/obj/
+# Scoped to *.db (not a bare "data/" dir match) because this filesystem's git config
+# treats paths case-insensitively, and a bare "data/" pattern also matches the
+# Lunos.Api.Data source folder (Data/LunosDbContext.cs, Data/Migrations/).
+Lunos.Api/**/data/*.db
