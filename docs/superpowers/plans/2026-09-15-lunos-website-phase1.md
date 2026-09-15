@@ -960,7 +960,7 @@ git commit -m "feat(api): add Serilog structured request logging with rolling fi
 - Create: `.nvmrc`
 
 **Interfaces:**
-- Produces: `RequestState<T>` union type (`{ status: 'idle' | 'loading' | 'loaded' | 'error'; data?: T; error?: string }`) used by every API-calling component; the full Phase 1 route table in `app.routes.ts`. Tasks 6, 7, and 8 all consume this route table and the token classes; Task 8 consumes `RequestState<T>`.
+- Produces: `RequestState<T>` discriminated union (`{ status: 'idle' } | { status: 'loading' } | { status: 'loaded'; data: T } | { status: 'error'; message: string }`, per the code block in this task's Step 5) used by every API-calling component; the full Phase 1 route table in `app.routes.ts`. Tasks 6, 7, and 8 all consume this route table and the token classes; Task 8 consumes `RequestState<T>`.
 
 - [ ] **Step 1: Generate the Angular workspace pinned to Angular 22, zoneless, Vitest**
 
