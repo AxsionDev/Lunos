@@ -1,3 +1,5 @@
+import { domain } from "./stage"
+
 ////////////////
 // DATABASE
 ////////////////
@@ -30,8 +32,10 @@ const registryDb = new sst.cloudflare.D1("MarketplaceRegistryDb", {
 // WORKER
 ////////////////
 
-// `url: true` yields a workers.dev dev/staging URL. There is deliberately NO custom
-// `domain: registry.<domain>` here — a custom domain is XCOD-36's scope, not this story's.
+// XCOD-36: custom domain, matching the `auth.${domain}`/`api.${domain}` pattern in
+// infra/console.ts and infra/app.ts. `url: true` is kept alongside it — SST's Worker
+// component supports both simultaneously, and the workers.dev URL remains useful as a
+// pre-DNS-propagation fallback during the first production deploy.
 //
 // The D1 resource's SST logical name above ("MarketplaceRegistryDb") is what the linked
 // binding surfaces as on `env` inside the Worker, so it must stay byte-identical to the
@@ -40,6 +44,7 @@ const registryDb = new sst.cloudflare.D1("MarketplaceRegistryDb", {
 // packages/console/function/src/auth.ts; this repo has no D1 precedent, so it stays
 // unconfirmed until F-001's deploy exercises it.
 export const registry = new sst.cloudflare.Worker("MarketplaceRegistry", {
+  domain: `registry.${domain}`,
   handler: "packages/registry/src/index.ts",
   url: true,
   link: [registryDb],

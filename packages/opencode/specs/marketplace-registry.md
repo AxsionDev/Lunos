@@ -51,6 +51,10 @@ Cloudflare D1 database created with `jurisdiction: "eu"`.**
 
 ### Implementation risk to verify in XCOD-34 — read before creating any D1 instance
 
+**Resolved in XCOD-34** — `infra/registry.ts` records the confirmed finding (the
+`transform.database` escape hatch does plumb `jurisdiction: "eu"` through) and takes the inline
+`sst.cloudflare.D1` path described below, not the `wrangler d1 create` fallback.
+
 Per [D1's data-location docs](https://developers.cloudflare.com/d1/learning/data-location),
 **jurisdiction can only be set at database creation time and cannot be changed afterward.** SST's
 `sst.cloudflare.D1` component does not document a `jurisdiction` constructor argument directly —
