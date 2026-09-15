@@ -43,6 +43,7 @@ app.UseExceptionHandler(errorApp =>
 app.UseCors("LunosWebPolicy");
 
 app.MapHealthEndpoints();
+app.MapContactEndpoints();
 
 // Tests substitute their own DbContext/connection per-test (see Lunos.Api.Tests) and migrate it
 // themselves against this app's real DI container. Running the startup migration unconditionally
