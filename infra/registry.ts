@@ -44,3 +44,25 @@ export const registry = new sst.cloudflare.Worker("MarketplaceRegistry", {
   url: true,
   link: [registryDb],
 })
+
+////////////////
+// INGESTION CRON (XCOD-35)
+////////////////
+
+// A dedicated `sst.cloudflare.Cron`, not a `scheduled` handler bolted onto the
+// `MarketplaceRegistry` Worker above: `worker.handler` compiles to its OWN Worker bundle
+// (per SST's Cron component), so packages/registry/src/ingest-worker.ts's `effect`
+// dependency (via resolve.ts's `Marketplace.decode`) never reaches the read-API's fetch
+// bundle — see ingest-worker.ts's own comment. Same D1 database linked as the read Worker,
+// same "SST logical name -> env key" mapping convention as above (env.MarketplaceRegistryDb).
+//
+// Hourly by default (AC1 only requires "a fixed interval"; the ticket leaves the exact
+// frequency to the hosting story's infra choice). Revisit if source count/GitHub API rate
+// limits (60 req/hr unauthenticated) make hourly too aggressive once real sources are added.
+export const registryIngestCron = new sst.cloudflare.Cron("MarketplaceRegistryIngestCron", {
+  schedules: ["0 * * * *"],
+  worker: {
+    handler: "packages/registry/src/ingest-worker.ts",
+    link: [registryDb],
+  },
+})

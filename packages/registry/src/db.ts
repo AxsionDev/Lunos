@@ -5,9 +5,13 @@ import type { Marketplace } from "@opencode-ai/core/marketplace"
  * Plain-JSON (encoded) forms of the XCOD-8 schema, DERIVED from
  * packages/core/src/marketplace.ts — never redefined here.
  *
- * `import type` is MANDATORY, not stylistic: the Worker needs these only as types
- * (decoding happens exclusively in F-002's seed script and in unit tests), so a
- * type-only import keeps `effect` out of the Worker bundle entirely.
+ * `import type` is MANDATORY, not stylistic: THIS FILE needs these only as types (decoding
+ * happens in F-002's seed script, in resolve.ts's XCOD-35 ingestion resolver, and in unit
+ * tests — never here), so a type-only import keeps `effect` out of db.ts specifically. It
+ * does NOT keep `effect` out of the Worker bundle as a whole any more: unlike index.ts's
+ * fetch handler (still effect-free, see its BUNDLE CONSTRAINT comment), the cron worker
+ * (ingest-worker.ts) value-imports `Marketplace` for real schema validation of fetched
+ * manifests, so effect legitimately enters THAT bundle.
  */
 export type OwnerJson = typeof Marketplace.Owner.Encoded
 export type SourceJson = typeof Marketplace.Source.Encoded
@@ -102,12 +106,31 @@ export interface RegistryReadDb {
   listPlugins(options?: { readonly filter?: (plugin: PluginRecord) => boolean }): Promise<PluginRecord[]>
 }
 
-/** Write side. ONLY F-002's seed script codes against this. */
+/**
+ * XCOD-35's read seam. Deliberately NOT a member of `RegistryReadDb` above: C-001/C-002/
+ * C-003's handlers never need the source list, so folding it in would force every one of
+ * their test fakes to implement a method they never call — a real cost the codebase
+ * elsewhere pays close attention to (`RegistryReadDb`'s own docstring scopes it to exactly
+ * those three handlers).
+ */
+export interface IngestionSourceDb {
+  /**
+   * Every DISTINCT `marketplace.source` value — "every registered source" the ingestion
+   * job re-resolves. There is deliberately no separate sources table: a marketplace row's
+   * own `source` column already IS the registered-source record (written once by
+   * `replaceMarketplace`/the seed, re-written idempotently by every successful ingestion
+   * run), so a second table would only duplicate it.
+   */
+  listMarketplaceSources(): Promise<string[]>
+}
+
+/** Write side. F-002's seed script and F-003's (XCOD-35) ingestion job code against this. */
 export interface RegistryWriteDb {
   /**
    * Atomically replace one marketplace and all of its plugins. Applies
    * `buildReplaceStatements` as a single transaction — all rows or none, never
-   * a partial write (F-002's AC).
+   * a partial write (F-002's AC, and XCOD-35's "failure leaves last-known-good data
+   * intact" AC: a failed resolve must never reach this method at all).
    */
   replaceMarketplace(input: { readonly manifest: ManifestJson; readonly source: string }): Promise<void>
 }
@@ -216,6 +239,12 @@ export const LIST_PLUGINS_SQL =
   " FROM plugin" +
   " ORDER BY marketplace_name, name"
 
+/** XCOD-35: backs `listMarketplaceSources`. `DISTINCT` because two marketplaces can share
+ * one source (e.g. one manifest file listing more than one `marketplace` entry, per a
+ * multi-marketplace source) — the ingestion job must re-resolve that source once, not once
+ * per marketplace row it produced. */
+export const LIST_MARKETPLACE_SOURCES_SQL = "SELECT DISTINCT source FROM marketplace ORDER BY source"
+
 /**
  * One row of `LIST_MARKETPLACES_SQL`. A `type` and not an `interface`: D1's `all<T>()` and
  * `bun:sqlite`'s `query<T>()` both constrain `T` to something index-signature-compatible,
@@ -306,6 +335,40 @@ export function d1ReadDb(db: D1Database): RegistryReadDb {
   }
 }
 
+/** XCOD-35's source-list read transport. Separate from `d1ReadDb` for the same reason
+ * `IngestionSourceDb` is separate from `RegistryReadDb` above — see that interface's doc. */
+export function d1IngestionSourceDb(db: D1Database): IngestionSourceDb {
+  return {
+    async listMarketplaceSources() {
+      const { results } = await db.prepare(LIST_MARKETPLACE_SOURCES_SQL).all<{ source: string }>()
+      return results.map((row) => row.source)
+    },
+  }
+}
+
+/**
+ * XCOD-35's write transport: unlike F-002's seed (a Bun CLI process with no D1 binding, so
+ * its write had to go over HTTP and was deliberately deferred), the ingestion job runs
+ * INSIDE the Worker and has the real binding — the same one `d1ReadDb` above wraps — so
+ * this is the natural, already-available write path. It is a separate function, not a
+ * write-mode branch on `d1ReadDb`, so `index.ts`'s fetch handler (which only ever
+ * constructs `d1ReadDb`) has no code path that can reach it.
+ *
+ * `db.batch(...)` is D1's documented atomic-transaction primitive: every statement
+ * commits or none do. That is what makes `buildReplaceStatements`' "DELETE then INSERT"
+ * ordering safe to use here — a batch failure partway through cannot leave a marketplace
+ * with its old rows deleted and no new ones written, which is exactly the corruption
+ * XCOD-35's "failure doesn't corrupt last-known-good data" AC forbids.
+ */
+export function d1WriteDb(db: D1Database): RegistryWriteDb {
+  return {
+    async replaceMarketplace(input) {
+      const statements = buildReplaceStatements(input)
+      await db.batch(statements.map((statement) => db.prepare(statement.sql).bind(...statement.params)))
+    },
+  }
+}
+
 /**
  * Mirrors `searchPlugins` (packages/opencode/src/plugin/discover.ts) exactly, so a query
  * behaves identically whether the client filters its cache or the registry filters
@@ -332,6 +395,14 @@ export const REGISTRY_MANIFEST_OWNER: OwnerJson = { name: "Lunos", url: "https:/
 // (the seed reads a local file, so there is no URL to observe); the value chosen is the
 // repo the seed manifest lives in, matching XCOD-33's own /marketplaces example.
 // INDEPENDENT of REGISTRY_MANIFEST_OWNER.url and of the seed manifest's own `owner.url`
-// (both verified as this same string today). Three separate concepts that happen to share
-// a value — do not collapse them into one constant or derive one from another.
-export const SEED_SOURCE = "https://github.com/pminev1/Lunos"
+// (both verified as this same string today, modulo the bare-shorthand form below).
+// Three separate concepts that happen to share a value — do not collapse them into one
+// constant or derive one from another.
+//
+// Bare "owner/repo" GitHub shorthand, NOT the "https://github.com/..." landing-page form
+// used for the two `url` fields above: XCOD-35's `resolveSource` (resolve.ts) re-fetches
+// this value on a schedule, and only the shorthand form round-trips through GitHub's API
+// (repo default-branch lookup -> raw.githubusercontent.com) to real manifest content — the
+// landing-page URL fetched literally returns an HTML page, not JSON, and would fail every
+// ingestion run.
+export const SEED_SOURCE = "pminev1/Lunos"
