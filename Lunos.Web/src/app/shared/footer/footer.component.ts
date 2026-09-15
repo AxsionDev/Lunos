@@ -8,7 +8,7 @@ import { Component } from '@angular/core';
     .footer {
       text-align: center;
       padding: 2rem;
-      color: var(--overlay1);
+      color: var(--subtext1);
       font-family: var(--font-mono);
     }
   `,

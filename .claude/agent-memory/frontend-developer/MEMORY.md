@@ -1,3 +1,5 @@
 - [Lunos.Web toolchain gotchas](project_lunos_web_toolchain.md) — Node/npm version requirements and `ng new` flag behavior discovered in Task 5; relevant to Tasks 6-8.
 - [Lunos.Web verification gotcha](project_lunos_web_verification.md) — `tsc --noEmit` doesn't run Angular's template type-checker; use `ng test` smoke specs for unconsumed components instead.
 - [Lunos.Web page spec gotcha](project_lunos_web_page_specs.md) — raw TestBed specs for pages rendering `<lunos-nav-bar>` need `provideRouter([])` or they hit NG0201.
+- [Lunos.Web prerender gotcha](project_lunos_web_prerender.md) — angular.json's "prerender" key is dead once "outputMode" is set; render mode comes from app.routes.server.ts. Also: index.html vs index.csr.html after prerendering.
+- [Lunos.Web contrast tokens](project_lunos_web_contrast_tokens.md) — exact WCAG ratios for overlay0/overlay1/subtext0/subtext1 vs --base/--crust; --overlay1 fails AA on --base despite the plan's claim.

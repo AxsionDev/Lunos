@@ -10,9 +10,11 @@ import { SovereigntyStripComponent } from '../../../shared/sovereignty-strip/sov
   imports: [NavBarComponent, FooterComponent, HeroSceneComponent, SovereigntyStripComponent],
   template: `
     <lunos-nav-bar />
-    <lunos-hero-scene />
-    <lunos-sovereignty-strip
-      statement="lunos.tech itself runs on self-hosted EU infrastructure — the sovereignty pitch, checkable." />
+    <main>
+      <lunos-hero-scene />
+      <lunos-sovereignty-strip
+        statement="lunos.tech itself runs on self-hosted EU infrastructure — the sovereignty pitch, checkable." />
+    </main>
     <lunos-footer />
   `,
 })
