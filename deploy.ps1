@@ -17,6 +17,9 @@ $extractPath = Join-Path $env:TEMP "lunos-deploy-$stamp"
 Expand-Archive -Path $ArtifactZip -DestinationPath $extractPath -Force
 
 # Sanity check before touching any live app pool: fail fast if build.ps1's flatten step didn't run.
+# Note: index.html is now the build-time-prerendered home page (Task 11), not a generic SPA shell —
+# it existing here only confirms the flatten ran. It is NOT what the IIS SPA-fallback rewrite rule
+# should target; that rule must point at index.csr.html (the true empty CSR shell) instead.
 $indexPath = Join-Path (Join-Path $extractPath "web") "index.html"
 if (-not (Test-Path $indexPath)) {
     throw "Expected $indexPath to exist — check build.ps1's browser/ flatten step before deploying."
