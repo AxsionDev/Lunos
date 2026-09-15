@@ -731,22 +731,6 @@
         "@typescript/native-preview": "catalog:",
       },
     },
-    "packages/registry": {
-      "name": "@opencode-ai/registry",
-      "version": "1.18.30",
-      "dependencies": {
-        "@opencode-ai/core": "workspace:*",
-        "effect": "catalog:",
-      },
-      "devDependencies": {
-        "@cloudflare/workers-types": "catalog:",
-        "@tsconfig/node22": "22.0.2",
-        "@types/bun": "catalog:",
-        "@types/node": "catalog:",
-        "@typescript/native-preview": "catalog:",
-        "typescript": "catalog:",
-      },
-    },
     "packages/schema": {
       "name": "@opencode-ai/schema",
       "dependencies": {
@@ -1997,8 +1981,6 @@
     "@opencode-ai/plugin": ["@opencode-ai/plugin@workspace:packages/plugin"],
 
     "@opencode-ai/protocol": ["@opencode-ai/protocol@workspace:packages/protocol"],
-
-    "@opencode-ai/registry": ["@opencode-ai/registry@workspace:packages/registry"],
 
     "@opencode-ai/schema": ["@opencode-ai/schema@workspace:packages/schema"],
 
