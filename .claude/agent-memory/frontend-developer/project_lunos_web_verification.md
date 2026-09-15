@@ -1,0 +1,14 @@
+---
+name: project-lunos-web-verification
+description: Why plain `tsc --noEmit` is not sufficient to verify Angular components in Lunos.Web, and what to use instead — relevant to Tasks 6-8.
+metadata:
+  type: project
+---
+
+`npx tsc --noEmit -p tsconfig.app.json` in `Lunos.Web/` does include all `src/**/*.ts` files in its program (verify with `--listFiles`), even ones nothing imports yet — but it invokes the plain `typescript` package's `tsc` binary, not Angular's `compiler-cli`/`ngc`. It type-checks the TS class body but never runs Angular's template type-checker, so a bad binding, unknown property, or wrong input name inside a component's inline `template:` string will NOT be caught by `tsc --noEmit` even though the file is "checked."
+
+**Why:** discovered in Task 6 via [[project-lunos-web-toolchain]] follow-up — an advisor review flagged that presentational components with no dedicated spec (footer, hero-scene, sovereignty-strip, feature-card) were claimed "type-checked" based on `tsc --noEmit` alone, which doesn't exercise the real Angular build pipeline.
+
+**How to apply:** for any component that isn't consumed yet by a page/route (so a full `ng build`/`ng serve` won't touch it), don't rely on `tsc --noEmit` as your only compile verification. Add a minimal one-`it` smoke spec (`render(Component, { inputs: {...} })` + assert something in the DOM) and run it through `npx ng test` — that invokes `@angular/build:unit-test`'s real Angular/Vitest builder, which does AOT template type-checking and also validates `@Input({ required: true })` contracts. Reserve bare `tsc --noEmit` for a quick sanity pass on files already covered by specs or already wired into `main.ts`'s import graph via routes.
+
+**Related gotcha (Task 7): grepping a production bundle for an `environment.ts`/`environment.production.ts` value proves nothing if no code actually imports the `environment` module.** `fileReplacements` in `angular.json`'s production config swaps the file at compile time, but if nothing references `environment.apiBaseUrl` (e.g. `ContactApiService` doesn't exist yet), the bundler's dead-code elimination drops the whole module — so both the dev URL (`localhost:5443`) and prod URL (`api.lunos.tech`) will be absent from `dist/`, and that absence is not evidence the swap works. To positively verify `fileReplacements`, temporarily force a real reference (e.g. `console.log(environment.apiBaseUrl)` in `app.ts`), rebuild, grep, then revert and confirm `git diff` is empty on the touched file before committing. Once Task 8's `ContactApiService` (a real, permanent consumer of `environment.apiBaseUrl`) exists, this can be verified directly against production builds without the temporary-reference workaround — re-verify then rather than trusting this task's forced-reference result as the last word.

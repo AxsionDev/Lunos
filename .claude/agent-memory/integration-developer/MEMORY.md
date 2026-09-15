@@ -1,0 +1,1 @@
+- [Lunos PowerShell gotchas](lunos_powershell_gotchas.md) — Join-Path/backslash cross-platform bug and swallowed robocopy exit codes found in build.ps1/deploy.ps1 (Task 9)
