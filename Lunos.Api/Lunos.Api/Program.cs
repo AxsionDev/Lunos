@@ -4,8 +4,29 @@ using Lunos.Api.Endpoints;
 using Lunos.Api.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
+using Serilog.Sinks.TestCorrelator;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .WriteTo.File(
+            path: Path.Combine(context.HostingEnvironment.ContentRootPath, "Logs", "lunos-api-.log"),
+            rollingInterval: RollingInterval.Day,
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
+
+    // Test-only sink: lets RequestLoggingTests assert on emitted events via TestCorrelator
+    // without touching the file system or Console output.
+    if (context.HostingEnvironment.IsEnvironment("Testing"))
+    {
+        configuration.WriteTo.TestCorrelator();
+    }
+});
 
 var connectionString = builder.Configuration.GetConnectionString("MarketplaceDb")
     ?? throw new InvalidOperationException("ConnectionStrings:MarketplaceDb is not configured.");
@@ -38,6 +59,17 @@ app.UseExceptionHandler(errorApp =>
         var payload = new ErrorResponseDto(new ErrorDetailDto("internal_error", "An unexpected error occurred."));
         await context.Response.WriteAsJsonAsync(payload);
     });
+});
+
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+    // Bind explicitly to this host's configured logger instead of the process-global static
+    // Log.Logger (Serilog.AspNetCore's default): when multiple hosts are built in the same
+    // process (e.g. one WebApplicationFactory per xunit test class, running in parallel),
+    // Log.Logger is whichever host's UseSerilog callback ran last, so a completed/disposed
+    // host's request-logging completion events were being silently dropped for other hosts.
+    options.Logger = app.Services.GetRequiredService<Serilog.ILogger>();
 });
 
 app.UseCors("LunosWebPolicy");
@@ -73,6 +105,13 @@ if (app.Environment.IsEnvironment("Testing"))
     app.MapGet("/__throw", () => { throw new InvalidOperationException("boom"); });
 }
 
-app.Run();
+try
+{
+    app.Run();
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 public partial class Program; // exposed for WebApplicationFactory<Program> in tests
