@@ -16,14 +16,26 @@ export const logo = {
   ],
 }
 
-// Home-screen splash art ("Moonlit cove", XCOD-6). Hand-built block-character
+// Home-screen splash art ("Moonlit cove", XCOD-6/XCOD-37). Hand-built block-character
 // shapes — needs a look in an actual terminal/TUI before shipping.
 export const splash = {
   wordmark: "lunos",
-  moon: [" ▄▄▄ ", "▄███▄", "▀███▀", " ▀▀▀ "],
-  cloud: ["  ▄▄▄  ", " ▀▀▀▀▀ "],
-  waterWidth: 9,
-  reflectionWidth: 6,
+  moon: [
+    "   ▄▄▄▄▄▄▄▄▄   ",
+    " ▄███████████▄ ",
+    "▄█████████████▄",
+    "███████████████",
+    "███████████████",
+    "▀█████████████▀",
+    " ▀███████████▀ ",
+    "   ▀▀▀▀▀▀▀▀▀   ",
+  ],
+  cloud: ["   ▄▄▄   ", "▄▄▄▄▄▄▄▄▄"],
+  // Full water band spans the same width as the moon+clouds row above it;
+  // the reflection inset matches the moon's width so it reads as the moon's
+  // reflection rather than a separate decoration.
+  waterWidth: 37,
+  reflectionWidth: 15,
 }
 
 export const go = {

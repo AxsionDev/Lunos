@@ -1,5 +1,8 @@
 {
   "$schema": "https://opencode.ai/tui.json",
+  "prompt": {
+    "max_width": "auto"
+  },
   "plugin": [
     [
       "./plugins/tui-smoke.tsx",
