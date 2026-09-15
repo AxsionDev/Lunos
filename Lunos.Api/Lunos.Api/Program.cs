@@ -1,5 +1,7 @@
 using Lunos.Api.Data;
 using Lunos.Api.Dtos;
+using Lunos.Api.Endpoints;
+using Lunos.Api.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +11,7 @@ var connectionString = builder.Configuration.GetConnectionString("MarketplaceDb"
     ?? throw new InvalidOperationException("ConnectionStrings:MarketplaceDb is not configured.");
 
 builder.Services.AddDbContext<LunosDbContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddScoped<IDatabaseHealthChecker, SqliteDatabaseHealthChecker>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
@@ -38,6 +41,8 @@ app.UseExceptionHandler(errorApp =>
 });
 
 app.UseCors("LunosWebPolicy");
+
+app.MapHealthEndpoints();
 
 // Tests substitute their own DbContext/connection per-test (see Lunos.Api.Tests) and migrate it
 // themselves against this app's real DI container. Running the startup migration unconditionally
