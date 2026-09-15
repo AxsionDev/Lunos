@@ -4,6 +4,7 @@ import { readFileSync } from "fs"
 import path from "path"
 import {
   buildReplaceStatements,
+  LIST_MARKETPLACE_SOURCES_SQL,
   LIST_MARKETPLACES_SQL,
   LIST_PLUGINS_SQL,
   SEED_SOURCE,
@@ -255,6 +256,39 @@ describe("LIST_PLUGINS_SQL", () => {
     db.query("UPDATE plugin SET source_repo = NULL WHERE name = 'bare-plugin'").run()
 
     expect(() => readPlugins(db)).toThrow(/source_repo/)
+
+    db.close()
+  })
+})
+
+describe("LIST_MARKETPLACE_SOURCES_SQL", () => {
+  const readSources = (db: Database) => db.query<{ source: string }, []>(LIST_MARKETPLACE_SOURCES_SQL).all()
+
+  test("returns every distinct source, ordered", () => {
+    const db = seeded()
+
+    expect(readSources(db).map((row) => row.source)).toEqual(["https://example.com/alpha", SEED_SOURCE])
+
+    db.close()
+  })
+
+  test("collapses two marketplaces sharing one source into a single row", () => {
+    // XCOD-35's ingestion job re-resolves a SOURCE, not a marketplace row: one manifest
+    // that produced two marketplace rows must appear once here, or the job would fetch
+    // the same URL twice per run.
+    const db = migrated()
+    apply(db, buildReplaceStatements({ manifest: alpha, source: SEED_SOURCE }))
+    apply(db, buildReplaceStatements({ manifest: zulu, source: SEED_SOURCE }))
+
+    expect(readSources(db).map((row) => row.source)).toEqual([SEED_SOURCE])
+
+    db.close()
+  })
+
+  test("returns an empty list against an empty database", () => {
+    const db = migrated()
+
+    expect(readSources(db)).toEqual([])
 
     db.close()
   })
