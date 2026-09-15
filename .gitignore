@@ -40,3 +40,6 @@ Lunos.Api/**/obj/
 # treats paths case-insensitively, and a bare "data/" pattern also matches the
 # Lunos.Api.Data source folder (Data/LunosDbContext.cs, Data/Migrations/).
 Lunos.Api/**/data/*.db
+
+# build.ps1 output
+/artifacts/
