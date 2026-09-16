@@ -50,6 +50,7 @@ it.instance("returns default native agents when no config", () =>
     const names = agents.map((a) => a.name)
     expect(names).toContain("build")
     expect(names).toContain("plan")
+    expect(names).toContain("research")
     expect(names).toContain("general")
     expect(names).toContain("explore")
     expect(names).toContain("compaction")
@@ -87,6 +88,88 @@ it.instance("plan agent denies the general subagent by default", () =>
     expect(Permission.evaluate("task", "general", plan!.permission).action).toBe("deny")
     expect(Permission.evaluate("task", "explore", plan!.permission).action).toBe("allow")
     expect(Permission.evaluate("task", "custom", plan!.permission).action).toBe("allow")
+  }),
+)
+
+it.instance("returns the research agent as a visible, primary, native agent", () =>
+  Effect.gen(function* () {
+    const research = yield* load((svc) => svc.get("research"))
+    expect(research).toBeDefined()
+    expect(research?.mode).toBe("primary")
+    expect(research?.native).toBe(true)
+    expect(research?.hidden).toBeUndefined()
+    const agents = yield* load((svc) => svc.list())
+    expect(agents.map((a) => a.name)).toContain("research")
+  }),
+)
+
+it.instance("research agent denies edits except .opencode/research/*.md", () =>
+  Effect.gen(function* () {
+    const research = yield* load((svc) => svc.get("research"))
+    expect(research).toBeDefined()
+    // Wildcard is denied
+    expect(evalPerm(research, "edit")).toBe("deny")
+    expect(Permission.evaluate("edit", "src/index.ts", research!.permission).action).toBe("deny")
+    // Markdown under the research output path is allowed
+    expect(Permission.evaluate("edit", ".opencode/research/findings.md", research!.permission).action).toBe("allow")
+    // A non-.md file under the same directory is still denied
+    expect(Permission.evaluate("edit", ".opencode/research/findings.ts", research!.permission).action).toBe("deny")
+  }),
+)
+
+it.instance("research agent's global data-dir edit rule mirrors plan's (parity check)", () =>
+  Effect.gen(function* () {
+    const research = yield* load((svc) => svc.get("research"))
+    const plan = yield* load((svc) => svc.get("plan"))
+    expect(research).toBeDefined()
+    expect(plan).toBeDefined()
+
+    // `plan` has an equivalent second edit rule for `.opencode-data/plans/*.md`
+    // (path.relative(ctx.worktree, Global.Path.data/plans/*.md)); `research`
+    // must have the structurally identical rule for its own output dir, or a
+    // regression in either construction would silently drop file-write access.
+    const dataDirRule = (permission: PermissionV1.Ruleset, dir: string) =>
+      permission.find(
+        (rule) => rule.permission === "edit" && rule.action === "allow" && rule.pattern.includes(`/${dir}/*.md`),
+      )
+    const planRule = dataDirRule(plan!.permission, "plans")
+    const researchRule = dataDirRule(research!.permission, "research")
+    expect(planRule).toBeDefined()
+    expect(researchRule).toBeDefined()
+    expect(researchRule!.pattern).toBe(planRule!.pattern.replace("/plans/", "/research/"))
+
+    const externalDirRule = (permission: PermissionV1.Ruleset, dir: string) =>
+      permission.find(
+        (rule) =>
+          rule.permission === "external_directory" && rule.action === "allow" && rule.pattern.endsWith(`/${dir}/*`),
+      )
+    const planExternalRule = externalDirRule(plan!.permission, "plans")
+    const researchExternalRule = externalDirRule(research!.permission, "research")
+    expect(planExternalRule).toBeDefined()
+    expect(researchExternalRule).toBeDefined()
+    expect(researchExternalRule!.pattern).toBe(planExternalRule!.pattern.replace("/plans/", "/research/"))
+  }),
+)
+
+it.instance("research agent does not deny the general or explore subagents", () =>
+  Effect.gen(function* () {
+    const research = yield* load((svc) => svc.get("research"))
+    expect(research).toBeDefined()
+    // Unlike `plan`, task delegation must not be denied.
+    expect(Permission.evaluate("task", "general", research!.permission).action).not.toBe("deny")
+    expect(Permission.evaluate("task", "explore", research!.permission).action).not.toBe("deny")
+  }),
+)
+
+it.instance("research agent allows broad read-only tool access", () =>
+  Effect.gen(function* () {
+    const research = yield* load((svc) => svc.get("research"))
+    expect(research).toBeDefined()
+    expect(evalPerm(research, "read")).toBe("allow")
+    expect(evalPerm(research, "grep")).toBe("allow")
+    expect(evalPerm(research, "glob")).toBe("allow")
+    expect(evalPerm(research, "webfetch")).toBe("allow")
+    expect(evalPerm(research, "websearch")).toBe("allow")
   }),
 )
 
@@ -749,6 +832,7 @@ it.instance(
       agent: {
         build: { disable: true },
         plan: { disable: true },
+        research: { disable: true },
       },
     },
   },
