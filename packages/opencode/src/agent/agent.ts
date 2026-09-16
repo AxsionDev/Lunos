@@ -12,6 +12,7 @@ import { ProviderTransform } from "@/provider/transform"
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
+import PROMPT_RESEARCH from "./prompt/research.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
@@ -178,6 +179,32 @@ const layer = Layer.effect(
             ),
             mode: "primary",
             native: true,
+          },
+          research: {
+            name: "research",
+            description:
+              "Deep research and understanding of a topic or goal — no code changes. Output is Markdown files and specs.",
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                question: "allow",
+                // Unlike `plan`, no `task: { general: "deny" }` — this mode
+                // must be able to delegate research legwork to subagents.
+                external_directory: {
+                  [path.join(Global.Path.data, "research", "*")]: "allow",
+                },
+                edit: {
+                  "*": "deny",
+                  [path.join(".opencode", "research", "*.md")]: "allow",
+                  [path.relative(ctx.worktree, path.join(Global.Path.data, path.join("research", "*.md")))]: "allow",
+                },
+              }),
+              user,
+            ),
+            mode: "primary",
+            native: true,
+            prompt: PROMPT_RESEARCH,
           },
           general: {
             name: "general",
