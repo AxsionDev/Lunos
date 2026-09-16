@@ -126,9 +126,9 @@ export const Definitions = {
   mcp_list: keybind("none", "List MCP servers"),
   provider_connect: keybind("none", "Connect provider"),
   console_org_switch: keybind("none", "Switch console organization"),
-  agent_list: keybind("<leader>a", "List agents"),
-  agent_cycle: keybind("tab", "Next agent"),
-  agent_cycle_reverse: keybind("shift+tab", "Previous agent"),
+  mode_list: keybind("<leader>a", "List modes"),
+  mode_cycle: keybind("tab", "Next mode"),
+  mode_cycle_reverse: keybind("shift+tab", "Previous mode"),
   variant_cycle: keybind("ctrl+t", "Cycle model variants"),
   variant_list: keybind("none", "List model variants"),
 
@@ -244,6 +244,17 @@ export const Definitions = {
 type KeybindName = keyof typeof Definitions
 const KeybindNames = new Set<string>(Object.keys(Definitions))
 
+/**
+ * Pre-rename keybind names, kept working as deprecated aliases so existing
+ * user configs don't hard-error (XCOD-40). Each maps to the canonical
+ * post-rename name it now resolves to.
+ */
+export const KeybindAliases: Record<string, KeybindName> = {
+  agent_list: "mode_list",
+  agent_cycle: "mode_cycle",
+  agent_cycle_reverse: "mode_cycle_reverse",
+}
+
 export const KeybindOverrides = Schema.Struct(
   Object.fromEntries(
     Object.entries(Definitions).map(([name, item]) => [
@@ -334,9 +345,9 @@ export const CommandMap = {
   mcp_list: "mcp.list",
   provider_connect: "provider.connect",
   console_org_switch: "console.org.switch",
-  agent_list: "agent.list",
-  agent_cycle: "agent.cycle",
-  agent_cycle_reverse: "agent.cycle.reverse",
+  mode_list: "mode.list",
+  mode_cycle: "mode.cycle",
+  mode_cycle_reverse: "mode.cycle.reverse",
   variant_cycle: "variant.cycle",
   variant_list: "variant.list",
   messages_page_up: "session.page.up",
@@ -449,13 +460,37 @@ export function defaultValue(name: KeybindName) {
   return Definitions[name].default
 }
 
+/**
+ * Resolves legacy keybind names in a raw overrides object onto their
+ * canonical names, without mutating the input. Returns the resolved object
+ * (safe to validate/parse) and the list of legacy aliases that were found,
+ * so a caller can surface a deprecation notice.
+ */
+export function resolveKeybindAliases(input: Record<string, unknown>): {
+  resolved: Record<string, unknown>
+  deprecated: { legacy: string; canonical: KeybindName }[]
+} {
+  const resolved = { ...input }
+  const deprecated: { legacy: string; canonical: KeybindName }[] = []
+  for (const [legacy, canonical] of Object.entries(KeybindAliases)) {
+    if (!(legacy in resolved)) continue
+    const value = resolved[legacy]
+    delete resolved[legacy]
+    deprecated.push({ legacy, canonical })
+    if (resolved[canonical] !== undefined) continue
+    resolved[canonical] = value
+  }
+  return { resolved, deprecated }
+}
+
 export function parse(keybinds: KeybindOverrides): Keybinds {
-  const invalid = unknownKeys(keybinds)
+  const { resolved } = resolveKeybindAliases(keybinds)
+  const invalid = unknownKeys(resolved)
   if (invalid.length) throw new Error(`Unrecognized keybind${invalid.length === 1 ? "" : "s"}: ${invalid.join(", ")}`)
   return Object.fromEntries(
     Object.entries(Definitions).map(([name, item]) => [
       name,
-      decodeBindingValue(keybinds[name as KeybindName] ?? item.default),
+      decodeBindingValue(resolved[name as KeybindName] ?? item.default),
     ]),
   ) as Keybinds
 }

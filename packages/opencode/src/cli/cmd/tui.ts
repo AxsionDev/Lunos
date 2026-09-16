@@ -101,9 +101,14 @@ export const TuiThreadCommand = cmd({
         type: "string",
         describe: "prompt to use",
       })
+      .option("mode", {
+        type: "string",
+        describe: "mode to use",
+      })
       .option("agent", {
         type: "string",
-        describe: "agent to use",
+        hidden: true,
+        describe: "deprecated, use --mode",
       })
       .option("auto", {
         type: "boolean",
@@ -149,6 +154,12 @@ export const TuiThreadCommand = cmd({
     }
     const noReplay = args.replay === false || args.noReplay === true
 
+    // XCOD-40: --agent is deprecated in favor of --mode; --mode wins if both are set.
+    if (args.agent && !args.mode) {
+      UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL, `--agent is deprecated, use --mode instead`)
+    }
+    const modeArg = args.mode ?? args.agent
+
     if (args.mini) {
       const network = ["--port", "--hostname", "--mdns", "--no-mdns", "--mdns-domain", "--cors"].find((option) =>
         process.argv.some((arg) => arg === option || arg.startsWith(option + "=")),
@@ -166,7 +177,7 @@ export const TuiThreadCommand = cmd({
         session: args.session,
         fork: args.fork,
         model: args.model,
-        agent: args.agent,
+        mode: modeArg,
         prompt: args.prompt,
         replay: noReplay ? false : undefined,
         replayLimit: args.replayLimit,
@@ -287,7 +298,7 @@ export const TuiThreadCommand = cmd({
             args: {
               continue: args.continue,
               sessionID: args.session,
-              agent: args.agent,
+              mode: modeArg,
               model: args.model,
               prompt,
               fork: args.fork,

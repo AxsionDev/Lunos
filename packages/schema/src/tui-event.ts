@@ -31,6 +31,7 @@ export const CommandExecute = Event.define({
         "prompt.clear",
         "prompt.submit",
         "agent.cycle",
+        "mode.cycle",
       ]),
       Schema.String,
     ]),

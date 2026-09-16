@@ -3,7 +3,7 @@ const keybinds: Record<string, string> = {
   "prompt.mode.shell": "mod+shift+x",
   "prompt.mode.normal": "mod+shift+e",
   "permissions.autoaccept": "mod+shift+a",
-  "agent.cycle": "mod+.",
+  "mode.cycle": "mod+.",
   "model.choose": "mod+m",
   "model.variant.cycle": "mod+shift+m",
 }

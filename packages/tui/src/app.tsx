@@ -46,7 +46,7 @@ import { DialogStatus } from "./component/dialog-status"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
-import { DialogAgent } from "./component/dialog-agent"
+import { DialogMode } from "./component/dialog-mode"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
@@ -110,10 +110,10 @@ const appBindingCommands = [
   "model.cycle_recent_reverse",
   "model.cycle_favorite",
   "model.cycle_favorite_reverse",
-  "agent.list",
+  "mode.list",
   "mcp.list",
-  "agent.cycle",
-  "agent.cycle.reverse",
+  "mode.cycle",
+  "mode.cycle.reverse",
   "variant.cycle",
   "variant.list",
   "provider.connect",
@@ -477,8 +477,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
 
   const args = useArgs()
   onMount(() => {
+    for (const item of tuiConfig.deprecatedKeybinds) {
+      toast.show({
+        variant: "warning",
+        message: `Keybind "${item.legacy}" is deprecated, use "${item.canonical}" instead`,
+        duration: 5000,
+      })
+    }
     batch(() => {
-      if (args.agent) local.agent.set(args.agent)
+      if (args.mode) local.mode.set(args.mode)
       if (args.model) {
         const { providerID, modelID } = Model.parse(args.model)
         if (!providerID || !modelID)
@@ -630,7 +637,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "model.list",
         title: "Switch model",
         suggested: true,
-        category: "Agent",
+        category: "Mode",
         slashName: "models",
         // Bias /mo toward /models over /move without changing global fuzzy scoring.
         slashAliases: ["mo"],
@@ -641,7 +648,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_recent",
         title: "Model cycle",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycle(1)
@@ -650,7 +657,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_recent_reverse",
         title: "Model cycle reverse",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycle(-1)
@@ -659,7 +666,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_favorite",
         title: "Favorite cycle",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycleFavorite(1)
@@ -668,43 +675,49 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_favorite_reverse",
         title: "Favorite cycle reverse",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycleFavorite(-1)
         },
       },
       {
-        name: "agent.list",
-        title: "Switch agent",
-        category: "Agent",
-        slashName: "agents",
+        name: "mode.list",
+        title: "Switch mode",
+        category: "Mode",
+        slashName: "modes",
+        // Deprecated alias (XCOD-40): "/agents" still resolves here via fuzzy
+        // slash matching (isVisiblePaletteCommand excludes hidden commands
+        // from the slash list, so a separate hidden alias command would
+        // never actually be reachable — this must be an alias on the visible
+        // command, not a second entry).
+        slashAliases: ["agents"],
         run: () => {
-          dialog.replace(() => <DialogAgent />)
+          dialog.replace(() => <DialogMode />)
         },
       },
       {
         name: "mcp.list",
         title: "Toggle MCPs",
-        category: "Agent",
+        category: "Mode",
         slashName: "mcps",
         run: () => {
           dialog.replace(() => <DialogMcp />)
         },
       },
       {
-        name: "agent.cycle",
-        title: "Agent cycle",
-        category: "Agent",
+        name: "mode.cycle",
+        title: "Mode cycle",
+        category: "Mode",
         hidden: true,
         run: () => {
-          local.agent.move(1)
+          local.mode.move(1)
         },
       },
       {
         name: "variant.cycle",
         title: "Variant cycle",
-        category: "Agent",
+        category: "Mode",
         run: () => {
           local.model.variant.cycle()
         },
@@ -712,7 +725,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "variant.list",
         title: "Switch model variant",
-        category: "Agent",
+        category: "Mode",
         hidden: local.model.variant.list().length === 0,
         slashName: "variants",
         run: () => {
@@ -727,12 +740,12 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         },
       },
       {
-        name: "agent.cycle.reverse",
-        title: "Agent cycle reverse",
-        category: "Agent",
+        name: "mode.cycle.reverse",
+        title: "Mode cycle reverse",
+        category: "Mode",
         hidden: true,
         run: () => {
-          local.agent.move(-1)
+          local.mode.move(-1)
         },
       },
       {

@@ -63,21 +63,21 @@ export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
       onSelect: () => model.variant.cycle(),
     }),
     agentCommand({
-      id: "agent.cycle",
+      id: "mode.cycle",
       title: language.t("command.agent.cycle"),
       description: language.t("command.agent.cycle.description"),
       keybind: "mod+.",
-      slash: "agent",
-      disabled: !local.agent.visible(),
-      onSelect: () => local.agent.move(1),
+      slash: "mode",
+      disabled: !local.mode.visible(),
+      onSelect: () => local.mode.move(1),
     }),
     agentCommand({
-      id: "agent.cycle.reverse",
+      id: "mode.cycle.reverse",
       title: language.t("command.agent.cycle.reverse"),
       description: language.t("command.agent.cycle.reverse.description"),
       keybind: "shift+mod+.",
-      disabled: !local.agent.visible(),
-      onSelect: () => local.agent.move(-1),
+      disabled: !local.mode.visible(),
+      onSelect: () => local.mode.move(-1),
     }),
   ])
 }

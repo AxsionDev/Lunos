@@ -332,10 +332,10 @@ export function Session() {
     if (part.id === lastSwitch) return
 
     if (part.tool === "plan_exit") {
-      local.agent.set("build")
+      local.mode.set("build")
       lastSwitch = part.id
     } else if (part.tool === "plan_enter") {
-      local.agent.set("plan")
+      local.mode.set("plan")
       lastSwitch = part.id
     }
   })
@@ -1385,7 +1385,7 @@ function UserMessage(props: {
   const { theme } = useTheme()
   const [hover, setHover] = createSignal(false)
   const queued = createMemo(() => props.pending !== undefined && props.index > props.pending)
-  const color = createMemo(() => local.agent.color(props.message.agent))
+  const color = createMemo(() => local.mode.color(props.message.agent))
   const queuedFg = createMemo(() => selectedForeground(theme, color()))
   const metadataVisible = createMemo(() => queued() || ctx.showTimestamps())
 
@@ -1554,7 +1554,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                   fg:
                     props.message.error?.name === "MessageAbortedError"
                       ? theme.textMuted
-                      : local.agent.color(props.message.agent),
+                      : local.mode.color(props.message.agent),
                 }}
               >
                 ▣{" "}

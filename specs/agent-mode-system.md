@@ -333,3 +333,110 @@ this epic and would be unrelated scope creep.
 - The new mode will be `native: true`, not `hidden`, matching `build`/`plan`
   (contrast with `compaction`/`title`/`summary`, which are `hidden: true`
   and must stay that way — don't pattern-match on the wrong sibling).
+
+## Addendum: surface found during XCOD-40 implementation
+
+§2 above described itself as a "full surface map" but missed a real layer:
+`packages/app`'s own command-palette and i18n corpus. Recorded here so
+XCOD-41's implementer (and anyone auditing this doc later) has the accurate
+boundary rather than trusting the original claim at face value.
+
+- **`packages/app` composer commands**
+  (`packages/app/src/pages/session/use-composer-commands.tsx:65-81`): a
+  second, independent set of Tab-switcher-equivalent commands
+  (`agent.cycle`/`agent.cycle.reverse`, `slash: "agent"`) for the web/session
+  UI frontend, parallel to the TUI's `app.tsx` commands. Renamed to
+  `mode.cycle`/`mode.cycle.reverse`/`slash: "mode"` as part of XCOD-40. This
+  frontend's `CommandOption` type (`packages/app/src/context/command.tsx:75-88`)
+  has no `slashAliases`-equivalent field, unlike the TUI's `slashAliases`
+  mechanism — so the legacy `/agent` slash trigger has **no deprecation
+  shim** on this frontend. Adding one requires extending `CommandOption`
+  plus wiring a toast/notice, which XCOD-40 did not do.
+- **The i18n corpus** (`packages/app/src/i18n/`, ~50 locale files): the four
+  English string values tied to the renamed commands
+  (`command.agent.cycle`, `command.agent.cycle.description`,
+  `command.agent.cycle.reverse`, `command.agent.cycle.reverse.description`)
+  were updated from "agent" to "mode" wording. The *key paths* were
+  deliberately left unchanged (they're lookup identifiers, not user copy —
+  renaming them would touch all ~50 locale files for no user-visible
+  benefit) and other locales' translated values still say "agent" in their
+  own language until someone runs a normal translation update.
+- **The broader settings-page surface** was deliberately left untouched:
+  `command.category.agent` (command-palette category key, English value
+  still "Agent"), `settings.agents.title`/`settings.agents.description`,
+  `settings.general.row.showCustomAgents.title`/`.description` ("Switch
+  between agents in the composer..."), and the notification/sound settings
+  labeled "Agent" (`settings.general.notifications.agent.*`,
+  `settings.general.sounds.agent.*`). These describe the same Tab-switcher
+  concept in prose but sit a layer further from the mechanical rename than
+  the command IDs; call it a judgment call to leave them for a follow-up
+  pass rather than let this story's diff sprawl further.
+- **`PromptInputControls.agents`**
+  (`packages/app/src/components/prompt-input/contracts.ts:14-21`) and the
+  persisted `State.agent`/`store.last.agent` fields
+  (`packages/app/src/context/local.tsx`) were also left unrenamed: the
+  former is a downstream consumer type with its own cascade into
+  `prompt-input.tsx`, the latter is on-disk persisted session state — neither
+  matches the AC's literal `local\.agent\.` grep target, and renaming either
+  risks a much larger, less bounded change than this story asked for.
+
+### Follow-up fixes made after a second advisor pass
+
+A second review caught real regressions the first implementation pass
+introduced. Fixed in the same branch, worth recording so the pattern isn't
+repeated in XCOD-41:
+
+- **The TUI's `/agents` shim was dead on arrival.** The first pass added a
+  separate `hidden: true` command with `slashName: "agents"`, but
+  `isVisiblePaletteCommand` (`packages/tui/src/keymap.tsx:49-51`) filters
+  `hidden` commands out of the slash list entirely — so that command was
+  never reachable and `/agents` would have hard-broken. Fixed by using
+  `slashAliases: ["agents"]` on the canonical (visible) `mode.list` command
+  instead — confirmed `fuzzysort` matches against `.aliases`
+  (`packages/tui/src/component/prompt/autocomplete.tsx:502-509`), the same
+  mechanism already used for `slashAliases: ["mo"]` on `model.list`. Trade-off:
+  this path shows no deprecation toast (unlike the keybind and `--agent`-flag
+  paths), since a shared `onSelect` can't tell which alias text was typed.
+- **Stale command-ID string literals broke keybind-hint lookups.** Renaming
+  `agent.cycle` → `mode.cycle` orphaned four separate lookups by the old
+  literal: `packages/app/src/components/prompt-input-v2.tsx:393`,
+  `packages/app/src/components/prompt-input.tsx:1658`,
+  `packages/tui/src/feature-plugins/home/tips-view.tsx:101`, and a Storybook
+  mock at `packages/storybook/.storybook/mocks/app/context/command.ts:6`. All
+  four now reference `"mode.cycle"`. Found via `git grep` for the literal
+  command-name strings, not by tsgo — command IDs are plain strings, so the
+  type checker can't catch a rename that leaves a stale lookup behind.
+- **An external HTTP API used the old keybind action name as its wire
+  vocabulary.** `packages/opencode/src/server/routes/instance/httpapi/handlers/tui.ts`
+  has a legacy `/tui/execute-command` endpoint whose `commandAliases` map
+  translates snake_case action names (e.g. `agent_cycle`) to internal
+  command names (`"agent.cycle"`) — this is a pre-existing legacy-alias
+  pattern, not something XCOD-40 introduced. Updated `agent_cycle` to map to
+  `"mode.cycle"` (keeping the external wire key working) and added
+  `mode_cycle` as the new canonical wire key. Also added `"mode.cycle"` as a
+  documented literal in the source schema
+  (`packages/schema/src/tui-event.ts`, `CommandExecute.command`), additively
+  — `"agent.cycle"` stays listed too, since the schema always had a
+  `Schema.String` fallback and removing it would just be documentation
+  churn. Generated SDK files under `packages/sdk/js/src/gen/` and
+  `packages/client/src/generated-effect/` were **not** regenerated (would
+  need `bun run generate` in `packages/client`, not run this pass) — they
+  still only list `"agent.cycle"` as a typed literal; this is a docs/autocomplete
+  gap in the generated types, not a functional break, since the underlying
+  schema accepts any string.
+- **Docs fixes**: `packages/web/src/content/docs/keybinds.mdx`'s full
+  keybind-defaults JSON dump still had `agent_list`/`agent_cycle`/
+  `agent_cycle_reverse` — updated to `mode_list`/`mode_cycle`/
+  `mode_cycle_reverse`. `agents.mdx`'s two references to a `switch_agent`
+  keybind (which never existed under that literal name, before or after
+  this rename) were corrected to `mode_cycle`. The rest of `agents.mdx` —
+  which is almost entirely about the config-file agent-authoring surface
+  (`mode: primary|subagent|all`, permissions, `agent create`) — was left
+  alone: that's the correctly-named, out-of-scope "agent" concept, not the
+  Tab-switcher, and a full editorial pass distinguishing the two throughout
+  a 780-line doc is a separate task from this rename. Its stale "Scout"
+  subagent mention (G5, §2) was also left as-is.
+- **The help-text snapshot test** (`packages/opencode/test/cli/help/help-snapshots.test.ts`)
+  needed `--update-snapshots` after the CLI flag rename — a legitimate diff
+  (new `--mode`/`--role` help text replacing `--agent`/`--mode`), not a
+  regression.

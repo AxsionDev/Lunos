@@ -37,17 +37,17 @@ export function createPromptInputController(input: {
     return {
       agents: {
         available: sync().data.agent,
-        options: local.agent.list().map((agent) => agent.name),
-        current: local.agent.current()?.name ?? "",
+        options: local.mode.list().map((agent) => agent.name),
+        current: local.mode.current()?.name ?? "",
         loading: agentsQuery.isLoading,
-        visible: local.agent.visible(),
-        select: local.agent.set,
+        visible: local.mode.visible(),
+        select: local.mode.set,
       },
       model: {
         selection: input.model ?? local.model,
         paid: providers.paid().length > 0,
         loading:
-          (local.agent.visible() && agentsQuery.isLoading) ||
+          (local.mode.visible() && agentsQuery.isLoading) ||
           providersQuery.isLoading ||
           globalProvidersQuery.isLoading,
       },

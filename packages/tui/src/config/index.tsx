@@ -91,6 +91,8 @@ export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | 
     style: "block" | "underline" | "line" | "default"
     blinking: boolean
   }
+  /** Legacy keybind override names found in config, resolved onto their current names (XCOD-40). */
+  deprecatedKeybinds: { legacy: string; canonical: string }[]
 }
 
 export const ResolveOptions = Schema.Struct({
@@ -110,6 +112,8 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
     }
   }
 
+  const { deprecated } = TuiKeybind.resolveKeybindAliases(keybinds)
+
   return {
     ...input,
     attention: {
@@ -124,6 +128,7 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
       commandMap: TuiKeybind.CommandMap,
       bindingDefaults: TuiKeybind.bindingDefaults(),
     }),
+    deprecatedKeybinds: deprecated.map((item) => ({ legacy: item.legacy, canonical: item.canonical })),
     leader_timeout: input.leader_timeout ?? LeaderTimeoutDefault,
     mouse: input.mouse ?? true,
     cursor: input.cursor

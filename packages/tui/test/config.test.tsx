@@ -95,6 +95,19 @@ test("resolves overrides without mutating input", () => {
   expect(input.keybinds).toEqual({ session_list: "ctrl+l" })
 })
 
+test("resolves a legacy agent_list keybind override to mode.list and reports it as deprecated", () => {
+  const config = resolve({ keybinds: { agent_list: "ctrl+a" } }, { terminalSuspend: true })
+
+  expect(config.keybinds.get("mode.list")).toMatchObject([{ key: "ctrl+a" }])
+  expect(config.deprecatedKeybinds).toEqual([{ legacy: "agent_list", canonical: "mode_list" }])
+})
+
+test("reports no deprecated keybinds when config uses only current names", () => {
+  const config = resolve({ keybinds: { session_list: "ctrl+l" } }, { terminalSuspend: true })
+
+  expect(config.deprecatedKeybinds).toEqual([])
+})
+
 test("resolves a session move keybind", () => {
   const config = resolve({ keybinds: { session_move: "ctrl+o" } }, { terminalSuspend: true })
 
