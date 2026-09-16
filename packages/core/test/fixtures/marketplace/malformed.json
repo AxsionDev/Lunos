@@ -1,0 +1,15 @@
+{
+  "name": "broken-marketplace",
+  "owner": {
+    "name": "Test"
+  },
+  "plugins": [
+    {
+      "name": "example",
+      "source": {
+        "type": "archive",
+        "url": "https://example.com/plugin.tar.gz"
+      }
+    }
+  ]
+}

@@ -1,1 +1,0 @@
-- [Lunos repo environment](project_lunos_repo_environment.md) — Axcode worktree tasks are actually the Bun/TS Lunos monorepo, not .NET/Angular; resolve docs/stories paths against the given working directory

@@ -3,18 +3,11 @@
     "original": null,
     "holders": [
       {
-        "pid": 59181,
+        "pid": 89672,
         "start_src": null,
         "start_time": null,
         "port": 8787,
         "inherited": false
-      },
-      {
-        "pid": 9870,
-        "start_src": null,
-        "start_time": null,
-        "port": 8787,
-        "inherited": true
       }
     ]
   },
@@ -22,18 +15,11 @@
     "original": null,
     "holders": [
       {
-        "pid": 59181,
+        "pid": 89672,
         "start_src": null,
         "start_time": null,
         "port": null,
         "inherited": false
-      },
-      {
-        "pid": 9870,
-        "start_src": null,
-        "start_time": null,
-        "port": null,
-        "inherited": true
       }
     ]
   }
