@@ -1,0 +1,3 @@
+- [XCOD-32 marketplace registry epic structure](project_xcod32_marketplace_registry_epic.md) — XCOD-33 design/34 API/35 ingestion/36 deploy split; XCOD-34 has zero System/External Integration journeys
+- [Client vs. registry endpoint scope](feedback_client_vs_registry_endpoint_scope.md) — verify real call chains in client source before assuming a UX action hits a matching new endpoint
+- [Headless subagent review protocol](feedback_headless_subagent_review_protocol.md) — skip per-actor interactive stalling when no human is in the loop; produce complete doc + summary in final message instead
