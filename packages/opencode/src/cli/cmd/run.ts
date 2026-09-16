@@ -167,9 +167,14 @@ export const RunCommand = effectCmd({
         alias: ["m"],
         describe: "model to use in the format of provider/model",
       })
+      .option("mode", {
+        type: "string",
+        describe: "mode to use",
+      })
       .option("agent", {
         type: "string",
-        describe: "agent to use",
+        hidden: true,
+        describe: "deprecated, use --mode",
       })
       .option("format", {
         type: "string",
@@ -272,6 +277,15 @@ export const RunCommand = effectCmd({
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
       const auto = args.auto || args.yolo || args["dangerously-skip-permissions"]
+      // XCOD-40: --agent is deprecated in favor of --mode; --mode wins if both are set.
+      if (args.agent && !args.mode) {
+        UI.println(
+          UI.Style.TEXT_WARNING_BOLD + "!",
+          UI.Style.TEXT_NORMAL,
+          `--agent is deprecated, use --mode instead`,
+        )
+      }
+      const modeArg = args.mode ?? args.agent
       const thinking = interactive ? (args.thinking ?? true) : (args.thinking ?? false)
       const die = (message: string): never => {
         UI.error(message)
@@ -593,8 +607,8 @@ export const RunCommand = effectCmd({
       }
 
       async function localAgent() {
-        if (!args.agent) return undefined
-        const name = args.agent
+        if (!modeArg) return undefined
+        const name = modeArg
 
         const entry = await Effect.runPromise(
           agentSvc.get(name).pipe(Effect.provideService(InstanceRef, localInstance)),
@@ -603,7 +617,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" not found. Falling back to default agent`,
+            `mode "${name}" not found. Falling back to default mode`,
           )
           return undefined
         }
@@ -611,7 +625,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" is a subagent, not a primary agent. Falling back to default agent`,
+            `mode "${name}" is a subagent, not a primary mode. Falling back to default mode`,
           )
           return undefined
         }
@@ -619,8 +633,8 @@ export const RunCommand = effectCmd({
       }
 
       async function attachAgent(sdk: OpencodeClient) {
-        if (!args.agent) return undefined
-        const name = args.agent
+        if (!modeArg) return undefined
+        const name = modeArg
 
         const modes = await sdk.app
           .agents(undefined, { throwOnError: true })
@@ -631,7 +645,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `failed to list agents from ${args.attach}. Falling back to default agent`,
+            `failed to list modes from ${args.attach}. Falling back to default mode`,
           )
           return undefined
         }
@@ -641,7 +655,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" not found. Falling back to default agent`,
+            `mode "${name}" not found. Falling back to default mode`,
           )
           return undefined
         }
@@ -650,7 +664,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" is a subagent, not a primary agent. Falling back to default agent`,
+            `mode "${name}" is a subagent, not a primary mode. Falling back to default mode`,
           )
           return undefined
         }
@@ -659,7 +673,7 @@ export const RunCommand = effectCmd({
       }
 
       async function pickAgent(sdk: OpencodeClient) {
-        if (!args.agent) return undefined
+        if (!modeArg) return undefined
         if (args.attach) {
           return attachAgent(sdk)
         }
@@ -924,7 +938,7 @@ export const RunCommand = effectCmd({
             session,
             share,
             createSession: createFreshSession,
-            agent: args.agent,
+            agent: modeArg,
             model,
             variant: args.variant,
             replay,
@@ -972,7 +986,7 @@ type MiniCommandInput = {
   session?: string
   fork?: boolean
   model?: string
-  agent?: string
+  mode?: string
   prompt?: string
   replay?: boolean
   replayLimit?: number
@@ -991,7 +1005,8 @@ export async function runMini(input: MiniCommandInput) {
     fork: input.fork,
     share: undefined,
     model: input.model,
-    agent: input.agent,
+    mode: input.mode,
+    agent: undefined,
     format: "default",
     file: undefined,
     title: undefined,

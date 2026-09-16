@@ -333,3 +333,49 @@ this epic and would be unrelated scope creep.
 - The new mode will be `native: true`, not `hidden`, matching `build`/`plan`
   (contrast with `compaction`/`title`/`summary`, which are `hidden: true`
   and must stay that way — don't pattern-match on the wrong sibling).
+
+## Addendum: surface found during XCOD-40 implementation
+
+§2 above described itself as a "full surface map" but missed a real layer:
+`packages/app`'s own command-palette and i18n corpus. Recorded here so
+XCOD-41's implementer (and anyone auditing this doc later) has the accurate
+boundary rather than trusting the original claim at face value.
+
+- **`packages/app` composer commands**
+  (`packages/app/src/pages/session/use-composer-commands.tsx:65-81`): a
+  second, independent set of Tab-switcher-equivalent commands
+  (`agent.cycle`/`agent.cycle.reverse`, `slash: "agent"`) for the web/session
+  UI frontend, parallel to the TUI's `app.tsx` commands. Renamed to
+  `mode.cycle`/`mode.cycle.reverse`/`slash: "mode"` as part of XCOD-40. This
+  frontend's `CommandOption` type (`packages/app/src/context/command.tsx:75-88`)
+  has no `slashAliases`-equivalent field, unlike the TUI's `slashAliases`
+  mechanism — so the legacy `/agent` slash trigger has **no deprecation
+  shim** on this frontend. Adding one requires extending `CommandOption`
+  plus wiring a toast/notice, which XCOD-40 did not do.
+- **The i18n corpus** (`packages/app/src/i18n/`, ~50 locale files): the four
+  English string values tied to the renamed commands
+  (`command.agent.cycle`, `command.agent.cycle.description`,
+  `command.agent.cycle.reverse`, `command.agent.cycle.reverse.description`)
+  were updated from "agent" to "mode" wording. The *key paths* were
+  deliberately left unchanged (they're lookup identifiers, not user copy —
+  renaming them would touch all ~50 locale files for no user-visible
+  benefit) and other locales' translated values still say "agent" in their
+  own language until someone runs a normal translation update.
+- **The broader settings-page surface** was deliberately left untouched:
+  `command.category.agent` (command-palette category key, English value
+  still "Agent"), `settings.agents.title`/`settings.agents.description`,
+  `settings.general.row.showCustomAgents.title`/`.description` ("Switch
+  between agents in the composer..."), and the notification/sound settings
+  labeled "Agent" (`settings.general.notifications.agent.*`,
+  `settings.general.sounds.agent.*`). These describe the same Tab-switcher
+  concept in prose but sit a layer further from the mechanical rename than
+  the command IDs; call it a judgment call to leave them for a follow-up
+  pass rather than let this story's diff sprawl further.
+- **`PromptInputControls.agents`**
+  (`packages/app/src/components/prompt-input/contracts.ts:14-21`) and the
+  persisted `State.agent`/`store.last.agent` fields
+  (`packages/app/src/context/local.tsx`) were also left unrenamed: the
+  former is a downstream consumer type with its own cascade into
+  `prompt-input.tsx`, the latter is on-disk persisted session state — neither
+  matches the AC's literal `local\.agent\.` grep target, and renaming either
+  risks a much larger, less bounded change than this story asked for.

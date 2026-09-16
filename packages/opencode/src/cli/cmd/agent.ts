@@ -43,9 +43,9 @@ const AgentCreateCommand = effectCmd({
         type: "string",
         describe: "what the agent should do",
       })
-      .option("mode", {
+      .option("role", {
         type: "string",
-        describe: "agent mode",
+        describe: "agent role (all, primary, or subagent — worker classification; unrelated to the Tab-switchable Mode concept)",
         choices: ["all", "primary", "subagent"] as const,
       })
       .option("permissions", {
@@ -71,10 +71,10 @@ const AgentCreateCommand = effectCmd({
     yield* Effect.promise(async () => {
       const cliPath = args.path
       const cliDescription = args.description
-      const cliMode = args.mode as AgentMode | undefined
+      const cliRole = args.role as AgentMode | undefined
       const perms = args.permissions
 
-      const isFullyNonInteractive = cliPath && cliDescription && cliMode && perms !== undefined
+      const isFullyNonInteractive = cliPath && cliDescription && cliRole && perms !== undefined
 
       if (!isFullyNonInteractive) {
         UI.empty()
@@ -153,13 +153,13 @@ const AgentCreateCommand = effectCmd({
         selected = result
       }
 
-      // Get mode
+      // Get role
       let mode: AgentMode
-      if (cliMode) {
-        mode = cliMode
+      if (cliRole) {
+        mode = cliRole
       } else {
         const modeResult = await prompts.select({
-          message: "Agent mode",
+          message: "Agent role",
           options: [
             {
               label: "All",
