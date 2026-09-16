@@ -1655,7 +1655,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       placement="top"
                       gutter={4}
                       title={language.t("command.agent.cycle")}
-                      keybind={command.keybind("agent.cycle")}
+                      keybind={command.keybind("mode.cycle")}
                     >
                       <Select
                         size="normal"

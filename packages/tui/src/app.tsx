@@ -686,24 +686,13 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         title: "Switch mode",
         category: "Mode",
         slashName: "modes",
+        // Deprecated alias (XCOD-40): "/agents" still resolves here via fuzzy
+        // slash matching (isVisiblePaletteCommand excludes hidden commands
+        // from the slash list, so a separate hidden alias command would
+        // never actually be reachable — this must be an alias on the visible
+        // command, not a second entry).
+        slashAliases: ["agents"],
         run: () => {
-          dialog.replace(() => <DialogMode />)
-        },
-      },
-      {
-        // Deprecated alias (XCOD-40): "/agents" still opens the mode switcher,
-        // but tells the user to use "/modes" going forward.
-        name: "mode.list.legacy-agents-alias",
-        title: "Switch mode (deprecated alias)",
-        category: "Mode",
-        hidden: true,
-        slashName: "agents",
-        run: () => {
-          toast.show({
-            variant: "warning",
-            message: `"/agents" is deprecated, use "/modes" instead`,
-            duration: 5000,
-          })
           dialog.replace(() => <DialogMode />)
         },
       },

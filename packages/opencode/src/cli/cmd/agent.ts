@@ -45,7 +45,7 @@ const AgentCreateCommand = effectCmd({
       })
       .option("role", {
         type: "string",
-        describe: "agent role (all, primary, or subagent — worker classification; unrelated to the Tab-switchable Mode concept)",
+        describe: "agent role (worker classification, unrelated to the Mode switcher)",
         choices: ["all", "primary", "subagent"] as const,
       })
       .option("permissions", {

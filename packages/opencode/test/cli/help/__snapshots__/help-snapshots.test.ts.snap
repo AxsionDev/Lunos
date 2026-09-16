@@ -87,7 +87,7 @@ Options:
       --fork         fork the session before continuing (requires --continue or --session) [boolean]
       --share        share the session                                                     [boolean]
   -m, --model        model to use in the format of provider/model                           [string]
-      --agent        agent to use                                                           [string]
+      --mode         mode to use                                                            [string]
       --format       format: default (formatted) or json (raw JSON events)
                                           [string] [choices: "default", "json"] [default: "default"]
   -f, --file         file(s) to attach to message                                            [array]
@@ -535,7 +535,8 @@ Options:
       --pure                  run without external plugins                                 [boolean]
       --path                  directory path to generate the agent file                     [string]
       --description           what the agent should do                                      [string]
-      --mode                  agent mode            [string] [choices: "all", "primary", "subagent"]
+      --role                  agent role (worker classification, unrelated to the Mode switcher)
+                                                    [string] [choices: "all", "primary", "subagent"]
       --permissions, --tools  comma-separated list of permissions to allow (default: all).
                               Available: "bash, read, edit, glob, grep, webfetch, task, todowrite,
                               websearch, lsp, skill"                                        [string]

@@ -98,7 +98,7 @@ export function Tips(props: { api: TuiPluginApi; connected?: boolean }) {
   const theme = useTheme().theme
   const tipOffset = Math.random()
   const shortcuts: Shortcuts = {
-    agentCycle: useCommandShortcut("agent.cycle"),
+    agentCycle: useCommandShortcut("mode.cycle"),
     childFirst: configShortcut(props.api, "session.child.first"),
     childNext: configShortcut(props.api, "session.child.next"),
     childPrevious: configShortcut(props.api, "session.child.previous"),
