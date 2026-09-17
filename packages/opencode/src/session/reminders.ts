@@ -11,6 +11,7 @@ import { Session } from "./session"
 import PROMPT_PLAN from "./prompt/plan.txt"
 import BUILD_SWITCH from "./prompt/build-switch.txt"
 import PLAN_MODE from "./prompt/plan-mode.txt"
+import RESEARCH_MODE from "./prompt/research-mode.txt"
 
 export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   messages: SessionV1.WithParts[]
@@ -22,6 +23,29 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   const sessions = yield* Session.Service
   const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
   if (!userMessage) return input.messages
+
+  // Research mode is independent of the plan-mode flag: its reminder carries
+  // the output path, so it always follows the path-bearing shape below.
+  if (input.agent.name === "research") {
+    const ctx = yield* InstanceState.context
+    const file = Session.research(input.session, ctx)
+    const exists = yield* fsys.existsSafe(file)
+    if (!exists) yield* fsys.ensureDir(path.dirname(file)).pipe(Effect.catch(Effect.die))
+    const part = yield* sessions.updatePart({
+      id: PartID.ascending(),
+      messageID: userMessage.info.id,
+      sessionID: userMessage.info.sessionID,
+      type: "text",
+      text: RESEARCH_MODE.replace("${researchInfo}", () =>
+        exists
+          ? `A research file already exists at ${file}. You can read it and make incremental edits using the edit tool.`
+          : `No research file exists yet. You should create it at ${file} using the write tool.`,
+      ),
+      synthetic: true,
+    })
+    userMessage.parts.push(part)
+    return input.messages
+  }
 
   if (!flags.experimentalPlanMode) {
     if (input.agent.name === "plan") {

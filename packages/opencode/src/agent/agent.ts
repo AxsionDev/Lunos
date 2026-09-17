@@ -12,7 +12,6 @@ import { ProviderTransform } from "@/provider/transform"
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
-import PROMPT_RESEARCH from "./prompt/research.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
@@ -204,7 +203,12 @@ const layer = Layer.effect(
             ),
             mode: "primary",
             native: true,
-            prompt: PROMPT_RESEARCH,
+            // Deliberately no `prompt` — for a primary agent that field
+            // *replaces* SystemPrompt.provider() (see session/llm/request.ts),
+            // which would strip the provider prompt's tool-use discipline and
+            // leave research mode answering from memory. Like `plan`, research
+            // mode is steered by a per-turn reminder instead
+            // (session/reminders.ts).
           },
           general: {
             name: "general",

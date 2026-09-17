@@ -42,7 +42,7 @@ OpenCode comes with three built-in subagents, **General**, **Explore**, and **Sc
 
 ## Built-in
 
-OpenCode comes with two built-in primary agents and three built-in subagents.
+OpenCode comes with three built-in primary agents and three built-in subagents.
 
 ---
 
@@ -65,6 +65,16 @@ By default, all of the following are set to `ask`:
 - `bash`: All bash commands
 
 This agent is useful when you want the LLM to analyze code, suggest changes, or create plans without making any actual modifications to your codebase.
+
+---
+
+### Use research
+
+_Mode_: `primary`
+
+A read-only agent for deep investigation of a topic or codebase. All file edits are denied except Markdown under the research output path — `.opencode/research/` in a Git project, or the global data directory otherwise. Unlike `plan`, it can delegate legwork to the `general` and `explore` subagents.
+
+Research mode is expected to gather evidence with real tool calls and write its findings to a Markdown file, citing the file paths and sources it drew on. A request phrased as an implementation task ("add X", "create Y") still produces a how-to document describing how the change should be made rather than the change itself — switch to `build` when you want it applied.
 
 ---
 

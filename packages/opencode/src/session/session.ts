@@ -328,11 +328,23 @@ export const Event = {
   Error: SessionV1.Event.Error,
 }
 
-export function plan(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+// `plan` and `research` must stay in lockstep: the agent's edit permission is
+// built from the same directory name (see agent/agent.ts), so a change here
+// that isn't mirrored there leaves a mode allowed to write to a path it is
+// never told about, or told about a path it cannot write.
+function artifact(dir: string, input: { slug: string; time: { created: number } }, instance: InstanceContext) {
   const base = instance.project.vcs
-    ? path.join(instance.worktree, ".opencode", "plans")
-    : path.join(Global.Path.data, "plans")
+    ? path.join(instance.worktree, ".opencode", dir)
+    : path.join(Global.Path.data, dir)
   return path.join(base, [input.time.created, input.slug].join("-") + ".md")
+}
+
+export function plan(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return artifact("plans", input, instance)
+}
+
+export function research(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return artifact("research", input, instance)
 }
 
 export const getUsage = (input: { model: Provider.Model; usage: Usage; metadata?: ProviderMetadata }) => {
