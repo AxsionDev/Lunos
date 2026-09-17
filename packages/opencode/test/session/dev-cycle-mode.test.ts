@@ -109,3 +109,57 @@ describe("dev-cycle cursor parsing", () => {
     }),
   )
 })
+
+describe("dev-cycle mode agent", () => {
+  it.instance("carries no prompt, so the provider system prompt is retained", () =>
+    Effect.gen(function* () {
+      const agents = yield* Agent.Service
+      const devcycle = yield* agents.get("dev-cycle")
+
+      expect(devcycle).toBeDefined()
+      expect(devcycle?.mode).toBe("primary")
+      // `prompt` replaces SystemPrompt.provider() for primary agents (XCOD-45).
+      expect(devcycle?.prompt).toBeUndefined()
+    }),
+  )
+
+  // Parity with `plan` rather than a literal "allow", for the same reason the
+  // research test gives at research-mode.test.ts:100-107: these scalar rules
+  // resolve through glob matching whose behaviour on a non-path subject is a
+  // quirk `plan` has already shipped with. The invariant that matters is that
+  // dev-cycle is never more restricted than plan for the tool its gates need.
+  it.instance("allows question at least as freely as plan, since every gate depends on it", () =>
+    Effect.gen(function* () {
+      const agents = yield* Agent.Service
+      const devcycle = yield* agents.get("dev-cycle")
+      const plan = yield* agents.get("plan")
+
+      expect(Permission.evaluate("question", "", devcycle.permission).action).toBe(
+        Permission.evaluate("question", "", plan.permission).action,
+      )
+    }),
+  )
+
+  it.instance("does not deny task, so phases can delegate to subagents", () =>
+    Effect.gen(function* () {
+      const agents = yield* Agent.Service
+      const devcycle = yield* agents.get("dev-cycle")
+      const plan = yield* agents.get("plan")
+
+      // plan denies task.general; this mode must not.
+      expect(Permission.evaluate("task", "general", plan.permission).action).toBe("deny")
+      expect(Permission.evaluate("task", "general", devcycle.permission).action).not.toBe("deny")
+    }),
+  )
+
+  it.instance("can edit the codebase, unlike plan and research", () =>
+    Effect.gen(function* () {
+      const agents = yield* Agent.Service
+      const devcycle = yield* agents.get("dev-cycle")
+      const research = yield* agents.get("research")
+
+      expect(Permission.evaluate("edit", "packages/opencode/src/index.ts", devcycle.permission).action).toBe("allow")
+      expect(Permission.evaluate("edit", "packages/opencode/src/index.ts", research.permission).action).toBe("deny")
+    }),
+  )
+})

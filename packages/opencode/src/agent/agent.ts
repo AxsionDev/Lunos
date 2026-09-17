@@ -210,6 +210,33 @@ const layer = Layer.effect(
             // mode is steered by a per-turn reminder instead
             // (session/reminders.ts).
           },
+          "dev-cycle": {
+            name: "dev-cycle",
+            description:
+              "Full development cycle — discover, architect, plan, build and verify, with human approval gates between phases.",
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                // Every gate is a `question` call, and question is denied by default.
+                question: "allow",
+                // Unlike `plan`, no `task: { general: "deny" }` — each phase
+                // delegates to a subagent.
+                //
+                // Also unlike `plan`/`research`, no `edit` restriction: this
+                // mode implements code and inherits "*": "allow" from defaults.
+                // The gates are prompt-level, not permission-level.
+                external_directory: {
+                  [path.join(Global.Path.data, "dev-cycle", "*")]: "allow",
+                },
+              }),
+              user,
+            ),
+            mode: "primary",
+            native: true,
+            // Deliberately no `prompt` — see the note on the `research` entry
+            // above. Steered by a per-turn reminder (session/reminders.ts).
+          },
           general: {
             name: "general",
             description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
