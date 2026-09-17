@@ -203,9 +203,9 @@ last-match-wins via `findLast` (`permission/index.ts:32`) — so their trailing
 `bash`, which gates on the separate `"bash"` permission key
 (`tool/shell/id.ts:16`) and is a general write channel — redirection, `sed -i`,
 `git checkout`. `qa` can therefore modify files at the permission layer, and
-its "report, never fix" discipline (§5.2 prompt text, restated in §7) holds by
-instruction only. That is the accepted trade: `qa` cannot run the suite without
-a shell.
+its "report, never fix" discipline (stated in its own prompt,
+`.opencode/agent/qa.md`, and noted in §7) holds by instruction only. That is
+the accepted trade: `qa` cannot run the suite without a shell.
 
 Note that the 39-agent fleet under `.claude/agents/` is **not** reachable
 from Lunos — the agent loader and config never reference `.claude`
