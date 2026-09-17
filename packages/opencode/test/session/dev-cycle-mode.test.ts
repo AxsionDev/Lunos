@@ -18,6 +18,7 @@ import { InstanceStore } from "@/project/instance-store"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { InstanceState } from "@/effect/instance-state"
 import type { InstanceContext } from "@/project/instance-context"
+import { DevCycle } from "@/session/dev-cycle"
 
 const it = testEffect(
   AppNodeBuilder.build(
@@ -66,6 +67,45 @@ describe("dev-cycle output path", () => {
 
       expect(SessionNs.devcycle(session, ctx)).toBe(SessionNs.plan(session, ctx).replace("/plans/", "/dev-cycle/"))
       expect(SessionNs.devcycle(session, ctx)).not.toContain("/tmp/wt")
+    }),
+  )
+})
+
+describe("dev-cycle cursor parsing", () => {
+  const frontmatter = (phase: string, gate: string) => `---\nphase: ${phase}\ngate: ${gate}\n---\n\n# Cycle\n`
+
+  it.effect("reads phase and gate from frontmatter", () =>
+    Effect.sync(() => {
+      expect(DevCycle.parseCursor(frontmatter("architect", "approved"))).toEqual({
+        phase: "architect",
+        gate: "approved",
+      })
+      expect(DevCycle.parseCursor(frontmatter("verify", "pending"))).toEqual({ phase: "verify", gate: "pending" })
+    }),
+  )
+
+  it.effect("degrades to discover/pending rather than throwing", () =>
+    Effect.sync(() => {
+      // Each of these is a real way the file can be wrong: absent, empty,
+      // no frontmatter at all, unterminated block, unknown phase, unknown gate.
+      expect(DevCycle.parseCursor(undefined)).toEqual(DevCycle.DEFAULT_CURSOR)
+      expect(DevCycle.parseCursor("")).toEqual(DevCycle.DEFAULT_CURSOR)
+      expect(DevCycle.parseCursor("# Cycle\n\nno frontmatter here")).toEqual(DevCycle.DEFAULT_CURSOR)
+      expect(DevCycle.parseCursor("---\nphase: architect\n")).toEqual(DevCycle.DEFAULT_CURSOR)
+      expect(DevCycle.parseCursor(frontmatter("deploy", "approved"))).toEqual({
+        phase: "discover",
+        gate: "approved",
+      })
+      expect(DevCycle.parseCursor(frontmatter("plan", "yes"))).toEqual({ phase: "plan", gate: "pending" })
+    }),
+  )
+
+  it.effect("tolerates windows line endings and surrounding whitespace", () =>
+    Effect.sync(() => {
+      expect(DevCycle.parseCursor("---\r\nphase:   build  \r\ngate: approved\r\n---\r\n")).toEqual({
+        phase: "build",
+        gate: "approved",
+      })
     }),
   )
 })
