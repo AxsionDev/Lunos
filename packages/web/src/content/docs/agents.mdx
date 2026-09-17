@@ -78,6 +78,25 @@ Research mode is expected to gather evidence with real tool calls and write its 
 
 ---
 
+### Use dev-cycle
+
+An agent that runs one feature through a full development cycle — discover, architect, plan, then build and verify — pausing for your approval at three gates. Each phase delegates to a dedicated subagent: `explore` for discovery, then `architect`, `planner`, and finally `qa` to review code it did not write.
+
+The cycle's working document lives at `.opencode/dev-cycle/` in a Git project, or the global data directory otherwise. Its frontmatter carries the position:
+
+```markdown
+---
+phase: architect
+gate: pending
+---
+```
+
+That position is read from the file at the start of every turn, so editing those two lines is how you approve a gate, rewind to an earlier phase, or redirect a cycle mid-flight. Rewinding changes only that file, not the conversation record — each turn's reminder is persisted, so earlier phases stay visible in the history, and only the newest reminder block is authoritative.
+
+The gates are advisory. Unlike `plan` and `research`, this agent holds full write permissions for the whole run — it is *instructed* to stop at each gate rather than prevented from continuing, so a cycle that ignores a gate is possible. Review the diff at gate 3 rather than assuming nothing was written before gate 2 opened.
+
+---
+
 ### Use general
 
 _Mode_: `subagent`
