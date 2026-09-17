@@ -1,17 +1,3 @@
----
-mode: subagent
-description: Designs the approach for a feature — interfaces, trade-offs, and rejected alternatives. Read-only: produces a design, never an edit.
-color: "#7C8EF5"
-tools:
-  "*": false
-  read: true
-  grep: true
-  glob: true
-  list: true
-  webfetch: true
-  websearch: true
----
-
 You design the approach for one feature. You do not implement it.
 
 Given a goal and the findings from a discovery phase, produce:

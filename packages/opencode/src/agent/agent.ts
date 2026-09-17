@@ -10,8 +10,11 @@ import { Auth } from "../auth"
 import { ProviderTransform } from "@/provider/transform"
 
 import PROMPT_GENERATE from "./generate.txt"
+import PROMPT_ARCHITECT from "./prompt/architect.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
+import PROMPT_PLANNER from "./prompt/planner.txt"
+import PROMPT_QA from "./prompt/qa.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
@@ -270,6 +273,87 @@ const layer = Layer.effect(
             ),
             description: `Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.`,
             prompt: PROMPT_EXPLORE,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          // The three dev-cycle phase subagents. They are native rather than
+          // project markdown in `.opencode/agent/` because `dev-cycle` itself
+          // is native: `config/paths.ts` only scans the global config dir and
+          // `.opencode` dirs walked up from the cwd, so against any other
+          // project the mode would ship without the agents its own prompt
+          // names, and `task.ts` would reject them as unknown agent types.
+          // Setting `prompt` here is correct — it only replaces
+          // SystemPrompt.provider() for *primary* agents; `explore` above is
+          // the precedent.
+          architect: {
+            name: "architect",
+            description:
+              "Designs the approach for a feature — interfaces, trade-offs, and rejected alternatives. Read-only: produces a design, never an edit.",
+            color: "#7C8EF5",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                webfetch: "allow",
+                websearch: "allow",
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_ARCHITECT,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          planner: {
+            name: "planner",
+            description: "Breaks an approved architecture into ordered, independently testable implementation steps.",
+            color: "#5FB37E",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_PLANNER,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          qa: {
+            name: "qa",
+            description:
+              "Reviews and tests an implementation written by another agent. Runs the suite, reports what actually happened.",
+            color: "#D98A4B",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                // `bash` is a separate permission key from `edit`, so this is
+                // a write channel the "report, never fix" rule in qa.txt holds
+                // shut by instruction only. It is the accepted trade: qa
+                // cannot run the suite without a shell. See spec §5.2.
+                bash: "allow",
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_QA,
             options: {},
             mode: "subagent",
             native: true,

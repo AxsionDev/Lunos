@@ -52,12 +52,15 @@ and a per-turn restatement; it does not eliminate it.
 
 | File | Change |
 |---|---|
-| `packages/opencode/src/agent/agent.ts` | New `dev-cycle` entry in the `agents` record (alongside `research`, `agent.ts:182-212`) |
+| `packages/opencode/src/agent/agent.ts` | New `dev-cycle` entry in the `agents` record (alongside `research`, `agent.ts:182-212`), plus the three native phase subagents (§5.2) |
 | `packages/opencode/src/session/session.ts` | New `devcycle()` export beside `plan()` (`session.ts:342`) and `research()` (`session.ts:346`) |
 | `packages/opencode/src/session/prompt/dev-cycle-mode.txt` | New reminder body |
 | `packages/opencode/src/session/reminders.ts` | New branch mirroring the `research` branch (`reminders.ts:29-48`) |
-| `.opencode/agent/architect.md`, `planner.md`, `qa.md` | Three new subagent definitions |
+| `packages/opencode/src/agent/prompt/architect.txt`, `planner.txt`, `qa.txt` | Prompt bodies for the three new native subagents (§5.2) |
+| `packages/opencode/src/session/dev-cycle.ts` | Frontmatter cursor parser. **Not in the original design** — the spec put the regex inline in `reminders.ts`; splitting it out is an improvement, since it is the one piece of this mode that is unit-testable without the reminder harness |
 | `packages/opencode/test/session/dev-cycle-mode.test.ts` | New test file mirroring `research-mode.test.ts` |
+| `packages/opencode/test/agent/agent.test.ts` | Extended: the native-agent roster and the phase subagents' permission outcomes. This is the file that catches a new primary or subagent breaking the mode's registration |
+| `packages/web/src/content/docs/agents.mdx` | User-facing documentation of the mode |
 
 ### 2.1 Agent entry
 
@@ -187,24 +190,60 @@ not.
 
 ### 5.2 Subagent definitions
 
-The three new agents are Lunos-native markdown in `.opencode/agent/`,
-following the frontmatter shape of `.opencode/agent/triage.md` (`mode`,
-`model`, `color`, `tools`). They are declared `mode: subagent`.
+The three new agents are **native**, compiled into the binary alongside
+`explore` (`agent/agent.ts:254-276`): entries in the `agents` record with
+`mode: "subagent"`, `native: true`, and a `prompt:` imported from
+`agent/prompt/{architect,planner,qa}.txt`.
+
+They are deliberately *not* project markdown under `.opencode/agent/`, which is
+where this design originally put them. That was wrong, and shipped broken:
+`ConfigPaths.directories` (`config/paths.ts:23-40`) scans only
+`Global.Path.config` and the `.opencode` directories walked up from the cwd —
+nothing bundled into the binary. Run this build against any project other than
+this one and `dev-cycle` appears in the picker while three of its four phases
+fail with `Unknown agent type` (`tool/task.ts:133`). A native mode cannot name
+project-scoped agents in its own prompt. Graceful degradation was considered
+and rejected: the only fallback is `general`, which inherits `edit: "*":
+"allow"` from `defaults`, so a "degraded" `architect` would be a *writable*
+architect — precisely inverting the guarantee below.
+
+Setting `prompt` on these entries does not violate §1's constraint 1. That
+constraint is specific to *primary* agents, where `prompt` replaces
+`SystemPrompt.provider()`; for a subagent it is the normal way to define the
+agent, which is why `explore` has always carried one.
 
 **Verified after implementation.** `architect` and `planner` are read-only at
-the permission layer, not merely by prompt: `write`, `edit` and `apply_patch`
-all normalise to the single `edit` permission
-(`packages/core/src/v1/config/agent.ts:62-81`), a file-agent's own ruleset is
-appended last (`agent/agent.ts:325-352`), and `evaluate()` resolves
-last-match-wins via `findLast` (`permission/index.ts:32`) — so their trailing
-`"*": false`, with no later `edit` allow, genuinely denies edits.
+the permission layer, not merely by prompt. Each ruleset opens with
+`"*": "deny"` and adds back only read tools; `write`, `edit` and `patch` all
+normalise onto the single `edit` permission key
+(`packages/core/src/v1/config/agent.ts:62-81`), and `evaluate()` resolves
+last-match-wins via `findLast` (`permission/index.ts:32`), so with no later
+`edit` allow the blanket deny stands. `test/agent/agent.test.ts` pins this —
+which it could not do while the agents were project markdown invisible to the
+test harness.
+
+Two consequences of being native rather than file-scoped are worth stating,
+because both are real changes from the markdown form:
+
+- **User config now outranks the agent's own rules.** Native rulesets are built
+  `Permission.merge(defaults, fromConfig({...}), user)`, so a user's
+  `permission: { edit: "allow" }` wins. Under the markdown form the file's own
+  ruleset was appended last (`agent/agent.ts:325-352`) and could not be
+  overridden. This is the native convention — `explore` has shipped with it —
+  but it narrows the claim above: read-only is a guarantee against the *agent*,
+  not against the operator's own configuration.
+- **External-directory reads loosen from deny to ask.** The markdown `"*":
+  false` incidentally denied the independent `external_directory` gate too,
+  which a subagent cannot recover from since it has no one to prompt. The
+  native entries follow `explore` and restore `readonlyExternalDirectory`
+  (`agent.ts:114-117`) after the blanket deny. This does not touch `edit`.
 
 `qa` is deliberately weaker, and the difference is easy to miss. It is granted
 `bash`, which gates on the separate `"bash"` permission key
 (`tool/shell/id.ts:16`) and is a general write channel — redirection, `sed -i`,
 `git checkout`. `qa` can therefore modify files at the permission layer, and
 its "report, never fix" discipline (stated in its own prompt,
-`.opencode/agent/qa.md`, and noted in §7) holds by instruction only. That is
+`agent/prompt/qa.txt`, and noted in §7) holds by instruction only. That is
 the accepted trade: `qa` cannot run the suite without a shell.
 
 Note that the 39-agent fleet under `.claude/agents/` is **not** reachable

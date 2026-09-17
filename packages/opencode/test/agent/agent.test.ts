@@ -51,11 +51,48 @@ it.instance("returns default native agents when no config", () =>
     expect(names).toContain("build")
     expect(names).toContain("plan")
     expect(names).toContain("research")
+    expect(names).toContain("dev-cycle")
     expect(names).toContain("general")
     expect(names).toContain("explore")
+    expect(names).toContain("architect")
+    expect(names).toContain("planner")
+    expect(names).toContain("qa")
     expect(names).toContain("compaction")
     expect(names).toContain("title")
     expect(names).toContain("summary")
+  }),
+)
+
+// The dev-cycle phase subagents are compiled in rather than read from
+// `.opencode/agent/`, so that the mode works against projects other than this
+// one. These assertions are what makes that testable at all — while they were
+// project markdown, this suite could not see them.
+it.instance("architect and planner are native read-only subagents", () =>
+  Effect.gen(function* () {
+    for (const name of ["architect", "planner"]) {
+      const agent = yield* load((svc) => svc.get(name))
+      expect(agent).toBeDefined()
+      expect(agent?.mode).toBe("subagent")
+      expect(agent?.native).toBe(true)
+      expect(evalPerm(agent, "edit")).toBe("deny")
+      expect(Permission.evaluate("edit", "packages/opencode/src/index.ts", agent!.permission).action).toBe("deny")
+      expect(evalPerm(agent, "read")).toBe("allow")
+      expect(evalPerm(agent, "bash")).toBe("deny")
+    }
+  }),
+)
+
+it.instance("qa is a native subagent that keeps bash but not edit", () =>
+  Effect.gen(function* () {
+    const qa = yield* load((svc) => svc.get("qa"))
+    expect(qa).toBeDefined()
+    expect(qa?.mode).toBe("subagent")
+    expect(qa?.native).toBe(true)
+    // It cannot run the suite without a shell, so bash stays allowed even
+    // though bash is itself a write channel (spec §5.2).
+    expect(evalPerm(qa, "bash")).toBe("allow")
+    expect(evalPerm(qa, "edit")).toBe("deny")
+    expect(evalPerm(qa, "read")).toBe("allow")
   }),
 )
 
@@ -824,6 +861,13 @@ it.instance(
   },
 )
 
+// HAZARD: this map must name every *visible primary* native agent, and the
+// config shape gives no way to derive it — `it.instance` takes a static config
+// object, evaluated before any Agent service exists to list from. Adding a
+// fifth primary agent to `agents` in agent.ts without adding it here turns
+// this into a silent false pass: `defaultAgent()` finds the new agent, returns
+// it, and the expected error never fires. Adding `dev-cycle` was exactly that
+// edit for primary number four.
 it.instance(
   "defaultAgent throws when all primary agents are disabled",
   () => expectDefaultAgentError("no primary visible agent found"),
