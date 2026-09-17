@@ -191,6 +191,22 @@ The three new agents are Lunos-native markdown in `.opencode/agent/`,
 following the frontmatter shape of `.opencode/agent/triage.md` (`mode`,
 `model`, `color`, `tools`). They are declared `mode: subagent`.
 
+**Verified after implementation.** `architect` and `planner` are read-only at
+the permission layer, not merely by prompt: `write`, `edit` and `apply_patch`
+all normalise to the single `edit` permission
+(`packages/core/src/v1/config/agent.ts:62-81`), a file-agent's own ruleset is
+appended last (`agent/agent.ts:325-352`), and `evaluate()` resolves
+last-match-wins via `findLast` (`permission/index.ts:32`) — so their trailing
+`"*": false`, with no later `edit` allow, genuinely denies edits.
+
+`qa` is deliberately weaker, and the difference is easy to miss. It is granted
+`bash`, which gates on the separate `"bash"` permission key
+(`tool/shell/id.ts:16`) and is a general write channel — redirection, `sed -i`,
+`git checkout`. `qa` can therefore modify files at the permission layer, and
+its "report, never fix" discipline (§5.2 prompt text, restated in §7) holds by
+instruction only. That is the accepted trade: `qa` cannot run the suite without
+a shell.
+
 Note that the 39-agent fleet under `.claude/agents/` is **not** reachable
 from Lunos — the agent loader and config never reference `.claude`
 (verified by grep over `agent/agent.ts` and `config/*.ts`). The two
