@@ -537,9 +537,10 @@ Options:
       --description           what the agent should do                                      [string]
       --role                  agent role (worker classification, unrelated to the Mode switcher)
                                                     [string] [choices: "all", "primary", "subagent"]
-      --permissions, --tools  comma-separated list of permissions to allow (default: all).
-                              Available: "bash, read, edit, glob, grep, webfetch, task, todowrite,
-                              websearch, lsp, skill"                                        [string]
+      --permissions, --tools  comma-separated list of permissions to allow (default: "read, glob,
+                              grep, webfetch, todowrite, websearch, lsp, skill"). Available: "bash,
+                              read, edit, glob, grep, webfetch, task, todowrite, websearch, lsp,
+                              skill"                                                        [string]
   -m, --model                 model to use in the format of provider/model                  [string]"
 `;
 
