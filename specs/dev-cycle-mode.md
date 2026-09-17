@@ -222,9 +222,11 @@ registries are separate, and this design uses only the Lunos one.
    themselves. The underlying accumulation is shared with `plan` and
    `research` and would need a generic fix across all three modes.
 
-All four are consequences of the advisory approach chosen in §1, and all
-three are resolved by the permission-level alternative if it is ever
-revisited.
+Limitations 1-3 are consequences of the advisory approach chosen in §1, and
+all three are resolved by the permission-level alternative if it is ever
+revisited. Limitation 4 is independent of that choice: it follows from how
+reminders are persisted, is shared with `plan` and `research`, and would
+survive the permission-level alternative unchanged.
 
 ## 8. Testing
 
