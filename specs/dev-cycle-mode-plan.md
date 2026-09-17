@@ -604,7 +604,19 @@ git commit -m "feat(dev-cycle): steer dev-cycle mode by per-turn phase reminder"
 
 That means the `tools:` blocks use `triage.md`'s **proven deny-all-then-allow form** (`"*": false` plus explicit allows), not a per-tool `false` form, which is unverified. Tool names are taken from the files in `packages/opencode/src/tool/` and from the `explore` agent's allow-list (`agent.ts:231-240`): `read`, `grep`, `glob`, `list`, `bash`, `webfetch`, `websearch`.
 
-**Read this before Step 4:** if the `tools:` key is silently ignored by the loader, `architect` and `planner` would quietly hold write access, defeating the read-only property §5 of the spec depends on. Step 4 checks that the agents *load*; confirming they lack write may not be possible from `agent list` alone. If it isn't, treat their read-only status as prompt-level only — consistent with the advisory-gate decision — and say so rather than assuming it is enforced.
+**Verified after implementation:** `architect` and `planner` are read-only at
+the permission layer, not merely by prompt. `write`, `edit` and `apply_patch`
+all normalise to the single `edit` permission
+(`packages/core/src/v1/config/agent.ts:62-81`), the file-agent's own ruleset is
+appended last (`agent/agent.ts:325-352`), and `evaluate()` resolves
+last-match-wins via `findLast` (`permission/index.ts:32`) — so their trailing
+`"*": false` with no later `edit` allow genuinely denies edits.
+
+`qa` is different, deliberately. It is granted `bash`, which gates on the
+separate `"bash"` permission key (`tool/shell/id.ts:16`) and is a general write
+channel — redirection, `sed -i`, `git checkout`. So `qa` *can* modify files at
+the permission layer, and its "report, never fix" property is prompt-level
+only. That is the accepted trade: `qa` cannot run the suite without a shell.
 
 - [ ] **Step 1: Create the architect subagent**
 

@@ -80,7 +80,7 @@ Research mode is expected to gather evidence with real tool calls and write its 
 
 ### Use dev-cycle
 
-An agent that runs one feature through a full development cycle — discover, architect, plan, then build and verify — pausing for your approval at three gates. Each phase delegates to a dedicated subagent: `explore` for discovery, then `architect`, `planner`, and finally `qa` to review code it did not write.
+An agent that runs one feature through a full development cycle — discover, architect, plan, then build and verify — pausing for your approval at three gates. Every phase but the build itself delegates to a dedicated subagent: `explore` for discovery, then `architect`, `planner`, and finally `qa` to review code it did not write.
 
 The cycle's working document lives at `.opencode/dev-cycle/` in a Git project, or the global data directory otherwise. Its frontmatter carries the position:
 
