@@ -108,6 +108,30 @@ describe("dev-cycle cursor parsing", () => {
       })
     }),
   )
+
+  it.effect("reports whether the phase was actually read", () =>
+    Effect.sync(() => {
+      expect(DevCycle.parseCursorResult(frontmatter("architect", "approved")).ok).toBe(true)
+      // No block, no phase line, and an unknown phase are all unreadable.
+      expect(DevCycle.parseCursorResult(undefined).ok).toBe(false)
+      expect(DevCycle.parseCursorResult("# Cycle\n").ok).toBe(false)
+      expect(DevCycle.parseCursorResult("---\ngate: approved\n---\n").ok).toBe(false)
+      expect(DevCycle.parseCursorResult(frontmatter("deploy", "approved")).ok).toBe(false)
+      // The two strictness traps a human hand-edit falls into.
+      expect(DevCycle.parseCursorResult(frontmatter("Architect", "pending")).ok).toBe(false)
+      expect(DevCycle.parseCursorResult("---\nphase: architect  # waiting\n---\n").ok).toBe(false)
+    }),
+  )
+
+  it.effect("treats an unreadable gate as a safe degradation, not a failure", () =>
+    Effect.sync(() => {
+      // The gate falls back to `pending`, which only ever asks for an approval
+      // again. Only a lost *phase* risks redoing finished work.
+      const result = DevCycle.parseCursorResult(frontmatter("plan", "yes"))
+      expect(result.ok).toBe(true)
+      expect(result.cursor).toEqual({ phase: "plan", gate: "pending" })
+    }),
+  )
 })
 
 describe("dev-cycle mode agent", () => {
@@ -246,6 +270,40 @@ describe("dev-cycle mode reminder", () => {
       const text = reminderText(parts)
 
       expect(text).toContain("Current phase: discover. Gate at the end of this phase: pending.")
+      // ...and says so, rather than letting the fallback pass for fact.
+      expect(text).toContain("its frontmatter could not be parsed")
+    }),
+  )
+
+  it.instance("flags an unparseable position instead of presenting it as discover", () =>
+    Effect.gen(function* () {
+      // `phase: Architect` is the realistic way in: FIELD is case-sensitive,
+      // so one capital letter rewinds an in-flight cycle to phase 1. Without
+      // the warning this is indistinguishable from genuinely being at
+      // discover, and the model restarts discovery over live work.
+      const { parts } = yield* applyFor("dev-cycle", "---\nphase: Architect\ngate: approved\n---\n")
+      const text = reminderText(parts)
+
+      expect(text).toContain("Current phase: discover. Gate at the end of this phase: approved.")
+      expect(text).toContain("Treat this position as unknown")
+      expect(text).toContain("do not redo an earlier phase")
+    }),
+  )
+
+  it.instance("does not cry unknown for a position it could read", () =>
+    Effect.gen(function* () {
+      // No file at all is not a parse failure — there is nothing to parse.
+      const fresh = yield* applyFor("dev-cycle")
+      expect(reminderText(fresh.parts)).not.toContain("could not be parsed")
+
+      const good = yield* applyFor("dev-cycle", "---\nphase: build\ngate: approved\n---\n")
+      expect(reminderText(good.parts)).toContain("Current phase: build. Gate at the end of this phase: approved.")
+      expect(reminderText(good.parts)).not.toContain("could not be parsed")
+
+      // An unreadable gate degrades on its own and must not trip the warning.
+      const gate = yield* applyFor("dev-cycle", "---\nphase: build\ngate: yes\n---\n")
+      expect(reminderText(gate.parts)).toContain("Current phase: build. Gate at the end of this phase: pending.")
+      expect(reminderText(gate.parts)).not.toContain("could not be parsed")
     }),
   )
 

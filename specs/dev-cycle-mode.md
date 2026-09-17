@@ -258,7 +258,7 @@ registries are separate, and this design uses only the Lunos one.
 | Verify fails | Gate 3 stays `pending`; failures appended to the artifact; `phase` returns to `build` |
 | Gate rejected | Revise the current section in place; do not advance |
 | Session restart / compaction | Artifact frontmatter is the source of truth; reminder re-injects position |
-| Malformed frontmatter | Degrade to `discover`/`pending`; never throw |
+| Malformed frontmatter | Degrade to `discover`/`pending`; never throw; **the reminder states explicitly that the position is unknown**, so a parse failure does not read as genuinely being at phase 1. Only an unreadable *phase* triggers that — an unreadable `gate` degrades to `pending` silently, which errs toward re-asking rather than toward redoing work |
 | User switches to another mode mid-cycle | **Known gap, out of scope for v1.** Plan mode handles its equivalent with `BUILD_SWITCH` (`reminders.ts:62-71,76-92`); no analogue is built here |
 
 ## 7. Known limitations

@@ -66,7 +66,16 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
     const contents = exists
       ? yield* fsys.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
       : undefined
-    const cursor = DevCycle.parseCursor(contents)
+    const parsed = DevCycle.parseCursorResult(contents)
+    const cursor = parsed.cursor
+    // A file that exists and has content but whose frontmatter will not parse
+    // reads exactly like a cycle genuinely sitting at phase 1, and the model
+    // responds by redoing discovery over work that is already in flight.
+    // Hand-editing this frontmatter is the mode's only human control surface
+    // and the parser is strict on purpose, so this is one typo away
+    // (`phase: Architect`, `phase: architect  # waiting`). Say the position is
+    // unknown rather than assert a position nobody wrote.
+    const unreadable = exists && !!contents?.trim() && !parsed.ok
     const part = yield* sessions.updatePart({
       id: PartID.ascending(),
       messageID: userMessage.info.id,
@@ -78,6 +87,11 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
             ? `A cycle file already exists at ${file}. Read it and make incremental edits using the edit tool.`
             : `No cycle file exists yet. Create it at ${file} using the write tool, opening with the frontmatter block described below.`,
           `Current phase: ${cursor.phase}. Gate at the end of this phase: ${cursor.gate}.`,
+          ...(unreadable
+            ? [
+                "The cycle file exists but its frontmatter could not be parsed. Treat this position as unknown -- ask the human where the cycle stands before acting on it, and do not redo an earlier phase on the assumption that it was never done.",
+              ]
+            : []),
         ].join("\n"),
       ),
       synthetic: true,
