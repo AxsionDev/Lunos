@@ -220,8 +220,11 @@ describe("dev-cycle mode reminder", () => {
       // The placeholder must be interpolated, never emitted literally.
       expect(text).not.toContain("${cycleInfo}")
       // A fresh cycle starts at the first phase with its gate unapproved.
-      expect(text).toContain("discover")
-      expect(text).toContain("pending")
+      // Assert the whole interpolated line, not its words: "discover" and
+      // "pending" both appear in the static body of dev-cycle-mode.txt (line
+      // 10 lists every phase), so a substring assertion would pass even if the
+      // cursor were never injected at all.
+      expect(text).toContain("Current phase: discover. Gate at the end of this phase: pending.")
       expect(text).toContain("ONLY THE LAST ONE is current")
     }),
   )
@@ -233,8 +236,7 @@ describe("dev-cycle mode reminder", () => {
 
       expect(text).toContain("A cycle file already exists")
       expect(text).toContain(file)
-      expect(text).toContain("plan")
-      expect(text).toContain("approved")
+      expect(text).toContain("Current phase: plan. Gate at the end of this phase: approved.")
     }),
   )
 
@@ -243,8 +245,7 @@ describe("dev-cycle mode reminder", () => {
       const { parts } = yield* applyFor("dev-cycle", "# Cycle\n\nsomebody deleted the frontmatter\n")
       const text = reminderText(parts)
 
-      expect(text).toContain("discover")
-      expect(text).toContain("pending")
+      expect(text).toContain("Current phase: discover. Gate at the end of this phase: pending.")
     }),
   )
 
