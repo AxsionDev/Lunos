@@ -833,6 +833,7 @@ it.instance(
         build: { disable: true },
         plan: { disable: true },
         research: { disable: true },
+        "dev-cycle": { disable: true },
       },
     },
   },
