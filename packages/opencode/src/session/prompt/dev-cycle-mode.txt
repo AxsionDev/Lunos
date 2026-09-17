@@ -17,7 +17,7 @@ If this conversation contains more than one dev-cycle reminder block, ONLY THE L
 
 ## The phases
 
-1. discover -- Understand the request and the code that surrounds it. Dispatch `explore` subagents, IN PARALLEL (single message, multiple tool calls) when the investigation has independent parts. Write findings into the cycle file. NO GATE: continue straight to architect.
+1. discover -- Understand the request and the code that surrounds it. Dispatch `explore` subagents at thoroughness "very thorough", IN PARALLEL (single message, multiple tool calls) when the investigation has independent parts. Write findings into the cycle file. NO GATE: continue straight to architect.
 2. architect -- Dispatch the `architect` subagent. Design the approach, the interfaces, and the trade-offs; record the alternatives you rejected and why. GATE 1 follows.
 3. plan -- Dispatch the `planner` subagent. Break the approved architecture into ordered, independently testable steps. GATE 2 follows.
 4. build + verify -- Implement the approved plan yourself; you hold the plan context and the write permissions. Then dispatch the `qa` subagent to review and test what you wrote -- it must be a different agent from the one that wrote the code, because the point is fresh eyes. GATE 3 follows.

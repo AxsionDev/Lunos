@@ -198,13 +198,26 @@ const userMessage = (input: { sessionID: string; messageID: string }) => ({
   parts: [] as SessionV1.Part[],
 })
 
+// A prior assistant turn, used to put a mode-switch in the history. Only its
+// role and `agent` are read (reminders.ts:100).
+const assistantMessage = (input: { sessionID: string; agent: string }) => ({
+  info: {
+    id: MessageID.ascending(),
+    sessionID: input.sessionID,
+    role: "assistant",
+    agent: input.agent,
+    time: { created: Date.now() },
+  } as unknown as SessionV1.Info,
+  parts: [] as SessionV1.Part[],
+})
+
 const reminderText = (parts: SessionV1.Part[]) =>
   parts
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n")
 
-const applyFor = (agentName: string, seed?: string) =>
+const applyFor = (agentName: string, seed?: string, options?: { priorAgent?: string }) =>
   Effect.gen(function* () {
     const sessions = yield* SessionNs.Service
     const agents = yield* Agent.Service
@@ -227,9 +240,14 @@ const applyFor = (agentName: string, seed?: string) =>
       mode: "",
     } as unknown as SessionV1.Info)
 
-    const messages = [userMessage({ sessionID: session.id, messageID })] as any
-    const result = yield* SessionReminders.apply({ messages, agent, session })
-    return { session, file, parts: result[0].parts }
+    const user = userMessage({ sessionID: session.id, messageID })
+    // Reminders are pushed onto the last *user* message, so hold the reference
+    // rather than indexing — a prior turn shifts index 0.
+    const messages = (
+      options?.priorAgent ? [assistantMessage({ sessionID: session.id, agent: options.priorAgent }), user] : [user]
+    ) as any
+    yield* SessionReminders.apply({ messages, agent, session })
+    return { session, file, parts: user.parts }
   })
 
 describe("dev-cycle mode reminder", () => {
@@ -312,8 +330,15 @@ describe("dev-cycle mode reminder", () => {
   // input.agent.name === "build" (reminders.ts:61-71). This pins them apart.
   it.instance("does not fire for build mode, even with a phase: build artifact", () =>
     Effect.gen(function* () {
-      const { parts } = yield* applyFor("build", "---\nphase: build\ngate: pending\n---\n")
-      expect(reminderText(parts)).not.toContain("Dev-cycle mode is active")
+      // The prior assistant-`plan` turn is load-bearing: without it `wasPlan`
+      // is false at reminders.ts:100 and BUILD_SWITCH never gets pushed, so
+      // the second half of spec §8 — "the BUILD_SWITCH path behaves as
+      // before" — would silently never run.
+      const { parts } = yield* applyFor("build", "---\nphase: build\ngate: pending\n---\n", { priorAgent: "plan" })
+      const text = reminderText(parts)
+
+      expect(text).not.toContain("Dev-cycle mode is active")
+      expect(text).toContain("Your operational mode has changed from plan to build.")
     }),
   )
 
