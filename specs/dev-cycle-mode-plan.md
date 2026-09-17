@@ -591,6 +591,18 @@ git commit -m "feat(dev-cycle): steer dev-cycle mode by per-turn phase reminder"
 
 ### Task 5: Phase subagents
 
+> **SUPERSEDED — do not execute as written.** This task's premise is the defect
+> it shipped: project markdown under `.opencode/agent/` is only found by
+> `ConfigPaths.directories`, which scans the global config dir and the
+> `.opencode` dirs walked up from the cwd — never anything bundled into the
+> binary. A compiled-in `dev-cycle` naming project-scoped agents worked in this
+> repo and nowhere else. The three agents are now **native**, defined in
+> `agent.ts` with prompts in `packages/opencode/src/agent/prompt/{architect,planner,qa}.txt`.
+> See spec §5.2. The steps below are kept as a record of what was planned, not
+> as instructions; Step 5's verification note ("their read-only status is
+> prompt-level only and unverified at the config layer") is also obsolete —
+> `test/agent/agent.test.ts` now pins it at the permission layer.
+
 **Files:**
 - Create: `.opencode/agent/architect.md`
 - Create: `.opencode/agent/planner.md`
