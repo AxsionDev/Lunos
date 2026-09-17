@@ -347,6 +347,10 @@ export function research(input: { slug: string; time: { created: number } }, ins
   return artifact("research", input, instance)
 }
 
+export function devcycle(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return artifact("dev-cycle", input, instance)
+}
+
 export const getUsage = (input: { model: Provider.Model; usage: Usage; metadata?: ProviderMetadata }) => {
   const finite = (value: number) => (Number.isFinite(value) ? value : 0)
   const safe = (value: number) => Math.max(0, finite(value))
