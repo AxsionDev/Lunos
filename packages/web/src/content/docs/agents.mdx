@@ -713,6 +713,11 @@ This interactive command will:
 4. Let you select which permissions the agent should be allowed (anything you don't select is denied).
 5. Finally, create a markdown file with the agent configuration.
 
+The permissions in step 4 start with the read-only set selected — `bash`, `edit`, and `task` are
+off unless you turn them on. The agent's generated system prompt has no effect on what it is
+actually allowed to do, so an agent described as research-only still needs `edit` left unselected
+to be unable to write files.
+
 ---
 
 ## Use cases

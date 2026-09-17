@@ -16,7 +16,7 @@ type AgentMode = "all" | "primary" | "subagent"
 // Permission keys (not raw tool names). Multiple tools can map to a single
 // permission — e.g. write/edit/apply_patch all gate on `edit` — so we configure
 // agents at the permission level to match how the runtime actually enforces it.
-const AVAILABLE_PERMISSIONS = [
+export const AVAILABLE_PERMISSIONS = [
   "bash",
   "read",
   "edit",
@@ -29,6 +29,67 @@ const AVAILABLE_PERMISSIONS = [
   "lsp",
   "skill",
 ]
+
+// Permissions that let an agent change the world rather than observe it. `task`
+// counts because a subagent spawned with its own `edit`/`bash` grant is a
+// trivial way around a restriction placed on the parent.
+export const HIGH_RISK_PERMISSIONS = ["bash", "edit", "task"]
+
+// Opt-in, not opt-out: an agent starts with the observe-only permissions and the
+// user has to actively grant anything that can mutate state.
+export const DEFAULT_ALLOWED_PERMISSIONS = AVAILABLE_PERMISSIONS.filter(
+  (permission) => !HIGH_RISK_PERMISSIONS.includes(permission),
+)
+
+// Language that reads as "this agent only looks, it doesn't build". Used to warn
+// when a description like this is paired with mutating permissions — the
+// generated system prompt has no bearing on what the runtime actually allows.
+const RESTRICTED_INTENT_PATTERNS = [
+  /\bresearch(?:es|ing)?\b/i,
+  /\binvestigat(?:e|es|ing|ion)\b/i,
+  /\bexplain(?:s|ing)?\b/i,
+  /\baudit(?:s|ing|or)?\b/i,
+  /\bread[-\s]only\b/i,
+  /\bno code changes\b/i,
+  /\bwithout (?:making |writing )?(?:any )?(?:code )?changes\b/i,
+  /\bdoes not (?:write|edit|modify)\b/i,
+]
+
+/**
+ * Resolve the permission set from a `--permissions` value.
+ *
+ * Both an omitted flag and an empty value fall back to the conservative
+ * defaults — previously either one silently granted every permission.
+ */
+export function resolveSelectedPermissions(perms: string | undefined): string[] {
+  if (!perms) return DEFAULT_ALLOWED_PERMISSIONS
+  const parsed = perms
+    .split(",")
+    .map((permission) => permission.trim())
+    .filter((permission) => permission.length > 0)
+  return parsed.length > 0 ? [...new Set(parsed)] : DEFAULT_ALLOWED_PERMISSIONS
+}
+
+/** Build the frontmatter deny-map: everything not explicitly selected is denied. */
+export function buildPermissionConfig(selected: string[]): Record<string, "deny"> {
+  const permissions: Record<string, "deny"> = {}
+  for (const permission of AVAILABLE_PERMISSIONS) {
+    if (!selected.includes(permission)) {
+      permissions[permission] = "deny"
+    }
+  }
+  return permissions
+}
+
+/**
+ * Return the mutating permissions granted to an agent whose description reads as
+ * observe-only, so the caller can warn before writing the file. Empty when the
+ * intent and the permissions agree.
+ */
+export function detectIntentMismatch(input: { text: string; selected: string[] }): string[] {
+  if (!RESTRICTED_INTENT_PATTERNS.some((pattern) => pattern.test(input.text))) return []
+  return HIGH_RISK_PERMISSIONS.filter((permission) => input.selected.includes(permission))
+}
 
 const AgentCreateCommand = effectCmd({
   command: "create",
@@ -51,7 +112,9 @@ const AgentCreateCommand = effectCmd({
       .option("permissions", {
         type: "string",
         alias: ["tools"],
-        describe: `comma-separated list of permissions to allow (default: all). Available: "${AVAILABLE_PERMISSIONS.join(", ")}"`,
+        describe: `comma-separated list of permissions to allow (default: "${DEFAULT_ALLOWED_PERMISSIONS.join(
+          ", ",
+        )}"). Available: "${AVAILABLE_PERMISSIONS.join(", ")}"`,
       })
       .option("model", {
         type: "string",
@@ -74,7 +137,10 @@ const AgentCreateCommand = effectCmd({
       const cliRole = args.role as AgentMode | undefined
       const perms = args.permissions
 
-      const isFullyNonInteractive = cliPath && cliDescription && cliRole && perms !== undefined
+      // `--permissions` is deliberately not required here: omitting it is a valid
+      // scripted invocation that lands on the conservative defaults, rather than
+      // dropping into an interactive picker that would hang a non-TTY.
+      const isFullyNonInteractive = Boolean(cliPath && cliDescription && cliRole)
 
       if (!isFullyNonInteractive) {
         UI.empty()
@@ -138,16 +204,17 @@ const AgentCreateCommand = effectCmd({
 
       // Select permissions to allow
       let selected: string[]
-      if (perms !== undefined) {
-        selected = perms ? perms.split(",").map((t) => t.trim()) : AVAILABLE_PERMISSIONS
+      if (perms !== undefined || isFullyNonInteractive) {
+        selected = resolveSelectedPermissions(perms)
       } else {
         const result = await prompts.multiselect({
           message: "Select permissions to allow (Space to toggle)",
           options: AVAILABLE_PERMISSIONS.map((permission) => ({
             label: permission,
             value: permission,
+            hint: HIGH_RISK_PERMISSIONS.includes(permission) ? "lets the agent change things" : undefined,
           })),
-          initialValues: AVAILABLE_PERMISSIONS,
+          initialValues: DEFAULT_ALLOWED_PERMISSIONS,
         })
         if (prompts.isCancel(result)) throw new UI.CancelledError()
         selected = result
@@ -184,10 +251,26 @@ const AgentCreateCommand = effectCmd({
       }
 
       // Build permissions config — deny anything not explicitly selected.
-      const permissions: Record<string, "deny"> = {}
-      for (const permission of AVAILABLE_PERMISSIONS) {
-        if (!selected.includes(permission)) {
-          permissions[permission] = "deny"
+      const permissions = buildPermissionConfig(selected)
+
+      // The generated system prompt is prose; only this permission block is
+      // enforced. Warn when the two disagree instead of letting an agent that
+      // describes itself as read-only quietly keep write access.
+      // Only the user's own words and the when-to-use line — the generated
+      // system prompt is verbose enough ("explain your reasoning") to match on
+      // almost any agent, and a warning that always fires gets ignored.
+      const mismatched = detectIntentMismatch({
+        text: `${description} ${generated.whenToUse}`,
+        selected,
+      })
+      if (mismatched.length > 0) {
+        const warning = `This agent describes itself as research/read-only, but still has ${mismatched.join(
+          ", ",
+        )}. Its system prompt cannot restrict it — only permissions can.`
+        if (isFullyNonInteractive) {
+          console.error(`Warning: ${warning}`)
+        } else {
+          prompts.log.warn(warning)
         }
       }
 
