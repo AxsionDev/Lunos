@@ -214,8 +214,15 @@ registries are separate, and this design uses only the Lunos one.
    one mode, one permission set. Enforcing "no edits before gate 2" requires
    the rejected permission-level approach.
 3. **No mid-cycle mode-switch handling.** Per §6.
+4. **Prior turns retain their phase lines.** The reminder is persisted per
+   turn, so a multi-turn cycle shows several reminder blocks, each with the
+   phase that was current when it was written. Only the last is
+   authoritative; the earlier ones read as the cycle's history. The prompt
+   states this rule explicitly, but it is prompt-level like the gates
+   themselves. The underlying accumulation is shared with `plan` and
+   `research` and would need a generic fix across all three modes.
 
-All three are consequences of the advisory approach chosen in §1, and all
+All four are consequences of the advisory approach chosen in §1, and all
 three are resolved by the permission-level alternative if it is ever
 revisited.
 

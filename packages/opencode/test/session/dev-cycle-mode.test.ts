@@ -222,6 +222,7 @@ describe("dev-cycle mode reminder", () => {
       // A fresh cycle starts at the first phase with its gate unapproved.
       expect(text).toContain("discover")
       expect(text).toContain("pending")
+      expect(text).toContain("ONLY THE LAST ONE is current")
     }),
   )
 

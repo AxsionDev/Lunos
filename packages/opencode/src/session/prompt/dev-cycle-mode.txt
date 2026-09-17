@@ -13,6 +13,8 @@ gate: pending | approved
 
 The human may edit that frontmatter between turns to approve, rewind, or redirect you. The position quoted above is read fresh from the file every turn -- trust it over your own memory of what you were doing.
 
+If this conversation contains more than one dev-cycle reminder block, ONLY THE LAST ONE is current. Earlier blocks record where the cycle used to be, not where it is. This matters most after a rewind: if the human moves the phase backwards, an earlier block will show a LATER phase than the one you are actually in, and following it would skip the gate you were sent back to redo.
+
 ## The phases
 
 1. discover -- Understand the request and the code that surrounds it. Dispatch `explore` subagents, IN PARALLEL (single message, multiple tool calls) when the investigation has independent parts. Write findings into the cycle file. NO GATE: continue straight to architect.
