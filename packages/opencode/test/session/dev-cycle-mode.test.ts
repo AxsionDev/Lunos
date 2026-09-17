@@ -163,3 +163,109 @@ describe("dev-cycle mode agent", () => {
     }),
   )
 })
+
+const userMessage = (input: { sessionID: string; messageID: string }) => ({
+  info: {
+    id: input.messageID,
+    sessionID: input.sessionID,
+    role: "user",
+    time: { created: Date.now() },
+  } as unknown as SessionV1.Info,
+  parts: [] as SessionV1.Part[],
+})
+
+const reminderText = (parts: SessionV1.Part[]) =>
+  parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n")
+
+const applyFor = (agentName: string, seed?: string) =>
+  Effect.gen(function* () {
+    const sessions = yield* SessionNs.Service
+    const agents = yield* Agent.Service
+    const ctx = yield* InstanceState.context
+    const session = yield* sessions.create({})
+    const agent = yield* agents.get(agentName)
+    const messageID = MessageID.ascending()
+    const file = SessionNs.devcycle(session, ctx)
+
+    if (seed !== undefined) yield* Effect.promise(() => Bun.write(file, seed))
+
+    yield* sessions.updateMessage({
+      id: messageID,
+      sessionID: session.id,
+      role: "user",
+      time: { created: Date.now() },
+      agent: "user",
+      model: { providerID: "test", modelID: "test" },
+      tools: {},
+      mode: "",
+    } as unknown as SessionV1.Info)
+
+    const messages = [userMessage({ sessionID: session.id, messageID })] as any
+    const result = yield* SessionReminders.apply({ messages, agent, session })
+    return { session, file, parts: result[0].parts }
+  })
+
+describe("dev-cycle mode reminder", () => {
+  it.instance("injects a reminder carrying the resolved artifact path", () =>
+    Effect.gen(function* () {
+      const { file, parts } = yield* applyFor("dev-cycle")
+      const text = reminderText(parts)
+
+      expect(text).toContain("Dev-cycle mode is active")
+      expect(text).toContain("No cycle file exists yet")
+      expect(text).toContain(file)
+      // The placeholder must be interpolated, never emitted literally.
+      expect(text).not.toContain("${cycleInfo}")
+      // A fresh cycle starts at the first phase with its gate unapproved.
+      expect(text).toContain("discover")
+      expect(text).toContain("pending")
+    }),
+  )
+
+  it.instance("injects the cursor parsed from an existing artifact", () =>
+    Effect.gen(function* () {
+      const { file, parts } = yield* applyFor("dev-cycle", "---\nphase: plan\ngate: approved\n---\n\n# Cycle\n")
+      const text = reminderText(parts)
+
+      expect(text).toContain("A cycle file already exists")
+      expect(text).toContain(file)
+      expect(text).toContain("plan")
+      expect(text).toContain("approved")
+    }),
+  )
+
+  it.instance("degrades to discover/pending on malformed frontmatter", () =>
+    Effect.gen(function* () {
+      const { parts } = yield* applyFor("dev-cycle", "# Cycle\n\nsomebody deleted the frontmatter\n")
+      const text = reminderText(parts)
+
+      expect(text).toContain("discover")
+      expect(text).toContain("pending")
+    }),
+  )
+
+  // The cursor value `build` and the agent name `build` are different
+  // namespaces that now share one module: reminders.ts already branches on
+  // input.agent.name === "build" (reminders.ts:61-71). This pins them apart.
+  it.instance("does not fire for build mode, even with a phase: build artifact", () =>
+    Effect.gen(function* () {
+      const { parts } = yield* applyFor("build", "---\nphase: build\ngate: pending\n---\n")
+      expect(reminderText(parts)).not.toContain("Dev-cycle mode is active")
+    }),
+  )
+
+  it.instance("leaves the plan and research reminders untouched", () =>
+    Effect.gen(function* () {
+      const plan = yield* applyFor("plan")
+      expect(reminderText(plan.parts)).toContain("Plan mode")
+      expect(reminderText(plan.parts)).not.toContain("Dev-cycle mode is active")
+
+      const research = yield* applyFor("research")
+      expect(reminderText(research.parts)).toContain("Research mode is active")
+      expect(reminderText(research.parts)).not.toContain("Dev-cycle mode is active")
+    }),
+  )
+})

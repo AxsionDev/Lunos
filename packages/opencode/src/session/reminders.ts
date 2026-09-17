@@ -12,6 +12,8 @@ import PROMPT_PLAN from "./prompt/plan.txt"
 import BUILD_SWITCH from "./prompt/build-switch.txt"
 import PLAN_MODE from "./prompt/plan-mode.txt"
 import RESEARCH_MODE from "./prompt/research-mode.txt"
+import DEV_CYCLE_MODE from "./prompt/dev-cycle-mode.txt"
+import { DevCycle } from "./dev-cycle"
 
 export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   messages: SessionV1.WithParts[]
@@ -40,6 +42,43 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
         exists
           ? `A research file already exists at ${file}. You can read it and make incremental edits using the edit tool.`
           : `No research file exists yet. You should create it at ${file} using the write tool.`,
+      ),
+      synthetic: true,
+    })
+    userMessage.parts.push(part)
+    return input.messages
+  }
+
+  // Like research, dev-cycle is independent of the plan-mode flag: its
+  // reminder carries both the output path and the phase cursor, so it always
+  // follows the path-bearing shape above.
+  if (input.agent.name === "dev-cycle") {
+    const ctx = yield* InstanceState.context
+    const file = Session.devcycle(input.session, ctx)
+    const exists = yield* fsys.existsSafe(file)
+    if (!exists) yield* fsys.ensureDir(path.dirname(file)).pipe(Effect.catch(Effect.die))
+    // Read every turn, never cache: the human edits this frontmatter to
+    // approve or rewind a gate, and that must take effect on the next turn.
+    // `readFileStringSafe` carries an Error channel (fs-util.ts:35) that this
+    // file has no precedent for handling — `orElseSucceed` is verified in use
+    // across packages/*/src (26 call sites, e.g. packages/core/src/npm.ts).
+    // A file we cannot read degrades to the default cursor; it never throws.
+    const contents = exists
+      ? yield* fsys.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
+      : undefined
+    const cursor = DevCycle.parseCursor(contents)
+    const part = yield* sessions.updatePart({
+      id: PartID.ascending(),
+      messageID: userMessage.info.id,
+      sessionID: userMessage.info.sessionID,
+      type: "text",
+      text: DEV_CYCLE_MODE.replace("${cycleInfo}", () =>
+        [
+          exists
+            ? `A cycle file already exists at ${file}. Read it and make incremental edits using the edit tool.`
+            : `No cycle file exists yet. Create it at ${file} using the write tool, opening with the frontmatter block described below.`,
+          `Current phase: ${cursor.phase}. Gate at the end of this phase: ${cursor.gate}.`,
+        ].join("\n"),
       ),
       synthetic: true,
     })
