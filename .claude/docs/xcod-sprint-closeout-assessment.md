@@ -11,15 +11,15 @@ Already Done: XCOD-16, 18, 19, 22, 23, 24, 25, 27, 40, 45.
 
 ## The 7 remaining, triaged by who can actually close them
 
-| Issue   | Summary                              | Verdict                                                                         |
-| ------- | ------------------------------------ | ------------------------------------------------------------------------------- |
-| XCOD-28 | GitHub org/repo rename               | **Closable now** — verified complete                                            |
-| XCOD-20 | Clean-machine install (Phase 0 exit) | **Advanced, not Done** — clean-container install verified; needs a real release |
-| XCOD-17 | Legal/entity ownership decision      | Needs owner decision                                                            |
-| XCOD-26 | Claim social/community handles       | Needs owner accounts                                                            |
-| XCOD-29 | Design-partner outreach              | Explicitly "BD/PO-owned, not engineering"                                       |
-| XCOD-30 | GTM metrics tracking                 | Reference doc missing                                                           |
-| XCOD-31 | Build-in-public cadence              | Reference doc missing                                                           |
+| Issue   | Summary                              | Verdict                                                                                                     |
+| ------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| XCOD-28 | GitHub org/repo rename               | **Closable now** — verified complete                                                                        |
+| XCOD-20 | Clean-machine install (Phase 0 exit) | **All 4 ACs met** — install verified from a real release; AC-3 splash/theme verified 2026-09-18 under a pty |
+| XCOD-17 | Legal/entity ownership decision      | Needs owner decision                                                                                        |
+| XCOD-26 | Claim social/community handles       | Needs owner accounts                                                                                        |
+| XCOD-29 | Design-partner outreach              | Explicitly "BD/PO-owned, not engineering"                                                                   |
+| XCOD-30 | GTM metrics tracking                 | Reference doc missing                                                                                       |
+| XCOD-31 | Build-in-public cadence              | Reference doc missing                                                                                       |
 
 ## XCOD-28 — verified complete
 
@@ -38,6 +38,12 @@ Both acceptance criteria hold as of this assessment:
 agent." — inherited from upstream, never rebranded. A one-line `gh repo edit --description` fixes it.
 
 ## XCOD-20 — partially verifiable today, fully blocked on release
+
+> [!NOTE]
+> **Superseded in part (2026-09-18).** All four ACs have since been met — see the AC-3 close-out at
+> the end of this section and `xcod-20-ac3-splash-theme-verification.md`. The publish-pipeline and
+> code-signing analysis below remains accurate and still applies to a **real versioned release**;
+> XCOD-20 itself was verified against a prerelease.
 
 Phase 0's stated exit criterion is **not** fully blocked. `build-cli` succeeded and left a live
 run artifact, so the CI-built CLI can be inspected now; what is missing is the _published release_
@@ -205,8 +211,10 @@ A **prerelease** was used deliberately: `releases/latest/download/` skips prerel
 not become what a stray `curl … | bash` picks up, while `install --version` still exercises the
 genuine `releases/download/v${version}/` path.
 
-**Remaining gap for XCOD-20:** AC-3 — splash and default theme (XCOD-6 / XCOD-2) are still
-unverified, because both need an interactive TTY that a scripted container run cannot exercise.
+**~~Remaining gap for XCOD-20:~~ AC-3 — CLOSED 2026-09-18.** Splash and default theme
+(XCOD-6 / XCOD-2) are **verified**; see `xcod-20-ac3-splash-theme-verification.md`. The blocker
+recorded below assumed a scripted run cannot reach a TTY — true of a plain pipe, but a **pty**
+(`pty.fork()` + `TIOCSWINSZ`) gives the TUI a real terminal, and the check ran cleanly at 120x45.
 
 **What the earlier `--binary` test did not prove:**
 
@@ -215,11 +223,13 @@ unverified, because both need an interactive TTY that a scripted container run c
    is accepted as satisfying the AC.
 3. **Version is a dev build,** not a real release version. Acceptable for verification purposes; a
    real versioned release still depends on the publish pipeline.
-4. **Splash and default theme (XCOD-6 / XCOD-2) unverified** — both require an interactive TUI
-   session, which a non-TTY container run cannot exercise. **Still open.**
+4. ~~**Splash and default theme (XCOD-6 / XCOD-2) unverified**~~ — **Resolved 2026-09-18.** The
+   premise ("a non-TTY container run cannot exercise it") was too strong: a pty gives the TUI a
+   real terminal. Splash renders to spec and the default theme is Catppuccin Mocha, deliberately
+   set by `6e3fc97d5d` under XCOD-2. See `xcod-20-ac3-splash-theme-verification.md`.
 
-So XCOD-20 has three of four acceptance criteria met with recorded evidence. Only the splash/theme
-check (AC-3) remains before it can close.
+So **all four of XCOD-20's acceptance criteria are met with recorded evidence.** From XCOD-20's side
+the Phase 0 exit gate is clear; XCOD-15 is a separate gate and is unaffected.
 
 ## XCOD-30 / XCOD-31 — dangling reference
 
