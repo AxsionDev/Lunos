@@ -14,7 +14,7 @@
 ## Why this exists
 
 A cadence of small public updates compounds trust in a way a single launch moment cannot. The
-GTM plan calls it *low effort, high compounding trust signal* — and it solves the content-calendar
+GTM plan calls it _low effort, high compounding trust signal_ — and it solves the content-calendar
 problem permanently, because the roadmap's own phase-exit criteria decide what gets written and
 when. Nobody has to invent something to say.
 
@@ -27,13 +27,13 @@ fork.** That reads as vaporware and cannot be redone.
 
 A note is written when one of these happens — not on a calendar:
 
-| Trigger | Note type | Example |
-| --- | --- | --- |
-| A **roadmap phase exits** | Milestone post | Phase 0 exit — the launch moment |
-| A **Phase 1 differentiator ships** | Milestone post | EU model routing live; self-hosted deployment guide; CRA/SBOM mapping |
-| An **epic ships** | Milestone post | The marketplace epic (XCOD-7) — demo-able, screenshot/GIF-friendly |
-| **~2 weeks of merged work** with no milestone | Sprint note | The seeded entry below |
-| A **decision worth showing the reasoning for** | Sprint note section | Merge-over-rebase (XCOD-16); the name freeze (XCOD-22) |
+| Trigger                                        | Note type           | Example                                                               |
+| ---------------------------------------------- | ------------------- | --------------------------------------------------------------------- |
+| A **roadmap phase exits**                      | Milestone post      | Phase 0 exit — the launch moment                                      |
+| A **Phase 1 differentiator ships**             | Milestone post      | EU model routing live; self-hosted deployment guide; CRA/SBOM mapping |
+| An **epic ships**                              | Milestone post      | The marketplace epic (XCOD-7) — demo-able, screenshot/GIF-friendly    |
+| **~2 weeks of merged work** with no milestone  | Sprint note         | The seeded entry below                                                |
+| A **decision worth showing the reasoning for** | Sprint note section | Merge-over-rebase (XCOD-16); the name freeze (XCOD-22)                |
 
 If two weeks pass and none of the above fired, that is itself the signal — write nothing rather
 than manufacture an update. An honest gap beats filler.
@@ -60,11 +60,11 @@ sprint note.
 Notes are one of **three distinct changelog-shaped artifacts**. Keeping them separate is what stops
 each from being a worse version of another:
 
-| Artifact | Location | Answers | Produced by |
-| --- | --- | --- | --- |
-| Per-release notes | GitHub Release body | *What changed in this release* | Generated — `script/version.ts` → `script/changelog.ts` → `gh release create --notes-file` |
-| `CHANGELOG.md` | Repo root | *What changed across releases*, curated | Hand-written, updated as work merges |
-| **Lunos Notes** | `.claude/docs/notes/` | ***Why we did it that way*** | Hand-written, per trigger above |
+| Artifact          | Location              | Answers                                 | Produced by                                                                                |
+| ----------------- | --------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Per-release notes | GitHub Release body   | _What changed in this release_          | Generated — `script/version.ts` → `script/changelog.ts` → `gh release create --notes-file` |
+| `CHANGELOG.md`    | Repo root             | _What changed across releases_, curated | Hand-written, updated as work merges                                                       |
+| **Lunos Notes**   | `.claude/docs/notes/` | **_Why we did it that way_**            | Hand-written, per trigger above                                                            |
 
 The notes are the only one of the three that is narrative. A generator cannot produce
 "we measured 109 conflicts rebasing and 0 merging, so here is the policy" — that is the half worth
@@ -76,7 +76,7 @@ upstream sync policy (`.claude/docs/xcod-16-upstream-sync-policy.md`) governs sh
 upstream never touches is not one of them.
 
 **This path is a staging area, not the published home.** `.claude/` is internal working space; a
-note is *copied out* to its public channel at publication time and the copy becomes canonical. The
+note is _copied out_ to its public channel at publication time and the copy becomes canonical. The
 staged file stays as the drafting record. `.claude/docs/notes/` never itself becomes public.
 
 **Publication target once the gate opens:** GitHub Releases (attached to the release the note
@@ -93,15 +93,19 @@ home, with every other channel linking back to it.
 **Date:** YYYY-MM-DD · **Covers:** <ticket range or phase>
 
 ## What shipped
+
 <3-6 bullets. Each names the user-visible effect, not the commit.>
 
 ## What we decided, and why
+
 <1-3 decisions with the reasoning shown. This is the part people actually read.>
 
 ## What is still broken or unproven
+
 <Honest. Named blockers with ticket keys. Never omit this section.>
 
 ## Next
+
 <2-3 items. No dates unless they are already committed publicly.>
 ```
 
@@ -109,7 +113,7 @@ home, with every other channel linking back to it.
 
 - **Never disparage upstream.** The fork exists because opencode is good enough to build on.
 - **Never claim unverified parity or working installs.** Every claim must be true at publication
-  time. If it is not yet verified, it goes in *"still broken or unproven"* instead.
+  time. If it is not yet verified, it goes in _"still broken or unproven"_ instead.
 - Lead with sovereignty and compliance, not feature-parity (GTM plan §3).
 
 ---
@@ -118,7 +122,7 @@ home, with every other channel linking back to it.
 
 **Hold Show HN, press outreach, and any paid channel** until **both**:
 
-1. Phase 0 exits — **XCOD-15** / **XCOD-20**, *and*
+1. Phase 0 exits — **XCOD-15** / **XCOD-20**, _and_
 2. one real Phase 1 differentiator is live.
 
 This is an explicit gate, not a task. Nothing completes it; it either holds or it is violated.
@@ -137,7 +141,7 @@ Run top to bottom. **Do not skip ahead**; each tier assumes the one above it is 
 > **One deliberate reorder from XCOD-31's list.** The ticket enumerates GitHub → Reddit → Fosstodon
 > → Digital SME → opencode ecosystem → FOSDEM/Sofia. This checklist keeps GitHub first and the
 > venues last, but promotes **Digital SME and design partners above Reddit/Fosstodon** — because
-> the GTM plan calls Digital SME *the cheapest, warmest distribution available* (§6-7) and rates
+> the GTM plan calls Digital SME _the cheapest, warmest distribution available_ (§6-7) and rates
 > design-partner outreach above any public post at this stage (§5), and because both are **ungated**
 > while the cold channels are not. Warm before cold; the relative order of the cold channels is
 > unchanged from the ticket.
@@ -145,24 +149,24 @@ Run top to bottom. **Do not skip ahead**; each tier assumes the one above it is 
 ### Tier 0 — before anything is public
 
 - [ ] **Gate check.** XCOD-15 and XCOD-20 both closed? If no, stop. Only Tier 1 items marked
-      *(ungated)* are available.
+      _(ungated)_ are available.
 - [ ] One real Phase 1 differentiator live and demonstrable?
-- [ ] Every claim in the note verified true *today*, not "true when drafted"?
+- [ ] Every claim in the note verified true _today_, not "true when drafted"?
 
-### Tier 1 — GitHub itself *(free and compounding; start here always)*
+### Tier 1 — GitHub itself _(free and compounding; start here always)_
 
-- [ ] README current and leading with the §3 positioning *(ungated — already done, XCOD-23)*
-- [ ] Roadmap visible and current *(ungated)*
-- [ ] `good-first-issue` labels applied to real, genuinely small issues *(ungated)*
+- [ ] README current and leading with the §3 positioning _(ungated — already done, XCOD-23)_
+- [ ] Roadmap visible and current _(ungated)_
+- [ ] `good-first-issue` labels applied to real, genuinely small issues _(ungated)_
 - [ ] Note published to Releases / Discussions
 
-### Tier 2 — warm distribution *(cheapest, highest-trust — do before cold channels)*
+### Tier 2 — warm distribution _(cheapest, highest-trust — do before cold channels)_
 
 - [ ] **Digital SME Alliance** — leverage the CRA compliance guide co-authorship. The GTM plan
-      calls this *the cheapest, warmest distribution available*. Strongest fit for the CRA/SBOM
+      calls this _the cheapest, warmest distribution available_. Strongest fit for the CRA/SBOM
       milestone specifically.
 - [ ] **Design partners** — 3-5 warm ECRIS/euLISA-adjacent and Axsion-network contacts (XCOD-29).
-      Private outreach, *not* a public post. **Ungated and can start immediately** — the GTM plan
+      Private outreach, _not_ a public post. **Ungated and can start immediately** — the GTM plan
       rates this above any public post at this stage.
 
 ### Tier 3 — community channels
@@ -173,7 +177,7 @@ Run top to bottom. **Do not skip ahead**; each tier assumes the one above it is 
 - [ ] **opencode's own community / `ecosystem.mdx`** — a fork listing itself respectfully.
       Read the tone rules above twice before writing this one.
 
-### Tier 4 — venues *(low-cost rehearsal before any high-stakes post)*
+### Tier 4 — venues _(low-cost rehearsal before any high-stakes post)_
 
 - [ ] **FOSDEM** — Brussels, early February.
 - [ ] **Local Sofia meetups.**
@@ -188,13 +192,13 @@ Run top to bottom. **Do not skip ahead**; each tier assumes the one above it is 
 
 ## Metrics to watch
 
-Per GTM plan §8 and XCOD-30 — what a note is *for*, so cadence can be judged:
+Per GTM plan §8 and XCOD-30 — what a note is _for_, so cadence can be judged:
 
 - GitHub stars and forks; **unique contributors** (a better OSS-credibility signal than stars)
 - CLI install counts (a manual proxy is acceptable until telemetry exists)
 - README / landing-page → email-capture conversion
-- **Design-partner conversations opened and signed reference deployments** — *the metric that
-  actually matters for this business model*
+- **Design-partner conversations opened and signed reference deployments** — _the metric that
+  actually matters for this business model_
 
 **Explicitly vanity, do not optimise for:** follower counts, post likes.
 

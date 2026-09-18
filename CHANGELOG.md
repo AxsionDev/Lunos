@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 **About this file.** Lunos is a fork of [opencode](https://github.com/sst/opencode). This changelog
-records *Lunos's own* changes — the fork's branding, infrastructure, and EU-sovereignty work — not
+records _Lunos's own_ changes — the fork's branding, infrastructure, and EU-sovereignty work — not
 the full upstream history, which lives in opencode's repository. Where an upstream release is
 merged in, it is noted as a single entry rather than expanded.
 

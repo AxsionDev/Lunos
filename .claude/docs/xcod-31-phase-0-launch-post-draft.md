@@ -11,7 +11,7 @@
 > 2. **XCOD-15** closed — Phase 0 governance, CI, and legal foundation complete.
 > 3. **One real Phase 1 differentiator live.** As of this draft, none is. Publishing on an
 >    essentially unmodified fork reads as vaporware.
-> 4. Every factual claim below re-verified *on the day*, not trusted from this draft.
+> 4. Every factual claim below re-verified _on the day_, not trusted from this draft.
 > 5. `[BRACKETED]` placeholders resolved — each marks a claim that cannot be written truthfully yet.
 >
 > **Do not** copy this into the README, a GitHub Release body, a Discussion, the landing site, or
@@ -113,14 +113,14 @@ data-protection or procurement constraint that off-the-shelf agents fail. If tha
 
 ## Channel-specific adjustments
 
-| Channel | Adjustment |
-| --- | --- |
-| **GitHub Release / Discussion** | Publish as-is. This is the canonical version; everything else links here. |
-| **Digital SME Alliance** | Lead with the CRA section, not the fork story. This audience cares about the May 2026 deadline first. |
-| **r/opensource, r/selfhosted** | Lead with self-hosting specifics. Trim the procurement framing — it reads as enterprise marketing to this audience. |
-| **r/LocalLLaMA** | Lead with model routing and what runs locally. The sovereignty framing is secondary; the technical substance is the draw. |
-| **Fosstodon / EU Mastodon** | Thread, not a link drop. Lead with the EU angle — it is the reason this audience is the right one. |
-| **opencode community / `ecosystem.mdx`** | Shortest form. A respectful listing, no positioning-against. Re-read the tone rules first. |
+| Channel                                  | Adjustment                                                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **GitHub Release / Discussion**          | Publish as-is. This is the canonical version; everything else links here.                                                 |
+| **Digital SME Alliance**                 | Lead with the CRA section, not the fork story. This audience cares about the May 2026 deadline first.                     |
+| **r/opensource, r/selfhosted**           | Lead with self-hosting specifics. Trim the procurement framing — it reads as enterprise marketing to this audience.       |
+| **r/LocalLLaMA**                         | Lead with model routing and what runs locally. The sovereignty framing is secondary; the technical substance is the draw. |
+| **Fosstodon / EU Mastodon**              | Thread, not a link drop. Lead with the EU angle — it is the reason this audience is the right one.                        |
+| **opencode community / `ecosystem.mdx`** | Shortest form. A respectful listing, no positioning-against. Re-read the tone rules first.                                |
 
 ## Pre-publication checklist
 
