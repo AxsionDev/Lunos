@@ -129,14 +129,14 @@ This is an explicit gate, not a task. Nothing completes it; it either holds or i
 
 **Current status — 2026-09-18: the gate HOLDS, on XCOD-15 alone.** XCOD-20's acceptance criteria are
 now all met — AC-3 (splash / default theme) was verified 2026-09-18, see
-`xcod-20-ac3-splash-theme-verification.md` — though the ticket still needs its Jira status moved.
-**XCOD-15 remains open, so publication stays gated.**
+`xcod-20-ac3-splash-theme-verification.md` — and the ticket sits in _in Review_ pending the owner's
+Phase 0 exit call. **XCOD-15 remains open, so publication stays gated.**
 
 > [!WARNING]
-> **Before publishing, clear the first-run branding defect** recorded in the AC-3 verification:
-> `packages/tui/src/feature-plugins/home/tips-view.tsx` still tells users to run `opencode …`
-> commands that do not exist on a `lunos` install. The launch post drives traffic straight at that
-> screen.
+> **Before publishing, clear XCOD-56** — the first-run branding defect found during the AC-3
+> verification. `packages/tui/src/feature-plugins/home/tips-view.tsx` still tells users to run
+> `opencode …` commands that do not exist on a `lunos` install. The launch post drives traffic
+> straight at that screen.
 
 Re-check both tickets before any publication. The gate is not satisfied by this document existing.
 

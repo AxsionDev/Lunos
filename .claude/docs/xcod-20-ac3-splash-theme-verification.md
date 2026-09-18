@@ -184,7 +184,9 @@ rebrand sweep was textual and nobody had looked at the running TUI.
 model line — "OpenCode Zen" is a provider name and is deliberately excluded from the rebrand.
 Only the command names and the standalone product references should change.
 
-Recommend a separate ticket; it is outside XCOD-20's ACs and should not block Phase 0 exit.
+Filed as **XCOD-56**. Outside XCOD-20's ACs, so it does not block Phase 0 exit — but it is a
+launch-readiness item, since XCOD-31's publication gate opens partly on XCOD-20 and the launch post
+drives new users straight at this screen.
 
 ## Session note — Jira unreachable
 
