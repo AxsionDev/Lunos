@@ -68,6 +68,12 @@ public-sector procurement carries more trademark exposure than a typical dev too
 scoped to accept a provisional answer with a named trigger — or, at the latest, **before the first
 paid pilot**. A name freeze is not a trademark clearance, and nothing here should be read as one.
 
+> **Update 2026-09-18 (XCOD-17 decided):** XCOD-17 landed as "provisional: Axsion" and
+> **deliberately re-deferred** trademark clearance rather than folding it in — entity choice and
+> name clearance are separable, and clearance needs a registry search plus counsel. The trigger is
+> now the fallback named above: **before the first paid pilot**, travelling with XCOD-17's own
+> revisit gate. See `.claude/docs/xcod-17-legal-entity-decision.md`.
+
 Also unchecked, and deliberately deferred to the stories that own them: App Store / VS Code
 Marketplace / Open VSX listing conflicts (both publish workflows are deferred by XCOD-19), GitHub
 org availability (XCOD-28), and social handles (XCOD-26).
