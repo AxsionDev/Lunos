@@ -53,8 +53,10 @@ CI, and release pipeline. Nothing here is production-ready yet.
 Decision records for the work so far live in [`.claude/docs/`](.claude/docs/) — covering the
 upstream sync policy, the CI workflow triage, and the product name freeze.
 
-<!-- TODO(XCOD-23): link or embed the feature-parity table once it exists. The ticket sources it
-     from product-vision-roadmap.md, which is not present in this repository. -->
+<!-- XCOD-23: a feature-parity table was dropped from scope by the product owner (2026-09-18).
+     The ticket sourced it from product-vision-roadmap.md, which is confirmed lost — no written
+     parity table has ever existed; comparisons were made ad hoc from vendors' own sites. Do not
+     re-open this as an oversight; add one only if someone decides to author it from scratch. -->
 A published roadmap and a feature-parity comparison table are still to come.
 
 <p align="center">
@@ -82,9 +84,9 @@ A published roadmap and a feature-parity comparison table are still to come.
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-<!-- TODO(XCOD-23): replace with a terminal GIF/screenshot of Lunos actually running.
-     This still shows upstream opencode's UI, not Lunos's splash or default theme.
-     Needs a real capture (asciinema or similar). -->
+<!-- XCOD-23: capturing a Lunos-specific terminal GIF/screenshot was explicitly skipped by the
+     product owner (2026-09-18). This image is upstream opencode's UI, not Lunos's splash or
+     default theme. Kept deliberately as a stand-in; replace it whenever someone records one. -->
 [![Terminal UI — upstream opencode, pending a Lunos capture](packages/web/src/assets/lander/screenshot.png)](https://github.com/pminev1/Lunos)
 
 ---
