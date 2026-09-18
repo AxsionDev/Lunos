@@ -38,6 +38,11 @@ A note is written when one of these happens — not on a calendar:
 If two weeks pass and none of the above fired, that is itself the signal — write nothing rather
 than manufacture an update. An honest gap beats filler.
 
+**`CHANGELOG.md` is updated on a different rhythm: as work merges, not per note.** Add the entry
+under `[Unreleased]` when the change lands, and promote `[Unreleased]` to a version heading at
+release time. Keep its **Known limitations** section current — that section is the reason the rest
+of the file is credible, and it is the first thing to go stale.
+
 ### The CRA angle is time-sensitive
 
 The CRA/SBOM mapping milestone is flagged in the GTM plan as **genuinely newsworthy** given the
@@ -52,16 +57,23 @@ sprint note.
 .claude/docs/notes/YYYY-MM-DD-<slug>.md
 ```
 
-Fork-owned, inside the gate, and **deliberately not a root `CHANGELOG.md`**:
+Notes are one of **three distinct changelog-shaped artifacts**. Keeping them separate is what stops
+each from being a worse version of another:
 
-- The release pipeline **already generates per-release notes** — `script/version.ts` runs
-  `script/changelog.ts` to produce `UPCOMING_CHANGELOG.md` and feeds it to
-  `gh release create --notes-file`. A hand-maintained root changelog would duplicate that.
-- These are different artifacts. The generated changelog answers *what changed*. A build-in-public
-  note answers *why we did it that way* — the narrative half, which no generator produces.
-- A root-level file is a **merge surface against upstream**. The upstream sync policy
-  (`.claude/docs/xcod-16-upstream-sync-policy.md`) exists because conflict cost here is real and
-  measured. Fork-owned paths under `.claude/` cost nothing to carry.
+| Artifact | Location | Answers | Produced by |
+| --- | --- | --- | --- |
+| Per-release notes | GitHub Release body | *What changed in this release* | Generated — `script/version.ts` → `script/changelog.ts` → `gh release create --notes-file` |
+| `CHANGELOG.md` | Repo root | *What changed across releases*, curated | Hand-written, updated as work merges |
+| **Lunos Notes** | `.claude/docs/notes/` | ***Why we did it that way*** | Hand-written, per trigger above |
+
+The notes are the only one of the three that is narrative. A generator cannot produce
+"we measured 109 conflicts rebasing and 0 merging, so here is the policy" — that is the half worth
+reading, and the half that does the build-in-public work.
+
+**On the root `CHANGELOG.md`:** upstream has no changelog at its root, so a fork-only file there
+carries near-zero merge risk — git conflicts only when both sides modify the same file. The
+upstream sync policy (`.claude/docs/xcod-16-upstream-sync-policy.md`) governs shared files; a file
+upstream never touches is not one of them.
 
 **This path is a staging area, not the published home.** `.claude/` is internal working space; a
 note is *copied out* to its public channel at publication time and the copy becomes canonical. The
