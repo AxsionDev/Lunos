@@ -156,10 +156,10 @@ Every document must follow this structure:
 
 _This section is reserved for the legal team's review comments._
 
-- [ ] Reviewed by: ******\_\_\_******
-- [ ] Review date: ******\_\_\_******
+- [ ] Reviewed by: **\*\***\_\_\_**\*\***
+- [ ] Review date: **\*\***\_\_\_**\*\***
 - [ ] Approved: Yes / No / With Changes
-- [ ] Changes required: ******\_\_\_******
+- [ ] Changes required: **\*\***\_\_\_**\*\***
 ```
 
 ## Task-Specific Rules

@@ -25,7 +25,7 @@
 
 ## 1. Current-state assessment
 
-*Source: XCOD-21 background, close paraphrase.*
+_Source: XCOD-21 background, close paraphrase._
 
 The plan's v0.1 review of the project found:
 
@@ -43,21 +43,21 @@ The plan's v0.1 review of the project found:
 
 ## 2. Naming — "Priority Zero"
 
-*Source: XCOD-22. Resolved; see below.*
+_Source: XCOD-22. Resolved; see below._
 
 v0.1 flagged naming as **Priority Zero**. The collision risk recorded against "Lunos":
 
-| Collision | Nature |
-|---|---|
-| `lunos.ai` | Active, funded AI-agents startup (~$5M pre-seed) |
-| `lunosrouter.com` | An LLM router |
-| `lunos.de` | German company shipping its own AI product, "LUISA" |
+| Collision         | Nature                                              |
+| ----------------- | --------------------------------------------------- |
+| `lunos.ai`        | Active, funded AI-agents startup (~$5M pre-seed)    |
+| `lunosrouter.com` | An LLM router                                       |
+| `lunos.de`        | German company shipping its own AI product, "LUISA" |
 
 None is a CLI coding agent directly, but each competes for search, HN and word-of-mouth attention.
 "Ratio" had no direct collisions found and was noted as arguably safer on pure marketing clearance.
 
 The decision criteria v0.1 demanded: domain availability, npm package availability,
-App/marketplace listing conflicts, and search confusability — explicitly *not* just "no other
+App/marketplace listing conflicts, and search confusability — explicitly _not_ just "no other
 coding agent uses this name."
 
 **Resolved (XCOD-22, Done):** the name is **frozen as Lunos**. Trademark clearance remains
@@ -65,7 +65,7 @@ outstanding as a separate concern. See `.claude/docs/xcod-4-lunos-rename-decisio
 
 ## 3. Positioning
 
-*Source: XCOD-23, quoted verbatim from v0.1 §3.*
+_Source: XCOD-23, quoted verbatim from v0.1 §3._
 
 The one-liner:
 
@@ -85,7 +85,7 @@ XCOD-25 requires the landing page to reproduce this positioning **verbatim**.
 
 ## 4. Assets
 
-*Source: XCOD-23, 25, 26, 27 (all cite §4).*
+_Source: XCOD-23, 25, 26, 27 (all cite §4)._
 
 **The README is the single highest-leverage marketing asset for a dev tool** — v0.1's phrasing.
 Required elements:
@@ -102,7 +102,7 @@ Supporting assets: a one-page landing site with email capture (§9.3), claimed s
 
 ## 5. Design partners — the highest-value channel
 
-*Source: XCOD-29, XCOD-31.*
+_Source: XCOD-29, XCOD-31._
 
 Private outreach to **3-5 warm ECRIS/euLISA-adjacent and Axsion-network contacts**, characterised
 in v0.1 as **"likely worth more than any public post at this stage."**
@@ -112,13 +112,13 @@ start immediately, independent of whether any public asset is ready.
 
 ## 6-7. Channel sequencing
 
-*Source: XCOD-31, close paraphrase.*
+_Source: XCOD-31, close paraphrase._
 
 Once a first public post is ready, in priority order:
 
 1. **GitHub itself** — README, roadmap, `good-first-issue` labels. Free and compounding.
-2. **Reddit** — r/opensource, r/selfhosted, r/programming, r/LocalLLaMA. As *build-in-public
-   updates*, not announcements.
+2. **Reddit** — r/opensource, r/selfhosted, r/programming, r/LocalLLaMA. As _build-in-public
+   updates_, not announcements.
 3. **Fosstodon / EU Mastodon** — flagged as mattering more than X for this audience.
 4. **The Digital SME Alliance relationship** — leveraging Petar's own CRA compliance guide
    co-authorship. Called out as **the cheapest, warmest distribution available.**
@@ -127,7 +127,7 @@ Once a first public post is ready, in priority order:
 
 ## 8. Metrics
 
-*Source: XCOD-30.*
+_Source: XCOD-30._
 
 Tracked from day one:
 
@@ -135,8 +135,8 @@ Tracked from day one:
 - **Unique contributors** — a better OSS-credibility signal than stars alone
 - CLI install counts
 - README / landing-page → email-capture conversion
-- **Design-partner conversations opened and signed reference deployments** — called out as *the
-  metric that actually matters for this business model*
+- **Design-partner conversations opened and signed reference deployments** — called out as _the
+  metric that actually matters for this business model_
 
 **Explicitly deprioritised as vanity metrics:** follower counts, post likes.
 
@@ -144,20 +144,20 @@ A manual proxy for install counts is acceptable if no telemetry exists yet.
 
 ## 9. Punch list
 
-| § | Action | Ticket | Status |
-|---|---|---|---|
-| 9.1 | Freeze the name | XCOD-22 | ✅ Done |
+| §   | Action                                                                | Ticket          | Status  |
+| --- | --------------------------------------------------------------------- | --------------- | ------- |
+| 9.1 | Freeze the name                                                       | XCOD-22         | ✅ Done |
 | 9.2 | Rebrand README; resolve 21 translated READMEs; rename GitHub org/repo | XCOD-23, 24, 28 | ✅ Done |
-| 9.3 | One-page landing site with email capture | XCOD-25 | ✅ Done |
-| 9.4 | Claim social/community handles | XCOD-26 | ⬜ Open |
-| 9.5 | "Why we forked opencode" FAQ | XCOD-27 | ✅ Done |
-| 9.6 | Private design-partner outreach | XCOD-29 | ⬜ Open |
-| 9.7 | Build-in-public publishing cadence | XCOD-31 | ⬜ Open |
-| — | GTM metrics tracking | XCOD-30 | ⬜ Open |
+| 9.3 | One-page landing site with email capture                              | XCOD-25         | ✅ Done |
+| 9.4 | Claim social/community handles                                        | XCOD-26         | ⬜ Open |
+| 9.5 | "Why we forked opencode" FAQ                                          | XCOD-27         | ✅ Done |
+| 9.6 | Private design-partner outreach                                       | XCOD-29         | ⬜ Open |
+| 9.7 | Build-in-public publishing cadence                                    | XCOD-31         | ⬜ Open |
+| —   | GTM metrics tracking                                                  | XCOD-30         | ⬜ Open |
 
 ### 9.7 — cadence detail
 
-*Source: XCOD-31.*
+_Source: XCOD-31._
 
 A public CHANGELOG or "Lunos Weekly/Monthly Notes" habit — low effort, high compounding trust
 signal. Milestone posts already identified:
@@ -170,7 +170,7 @@ signal. Milestone posts already identified:
 
 ## 10. What not to do yet — an explicit gate
 
-*Source: XCOD-21 and XCOD-31, both quoting v0.1's "what not to do yet" section.*
+_Source: XCOD-21 and XCOD-31, both quoting v0.1's "what not to do yet" section._
 
 **Hold Show HN, press outreach, and any paid channel** until **both**:
 

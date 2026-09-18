@@ -11,15 +11,15 @@ Already Done: XCOD-16, 18, 19, 22, 23, 24, 25, 27, 40, 45.
 
 ## The 7 remaining, triaged by who can actually close them
 
-| Issue | Summary | Verdict |
-|-------|---------|---------|
-| XCOD-28 | GitHub org/repo rename | **Closable now** — verified complete |
+| Issue   | Summary                              | Verdict                                                                         |
+| ------- | ------------------------------------ | ------------------------------------------------------------------------------- |
+| XCOD-28 | GitHub org/repo rename               | **Closable now** — verified complete                                            |
 | XCOD-20 | Clean-machine install (Phase 0 exit) | **Advanced, not Done** — clean-container install verified; needs a real release |
-| XCOD-17 | Legal/entity ownership decision | Needs owner decision |
-| XCOD-26 | Claim social/community handles | Needs owner accounts |
-| XCOD-29 | Design-partner outreach | Explicitly "BD/PO-owned, not engineering" |
-| XCOD-30 | GTM metrics tracking | Reference doc missing |
-| XCOD-31 | Build-in-public cadence | Reference doc missing |
+| XCOD-17 | Legal/entity ownership decision      | Needs owner decision                                                            |
+| XCOD-26 | Claim social/community handles       | Needs owner accounts                                                            |
+| XCOD-29 | Design-partner outreach              | Explicitly "BD/PO-owned, not engineering"                                       |
+| XCOD-30 | GTM metrics tracking                 | Reference doc missing                                                           |
+| XCOD-31 | Build-in-public cadence              | Reference doc missing                                                           |
 
 ## XCOD-28 — verified complete
 
@@ -29,7 +29,7 @@ Both acceptance criteria hold as of this assessment:
 - **AC2, no stale old-name references:** exact-case sweep for `Axcode` / `AxCode` / `axcode` across the
   tree returns hits in only five files, all of them historical records:
   `.claude/docs/xcod-{1,4,16}-*.md` and two agent-memory files. `xcod-4-lunos-rename-decisions.md`
-  itself notes these references "describe what was true *at that time*" — they are deliberately
+  itself notes these references "describe what was true _at that time_" — they are deliberately
   preserved history, not stale pointers.
   The `install` script (lines 23, 24, 187, 188, 197, 201, 204, 462) and every
   `.github/workflows/*.yml` repo reference already resolve to `pminev1/Lunos`.
@@ -40,7 +40,7 @@ agent." — inherited from upstream, never rebranded. A one-line `gh repo edit -
 ## XCOD-20 — partially verifiable today, fully blocked on release
 
 Phase 0's stated exit criterion is **not** fully blocked. `build-cli` succeeded and left a live
-run artifact, so the CI-built CLI can be inspected now; what is missing is the *published release*
+run artifact, so the CI-built CLI can be inspected now; what is missing is the _published release_
 that the `install` script actually downloads from.
 
 Artifacts on run `35335881462` (none expired):
@@ -97,7 +97,7 @@ the npm publish proceed off the successful `build-cli`.
 **Option B — gate signing behind a repo variable.**
 Add a `vars.ENABLE_CODE_SIGNING == 'true'` flag to the `sign-cli-windows` job condition and to the
 macOS / Windows signing steps in `build-electron`. Larger diff, but keeps one switch to re-enable
-signing later. *Needs confirming:* this design assumes the `secrets` context is unavailable in
+signing later. _Needs confirming:_ this design assumes the `secrets` context is unavailable in
 job-level `if` (forcing a `vars` flag rather than a direct secret-emptiness test) — verify against
 GitHub's context-availability docs before building on it.
 
@@ -230,7 +230,7 @@ Rebuilding the GTM plan is its own piece of work.
 
 ## XCOD-17 / XCOD-26 / XCOD-29 — owner-only
 
-- **XCOD-17** asks for a *recorded decision* on whether Lunos sits under Axsion or a new EU entity,
+- **XCOD-17** asks for a _recorded decision_ on whether Lunos sits under Axsion or a new EU entity,
   with IP and liability implications noted. An options memo can be drafted, but the decision itself
   is the product owner's.
 - **XCOD-26** requires creating real accounts (Fosstodon, LinkedIn company page, optionally X).
