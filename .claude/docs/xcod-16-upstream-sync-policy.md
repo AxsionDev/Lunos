@@ -40,6 +40,8 @@ git merge upstream/dev                                          # merge, never r
 bun install                                                     # bun.lock conflicts most often
 GITHUB_ACTIONS=false bun turbo test                             # NOT `bun test` — see note
 bun run typecheck
+(cd packages/client   && bun run check:generated)               # CI runs these two as well
+(cd packages/opencode && bun run test:httpapi)
 # compare the failing-test set against dev's baseline before blaming the sync
 ```
 
@@ -97,6 +99,15 @@ Baseline captured **before** the sync in the **same worktree**, so the compariso
 | `bun run typecheck` | 30/30 pass, exit 0 | 30/30 pass, exit 0 | no change |
 | `bun turbo test` | 830 pass / 9 fail, exit 1 | 830 pass / 9 fail, exit 1 | no change |
 | Failing-test set | 9 named tests | **identical 9 tests** | **zero regressions** |
+| `check:generated` (in `packages/client`) | exit 0 | exit 0 | no change |
+| `test:httpapi` (in `packages/opencode`) | exit 0 | exit 0 | no change |
+
+`test.yml` runs **three** commands in its unit job, not one — `bun turbo test`,
+`bun run check:generated` (from `packages/client`), and `bun run test:httpapi` (from
+`packages/opencode`). All three were run at both ends. `check:generated` matters most here: it is
+the natural casualty of merging upstream changes to generated SDK output, and the merge absorbed
+upstream edits to `packages/opencode/src/server/routes/instance/httpapi/middleware/error.ts` and
+its test. It passes.
 
 The 9 failures are **pre-existing on `dev`** and unrelated to the sync — 8 in
 `prompt submit worktree selection` and 1 in `desktop native locale detection`, all in
@@ -151,7 +162,7 @@ file-level separation. The policy keeps the boundary requirement and drops the r
 
 ## Follow-up for the reviewer
 
-The rehearsal branch **`xcod-16-rebase-rehearsal`** holds the actual clean merge of
+The rehearsal branch **`xcod-16-upstream-sync-verified`** holds the actual clean merge of
 `upstream/dev` (22 upstream commits, 0 conflicts, 0 regressions). It is deliberately **not**
 merged into `dev` — taking 22 upstream commits is a real product decision, separate from adopting
 a policy document. Merge it when you want the sync; it is verified and ready.
