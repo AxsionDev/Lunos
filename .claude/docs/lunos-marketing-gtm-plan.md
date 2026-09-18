@@ -144,16 +144,16 @@ A manual proxy for install counts is acceptable if no telemetry exists yet.
 
 ## 9. Punch list
 
-| §   | Action                                                                | Ticket          | Status  |
-| --- | --------------------------------------------------------------------- | --------------- | ------- |
-| 9.1 | Freeze the name                                                       | XCOD-22         | ✅ Done |
-| 9.2 | Rebrand README; resolve 21 translated READMEs; rename GitHub org/repo | XCOD-23, 24, 28 | ✅ Done |
-| 9.3 | One-page landing site with email capture                              | XCOD-25         | ✅ Done |
-| 9.4 | Claim social/community handles                                        | XCOD-26         | ⬜ Open |
-| 9.5 | "Why we forked opencode" FAQ                                          | XCOD-27         | ✅ Done |
-| 9.6 | Private design-partner outreach                                       | XCOD-29         | ⬜ Open |
+| §   | Action                                                                | Ticket          | Status       |
+| --- | --------------------------------------------------------------------- | --------------- | ------------ |
+| 9.1 | Freeze the name                                                       | XCOD-22         | ✅ Done      |
+| 9.2 | Rebrand README; resolve 21 translated READMEs; rename GitHub org/repo | XCOD-23, 24, 28 | ✅ Done      |
+| 9.3 | One-page landing site with email capture                              | XCOD-25         | ✅ Done      |
+| 9.4 | Claim social/community handles                                        | XCOD-26         | ⬜ Open      |
+| 9.5 | "Why we forked opencode" FAQ                                          | XCOD-27         | ✅ Done      |
+| 9.6 | Private design-partner outreach                                       | XCOD-29         | ⬜ Open      |
 | 9.7 | Build-in-public publishing cadence                                    | XCOD-31         | 🔄 In Review |
-| —   | GTM metrics tracking                                                  | XCOD-30         | ⬜ Open |
+| —   | GTM metrics tracking                                                  | XCOD-30         | ⬜ Open      |
 
 ### 9.7 — cadence detail
 
@@ -167,8 +167,8 @@ post is drafted and staged at `.claude/docs/xcod-31-phase-0-launch-post-draft.md
 One implementation decision departs from v0.1's wording: **there is no root `CHANGELOG.md`.** The
 release pipeline already generates per-release notes (`script/version.ts` → `script/changelog.ts` →
 `gh release create --notes-file`), so a hand-maintained root changelog would duplicate it and add
-an upstream merge surface. Notes live under `.claude/docs/notes/` instead, and answer *why* rather
-than *what changed* — the half no generator produces.
+an upstream merge surface. Notes live under `.claude/docs/notes/` instead, and answer _why_ rather
+than _what changed_ — the half no generator produces.
 
 A public CHANGELOG or "Lunos Weekly/Monthly Notes" habit — low effort, high compounding trust
 signal. Milestone posts already identified:
