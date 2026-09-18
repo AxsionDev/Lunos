@@ -10,7 +10,7 @@ Execute this multi-agent debugging workflow sequentially, with human approval ga
 
 ## Pre-flight: Worktree Reset (FIRST — before any action)
 
-Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. *(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)* If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally.
+Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. _(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)_ If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally.
 
 ---
 
@@ -31,6 +31,7 @@ Before any investigation begins, ensure session state is properly initialized.
 ### Resume Check (if applicable)
 
 If the user indicates they're resuming a previous investigation:
+
 - Run `/state-resume` to load previous context
 - Display previous session summary
 - Ask user where to continue from
@@ -72,6 +73,7 @@ Check for existing documentation first:
 **If no documentation exists, auto-generate it:**
 
 Use Glob and Read tools to discover:
+
 - `package.json` → extract `scripts.start`, `scripts.dev`, `scripts.serve`
 - `*.csproj` → identify runnable projects
 - Detect common patterns (`ng serve`, `npm start`, `dotnet run`)
@@ -93,19 +95,20 @@ If no docs found, note the documentation gap and suggest `/discover` after the f
 
 Based on the bug description from `$ARGUMENTS`:
 
-| Bug Type | Frontend Needed | Backend Needed |
-|----------|-----------------|----------------|
-| UI/styling bug | Yes | Maybe (if data-dependent) |
-| JavaScript/TypeScript error | Yes | Maybe (if API-dependent) |
-| API endpoint bug | Maybe (for testing) | Yes |
-| Database/query bug | No | Yes |
-| Integration/data flow | Yes | Yes |
+| Bug Type                    | Frontend Needed     | Backend Needed            |
+| --------------------------- | ------------------- | ------------------------- |
+| UI/styling bug              | Yes                 | Maybe (if data-dependent) |
+| JavaScript/TypeScript error | Yes                 | Maybe (if API-dependent)  |
+| API endpoint bug            | Maybe (for testing) | Yes                       |
+| Database/query bug          | No                  | Yes                       |
+| Integration/data flow       | Yes                 | Yes                       |
 
 ### Start Development Servers
 
 If this bug involves frontend (UI verification needed), start servers in background:
 
 **Frontend (if needed):**
+
 ```
 Use Bash tool with run_in_background: true
 Command: cd {frontend_path} && {start_command}
@@ -113,6 +116,7 @@ Expected URL: See PROJECT_STARTUP.md for frontend URL
 ```
 
 **Backend (if needed):**
+
 ```
 Use Bash tool with run_in_background: true
 Command: cd {backend_path} && {start_command}
@@ -198,6 +202,7 @@ Based on the clarified bug scope from Step 1 and the AI-optimized prompt from St
 ### Classify Bug Type
 
 Analyze the bug description to determine scope:
+
 - **Frontend-only**: UI bugs, JavaScript errors, styling issues, component state
 - **Backend-only**: API errors, database issues, service logic, server errors
 - **Mixed/Unclear**: Integration bugs, data flow issues, or unclear root cause
@@ -209,6 +214,7 @@ Analyze the bug description to determine scope:
 Launch **both reviewers in parallel** (single message, multiple Task calls):
 
 1. Use the Task tool with `subagent_type="bug-reviewer-frontend"`:
+
    ```
    ## Frontend Bug Analysis Request
 
@@ -234,6 +240,7 @@ Launch **both reviewers in parallel** (single message, multiple Task calls):
    ```
 
 2. Use the Task tool with `subagent_type="bug-reviewer-backend"`:
+
    ```
    ## Backend Bug Analysis Request
 
@@ -343,6 +350,7 @@ This step follows the Reproduce → Fix → Verify workflow. See `_gemini-design
 ### Capture Pre-Fix Baseline
 
 1. **Screenshot the broken state:**
+
    ```
    Use mcp__chrome-devtools__take_screenshot
    filename: "bug-pre-fix-baseline.png"
@@ -350,12 +358,14 @@ This step follows the Reproduce → Fix → Verify workflow. See `_gemini-design
    ```
 
 2. **Snapshot the broken DOM:**
+
    ```
    Use mcp__chrome-devtools__take_snapshot
    Purpose: Capture broken DOM/accessibility tree state
    ```
 
 3. **Record console errors:**
+
    ```
    Use mcp__chrome-devtools__list_console_messages
    Purpose: Document pre-fix console errors as baseline
@@ -375,15 +385,18 @@ Present to user:
 ## Pre-Fix Baseline Captured
 
 ### Bug Location
+
 [How we navigated to the bug]
 
 ### Pre-Fix Evidence
+
 - **Screenshot:** bug-pre-fix-baseline.png
 - **DOM Snapshot:** [summary of broken state]
 - **Console Errors:** [list of errors found, or "none"]
 - **Network Failures:** [list of failures found, or "none"]
 
 ### Bug Reproduction
+
 - **Reproduced:** Yes / No / Partial
 - **Observed Behavior:** [what we saw]
 - **Expected Behavior:** [what should happen]
@@ -411,17 +424,17 @@ This step uses the three-tier tool hierarchy to verify the fix in the browser.
 
 For frontend HTML/SCSS bugs, follow this priority order:
 
-| Tier | Tool | Load Via | Use For |
-|------|------|----------|---------|
-| **1 (Primary)** | Gemini Design MCP | `ToolSearch: "gemini-design"` | Fix/regenerate HTML, SCSS, visual markup before browser verification |
-| **2 (Fallback)** | Chrome DevTools MCP | `ToolSearch: "chrome-devtools"` | Browser verification, DOM inspection, screenshots, console, network |
-| **3 (Last Resort)** | Playwright MCP | `ToolSearch: "+playwright browser"` | Full browser interaction when Chrome DevTools is unavailable |
+| Tier                | Tool                | Load Via                            | Use For                                                              |
+| ------------------- | ------------------- | ----------------------------------- | -------------------------------------------------------------------- |
+| **1 (Primary)**     | Gemini Design MCP   | `ToolSearch: "gemini-design"`       | Fix/regenerate HTML, SCSS, visual markup before browser verification |
+| **2 (Fallback)**    | Chrome DevTools MCP | `ToolSearch: "chrome-devtools"`     | Browser verification, DOM inspection, screenshots, console, network  |
+| **3 (Last Resort)** | Playwright MCP      | `ToolSearch: "+playwright browser"` | Full browser interaction when Chrome DevTools is unavailable         |
 
 **Escalation:** Try Tier 1 first. If Gemini fails or doesn't apply → use Tier 2. If Chrome DevTools is unavailable → fall back to Tier 3.
 
 See `.claude/agents/_gemini-design-hook.md` for the full protocol.
 
-> **Gemini-First Pattern:** For frontend HTML/SCSS bugs, FIRST try Gemini Design MCP (`modify_frontend`) to fix or regenerate the problematic component code *before* browser verification. This often resolves layout/styling issues more reliably than manual iteration. If Gemini hits a token limit, fall back to manual edits and verify with Chrome DevTools (Tier 2) or Playwright (Tier 3).
+> **Gemini-First Pattern:** For frontend HTML/SCSS bugs, FIRST try Gemini Design MCP (`modify_frontend`) to fix or regenerate the problematic component code _before_ browser verification. This often resolves layout/styling issues more reliably than manual iteration. If Gemini hits a token limit, fall back to manual edits and verify with Chrome DevTools (Tier 2) or Playwright (Tier 3).
 
 > **Tool Loading Order:** Load `ToolSearch: "gemini-design"` first, then `ToolSearch: "chrome-devtools"`, then `ToolSearch: "+playwright browser"` only if needed.
 
@@ -437,6 +450,7 @@ Wait for servers to be available (check with navigate_page)
 ### Initial Navigation
 
 1. Navigate to the application:
+
    ```
    Use mcp__chrome-devtools__navigate_page
    URL: See PROJECT_STARTUP.md for frontend URL
@@ -465,6 +479,7 @@ Wait for servers to be available (check with navigate_page)
 3. **For actions requiring user knowledge** (credentials, specific data, complex navigation):
 
    Present to user:
+
    ```
    I'm currently at [page description from snapshot].
 
@@ -485,6 +500,7 @@ Wait for servers to be available (check with navigate_page)
 Once at the bug location (after fix has been applied in Step 4):
 
 1. **Refresh or re-navigate to trigger the fixed code path:**
+
    ```
    Use mcp__chrome-devtools__navigate_page
    Or use mcp__chrome-devtools__press_key with "F5" to refresh
@@ -496,6 +512,7 @@ Once at the bug location (after fix has been applied in Step 4):
    - Compare against the pre-fix baseline evidence
 
 3. **Document the post-fix state:**
+
    ```
    Use mcp__chrome-devtools__take_screenshot
    filename: "bug-post-fix-verified.png"
@@ -503,6 +520,7 @@ Once at the bug location (after fix has been applied in Step 4):
    ```
 
 4. **Capture post-fix console and network state:**
+
    ```
    Use mcp__chrome-devtools__list_console_messages
    Purpose: Confirm pre-fix console errors are gone
@@ -519,29 +537,34 @@ Present to user:
 ## Browser Verification Results
 
 ### Navigation Path
+
 [How we got to the bug location]
 
 ### Pre-Fix Baseline (from Step 4.5)
+
 - **Screenshot:** bug-pre-fix-baseline.png
 - **DOM State:** [summary of broken state]
 - **Console Errors:** [errors captured before fix]
 - **Network Failures:** [failures captured before fix]
 
 ### Post-Fix State
+
 - **Screenshot:** bug-post-fix-verified.png
 - **DOM State:** [summary of fixed state]
 - **Console Errors:** [errors after fix, or "none"]
 - **Network Failures:** [failures after fix, or "none"]
 
 ### Before/After Comparison
-| Aspect | Pre-Fix (Baseline) | Post-Fix (Verified) |
-|--------|-------------------|---------------------|
-| Visual state | [broken description] | [fixed description] |
-| Console errors | [N errors] | [0 errors] |
-| Network failures | [N failures] | [0 failures] |
-| **Verdict** | **Bug present** | **Bug resolved** |
+
+| Aspect           | Pre-Fix (Baseline)   | Post-Fix (Verified) |
+| ---------------- | -------------------- | ------------------- |
+| Visual state     | [broken description] | [fixed description] |
+| Console errors   | [N errors]           | [0 errors]          |
+| Network failures | [N failures]         | [0 failures]        |
+| **Verdict**      | **Bug present**      | **Bug resolved**    |
 
 ### Verdict
+
 - [ ] FIX VERIFIED - Bug no longer reproduces, before/after comparison confirms resolution
 - [ ] FIX PARTIAL - Some aspects still broken (see comparison)
 - [ ] COULD NOT VERIFY - Unable to reach bug location
@@ -610,29 +633,36 @@ Provide a final summary of the entire workflow:
 ## Bug Fix Complete
 
 ### Original Issue
+
 $ARGUMENTS
 
 ### Clarification Summary
+
 - Rounds of clarification: [N]
 - User confirmed understanding: Yes
 
 ### Root Cause Identified
+
 [What was causing the bug]
 
 ### Research Process
+
 - Backend findings: [summary]
 - Frontend findings: [summary]
 - Confidence level: [High/Medium]
 
 ### Solution Implemented
+
 [What was done to fix it]
 
 ### Files Changed
-| File | Change |
-|------|--------|
+
+| File   | Change         |
+| ------ | -------------- |
 | [file] | [what changed] |
 
 ### Browser Verification
+
 - **Status:** [VERIFIED / SKIPPED / PARTIAL]
 - **Pre-Fix Baseline:** bug-pre-fix-baseline.png (from Step 4.5)
 - **Post-Fix Verified:** bug-post-fix-verified.png (from Step 5)
@@ -640,9 +670,11 @@ $ARGUMENTS
 - **Notes:** [Any observations from browser testing]
 
 ### Review Outcome
+
 [APPROVED by code-review-signoff]
 
 ### Testing Recommendations
+
 [What should be tested to verify the fix]
 ```
 
@@ -691,6 +723,7 @@ Use the Task tool with `subagent_type="state-manager"`:
 ### Display Session Summary
 
 Run `/session-status` to display:
+
 - Session duration
 - Investigation phases completed
 - Files analyzed and modified
@@ -705,6 +738,7 @@ Run `/session-status` to display:
 **Duration:** [Start to end time]
 
 ### Artifacts Produced
+
 - ✅ Bug analysis report
 - ✅ Implementation complete
 - ✅ Code review passed
@@ -712,12 +746,15 @@ Run `/session-status` to display:
 - ✅ Handoff document generated
 
 ### State Files Updated
+
 - `.agent-state/sessions/{session-id}/decisions.yaml`
 - `.agent-state/sessions/{session-id}/context.yaml`
 - `.agent-state/sessions/{session-id}/handoff.md`
 
 ### To Resume or Reference
+
 Future agents can access this bug fix context via:
+
 - `/state-resume {session-id}`
 - Read `.agent-state/sessions/{session-id}/handoff.md`
 ```
@@ -733,40 +770,53 @@ At workflow start, each dispatched agent should consult its `.claude/agent-memor
 ## Error Handling
 
 ### Vague Bug Description
+
 The agent-clarifier will ask targeted questions to clarify. If still vague after 5 rounds, proceed with uncertainties documented.
 
 ### Research Finds No Root Cause
+
 If the research-orchestrator cannot identify a clear root cause:
+
 - Present what was found
 - List investigation gaps
 - Ask user for additional debugging (logs, environment access, etc.)
 
 ### Conflicting Research Findings
+
 If backend and frontend developers identify conflicting root causes:
+
 - Present both with evidence quality
 - Let user decide which to pursue
 
 ### Build Failures
+
 If the implementation fails to build, automatically loop back with the build errors for the developer agent to address.
 
 ### Server Start Failures
+
 If development servers fail to start:
+
 - Check for port conflicts (use `lsof -i :{port}` to identify)
 - Verify dependencies are installed (`npm install`, `dotnet restore`)
 - Ask user for help if environment-specific issue
 
 ### Browser Navigation Issues
+
 If unable to reach the bug location in browser:
+
 - Use Guided Navigation Mode to request user assistance
 - Document what was accessible vs. what wasn't
 - Offer to skip browser verification if user provides manual testing
 
 ### Browser Verification Inconclusive
+
 If browser testing cannot definitively verify the fix:
+
 - Document what was observed
 - Note any remaining uncertainty
 - Proceed to code review with findings documented
 - Recommend specific manual testing scenarios
 
 ### Review Rejection
+
 If code review identifies issues, loop back to implementation with the specific feedback.

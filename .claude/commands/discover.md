@@ -11,6 +11,7 @@ You are creating discovery documentation that will be consumed by AI agents duri
 ### Step 1: Explore the Functionality
 
 Use the Explore agent to thoroughly investigate:
+
 1. All files related to the target functionality
 2. Entry points (components, services, routes)
 3. Dependencies (imports, injected services)
@@ -36,22 +37,25 @@ Create a markdown file at `.claude/docs/{feature-name}.md` with this structure:
 ## Architecture
 
 ### Entry Points
-| Type | Path | Description |
-|------|------|-------------|
-| Component | path/to/file.ts | What it does |
-| Service | path/to/service.ts | What it provides |
-| Route | /account/:id/path | Route purpose |
+
+| Type      | Path               | Description      |
+| --------- | ------------------ | ---------------- |
+| Component | path/to/file.ts    | What it does     |
+| Service   | path/to/service.ts | What it provides |
+| Route     | /account/:id/path  | Route purpose    |
 
 ### File Structure
 ```
+
 module/
 ├── components/
-│   └── feature.component.ts    # Main component
+│ └── feature.component.ts # Main component
 ├── services/
-│   └── feature.service.ts      # Business logic
+│ └── feature.service.ts # Business logic
 └── models/
-    └── feature.model.ts        # Data models
-```
+└── feature.model.ts # Data models
+
+````
 
 ## Dependencies
 
@@ -84,31 +88,36 @@ module/
 ### Pattern Name
 ```typescript
 // Code example showing the pattern
-```
+````
+
 **When to use:** Explanation of when this pattern applies
 
 ## Integration Points
 
 ### With Other Modules
-| Module | Integration Type | Description |
-|--------|-----------------|-------------|
-| SharedModule | Service injection | Uses XService for Y |
-| PlanningModule | Event emission | Notifies on Z changes |
+
+| Module         | Integration Type  | Description           |
+| -------------- | ----------------- | --------------------- |
+| SharedModule   | Service injection | Uses XService for Y   |
+| PlanningModule | Event emission    | Notifies on Z changes |
 
 ### API Endpoints
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| GET | /api/resource | Fetches data |
-| POST | /api/resource | Creates new item |
+
+| Method | Endpoint      | Purpose          |
+| ------ | ------------- | ---------------- |
+| GET    | /api/resource | Fetches data     |
+| POST   | /api/resource | Creates new item |
 
 ## Usage Examples
 
 ### Basic Usage
+
 ```typescript
 // Example code for common use case
 ```
 
 ### Advanced Usage
+
 ```typescript
 // Example code for complex scenarios
 ```
@@ -129,6 +138,7 @@ module/
 > **Quick Start:** Steps an agent should take to work with this feature
 > **Common Pitfalls:** Mistakes to avoid
 > **Extension Points:** Where new functionality can be added
+
 ```
 
 ### Step 3: Validate
@@ -148,3 +158,4 @@ Report back with:
 - Key files an agent should read first
 
 > **Memory**: Agents should consult and update their `.claude/agent-memory/` between sessions.
+```

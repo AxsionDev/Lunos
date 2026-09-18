@@ -20,7 +20,7 @@ Run each check and report the result plainly — don't skip a check because a pr
 grep -A2 "^  memory:" ~/.docker/mcp/registry.yaml 2>/dev/null
 ```
 
-An entry here just means the server is *known* to Docker MCP Toolkit, not that it's active. If this is empty/absent, the server has been fully de-registered, not just profile-removed — say so, that's a stronger state than what was done on 2026-09-10.
+An entry here just means the server is _known_ to Docker MCP Toolkit, not that it's active. If this is empty/absent, the server has been fully de-registered, not just profile-removed — say so, that's a stronger state than what was done on 2026-09-10.
 
 ### 2. Active profile — is it enabled for actual use?
 
@@ -89,6 +89,7 @@ Report the count. Zero real invocations across a large local transcript sample (
 ### 6. Verdict
 
 State plainly, in one paragraph:
+
 - Is `memory` registered / profile-active / volume-populated / still schema-live in this session / ever actually invoked — five separate yes/no facts, not blended into one vague "unused."
 - Whether the 2026-09-10 removal decision still holds given current evidence.
 - If step 4 shows it's still schema-live in this session, say the fix requires restarting the Claude Code session (or the MCP gateway) — removing it from the profile alone doesn't retroactively free the cost for sessions already running.

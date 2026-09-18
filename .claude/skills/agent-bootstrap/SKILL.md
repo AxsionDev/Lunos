@@ -32,6 +32,7 @@ Ensure `.agent-state/` exists; create it if missing:
 ```
 
 Read `.agent-state/active-session.yaml`. If `session_id` is null or absent, create a session:
+
 - ID format: `session-{YYYYMMDD}-{HHMMSS}-{task-slug}` (slug from the user request: lowercase, hyphens, ≤30 chars)
 - Create `sessions/{id}/` with `session.yaml`, `tasks.yaml`, `decisions.yaml`, `context.yaml`
 - Point `active-session.yaml` at the new id
@@ -46,6 +47,7 @@ Read `.claude/PROJECT_STARTUP.md` for paths, build/start commands, and dev URLs.
 ### 3. Tech-stack patterns
 
 Load project-specific idioms if present:
+
 - `.claude/patterns/tech-stack.md` — key idioms and review focus per layer
 - `.claude/patterns/{backend,frontend,database}-patterns.md` — real code examples
 
@@ -61,6 +63,7 @@ Also check `{feature}.md` and `{feature}-user-journeys.md`. Read the most releva
 ### 5. Workspace (multi-agent workflows only — OPTIONAL)
 
 Glob `.agent-workspace/*/` for an active run.
+
 - If one exists: read dependency artifacts (e.g. `contracts/`, other agents' `outputs/*.md`) before starting; after finishing, write your artifact to `outputs/{agent-name}.md` using the `agent-output-contract` skill.
 - **Worktree caveat:** agents running with `isolation: "worktree"` are on a separate branch and **cannot** see `.agent-workspace/` (it lives on main) — skip workspace reads/writes; their output lives in the worktree branch.
 - If no workspace exists: skip silently. Never block waiting on another agent.
@@ -78,13 +81,13 @@ todo_write: { enabled: true, sync_mode: "bidirectional" }
 
 ## Quick Reference
 
-| Step | Check | Fallback if missing |
-|------|-------|---------------------|
-| 1 State | `.agent-state/` + active session | Create structure + new session |
-| 2 Startup | `.claude/PROJECT_STARTUP.md` | Tell user to run `/generate-startup`; don't auto-scan |
-| 3 Patterns | `.claude/patterns/*.md` | Use baseline expertise |
-| 4 Docs | `.claude/docs/`, `.augment/`, `docs/` | Note gap; suggest `/discover` |
-| 5 Workspace | `.agent-workspace/{run}/` | Skip silently (always optional) |
+| Step        | Check                                 | Fallback if missing                                   |
+| ----------- | ------------------------------------- | ----------------------------------------------------- |
+| 1 State     | `.agent-state/` + active session      | Create structure + new session                        |
+| 2 Startup   | `.claude/PROJECT_STARTUP.md`          | Tell user to run `/generate-startup`; don't auto-scan |
+| 3 Patterns  | `.claude/patterns/*.md`               | Use baseline expertise                                |
+| 4 Docs      | `.claude/docs/`, `.augment/`, `docs/` | Note gap; suggest `/discover`                         |
+| 5 Workspace | `.agent-workspace/{run}/`             | Skip silently (always optional)                       |
 
 ## Common Mistakes
 

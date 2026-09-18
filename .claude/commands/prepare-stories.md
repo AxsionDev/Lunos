@@ -17,6 +17,7 @@ This location is required for the `/feature` command to find and execute the sto
 **Before creating stories, check for existing documentation:**
 
 1. Search for relevant docs:
+
    ```
    Glob: "**/.claude/docs/*.md"
    Glob: "**/{.claude/docs,.augment,docs}/**/*.md"
@@ -40,27 +41,34 @@ For each story, use this format:
 **Priority:** P0 (Critical) | P1 (High) | P2 (Medium) | P3 (Low)
 
 ### Objective
+
 [One sentence describing what this story achieves]
 
 ### Context
+
 - **Feature Area:** [e.g., Incident Management, Planning, etc.]
 - **Documentation:** [Link to relevant .claude/docs/ file or "None - run /discover first"]
 - **Key Files:** [List primary files to modify]
 - **Related Stories:** [Dependencies on other stories]
 
 ### Acceptance Criteria
+
 - [ ] [Specific, testable criterion 1]
 - [ ] [Specific, testable criterion 2]
 - [ ] [Build passes with no errors]
 - [ ] [Follows patterns documented in .claude/docs/]
 
 ### Technical Notes
+
 [Any specific implementation guidance, patterns to follow, or pitfalls to avoid]
 
 ### Agent Command
 ```
+
 /fullstack-dev [brief task description for this story]
+
 ```
+
 ```
 
 ---
@@ -68,6 +76,7 @@ For each story, use this format:
 ## Story Types
 
 ### Discovery Story (when no docs exist)
+
 ```markdown
 ## Story 0: Discovery - [Feature Area]
 
@@ -76,25 +85,32 @@ For each story, use this format:
 **Priority:** P0
 
 ### Objective
+
 Generate documentation for [feature area] before implementation begins.
 
 ### Agent Command
 ```
+
 /discover [feature area description]
+
 ```
+
 ```
 
 ### Implementation Story
+
 - Clear technical requirements
 - References to existing patterns
 - Specific files to modify
 
 ### Integration Story
+
 - How components connect
 - API contracts
 - Data flow
 
 ### Testing Story
+
 - Test scenarios
 - Edge cases
 - Mocking requirements
@@ -109,6 +125,7 @@ Provide stories in this structure:
 # Stories for: [Feature/Epic Name]
 
 ## Overview
+
 - **Total Stories:** [N]
 - **Estimated Effort:** [Total complexity]
 - **Documentation Status:** [Available / Needs Discovery]
@@ -116,12 +133,15 @@ Provide stories in this structure:
 ## Story Sequence
 
 ### Phase 1: Preparation
+
 [Discovery and planning stories]
 
 ### Phase 2: Implementation
+
 [Core implementation stories in dependency order]
 
 ### Phase 3: Integration & Testing
+
 [Integration, testing, and documentation stories]
 
 ---
@@ -157,11 +177,13 @@ Provide stories in this structure:
 After creating stories:
 
 1. **Save the stories file:**
+
    ```
    .claude/stories/{feature-name}.md
    ```
 
 2. **Report to user:**
+
    ```
    ✅ Stories prepared and saved to: .claude/stories/{feature-name}.md
 
@@ -174,6 +196,7 @@ After creating stories:
    ```
 
 3. **If documentation was missing:**
+
    ```
    ⚠️ Note: No documentation found for this feature area.
    Story 0 (Discovery) has been added to generate documentation first.

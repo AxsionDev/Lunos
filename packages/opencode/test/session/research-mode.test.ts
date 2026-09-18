@@ -113,11 +113,7 @@ describe("research mode agent", () => {
       const ctx = yield* InstanceState.context
       const session = { slug: "topic", time: { created: 1700000000000 } }
 
-      const researchAction = Permission.evaluate(
-        "edit",
-        SessionNs.research(session, ctx),
-        research.permission,
-      ).action
+      const researchAction = Permission.evaluate("edit", SessionNs.research(session, ctx), research.permission).action
       const planAction = Permission.evaluate("edit", SessionNs.plan(session, ctx), plan.permission).action
       expect(researchAction).toBe(planAction)
 

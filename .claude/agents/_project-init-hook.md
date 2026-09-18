@@ -28,6 +28,7 @@ If file MISSING:
 ### 2. Key Information to Extract
 
 From PROJECT_STARTUP.md, agents should note:
+
 - Frontend/Backend paths and start commands
 - Development server URLs
 - Any required environment setup

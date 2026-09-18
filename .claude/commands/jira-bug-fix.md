@@ -14,7 +14,7 @@ Jira Step 0: Setup & Fetch  →  Jira Step 1: Assess & Enrich  →  Jira Step 2:
 
 ## Pre-flight: Worktree Reset (FIRST — before any action)
 
-Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. *(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)* If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. (The wrapped `/bug-fix` in Jira Step 2 will detect this worktree and reuse it rather than reset again.)
+Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. _(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)_ If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. (The wrapped `/bug-fix` in Jira Step 2 will detect this worktree and reuse it rather than reset again.)
 
 ---
 
@@ -46,6 +46,7 @@ After fetching, check the ticket type:
 > "This ticket ({ticket.key}) is a **{ticket.type}**, not a Bug. The `/jira-bug-fix` workflow is optimized for bug investigation.
 >
 > Would you like to:
+>
 > 1. **Continue anyway** — Treat it as a bug fix
 > 2. **Switch to `/jira-feature`** — Use the feature lifecycle workflow instead
 > 3. **Cancel** — Stop and reconsider"
@@ -62,13 +63,13 @@ Execute Protocol C from `.claude/commands/_jira-protocol.md` using the **Bug che
 
 Evaluate the ticket against the bug checklist:
 
-| # | Criteria | Status |
-|---|----------|--------|
-| 1 | Steps to Reproduce | ? |
-| 2 | Expected Behavior | ? |
-| 3 | Actual Behavior | ? |
-| 4 | Environment | ? |
-| 5 | Error Messages / Logs | ? |
+| #   | Criteria              | Status |
+| --- | --------------------- | ------ |
+| 1   | Steps to Reproduce    | ?      |
+| 2   | Expected Behavior     | ?      |
+| 3   | Actual Behavior       | ?      |
+| 4   | Environment           | ?      |
+| 5   | Error Messages / Logs | ?      |
 
 ### Fill Gaps
 
@@ -87,6 +88,7 @@ Present the enriched bug description and ask:
 > "Bug details extracted from **{ticket.key}: {ticket.title}**
 >
 > **Summary:**
+>
 > - Steps to Reproduce: {present/enriched}
 > - Expected: {present/enriched}
 > - Actual: {present/enriched}
@@ -138,11 +140,11 @@ Execute Protocol D from `.claude/commands/_jira-protocol.md` — but ONLY if the
 
 ### Decision Logic
 
-| Workflow Outcome | Jira Action |
-|------------------|-------------|
-| `completed` | Transition to "In Review" + add summary comment |
-| `partial` | Offer optional progress comment (no transition) |
-| `failed` | No Jira updates |
+| Workflow Outcome | Jira Action                                     |
+| ---------------- | ----------------------------------------------- |
+| `completed`      | Transition to "In Review" + add summary comment |
+| `partial`        | Offer optional progress comment (no transition) |
+| `failed`         | No Jira updates                                 |
 
 ### If Completed
 
@@ -162,6 +164,7 @@ Ask the user:
 > "The bug fix workflow didn't fully complete. Would you like me to add a progress comment to {ticket.key}?
 >
 > The comment would include:
+>
 > - Steps completed so far
 > - Current status
 > - Remaining work
@@ -182,6 +185,7 @@ If yes, add a progress comment without transitioning the ticket.
 ### Jira Connection Failures
 
 If Jira becomes unavailable mid-workflow:
+
 - Continue the bug fix — don't block development over Jira connectivity
 - At the end, provide the comment text for manual posting
 
@@ -192,6 +196,7 @@ If the ticket is not a Bug type, offer to switch to `/jira-feature`. Don't force
 ### Enrichment Stalls
 
 If the user can't provide missing information after 2 rounds:
+
 - Proceed with available information
 - Note gaps in the bug description
 - The agent-clarifier in `/bug-fix` Step 1 will catch remaining gaps
@@ -199,6 +204,7 @@ If the user can't provide missing information after 2 rounds:
 ### Transition Failures
 
 If the "In Review" transition fails:
+
 - Show available transitions
 - Let the user choose or skip
 - Provide the comment text for manual posting

@@ -19,9 +19,9 @@ worktree with **uncommitted work**, or a **missing base branch**) — never dest
 ## When to Use
 
 - **First action** of any command/workflow that edits code or files (bug-fix, feature,
-  feature-lifecycle, quick-bugfix, batch-bugfix, jira-*, fullstack-dev).
+  feature-lifecycle, quick-bugfix, batch-bugfix, jira-\*, fullstack-dev).
 - **Skip** for read-only / docs-only / state commands (discover, user-journeys, prepare-stories,
-  doc-refresh, session-*, state-*, etc.) — they take no code actions.
+  doc-refresh, session-_, state-_, etc.) — they take no code actions.
 
 ## The Sequence
 
@@ -50,6 +50,7 @@ This is what makes the skill safe to wire into every command.
   **If empty,** fall back to the first existing of `main`, `master`, `develop`
   (`git rev-parse --verify <name>`); **final fallback** is the current branch
   (`git branch --show-current`).
+
 - **Verify it exists:** `git rev-parse --verify --quiet "<base>"`. **If missing:** surface the
   resolved name and **ask the user** which branch to base the worktree on; do not guess.
 
@@ -83,6 +84,7 @@ WT_BRANCH="agent/task"                                     # stable; recreated f
 
   If **either is non-empty** (dirty worktree), **surface exactly what would be lost and ask the user
   to confirm** before removing — never silently `--force` away real work.
+
 - When clean (or the user confirms):
 
   ```bash
@@ -116,14 +118,14 @@ first step (state init, workspace setup, etc.).
 
 ## Quick Reference
 
-| Step | Check | Fallback / guard |
-|------|-------|------------------|
-| 1 Git guard | `git rev-parse --is-inside-work-tree` | Not a repo → log + return (no-op) |
-| 2 Base branch | override → `origin/HEAD` → main/master/develop → current | Missing → ask the user |
-| 3 Location | `$ROOT/../.agent-worktrees/<repo>/task`, branch `agent/task` | Deterministic, idempotent |
-| 4 Remove old | healthy `agent/task` exists & same base → reuse (no-op); else match `git worktree list` | Dirty → confirm before `--force`; `--fresh`/new `--base` forces rebuild |
-| 5 Create | `git worktree add -B agent/task "$WT" <base>` | Copy `.worktreeinclude` files in |
-| 6 Hand off | treat `$WT` as project root | Continue command's normal first step |
+| Step          | Check                                                                                   | Fallback / guard                                                        |
+| ------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1 Git guard   | `git rev-parse --is-inside-work-tree`                                                   | Not a repo → log + return (no-op)                                       |
+| 2 Base branch | override → `origin/HEAD` → main/master/develop → current                                | Missing → ask the user                                                  |
+| 3 Location    | `$ROOT/../.agent-worktrees/<repo>/task`, branch `agent/task`                            | Deterministic, idempotent                                               |
+| 4 Remove old  | healthy `agent/task` exists & same base → reuse (no-op); else match `git worktree list` | Dirty → confirm before `--force`; `--fresh`/new `--base` forces rebuild |
+| 5 Create      | `git worktree add -B agent/task "$WT" <base>`                                           | Copy `.worktreeinclude` files in                                        |
+| 6 Hand off    | treat `$WT` as project root                                                             | Continue command's normal first step                                    |
 
 ## Relationship to native worktree config — audited 2026-09-10
 
@@ -132,7 +134,7 @@ first step (state init, workspace setup, etc.).
 
 - Native `isolation: "worktree"` (agent frontmatter) and `--worktree`/`-w` (CLI flag) each create
   **one worktree scoped to one agent spawn or one session**. `worktree.baseRef` (`fresh`|`head`)
-  only configures what *those* native paths branch from.
+  only configures what _those_ native paths branch from.
 - This skill creates and manages **one worktree per task**, shared across an entire command chain
   that may invoke other wired commands internally (`jira-feature` → `feature-lifecycle` → `feature`,
   `batch-bugfix` → `quick-bugfix`/`bug-fix`). Native config has no concept of "task" spanning nested

@@ -15,14 +15,14 @@ You are the **Alpha Investigator** in a collaborative pair-debugging workflow �
 ## On invocation
 
 1. **agent-bootstrap** — preloaded via this agent's `skills:` frontmatter (state, project config, tech-stack patterns, docs context, workspace already in context at startup; no explicit `Skill` call needed).
-2. **`Skill(bug-investigation)`** — evidence/hypothesis discipline, classification, data-flow tracing, and (for UI bugs) the browser-first Reproduce→Fix→Verify tool hierarchy (Gemini→Chrome DevTools→Playwright; load via ToolSearch). Then read **`references/collaborative-dialogue.md`** for the Alpha report/response formats and round flow. *(Fallback: read the files under `.claude/skills/bug-investigation/`.)*
+2. **`Skill(bug-investigation)`** — evidence/hypothesis discipline, classification, data-flow tracing, and (for UI bugs) the browser-first Reproduce→Fix→Verify tool hierarchy (Gemini→Chrome DevTools→Playwright; load via ToolSearch). Then read **`references/collaborative-dialogue.md`** for the Alpha report/response formats and round flow. _(Fallback: read the files under `.claude/skills/bug-investigation/`.)_
 3. Use `mcp__MCP_DOCKER__sequentialthinking` before forming hypotheses (else extended thinking).
 
 ## Skill Protocol
 
-| Trigger | Skill |
-|---------|-------|
-| At the start of every investigation | `superpowers:systematic-debugging` |
+| Trigger                                            | Skill                                        |
+| -------------------------------------------------- | -------------------------------------------- |
+| At the start of every investigation                | `superpowers:systematic-debugging`           |
 | When proposing a fix after root cause is confirmed | `superpowers:verification-before-completion` |
 
 ## Your role (Alpha)

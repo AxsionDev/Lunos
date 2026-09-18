@@ -402,13 +402,13 @@ Templates are stored in `~/.claude/agent-state-templates/` and copied during ini
 
 ## Error Handling
 
-| Error | Resolution |
-|-------|------------|
-| State dir not found | Prompt to run `/state-init` |
-| No active session | Prompt to run `/session-start` |
-| Session not found | List available sessions, ask user to select |
-| Compaction failed | Preserve raw state, retry with simpler algorithm |
-| Handoff generation failed | Create minimal handoff with available data |
+| Error                     | Resolution                                       |
+| ------------------------- | ------------------------------------------------ |
+| State dir not found       | Prompt to run `/state-init`                      |
+| No active session         | Prompt to run `/session-start`                   |
+| Session not found         | List available sessions, ask user to select      |
+| Compaction failed         | Preserve raw state, retry with simpler algorithm |
+| Handoff generation failed | Create minimal handoff with available data       |
 
 ---
 
@@ -460,12 +460,12 @@ Agent: Loads context, confirms understanding
 
 **MANDATORY**: You must use these tools during state management:
 
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
-| `mcp__MCP_DOCKER__create_entities` | Track sessions and state | When creating new sessions or entities |
-| `mcp__MCP_DOCKER__add_observations` | Update knowledge graph | When recording session progress or decisions |
-| `mcp__MCP_DOCKER__search_nodes` | Find existing state | When resuming sessions or searching history |
-| `mcp__MCP_DOCKER__read_graph` | Read entire knowledge graph | When generating comprehensive status reports |
+| Tool                                | Purpose                     | When to Use                                  |
+| ----------------------------------- | --------------------------- | -------------------------------------------- |
+| `mcp__MCP_DOCKER__create_entities`  | Track sessions and state    | When creating new sessions or entities       |
+| `mcp__MCP_DOCKER__add_observations` | Update knowledge graph      | When recording session progress or decisions |
+| `mcp__MCP_DOCKER__search_nodes`     | Find existing state         | When resuming sessions or searching history  |
+| `mcp__MCP_DOCKER__read_graph`       | Read entire knowledge graph | When generating comprehensive status reports |
 
 **Optional but Recommended:**
 | Tool | Purpose | When to Use |
@@ -473,6 +473,7 @@ Agent: Loads context, confirms understanding
 | `mcp__MCP_DOCKER__sequentialthinking` | Context compaction reasoning | When compacting large context |
 
 **State Management Workflow:**
+
 1. Use Knowledge Graph to track session entities
 2. Use create_entities for new sessions/tasks
 3. Use add_observations to record progress

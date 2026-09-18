@@ -4,7 +4,7 @@
 **Supersedes:** AXC-7 and AXC-8 from the Phase 0 backlog
 
 > [!IMPORTANT]
-> **The draft policy was amended by this rehearsal.** The draft mandated *rebase* onto
+> **The draft policy was amended by this rehearsal.** The draft mandated _rebase_ onto
 > `upstream/dev`. The rehearsal proved rebase is not viable for this fork: **109 conflicts vs. 0
 > for a merge** of the identical upstream range. The adopted policy below uses **merge**. The
 > ticket explicitly licensed this — "carry forward as-is unless this story's rebase rehearsal
@@ -54,15 +54,15 @@ uses in `test.yml` — is `GITHUB_ACTIONS=false bun turbo test`.
 
 **Divergence at rehearsal time**
 
-| Measure | Value |
-|---|---|
-| Merge base | `95daf9067` |
-| `upstream/dev` tip | `b02acc1e3` |
-| Fork-only commits (`upstream/dev..dev`) | **85** |
-| Upstream-only commits (`dev..upstream/dev`) | **22** |
-| Fork-changed files since base | 385 |
-| Upstream-changed files since base | 112 |
-| **Files changed by both (net diff)** | **4** — `bun.lock`, `packages/cli/package.json`, `packages/opencode/src/cli/cmd/tui.ts`, `packages/tui/src/app.tsx` |
+| Measure                                     | Value                                                                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Merge base                                  | `95daf9067`                                                                                                         |
+| `upstream/dev` tip                          | `b02acc1e3`                                                                                                         |
+| Fork-only commits (`upstream/dev..dev`)     | **85**                                                                                                              |
+| Upstream-only commits (`dev..upstream/dev`) | **22**                                                                                                              |
+| Fork-changed files since base               | 385                                                                                                                 |
+| Upstream-changed files since base           | 112                                                                                                                 |
+| **Files changed by both (net diff)**        | **4** — `bun.lock`, `packages/cli/package.json`, `packages/opencode/src/cli/cmd/tui.ts`, `packages/tui/src/app.tsx` |
 
 ### Attempt 1 — `git rebase upstream/dev`: aborted
 
@@ -70,37 +70,37 @@ Failed on the very first fork commit it tried to replay, **`3f3585cf1` "chore: r
 AxCode/opencode fork content"** — a mass-deletion commit touching **6,560 files
 (1,426,709 deletions)**.
 
-| Result | Value |
-|---|---|
-| Conflicted files | **109** |
-| Conflict type | **109 modify/delete, 0 content** |
-| Time to first failure | ~3s |
-| Outcome | **aborted** — `dev` never touched |
+| Result                | Value                             |
+| --------------------- | --------------------------------- |
+| Conflicted files      | **109**                           |
+| Conflict type         | **109 modify/delete, 0 content**  |
+| Time to first failure | ~3s                               |
+| Outcome               | **aborted** — `dev` never touched |
 
-Every conflict has the same shape: *"deleted in `3f3585cf1` … and modified in HEAD."* Our history
+Every conflict has the same shape: _"deleted in `3f3585cf1` … and modified in HEAD."_ Our history
 deletes a file; upstream has since edited it; the replay cannot reconcile the two without a manual
-decision per file. Resolving 109 of these by hand, on the *first* of 85 commits, with no guarantee
+decision per file. Resolving 109 of these by hand, on the _first_ of 85 commits, with no guarantee
 later commits don't re-conflict, is not a weekly operation.
 
 ### Attempt 2 — `git merge upstream/dev`: clean
 
-| Result | Value |
-|---|---|
-| Conflicted files | **0** |
-| Time | **<1s** |
+| Result                    | Value                |
+| ------------------------- | -------------------- |
+| Conflicted files          | **0**                |
+| Time                      | **<1s**              |
 | Upstream commits absorbed | 22 (+1 merge commit) |
 
 ### Post-sync verification
 
 Baseline captured **before** the sync in the **same worktree**, so the comparison is valid.
 
-| Check | Before sync | After sync | Verdict |
-|---|---|---|---|
-| `bun run typecheck` | 30/30 pass, exit 0 | 30/30 pass, exit 0 | no change |
-| `bun turbo test` | 830 pass / 9 fail, exit 1 | 830 pass / 9 fail, exit 1 | no change |
-| Failing-test set | 9 named tests | **identical 9 tests** | **zero regressions** |
-| `check:generated` (in `packages/client`) | exit 0 | exit 0 | no change |
-| `test:httpapi` (in `packages/opencode`) | exit 0 | exit 0 | no change |
+| Check                                    | Before sync               | After sync                | Verdict              |
+| ---------------------------------------- | ------------------------- | ------------------------- | -------------------- |
+| `bun run typecheck`                      | 30/30 pass, exit 0        | 30/30 pass, exit 0        | no change            |
+| `bun turbo test`                         | 830 pass / 9 fail, exit 1 | 830 pass / 9 fail, exit 1 | no change            |
+| Failing-test set                         | 9 named tests             | **identical 9 tests**     | **zero regressions** |
+| `check:generated` (in `packages/client`) | exit 0                    | exit 0                    | no change            |
+| `test:httpapi` (in `packages/opencode`)  | exit 0                    | exit 0                    | no change            |
 
 `test.yml` runs **three** commands in its unit job, not one — `bun turbo test`,
 `bun run check:generated` (from `packages/client`), and `bun run test:httpapi` (from
@@ -123,15 +123,15 @@ suggests a trivial integration. The rebase produced **109** conflicts.
 
 Both numbers are correct — they measure different things:
 
-- A **merge** is a three-way comparison of *endpoints*. A file deleted and later re-added nets out
+- A **merge** is a three-way comparison of _endpoints_. A file deleted and later re-added nets out
   to "unchanged," so it never conflicts.
-- A **rebase** replays all 85 commits *individually*, re-enacting every intermediate state —
+- A **rebase** replays all 85 commits _individually_, re-enacting every intermediate state —
   including the mass deletion in `3f3585cf1` — against a moved target.
 
 This fork's history is full of delete/re-add churn from the AXCODE → Ratio → Lunos renames. That
 churn is invisible in the net diff and dominant in a replay.
 
-**Rule of thumb:** net-diff overlap predicts *merge* burden. It predicts *rebase* burden only for a
+**Rule of thumb:** net-diff overlap predicts _merge_ burden. It predicts _rebase_ burden only for a
 fork whose history has no large delete/re-add or rename churn. This fork is not that fork, and
 `3f3585cf1` alone guarantees it never will be — history is immutable, so this cost is permanent,
 not a transient state that cleans itself up.
@@ -140,7 +140,7 @@ not a transient state that cleans itself up.
 
 The draft policy asserted Lunos-specific code is "clearly separated … so weekly rebases stay
 mechanical." **The separation claim is true** — 4 overlapping files out of 385 is excellent
-isolation, and it is why the merge was clean. The *conclusion* drawn from it was wrong: good
+isolation, and it is why the merge was clean. The _conclusion_ drawn from it was wrong: good
 isolation makes **merges** mechanical, not rebases. Rebase cost is driven by history shape, not by
 file-level separation. The policy keeps the boundary requirement and drops the rebase inference.
 

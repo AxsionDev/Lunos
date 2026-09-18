@@ -11,9 +11,9 @@ Shared discipline for bug work, whether **triaging** a raw report into structure
 
 ## Mode references (load what fits your role)
 
-| Your role | Reference |
-|-----------|-----------|
-| Triage a raw report → structured Bug Analysis Report | `references/bug-triage.md` |
+| Your role                                                  | Reference                              |
+| ---------------------------------------------------------- | -------------------------------------- |
+| Triage a raw report → structured Bug Analysis Report       | `references/bug-triage.md`             |
 | Collaborative root-cause investigation (Alpha/Beta rounds) | `references/collaborative-dialogue.md` |
 
 ## Evidence discipline (always)

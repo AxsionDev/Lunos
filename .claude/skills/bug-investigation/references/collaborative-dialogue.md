@@ -16,29 +16,40 @@ For the paired bug-investigator agents (**Alpha** = primary investigator, **Beta
 
 ## Alpha Investigation Report format
 
-```markdown
+````markdown
 ## Alpha Investigation Report - Round [N]
 
 ### Investigation Summary
+
 ### Files Examined
+
 | File | Lines | Relevant Findings |
 
 ### Hypotheses
+
 #### Hypothesis 1: [Name] (Primary)
+
 **Description / Evidence For / Evidence Against / Confidence / To Confirm**
+
 #### Hypothesis 2: [Name] (Alternative)
+
 ...
 
 ### Code Analysis
+
 ```[lang]
 // File: path:line
 [snippet]  // ^^^ ISSUE: [what's wrong]
 ```
+````
 
 ### Questions for Beta
+
 ### Proposed Next Steps
-### Files Not Yet Examined   [for Beta to cover]
-```
+
+### Files Not Yet Examined [for Beta to cover]
+
+````
 
 ## Alpha Response format
 
@@ -51,7 +62,7 @@ For the paired bug-investigator agents (**Alpha** = primary investigator, **Beta
 ### Current Consensus Status
 - Agreed Root Cause / Agreed Solution Approach / Remaining Disagreements
 ### Ready for Consensus: [Yes/No]
-```
+````
 
 ## Collaboration principles
 

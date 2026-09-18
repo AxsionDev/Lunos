@@ -9,9 +9,11 @@ When you copy this framework to a new project, complete these steps:
 ### 1. Fill in Project Startup Guide (Required)
 
 **Option A: Auto-generate (recommended)**
+
 ```
 /generate-startup
 ```
+
 This scans your project and fills in the values automatically. Review and adjust as needed.
 
 **Option B: Manual**
@@ -21,12 +23,14 @@ Edit `.claude/PROJECT_STARTUP.md` with your project's actual values:
 ## Quick Start
 
 ### Frontend
+
 - **Path:** `./your-frontend-folder`
 - **Install:** `npm install`
 - **Start:** `npm run dev`
 - **URL:** http://localhost:3000
 
 ### Backend
+
 - **Path:** `./your-api-folder`
 - **Install:** `dotnet restore`
 - **Start:** `dotnet run`
@@ -82,27 +86,28 @@ explanatory-output-style, circleback
 
 `claude plugin install <name>@claude-plugins-official` for each. Everything above was audited for real usage on 2026-09-10 — `code-simplifier`, `feature-dev`, `greptile`, `notion`, `ralph-loop`, `serena`, `learning-output-style`, and `ui-ux-pro-max` are deliberately left disabled (no confirmed invocations, or superseded by another plugin); don't re-enable them without a reason.
 
-**Headroom** (token-compression proxy) is the one exception — it's installed **local scope, this repo only**, not user scope, so it does *not* travel automatically even within this machine, and `scripts/sync-claude-fleet.py` never touches `.claude/settings.local.json` either. To add it to another repo/harness:
+**Headroom** (token-compression proxy) is the one exception — it's installed **local scope, this repo only**, not user scope, so it does _not_ travel automatically even within this machine, and `scripts/sync-claude-fleet.py` never touches `.claude/settings.local.json` either. To add it to another repo/harness:
 
 ```
 uv tool install --python 3.13 "headroom-ai[all]"
 HEADROOM_BEACON=off headroom init -v claude   # run from the target repo root
 ```
+
 Then restart Claude Code (hooks/routing don't activate until restart). GitHub: https://github.com/headroomlabs-ai/headroom
 
 ⚠️ Before replicating it onto a client-code-adjacent repo, know what it writes to `.claude/settings.local.json`: it points `ANTHROPIC_BASE_URL` at a local proxy (`http://127.0.0.1:8787`) and sets `allowDangerouslySkipPermissions: true` + `initialPermissionMode: "bypassPermissions"`. That's a real permission-bypass config, not just a routing tweak — review it before turning it on somewhere that matters.
 
 ## Key Commands
 
-| Command | Purpose |
-|---------|---------|
-| `/generate-startup` | Scan project and fill PROJECT_STARTUP.md |
-| `/feature-lifecycle` | Full 5-phase development cycle |
-| `/feature` | Multi-developer parallel implementation |
-| `/bug-fix` | Structured bug investigation and fix |
-| `/discover` | Generate AI-friendly documentation |
-| `/compact` | Compress conversation context |
-| `/handoff` | Generate handoff for agent transitions |
+| Command              | Purpose                                  |
+| -------------------- | ---------------------------------------- |
+| `/generate-startup`  | Scan project and fill PROJECT_STARTUP.md |
+| `/feature-lifecycle` | Full 5-phase development cycle           |
+| `/feature`           | Multi-developer parallel implementation  |
+| `/bug-fix`           | Structured bug investigation and fix     |
+| `/discover`          | Generate AI-friendly documentation       |
+| `/compact`           | Compress conversation context            |
+| `/handoff`           | Generate handoff for agent transitions   |
 
 ## Quick Reference
 

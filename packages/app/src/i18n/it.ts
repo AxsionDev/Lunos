@@ -398,8 +398,7 @@ export const dict = {
   "wsl.onboarding.wslUnavailable.title": "WSL non disponibile",
   "wsl.onboarding.wslUnavailable.description": "Lunos non ha potuto verificare WSL su questa macchina.",
   "wsl.onboarding.installWsl": "Installa WSL",
-  "wsl.onboarding.windowsRestartRequired":
-    "Riavvia Windows per completare l'installazione WSL, quindi riapri Lunos.",
+  "wsl.onboarding.windowsRestartRequired": "Riavvia Windows per completare l'installazione WSL, quindi riapri Lunos.",
   "wsl.onboarding.next": "Avanti",
   "wsl.onboarding.refresh": "Aggiorna",
   "wsl.onboarding.allDistrosAdded": "Tutte le distribuzioni installate sono già aggiunte.",

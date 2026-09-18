@@ -13,12 +13,12 @@ Shared engine for the review team. Each reviewer owns ONE dimension and stays in
 
 Read the reference for your dimension (progressive disclosure — load only yours):
 
-| Dimension | Reference | Owner agent |
-|-----------|-----------|-------------|
+| Dimension    | Reference                    | Owner agent           |
+| ------------ | ---------------------------- | --------------------- |
 | Architecture | `references/architecture.md` | architecture-reviewer |
-| Security | `references/security.md` | security-reviewer |
-| Performance | `references/performance.md` | performance-reviewer |
-| Code quality | `references/code-quality.md` | code-review-signoff |
+| Security     | `references/security.md`     | security-reviewer     |
+| Performance  | `references/performance.md`  | performance-reviewer  |
+| Code quality | `references/code-quality.md` | code-review-signoff   |
 
 ## Stay in your lane
 
@@ -26,12 +26,12 @@ Review ONLY your dimension. Defer everything else to the owning reviewer (table 
 
 ## Severity scale (all dimensions)
 
-| Level | Meaning |
-|-------|---------|
+| Level       | Meaning                                 |
+| ----------- | --------------------------------------- |
 | 🔴 Critical | Fundamental flaw; must fix before merge |
-| 🟠 High | Significant maintainability/risk impact |
-| 🟡 Medium | Notable smell worth addressing |
-| 🟢 Low | Minor improvement opportunity |
+| 🟠 High     | Significant maintainability/risk impact |
+| 🟡 Medium   | Notable smell worth addressing          |
+| 🟢 Low      | Minor improvement opportunity           |
 
 ## Structured reasoning (recommended)
 
@@ -51,7 +51,8 @@ For each issue requiring a fix:
 
 ```markdown
 ### Issue: [name]
-**Severity**: [level]   **Location**: `path/file:line`
+
+**Severity**: [level] **Location**: `path/file:line`
 **Current State**: [the violation]
 **Required Change**: [specific change]
 **Acceptance Criteria**: [ ] measurable criterion

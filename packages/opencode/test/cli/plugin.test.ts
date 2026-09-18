@@ -166,7 +166,11 @@ describe("plugin.search", () => {
     await using tmp = await tmpdir()
     await withMarketplace(tmp.path)
 
-    const result = await searchPlugins("keybindings", ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
+    const result = await searchPlugins(
+      "keybindings",
+      ctx(tmp.path),
+      listDeps(path.join(tmp.path, "global"), resolveDeps),
+    )
     expect(result.plugins.map((p) => p.name)).toEqual(["vim-bindings"])
   })
 
@@ -174,7 +178,11 @@ describe("plugin.search", () => {
     await using tmp = await tmpdir()
     await withMarketplace(tmp.path)
 
-    const byCategory = await searchPlugins("editing", ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
+    const byCategory = await searchPlugins(
+      "editing",
+      ctx(tmp.path),
+      listDeps(path.join(tmp.path, "global"), resolveDeps),
+    )
     expect(byCategory.plugins.map((p) => p.name)).toEqual(["vim-bindings"])
 
     const byTag = await searchPlugins("status-bar", ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
@@ -185,7 +193,11 @@ describe("plugin.search", () => {
     await using tmp = await tmpdir()
     await withMarketplace(tmp.path)
 
-    const result = await searchPlugins("nonexistent", ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
+    const result = await searchPlugins(
+      "nonexistent",
+      ctx(tmp.path),
+      listDeps(path.join(tmp.path, "global"), resolveDeps),
+    )
     expect(result.marketplaceCount).toBe(1)
     expect(result.plugins).toEqual([])
   })

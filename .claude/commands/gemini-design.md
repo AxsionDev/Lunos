@@ -11,21 +11,27 @@ You are an orchestrator that dispatches UI design tasks to the `angular-gemini-d
 Before dispatching, gather the context the agent needs:
 
 1. **Read design system** (if it exists):
+
    ```
    Glob: design-system.md (project root)
    ```
+
    If found, read its full contents — this will be passed to the agent.
 
 2. **Search for related documentation:**
+
    ```
    Glob: ".claude/docs/*.md"
    ```
+
    Read any docs related to the feature area being designed.
 
 3. **Identify existing components** (if this is a redesign):
+
    ```
    Glob: "BabyCalendar.UI/src/app/pages/**/*.component.ts"
    ```
+
    Check if a component already exists for the target page/feature.
 
 4. **Read VaxideteModule registry** to know which shared components are available:
@@ -79,21 +85,27 @@ prompt: |
 After the agent completes, verify the output:
 
 1. **Check generated files exist:**
+
    ```
    Glob: "BabyCalendar.UI/src/app/pages/**/*.component.{html,scss,ts}"
    ```
+
    Confirm the expected component files were created.
 
 2. **Verify module registration:**
+
    ```
    Grep: pattern="Component" in the new module file
    ```
+
    Ensure the component is declared and VaxideteModule is imported.
 
 3. **Run build check** (if available):
+
    ```
    cd BabyCalendar.UI && npx ng build --configuration development 2>&1 | head -30
    ```
+
    Report any compilation errors back to the user.
 
 4. **Browser verification** — Verify generated component using the three-tier hierarchy:

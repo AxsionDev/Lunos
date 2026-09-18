@@ -32,6 +32,7 @@ ls -la "$CLAUDE_PROJECT_DIR/.remember/" 2>/dev/null
 ```
 
 Read and summarize:
+
 - `now.md` — the current in-progress buffer (should be small; if it's grown large, compaction may be overdue)
 - `today-*.md` files — one per day worked; count them and note the date range they span
 - `recent.md` — rolling 7-day window
@@ -57,6 +58,7 @@ ls ~/.claude-mem/logs/ 2>/dev/null | tail -5
 If the exact column name for the timestamp differs from `created_at`, first run `sqlite3 ~/.claude-mem/claude-mem.db ".schema observations"` to find the real column before the MIN/MAX query, rather than guessing repeatedly.
 
 Report:
+
 - DB size and total observation count
 - Date range covered (first → last observation)
 - Whether the most recent log file's date is **today** — if it is, and `claude plugin list` showed `claude-mem` absent, that's a contradiction worth surfacing (something is still writing to it, e.g. another machine, a stale background process, or the uninstall didn't fully stop an already-running MCP server this session).
@@ -67,6 +69,7 @@ Do **not** delete or modify `~/.claude-mem/` in this step, even if it looks like
 ### 4. Verdict
 
 Compare the two:
+
 - Is `remember` actively growing (recent `today-*.md` entries, `now.md` updated recently)?
 - Is `claude-mem`'s data frozen as of the uninstall date, or still growing (see the contradiction check above)?
 - Restate plainly: `remember` is the one live system; `claude-mem`'s DB is historical-only unless the freshness check says otherwise.

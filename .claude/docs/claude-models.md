@@ -7,74 +7,75 @@
 
 ## Overview
 
-This document is a local, AI-agent-friendly reference for choosing and using Claude models. It covers every active model, its pricing and limits, the API quirks that will cause `400` errors if you get them wrong, and a decision guide for matching a model to a task. The headline addition is **Claude Fable 5** — Anthropic's most capable widely released model, which sits *above* the Opus tier and has a meaningfully different API contract from the Opus family.
+This document is a local, AI-agent-friendly reference for choosing and using Claude models. It covers every active model, its pricing and limits, the API quirks that will cause `400` errors if you get them wrong, and a decision guide for matching a model to a task. The headline addition is **Claude Fable 5** — Anthropic's most capable widely released model, which sits _above_ the Opus tier and has a meaningfully different API contract from the Opus family.
 
 ---
 
 ## Quick Catalog (Current / Recommended Models)
 
-| Model | Model ID (use this) | Context | Max Output | Input $/1M | Output $/1M | Tier |
-|-------|---------------------|---------|------------|-----------|-------------|------|
-| **Claude Fable 5** | `claude-fable-5` | 1M | 128K | $10.00 | $50.00 | Frontier / most capable |
-| **Claude Mythos 5** | `claude-mythos-5` | 1M | 128K | $10.00 | $50.00 | Frontier (Project Glasswing only) |
-| **Claude Opus 4.8** | `claude-opus-4-8` | 1M | 128K | $5.00 | $25.00 | Opus (most capable Opus-tier) |
-| **Claude Opus 4.7** | `claude-opus-4-7` | 1M | 128K | $5.00 | $25.00 | Opus (previous gen) |
-| **Claude Opus 4.6** | `claude-opus-4-6` | 1M | 128K | $5.00 | $25.00 | Opus (older) |
-| **Claude Sonnet 4.6** | `claude-sonnet-4-6` | 1M | 64K | $3.00 | $15.00 | Sonnet (speed + intelligence) |
-| **Claude Haiku 4.5** | `claude-haiku-4-5` | 200K | 64K | $1.00 | $5.00 | Haiku (fast + cheap) |
+| Model                 | Model ID (use this) | Context | Max Output | Input $/1M | Output $/1M | Tier                              |
+| --------------------- | ------------------- | ------- | ---------- | ---------- | ----------- | --------------------------------- |
+| **Claude Fable 5**    | `claude-fable-5`    | 1M      | 128K       | $10.00     | $50.00      | Frontier / most capable           |
+| **Claude Mythos 5**   | `claude-mythos-5`   | 1M      | 128K       | $10.00     | $50.00      | Frontier (Project Glasswing only) |
+| **Claude Opus 4.8**   | `claude-opus-4-8`   | 1M      | 128K       | $5.00      | $25.00      | Opus (most capable Opus-tier)     |
+| **Claude Opus 4.7**   | `claude-opus-4-7`   | 1M      | 128K       | $5.00      | $25.00      | Opus (previous gen)               |
+| **Claude Opus 4.6**   | `claude-opus-4-6`   | 1M      | 128K       | $5.00      | $25.00      | Opus (older)                      |
+| **Claude Sonnet 4.6** | `claude-sonnet-4-6` | 1M      | 64K        | $3.00      | $15.00      | Sonnet (speed + intelligence)     |
+| **Claude Haiku 4.5**  | `claude-haiku-4-5`  | 200K    | 64K        | $1.00      | $5.00       | Haiku (fast + cheap)              |
 
 > **Default model:** Unless you have a specific reason otherwise, use **`claude-opus-4-8`**. Use `claude-fable-5` only when you explicitly want the most capable model and accept the higher price + different API contract. Never silently downgrade for cost — that is the user's decision.
 
 ### Legacy / still-active (pin only if you need them)
 
-| Model | Model ID | Status |
-|-------|----------|--------|
-| Claude Opus 4.5 | `claude-opus-4-5` | Active |
-| Claude Opus 4.1 | `claude-opus-4-1` | Deprecated — retires 2026-08-05 → migrate to `claude-opus-4-8` |
-| Claude Sonnet 4.5 | `claude-sonnet-4-5` | Active |
-| Claude Sonnet 4 | `claude-sonnet-4-0` | Deprecated → `claude-sonnet-4-6` |
-| Claude Opus 4 | `claude-opus-4-0` | Deprecated → `claude-opus-4-8` |
-| Claude Haiku 3 | `claude-3-haiku-20240307` | Deprecated — retires 2026-04-19 → `claude-haiku-4-5` |
+| Model             | Model ID                  | Status                                                         |
+| ----------------- | ------------------------- | -------------------------------------------------------------- |
+| Claude Opus 4.5   | `claude-opus-4-5`         | Active                                                         |
+| Claude Opus 4.1   | `claude-opus-4-1`         | Deprecated — retires 2026-08-05 → migrate to `claude-opus-4-8` |
+| Claude Sonnet 4.5 | `claude-sonnet-4-5`       | Active                                                         |
+| Claude Sonnet 4   | `claude-sonnet-4-0`       | Deprecated → `claude-sonnet-4-6`                               |
+| Claude Opus 4     | `claude-opus-4-0`         | Deprecated → `claude-opus-4-8`                                 |
+| Claude Haiku 3    | `claude-3-haiku-20240307` | Deprecated — retires 2026-04-19 → `claude-haiku-4-5`           |
 
 ### Recently retired (return 404 — replace immediately)
 
-| Retired model | Replacement |
-|---------------|-------------|
-| `claude-3-7-sonnet-20250219` (retired 2026-02-19) | `claude-sonnet-4-6` |
-| `claude-3-5-haiku-20241022` (retired 2026-02-19) | `claude-haiku-4-5` |
-| `claude-3-opus-20240229` (retired 2026-01-05) | `claude-opus-4-8` |
-| `claude-mythos-preview` (invite-only preview) | `claude-mythos-5` (Glasswing) or `claude-fable-5` (GA) |
+| Retired model                                     | Replacement                                            |
+| ------------------------------------------------- | ------------------------------------------------------ |
+| `claude-3-7-sonnet-20250219` (retired 2026-02-19) | `claude-sonnet-4-6`                                    |
+| `claude-3-5-haiku-20241022` (retired 2026-02-19)  | `claude-haiku-4-5`                                     |
+| `claude-3-opus-20240229` (retired 2026-01-05)     | `claude-opus-4-8`                                      |
+| `claude-mythos-preview` (invite-only preview)     | `claude-mythos-5` (Glasswing) or `claude-fable-5` (GA) |
 
 ---
 
 ## ⭐ Claude Fable 5 — The New Flagship
 
-**`claude-fable-5`** is Anthropic's most capable widely released model, built for the most demanding reasoning and **long-horizon agentic work**. It is *not* the default Opus upgrade path — it is a higher tier with higher pricing ($10/$50 per 1M vs Opus's $5/$25) and a different API surface.
+**`claude-fable-5`** is Anthropic's most capable widely released model, built for the most demanding reasoning and **long-horizon agentic work**. It is _not_ the default Opus upgrade path — it is a higher tier with higher pricing ($10/$50 per 1M vs Opus's $5/$25) and a different API surface.
 
 - **Context:** 1M tokens (the maximum is also the default).
 - **Max output:** 128K tokens.
 - **Pricing:** $10.00 input / $50.00 output per 1M tokens — above Opus-tier.
 
-> **Claude Mythos 5** (`claude-mythos-5`) is the *same model* — identical capabilities, pricing, limits, and API behavior — available only through **Project Glasswing**. It succeeds the invite-only `claude-mythos-preview`. Use `claude-mythos-5` only if your org participates in Glasswing; otherwise use `claude-fable-5`. Everything below applies to both.
+> **Claude Mythos 5** (`claude-mythos-5`) is the _same model_ — identical capabilities, pricing, limits, and API behavior — available only through **Project Glasswing**. It succeeds the invite-only `claude-mythos-preview`. Use `claude-mythos-5` only if your org participates in Glasswing; otherwise use `claude-fable-5`. Everything below applies to both.
 
 ### What makes Fable 5 different (API contract)
 
 These are the breaking differences vs the Opus family. Getting them wrong produces `400` errors.
 
-| Behavior | Fable 5 contract |
-|----------|------------------|
-| **Thinking** | **Always on.** Omit the `thinking` parameter entirely (or send `{type: "adaptive"}`). `{type: "disabled"}` → **400**. `{type: "enabled", budget_tokens: N}` → **400**. Control depth with `output_config.effort` (`low`→`xhigh`, `max`). |
-| **Protected thinking** | The **raw chain of thought is never returned.** Responses carry regular `thinking` blocks: `display: "summarized"` gives a readable summary; `"omitted"` (the default) leaves the text empty. Echo thinking blocks back **unchanged** on the same model; a *different* model silently drops them from the prompt (unbilled). |
-| **Tokenizer** | **New tokenizer — ~30% more tokens** for the same content vs Opus-tier. Re-baseline token counts, context budgets, and `max_tokens` with `count_tokens` (pass `model: "claude-fable-5"` — the response returns counts under both tokenizers). |
-| **`refusal` stop reason** | Safety classifiers may decline a request: **HTTP 200** with `stop_reason: "refusal"` + a `stop_details.category`. Pre-output refusal = empty `content`, not billed; mid-stream = partial output billed (discard it). **Always check `stop_reason` before reading `content[0]`.** |
-| **Assistant prefill** | Not supported (same as the 4.6+ family). Use `output_config.format` (structured outputs) or system-prompt instructions. |
-| **Sampling params** | `temperature`, `top_p`, `top_k` are removed → **400** if sent. Steer with prompting. |
-| **Data retention** | Requires **30-day data retention.** Not available under zero-data-retention (ZDR); a ZDR/sub-30-day org gets `400 invalid_request_error` on *every* request regardless of payload. |
-| **Turn length** | Single requests on hard tasks can run **many minutes** at high effort. Plan timeouts, streaming, and async progress UX. |
+| Behavior                  | Fable 5 contract                                                                                                                                                                                                                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Thinking**              | **Always on.** Omit the `thinking` parameter entirely (or send `{type: "adaptive"}`). `{type: "disabled"}` → **400**. `{type: "enabled", budget_tokens: N}` → **400**. Control depth with `output_config.effort` (`low`→`xhigh`, `max`).                                                                                     |
+| **Protected thinking**    | The **raw chain of thought is never returned.** Responses carry regular `thinking` blocks: `display: "summarized"` gives a readable summary; `"omitted"` (the default) leaves the text empty. Echo thinking blocks back **unchanged** on the same model; a _different_ model silently drops them from the prompt (unbilled). |
+| **Tokenizer**             | **New tokenizer — ~30% more tokens** for the same content vs Opus-tier. Re-baseline token counts, context budgets, and `max_tokens` with `count_tokens` (pass `model: "claude-fable-5"` — the response returns counts under both tokenizers).                                                                                |
+| **`refusal` stop reason** | Safety classifiers may decline a request: **HTTP 200** with `stop_reason: "refusal"` + a `stop_details.category`. Pre-output refusal = empty `content`, not billed; mid-stream = partial output billed (discard it). **Always check `stop_reason` before reading `content[0]`.**                                             |
+| **Assistant prefill**     | Not supported (same as the 4.6+ family). Use `output_config.format` (structured outputs) or system-prompt instructions.                                                                                                                                                                                                      |
+| **Sampling params**       | `temperature`, `top_p`, `top_k` are removed → **400** if sent. Steer with prompting.                                                                                                                                                                                                                                         |
+| **Data retention**        | Requires **30-day data retention.** Not available under zero-data-retention (ZDR); a ZDR/sub-30-day org gets `400 invalid_request_error` on _every_ request regardless of payload.                                                                                                                                           |
+| **Turn length**           | Single requests on hard tasks can run **many minutes** at high effort. Plan timeouts, streaming, and async progress UX.                                                                                                                                                                                                      |
 
 ### When Fable 5 shines (and when not to bother)
 
 **Use Fable 5 for:**
+
 - Long-horizon autonomous agentic runs (overnight coding, complex multi-step refactors that complete without human correction).
 - First-shot implementation of well-specified systems.
 - End-to-end enterprise deliverables (financial analysis, spreadsheets, slides, docs with self-verification).
@@ -83,6 +84,7 @@ These are the breaking differences vs the Opus family. Getting them wrong produc
 - Navigating genuine ambiguity where you want the strongest planning.
 
 **Don't reach for Fable 5 when:**
+
 - The task is routine — Opus 4.8 or Sonnet 4.6 is cheaper and plenty capable.
 - You need security/biology-domain work (classifiers target these; benign adjacent work can false-positive).
 - You're in a ZDR org (it's simply unavailable).
@@ -90,7 +92,8 @@ These are the breaking differences vs the Opus family. Getting them wrong produc
 
 ### Prompting Fable 5 (it differs from prior models)
 
-Prompts tuned for older models are often **too prescriptive** and *reduce* Fable 5's output quality. Key levers:
+Prompts tuned for older models are often **too prescriptive** and _reduce_ Fable 5's output quality. Key levers:
+
 - **Run an effort sweep including `low`/`medium`** for routine work — low effort on Fable 5 often beats `xhigh`/`max` on prior models.
 - **Add a "no unrequested tidying/refactoring" instruction** at higher effort, or it may over-build.
 - **Ground progress claims** ("audit each claim against a tool result before reporting") — nearly eliminates fabricated status on long runs.
@@ -110,7 +113,7 @@ The most capable **Opus-tier** model: highly autonomous, state-of-the-art on lon
 - Adaptive thinking only (`{type: "adaptive"}`); `budget_tokens` and sampling params removed.
 - `thinking.display` defaults to `"omitted"` — set `"summarized"` if you surface reasoning.
 - New feature: **mid-session system prompts** (`role: "system"` in `messages`, beta `mid-conversation-system-2026-04-07`) — inject context mid-conversation without invalidating the prompt cache.
-- Behavioral notes: narrates *more* than 4.7 (add a silence-default for terse coding agents); asks permission more often (add small-decisions-don't-ask guidance); under-reaches for search/subagents/memory/custom tools (add explicit "when to use" triggers).
+- Behavioral notes: narrates _more_ than 4.7 (add a silence-default for terse coding agents); asks permission more often (add small-decisions-don't-ask guidance); under-reaches for search/subagents/memory/custom tools (add explicit "when to use" triggers).
 
 ### Claude Opus 4.7 (`claude-opus-4-7`) — previous-gen Opus
 
@@ -132,20 +135,20 @@ Fastest and most cost-effective model for simple, speed-critical tasks (classifi
 
 ## "Which Model for What" Decision Guide
 
-| Task / Use case | Recommended model | Why |
-|-----------------|-------------------|-----|
-| Simple classification / extraction / routing at volume | `claude-haiku-4-5` | Fastest, cheapest; no thinking overhead needed |
-| Summarization / Q&A / content generation (production volume) | `claude-sonnet-4-6` | Best speed/intelligence/cost balance |
-| Most general engineering, coding, agentic work | `claude-opus-4-8` | The recommended default; top Opus-tier intelligence |
-| Interactive coding agent | `claude-opus-4-8` at `high`/`xhigh` effort | Strong autonomy; re-tune effort per route |
-| Long-horizon autonomous agents (overnight runs, big migrations) | `claude-fable-5` | Most capable; state-of-the-art long-horizon execution |
-| First-shot build of a well-specified complex system | `claude-fable-5` | Highest planning + execution ceiling |
-| Deep code review / bug hunting (non-security) | `claude-fable-5` or `claude-opus-4-8` | Higher recall + precision; report-everything-then-filter |
-| Vision-heavy (screenshots, charts, documents, computer use) | `claude-opus-4-8` / `claude-opus-4-7` | High-res vision, pixel-accurate coordinates |
-| Enterprise deliverables (xlsx/docx/pptx with self-verification) | `claude-fable-5` | Strong self-verifying knowledge work |
-| Cost-sensitive but needs reasoning | `claude-sonnet-4-6` at `low`/`medium` effort | Tunable depth, half the Opus price |
-| Security or biology domain work | **Not Fable 5** — use `claude-opus-4-8` | Fable 5 classifiers target/refuse these domains |
-| ZDR (zero data retention) org | Any except Fable 5/Mythos 5 | Fable 5 requires 30-day retention |
+| Task / Use case                                                 | Recommended model                            | Why                                                      |
+| --------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------- |
+| Simple classification / extraction / routing at volume          | `claude-haiku-4-5`                           | Fastest, cheapest; no thinking overhead needed           |
+| Summarization / Q&A / content generation (production volume)    | `claude-sonnet-4-6`                          | Best speed/intelligence/cost balance                     |
+| Most general engineering, coding, agentic work                  | `claude-opus-4-8`                            | The recommended default; top Opus-tier intelligence      |
+| Interactive coding agent                                        | `claude-opus-4-8` at `high`/`xhigh` effort   | Strong autonomy; re-tune effort per route                |
+| Long-horizon autonomous agents (overnight runs, big migrations) | `claude-fable-5`                             | Most capable; state-of-the-art long-horizon execution    |
+| First-shot build of a well-specified complex system             | `claude-fable-5`                             | Highest planning + execution ceiling                     |
+| Deep code review / bug hunting (non-security)                   | `claude-fable-5` or `claude-opus-4-8`        | Higher recall + precision; report-everything-then-filter |
+| Vision-heavy (screenshots, charts, documents, computer use)     | `claude-opus-4-8` / `claude-opus-4-7`        | High-res vision, pixel-accurate coordinates              |
+| Enterprise deliverables (xlsx/docx/pptx with self-verification) | `claude-fable-5`                             | Strong self-verifying knowledge work                     |
+| Cost-sensitive but needs reasoning                              | `claude-sonnet-4-6` at `low`/`medium` effort | Tunable depth, half the Opus price                       |
+| Security or biology domain work                                 | **Not Fable 5** — use `claude-opus-4-8`      | Fable 5 classifiers target/refuse these domains          |
+| ZDR (zero data retention) org                                   | Any except Fable 5/Mythos 5                  | Fable 5 requires 30-day retention                        |
 
 ### Effort parameter quick guide (Opus 4.5+, Sonnet 4.6, Fable 5 — not Haiku)
 
@@ -161,12 +164,12 @@ Fastest and most cost-effective model for simple, speed-critical tasks (classifi
 
 ## Thinking & Effort — Cheat Sheet by Model
 
-| Model | Thinking config | Notes |
-|-------|-----------------|-------|
-| Fable 5 / Mythos 5 | Omit `thinking` (always on) or `{type: "adaptive"}` | `{type: "disabled"}` → 400; `budget_tokens` → 400 |
-| Opus 4.8 / 4.7 | `{type: "adaptive"}` | `budget_tokens` → 400; `{type: "disabled"}` allowed |
-| Opus 4.6 / Sonnet 4.6 | `{type: "adaptive"}` (recommended) | `budget_tokens` deprecated but still functional |
-| Haiku 4.5 / older | `{type: "enabled", budget_tokens: N}` | `budget_tokens` must be < `max_tokens`, min 1024; no `effort` |
+| Model                 | Thinking config                                     | Notes                                                         |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------------------- |
+| Fable 5 / Mythos 5    | Omit `thinking` (always on) or `{type: "adaptive"}` | `{type: "disabled"}` → 400; `budget_tokens` → 400             |
+| Opus 4.8 / 4.7        | `{type: "adaptive"}`                                | `budget_tokens` → 400; `{type: "disabled"}` allowed           |
+| Opus 4.6 / Sonnet 4.6 | `{type: "adaptive"}` (recommended)                  | `budget_tokens` deprecated but still functional               |
+| Haiku 4.5 / older     | `{type: "enabled", budget_tokens: N}`               | `budget_tokens` must be < `max_tokens`, min 1024; no `effort` |
 
 > **`max_tokens` defaults:** non-streaming → ~16000 (avoids SDK HTTP timeouts); streaming → ~64000. Fable 5 / Opus 4.6/4.7/4.8 support up to 128K output **but require streaming** at large values.
 

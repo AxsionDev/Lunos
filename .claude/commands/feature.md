@@ -4,26 +4,26 @@ Orchestrate a complete feature development cycle with multiple developers workin
 
 ## Team Structure
 
-| Role | Agent | Responsibility |
-|------|-------|----------------|
-| **Orchestrator** | `project-orchestrator` | Break down requirements |
-| **UI/UX Designer** | `ui-ux-designer` | User experience, layouts, interactions |
-| **Team Lead** | `team-lead` | Contracts, oversight, sign-off |
-| **Backend Developer** | `backend-developer` | .NET/C# services, APIs |
-| **Frontend Developer** | `frontend-developer` | Angular components, UI |
-| **Database Developer** | `database-developer` | SQL/EF Core, migrations |
-| **Integration Developer** | `integration-developer` | Connect all layers |
-| **Security Reviewer** | `security-reviewer` | Vulnerabilities |
-| **Performance Reviewer** | `performance-reviewer` | N+1, async, caching |
-| **Architecture Reviewer** | `architecture-reviewer` | SOLID, patterns |
-| **Code Quality Reviewer** | `code-review-signoff` | Readability, DRY |
-| **Documentation** | `ai-docs-generator` | AI-friendly docs |
+| Role                      | Agent                   | Responsibility                         |
+| ------------------------- | ----------------------- | -------------------------------------- |
+| **Orchestrator**          | `project-orchestrator`  | Break down requirements                |
+| **UI/UX Designer**        | `ui-ux-designer`        | User experience, layouts, interactions |
+| **Team Lead**             | `team-lead`             | Contracts, oversight, sign-off         |
+| **Backend Developer**     | `backend-developer`     | .NET/C# services, APIs                 |
+| **Frontend Developer**    | `frontend-developer`    | Angular components, UI                 |
+| **Database Developer**    | `database-developer`    | SQL/EF Core, migrations                |
+| **Integration Developer** | `integration-developer` | Connect all layers                     |
+| **Security Reviewer**     | `security-reviewer`     | Vulnerabilities                        |
+| **Performance Reviewer**  | `performance-reviewer`  | N+1, async, caching                    |
+| **Architecture Reviewer** | `architecture-reviewer` | SOLID, patterns                        |
+| **Code Quality Reviewer** | `code-review-signoff`   | Readability, DRY                       |
+| **Documentation**         | `ai-docs-generator`     | AI-friendly docs                       |
 
 ---
 
 ## Pre-flight: Worktree Reset (FIRST — before any action)
 
-Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. *(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)* If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. This is **task-level** — the per-developer `isolation: "worktree"` agents in Steps 5.1–5.3 still spawn their own worktrees on top of this clean base.
+Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. _(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)_ If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. This is **task-level** — the per-developer `isolation: "worktree"` agents in Steps 5.1–5.3 still spawn their own worktrees on top of this clean base.
 
 ---
 
@@ -49,6 +49,7 @@ Note the workspace path and pass it to the integration developer (Step 5.4) and 
 > **Parallelism Note:** If the feature description in `$ARGUMENTS` is detailed enough for UI/UX work to begin independently (clear user-facing requirements, not purely backend), launch Steps 1 and 2 in parallel using multiple Task tool calls in a single message. The planner focuses on technical decomposition while the designer focuses on user experience — these are independent concerns.
 
 Use the Task tool with `subagent_type="project-orchestrator"` to:
+
 - **First**: Read `QUICK_REFERENCE.md` (search in `.claude/docs/`, `.augment/`, `docs/`) and `CODE_STRUCTURE.md` (search in `.claude/docs/`, `.claude/patterns/`, `.augment/`, `docs/`)
 - Analyze the feature request: "$ARGUMENTS"
 - Break it down into specific, actionable tasks
@@ -257,7 +258,7 @@ three-tier tool hierarchy defined in `.claude/agents/_gemini-design-hook.md`.
 
 After the three parallel developers complete, use the Task tool with `subagent_type="integration-developer"`:
 
-```
+````
 ## Integration Developer Assignment
 
 ### Step 1 — Merge Worktree Branches (REQUIRED FIRST)
@@ -268,20 +269,24 @@ The parallel developers ran with `isolation: "worktree"`. Their changes are on s
 git merge {db-dev-branch} --no-edit        # branch name from database developer task result
 git merge {backend-dev-branch} --no-edit   # branch name from backend developer task result
 git merge {frontend-dev-branch} --no-edit  # branch name from frontend developer task result
-```
+````
 
 If a merge conflict occurs, use `.claude/docs/{feature-slug}-contracts.md` as the source of truth for interface decisions.
 
 ### Contracts Reference
+
 Read `.claude/docs/{feature-slug}-contracts.md` for all contracts.
 
 ### UI/UX Design Reference
+
 Read `.claude/docs/{feature-slug}-ux-design.md` for integration points (API calls, data shapes).
 
 ### Work Completed By Other Developers
+
 [Summarize outputs from Backend, Frontend, Database developers]
 
 ### Your Tasks
+
 1. Verify contracts are aligned across all layers
 2. Wire up dependency injection in Program.cs
 3. Configure AutoMapper if needed
@@ -290,9 +295,11 @@ Read `.claude/docs/{feature-slug}-ux-design.md` for integration points (API call
 6. Fix any integration mismatches
 
 ### Deliverables
+
 - DI configuration
 - Mapping profiles
 - Verified end-to-end flow
+
 ```
 
 After ALL developers complete, ask: **"Step 5 (Implementation) complete. Ready to proceed to Step 6 (Team Lead Review)? (yes/no/adjust)"**
@@ -306,18 +313,23 @@ Wait for user approval before continuing.
 Use the Task tool with `subagent_type="team-lead"` with this prompt:
 
 ```
+
 ## Team Lead Review Request
 
 ### Original Contracts
+
 [Include contracts from Step 3]
 
 ### UI/UX Design Specification
+
 [Include UI/UX design from Step 2]
 
 ### Developer Outputs
+
 [Include summaries from all four developers]
 
 ### Your Task
+
 Review each developer's work:
 
 1. **Contract Compliance**: Does each implementation match the contracts?
@@ -326,10 +338,12 @@ Review each developer's work:
 4. **Integration**: Can all pieces work together?
 
 For each developer, provide:
+
 - ✅ APPROVED - ready for code review
 - 🔄 NEEDS FIXES - list specific issues
 
 If any developer needs fixes, specify exactly what needs to change.
+
 ```
 
 ### If Fixes Needed
@@ -337,9 +351,11 @@ If any developer needs fixes, specify exactly what needs to change.
 Use **SendMessage** to re-engage the relevant developer(s) with specific feedback, preserving their context:
 
 ```
-SendMessage(to: "backend-dev",  message: "Team lead review: NEEDS FIXES\n\n[specific issues]")
+
+SendMessage(to: "backend-dev", message: "Team lead review: NEEDS FIXES\n\n[specific issues]")
 SendMessage(to: "frontend-dev", message: "Team lead review: NEEDS FIXES\n\n[specific issues]")
-SendMessage(to: "db-dev",       message: "Team lead review: NEEDS FIXES\n\n[specific issues]")
+SendMessage(to: "db-dev", message: "Team lead review: NEEDS FIXES\n\n[specific issues]")
+
 ```
 
 Only SendMessage to the developer(s) that need fixes. If a developer's session has expired (agent no longer active), re-launch with the Task tool providing the original context + specific fix feedback. Continue until all developers are approved.
@@ -359,16 +375,21 @@ Launch **all four reviewers in parallel** (use multiple Task tool calls in a sin
 Use the Task tool with `subagent_type="security-reviewer"`:
 
 ```
+
 ## Security Review Request
 
 ### Feature Implemented
+
 $ARGUMENTS
 
 ### Files Changed
+
 [List all files created/modified in Step 5]
 
 ### Your Task
+
 Review for security vulnerabilities:
+
 - Injection attacks (SQL, XSS, command)
 - Authentication/authorization flaws
 - Sensitive data exposure
@@ -376,6 +397,7 @@ Review for security vulnerabilities:
 - Security misconfigurations
 
 Provide Security Review Report with verdict.
+
 ```
 
 ### 7.2: Performance Review
@@ -383,16 +405,21 @@ Provide Security Review Report with verdict.
 Use the Task tool with `subagent_type="performance-reviewer"`:
 
 ```
+
 ## Performance Review Request
 
 ### Feature Implemented
+
 $ARGUMENTS
 
 ### Files Changed
+
 [List all files created/modified in Step 5]
 
 ### Your Task
+
 Review for performance issues:
+
 - N+1 query problems
 - Missing async/await
 - Inefficient LINQ
@@ -400,6 +427,7 @@ Review for performance issues:
 - Resource leaks
 
 Provide Performance Review Report with verdict.
+
 ```
 
 ### 7.3: Architecture Review
@@ -407,16 +435,21 @@ Provide Performance Review Report with verdict.
 Use the Task tool with `subagent_type="architecture-reviewer"`:
 
 ```
+
 ## Architecture Review Request
 
 ### Feature Implemented
+
 $ARGUMENTS
 
 ### Files Changed
+
 [List all files created/modified in Step 5]
 
 ### Your Task
+
 Review for architectural concerns:
+
 - SOLID principles adherence
 - Layer boundary violations
 - Abstraction quality
@@ -424,6 +457,7 @@ Review for architectural concerns:
 - Coupling and cohesion
 
 Provide Architecture Review Report with verdict.
+
 ```
 
 ### 7.4: Code Quality Review
@@ -431,16 +465,21 @@ Provide Architecture Review Report with verdict.
 Use the Task tool with `subagent_type="code-review-signoff"`:
 
 ```
+
 ## Code Quality Review Request
 
 ### Feature Implemented
+
 $ARGUMENTS
 
 ### Files Changed
+
 [List all files created/modified in Step 5]
 
 ### Your Task
+
 Review for code quality:
+
 - Readability and clarity
 - Naming conventions
 - DRY violations
@@ -449,6 +488,7 @@ Review for code quality:
 - Testability
 
 Provide Code Quality Review Report with verdict.
+
 ```
 
 After all reviews complete, ask: **"Step 7 (Comprehensive Code Review) complete. Ready to proceed to Step 8 (Team Lead Final Sign-off)? (yes/no/adjust)"**
@@ -462,18 +502,22 @@ Wait for user approval before continuing.
 Use the Task tool with `subagent_type="team-lead"` with this prompt:
 
 ```
+
 ## Consolidate Review Findings
 
 ### Review Reports
+
 - Security Review: [include report]
 - Performance Review: [include report]
 - Architecture Review: [include report]
 - Code Quality Review: [include report]
 
 ### UI/UX Design Compliance
+
 [Note any UI/UX design deviations found during review]
 
 ### Your Task
+
 1. Consolidate all findings into a single summary
 2. Prioritize issues by severity (Critical > High > Medium > Low)
 3. Verify UI/UX design was implemented correctly
@@ -482,6 +526,7 @@ Use the Task tool with `subagent_type="team-lead"` with this prompt:
    - 🔄 NEEDS FIXES - List required changes
 
 If fixes needed, specify which developer should address each issue.
+
 ```
 
 ### If Fixes Needed
@@ -489,9 +534,11 @@ If fixes needed, specify which developer should address each issue.
 Use **SendMessage** to route consolidated feedback to the relevant developer(s):
 
 ```
-SendMessage(to: "backend-dev",  message: "Review fixes required:\n\n[consolidated issues for backend]")
+
+SendMessage(to: "backend-dev", message: "Review fixes required:\n\n[consolidated issues for backend]")
 SendMessage(to: "frontend-dev", message: "Review fixes required:\n\n[consolidated issues for frontend]")
-```
+
+````
 
 After fixes are applied, re-run only the affected reviewers (not the full set). Get Team Lead final sign-off again.
 
@@ -552,7 +599,7 @@ $ARGUMENTS
 
 ### Team Lead Final Verdict
 ✅ APPROVED - Feature is production-ready
-```
+````
 
 ---
 
@@ -567,6 +614,7 @@ At workflow start, each dispatched agent should consult its `.claude/agent-memor
 ### If a Developer is Blocked
 
 When a developer signals `HELP NEEDED`:
+
 1. Check if another developer can help
 2. Use the Integration Developer as default helper
 3. Resume work after unblocking

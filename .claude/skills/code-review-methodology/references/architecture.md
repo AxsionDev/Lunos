@@ -24,6 +24,7 @@ Load project code examples from `.claude/patterns/backend-patterns.md` when avai
 ✅ Controllers → Services → Repositories → Database
 ❌ Repository → Controller | Service → Controller | EF/DbContext in Controller
 ```
+
 Flag: business logic in controllers; services touching DbContext directly when a repository pattern exists; cross-layer dependencies; infrastructure concerns in the domain layer.
 
 ### 3. Abstraction Quality (leaky abstractions)
@@ -48,12 +49,12 @@ Flag circular dependencies; service-locator anti-pattern; static dependencies (h
 
 **SRP violations — thresholds:**
 
-| Metric | OK | Warning | Violation |
-|--------|----|---------|-----------|
-| Methods per class | ≤10 | 11–15 | >15 |
-| Ctor dependencies | ≤4 | 5–6 | >6 |
-| Lines per class | ≤300 | 301–500 | >500 |
-| Distinct concerns | 1 | 2 | >2 |
+| Metric            | OK   | Warning | Violation |
+| ----------------- | ---- | ------- | --------- |
+| Methods per class | ≤10  | 11–15   | >15       |
+| Ctor dependencies | ≤4   | 5–6     | >6        |
+| Lines per class   | ≤300 | 301–500 | >500      |
+| Distinct concerns | 1    | 2       | >2        |
 
 Concern detection: count distinct method-name verb prefixes (`Send*`, `Get*`, `Calculate*`, `Validate*`); 3+ → likely SRP violation.
 
@@ -67,22 +68,22 @@ Concern detection: count distinct method-name verb prefixes (`Send*`, `Get*`, `C
 
 **Accept (NOT violations):**
 
-| Pattern | Why OK |
-|---------|--------|
-| Controller with 8 actions | Distinct HTTP endpoints, not SRP |
-| Service with many small related methods | Single domain concept |
-| `new` for DTOs/exceptions | Value objects don't need DI |
-| Stateless utility for pure functions | Math/string formatting |
-| 6 deps on an orchestrator | Orchestrators coordinate |
+| Pattern                                 | Why OK                           |
+| --------------------------------------- | -------------------------------- |
+| Controller with 8 actions               | Distinct HTTP endpoints, not SRP |
+| Service with many small related methods | Single domain concept            |
+| `new` for DTOs/exceptions               | Value objects don't need DI      |
+| Stateless utility for pure functions    | Math/string formatting           |
+| 6 deps on an orchestrator               | Orchestrators coordinate         |
 
 **Challenge (likely violations):**
 
-| Pattern | Why suspicious |
-|---------|----------------|
+| Pattern                         | Why suspicious     |
+| ------------------------------- | ------------------ |
 | Service creating other services | Should be injected |
-| 3+ unrelated method groups | SRP |
-| Repository with business logic | Layer violation |
-| Interface with 10+ methods | ISP |
+| 3+ unrelated method groups      | SRP                |
+| Repository with business logic  | Layer violation    |
+| Interface with 10+ methods      | ISP                |
 
 ## Output Layout
 
@@ -90,23 +91,30 @@ Concern detection: count distinct method-name verb prefixes (`Send*`, `Get*`, `C
 ## Architecture Review Report
 
 ### Summary
+
 - Files Reviewed / Critical / High / Medium / Low: [counts]
 
 ### Layer Diagram
+
 [Controllers] → [Services] → [Repositories] → [Database]
 
 ### Critical 🔴 / High 🟠 / Medium 🟡 / Low 🟢
+
 #### Issue: [name]
+
 **Location**: `file:line`
 **Description**: [violation]
 **Impact**: [consequence]
 **Fix**: [specific change]
 
 ### Pattern Consistency
+
 | Pattern | Consistent? | Notes |
 
 ### Good Patterns Observed ✅
+
 ### Verdict: APPROVED / NEEDS FIXES
+
 ### Required Actions
 ```
 

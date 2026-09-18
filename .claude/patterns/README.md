@@ -6,14 +6,14 @@ It contains project-specific code patterns extracted from the actual codebase. A
 
 ## Files
 
-| File | Generated When |
-|------|---------------|
-| `tech-stack.md` | Always generated — technology personas and idioms for developer agents |
-| `backend-patterns.md` | Backend framework detected |
-| `frontend-patterns.md` | Frontend framework detected |
-| `database-patterns.md` | Database ORM detected |
-| `integration-patterns.md` | Fullstack project detected |
-| `review-patterns.md` | Always generated |
+| File                      | Generated When                                                         |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `tech-stack.md`           | Always generated — technology personas and idioms for developer agents |
+| `backend-patterns.md`     | Backend framework detected                                             |
+| `frontend-patterns.md`    | Frontend framework detected                                            |
+| `database-patterns.md`    | Database ORM detected                                                  |
+| `integration-patterns.md` | Fullstack project detected                                             |
+| `review-patterns.md`      | Always generated                                                       |
 
 ## Regenerating
 

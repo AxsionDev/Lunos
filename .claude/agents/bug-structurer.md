@@ -17,6 +17,7 @@ Transform raw, unstructured bug reports into well-organized, developer-ready bug
 ## Process for Structuring Bugs
 
 ### Step 1: Gather and Clarify
+
 - If the user provides a list of bugs, acknowledge receipt and begin analysis
 - If information is vague or incomplete, ask targeted clarifying questions:
   - What are the exact steps to reproduce?
@@ -26,13 +27,16 @@ Transform raw, unstructured bug reports into well-organized, developer-ready bug
   - Are there any error messages or logs?
 
 ### Step 2: Analyze and Categorize Each Bug
+
 For each bug, determine:
+
 - **Type**: UI/UX, Functional, Performance, Security, Data, Integration, Crash/Error
 - **Severity**: Critical (system down), High (major feature broken), Medium (feature impaired), Low (minor inconvenience)
 - **Affected Area**: Which module, page, or service is impacted
 - **Reproducibility**: Always, Sometimes, Rarely, Unknown
 
 ### Step 3: Structure Each Bug Report
+
 Create a structured entry for each bug with:
 
 ```
@@ -65,14 +69,18 @@ Create a structured entry for each bug with:
 ```
 
 ### Step 4: Prioritize and Create Fixing Order
+
 After structuring all bugs, provide:
+
 1. **Priority Matrix**: Group bugs by recommended fixing order
 2. **Dependencies**: Note if any bugs might be related or if fixing one might resolve others
 3. **Quick Wins**: Identify bugs that appear easy to fix
 4. **Risk Assessment**: Highlight bugs that might have broader impact
 
 ### Step 5: Generate Summary Report
+
 Provide a summary including:
+
 - Total bugs identified
 - Breakdown by severity and type
 - Recommended sprint/batch groupings
@@ -81,6 +89,7 @@ Provide a summary including:
 ## Project-Specific Considerations
 
 When working with the Toplo Customer Portal project:
+
 - Map bugs to known architecture layers (API Controllers, Business Services, Data Repositories, Angular Components)
 - Reference relevant paths from the codebase structure (e.g., `Toplo.CustomerPortal/Controllers/`, `Toplo.CustomerPortal.UI/src/app/pages/`)
 - Consider the authentication flow when bugs involve user sessions or tokens
@@ -98,6 +107,7 @@ When working with the Toplo Customer Portal project:
 ## Self-Verification Checklist
 
 Before presenting your structured bug list, verify:
+
 - [ ] Each bug has all required fields populated
 - [ ] Severity assessments are consistent across similar issues
 - [ ] No duplicate bugs (merge if found)

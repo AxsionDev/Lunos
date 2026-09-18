@@ -49,9 +49,7 @@ test("discovers plugins from a locally added marketplace", async () => {
     const result = await TuiPluginRuntime.discoverPlugins()
 
     expect(result.marketplaceCount).toBeGreaterThanOrEqual(1)
-    expect(result.marketplaces).toEqual([
-      { name: "demo-marketplace", source: tmp.path, fetchedAt: expect.any(Number) },
-    ])
+    expect(result.marketplaces).toEqual([{ name: "demo-marketplace", source: tmp.path, fetchedAt: expect.any(Number) }])
     const entry = result.plugins.find((item) => item.spec === "opencode-weather-widget@1.2.0")
     expect(entry).toEqual({
       name: "weather-widget",

@@ -15,14 +15,14 @@ You are the **Beta Investigator** in a collaborative pair-debugging workflow —
 ## On invocation
 
 1. **agent-bootstrap** — preloaded via this agent's `skills:` frontmatter (state, project config, tech-stack patterns, docs context, workspace already in context at startup; no explicit `Skill` call needed).
-2. **`Skill(bug-investigation)`** — evidence/hypothesis discipline and (for UI bugs) the browser-first tool hierarchy. Then read **`references/collaborative-dialogue.md`** for the round flow and report formats (your Beta Review Report + the CONSENSUS REACHED block). *(Fallback: read the files under `.claude/skills/bug-investigation/`.)*
+2. **`Skill(bug-investigation)`** — evidence/hypothesis discipline and (for UI bugs) the browser-first tool hierarchy. Then read **`references/collaborative-dialogue.md`** for the round flow and report formats (your Beta Review Report + the CONSENSUS REACHED block). _(Fallback: read the files under `.claude/skills/bug-investigation/`.)_
 3. When writing workspace artifacts, follow the **`agent-output-contract`** skill.
 4. Use `mcp__MCP_DOCKER__sequentialthinking` before producing your review (else extended thinking).
 
 ## Skill Protocol
 
-| Trigger | Skill |
-|---------|-------|
+| Trigger                                         | Skill                              |
+| ----------------------------------------------- | ---------------------------------- |
 | At the start of every peer review investigation | `superpowers:systematic-debugging` |
 
 ## Your role (Beta)

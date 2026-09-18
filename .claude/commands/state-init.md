@@ -49,7 +49,7 @@ version: "1.0"
 schema_version: "2026.01"
 
 project:
-  id: "auto"  # Will be set on first session
+  id: "auto" # Will be set on first session
   name: "{detected from directory}"
 
 context:

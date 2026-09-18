@@ -336,9 +336,7 @@ export const Event = {
 // (agent.ts:230) — it does not restrict edits, but an unmirrored rename there
 // sends every artifact write outside the worktree to the `"*": "ask"` default.
 function artifact(dir: string, input: { slug: string; time: { created: number } }, instance: InstanceContext) {
-  const base = instance.project.vcs
-    ? path.join(instance.worktree, ".opencode", dir)
-    : path.join(Global.Path.data, dir)
+  const base = instance.project.vcs ? path.join(instance.worktree, ".opencode", dir) : path.join(Global.Path.data, dir)
   return path.join(base, [input.time.created, input.slug].join("-") + ".md")
 }
 

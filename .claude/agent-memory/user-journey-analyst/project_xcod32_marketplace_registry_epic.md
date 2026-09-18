@@ -27,4 +27,4 @@ actor types on XCOD-34-scoped work; a future XCOD-35/36 journey analysis is wher
 
 Client-side marketplace code (XCOD-8 schema, XCOD-9 seed, XCOD-10 `marketplace add`, XCOD-11
 `listPlugins`/`searchPlugins`, XCOD-13 caching) is already implemented and unmodified by XCOD-34 — the
-registry is *an additional* marketplace source, not a replacement. See [[feedback_client_vs_registry_endpoint_scope]].
+registry is _an additional_ marketplace source, not a replacement. See [[feedback_client_vs_registry_endpoint_scope]].

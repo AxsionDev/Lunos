@@ -9,23 +9,20 @@ Tables are defined with `sqliteTable`, snake_case column names (so no string rem
 
 ```ts
 // packages/core/src/session/sql.ts
-export const SessionTable = sqliteTable(
-  "session",
-  {
-    id: text().$type<SessionSchema.ID>().primaryKey(),
-    project_id: text()
-      .$type<ProjectV2.ID>()
-      .notNull()
-      .references(() => ProjectTable.id, { onDelete: "cascade" }),
-    workspace_id: text().$type<WorkspaceV2.ID>(),
-    parent_id: text().$type<SessionSchema.ID>(),
-    slug: text().notNull(),
-    directory: DatabasePath.directoryColumn().notNull(),
-    title: text().notNull(),
-    version: text().notNull(),
-    // ...
-  },
-)
+export const SessionTable = sqliteTable("session", {
+  id: text().$type<SessionSchema.ID>().primaryKey(),
+  project_id: text()
+    .$type<ProjectV2.ID>()
+    .notNull()
+    .references(() => ProjectTable.id, { onDelete: "cascade" }),
+  workspace_id: text().$type<WorkspaceV2.ID>(),
+  parent_id: text().$type<SessionSchema.ID>(),
+  slug: text().notNull(),
+  directory: DatabasePath.directoryColumn().notNull(),
+  title: text().notNull(),
+  version: text().notNull(),
+  // ...
+})
 ```
 
 ## Naming Convention (enforced, see AGENTS.md)
@@ -65,5 +62,6 @@ Bun vs Node SQLite drivers are chosen via the `#db` subpath import map in `packa
 ```
 
 ## Build & Test
+
 - Typecheck: `cd packages/core && bun typecheck`
 - Test: `cd packages/core && bun test` (never from repo root)

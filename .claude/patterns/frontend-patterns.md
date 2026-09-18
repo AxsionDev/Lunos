@@ -22,11 +22,7 @@ export function DialogAddWslServer(props: DialogWslServerProps = {}) {
   const model = controller.model
   const primaryButton = () => model().primaryButton
 
-  return (
-    <Show when={!controller.wslServers.isPending && !controller.wslServers.isError}>
-      {/* ... */}
-    </Show>
-  )
+  return <Show when={!controller.wslServers.isPending && !controller.wslServers.isError}>{/* ... */}</Show>
 }
 ```
 
@@ -52,6 +48,7 @@ Entry points: `packages/app/src/app.tsx`, `packages/app/src/entry.tsx`. Desktop-
 `packages/web` uses Astro + Starlight with SolidJS islands (`@astrojs/solid-js`) and Cloudflare adapter (`@astrojs/cloudflare`). Config: `packages/web/astro.config.mjs`.
 
 ## Build & Test
+
 - Dev: `bun run dev:web` (root) or `bun --cwd packages/app dev`
 - Typecheck: `cd packages/app && bun run typecheck` (uses `tsgo -b`)
 - Unit tests: `cd packages/app && bun run test:unit`

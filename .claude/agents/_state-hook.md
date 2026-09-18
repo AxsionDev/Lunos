@@ -51,12 +51,12 @@ After state is initialized/loaded, proceed with the agent's primary task.
 
 ## Quick Reference
 
-| Check | Action if Missing |
-|-------|-------------------|
-| `.agent-state/` | Create directory structure |
-| `config.yaml` | Create with defaults |
-| `active-session.yaml` | Create with `session_id: null` |
-| Active session | Create new session from task context |
+| Check                 | Action if Missing                    |
+| --------------------- | ------------------------------------ |
+| `.agent-state/`       | Create directory structure           |
+| `config.yaml`         | Create with defaults                 |
+| `active-session.yaml` | Create with `session_id: null`       |
+| Active session        | Create new session from task context |
 
 ---
 

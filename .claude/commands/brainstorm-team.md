@@ -121,6 +121,7 @@ Focus on ideas that are:
 ### Record Alpha's Output
 
 Store Alpha's ideation report for reference:
+
 - Ideas generated
 - Evidence cited
 - Questions for Beta
@@ -136,16 +137,18 @@ Present Alpha's ideas to the user and ask for direction.
 ```markdown
 ## Alpha Generated [N] Ideas
 
-| # | Idea | User Value | Confidence | Key Insight |
-|---|------|------------|------------|-------------|
-| 1 | [Name] | [High/Med/Low] | [High/Med/Low] | [Brief insight] |
-| 2 | [Name] | [High/Med/Low] | [High/Med/Low] | [Brief insight] |
-| ... | ... | ... | ... | ... |
+| #   | Idea   | User Value     | Confidence     | Key Insight     |
+| --- | ------ | -------------- | -------------- | --------------- |
+| 1   | [Name] | [High/Med/Low] | [High/Med/Low] | [Brief insight] |
+| 2   | [Name] | [High/Med/Low] | [High/Med/Low] | [Brief insight] |
+| ... | ...    | ...            | ...            | ...             |
 
 ### Alpha's Top Recommendation
+
 [Brief description of Alpha's preferred direction]
 
 ### Questions Alpha Raised
+
 1. [Question for Beta to investigate]
 2. [Concern to validate]
 ```
@@ -223,9 +226,11 @@ If Beta's review shows disagreements with Alpha, facilitate resolution.
 ### Check for Consensus
 
 If Beta's report shows "Ready for Consensus: Yes":
+
 - Skip to Step 6 with the consensus
 
 If Beta's report shows "Ready for Consensus: No":
+
 - Continue with resolution rounds
 
 ### Resolution Rounds (Max 3)
@@ -233,6 +238,7 @@ If Beta's report shows "Ready for Consensus: No":
 For each round:
 
 1. **Alpha Response**: Use Task tool with `subagent_type="product-ideator-alpha"`:
+
    ```
    ## Response to Beta's Review
 
@@ -249,6 +255,7 @@ For each round:
    ```
 
 2. **Beta Counter-Response**: Use Task tool with `subagent_type="product-critic-beta"`:
+
    ```
    ## Evaluation of Alpha's Response
 
@@ -276,14 +283,17 @@ If consensus not reached after 3 rounds:
 After 3 rounds of dialogue, Alpha and Beta have not reached full consensus.
 
 ### Points of Agreement
+
 [What they agree on]
 
 ### Remaining Disagreements
-| Point | Alpha's View | Beta's View |
-|-------|--------------|-------------|
-| [Point] | [View] | [View] |
+
+| Point   | Alpha's View | Beta's View |
+| ------- | ------------ | ----------- |
+| [Point] | [View]       | [View]      |
 
 ### Recommendation
+
 Present both perspectives to the user for decision.
 ```
 
@@ -303,25 +313,31 @@ Present the consensus (or final state) to the user for approval.
 ### Ideas Approved for Pursuit
 
 #### 1. [Idea Name] - Priority: [High/Medium]
+
 **Description:** [Clear description]
 **Why It's Validated:**
+
 - Alpha's evidence: [Key points]
 - Beta's verification: [Key points]
-**Next Steps:** [Recommended action]
+  **Next Steps:** [Recommended action]
 
 #### 2. [Idea Name] - Priority: [High/Medium]
+
 [Same structure]
 
 ### Ideas Dropped
-| Idea | Reason |
-|------|--------|
+
+| Idea   | Reason                           |
+| ------ | -------------------------------- |
 | [Name] | [Why both agents agreed to drop] |
 
 ### Key Insights
+
 1. [Most important discovery from the session]
 2. [Important consideration for implementation]
 
 ### Open Questions
+
 - [Question that needs user input]
 - [Decision point before implementation]
 ```
@@ -422,27 +438,32 @@ Run `/handoff` to create a structured handoff document.
 **Topic:** $ARGUMENTS
 
 ### Ideas Validated
-| Idea | Confidence | Status |
-|------|------------|--------|
-| [Name] | High | Approved |
-| [Name] | Medium | Approved with refinements |
+
+| Idea   | Confidence | Status                    |
+| ------ | ---------- | ------------------------- |
+| [Name] | High       | Approved                  |
+| [Name] | Medium     | Approved with refinements |
 
 ### Agents Consulted
+
 - **Alpha (Ideator):** [N] rounds of ideation
 - **Beta (Critic):** [N] rounds of review
 - **Consensus:** [Reached/Presented both views]
 
 ### Artifacts Produced
+
 - ✅ Alpha Ideation Report
 - ✅ Beta Review Report
 - ✅ Consensus Summary
 - [✅/❌] PRD Generated
 
 ### Next Steps
+
 1. [First action item]
 2. [Second action item]
 
 ### State Files Updated
+
 - `.agent-state/sessions/{session-id}/context.yaml`
 - `.agent-state/sessions/{session-id}/handoff.md`
 ```
@@ -454,6 +475,7 @@ Run `/handoff` to create a structured handoff document.
 ### Alpha Produces No Ideas
 
 If Alpha cannot generate ideas:
+
 - Ask for more context from user
 - Broaden the scope
 - Provide specific areas to explore
@@ -461,6 +483,7 @@ If Alpha cannot generate ideas:
 ### Beta Rejects All Ideas
 
 If Beta marks all ideas as DROP:
+
 - Present Beta's reasoning to user
 - Ask if user wants Alpha to try again with new direction
 - Consider user's own ideas for evaluation
@@ -468,6 +491,7 @@ If Beta marks all ideas as DROP:
 ### Endless Disagreement
 
 After 3 resolution rounds without consensus:
+
 - Present both views to user
 - Let user decide which direction to pursue
 - Document the disagreement for future reference
@@ -475,6 +499,7 @@ After 3 resolution rounds without consensus:
 ### User Wants to Pivot
 
 If user changes direction mid-session:
+
 - Acknowledge the pivot
 - Optionally save current progress
 - Restart from Step 1 with new direction
@@ -485,11 +510,11 @@ If user changes direction mid-session:
 
 ### Agents Used
 
-| Agent | Purpose | Model |
-|-------|---------|-------|
-| `product-ideator-alpha` | Research + generate 3-5 ideas | opus |
-| `product-critic-beta` | Verify + challenge + consensus | opus |
-| `product-brainstorm` | PRD generation | sonnet |
+| Agent                   | Purpose                        | Model  |
+| ----------------------- | ------------------------------ | ------ |
+| `product-ideator-alpha` | Research + generate 3-5 ideas  | opus   |
+| `product-critic-beta`   | Verify + challenge + consensus | opus   |
+| `product-brainstorm`    | PRD generation                 | sonnet |
 
 ### User Checkpoints
 

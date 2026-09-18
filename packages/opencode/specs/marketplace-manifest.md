@@ -68,14 +68,14 @@ install flows are downstream work for other stories under that epic.
 
 ### Top-level fields
 
-| Field         | Required | Type              | Notes                                             |
-| ------------- | -------- | ----------------- | -------------------------------------------------- |
-| `$schema`     | no       | `string`           | JSON schema reference, matching `opencode.json`/`tui.json` convention. No schema is published/hosted for this format yet — the field is supported for when one exists, and omitted from the example above to avoid implying a live URL. |
-| `name`        | yes      | `string`           | Marketplace identifier.                            |
-| `owner`       | yes      | `object`           | See below.                                         |
-| `description` | no       | `string`           |                                                    |
-| `version`     | no       | `string`           |                                                    |
-| `plugins`     | yes      | array of plugin entries | May be empty.                                |
+| Field         | Required | Type                    | Notes                                                                                                                                                                                                                                   |
+| ------------- | -------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$schema`     | no       | `string`                | JSON schema reference, matching `opencode.json`/`tui.json` convention. No schema is published/hosted for this format yet — the field is supported for when one exists, and omitted from the example above to avoid implying a live URL. |
+| `name`        | yes      | `string`                | Marketplace identifier.                                                                                                                                                                                                                 |
+| `owner`       | yes      | `object`                | See below.                                                                                                                                                                                                                              |
+| `description` | no       | `string`                |                                                                                                                                                                                                                                         |
+| `version`     | no       | `string`                |                                                                                                                                                                                                                                         |
+| `plugins`     | yes      | array of plugin entries | May be empty.                                                                                                                                                                                                                           |
 
 ### `owner`
 
@@ -87,15 +87,15 @@ install flows are downstream work for other stories under that epic.
 
 ### Plugin entry
 
-| Field         | Required | Type              | Notes                                    |
-| ------------- | -------- | ----------------- | ----------------------------------------- |
-| `name`        | yes      | `string`           |                                           |
-| `source`      | yes      | tagged union       | See below.                                |
-| `description` | no       | `string`           |                                           |
-| `version`     | no       | `string`           |                                           |
-| `author`      | no       | `string`           |                                           |
-| `category`    | no       | `string`           |                                           |
-| `tags`        | no       | array of `string`  |                                           |
+| Field         | Required | Type              | Notes      |
+| ------------- | -------- | ----------------- | ---------- |
+| `name`        | yes      | `string`          |            |
+| `source`      | yes      | tagged union      | See below. |
+| `description` | no       | `string`          |            |
+| `version`     | no       | `string`          |            |
+| `author`      | no       | `string`          |            |
+| `category`    | no       | `string`          |            |
+| `tags`        | no       | array of `string` |            |
 
 ### `source` (tagged on `type`)
 
@@ -109,11 +109,11 @@ Exactly two shapes are valid in v1:
 { "type": "github", "repo": "org/name", "ref": "v2" }
 ```
 
-| Type     | Field     | Required | Type     | Notes                                          |
-| -------- | --------- | -------- | -------- | ----------------------------------------------- |
-| `npm`    | `package` | yes      | `string` | npm package name.                              |
-| `npm`    | `version` | no       | `string` | Defaults to latest.                             |
-| `github` | `repo`    | yes      | `string` | `org/name` form.                                |
+| Type     | Field     | Required | Type     | Notes                                                                |
+| -------- | --------- | -------- | -------- | -------------------------------------------------------------------- |
+| `npm`    | `package` | yes      | `string` | npm package name.                                                    |
+| `npm`    | `version` | no       | `string` | Defaults to latest.                                                  |
+| `github` | `repo`    | yes      | `string` | `org/name` form.                                                     |
 | `github` | `ref`     | no       | `string` | Branch, tag, or commit. Defaults to the repository's default branch. |
 
 Any other `type` value fails validation — see [Validation errors](#validation-errors).
@@ -174,34 +174,35 @@ Resolved manifests are cached to disk so `lunos marketplace list`, `plugin list`
 TUI Discover view (XCOD-11, XCOD-12) all read from cache instead of re-fetching independently —
 following the same on-disk cache precedent as `@opencode-ai/core`'s npm plugin install cache
 (`Npm.add`, keyed under `Global.Path.cache`) and its `models-dev` catalog cache (`Hash.fast(source)`
-+ file mtime as the freshness clock), rather than inventing a new cache location or format.
 
-- **Location:** `~/.cache/opencode/marketplace/<hash>.json`, one file per added source, where
+- file mtime as the freshness clock), rather than inventing a new cache location or format.
+
+* **Location:** `~/.cache/opencode/marketplace/<hash>.json`, one file per added source, where
   `<hash>` is `Hash.fast(source)` (`packages/core/src/util/hash.ts`, sha1) of the source string
   exactly as configured (owner/repo shorthand, URL, or normalized local path).
-- **Format:** the resolved `Marketplace.Manifest` JSON as-is — no wrapper object. The file's mtime
+* **Format:** the resolved `Marketplace.Manifest` JSON as-is — no wrapper object. The file's mtime
   doubles as `fetchedAt`, so there's nothing else to keep in sync.
-- **Freshness policy (v1):** a cache hit younger than 24 hours is served with no network or file
+* **Freshness policy (v1):** a cache hit younger than 24 hours is served with no network or file
   fetch at all. Once it's older than that, the next read attempts one live re-fetch: success
   rewrites the cache; failure falls back to the existing (now-stale) cached manifest rather than
   failing the read. This is the "refresh in the background on a timer" policy this manifest-spec's
   Overview deferred to a later story, implemented lazily on read rather than as a background fiber.
-- **Local `path` sources bypass the cache entirely** and are always read live, mirroring how
+* **Local `path` sources bypass the cache entirely** and are always read live, mirroring how
   `resolvePluginTarget` (`packages/opencode/src/plugin/shared.ts`) caches npm plugin installs but
   reads file-plugin paths straight off disk every time. A local directory/file has no network
   round-trip to save and can't go "unreachable but last-known-good" the way a URL or GitHub source
   can.
-- **Explicit refresh:** `lunos marketplace update <name>` (accepts either the configured source or
+* **Explicit refresh:** `lunos marketplace update <name>` (accepts either the configured source or
   the manifest's declared `name`) bypasses the freshness check and forces a re-fetch. On failure it
   leaves the on-disk cache untouched and reports the error — the last-known-good manifest keeps
   being served by `list`/`search`/Discover.
-- **Unreachable sources:** a source that fails its live re-fetch (via the lazy TTL check above, or
+* **Unreachable sources:** a source that fails its live re-fetch (via the lazy TTL check above, or
   via `marketplace update`) but has a prior successful cache continues to resolve successfully, with
   a `stale` field carrying the failure reason. Callers surface this as a visible "refresh failed,
   showing cache from <time>" indicator rather than silently degrading or erroring the whole command.
   A source with no successful fetch ever (nothing cached yet) still fails outright — there is no
   last-known-good to fall back to.
-- **Implementation:** `packages/opencode/src/marketplace/shared.ts` (`resolveWithCache`,
+* **Implementation:** `packages/opencode/src/marketplace/shared.ts` (`resolveWithCache`,
   `resolveAddedMarketplaces`, `refreshMarketplaceCache`).
 
 ## Current in-repo examples
