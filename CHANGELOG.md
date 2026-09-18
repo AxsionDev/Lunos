@@ -31,11 +31,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 - Build-in-public publishing cadence: note triggers, format, and channel sequencing, with the
   pre-launch publication gate recorded explicitly.
 - "Why we forked opencode" FAQ, drafted and held until launch.
-- **A named legal entity behind the project: Lunos operates under Axsion, registered in Sofia,
-  Bulgaria.** Recorded provisionally, with a revisit point named, and with the implications for IP
-  ownership and liability written down rather than left implicit. Bulgarian incorporation puts the
-  counterparty inside the EU — though note this is entity-level sovereignty, not infrastructure
-  sovereignty; self-hosted deployments run on infrastructure you supply.
+- **A named legal entity behind the project: Lunos operates under ITService EOOD (UIC 201069485),
+  registered in Sofia, Bulgaria and trading as Axsion.** Recorded provisionally, with a revisit
+  point named, and with the implications for IP ownership and liability written down rather than
+  left implicit. Bulgarian incorporation puts the counterparty inside the EU — though note this is
+  entity-level sovereignty, not infrastructure sovereignty; self-hosted deployments run on
+  infrastructure you supply.
 
 ### Changed
 
