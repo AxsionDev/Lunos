@@ -1,8 +1,8 @@
 # XCOD-17 — Legal/entity ownership: **Axsion** (PROVISIONAL)
 
 **Status:** decided, provisional · **Date:** 2026-09-18 · **Decided by:** Petar Minev (product owner)
-**Epic:** XCOD-15 · **Resolves:** AXC-9 · **Partially unblocks:** XCOD-19 — settles *which entity
-owns the cloud accounts* (Axsion); leaves *whether US-controlled providers are acceptable* open
+**Epic:** XCOD-15 · **Resolves:** AXC-9 · **Partially unblocks:** XCOD-19 — settles _which entity
+owns the cloud accounts_ (Axsion); leaves _whether US-controlled providers are acceptable_ open
 
 > **This document is analysis, not legal advice.** No counsel was engaged in producing it. Confirm
 > with a qualified Bulgarian/EU practitioner before the first commercial contract, and before
@@ -59,10 +59,10 @@ That distinction is the practical work item behind this decision, not a footnote
 
 **Two gaps this decision exposes rather than closes:**
 
-| Gap                                                                                                                   | Current state                                                                                                                                                         | Consequence |
-| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| **No Axsion copyright line exists.** `LICENSE` names only `opencode`. Nothing in the repo asserts Axsion authorship of the Lunos-specific work. | An MIT-derivative convention is to add a second copyright line alongside — never replacing — upstream's. Needs a follow-up ticket. |
-| **No CLA and no DCO.** `CONTRIBUTING.md` (278 lines) contains neither.                                                 | Inbound external contributions rest on the implicit inbound=outbound convention only, with no express grant or sign-off. Thin for a procurement-facing project that may later need clean provenance. |
+| Gap                                                                                                                                             | Current state                                                                                                                                                                                        | Consequence |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| **No Axsion copyright line exists.** `LICENSE` names only `opencode`. Nothing in the repo asserts Axsion authorship of the Lunos-specific work. | An MIT-derivative convention is to add a second copyright line alongside — never replacing — upstream's. Needs a follow-up ticket.                                                                   |
+| **No CLA and no DCO.** `CONTRIBUTING.md` (278 lines) contains neither.                                                                          | Inbound external contributions rest on the implicit inbound=outbound convention only, with no express grant or sign-off. Thin for a procurement-facing project that may later need clean provenance. |
 
 **The exact registered legal name and form** (OOD / EOOD / AD, per the Bulgarian commercial
 register) must be used verbatim in any copyright line and in every contract. This document says
@@ -71,7 +71,7 @@ register) must be used verbatim in any copyright line and in every contract. Thi
 ## Implications for liability
 
 **The current posture disclaims on the wrong party's behalf.** `LICENSE` lines 15–21 carry MIT's
-"AS IS" warranty disclaimer — and it names *opencode* as the disclaiming author/copyright holder,
+"AS IS" warranty disclaimer — and it names _opencode_ as the disclaiming author/copyright holder,
 not Axsion. For a self-hosted Lunos deployment going wrong today, there is no Lunos-side disclaimer
 of record. Adding the Axsion copyright line (above) is what puts Axsion inside the clause that
 protects it.
@@ -87,7 +87,7 @@ is the price of the procurement and cost advantages above, and it is the specifi
 revisit trigger is watching.
 
 **EU Cyber Resilience Act.** CRA obligations differ sharply depending on whether an entity is a
-*manufacturer* placing a product on the market or an *open-source steward* — a lighter regime. Which
+_manufacturer_ placing a product on the market or an _open-source steward_ — a lighter regime. Which
 one Axsion is depends on how Lunos is distributed and monetised, so this decision does not settle
 it. It becomes live at the CRA/SBOM milestone tracked in
 `.claude/docs/xcod-31-build-in-public-cadence.md`, and should be assessed there with counsel.
@@ -106,7 +106,7 @@ not verified here, and should be confirmed** before the claim is made to a buyer
 **One honest caveat: entity sovereignty is not infrastructure sovereignty.** The two are separable
 and Lunos currently only has the first. `.claude/docs/xcod-19-ci-workflow-triage.md` records that
 `deploy.yml` targets **AWS and Cloudflare** — US-controlled providers. A fully defensible
-EU-sovereignty claim for any *hosted* Lunos offering needs the infrastructure question answered too;
+EU-sovereignty claim for any _hosted_ Lunos offering needs the infrastructure question answered too;
 the self-hosted distribution sidesteps it, because the buyer supplies their own infrastructure. Be
 precise about which of the two is being claimed in any given conversation.
 
@@ -154,7 +154,7 @@ which may independently argue for restructuring.
 | Subject                                                             | Why it is separate from XCOD-17                                                    |
 | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Add Axsion copyright line to `LICENSE` alongside upstream's         | A repo change with a rebrand-exclusion constraint; needs the exact registered name |
-| Decide contributor licensing posture (DCO, CLA, or neither)          | A governance decision with community cost, not an entity decision                  |
-| Trademark clearance, EUIPO + USPTO                                   | Needs registry search and counsel; gated on first paid pilot                       |
-| CRA manufacturer-vs-open-source-steward assessment                   | Gated on the CRA/SBOM milestone and on how Lunos is monetised                       |
-| Infrastructure sovereignty for any hosted offering (AWS/Cloudflare)  | Overlaps XCOD-19's `deploy.yml` infra ownership question                            |
+| Decide contributor licensing posture (DCO, CLA, or neither)         | A governance decision with community cost, not an entity decision                  |
+| Trademark clearance, EUIPO + USPTO                                  | Needs registry search and counsel; gated on first paid pilot                       |
+| CRA manufacturer-vs-open-source-steward assessment                  | Gated on the CRA/SBOM milestone and on how Lunos is monetised                      |
+| Infrastructure sovereignty for any hosted offering (AWS/Cloudflare) | Overlaps XCOD-19's `deploy.yml` infra ownership question                           |
