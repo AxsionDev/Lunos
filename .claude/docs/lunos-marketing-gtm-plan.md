@@ -152,12 +152,23 @@ A manual proxy for install counts is acceptable if no telemetry exists yet.
 | 9.4 | Claim social/community handles                                        | XCOD-26         | ⬜ Open |
 | 9.5 | "Why we forked opencode" FAQ                                          | XCOD-27         | ✅ Done |
 | 9.6 | Private design-partner outreach                                       | XCOD-29         | ⬜ Open |
-| 9.7 | Build-in-public publishing cadence                                    | XCOD-31         | ⬜ Open |
+| 9.7 | Build-in-public publishing cadence                                    | XCOD-31         | 🔄 In Review |
 | —   | GTM metrics tracking                                                  | XCOD-30         | ⬜ Open |
 
 ### 9.7 — cadence detail
 
 _Source: XCOD-31._
+
+**Delivered 2026-09-18.** The cadence is specified in
+`.claude/docs/xcod-31-build-in-public-cadence.md` (triggers, format, channel-sequencing checklist),
+seeded with a first real note at `.claude/docs/notes/2026-09-18-sprint-01.md`, and the Phase 0 exit
+post is drafted and staged at `.claude/docs/xcod-31-phase-0-launch-post-draft.md`.
+
+One implementation decision departs from v0.1's wording: **there is no root `CHANGELOG.md`.** The
+release pipeline already generates per-release notes (`script/version.ts` → `script/changelog.ts` →
+`gh release create --notes-file`), so a hand-maintained root changelog would duplicate it and add
+an upstream merge surface. Notes live under `.claude/docs/notes/` instead, and answer *why* rather
+than *what changed* — the half no generator produces.
 
 A public CHANGELOG or "Lunos Weekly/Monthly Notes" habit — low effort, high compounding trust
 signal. Milestone posts already identified:
@@ -196,10 +207,11 @@ either holds or it is violated.
 
 ## Downstream effect on open tickets
 
-Restoring this document clears the **dangling-reference** blocker on XCOD-30 and XCOD-31 — their
-acceptance criteria can now be read against a real source. It does **not** close them:
+Restoring this document cleared the **dangling-reference** blocker on XCOD-30 and XCOD-31 — their
+acceptance criteria can now be read against a real source.
 
 - **XCOD-30** still requires an actual tracked view (spreadsheet or dashboard) plus a decision on
-  the install-count mechanism.
-- **XCOD-31** still requires the cadence habit established, the Phase 0 exit post drafted and
-  staged, and channel sequencing documented as a live artifact.
+  the install-count mechanism. **Still open.**
+- **XCOD-31** — **delivered 2026-09-18, in review.** Cadence habit established and seeded, Phase 0
+  exit post drafted and staged behind the §10 gate, channel sequencing documented as an operational
+  checklist. See §9.7 above.
