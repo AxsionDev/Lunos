@@ -144,16 +144,41 @@ A manual proxy for install counts is acceptable if no telemetry exists yet.
 
 ## 9. Punch list
 
-| §   | Action                                                                | Ticket          | Status       |
-| --- | --------------------------------------------------------------------- | --------------- | ------------ |
-| 9.1 | Freeze the name                                                       | XCOD-22         | ✅ Done      |
-| 9.2 | Rebrand README; resolve 21 translated READMEs; rename GitHub org/repo | XCOD-23, 24, 28 | ✅ Done      |
-| 9.3 | One-page landing site with email capture                              | XCOD-25         | ✅ Done      |
-| 9.4 | Claim social/community handles                                        | XCOD-26         | ⬜ Open      |
-| 9.5 | "Why we forked opencode" FAQ                                          | XCOD-27         | ✅ Done      |
-| 9.6 | Private design-partner outreach                                       | XCOD-29         | ⬜ Open      |
-| 9.7 | Build-in-public publishing cadence                                    | XCOD-31         | 🔄 In Review |
-| —   | GTM metrics tracking                                                  | XCOD-30         | ⬜ Open      |
+| §   | Action                                                                | Ticket          | Status                           |
+| --- | --------------------------------------------------------------------- | --------------- | -------------------------------- |
+| 9.1 | Freeze the name                                                       | XCOD-22         | ✅ Done                          |
+| 9.2 | Rebrand README; resolve 21 translated READMEs; rename GitHub org/repo | XCOD-23, 24, 28 | ✅ Done                          |
+| 9.3 | One-page landing site with email capture                              | XCOD-25         | ✅ Done                          |
+| 9.4 | Claim social/community handles                                        | XCOD-26         | 🔄 Partial — orgs done, see §9.4 |
+| 9.5 | "Why we forked opencode" FAQ                                          | XCOD-27         | ✅ Done                          |
+| 9.6 | Private design-partner outreach                                       | XCOD-29         | ⬜ Open                          |
+| 9.7 | Build-in-public publishing cadence                                    | XCOD-31         | 🔄 In Review                     |
+| —   | GTM metrics tracking                                                  | XCOD-30         | ⬜ Open                          |
+
+### 9.4 — handles detail
+
+_Researched 2026-09-18. Claim pack: `.claude/docs/xcod-26-social-handles-claim-pack.md`._
+
+Two of this section's assumptions do not hold:
+
+- **Fosstodon registrations are closed** (invite-only). §9.4 and XCOD-26 both name it specifically,
+  so AC-2 is not executable as written and needs an instance decision. `mastodon.social` is open, has
+  no approval queue, and — being operated by a German GmbH — is a **better** fit for the
+  "EU-sovereign by design" positioning than UK-operated Fosstodon. `eupolicy.social` is more
+  on-message but has 190 active users and an approval queue.
+- **`github.com/Lunos` is squatted** by a dormant User account (2013, inactive since 2019). GitHub's
+  only documented route to a held name is its trademark policy — no inactivity-release request
+  process was found — and that route is closed while XCOD-22's clearance remains unperformed.
+
+Org decisions taken 2026-09-18, **both executed the same day**: **`AxsionDev`** owns the code — the
+repo moved `pminev1/Lunos` → **`AxsionDev/Lunos`** — and **`lunoshq`** was created under the product
+name to anchor the brand and block squatting. Note this _splits_ XCOD-26's AC-1 rather than meeting
+it as written: the product-named org holds the brand, not the code.
+
+Adjacent, outside XCOD-26's ACs: the **npm name `lunos` is still unclaimed** while the CLI already
+ships a `lunos` bin.
+
+Claiming handles is anti-squatting and is **not** subject to the §10 gate. Posting from them is.
 
 ### 9.7 — cadence detail
 
