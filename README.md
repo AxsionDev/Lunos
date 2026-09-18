@@ -1,25 +1,61 @@
 <p align="center">
-  <a href="https://opencode.ai">
+  <a href="https://github.com/pminev1/Lunos">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
+      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="Lunos logo">
     </picture>
   </a>
 </p>
+
+<p align="center">
+  <b>Lunos is the EU-sovereign, self-hostable AI coding agent</b> — opencode's infrastructure plus
+  Claude Code's platform features, built so a public-sector procurement officer can actually
+  approve it.
+</p>
+
+> [!WARNING]
+> **Pre-release.** Lunos has not shipped an installable build yet. The install commands below
+> still install **upstream opencode**, not Lunos. Build from source in the meantime.
+
 > **Lunos** is a fork of [opencode](https://github.com/anomalyco/opencode). It is not built by,
 > maintained by, or affiliated with the OpenCode team in any way — see
 > [Building on OpenCode](#building-on-opencode) below.
->
-> The name "Lunos" reflects this fork's EU-sovereignty positioning: an AI coding agent built and
-> operated under European jurisdiction and data-protection standards.
 
-<p align="center">The open source AI coding agent.</p>
-<p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
+## Why Lunos
+
+Most AI coding agents are a single vendor's closed product running in that vendor's cloud, under
+that vendor's jurisdiction. For a bank, a hospital, a municipal platform, or anyone with a
+data-protection obligation, that is not a procurement conversation that ends well.
+
+Lunos is built for the organisations that have to answer those questions:
+
+- **Self-hostable, not merely "EU region".** Run it inside your own infrastructure. Sovereignty is
+  an architectural property — who controls the deployment, which law governs the processor, what
+  the sub-processor chain looks like — not a region toggle in someone else's console.
+- **Provider-agnostic by design.** Inherited from opencode. If you cannot send code to a
+  US-headquartered provider, you still have a working agent. If you can, you keep the frontier
+  models. A single-vendor product cannot offer that by construction.
+- **Open source, auditable, forkable.** You can read what it does, and it keeps working if any
+  vendor changes terms.
+- **Answerable in a procurement review.** The explicit design target, not an afterthought.
+
+**What Lunos is not claiming:** it is not at feature parity with closed single-vendor agents today.
+The gap is real and the work is tracked in the open. The claim is structural — a closed
+single-vendor product cannot become self-hostable and provider-agnostic without ceasing to be
+itself, whereas an open fork can close a feature gap.
+
+### Project status
+
+Lunos is **pre-release** and in Phase 0: forking, rebranding, and standing up its own governance,
+CI, and release pipeline. Nothing here is production-ready yet.
+
+Decision records for the work so far live in [`.claude/docs/`](.claude/docs/) — covering the
+upstream sync policy, the CI workflow triage, and the product name freeze.
+
+<!-- TODO(XCOD-23): link or embed the feature-parity table once it exists. The ticket sources it
+     from product-vision-roadmap.md, which is not present in this repository. -->
+A published roadmap and a feature-parity comparison table are still to come.
 
 <p align="center">
   <a href="README.md">English</a> |
@@ -46,11 +82,22 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+<!-- TODO(XCOD-23): replace with a terminal GIF/screenshot of Lunos actually running.
+     This still shows upstream opencode's UI, not Lunos's splash or default theme.
+     Needs a real capture (asciinema or similar). -->
+[![Terminal UI — upstream opencode, pending a Lunos capture](packages/web/src/assets/lander/screenshot.png)](https://github.com/pminev1/Lunos)
 
 ---
 
 ### Installation
+
+> [!IMPORTANT]
+> **These commands install upstream opencode, not Lunos.** They are kept because they work and
+> because opencode is what Lunos forks — running them gives you the base this project builds on.
+> Lunos does not publish an installable artifact yet: there is no Lunos install script, tap, or
+> signed binary, and the `lunos-ai` npm name is unpublished. Publishing is gated on standing up
+> release CI under Lunos-owned credentials. Until then, build from source — see
+> [Contributing](#contributing).
 
 ```bash
 # YOLO
