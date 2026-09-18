@@ -7,6 +7,14 @@
     </picture>
   </a>
 </p>
+
+> [!WARNING]
+> **Inherited from upstream — not yet updated for Lunos.**
+> This translation was inherited from [opencode](https://github.com/anomalyco/opencode) and has
+> **not** been reviewed or re-translated for Lunos. The branding, install commands, and behaviour
+> described below may be out of date, or may describe upstream rather than Lunos.
+> For current and accurate documentation, see **[README.md (English)](README.md)**.
+
 <p align="center">เอเจนต์การเขียนโค้ดด้วย AI แบบโอเพนซอร์ส</p>
 <p align="center">
   <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
