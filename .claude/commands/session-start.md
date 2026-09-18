@@ -42,11 +42,13 @@ When the user runs `/session-start "description"`:
    - Example: `session-20260113-143022-user-auth`
 
 3. Create session directory:
+
 ```bash
 mkdir -p .agent-state/sessions/{session-id}
 ```
 
 4. Create `session.yaml`:
+
 ```yaml
 id: "{session-id}"
 created_at: "{ISO timestamp}"
@@ -95,6 +97,7 @@ labels:
 ```
 
 5. Create `tasks.yaml`:
+
 ```yaml
 version: "1.0"
 session_id: "{session-id}"
@@ -113,6 +116,7 @@ next_task_id: 1
 ```
 
 6. Create `decisions.yaml`:
+
 ```yaml
 version: "1.0"
 session_id: "{session-id}"
@@ -122,6 +126,7 @@ next_decision_id: 1
 ```
 
 7. Create `context.yaml`:
+
 ```yaml
 version: "1.0"
 session_id: "{session-id}"
@@ -162,12 +167,14 @@ handoff_notes: ""
 ```
 
 8. Update `active-session.yaml`:
+
 ```yaml
 session_id: "{session-id}"
 started_at: "{ISO timestamp}"
 ```
 
 9. Report:
+
 ```
 Session started: {session-id}
 

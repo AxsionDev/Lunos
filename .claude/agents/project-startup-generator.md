@@ -81,31 +81,37 @@ Generate `.claude/PROJECT_STARTUP.md` with detected values:
 ## Quick Start
 
 ### Frontend
+
 - **Path:** `{detected_frontend_path}`
 - **Install:** `{npm install | yarn install}`
 - **Start:** `{detected_start_command}`
 - **URL:** http://localhost:{detected_port}
 
 ### Backend
+
 - **Path:** `{detected_backend_path}`
 - **Install:** `{dotnet restore | npm install}`
 - **Start:** `{detected_start_command}`
 - **URL:** http://localhost:{detected_port}
 
 ## Prerequisites
+
 {detected_prerequisites}
 
 ## Environment Setup
+
 {detected_env_setup or default instructions}
 
 ## Common Commands
-| Task | Command |
-|------|---------|
-| Run tests | `{detected_test_command}` |
-| Build | `{detected_build_command}` |
-| Lint | `{detected_lint_command}` |
+
+| Task      | Command                    |
+| --------- | -------------------------- |
+| Run tests | `{detected_test_command}`  |
+| Build     | `{detected_build_command}` |
+| Lint      | `{detected_lint_command}`  |
 
 ## Notes
+
 <!-- Reviewed by user on: [DATE] -->
 ```
 
@@ -131,6 +137,7 @@ Scan the codebase for real examples and write pattern files to `.claude/patterns
 For each detected layer, create a pattern file:
 
 #### 1. `.claude/patterns/backend-patterns.md` (if backend detected)
+
 - Scan for controller/handler patterns (HTTP endpoint definitions)
 - Scan for service/business logic patterns
 - Scan for repository/data access patterns
@@ -139,6 +146,7 @@ For each detected layer, create a pattern file:
 - Note: build command, test command, project file type
 
 #### 2. `.claude/patterns/frontend-patterns.md` (if frontend detected)
+
 - Scan for component patterns (smart/presentational)
 - Scan for service/HTTP client patterns
 - Scan for form/validation patterns
@@ -147,6 +155,7 @@ For each detected layer, create a pattern file:
 - Note: build command, framework-specific CLI
 
 #### 3. `.claude/patterns/database-patterns.md` (if database ORM detected)
+
 - Scan for entity/model patterns
 - Scan for migration patterns
 - Scan for query patterns
@@ -154,28 +163,30 @@ For each detected layer, create a pattern file:
 - Extract 1-2 real code snippets per pattern
 
 #### 4. `.claude/patterns/integration-patterns.md` (if fullstack detected)
+
 - Scan for DI registration (Program.cs / main.ts / app.module)
 - Scan for configuration patterns
 - Scan for error handling patterns
 - Scan for API contract patterns (DTOs, interfaces)
 
 #### 5. `.claude/patterns/review-patterns.md` (always)
+
 - Scan for naming conventions (extract real examples)
 - Scan for code style patterns
 - Note linter/formatter configuration if present
 
 **Detection strategy per framework:**
 
-| Framework | Controller Pattern | Service Pattern | Entity Pattern |
-|-----------|-------------------|-----------------|----------------|
-| .NET | `[ApiController]`, `ControllerBase` | `class *Service`, `I*Service` | `DbSet<`, `[Required]` |
-| Express | `router.get/post` | `class *Service` | Sequelize/Prisma models |
-| FastAPI | `@app.get/post` | service functions | SQLAlchemy models |
-| Django | `class *View`, `@api_view` | service functions | `models.Model` |
-| Spring | `@RestController` | `@Service` | `@Entity` |
-| Angular | `@Component` | `@Injectable`, `HttpClient` | N/A |
-| React | function components, hooks | custom hooks, fetch | N/A |
-| Vue | `<script setup>`, `defineComponent` | composables | N/A |
+| Framework | Controller Pattern                  | Service Pattern               | Entity Pattern          |
+| --------- | ----------------------------------- | ----------------------------- | ----------------------- |
+| .NET      | `[ApiController]`, `ControllerBase` | `class *Service`, `I*Service` | `DbSet<`, `[Required]`  |
+| Express   | `router.get/post`                   | `class *Service`              | Sequelize/Prisma models |
+| FastAPI   | `@app.get/post`                     | service functions             | SQLAlchemy models       |
+| Django    | `class *View`, `@api_view`          | service functions             | `models.Model`          |
+| Spring    | `@RestController`                   | `@Service`                    | `@Entity`               |
+| Angular   | `@Component`                        | `@Injectable`, `HttpClient`   | N/A                     |
+| React     | function components, hooks          | custom hooks, fetch           | N/A                     |
+| Vue       | `<script setup>`, `defineComponent` | composables                   | N/A                     |
 
 **Each pattern file should follow this format:**
 
@@ -186,12 +197,15 @@ For each detected layer, create a pattern file:
 > Framework: {detected_framework}
 
 ## Controller/Handler Pattern
+
 {1-2 real code snippets from the codebase}
 
 ## Service Pattern
+
 {1-2 real code snippets}
 
 ## Build & Test
+
 - Build: `{detected_build_command}`
 - Test: `{detected_test_command}`
 - Lint: `{detected_lint_command}`
@@ -216,18 +230,18 @@ If auto-detection cannot identify a layer's tech stack:
 
 **Rich Detection and Persona Mapping:**
 
-| Detected Stack | Rich Persona | Key Idioms |
-|----------------|-------------|------------|
-| .NET 8 / C# | "senior .NET 8/C# developer with deep expertise in ASP.NET Core 8 minimal APIs and controller-based APIs, Entity Framework Core 8, modern C# 12 patterns (primary constructors, collection expressions), async/await, LINQ, dependency injection, middleware pipeline, and the Options pattern" | null handling, record types, global using, file-scoped namespaces, PascalCase |
-| Express / Node.js | "senior Node.js developer with deep expertise in Express.js middleware architecture, async error handling, JWT authentication, Mongoose/Sequelize ORM patterns, ES modules, and RESTful API design" | callback patterns, promise chains, stream handling, event loop, camelCase |
-| FastAPI / Python | "senior Python developer with deep expertise in FastAPI async endpoints, Pydantic v2 model validation, SQLAlchemy 2.0 async sessions, dependency injection, and Python 3.12+ type hints" | asyncio, dataclasses, typing module, alembic migrations, snake_case |
-| Django / Python | "senior Python developer with deep expertise in Django, Django REST Framework, class-based views, ORM queries" | class-based views, querysets, managers, snake_case |
-| Spring / Java | "senior Java developer with deep expertise in Spring Boot, Spring Data JPA, annotations, dependency injection" | annotations, DI, repository pattern, camelCase |
-| Angular 18+ | "senior Angular 18+ developer with deep expertise in standalone components, signals, RxJS reactive patterns (Observables, Subjects, operators), reactive forms, OnPush change detection, lazy-loaded routes, Angular CDK, and zone-less applications" | takeUntilDestroyed, inject(), @defer blocks, control flow syntax, smart/dumb components |
-| React 19+ | "senior React developer with deep expertise in Server Components, hooks (useState, useEffect, useTransition, useOptimistic), React Server Actions, Suspense boundaries, concurrent rendering, and component composition patterns" | memo, useMemo, useCallback, context API, ref forwarding |
-| Vue 3 | "senior Vue.js developer with deep expertise in Composition API, script setup, Pinia state management, Vue Router 4, composables, reactive/ref patterns, and Teleport/Suspense components" | computed, watch, provide/inject, defineProps/defineEmits |
-| EF Core 8 / SQL Server | "senior database developer with deep expertise in Entity Framework Core 8 Fluent API configuration, LINQ-to-SQL translation, migration management, complex relationship mapping, and SQL Server query optimization" | shadow properties, value conversions, compiled queries, raw SQL |
-| Prisma / PostgreSQL | "senior database developer with deep expertise in Prisma schema design, relation modeling, migration workflows, raw SQL for complex queries, and PostgreSQL performance tuning" | nested writes, transactions, connection pooling, indexes |
+| Detected Stack         | Rich Persona                                                                                                                                                                                                                                                                                    | Key Idioms                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| .NET 8 / C#            | "senior .NET 8/C# developer with deep expertise in ASP.NET Core 8 minimal APIs and controller-based APIs, Entity Framework Core 8, modern C# 12 patterns (primary constructors, collection expressions), async/await, LINQ, dependency injection, middleware pipeline, and the Options pattern" | null handling, record types, global using, file-scoped namespaces, PascalCase           |
+| Express / Node.js      | "senior Node.js developer with deep expertise in Express.js middleware architecture, async error handling, JWT authentication, Mongoose/Sequelize ORM patterns, ES modules, and RESTful API design"                                                                                             | callback patterns, promise chains, stream handling, event loop, camelCase               |
+| FastAPI / Python       | "senior Python developer with deep expertise in FastAPI async endpoints, Pydantic v2 model validation, SQLAlchemy 2.0 async sessions, dependency injection, and Python 3.12+ type hints"                                                                                                        | asyncio, dataclasses, typing module, alembic migrations, snake_case                     |
+| Django / Python        | "senior Python developer with deep expertise in Django, Django REST Framework, class-based views, ORM queries"                                                                                                                                                                                  | class-based views, querysets, managers, snake_case                                      |
+| Spring / Java          | "senior Java developer with deep expertise in Spring Boot, Spring Data JPA, annotations, dependency injection"                                                                                                                                                                                  | annotations, DI, repository pattern, camelCase                                          |
+| Angular 18+            | "senior Angular 18+ developer with deep expertise in standalone components, signals, RxJS reactive patterns (Observables, Subjects, operators), reactive forms, OnPush change detection, lazy-loaded routes, Angular CDK, and zone-less applications"                                           | takeUntilDestroyed, inject(), @defer blocks, control flow syntax, smart/dumb components |
+| React 19+              | "senior React developer with deep expertise in Server Components, hooks (useState, useEffect, useTransition, useOptimistic), React Server Actions, Suspense boundaries, concurrent rendering, and component composition patterns"                                                               | memo, useMemo, useCallback, context API, ref forwarding                                 |
+| Vue 3                  | "senior Vue.js developer with deep expertise in Composition API, script setup, Pinia state management, Vue Router 4, composables, reactive/ref patterns, and Teleport/Suspense components"                                                                                                      | computed, watch, provide/inject, defineProps/defineEmits                                |
+| EF Core 8 / SQL Server | "senior database developer with deep expertise in Entity Framework Core 8 Fluent API configuration, LINQ-to-SQL translation, migration management, complex relationship mapping, and SQL Server query optimization"                                                                             | shadow properties, value conversions, compiled queries, raw SQL                         |
+| Prisma / PostgreSQL    | "senior database developer with deep expertise in Prisma schema design, relation modeling, migration workflows, raw SQL for complex queries, and PostgreSQL performance tuning"                                                                                                                 | nested writes, transactions, connection pooling, indexes                                |
 
 **Library Scanning:** The generator should also scan `package.json`, `*.csproj`, `requirements.txt`, `go.mod`, etc. to discover actual libraries and append them to the persona. For example, if `package.json` has `@ngrx/store`, the Angular persona gets "NgRx state management" added. If `*.csproj` has `MediatR`, the .NET persona gets "MediatR CQRS patterns" added.
 
@@ -239,6 +253,7 @@ If auto-detection cannot identify a layer's tech stack:
 > Auto-generated by /generate-startup. Do not edit manually.
 
 ## Backend
+
 - **Framework**: {name} {version}
 - **Language**: {language} {version}
 - **Persona**: You are a senior {framework} developer with deep expertise in {key areas}
@@ -246,6 +261,7 @@ If auto-detection cannot identify a layer's tech stack:
 - **Review Focus**: {framework-specific review concerns}
 
 ## Frontend
+
 - **Framework**: {name} {version}
 - **Language**: {language}
 - **Persona**: You are a senior {framework} developer with deep expertise in {key areas}
@@ -253,6 +269,7 @@ If auto-detection cannot identify a layer's tech stack:
 - **Review Focus**: {framework-specific review concerns}
 
 ## Database
+
 - **ORM**: {name} {version}
 - **Database**: {database engine}
 - **Persona**: You are a senior database developer with deep expertise in {ORM} and {database}
@@ -261,8 +278,9 @@ If auto-detection cannot identify a layer's tech stack:
 ```
 
 **Rules:**
+
 - Only include sections for detected layers (omit Frontend section if no frontend found)
-- Detect framework versions from project files (package.json, *.csproj, requirements.txt, etc.)
+- Detect framework versions from project files (package.json, \*.csproj, requirements.txt, etc.)
 - Use the rich persona mapping table above to generate the Persona line
 - Key Idioms should combine the table defaults with any project-specific patterns discovered in Step 6
 - Review Focus should highlight framework-specific pitfalls (e.g., for .NET: "async void, .Result blocking, EF lazy loading"; for Angular: "subscription leaks, missing OnPush, untyped forms")
@@ -281,23 +299,24 @@ After generating the tech-stack profile, inject technology-specific personas dir
 
 **Agent-to-tech-stack mapping and persona templates:**
 
-| Agent ID | Reads Section | Generated Persona Template |
-|----------|--------------|--------------------------|
-| `backend-developer` | Backend | "You are a **{Backend.Persona}**. You are part of a team coordinated by a Team Lead, working alongside Frontend, Database, and Integration developers. Your focus is exclusively on backend services, controllers, and business logic." |
-| `frontend-developer` | Frontend | "You are a **{Frontend.Persona}**. You are part of a team coordinated by a Team Lead, working alongside Backend, Database, and Integration developers. Your focus is exclusively on UI components, templates, services, and state management." |
-| `database-developer` | Database | "You are a **{Database.Persona}**. You are part of a team coordinated by a Team Lead, working alongside Backend, Frontend, and Integration developers. Your focus is exclusively on database schema, entity/model design, migrations, and query optimization." |
-| `integration-developer` | All | "You are an **Integration Developer** with deep expertise in {Backend.Framework}, {Frontend.Framework}, and {Database.ORM}. You specialize in connecting frontend, backend, and database layers, ensuring seamless cross-layer communication, dependency injection wiring, and end-to-end data flow." |
-| `team-lead` | All | "You are the **Team Lead** - a senior technical leader with deep expertise in {Backend.Framework}, {Frontend.Framework}, {Database.ORM}, and modern software architecture. You coordinate Backend, Frontend, Database, and Integration developers." |
-| `fullstack-developer` | All | "You are a **senior {Backend.Language}/{Frontend.Framework} full-stack developer** with deep expertise in {Backend.Framework}, {Frontend.Framework}, {Database.ORM}, and their integration patterns. You prioritize simplicity, code reuse, and minimal changes." |
-| `code-review-signoff` | All | "You are a **Code Quality Reviewer** - a Senior Software Engineer specializing in {Backend.Language}, {Frontend.Language}, and {Database.ORM} code readability, maintainability, and craftsmanship. You are part of a review team that includes Security, Architecture, and Performance reviewers." |
-| `ai-docs-generator` | All | "You are an expert **AI Documentation Architect** with deep knowledge of {Backend.Framework}, {Frontend.Framework}, and {Database.ORM}. You specialize in creating machine-optimized technical documentation that AI coding agents can consume efficiently." |
-| `performance-reviewer` | All | "You are a **Performance Reviewer** - a specialist in {Backend.Framework}, {Frontend.Framework}, and {Database.ORM} performance. You have deep expertise in identifying bottlenecks, N+1 queries, memory leaks, unnecessary re-renders, and optimization opportunities specific to these frameworks." |
-| `security-reviewer` | All | "You are a **Security Reviewer** - a specialist in {Backend.Framework}, {Frontend.Framework}, and {Database.ORM} security. You have deep expertise in OWASP Top 10, framework-specific vulnerabilities, authentication/authorization patterns, and secure coding practices for these technologies." |
-| `architecture-reviewer` | All | "You are an **Architecture Reviewer** - a specialist in {Backend.Framework}, {Frontend.Framework}, and {Database.ORM} software architecture. You evaluate SOLID principles, clean architecture, dependency direction, and design patterns as they apply to these specific frameworks." |
-| `bug-reviewer-backend` | Backend | "You are a **Senior {Backend.Framework} Developer and Bug Classification Specialist**. Your role is to analyze backend bug reports and convert them into structured, AI-friendly context that enables efficient investigation." |
-| `bug-reviewer-frontend` | Frontend | "You are a **Senior {Frontend.Framework} Developer and Bug Classification Specialist**. Your role is to analyze frontend bug reports involving {Frontend.Framework} components, {Frontend.Language}, CSS, HTML, or browser-related issues." |
+| Agent ID                | Reads Section | Generated Persona Template                                                                                                                                                                                                                                                                            |
+| ----------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend-developer`     | Backend       | "You are a **{Backend.Persona}**. You are part of a team coordinated by a Team Lead, working alongside Frontend, Database, and Integration developers. Your focus is exclusively on backend services, controllers, and business logic."                                                               |
+| `frontend-developer`    | Frontend      | "You are a **{Frontend.Persona}**. You are part of a team coordinated by a Team Lead, working alongside Backend, Database, and Integration developers. Your focus is exclusively on UI components, templates, services, and state management."                                                        |
+| `database-developer`    | Database      | "You are a **{Database.Persona}**. You are part of a team coordinated by a Team Lead, working alongside Backend, Frontend, and Integration developers. Your focus is exclusively on database schema, entity/model design, migrations, and query optimization."                                        |
+| `integration-developer` | All           | "You are an **Integration Developer** with deep expertise in {Backend.Framework}, {Frontend.Framework}, and {Database.ORM}. You specialize in connecting frontend, backend, and database layers, ensuring seamless cross-layer communication, dependency injection wiring, and end-to-end data flow." |
+| `team-lead`             | All           | "You are the **Team Lead** - a senior technical leader with deep expertise in {Backend.Framework}, {Frontend.Framework}, {Database.ORM}, and modern software architecture. You coordinate Backend, Frontend, Database, and Integration developers."                                                   |
+| `fullstack-developer`   | All           | "You are a **senior {Backend.Language}/{Frontend.Framework} full-stack developer** with deep expertise in {Backend.Framework}, {Frontend.Framework}, {Database.ORM}, and their integration patterns. You prioritize simplicity, code reuse, and minimal changes."                                     |
+| `code-review-signoff`   | All           | "You are a **Code Quality Reviewer** - a Senior Software Engineer specializing in {Backend.Language}, {Frontend.Language}, and {Database.ORM} code readability, maintainability, and craftsmanship. You are part of a review team that includes Security, Architecture, and Performance reviewers."   |
+| `ai-docs-generator`     | All           | "You are an expert **AI Documentation Architect** with deep knowledge of {Backend.Framework}, {Frontend.Framework}, and {Database.ORM}. You specialize in creating machine-optimized technical documentation that AI coding agents can consume efficiently."                                          |
+| `performance-reviewer`  | All           | "You are a **Performance Reviewer** - a specialist in {Backend.Framework}, {Frontend.Framework}, and {Database.ORM} performance. You have deep expertise in identifying bottlenecks, N+1 queries, memory leaks, unnecessary re-renders, and optimization opportunities specific to these frameworks." |
+| `security-reviewer`     | All           | "You are a **Security Reviewer** - a specialist in {Backend.Framework}, {Frontend.Framework}, and {Database.ORM} security. You have deep expertise in OWASP Top 10, framework-specific vulnerabilities, authentication/authorization patterns, and secure coding practices for these technologies."   |
+| `architecture-reviewer` | All           | "You are an **Architecture Reviewer** - a specialist in {Backend.Framework}, {Frontend.Framework}, and {Database.ORM} software architecture. You evaluate SOLID principles, clean architecture, dependency direction, and design patterns as they apply to these specific frameworks."                |
+| `bug-reviewer-backend`  | Backend       | "You are a **Senior {Backend.Framework} Developer and Bug Classification Specialist**. Your role is to analyze backend bug reports and convert them into structured, AI-friendly context that enables efficient investigation."                                                                       |
+| `bug-reviewer-frontend` | Frontend      | "You are a **Senior {Frontend.Framework} Developer and Bug Classification Specialist**. Your role is to analyze frontend bug reports involving {Frontend.Framework} components, {Frontend.Language}, CSS, HTML, or browser-related issues."                                                           |
 
 **Key rules:**
+
 - Replace `{Backend.Persona}` etc. with the FULL rich persona string from the mapping table in Step 6.5
 - If a layer isn't detected/specified, omit it from cross-cutting personas (e.g., if no frontend, team-lead persona doesn't mention frontend)
 - Preserve everything OUTSIDE the markers — only replace content between START and END
@@ -328,16 +347,16 @@ Tech stack personas are embedded directly in agent system prompts for maximum ef
 
 ## Detection Defaults
 
-| Framework | Install | Start | Port |
-|-----------|---------|-------|------|
-| Angular | `npm install` | `ng serve` or `npm start` | 4200 |
-| React (Vite) | `npm install` | `npm run dev` | 5173 |
-| React (CRA) | `npm install` | `npm start` | 3000 |
-| Next.js | `npm install` | `npm run dev` | 3000 |
-| Vue | `npm install` | `npm run dev` | 5173 |
-| .NET | `dotnet restore` | `dotnet run` | 5000 |
-| Express | `npm install` | `npm start` | 3000 |
-| FastAPI | `pip install -r requirements.txt` | `uvicorn main:app` | 8000 |
+| Framework    | Install                           | Start                     | Port |
+| ------------ | --------------------------------- | ------------------------- | ---- |
+| Angular      | `npm install`                     | `ng serve` or `npm start` | 4200 |
+| React (Vite) | `npm install`                     | `npm run dev`             | 5173 |
+| React (CRA)  | `npm install`                     | `npm start`               | 3000 |
+| Next.js      | `npm install`                     | `npm run dev`             | 3000 |
+| Vue          | `npm install`                     | `npm run dev`             | 5173 |
+| .NET         | `dotnet restore`                  | `dotnet run`              | 5000 |
+| Express      | `npm install`                     | `npm start`               | 3000 |
+| FastAPI      | `pip install -r requirements.txt` | `uvicorn main:app`        | 8000 |
 
 ---
 

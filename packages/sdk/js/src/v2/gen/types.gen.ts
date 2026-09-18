@@ -1428,6 +1428,7 @@ export type GlobalEvent = {
             | "prompt.clear"
             | "prompt.submit"
             | "agent.cycle"
+            | "mode.cycle"
             | string
         }
       }
@@ -2631,6 +2632,7 @@ export type EventTuiCommandExecute = {
       | "prompt.clear"
       | "prompt.submit"
       | "agent.cycle"
+      | "mode.cycle"
       | string
   }
 }
@@ -2993,6 +2995,7 @@ export type EventTuiCommandExecute2 = {
       | "prompt.clear"
       | "prompt.submit"
       | "agent.cycle"
+      | "mode.cycle"
       | string
   }
 }
@@ -5790,6 +5793,7 @@ export type TuiCommandExecute = {
       | "prompt.clear"
       | "prompt.submit"
       | "agent.cycle"
+      | "mode.cycle"
       | string
   }
 }

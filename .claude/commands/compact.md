@@ -55,6 +55,7 @@ When the user runs `/compact`:
    - Any errors and their resolutions
 
 6. **Generate summary for each segment**:
+
    ```
    Messages {start}-{end}: {1-2 sentence summary}
    ```
@@ -69,12 +70,12 @@ When the user runs `/compact`:
 ```yaml
 compaction:
   performed_at: "{ISO timestamp}"
-  messages_compacted: {count}
-  token_reduction_estimate: {estimate}
+  messages_compacted: { count }
+  token_reduction_estimate: { estimate }
   compaction_method: "hierarchical_summary"
   message_range:
-    from: {last_compaction + 1}
-    to: {current_message}
+    from: { last_compaction + 1 }
+    to: { current_message }
 
 essential_context:
   mission: "{preserve or update}"
@@ -88,8 +89,8 @@ essential_context:
     - "{decision 1 summary}"
     - "{decision 2 summary}"
   key_files:
-    frontend: [{current frontend files}]
-    backend: [{current backend files}]
+    frontend: [{ current frontend files }]
+    backend: [{ current backend files }]
     # etc.
   active_patterns:
     - pattern: "{pattern being followed}"
@@ -115,12 +116,13 @@ recent_errors:
 ```
 
 9. **Update session.yaml**:
+
 ```yaml
 context_bounds:
-  last_compaction: {current_message}
-  token_estimate: {new_estimate}
+  last_compaction: { current_message }
+  token_estimate: { new_estimate }
 metrics:
-  compactions_performed: {increment}
+  compactions_performed: { increment }
 ```
 
 10. **Report results**:

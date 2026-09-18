@@ -7,6 +7,7 @@ Canonical reference for the **documentation-first** pattern. Agents reference th
 ## Purpose
 
 The `.claude/docs/` directory contains feature-level architecture documentation produced by the `/discover` command. These docs describe:
+
 - Feature architecture and component relationships
 - Data flows and integration points
 - Design decisions and trade-offs
@@ -21,6 +22,7 @@ Consulting these docs **before** code exploration saves significant investigatio
 ### Step 1: Extract Keywords
 
 From the task description, bug report, or feature name, extract 2-4 keywords that identify the feature area. Examples:
+
 - "user profile page is broken" → keywords: `user`, `profile`
 - "implement QR code scanning" → keywords: `qr`, `code`, `scanning`
 - "fix incident report export" → keywords: `incident`, `report`, `export`
@@ -36,6 +38,7 @@ Search these locations for matching documentation:
 5. **`README.md`** — Project root readme
 
 For each location that exists, Glob for `**/*.md` and filter for keyword matches. Also check for:
+
 - `{feature}.md` — Main feature documentation
 - `{feature}-user-journeys.md` — User journey documentation
 - Related features that might share context
@@ -43,12 +46,14 @@ For each location that exists, Glob for `**/*.md` and filter for keyword matches
 ### Step 3: Read and Apply
 
 **If matching docs are found:**
+
 1. Read the most relevant file(s)
 2. Extract key context: architecture, data flows, affected components
 3. Pass this context to downstream agents or use it to inform investigation
 4. Note which docs were consulted in your output
 
 **If no matching docs are found in any location:**
+
 1. Note the documentation gap
 2. Proceed with code exploration as normal
 3. Suggest running `/discover {feature-area}` after the task completes to fill the gap

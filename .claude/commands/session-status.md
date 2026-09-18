@@ -100,6 +100,7 @@ Commands: /compact, /handoff, /state-resume
 ```
 
 6. If no active session:
+
 ```
 No active session.
 

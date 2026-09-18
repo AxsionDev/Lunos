@@ -24,34 +24,44 @@ The prompt includes any of: `Mode: RESEARCH ONLY`, `DO NOT propose fixes`, or a 
 
 ## Output Format
 
-```markdown
+````markdown
 ## [Layer] Research Report
 
 ### Summary
+
 [One paragraph: what you investigated and key findings]
 
 ### Files Examined
+
 | File | Lines | Finding | Relevance |
-|------|-------|---------|-----------|
+| ---- | ----- | ------- | --------- |
 
 ### Code Analysis
+
 #### Finding 1: [Title]
+
 ```[lang]
 // File: path:line — Issue: [what's wrong]
 [snippet]
 ```
+````
+
 **Why This Matters:** [link to the reported symptom]
 
 ### Hypotheses
-| # | Hypothesis | Evidence For | Evidence Against | Confidence |
-|---|------------|--------------|------------------|------------|
+
+| #   | Hypothesis | Evidence For | Evidence Against | Confidence |
+| --- | ---------- | ------------ | ---------------- | ---------- |
 
 ### [Layer] Involvement Assessment
+
 - **Involved:** Yes/No
 - **Reasoning:** [why]
 
 ### Gaps and Uncertainties
+
 - [What you couldn't determine]
+
 ```
 
 ## Constraints
@@ -65,3 +75,4 @@ The prompt includes any of: `Mode: RESEARCH ONLY`, `DO NOT propose fixes`, or a 
 - Slipping into fix-design (that's the fixer's job — stay in evidence-gathering).
 - Findings without `file:line`.
 - Stating a hypothesis as fact — mark confidence and contradicting evidence honestly.
+```

@@ -93,7 +93,7 @@ gate: pending
 
 That position is read from the file at the start of every turn, so editing those two lines is how you approve a gate, rewind to an earlier phase, or redirect a cycle mid-flight. Rewinding changes only that file, not the conversation record — each turn's reminder is persisted, so earlier phases stay visible in the history, and only the newest reminder block is authoritative.
 
-The gates are advisory. Unlike `plan` and `research`, this agent holds full write permissions for the whole run — it is *instructed* to stop at each gate rather than prevented from continuing, so a cycle that ignores a gate is possible. Review the diff at gate 3 rather than assuming nothing was written before gate 2 opened.
+The gates are advisory. Unlike `plan` and `research`, this agent holds full write permissions for the whole run — it is _instructed_ to stop at each gate rather than prevented from continuing, so a cycle that ignores a gate is possible. Review the diff at gate 3 rather than assuming nothing was written before gate 2 opened.
 
 ---
 

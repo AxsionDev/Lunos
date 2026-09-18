@@ -62,6 +62,7 @@ const decodeV1Info = Schema.decodeUnknownOption(ConfigV1.Info, decodeOptions)
 Schema → Core/Protocol → Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server. After changing public Protocol/Server `HttpApi`, regenerate with `bun run generate` from `packages/client` — never hand-edit `src/generated`/`src/generated-effect`.
 
 ## Build & Test
+
 - Full-repo typecheck: `bun run typecheck` (root → `bun turbo typecheck`)
 - Per-package typecheck: `cd packages/<pkg> && bun typecheck`
 - Regenerate SDK: `./packages/sdk/js/script/build.ts`

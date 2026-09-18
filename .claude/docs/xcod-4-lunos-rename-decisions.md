@@ -51,5 +51,5 @@ executed via `gh repo rename` (GitHub auto-redirects the old URL for existing cl
   carry the "R" monogram from Ratio — XCOD-3 territory.)
 - **Translated READMEs** (~20 files) — left in English-only scope, same as XCOD-1.
 - The XCOD-1 decision doc (`xcod-1-ratio-rename-decisions.md`) is left untouched as a historical
-  record; its `lildax`/`pminev1/Axcode` references describe what was true *at that time*, not the
+  record; its `lildax`/`pminev1/Axcode` references describe what was true _at that time_, not the
   current state.

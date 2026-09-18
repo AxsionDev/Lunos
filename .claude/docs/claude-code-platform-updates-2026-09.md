@@ -17,20 +17,20 @@ cover up to v2.1.260; §10 is the 2026-09-10 update covering v2.1.261 → v2.1.2
 
 ## 1. Subagent orchestration — the caps
 
-| Version | Change |
-|---------|--------|
-| 2.1.212 | Per-session cap of 200 subagent spawns (`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`) — **later removed** |
-| 2.1.217 | Concurrent subagent cap, default **20** (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`) |
-| 2.1.217 | Subagents **stopped** spawning nested subagents by default — reversed 2 versions later |
+| Version | Change                                                                                                        |
+| ------- | ------------------------------------------------------------------------------------------------------------- |
+| 2.1.212 | Per-session cap of 200 subagent spawns (`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`) — **later removed**          |
+| 2.1.217 | Concurrent subagent cap, default **20** (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`)                              |
+| 2.1.217 | Subagents **stopped** spawning nested subagents by default — reversed 2 versions later                        |
 | 2.1.219 | **Nested spawning restored at depth 3 by default** (was 1). `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` disables |
-| 2.1.224 | Removed the 200-per-session spawn cap entirely |
-| 2.1.187 | Depth tracking fix: resumed subagents restore original depth; forked subagents count toward the cap |
+| 2.1.224 | Removed the 200-per-session spawn cap entirely                                                                |
+| 2.1.187 | Depth tracking fix: resumed subagents restore original depth; forked subagents count toward the cap           |
 
 ### Does the depth ceiling affect this repo? **No.**
 
 Verified by reading `.claude/commands/feature.md`: the command orchestrates everything **from the
 main session**. `team-lead` has no dispatch logic in its body (only frontmatter examples) — it is
-dispatched *by* the command, and the command separately dispatches the developers and reviewers.
+dispatched _by_ the command, and the command separately dispatches the developers and reviewers.
 
 ```
 main session (0) → project-orchestrator / team-lead / developers / reviewers  (all depth 1)
@@ -42,7 +42,7 @@ Nothing to change. The 20-concurrent cap is also fine (peak is 4 parallel review
 
 ### Subagent model resolution changed — this one matters
 
-- **2.1.251** — `CLAUDE_CODE_SUBAGENT_MODEL` became a *default* rather than an override. An agent
+- **2.1.251** — `CLAUDE_CODE_SUBAGENT_MODEL` became a _default_ rather than an override. An agent
   definition's `model:` and an explicit per-spawn model now **win over it**. Good news: the fleet's
   per-agent `model: opus` pins are authoritative again.
 - **2.1.257** — `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` restores override-everything behavior, if you ever
@@ -54,29 +54,29 @@ Nothing to change. The 20-concurrent cap is also fine (peak is 4 parallel review
 
 Authoritative field list — `https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields`:
 
-| Field | Notes |
-|-------|-------|
-| `name` **(req)** | lowercase + hyphens; no `:` (reserved for plugin namespacing, enforced 2.1.218) |
-| `description` **(req)** | when Claude should delegate here |
-| `model` | `sonnet`/`opus`/`haiku`/`fable`, a full id, or `inherit` |
-| `tools` / `disallowedTools` | `tools: Task(agent_type)` restricts which subagents it may spawn (2.1.33) |
-| `permissionMode` | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, `manual` |
-| `skills` | **Preloads** full skill content at startup (2.0.43) — see note below |
-| `hooks` | PreToolUse/PostToolUse/Stop scoped to this agent's lifecycle (2.1.0) |
-| `memory` | `user` / `project` / `local` persistent memory (2.1.33) |
-| `isolation: worktree` | isolated git checkout (2.1.50) — **already used here** |
-| `effort` | `low`…`max`, overrides session effort (2.1.78) |
-| `maxTurns` | stops after N turns, returns marked partial, **resumable via `SendMessage`** |
-| `background` | keep running even when Claude requests foreground |
-| `color` | task-list display color |
-| `initialPrompt` | auto-submitted first turn when run as main session (`--agent`) |
-| `mcpServers` | server names or inline definitions |
-| `experimental.cacheTtl` | `"5m"` / `"1h"` prompt cache TTL (2.1.248) |
+| Field                       | Notes                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| `name` **(req)**            | lowercase + hyphens; no `:` (reserved for plugin namespacing, enforced 2.1.218)    |
+| `description` **(req)**     | when Claude should delegate here                                                   |
+| `model`                     | `sonnet`/`opus`/`haiku`/`fable`, a full id, or `inherit`                           |
+| `tools` / `disallowedTools` | `tools: Task(agent_type)` restricts which subagents it may spawn (2.1.33)          |
+| `permissionMode`            | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, `manual` |
+| `skills`                    | **Preloads** full skill content at startup (2.0.43) — see note below               |
+| `hooks`                     | PreToolUse/PostToolUse/Stop scoped to this agent's lifecycle (2.1.0)               |
+| `memory`                    | `user` / `project` / `local` persistent memory (2.1.33)                            |
+| `isolation: worktree`       | isolated git checkout (2.1.50) — **already used here**                             |
+| `effort`                    | `low`…`max`, overrides session effort (2.1.78)                                     |
+| `maxTurns`                  | stops after N turns, returns marked partial, **resumable via `SendMessage`**       |
+| `background`                | keep running even when Claude requests foreground                                  |
+| `color`                     | task-list display color                                                            |
+| `initialPrompt`             | auto-submitted first turn when run as main session (`--agent`)                     |
+| `mcpServers`                | server names or inline definitions                                                 |
+| `experimental.cacheTtl`     | `"5m"` / `"1h"` prompt cache TTL (2.1.248)                                         |
 
 ### ✅ Resolved: `skills:` frontmatter vs. the `Skill`-call router pattern
 
 **They are different mechanisms, not old vs. new — this repo's pattern is correct.**
-The docs state: *"To preload Skills into context, use the `skills` field rather than listing `Skill` here."*
+The docs state: _"To preload Skills into context, use the `skills` field rather than listing `Skill` here."_
 
 - `skills:` frontmatter → **eager**: injects full skill content at subagent startup. Lower latency,
   costs tokens whether or not the skill is used.
@@ -87,6 +87,7 @@ optimization. For conditional skills (`research-mode`, `contract-driven-implemen
 call is strictly better. **No migration needed.**
 
 ### Deprecated / removed
+
 - **2.1.198** — the `/agents` wizard was **removed**. Edit `.claude/agents/` directly or ask Claude.
 - **2.1.218** — agent names containing `:` are now **rejected** (reserved for plugin namespacing).
 
@@ -94,24 +95,24 @@ call is strictly better. **No migration needed.**
 
 ## 3. Skills
 
-| Change | Version |
-|--------|---------|
-| Skills support introduced | 2.0.x |
-| `skills:` frontmatter to auto-load skills for subagents | 2.0.43 |
-| Nested `.claude/skills` auto-discovery in subdirectories | 2.1.6 |
-| `${CLAUDE_SESSION_ID}` substitution | 2.1.9 |
-| Skill hot-reload (no restart); `context: fork`; `agent:` field; hooks in skill frontmatter | 2.1.0 |
-| `${CLAUDE_SKILL_DIR}` substitution | 2.1.69 |
-| `effort:` frontmatter on skills and slash commands | 2.1.80 |
-| `disableSkillShellExecution` setting | 2.1.91 |
-| `/reload-skills` — re-scan skill dirs without restarting | 2.1.152 |
-| `disableBundledSkills` / `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS` | 2.1.169 |
+| Change                                                                                      | Version |
+| ------------------------------------------------------------------------------------------- | ------- |
+| Skills support introduced                                                                   | 2.0.x   |
+| `skills:` frontmatter to auto-load skills for subagents                                     | 2.0.43  |
+| Nested `.claude/skills` auto-discovery in subdirectories                                    | 2.1.6   |
+| `${CLAUDE_SESSION_ID}` substitution                                                         | 2.1.9   |
+| Skill hot-reload (no restart); `context: fork`; `agent:` field; hooks in skill frontmatter  | 2.1.0   |
+| `${CLAUDE_SKILL_DIR}` substitution                                                          | 2.1.69  |
+| `effort:` frontmatter on skills and slash commands                                          | 2.1.80  |
+| `disableSkillShellExecution` setting                                                        | 2.1.91  |
+| `/reload-skills` — re-scan skill dirs without restarting                                    | 2.1.152 |
+| `disableBundledSkills` / `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS`                               | 2.1.169 |
 | `context: fork` now runs **in the background by default**; opt out with `background: false` | 2.1.218 |
-| `disallowed-tools` in skill **and slash command** frontmatter | 2.1.152 |
-| Plugins accept `"."` as a `skills` path (root-level `SKILL.md`) | 2.1.221 |
-| Skill chaining — up to 6 skills with trailing args (`/a /b /c do XYZ`) | 2.1.242 |
+| `disallowed-tools` in skill **and slash command** frontmatter                               | 2.1.152 |
+| Plugins accept `"."` as a `skills` path (root-level `SKILL.md`)                             | 2.1.221 |
+| Skill chaining — up to 6 skills with trailing args (`/a /b /c do XYZ`)                      | 2.1.242 |
 
-**Slash commands are NOT deprecated in favour of skills**, and they *do* support frontmatter —
+**Slash commands are NOT deprecated in favour of skills**, and they _do_ support frontmatter —
 `model:`, `effort:` (2.1.80), `disallowed-tools:` (2.1.152), `name:`, and hooks (2.1.0). As recently
 as 2.1.259 there are bug fixes for "frontmatter `model:` on custom **commands** and skills". This
 repo's 32 `.claude/commands/` files need no migration.
@@ -148,16 +149,16 @@ Write `**/dir/**` for any-depth matching. `deny`/`ask` permission rules keep the
 **`.worktreeinclude` is a native Claude Code feature**, not a repo convention — it appears in
 changelog bug fixes at 2.1.207 and 2.1.239. CLAUDE.md's documentation of it is correct usage.
 
-| Feature | Version |
-|---------|---------|
-| `--worktree` / `-w` flag | 2.1.49 |
-| `isolation: worktree` in agent definitions + `WorktreeCreate`/`WorktreeRemove` hooks | 2.1.50 |
-| `worktree` field in status line hooks (name, path, branch, origin dir) | 2.1.69 |
-| `ExitWorktree` tool | 2.1.72 |
-| `worktree.sparsePaths` — sparse-checkout for large monorepos | 2.1.76 |
-| `EnterWorktree` gains a `path` param to switch into an existing worktree | 2.1.105 |
+| Feature                                                                                     | Version |
+| ------------------------------------------------------------------------------------------- | ------- |
+| `--worktree` / `-w` flag                                                                    | 2.1.49  |
+| `isolation: worktree` in agent definitions + `WorktreeCreate`/`WorktreeRemove` hooks        | 2.1.50  |
+| `worktree` field in status line hooks (name, path, branch, origin dir)                      | 2.1.69  |
+| `ExitWorktree` tool                                                                         | 2.1.72  |
+| `worktree.sparsePaths` — sparse-checkout for large monorepos                                | 2.1.76  |
+| `EnterWorktree` gains a `path` param to switch into an existing worktree                    | 2.1.105 |
 | **`worktree.baseRef`** (`fresh` \| `head`) — branch from `origin/<default>` or local `HEAD` | 2.1.133 |
-| `worktree.bgIsolation: "none"` — background sessions edit the working copy directly | 2.1.143 |
+| `worktree.bgIsolation: "none"` — background sessions edit the working copy directly         | 2.1.143 |
 
 ⚠️ **`worktree.baseRef` (2.1.133) overlaps this repo's custom `worktree-preflight` skill**, which
 CLAUDE.md describes as "reset into a clean git worktree from a chosen base branch." Worth auditing
@@ -195,7 +196,7 @@ change: `fresh` moved `EnterWorktree`'s base back to `origin/<default>`.
   step. The Agent tool's `team_name` parameter is still accepted but **ignored**.
   ⚠️ Known limitation: in-process teammates are **not restored by `/resume`**.
 - Named subagents are now auto-named by Claude to enable `SendMessage` resumption. With teams **on**,
-  named subagents launch as *teammates*; with teams **off**, they stay ordinary subagents.
+  named subagents launch as _teammates_; with teams **off**, they stay ordinary subagents.
 - **Cross-session `SendMessage` / `ListAgents`** (2.1.224) — sessions message each other across your
   machines; `crossSessionInbound` controls inbound policy (2.1.224).
 - `claude self-hosted-runner` (2.1.224) — run web/mobile/desktop sessions on your own machines.
@@ -218,7 +219,7 @@ change: `fresh` moved `EnterWorktree`'s base back to `origin/<default>`.
 
 ## 9. Permissions
 
-- **`Tool(param:value)` permission syntax** (**2.1.178**) — matches a tool's *input parameters*, with
+- **`Tool(param:value)` permission syntax** (**2.1.178**) — matches a tool's _input parameters_, with
   `*` wildcards. e.g. `Agent(model:opus)` to block Opus subagents. A real cost guardrail for a
   39-agent fleet.
 - `defaultMode: "bypassPermissions"` in **project** `.claude/settings.json` is now **ignored**
@@ -253,8 +254,8 @@ month, invisibly (cache misses aren't errors — just cost/latency). **v2.1.267 
 for this reason alone, independent of any feature interest below. This also makes follow-up #6
 below (preloading `agent-bootstrap` via `skills:`) safer than it was when first suggested, since
 the specific bug that would have undermined it (preloaded skills falling out of the prefix) is now
-fixed. Note the honest scope of that claim: it means the preload is *less likely to regress via a
-known cache bug*, not that it was measured faster — see the verification note under follow-up #6.
+fixed. Note the honest scope of that claim: it means the preload is _less likely to regress via a
+known cache bug_, not that it was measured faster — see the verification note under follow-up #6.
 
 ### `effort:` frontmatter silently ignored on pinned legacy models — fixed 2.1.267
 
@@ -283,7 +284,7 @@ Ran via `claude -p "/skill-doctor"` (confirms slash commands work headlessly, pe
   `research-mode`, `worktree-preflight`) all show **"0× never"** used — despite `bug-fix` alone
   showing **105 uses** in the same report, and `bug-fix`'s documented first step being
   `worktree-preflight`. The tool's usage counter evidently tracks `Skill()` calls made in the
-  **main session**, not calls made *inside subagents* — which is how every one of these 6 skills is
+  **main session**, not calls made _inside subagents_ — which is how every one of these 6 skills is
   invoked (per §2, they're called via the `Skill` tool from within agent bodies). **Conclusion: "0
   uses" here means "not measured," not "unused."** Do not use this report to argue for removing any
   of this repo's own skills.
@@ -298,15 +299,15 @@ whole conversation rather than fluctuating per turn.
 
 ### Other items worth knowing about, lower repo impact
 
-| Change | Version | Why it's here |
-|---|---|---|
-| `--append-subagent-system-prompt-file` | 2.1.261 | Subagent system prompts too large for the command line can be file-based |
-| `bashOutputMaxChars` / `taskOutputMaxChars` settings, up to 128K | 2.1.261 | Raises inline Bash/background-task output before it's saved to disk — relevant given how Bash-heavy the developer/reviewer agents are |
-| Forked skills (`context: fork`) not streaming their kickoff prompt as progress events | 2.1.265 fix | Relevant if any skill here uses `context: fork` (per §3, introduced 2.1.0) |
-| Workflow `agent()` calls with large output schemas wrongly refused in auto mode | 2.1.267 fix | Relevant to `Workflow` tool usage (§6) — schema-heavy `agent()` calls (e.g. `FINDINGS_SCHEMA`) were sometimes blocked pre-fix, not by design |
-| `/workflows` agent detail shows running/failed/done + subagent task list | 2.1.265 | Better visibility into Workflow runs |
-| `maxEffortLevel` setting (caps effort across providers) | 2.1.267 | Cost guardrail alternative/complement to `Agent(model:opus)` permission rules (§9) |
-| `--plugin-dir` accepting a folder of plugins, hot-added/removed | 2.1.265 | Not currently used by this repo but relevant if plugin distribution changes |
+| Change                                                                                | Version     | Why it's here                                                                                                                                |
+| ------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--append-subagent-system-prompt-file`                                                | 2.1.261     | Subagent system prompts too large for the command line can be file-based                                                                     |
+| `bashOutputMaxChars` / `taskOutputMaxChars` settings, up to 128K                      | 2.1.261     | Raises inline Bash/background-task output before it's saved to disk — relevant given how Bash-heavy the developer/reviewer agents are        |
+| Forked skills (`context: fork`) not streaming their kickoff prompt as progress events | 2.1.265 fix | Relevant if any skill here uses `context: fork` (per §3, introduced 2.1.0)                                                                   |
+| Workflow `agent()` calls with large output schemas wrongly refused in auto mode       | 2.1.267 fix | Relevant to `Workflow` tool usage (§6) — schema-heavy `agent()` calls (e.g. `FINDINGS_SCHEMA`) were sometimes blocked pre-fix, not by design |
+| `/workflows` agent detail shows running/failed/done + subagent task list              | 2.1.265     | Better visibility into Workflow runs                                                                                                         |
+| `maxEffortLevel` setting (caps effort across providers)                               | 2.1.267     | Cost guardrail alternative/complement to `Agent(model:opus)` permission rules (§9)                                                           |
+| `--plugin-dir` accepting a folder of plugins, hot-added/removed                       | 2.1.265     | Not currently used by this repo but relevant if plugin distribution changes                                                                  |
 
 ---
 
@@ -347,13 +348,16 @@ whole conversation rather than fluctuating per turn.
 9. ✅ **Already on v2.1.267** — confirmed via `claude --version`; no action needed.
 
 ### ⚠️ Claims from secondary research that this changelog contradicts
+
 A `claude-code-guide` research pass returned three assertions that are **false** against the changelog —
 recorded here so they don't get re-adopted later:
-- *"Slash commands have no frontmatter"* — false; see §3.
-- *"`.claude/commands/` is legacy; `.claude/skills/` is canonical"* — no changelog support whatsoever.
-- *"`worktree.sparsePaths` is not documented"* — it exists, added in **v2.1.76**.
+
+- _"Slash commands have no frontmatter"_ — false; see §3.
+- _"`.claude/commands/` is legacy; `.claude/skills/` is canonical"_ — no changelog support whatsoever.
+- _"`worktree.sparsePaths` is not documented"_ — it exists, added in **v2.1.76**.
 
 ### Explicitly NOT recommended
+
 - ~~Setting `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`~~ — verified unnecessary; the fleet dispatches from
   the main session and peaks at depth 2 of 3.
 - ~~Replacing `.worktreeinclude` with a `WorktreeCreate` hook~~ — `.worktreeinclude` **is** the native

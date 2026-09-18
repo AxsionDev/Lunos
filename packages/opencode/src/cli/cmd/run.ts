@@ -279,11 +279,7 @@ export const RunCommand = effectCmd({
       const auto = args.auto || args.yolo || args["dangerously-skip-permissions"]
       // XCOD-40: --agent is deprecated in favor of --mode; --mode wins if both are set.
       if (args.agent && !args.mode) {
-        UI.println(
-          UI.Style.TEXT_WARNING_BOLD + "!",
-          UI.Style.TEXT_NORMAL,
-          `--agent is deprecated, use --mode instead`,
-        )
+        UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL, `--agent is deprecated, use --mode instead`)
       }
       const modeArg = args.mode ?? args.agent
       const thinking = interactive ? (args.thinking ?? true) : (args.thinking ?? false)

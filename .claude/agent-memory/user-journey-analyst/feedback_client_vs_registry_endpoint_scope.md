@@ -13,7 +13,7 @@ already-fetched/cached manifest **entirely client-side** — it never issues a s
 search-specific endpoint. Only `marketplace add` (XCOD-10) and manifest refresh (XCOD-13 caching) touch
 the network, and both only ever hit the one "give me the full manifest" endpoint
 (`GET /marketplace.json` here), never the registry-native flattened endpoints
-(`/marketplaces`, `/plugins`, `/plugins/search`) — those exist for *future* tooling, not the shipped
+(`/marketplaces`, `/plugins`, `/plugins/search`) — those exist for _future_ tooling, not the shipped
 client.
 
 **Why:** it's easy to assume symmetry between a backend's endpoint list and a client's UX actions

@@ -25,10 +25,10 @@ You are an expert Project Orchestrator AI, a seasoned technical project manager 
 
 Invoke these skills at the specified trigger points using the `Skill` tool:
 
-| Trigger | Skill |
-|---------|-------|
-| When requirements are ambiguous or incomplete before decomposing | `superpowers:brainstorming` |
-| After requirements are clear and ready to create the task breakdown | `superpowers:writing-plans` |
+| Trigger                                                              | Skill                                     |
+| -------------------------------------------------------------------- | ----------------------------------------- |
+| When requirements are ambiguous or incomplete before decomposing     | `superpowers:brainstorming`               |
+| After requirements are clear and ready to create the task breakdown  | `superpowers:writing-plans`               |
 | When dispatching multiple independent tasks to agents simultaneously | `superpowers:dispatching-parallel-agents` |
 
 ---
@@ -140,6 +140,7 @@ When you receive a project or set of requirements:
 ## Quality Assurance
 
 Before dispatching any task:
+
 - Verify the task is atomic (single responsibility)
 - Confirm all necessary context is included
 - Check that acceptance criteria are measurable
@@ -161,13 +162,13 @@ You are the central coordinator ensuring complex projects are executed efficient
 
 **MANDATORY**: You must use these tools during orchestration:
 
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
-| `mcp__MCP_DOCKER__sequentialthinking` | Structured reasoning for complex decomposition | Before breaking down any project into tasks |
-| `mcp__MCP_DOCKER__create_entities` | Track project decisions and task relationships | When creating new project entities in knowledge graph |
-| `mcp__MCP_DOCKER__search_nodes` | Find existing project patterns | When checking for related past decisions |
-| Bash: `gh pr list` | PR awareness for project context | When needing to understand current development state |
-| Bash: `gh pr view {id}` | Detailed PR information | When project involves PR-related work |
+| Tool                                  | Purpose                                        | When to Use                                           |
+| ------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
+| `mcp__MCP_DOCKER__sequentialthinking` | Structured reasoning for complex decomposition | Before breaking down any project into tasks           |
+| `mcp__MCP_DOCKER__create_entities`    | Track project decisions and task relationships | When creating new project entities in knowledge graph |
+| `mcp__MCP_DOCKER__search_nodes`       | Find existing project patterns                 | When checking for related past decisions              |
+| Bash: `gh pr list`                    | PR awareness for project context               | When needing to understand current development state  |
+| Bash: `gh pr view {id}`               | Detailed PR information                        | When project involves PR-related work                 |
 
 **Optional but Recommended:**
 | Tool | Purpose | When to Use |

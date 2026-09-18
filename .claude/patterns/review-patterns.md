@@ -5,22 +5,26 @@
 The authoritative style guide for this repo is **`AGENTS.md`** at the repo root (imports, control flow, variables, Effect generator conventions, Drizzle naming, testing, type checking). This file does not duplicate those rules — it adds what AGENTS.md doesn't cover: tooling config locations and real naming examples pulled from the codebase.
 
 ## Linter / Formatter Config
+
 - Lint: `oxlint`, config at `.oxlintrc.json` (run via `bun run lint`)
 - Format: Prettier is a devDependency (`packages/opencode/package.json`); no repo-root `.prettierrc` found — check for package-local config before assuming defaults
 - `.editorconfig` present at repo root
 
 ## Naming Examples (real, from the codebase)
+
 - Files: kebab-case (`dialog-add-server.tsx`, `session-location.ts`, `schema-error.ts`)
 - Drizzle columns: snake_case matching the SQL column name exactly (`project_id`, `created_at`) — see `database-patterns.md`
 - Effect tagged errors: PascalCase class names ending in `Error` (`InvalidRequestError`, `UnauthorizedError`, `ConflictError`)
 - Config self-export modules: `export * as ConfigAgent from "./agent"` at the top of the file
 
 ## Commit / PR Conventions (see AGENTS.md for full detail)
+
 - Conventional commits: `type(scope): summary` — types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
 - Branch names: ≤3 words, hyphen-separated, no `feat/`/`fix/` prefixes (e.g. `session-recovery`, `fix-scroll-state`)
 - Default branch is `dev`, not `main`
 
 ## Review Focus Beyond AGENTS.md
+
 - Verify no repo-root test invocation slipped into a PR (root `test` script is a deliberate guard)
 - Verify `packages/client` was regenerated (`bun run generate`) after any Protocol/Server `HttpApi` change, and that `src/generated`/`src/generated-effect` weren't hand-edited
 - Verify new Drizzle tables use snake_case fields without redundant string column names

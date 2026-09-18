@@ -6,16 +6,16 @@ Shared protocol for agents that create Angular HTML/SCSS. Attempt Gemini Design 
 
 ## Applicability Matrix
 
-| Task Type | Use Gemini? | Reason |
-|-----------|-------------|--------|
-| New component templates (HTML) | YES | Gemini excels at layout generation |
-| Component SCSS styling | YES | Gemini produces polished, consistent styles |
-| Page redesigns / visual refresh | YES | Feed existing HTML to `modify_frontend` |
-| Adding a UI section to a page | YES | Use `snippet_frontend` |
-| TypeScript services / models | NO | Gemini only generates markup + styles |
-| Routing / module configuration | NO | Not visual work |
-| Bug fixes in existing logic | NO | Requires precise, targeted edits |
-| Unit tests | NO | Not visual work |
+| Task Type                       | Use Gemini? | Reason                                      |
+| ------------------------------- | ----------- | ------------------------------------------- |
+| New component templates (HTML)  | YES         | Gemini excels at layout generation          |
+| Component SCSS styling          | YES         | Gemini produces polished, consistent styles |
+| Page redesigns / visual refresh | YES         | Feed existing HTML to `modify_frontend`     |
+| Adding a UI section to a page   | YES         | Use `snippet_frontend`                      |
+| TypeScript services / models    | NO          | Gemini only generates markup + styles       |
+| Routing / module configuration  | NO          | Not visual work                             |
+| Bug fixes in existing logic     | NO          | Requires precise, targeted edits            |
+| Unit tests                      | NO          | Not visual work                             |
 
 ## Protocol Steps
 
@@ -30,6 +30,7 @@ This loads the deferred MCP tools. They are NOT available until loaded.
 ### Step 2: Load Design System
 
 Look for design context in this priority order:
+
 1. `design-system.md` in project root
 2. `.claude/docs/ui-ux-documentation.md`
 3. Existing component SCSS for token/convention reference
@@ -38,10 +39,10 @@ Read the file and store its content — you will pass it as the `designSystem` p
 
 ### Step 3: Select the Correct Tool
 
-| Scenario | Tool |
-|----------|------|
-| New page or component from scratch | `mcp__gemini-design-mcp__create_frontend` |
-| Redesign / update existing component | `mcp__gemini-design-mcp__modify_frontend` |
+| Scenario                                  | Tool                                       |
+| ----------------------------------------- | ------------------------------------------ |
+| New page or component from scratch        | `mcp__gemini-design-mcp__create_frontend`  |
+| Redesign / update existing component      | `mcp__gemini-design-mcp__modify_frontend`  |
 | Add a section or snippet to existing page | `mcp__gemini-design-mcp__snippet_frontend` |
 
 ### Step 4: Mandatory Parameters
@@ -70,12 +71,14 @@ techStack: "Angular 15 + TypeScript + Bootstrap 4 + SCSS + ng-bootstrap"
 If the Gemini call fails, **do NOT retry**. Proceed with manual coding.
 
 **Failure conditions (any of these):**
+
 - Error response containing: "token", "limit", "rate", "quota", "unavailable"
 - Empty response or response shorter than 50 characters
 - Response is predominantly JSX (multiple `className=`, `onClick={`, `.map(`)
 - ToolSearch returns no matching tools (Gemini MCP not configured)
 
 **Fallback procedure:**
+
 1. Log: "Gemini Design MCP was attempted but unavailable; falling back to manual coding."
 2. Use `.claude/patterns/frontend-patterns.md` for code patterns
 3. Reference design tokens from `design-system.md` or project docs
@@ -87,19 +90,20 @@ If the Gemini call fails, **do NOT retry**. Proceed with manual coding.
 
 **JSX-to-Angular conversion table — fix any leakage:**
 
-| JSX Pattern | Angular Replacement |
-|-------------|-------------------|
-| `className="..."` | `class="..."` |
-| `onClick={...}` | `(click)="..."` |
-| `onChange={...}` | `(change)="..."` |
-| `{condition && <div>}` | `<div *ngIf="condition">` |
-| `{items.map(item => ...)}` | `<div *ngFor="let item of items">` |
-| `style={{ color: 'red' }}` | `[ngStyle]="{ color: 'red' }"` or inline style |
-| `{variable}` (interpolation) | `{{ variable }}` |
-| `htmlFor="..."` | `for="..."` |
-| Self-closing `<div />` | `<div></div>` |
+| JSX Pattern                  | Angular Replacement                            |
+| ---------------------------- | ---------------------------------------------- |
+| `className="..."`            | `class="..."`                                  |
+| `onClick={...}`              | `(click)="..."`                                |
+| `onChange={...}`             | `(change)="..."`                               |
+| `{condition && <div>}`       | `<div *ngIf="condition">`                      |
+| `{items.map(item => ...)}`   | `<div *ngFor="let item of items">`             |
+| `style={{ color: 'red' }}`   | `[ngStyle]="{ color: 'red' }"` or inline style |
+| `{variable}` (interpolation) | `{{ variable }}`                               |
+| `htmlFor="..."`              | `for="..."`                                    |
+| Self-closing `<div />`       | `<div></div>`                                  |
 
 **Hardcoded color replacement:**
+
 - Replace any hardcoded hex color values with project CSS custom properties (e.g., `--vd-*` tokens or Bootstrap variables) where a matching token exists.
 
 ## Browser Verification & Debugging Hierarchy
@@ -110,28 +114,28 @@ After generating or fixing code via Gemini (Tier 1), you may need to verify resu
 
 Load via `ToolSearch: "chrome-devtools"` before use.
 
-| Tool | Purpose |
-|------|---------|
-| `mcp__chrome-devtools__take_snapshot` | Capture page DOM / accessibility tree |
-| `mcp__chrome-devtools__take_screenshot` | Visual screenshot of the page |
-| `mcp__chrome-devtools__list_console_messages` | Check for JS runtime errors |
-| `mcp__chrome-devtools__evaluate_script` | Run JS to inspect computed styles or state |
-| `mcp__chrome-devtools__navigate_page` | Navigate to a URL |
-| `mcp__chrome-devtools__resize_page` | Test responsive breakpoints |
+| Tool                                          | Purpose                                    |
+| --------------------------------------------- | ------------------------------------------ |
+| `mcp__chrome-devtools__take_snapshot`         | Capture page DOM / accessibility tree      |
+| `mcp__chrome-devtools__take_screenshot`       | Visual screenshot of the page              |
+| `mcp__chrome-devtools__list_console_messages` | Check for JS runtime errors                |
+| `mcp__chrome-devtools__evaluate_script`       | Run JS to inspect computed styles or state |
+| `mcp__chrome-devtools__navigate_page`         | Navigate to a URL                          |
+| `mcp__chrome-devtools__resize_page`           | Test responsive breakpoints                |
 
 ### Tier 3: Playwright MCP (Last Resort — When Chrome DevTools Is Unavailable)
 
 Load via `ToolSearch: "+playwright browser"` before use.
 
-| Playwright Tool | Equivalent Chrome DevTools Tool |
-|-----------------|--------------------------------|
-| `mcp__plugin_playwright_playwright__browser_snapshot` | `take_snapshot` |
-| `mcp__plugin_playwright_playwright__browser_take_screenshot` | `take_screenshot` |
-| `mcp__plugin_playwright_playwright__browser_console_messages` | `list_console_messages` |
-| `mcp__plugin_playwright_playwright__browser_network_requests` | `list_network_requests` |
-| `mcp__plugin_playwright_playwright__browser_click` | (interaction — Tier 3 only) |
-| `mcp__plugin_playwright_playwright__browser_type` | (interaction — Tier 3 only) |
-| `mcp__plugin_playwright_playwright__browser_navigate` | `navigate_page` |
+| Playwright Tool                                               | Equivalent Chrome DevTools Tool |
+| ------------------------------------------------------------- | ------------------------------- |
+| `mcp__plugin_playwright_playwright__browser_snapshot`         | `take_snapshot`                 |
+| `mcp__plugin_playwright_playwright__browser_take_screenshot`  | `take_screenshot`               |
+| `mcp__plugin_playwright_playwright__browser_console_messages` | `list_console_messages`         |
+| `mcp__plugin_playwright_playwright__browser_network_requests` | `list_network_requests`         |
+| `mcp__plugin_playwright_playwright__browser_click`            | (interaction — Tier 3 only)     |
+| `mcp__plugin_playwright_playwright__browser_type`             | (interaction — Tier 3 only)     |
+| `mcp__plugin_playwright_playwright__browser_navigate`         | `navigate_page`                 |
 
 **Fallback condition:** If Chrome DevTools tools are not available (ToolSearch returns no results for "chrome-devtools"), fall back to the equivalent Playwright tools listed above.
 
@@ -139,16 +143,16 @@ Load via `ToolSearch: "+playwright browser"` before use.
 
 ## Tool Selection by Task Type
 
-| Task | Tier 1: Gemini | Tier 2: Chrome DevTools | Tier 3: Playwright |
-|------|----------------|-------------------------|---------------------|
-| **Generate HTML/SCSS** | `create_frontend` / `snippet_frontend` | — | — |
-| **Fix/redesign markup** | `modify_frontend` | — | — |
-| **Verify rendered output** | — | `take_snapshot`, `take_screenshot` | `browser_snapshot`, `browser_take_screenshot` |
-| **Debug console errors** | — | `list_console_messages` | `browser_console_messages` |
-| **Inspect network calls** | — | `list_network_requests` | `browser_network_requests` |
-| **Test responsive layout** | — | `resize_page` + `take_snapshot` | `browser_resize` + `browser_snapshot` |
-| **Click/type interaction** | — | — | `browser_click`, `browser_type` |
-| **Navigate to page** | — | `navigate_page` | `browser_navigate` |
+| Task                       | Tier 1: Gemini                         | Tier 2: Chrome DevTools            | Tier 3: Playwright                            |
+| -------------------------- | -------------------------------------- | ---------------------------------- | --------------------------------------------- |
+| **Generate HTML/SCSS**     | `create_frontend` / `snippet_frontend` | —                                  | —                                             |
+| **Fix/redesign markup**    | `modify_frontend`                      | —                                  | —                                             |
+| **Verify rendered output** | —                                      | `take_snapshot`, `take_screenshot` | `browser_snapshot`, `browser_take_screenshot` |
+| **Debug console errors**   | —                                      | `list_console_messages`            | `browser_console_messages`                    |
+| **Inspect network calls**  | —                                      | `list_network_requests`            | `browser_network_requests`                    |
+| **Test responsive layout** | —                                      | `resize_page` + `take_snapshot`    | `browser_resize` + `browser_snapshot`         |
+| **Click/type interaction** | —                                      | —                                  | `browser_click`, `browser_type`               |
+| **Navigate to page**       | —                                      | `navigate_page`                    | `browser_navigate`                            |
 
 ---
 

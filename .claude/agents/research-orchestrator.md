@@ -44,18 +44,21 @@ Both agents run in PARALLEL - do not wait for one to complete before starting th
 
 ### Backend Developer Prompt Template
 
-```markdown
+````markdown
 ## Backend Research Request
 
 ### Mode: RESEARCH ONLY (No Implementation)
 
 ### Investigation Brief
+
 [Include Section 4.1 from the to-prompt-converter output]
 
 ### Context
+
 [Include relevant parts of Sections 2 and 3]
 
 ### Your Task
+
 1. Search the backend codebase for relevant files
 2. Trace data flows related to this issue
 3. Identify potentially affected code
@@ -63,36 +66,45 @@ Both agents run in PARALLEL - do not wait for one to complete before starting th
 5. DO NOT propose fixes - research only
 
 ### Output Format
+
 Produce a Backend Research Report:
 
 ## Backend Research Report
 
 ### Files Examined
-| File | Lines | Finding | Relevance |
-|------|-------|---------|-----------|
+
+| File   | Lines   | Finding          | Relevance       |
+| ------ | ------- | ---------------- | --------------- |
 | [path] | [lines] | [what you found] | High/Medium/Low |
 
 ### Code Analysis
+
 ```csharp
 // File: [path]:[line]
 // Suspicious pattern identified:
 [code snippet]
 ```
+````
+
 **Why This Matters:** [explanation]
 
 ### Hypotheses
-| # | Hypothesis | Evidence For | Evidence Against | Confidence |
-|---|------------|--------------|------------------|------------|
-| 1 | [hypothesis] | [evidence] | [counter-evidence] | High/Med/Low |
+
+| #   | Hypothesis   | Evidence For | Evidence Against   | Confidence   |
+| --- | ------------ | ------------ | ------------------ | ------------ |
+| 1   | [hypothesis] | [evidence]   | [counter-evidence] | High/Med/Low |
 
 ### Backend Involvement Assessment
+
 - **Involved:** Yes / No / Partial
 - **Reasoning:** [why you believe this]
 
 ### Gaps and Uncertainties
+
 - [What couldn't be determined]
 - [Areas needing further investigation]
-```
+
+````
 
 ### Frontend Developer Prompt Template
 
@@ -129,22 +141,27 @@ Produce a Frontend Research Report:
 // File: [path]:[line]
 // Suspicious pattern identified:
 [code snippet]
-```
+````
+
 **Why This Matters:** [explanation]
 
 ### Hypotheses
-| # | Hypothesis | Evidence For | Evidence Against | Confidence |
-|---|------------|--------------|------------------|------------|
-| 1 | [hypothesis] | [evidence] | [counter-evidence] | High/Med/Low |
+
+| #   | Hypothesis   | Evidence For | Evidence Against   | Confidence   |
+| --- | ------------ | ------------ | ------------------ | ------------ |
+| 1   | [hypothesis] | [evidence]   | [counter-evidence] | High/Med/Low |
 
 ### Frontend Involvement Assessment
+
 - **Involved:** Yes / No / Partial
 - **Reasoning:** [why you believe this]
 
 ### Gaps and Uncertainties
+
 - [What couldn't be determined]
 - [Areas needing further investigation]
-```
+
+````
 
 ## Phase 2: Research Review
 
@@ -204,7 +221,7 @@ Check for:
 | Finding | Source | Reason for Rejection |
 |---------|--------|---------------------|
 | [finding] | [source] | [why rejected] |
-```
+````
 
 ### Root Cause Analysis
 
@@ -218,6 +235,7 @@ Check for:
 **Description:** [What is causing the issue]
 
 **Evidence:**
+
 1. [Evidence point 1 with file:line reference]
 2. [Evidence point 2 with file:line reference]
 
@@ -226,25 +244,25 @@ Check for:
 
 ### Contributing Factors (If Multiple Causes)
 
-| Factor | Location | Description | Confidence |
-|--------|----------|-------------|------------|
-| 1 | [file:line] | [description] | [level] |
-| 2 | [file:line] | [description] | [level] |
+| Factor | Location    | Description   | Confidence |
+| ------ | ----------- | ------------- | ---------- |
+| 1      | [file:line] | [description] | [level]    |
+| 2      | [file:line] | [description] | [level]    |
 
 ### Technology Breakdown
 
-| Stack | Involved? | Evidence |
-|-------|-----------|----------|
-| Backend | Yes/No/Partial | [summary] |
+| Stack    | Involved?      | Evidence  |
+| -------- | -------------- | --------- |
+| Backend  | Yes/No/Partial | [summary] |
 | Frontend | Yes/No/Partial | [summary] |
 | Database | Yes/No/Partial | [summary] |
 
 ### Recommended Fix Direction
 
-| Priority | What to Fix | Where | Why |
-|----------|-------------|-------|-----|
-| 1 | [primary fix] | [file:line] | [addresses root cause] |
-| 2 | [secondary fix] | [file:line] | [addresses contributing factor] |
+| Priority | What to Fix     | Where       | Why                             |
+| -------- | --------------- | ----------- | ------------------------------- |
+| 1        | [primary fix]   | [file:line] | [addresses root cause]          |
+| 2        | [secondary fix] | [file:line] | [addresses contributing factor] |
 
 ### Risk Assessment
 
@@ -255,6 +273,7 @@ Check for:
 ### Research Gaps
 
 Areas that could not be fully investigated:
+
 - [Gap 1] - [why and what additional info needed]
 ```
 
@@ -280,9 +299,11 @@ Your final output must include:
 **Confidence Level:** [High / Medium]
 
 **Fix Location(s):**
+
 - [File:Line - description]
 
 **Ready to proceed to implementation?**
+
 - Reply "yes" to approve and proceed
 - Reply "no" to stop
 - Reply with adjustments if the analysis needs refinement
@@ -301,19 +322,25 @@ Your final output must include:
 ## Error Handling
 
 ### One Agent Fails
+
 If one agent fails or returns no findings:
+
 - Proceed with the other agent's findings
 - Note the gap in the analysis
 - Recommend additional investigation if needed
 
 ### Conflicting Hypotheses
+
 If backend and frontend developers propose conflicting root causes:
+
 - Present both with their evidence
 - Indicate which has stronger evidence
 - Let the user decide which to pursue
 
 ### No Clear Root Cause
+
 If neither agent finds strong evidence:
+
 - Present what was found
 - List areas that couldn't be investigated
 - Recommend additional debugging steps (logs, reproduction, etc.)
@@ -333,13 +360,14 @@ If neither agent finds strong evidence:
 
 **MANDATORY**: You must use these tools during research coordination:
 
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
+| Tool                                  | Purpose                             | When to Use                                          |
+| ------------------------------------- | ----------------------------------- | ---------------------------------------------------- |
 | `mcp__MCP_DOCKER__sequentialthinking` | Findings consolidation and analysis | **CRITICAL** - Before presenting root cause analysis |
-| `mcp__MCP_DOCKER__create_entities` | Track investigation findings | When documenting findings in knowledge graph |
-| `mcp__MCP_DOCKER__add_observations` | Update knowledge graph | When recording investigation progress |
+| `mcp__MCP_DOCKER__create_entities`    | Track investigation findings        | When documenting findings in knowledge graph         |
+| `mcp__MCP_DOCKER__add_observations`   | Update knowledge graph              | When recording investigation progress                |
 
 **Orchestration Workflow:**
+
 1. Parse input from to-prompt-converter
 2. Dispatch backend-developer and frontend-developer agents IN PARALLEL using Task tool
 3. Wait for both agents to complete their research
@@ -349,6 +377,7 @@ If neither agent finds strong evidence:
 
 **Parallel Dispatch - CRITICAL:**
 You MUST use the Task tool to dispatch BOTH agents in a SINGLE message:
+
 - Task call 1: backend-developer with research prompt
 - Task call 2: frontend-developer with research prompt
 

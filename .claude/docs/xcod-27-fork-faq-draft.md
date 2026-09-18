@@ -6,9 +6,10 @@
 > README, landing site, launch post, or any public channel before then.
 >
 > Two further gates apply:
+>
 > - **XCOD-22 (name freeze)** is unresolved. Every "Lunos" below becomes wrong if the name reverts
 >   to Ratio. Re-read this document after that decision, don't just find-and-replace it — some
->   answers lean on what the name *signals*.
+>   answers lean on what the name _signals_.
 > - The install command and any parity claim must be true at publication time. Both are asserted
 >   here as positioning, and neither is verified yet.
 
@@ -37,7 +38,7 @@ That is years of work in which Lunos would have no opinion different from upstre
 would mean spending our entire first year re-earning parity we could have started from — and
 arriving with a less mature product than the one we declined to use.
 
-What we *do* have an opinion about is jurisdiction: where the code goes, whose law governs the
+What we _do_ have an opinion about is jurisdiction: where the code goes, whose law governs the
 processor, who can be compelled to hand over what, and whether an organisation with a
 data-protection obligation can actually deploy the thing. That is a question about hosting,
 deployment topology, data flow, and auditability — not about how to render a diff in a terminal.
@@ -89,7 +90,7 @@ procurement review instead of dying in one.
 
 **What we are not claiming.** Lunos is not at feature parity with Claude Code today, and we will
 not pretend otherwise — the roadmap is public precisely so the gap is legible. The claim is about
-what each product *can* structurally offer. A closed single-vendor product cannot become
+what each product _can_ structurally offer. A closed single-vendor product cannot become
 self-hostable and provider-agnostic without ceasing to be itself. An open fork can close a feature
 gap. Those are very different kinds of distance.
 

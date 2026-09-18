@@ -13,15 +13,15 @@ The standard format for any artifact an agent writes to `.agent-workspace/{run}/
 
 ```yaml
 ---
-agent: {agent-name}
-workflow: {feature|bug-fix|quick-bugfix}
-step: {step-number}
-status: {completed|partial|blocked}
-timestamp: {ISO-8601}
+agent: { agent-name }
+workflow: { feature|bug-fix|quick-bugfix }
+step: { step-number }
+status: { completed|partial|blocked }
+timestamp: { ISO-8601 }
 files_changed: [list of file paths]
 depends_on: [artifact names this agent consumed]
 produces: [artifact names this output represents]
-confidence: {high|medium|low}
+confidence: { high|medium|low }
 ---
 ```
 
@@ -29,31 +29,36 @@ confidence: {high|medium|low}
 
 ```markdown
 ## Summary
+
 [1–2 sentences on what was accomplished]
 
 ## Changes Made
-| File | Change Type | Description |
-|------|-------------|-------------|
+
+| File      | Change Type              | Description       |
+| --------- | ------------------------ | ----------------- |
 | path/file | created/modified/deleted | Brief description |
 
 ## Key Decisions
+
 - [Decision and rationale]
 
 ## Issues & Concerns
-- [Issue: description + severity]  (or "None")
+
+- [Issue: description + severity] (or "None")
 
 ## Handoff Notes
+
 [What downstream agents need to continue]
 ```
 
 ## Role-specific sections (optional, after the required ones)
 
-| Role | Add |
-|------|-----|
-| Developers | `## Build Status`, `## Contract Compliance` |
-| Reviewers | `## Findings`, `## Verdict` (APPROVED / CHANGES REQUESTED / NEEDS FIXES) |
-| Investigators | `## Root Cause Hypothesis`, `## Evidence` |
-| Team Lead | `## Contract Specification`, `## Task Assignments` |
+| Role          | Add                                                                      |
+| ------------- | ------------------------------------------------------------------------ |
+| Developers    | `## Build Status`, `## Contract Compliance`                              |
+| Reviewers     | `## Findings`, `## Verdict` (APPROVED / CHANGES REQUESTED / NEEDS FIXES) |
+| Investigators | `## Root Cause Hypothesis`, `## Evidence`                                |
+| Team Lead     | `## Contract Specification`, `## Task Assignments`                       |
 
 ## Common Mistakes
 

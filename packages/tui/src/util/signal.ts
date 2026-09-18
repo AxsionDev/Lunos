@@ -16,7 +16,10 @@ export function createDebouncedSignal<T>(value: T, ms: number): [Accessor<T>, (v
   return [get, debounced]
 }
 
-export function createPulse(enabled: Accessor<boolean>, options: { min?: number; max?: number; periodMs?: number } = {}) {
+export function createPulse(
+  enabled: Accessor<boolean>,
+  options: { min?: number; max?: number; periodMs?: number } = {},
+) {
   const { min = 0.4, max = 0.95, periodMs = 2600 } = options
   const mid = (min + max) / 2
   const [alpha, setAlpha] = createSignal(mid)

@@ -935,8 +935,7 @@ export const dict = {
   "settings.general.row.appearance.title": "Vzhľad",
   "settings.general.row.appearance.description": "Prispôsobte vzhľad Lunos na svojom zariadení",
   "settings.general.row.colorScheme.title": "Farebná schéma",
-  "settings.general.row.colorScheme.description":
-    "Vyberte, či má Lunos nasledovať systémovú, svetlú alebo tmavú tému",
+  "settings.general.row.colorScheme.description": "Vyberte, či má Lunos nasledovať systémovú, svetlú alebo tmavú tému",
   "settings.general.row.theme.title": "Téma",
   "settings.general.row.theme.description": "Prispôsobte tému Lunos.",
   "settings.general.row.font.title": "Písmo kódu",

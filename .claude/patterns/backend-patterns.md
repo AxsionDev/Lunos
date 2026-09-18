@@ -42,9 +42,10 @@ export class LocationMiddleware extends HttpApiMiddleware.Service<LocationMiddle
 
 ```ts
 // packages/server/src/routes.ts
-return HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
+return HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" })
+  .pipe
   // ...
-)
+  ()
 ```
 
 ## Dependency Direction (enforced)
@@ -56,6 +57,7 @@ Schema → Core/Protocol → Server. Client runtime code may depend on Schema an
 After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Never hand-edit `src/generated` or `src/generated-effect`.
 
 ## Build & Test
+
 - Typecheck: `cd packages/server && bun typecheck` (never `tsc` directly)
 - Test: `cd packages/opencode && bun test` — root `test` script is a deliberate guard and will exit 1
 - Full-repo typecheck: `bun run typecheck` (root → `bun turbo typecheck`)

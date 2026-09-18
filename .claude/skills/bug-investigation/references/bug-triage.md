@@ -21,25 +21,32 @@ Frontend equivalents: Rendering/Visual · State/Data binding · Routing · Forms
 ## Bug Analysis Report
 
 ### Classification
+
 - **Type / Severity / Affected Layer / Root Cause Layer**
 
 ### Symptoms
+
 - [≥2 observable behaviors: error code, message, wrong data]
 
 ### Likely Affected Areas
+
 | Priority | File/Service | Reason |
 
 ### Data Flow Trace
+
 Request → Controller/Component → Service → Repository/API → Store → Response
 
 ### Investigation Paths
+
 1. Check `file:line` · Look for [pattern] · Debug [logs/breakpoint/profiler]
 2. ...
 
 ### Reproduction Context
+
 - Entry point · Required state (data/auth) · Expected vs Actual · Frequency
 
 ### Debugging Tools
+
 - [ ] Logs · [ ] Stack trace · [ ] DB/EF logging · [ ] `mcp__ide__getDiagnostics`
 ```
 

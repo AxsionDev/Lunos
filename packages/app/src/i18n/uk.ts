@@ -726,8 +726,7 @@ export const dict = {
   "error.chain.didYouMean": "Можливо, ви мали на увазі: {{suggestions}}",
   "error.chain.modelNotFound": "Модель не знайдено: {{provider}}/{{model}}",
   "error.chain.checkConfig": "Перевірте назви провайдерів/моделей у конфігурації (opencode.json)",
-  "error.chain.mcpFailed":
-    'Сервер MCP "{{name}}" не працює. Зверніть увагу, Lunos ще не підтримує автентифікацію MCP.',
+  "error.chain.mcpFailed": 'Сервер MCP "{{name}}" не працює. Зверніть увагу, Lunos ще не підтримує автентифікацію MCP.',
   "error.chain.providerAuthFailed": "Автентифікація провайдера не вдалася ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
     'Не вдалося ініціалізувати провайдера "{{provider}}". Перевірте облікові дані та конфігурацію.',

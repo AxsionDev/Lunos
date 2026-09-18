@@ -7,11 +7,13 @@ Execute a rapid bug fix for: $ARGUMENTS
 This is a streamlined workflow for **small, known issues** where the problem is already understood. It uses rapid Alpha/Beta validation to confirm the fix direction before implementation.
 
 **Use this when:**
+
 - You already know what the bug is
 - The issue is small/localized (1-3 files)
 - You have a clear hypothesis or fix in mind
 
 **Use `/bug-fix` instead when:**
+
 - Issue is vague or unclear
 - Root cause is unknown
 - Multiple systems/layers are affected
@@ -20,7 +22,7 @@ This is a streamlined workflow for **small, known issues** where the problem is 
 
 ## Pre-flight: Worktree Reset (FIRST — before any action)
 
-Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. *(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)* If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. (When invoked from `/batch-bugfix`, the worktree already exists and is reused — it is not reset per bug.)
+Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. _(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)_ If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. (When invoked from `/batch-bugfix`, the worktree already exists and is reused — it is not reset per bug.)
 
 ---
 
@@ -41,6 +43,7 @@ Before any investigation begins, ensure session state is properly initialized.
 ### Resume Check
 
 If user indicates resuming a previous investigation:
+
 - Run `/state-resume` to load previous context
 - Display previous session summary
 - Ask user where to continue from
@@ -60,6 +63,7 @@ Rapidly detect project type and prepare environment for verification.
 ### Start Commands Discovery
 
 Check (in order):
+
 1. `.claude/docs/project-start.md` (if exists, use it)
 2. `package.json` scripts → look for `start`, `dev`, `serve`
 3. `.csproj` files → use `dotnet run` (or see PROJECT_STARTUP.md)
@@ -101,14 +105,17 @@ Perform a quick dual-perspective validation using the bug-investigator agents IN
 ### Launch Parallel Analysis
 
 > **Workspace Enhancement:** Alpha and Beta agents can write findings to `.agent-workspace/quick-bugfix-{timestamp}/outputs/` for the consolidation step to read structured artifacts instead of parsing prose. Create the workspace directory before launching agents:
+>
 > ```bash
 > mkdir -p .agent-workspace/quick-bugfix-$(date +%Y%m%d-%H%M%S)/outputs
 > ```
+>
 > Pass the workspace path to both agents. If Alpha finishes first, Beta can read Alpha's structured output from the workspace for better-informed counter-analysis.
 
 Use the Task tool to launch BOTH agents in a SINGLE message (parallel execution):
 
 **Alpha Task** (`subagent_type="bug-investigator-alpha"`):
+
 ```
 ## Quick Analysis Request
 
@@ -131,6 +138,7 @@ Output a brief report:
 ```
 
 **Beta Task** (`subagent_type="bug-investigator-beta"`):
+
 ```
 ## Quick Validation Request
 
@@ -165,6 +173,7 @@ After both agents complete, present the combined findings:
 **Fix Approach:** [Brief description of the change]
 
 ### Alpha/Beta Consensus
+
 - **Alpha says:** [brief finding]
 - **Beta says:** [brief finding]
 - **Verdict:** AGREE / DISAGREE
@@ -172,6 +181,7 @@ After both agents complete, present the combined findings:
 [If DISAGREE: Present both perspectives for user decision]
 
 ### Risk Assessment
+
 - **Risk Level:** LOW / MEDIUM
 - **Files Affected:** [count]
 - **Estimated Impact:** [scope description]
@@ -207,6 +217,7 @@ Before implementing any fix, capture the broken state as evidence:
 
 ```markdown
 ## Pre-Fix Baseline
+
 - **Screenshot:** bug-pre-fix-baseline.png
 - **Bug reproduced:** Yes / No / Partial
 - **Console errors:** [list or "none"]
@@ -267,11 +278,11 @@ After implementation, verify and summarize:
 
 For frontend HTML/SCSS bugs, follow this priority order:
 
-| Tier | Tool | Load Via | Use For |
-|------|------|----------|---------|
-| **1 (Primary)** | Gemini Design MCP | `ToolSearch: "gemini-design"` | Fix/regenerate HTML, SCSS, visual markup before verification |
-| **2 (Fallback)** | Chrome DevTools MCP | `ToolSearch: "chrome-devtools"` | Browser verification, DOM inspection, screenshots |
-| **3 (Last Resort)** | Playwright MCP | `ToolSearch: "+playwright browser"` | Full browser interaction when Chrome DevTools is unavailable |
+| Tier                | Tool                | Load Via                            | Use For                                                      |
+| ------------------- | ------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| **1 (Primary)**     | Gemini Design MCP   | `ToolSearch: "gemini-design"`       | Fix/regenerate HTML, SCSS, visual markup before verification |
+| **2 (Fallback)**    | Chrome DevTools MCP | `ToolSearch: "chrome-devtools"`     | Browser verification, DOM inspection, screenshots            |
+| **3 (Last Resort)** | Playwright MCP      | `ToolSearch: "+playwright browser"` | Full browser interaction when Chrome DevTools is unavailable |
 
 **Escalation:** Try Tier 1 first. If Gemini fails or doesn't apply → use Tier 2. If Chrome DevTools is unavailable → fall back to Tier 3.
 
@@ -284,12 +295,14 @@ See `.claude/agents/_gemini-design-hook.md` for the full protocol.
 #### Quick Browser Test Protocol
 
 1. **Navigate to application:**
+
    ```
    Use mcp__chrome-devtools__navigate_page
    URL: Use frontend URL from PROJECT_STARTUP.md (or detected URL)
    ```
 
 2. **Take snapshot for element references:**
+
    ```
    Use mcp__chrome-devtools__take_snapshot
    ```
@@ -330,17 +343,21 @@ C) Skip browser verification"
 ## Quick Fix Complete
 
 ### Original Issue
+
 $ARGUMENTS
 
 ### Root Cause
+
 [What was causing the bug]
 
 ### Fix Applied
-| File | Line | Change |
-|------|------|--------|
+
+| File   | Line   | Change              |
+| ------ | ------ | ------------------- |
 | [file] | [line] | [brief description] |
 
 ### Verification
+
 - **Build:** PASS / FAIL
 - **Tests:** PASS / FAIL / SKIPPED (no tests in affected area)
 - **Browser:** VERIFIED / PARTIAL / SKIPPED
@@ -349,6 +366,7 @@ $ARGUMENTS
   - Before/After Comparison: [Summary of changes]
 
 ### Manual Test Recommendation
+
 [Specific scenario to verify the fix works]
 ```
 
@@ -376,6 +394,7 @@ Finalize the quick bugfix session for state persistence and future reference.
 ### Log Completion to Session State
 
 Update session state with completion:
+
 - Mark session status as "completed"
 - Log bug fix decision to decisions.yaml
 - Record files modified
@@ -383,6 +402,7 @@ Update session state with completion:
 ### Display Session Summary
 
 Run `/session-status` to display:
+
 - Session duration
 - Investigation phases completed
 - Files analyzed and modified
@@ -392,33 +412,33 @@ Run `/session-status` to display:
 
 ## Error Handling
 
-| Situation | Action |
-|-----------|--------|
-| **Alpha/Beta disagree** | Present both perspectives, let user decide |
-| **Hypothesis was wrong** | Ask: "Root cause not confirmed. Escalate to /bug-fix? (yes/no)" |
-| **Larger scope discovered** | Ask: "Issue is bigger than expected. Continue or escalate to /bug-fix?" |
-| **Build fails** | Show error, fix compilation issue, re-verify |
-| **Tests fail** | Show failures, ask user how to proceed |
-| **Server won't start** | Check port conflicts, show error, ask user to resolve |
-| **Browser can't connect** | Verify server is running, check URL, retry or skip browser test |
-| **Can't navigate to bug location** | Use Guided Navigation Mode, ask user for help |
-| **Browser verification inconclusive** | Note in summary, recommend manual testing |
+| Situation                             | Action                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| **Alpha/Beta disagree**               | Present both perspectives, let user decide                              |
+| **Hypothesis was wrong**              | Ask: "Root cause not confirmed. Escalate to /bug-fix? (yes/no)"         |
+| **Larger scope discovered**           | Ask: "Issue is bigger than expected. Continue or escalate to /bug-fix?" |
+| **Build fails**                       | Show error, fix compilation issue, re-verify                            |
+| **Tests fail**                        | Show failures, ask user how to proceed                                  |
+| **Server won't start**                | Check port conflicts, show error, ask user to resolve                   |
+| **Browser can't connect**             | Verify server is running, check URL, retry or skip browser test         |
+| **Can't navigate to bug location**    | Use Guided Navigation Mode, ask user for help                           |
+| **Browser verification inconclusive** | Note in summary, recommend manual testing                               |
 
 ---
 
 ## Comparison: /quick-bugfix vs /bug-fix
 
-| Aspect | /quick-bugfix | /bug-fix |
-|--------|---------------|----------|
-| **Steps** | 5 (Pre-Step + Steps 0-4) | 9 (Pre-Step + Steps 0-8) |
-| **Approval gates** | 1 | 4 |
-| **Session tracking** | Full (same as /bug-fix) | Full |
-| **Project detection** | Quick scan | Full detection + doc generation |
-| **Clarification** | Skip (user knows issue) | Full dialogue |
-| **Investigation** | Rapid Alpha/Beta (parallel) | Sequential with prompt conversion |
-| **Browser testing** | Integrated in verification | Dedicated step with screenshots |
-| **Code review** | Skip | Full review |
-| **Session closure** | Yes (compact + handoff) | Yes (compact + handoff) |
-| **Best for** | Known, small issues | Unknown, complex issues |
+| Aspect                | /quick-bugfix               | /bug-fix                          |
+| --------------------- | --------------------------- | --------------------------------- |
+| **Steps**             | 5 (Pre-Step + Steps 0-4)    | 9 (Pre-Step + Steps 0-8)          |
+| **Approval gates**    | 1                           | 4                                 |
+| **Session tracking**  | Full (same as /bug-fix)     | Full                              |
+| **Project detection** | Quick scan                  | Full detection + doc generation   |
+| **Clarification**     | Skip (user knows issue)     | Full dialogue                     |
+| **Investigation**     | Rapid Alpha/Beta (parallel) | Sequential with prompt conversion |
+| **Browser testing**   | Integrated in verification  | Dedicated step with screenshots   |
+| **Code review**       | Skip                        | Full review                       |
+| **Session closure**   | Yes (compact + handoff)     | Yes (compact + handoff)           |
+| **Best for**          | Known, small issues         | Unknown, complex issues           |
 
 > **Memory**: Agents should consult and update their `.claude/agent-memory/` between sessions.

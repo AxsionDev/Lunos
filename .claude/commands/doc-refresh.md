@@ -22,6 +22,7 @@ This phase closes the documentation feedback loop — what you document now beco
 Read `.claude/docs/{feature-name}.md` and update with implementation reality:
 
 **Sections to update:**
+
 1. **File Structure** - Add all new files created during implementation
 2. **Entry Points** - Update with actual controllers, components, services
 3. **Dependencies** - Add any new dependencies introduced
@@ -32,6 +33,7 @@ Read `.claude/docs/{feature-name}.md` and update with implementation reality:
 8. **Testing** - Update test file locations and key test scenarios
 
 **Sections to add (if missing):**
+
 1. **Implementation Notes** - Decisions made, trade-offs chosen, known limitations
 2. **Troubleshooting Guide** - Common issues, how to debug, error messages
 3. **Extension Points** - Where to add future enhancements, hooks for customization
@@ -41,6 +43,7 @@ Read `.claude/docs/{feature-name}.md` and update with implementation reality:
 Compare implemented behavior against `.claude/docs/{feature-name}-user-journeys.md`:
 
 For each journey verify:
+
 - [ ] Trigger still accurate?
 - [ ] Steps match implementation?
 - [ ] Success path works as documented?
@@ -52,6 +55,7 @@ Update if any journey was modified, added, or descoped during implementation.
 ### Step 3: Update Stories with Completion Status
 
 Update `.claude/stories/{feature-name}.md`:
+
 - Mark each story status: Complete / Deferred / Descoped
 - Add implementation notes
 - Link to actual files created
@@ -94,6 +98,7 @@ $ARGUMENTS
 ### Step 5: Update Project-Wide Documentation
 
 Check and update project-level documentation if applicable:
+
 - Backend reference docs (if new API endpoints)
 - Frontend reference docs (if new components)
 - Feature index (if exists)
@@ -106,38 +111,45 @@ Save to `.claude/docs/changelog/{feature-name}-{date}.md`:
 ```markdown
 ---
 type: implementation-record
-feature: {feature-name}
-completed: {YYYY-MM-DD}
+feature: { feature-name }
+completed: { YYYY-MM-DD }
 ---
 
 # Implementation: {Feature Name}
 
 ## Summary
+
 [2-3 sentence summary of what was built]
 
 ## Deliverables
-| Type | Item | Location |
-|------|------|----------|
-| [Controller/Service/Component/Migration] | [Name] | [path] |
+
+| Type                                     | Item   | Location |
+| ---------------------------------------- | ------ | -------- |
+| [Controller/Service/Component/Migration] | [Name] | [path]   |
 
 ## API Endpoints Added
+
 | Method | Endpoint | Purpose |
-|--------|----------|---------|
-| GET | /api/... | ... |
+| ------ | -------- | ------- |
+| GET    | /api/... | ...     |
 
 ## Database Changes
+
 [Tables/columns added or modified]
 
 ## Patterns Introduced
+
 [Any new patterns future developers should follow]
 
 ## Known Limitations
+
 [What this implementation doesn't do]
 ```
 
 ### Step 7: State Checkpoint
 
 Use the Task tool with `subagent_type="state-manager"`:
+
 ```
 ## Phase Checkpoint Request
 
@@ -163,6 +175,7 @@ Use the Task tool with `subagent_type="state-manager"`:
 ## Validation Gate
 
 **PASS if:**
+
 - [ ] Discovery doc updated with implementation details (file structure, entry points current)
 - [ ] User journeys verified against implementation (no stale journey steps)
 - [ ] Stories marked with completion status
@@ -171,6 +184,7 @@ Use the Task tool with `subagent_type="state-manager"`:
 - [ ] All file paths in docs exist in codebase
 
 **FAIL if:**
+
 - [ ] Discovery doc still reflects pre-implementation state
 - [ ] Changelog missing
 - [ ] File paths in docs reference non-existent files
@@ -181,11 +195,11 @@ Use the Task tool with `subagent_type="state-manager"`:
 
 ## Output
 
-| Artifact | Location |
-|----------|----------|
-| Updated discovery doc | `.claude/docs/{feature-name}.md` |
-| Verified user journeys | `.claude/docs/{feature-name}-user-journeys.md` |
-| Completed stories | `.claude/stories/{feature-name}.md` |
+| Artifact                 | Location                                          |
+| ------------------------ | ------------------------------------------------- |
+| Updated discovery doc    | `.claude/docs/{feature-name}.md`                  |
+| Verified user journeys   | `.claude/docs/{feature-name}-user-journeys.md`    |
+| Completed stories        | `.claude/stories/{feature-name}.md`               |
 | Implementation changelog | `.claude/docs/changelog/{feature-name}-{date}.md` |
 
 ---
@@ -196,14 +210,16 @@ Use the Task tool with `subagent_type="state-manager"`:
 ## Phase 5 Complete: Documentation Refresh
 
 ### Documentation Updated
-| Document | Status | Changes |
-|----------|--------|---------|
-| Discovery Doc | Updated | +[N] sections, [N] files added |
-| User Journeys | Verified | [N] journeys confirmed |
-| Stories | Completed | [N] marked complete |
-| Changelog | Created | Implementation record added |
+
+| Document      | Status    | Changes                        |
+| ------------- | --------- | ------------------------------ |
+| Discovery Doc | Updated   | +[N] sections, [N] files added |
+| User Journeys | Verified  | [N] journeys confirmed         |
+| Stories       | Completed | [N] marked complete            |
+| Changelog     | Created   | Implementation record added    |
 
 ### AI Agent Discoverability
+
 - [ ] Quick Start section added
 - [ ] Troubleshooting guide added
 - [ ] Extension points documented

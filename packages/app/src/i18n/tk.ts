@@ -932,8 +932,7 @@ export const dict = {
   "settings.general.row.appearance.title": "Daş görnüşi",
   "settings.general.row.appearance.description": "Lunos enjamyňyzda nähili görünýändigini düzüň",
   "settings.general.row.colorScheme.title": "Reňk shemasy",
-  "settings.general.row.colorScheme.description":
-    "Lunos ulgamy, ýagtylygy ýa-da garaňky temany yzarlaýandygyny saýlaň",
+  "settings.general.row.colorScheme.description": "Lunos ulgamy, ýagtylygy ýa-da garaňky temany yzarlaýandygyny saýlaň",
   "settings.general.row.theme.title": "Mowzuk",
   "settings.general.row.theme.description": "Lunos-iň mowzuklydygyny düzüň.",
   "settings.general.row.font.title": "Kod şrifti",

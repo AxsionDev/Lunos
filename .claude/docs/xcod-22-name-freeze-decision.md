@@ -21,11 +21,11 @@ Checked 2026-09-18. Marketing clearance was the explicit deciding lens, per the 
 
 **npm availability** — decisive, and the opposite of what the ticket assumed:
 
-| Package | Lunos | Ratio |
-|---|---|---|
-| bare name | `lunos` **available** | `ratio` **TAKEN** (v0.0.1) |
-| `-ai` suffix (upstream's `opencode-ai` convention) | `lunos-ai` available | `ratio-ai` available |
-| `-code` suffix | `lunos-code` available | `ratio-code` available |
+| Package                                            | Lunos                  | Ratio                      |
+| -------------------------------------------------- | ---------------------- | -------------------------- |
+| bare name                                          | `lunos` **available**  | `ratio` **TAKEN** (v0.0.1) |
+| `-ai` suffix (upstream's `opencode-ai` convention) | `lunos-ai` available   | `ratio-ai` available       |
+| `-code` suffix                                     | `lunos-code` available | `ratio-code` available     |
 
 **Domains** — measured by DNS A-record resolution:
 
@@ -37,7 +37,7 @@ Checked 2026-09-18. Marketing clearance was the explicit deciding lens, per the 
 was therefore dropped as a deciding factor. Either name requires a qualified launch domain.
 
 **Search confusability** — the axis that actually separates them, and where the ticket's intuition
-inverted the truth. The ticket treated collision risk as *counting competitors*, which favours
+inverted the truth. The ticket treated collision risk as _counting competitors_, which favours
 Ratio. But "ratio" is an ordinary English word and a core mathematical term: "ratio AI coding
 agent" competes against every use of the word and is effectively un-rankable. "Lunos" is a rare
 coined token whose collisions — `lunos.ai`, `lunosrouter.com`, `lunos.de` — are a **finite,
@@ -82,9 +82,9 @@ org availability (XCOD-28), and social handles (XCOD-26).
 
 ## Downstream status after this freeze
 
-| Story | Gate removed | Still blocked by |
-|---|---|---|
-| XCOD-23 README rebrand | ✅ | terminal GIF/screenshot; parity table source doc missing |
-| XCOD-25 landing site | ✅ | email-capture service account (note: `lunos-web` repo already exists) |
-| XCOD-26 social handles | ✅ | account creation — human action |
-| XCOD-28 GitHub org rename | ✅ | org-level permissions; outward-facing, owner-executed |
+| Story                     | Gate removed | Still blocked by                                                      |
+| ------------------------- | ------------ | --------------------------------------------------------------------- |
+| XCOD-23 README rebrand    | ✅           | terminal GIF/screenshot; parity table source doc missing              |
+| XCOD-25 landing site      | ✅           | email-capture service account (note: `lunos-web` repo already exists) |
+| XCOD-26 social handles    | ✅           | account creation — human action                                       |
+| XCOD-28 GitHub org rename | ✅           | org-level permissions; outward-facing, owner-executed                 |

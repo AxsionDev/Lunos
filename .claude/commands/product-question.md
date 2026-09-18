@@ -8,7 +8,7 @@ Answer a product or customer question that needs code-level investigation, not j
 Step 1: Investigate  →  Step 2: Answer  →  Step 3: Classify  →  Step 4: Draft & Confirm  →  Step 5: Create Ticket
 ```
 
-The answer is always the primary deliverable. Ticket creation is a possible *consequence* of the investigation, not an alternative path — a single question can be answered AND reveal a bug, a missing feature, both, or neither.
+The answer is always the primary deliverable. Ticket creation is a possible _consequence_ of the investigation, not an alternative path — a single question can be answered AND reveal a bug, a missing feature, both, or neither.
 
 ## MCP Note
 
@@ -18,7 +18,7 @@ This command creates Jira issues, which `.claude/commands/_jira-protocol.md` (Pr
 
 ## Step 1: Investigate
 
-Invoke **`Skill(research-mode)`** to gather code evidence for the question. *(Fallback: read `.claude/skills/research-mode/SKILL.md` and follow it.)* This is read-only — no code changes.
+Invoke **`Skill(research-mode)`** to gather code evidence for the question. _(Fallback: read `.claude/skills/research-mode/SKILL.md` and follow it.)_ This is read-only — no code changes.
 
 1. Search the codebase (Glob/Grep) for the area the question touches.
 2. Trace the relevant flow (controller → service → repository, or component → service → API).
@@ -39,11 +39,11 @@ Always deliver this answer, regardless of what Step 3 concludes.
 
 Based on the investigation, classify what was found. More than one can apply — don't force a single exclusive bucket:
 
-| Classification | Signal |
-|---|---|
-| **Bug** | Code exists for this behavior, but it doesn't do what it's supposed to — contradicts documented/expected behavior, throws, or produces wrong output. |
-| **Missing feature** | No code exists for what's being asked; the capability genuinely isn't there. |
-| **Neither** | The question is answerable as-is — behavior is correct/by-design, or it's a pure business/process question with no code gap. |
+| Classification      | Signal                                                                                                                                               |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bug**             | Code exists for this behavior, but it doesn't do what it's supposed to — contradicts documented/expected behavior, throws, or produces wrong output. |
+| **Missing feature** | No code exists for what's being asked; the capability genuinely isn't there.                                                                         |
+| **Neither**         | The question is answerable as-is — behavior is correct/by-design, or it's a pure business/process question with no code gap.                         |
 
 If **neither**, stop here — no ticket needed.
 

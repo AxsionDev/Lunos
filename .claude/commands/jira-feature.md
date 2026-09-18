@@ -14,7 +14,7 @@ Jira Step 0: Setup & Fetch  →  Jira Step 1: Assess & Enrich  →  Jira Step 2:
 
 ## Pre-flight: Worktree Reset (FIRST — before any action)
 
-Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. *(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)* If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. (The wrapped `/feature-lifecycle` in Jira Step 2 will detect this worktree and reuse it rather than reset again.)
+Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. _(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)_ If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. (The wrapped `/feature-lifecycle` in Jira Step 2 will detect this worktree and reuse it rather than reset again.)
 
 ---
 
@@ -46,6 +46,7 @@ After fetching, check the ticket type:
 > "This ticket ({ticket.key}) is a **Bug**, not a Story/Feature. The `/jira-feature` workflow is optimized for feature development.
 >
 > Would you like to:
+>
 > 1. **Continue anyway** — Treat it as a feature implementation
 > 2. **Switch to `/jira-bug-fix`** — Use the bug fix workflow instead
 > 3. **Cancel** — Stop and reconsider"
@@ -62,13 +63,13 @@ Execute Protocol C from `.claude/commands/_jira-protocol.md` using the **Feature
 
 Evaluate the ticket against the feature checklist:
 
-| # | Criteria | Status |
-|---|----------|--------|
-| 1 | Business Context | ? |
-| 2 | Acceptance Criteria | ? |
-| 3 | User-Facing Scope | ? |
-| 4 | Technical Constraints | ? |
-| 5 | Out of Scope | ? |
+| #   | Criteria              | Status |
+| --- | --------------------- | ------ |
+| 1   | Business Context      | ?      |
+| 2   | Acceptance Criteria   | ?      |
+| 3   | User-Facing Scope     | ?      |
+| 4   | Technical Constraints | ?      |
+| 5   | Out of Scope          | ?      |
 
 ### Fill Gaps
 
@@ -87,6 +88,7 @@ Present the enriched feature description and ask:
 > "Feature details extracted from **{ticket.key}: {ticket.title}**
 >
 > **Summary:**
+>
 > - Business Context: {present/enriched}
 > - Acceptance Criteria: {N criteria identified}
 > - User-Facing Scope: {present/enriched}
@@ -144,11 +146,11 @@ Execute Protocol D from `.claude/commands/_jira-protocol.md` — but ONLY if the
 
 ### Decision Logic
 
-| Workflow Outcome | Jira Action |
-|------------------|-------------|
-| `completed` (all 5 phases) | Transition to "In Review" + add full summary comment |
-| `partial` (some phases done) | Offer optional progress comment (no transition) |
-| `failed` | No Jira updates |
+| Workflow Outcome             | Jira Action                                          |
+| ---------------------------- | ---------------------------------------------------- |
+| `completed` (all 5 phases)   | Transition to "In Review" + add full summary comment |
+| `partial` (some phases done) | Offer optional progress comment (no transition)      |
+| `failed`                     | No Jira updates                                      |
 
 ### If Completed
 
@@ -167,6 +169,7 @@ Ask the user:
 > "The feature lifecycle completed **{N} of 5 phases**. Would you like me to add a progress comment to {ticket.key}?
 >
 > The comment would include:
+>
 > - Phases completed: {list}
 > - Phase currently at: {current_phase}
 > - Artifacts produced so far
@@ -192,6 +195,7 @@ Also offer:
 ### Jira Connection Failures
 
 If Jira becomes unavailable mid-workflow:
+
 - Continue the feature lifecycle — don't block development over Jira connectivity
 - At the end, provide the comment text for manual posting
 
@@ -202,6 +206,7 @@ If the ticket is a Bug type, offer to switch to `/jira-bug-fix`. Don't force the
 ### Enrichment Stalls
 
 If the user can't provide missing information after 2 rounds:
+
 - Proceed with available information
 - Note gaps in the feature description
 - Phase 1 (Discovery) will uncover technical details organically
@@ -210,6 +215,7 @@ If the user can't provide missing information after 2 rounds:
 ### Phase Failures
 
 If a specific phase fails:
+
 - Don't block subsequent phases unless they depend on the failed phase's output
 - Log the failure for the Jira progress comment
 - The `/feature-lifecycle` workflow has its own error handling per phase
@@ -217,6 +223,7 @@ If a specific phase fails:
 ### Transition Failures
 
 If the "In Review" transition fails:
+
 - Show available transitions
 - Let the user choose or skip
 - Provide the comment text for manual posting

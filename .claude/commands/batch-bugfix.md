@@ -4,7 +4,7 @@ Orchestrate batch bug fixing from an unstructured markdown file: **$ARGUMENTS**
 
 ## Pre-flight: Worktree Reset (FIRST — before any action)
 
-Before processing any bugs, invoke **`Skill(worktree-preflight)`** once to reset into a clean task worktree for the whole batch. *(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)* If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. The per-bug `/quick-bugfix` and `/bug-fix` calls dispatched below will **detect this worktree and reuse it** — they do not reset between bugs, so each fix accumulates in the same worktree.
+Before processing any bugs, invoke **`Skill(worktree-preflight)`** once to reset into a clean task worktree for the whole batch. _(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)_ If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. The per-bug `/quick-bugfix` and `/bug-fix` calls dispatched below will **detect this worktree and reuse it** — they do not reset between bugs, so each fix accumulates in the same worktree.
 
 ---
 
@@ -13,15 +13,19 @@ Before processing any bugs, invoke **`Skill(worktree-preflight)`** once to reset
 This command takes a markdown file containing multiple bugs in a structured format and orchestrates their systematic fixing using the appropriate fix command for each bug's complexity.
 
 **Input Format Expected:**
+
 ```markdown
 ## bug#1: Login fails intermittently
+
 Users report that login sometimes fails with a 500 error.
 
 ## bug#2: Dashboard loading slow
+
 The dashboard takes 10+ seconds to load.
 ```
 
 **Command Selection:**
+
 - **Simple bugs** (1-3 files, clear fix) → `/quick-bugfix`
 - **Complex bugs** (multi-layer, unknown root cause) → `/bug-fix`
 
@@ -29,11 +33,11 @@ The dashboard takes 10+ seconds to load.
 
 Each individual bug dispatched via `/quick-bugfix` or `/bug-fix` inherits the **Gemini → ChromeDevTools → Playwright** three-tier hierarchy for frontend/UI work:
 
-| Tier | Tool | Use For |
-|------|------|---------|
-| **1 (Primary)** | Gemini Design MCP | Generate/fix HTML, SCSS, visual markup |
-| **2 (Fallback)** | Chrome DevTools MCP | Browser verification, DOM inspection, screenshots |
-| **3 (Last Resort)** | Playwright MCP | Full browser interaction when Chrome DevTools is unavailable |
+| Tier                | Tool                | Use For                                                      |
+| ------------------- | ------------------- | ------------------------------------------------------------ |
+| **1 (Primary)**     | Gemini Design MCP   | Generate/fix HTML, SCSS, visual markup                       |
+| **2 (Fallback)**    | Chrome DevTools MCP | Browser verification, DOM inspection, screenshots            |
+| **3 (Last Resort)** | Playwright MCP      | Full browser interaction when Chrome DevTools is unavailable |
 
 See `.claude/agents/_gemini-design-hook.md` for the full protocol.
 
@@ -43,15 +47,16 @@ See `.claude/agents/_gemini-design-hook.md` for the full protocol.
 
 ## Arguments
 
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `PATH` | Required | Path to markdown file containing bugs |
-| `--mode` | `manual` | `auto` = minimal gates, `manual` = confirm each bug |
-| `--max-retries` | `2` | Retry attempts per failed bug |
-| `--skip-verification` | `false` | Skip final verification pass |
-| `--start-from` | `1` | Resume from specific bug number |
+| Argument              | Default  | Description                                         |
+| --------------------- | -------- | --------------------------------------------------- |
+| `PATH`                | Required | Path to markdown file containing bugs               |
+| `--mode`              | `manual` | `auto` = minimal gates, `manual` = confirm each bug |
+| `--max-retries`       | `2`      | Retry attempts per failed bug                       |
+| `--skip-verification` | `false`  | Skip final verification pass                        |
+| `--start-from`        | `1`      | Resume from specific bug number                     |
 
 **Examples:**
+
 ```
 /batch-bugfix bugs.md
 /batch-bugfix bugs.md --mode auto
@@ -92,7 +97,7 @@ Create `.agent-state/sessions/{session-id}/batch-state.yaml`:
 ```yaml
 version: "1.0"
 source_file: "$ARGUMENTS"
-mode: "manual"  # or "auto"
+mode: "manual" # or "auto"
 max_retries: 2
 skip_verification: false
 start_from: 1
@@ -122,12 +127,13 @@ bug_registry: []
 #   verified_at: null
 
 current_bug_index: 0
-workflow_status: "initializing"  # initializing/structuring/awaiting_approval/fixing/verifying/complete
+workflow_status: "initializing" # initializing/structuring/awaiting_approval/fixing/verifying/complete
 ```
 
 ### Resume Check
 
 If `--start-from` is provided or user indicates resuming:
+
 1. Read existing `batch-state.yaml`
 2. Display previous progress summary
 3. Ask user to confirm resume from specified bug
@@ -149,6 +155,7 @@ Read and parse the markdown file from `$ARGUMENTS`.
 Extract bugs using regex pattern: `## bug#(\d+):\s*(.+)`
 
 For each match:
+
 1. Capture bug number
 2. Capture bug title
 3. Capture description (text until next `## bug#` or end of file)
@@ -161,11 +168,11 @@ For each match:
 **Source file:** $ARGUMENTS
 **Bugs found:** [N]
 
-| # | Title | Description (preview) |
-|---|-------|----------------------|
-| 1 | Login fails intermittently | Users report that login sometimes... |
-| 2 | Dashboard loading slow | The dashboard takes 10+ seconds... |
-| ... | ... | ... |
+| #   | Title                      | Description (preview)                |
+| --- | -------------------------- | ------------------------------------ |
+| 1   | Login fails intermittently | Users report that login sometimes... |
+| 2   | Dashboard loading slow     | The dashboard takes 10+ seconds...   |
+| ... | ...                        | ...                                  |
 
 Proceed to structure and prioritize these bugs? (yes/no)
 ```
@@ -250,30 +257,33 @@ Present the structured and prioritized bug queue for user review.
 ## Bug Queue Ready for Fixing
 
 ### Summary
-| Metric | Count |
-|--------|-------|
-| Total Bugs | [N] |
-| Critical | [N] |
-| High | [N] |
-| Medium | [N] |
-| Low | [N] |
+
+| Metric     | Count |
+| ---------- | ----- |
+| Total Bugs | [N]   |
+| Critical   | [N]   |
+| High       | [N]   |
+| Medium     | [N]   |
+| Low        | [N]   |
 
 ### Fix Command Distribution
-| Command | Count | Bugs |
-|---------|-------|------|
-| /quick-bugfix | [N] | BUG-001, BUG-003, ... |
-| /bug-fix | [N] | BUG-002, BUG-004, ... |
+
+| Command       | Count | Bugs                  |
+| ------------- | ----- | --------------------- |
+| /quick-bugfix | [N]   | BUG-001, BUG-003, ... |
+| /bug-fix      | [N]   | BUG-002, BUG-004, ... |
 
 ### Prioritized Bug Queue
 
-| Order | ID | Title | Severity | Complexity | Command |
-|-------|-----|-------|----------|------------|---------|
-| 1 | BUG-002 | API timeout on large requests | Critical | Complex | bug-fix |
-| 2 | BUG-001 | Login fails intermittently | High | Complex | bug-fix |
-| 3 | BUG-003 | Button alignment off | Low | Simple | quick-bugfix |
-| ... | ... | ... | ... | ... | ... |
+| Order | ID      | Title                         | Severity | Complexity | Command      |
+| ----- | ------- | ----------------------------- | -------- | ---------- | ------------ |
+| 1     | BUG-002 | API timeout on large requests | Critical | Complex    | bug-fix      |
+| 2     | BUG-001 | Login fails intermittently    | High     | Complex    | bug-fix      |
+| 3     | BUG-003 | Button alignment off          | Low      | Simple     | quick-bugfix |
+| ...   | ...     | ...                           | ...      | ...        | ...          |
 
 ### Dependencies
+
 - BUG-003 depends on BUG-001 (same authentication module)
 
 ---
@@ -281,6 +291,7 @@ Present the structured and prioritized bug queue for user review.
 **Mode:** [manual/auto]
 
 **Options:**
+
 1. **Start** - Begin fixing in the displayed order
 2. **Reorder** - Modify the priority order
 3. **Skip [ID]** - Skip specific bug(s)
@@ -332,6 +343,7 @@ If mode is `manual`:
 ---
 
 **Options:**
+
 1. **Fix** - Execute /[command] for this bug
 2. **Skip** - Skip this bug
 3. **Override** - Use different fix command
@@ -365,6 +377,7 @@ Use the Skill tool to invoke `/bug-fix`:
 After the fix command completes:
 
 **If successful:**
+
 ```yaml
 bug_registry[index]:
   status: "fixed"
@@ -377,6 +390,7 @@ bugs:
 ```
 
 **If failed:**
+
 ```yaml
 bug_registry[index]:
   attempts: [N+1]
@@ -386,6 +400,7 @@ bug_registry[index]:
 #### 4.4: Retry Logic
 
 If bug fix failed and `attempts < max_retries`:
+
 1. Log the failure reason
 2. Ask user (in manual mode): "Bug fix failed. Retry? (yes/skip/abort)"
 3. If retry, go back to 4.2
@@ -393,6 +408,7 @@ If bug fix failed and `attempts < max_retries`:
 5. If abort, pause workflow
 
 If `attempts >= max_retries`:
+
 ```yaml
 bug_registry[index]:
   status: "failed"
@@ -449,6 +465,7 @@ For each bug with status "fixed":
 3. **Update Status:**
 
 **If verified:**
+
 ```yaml
 bug_registry[index]:
   status: "verified"
@@ -460,6 +477,7 @@ bugs:
 ```
 
 **If verification failed:**
+
 ```yaml
 bug_registry[index]:
   status: "failed"
@@ -475,17 +493,18 @@ bugs:
 ```markdown
 ## Verification Results
 
-| Bug ID | Title | Verification | Result |
-|--------|-------|--------------|--------|
-| BUG-001 | Login fails... | Unit tests passed | VERIFIED |
-| BUG-002 | API timeout... | Integration test failed | FAILED |
-| BUG-003 | Button alignment | Manual check needed | PENDING |
+| Bug ID  | Title            | Verification            | Result   |
+| ------- | ---------------- | ----------------------- | -------- |
+| BUG-001 | Login fails...   | Unit tests passed       | VERIFIED |
+| BUG-002 | API timeout...   | Integration test failed | FAILED   |
+| BUG-003 | Button alignment | Manual check needed     | PENDING  |
 
 **Verified:** [N]
 **Failed Verification:** [N]
 **Manual Check Needed:** [N]
 
 Bugs requiring manual verification:
+
 - BUG-003: Check button alignment in browser at /settings page
 ```
 
@@ -501,47 +520,54 @@ Generate final report and cleanup.
 ## Batch Bugfix Complete
 
 ### Source
+
 **File:** $ARGUMENTS
 **Session ID:** [session-id]
 **Duration:** [start to end time]
 
 ### Results Summary
 
-| Status | Count | Bugs |
-|--------|-------|------|
-| Verified | [N] | BUG-001, BUG-003, ... |
-| Fixed (unverified) | [N] | BUG-005, ... |
-| Failed | [N] | BUG-002, ... |
-| Skipped | [N] | BUG-004, ... |
-| **Total** | **[N]** | |
+| Status             | Count   | Bugs                  |
+| ------------------ | ------- | --------------------- |
+| Verified           | [N]     | BUG-001, BUG-003, ... |
+| Fixed (unverified) | [N]     | BUG-005, ...          |
+| Failed             | [N]     | BUG-002, ...          |
+| Skipped            | [N]     | BUG-004, ...          |
+| **Total**          | **[N]** |                       |
 
 ### Success Rate
+
 [N] of [Total] bugs fixed ([X]%)
 
 ### Detailed Results
 
 #### Verified Fixes
-| Bug ID | Title | Fix Command | Attempts |
-|--------|-------|-------------|----------|
-| BUG-001 | Login fails... | /bug-fix | 1 |
-| ... | ... | ... | ... |
+
+| Bug ID  | Title          | Fix Command | Attempts |
+| ------- | -------------- | ----------- | -------- |
+| BUG-001 | Login fails... | /bug-fix    | 1        |
+| ...     | ...            | ...         | ...      |
 
 #### Failed Fixes
-| Bug ID | Title | Attempts | Last Error |
-|--------|-------|----------|------------|
-| BUG-002 | API timeout... | 3 | Build failed: ... |
-| ... | ... | ... | ... |
+
+| Bug ID  | Title          | Attempts | Last Error        |
+| ------- | -------------- | -------- | ----------------- |
+| BUG-002 | API timeout... | 3        | Build failed: ... |
+| ...     | ...            | ...      | ...               |
 
 #### Skipped Bugs
-| Bug ID | Title | Reason |
-|--------|-------|--------|
+
+| Bug ID  | Title      | Reason       |
+| ------- | ---------- | ------------ |
 | BUG-004 | Minor typo | User skipped |
-| ... | ... | ... |
+| ...     | ...        | ...          |
 
 ### Manual Verification Needed
+
 [List any bugs that couldn't be auto-verified]
 
 ### Recommendations
+
 1. [Any follow-up actions needed]
 2. [Bugs that may need re-attempt]
 3. [Related issues discovered]
@@ -578,6 +604,7 @@ bugs:
 **Handoff:** .agent-state/sessions/[session-id]/handoff.md
 
 ### Quick Stats
+
 - **Success Rate:** [X]%
 - **Verified:** [N] bugs
 - **Failed:** [N] bugs
@@ -585,13 +612,18 @@ bugs:
 
 ### To Resume Failed Bugs
 ```
+
 /batch-bugfix $ARGUMENTS --start-from [first-failed-bug-number]
+
 ```
 
 ### To Review Session
 ```
+
 /session-status
+
 ```
+
 ```
 
 ---
@@ -605,6 +637,7 @@ At workflow start, each dispatched agent should consult its `.claude/agent-memor
 ## Error Handling
 
 ### File Not Found
+
 ```
 Error: Bug file not found at: $ARGUMENTS
 
@@ -615,6 +648,7 @@ Bug description here.
 ```
 
 ### No Bugs Found
+
 ```
 Error: No bugs found in file.
 
@@ -627,12 +661,15 @@ Another description...
 ```
 
 ### Invalid Bug Format
+
 If some bugs don't match the expected format:
+
 - Log warning
 - Ask user if they want to proceed with valid bugs only
 - Show which entries were skipped
 
 ### Fix Command Failure
+
 - Capture error output
 - Update bug status with error
 - Check retry count
@@ -640,13 +677,17 @@ If some bugs don't match the expected format:
 - In auto mode, mark as failed and continue
 
 ### Session Interruption
+
 If the session is interrupted:
+
 - State is preserved in batch-state.yaml
 - User can resume with: `/batch-bugfix $ARGUMENTS --start-from [N]`
 - Or run `/state-resume` to see previous session
 
 ### Build/Test Failures During Fix
+
 If build or tests fail during a bug fix:
+
 - The underlying `/bug-fix` or `/quick-bugfix` command handles this
 - Result is captured and recorded in batch state
 - Proceeds to next bug (or retries if configured)
@@ -717,13 +758,13 @@ completed_at: "2026-02-05T11:00:00Z"
 
 ## Comparison: /batch-bugfix vs Individual Commands
 
-| Aspect | /batch-bugfix | /bug-fix | /quick-bugfix |
-|--------|---------------|----------|---------------|
-| **Input** | Markdown file with multiple bugs | Single bug description | Single bug description |
-| **Orchestration** | Batch with state tracking | Single workflow | Single workflow |
-| **Command Selection** | Auto-selects per bug | Full workflow | Streamlined workflow |
-| **Approval Gates** | Per-batch + per-bug (manual) | 4 gates | 1 gate |
-| **State Persistence** | Full batch state | Session state | Session state |
-| **Resume Support** | `--start-from N` | `/state-resume` | `/state-resume` |
-| **Verification** | Batch verification pass | Per-bug | Per-bug |
-| **Best For** | Multiple known bugs | Single complex bug | Single simple bug |
+| Aspect                | /batch-bugfix                    | /bug-fix               | /quick-bugfix          |
+| --------------------- | -------------------------------- | ---------------------- | ---------------------- |
+| **Input**             | Markdown file with multiple bugs | Single bug description | Single bug description |
+| **Orchestration**     | Batch with state tracking        | Single workflow        | Single workflow        |
+| **Command Selection** | Auto-selects per bug             | Full workflow          | Streamlined workflow   |
+| **Approval Gates**    | Per-batch + per-bug (manual)     | 4 gates                | 1 gate                 |
+| **State Persistence** | Full batch state                 | Session state          | Session state          |
+| **Resume Support**    | `--start-from N`                 | `/state-resume`        | `/state-resume`        |
+| **Verification**      | Batch verification pass          | Per-bug                | Per-bug                |
+| **Best For**          | Multiple known bugs              | Single complex bug     | Single simple bug      |

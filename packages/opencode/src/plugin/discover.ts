@@ -48,7 +48,12 @@ export async function listPlugins(
   const plugins: PluginListEntry[] = []
   for (const entry of resolved) {
     if (!entry.ok) continue
-    marketplaces.push({ name: entry.manifest.name, source: entry.source, fetchedAt: entry.fetchedAt, stale: entry.stale })
+    marketplaces.push({
+      name: entry.manifest.name,
+      source: entry.source,
+      fetchedAt: entry.fetchedAt,
+      stale: entry.stale,
+    })
     for (const plugin of entry.manifest.plugins) {
       plugins.push({
         name: plugin.name,

@@ -14,7 +14,7 @@
 
 Copied verbatim from the spec; every task's requirements implicitly include these.
 
-- **No `prompt` field on the agent entry.** For a primary agent, `prompt` *replaces* `SystemPrompt.provider()` (`agent/agent.ts:206-211`). This is the bug commit `60ff27f45` fixed for research mode.
+- **No `prompt` field on the agent entry.** For a primary agent, `prompt` _replaces_ `SystemPrompt.provider()` (`agent/agent.ts:206-211`). This is the bug commit `60ff27f45` fixed for research mode.
 - **`task` must not be denied.** `plan` sets `task: { general: "deny" }` (`agent.ts:165-167`); this mode must delegate, like `research` (`agent.ts:191-192`).
 - **`external_directory` allow is required and is an independent gate.** `edit.ts:83` calls `assertExternalDirectoryEffect`, which issues its own `ctx.ask({ permission: "external_directory" })` (`tool/external-directory.ts:33-42`). A permissive `edit` does **not** short-circuit it.
 - **`edit` is NOT restricted to the artifact path.** Unlike `plan`/`research`, this mode implements code. It inherits `"*": "allow"` from `defaults` (`agent.ts:120`).
@@ -22,6 +22,7 @@ Copied verbatim from the spec; every task's requirements implicitly include thes
 - **Cursor is never cached.** Re-read from disk each turn, so a human hand-edit between turns takes effect immediately.
 
 **Commands:**
+
 - Tests: `bun test --timeout 30000 --only-failures` from `packages/opencode`
 - Single file: `bun test test/session/dev-cycle-mode.test.ts` from `packages/opencode`
 - Typecheck: `bun run typecheck` from `packages/opencode`
@@ -33,10 +34,12 @@ Copied verbatim from the spec; every task's requirements implicitly include thes
 ### Task 1: `Session.devcycle()` artifact path helper
 
 **Files:**
+
 - Modify: `packages/opencode/src/session/session.ts:346-348` (add after `research`)
 - Test: `packages/opencode/test/session/dev-cycle-mode.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: `artifact(dir, input, instance)` (`session.ts:335-340`), already resolves `<worktree>/.opencode/<dir>/<created>-<slug>.md` under VCS and `Global.Path.data/<dir>/...` otherwise.
 - Produces: `Session.devcycle(input: { slug: string; time: { created: number } }, instance: InstanceContext): string`
 
@@ -100,10 +103,12 @@ git commit -m "feat(dev-cycle): add Session.devcycle artifact path helper"
 ### Task 2: Phase cursor parser
 
 **Files:**
+
 - Create: `packages/opencode/src/session/dev-cycle.ts`
 - Test: `packages/opencode/test/session/dev-cycle-mode.test.ts` (append)
 
 **Interfaces:**
+
 - Consumes: nothing — pure module, no Effect, no I/O.
 - Produces:
   - `DevCycle.PHASES: readonly ["discover", "architect", "plan", "build", "verify"]`
@@ -221,10 +226,12 @@ git commit -m "feat(dev-cycle): add phase cursor frontmatter parser"
 ### Task 3: `dev-cycle` agent entry
 
 **Files:**
+
 - Modify: `packages/opencode/src/agent/agent.ts` (insert after the `research` entry ending at line 212)
 - Test: `packages/opencode/test/session/dev-cycle-mode.test.ts` (append)
 
 **Interfaces:**
+
 - Consumes: `Permission.merge`, `Permission.fromConfig`, the `defaults` ruleset (`agent.ts:119-136`), `user` (`agent.ts:138`).
 - Produces: an agent retrievable via `agents.get("dev-cycle")` with `mode: "primary"`, `native: true`, `prompt` undefined.
 
@@ -346,11 +353,13 @@ git commit -m "feat(dev-cycle): register dev-cycle primary agent"
 ### Task 4: Reminder prompt and `reminders.ts` branch
 
 **Files:**
+
 - Create: `packages/opencode/src/session/prompt/dev-cycle-mode.txt`
 - Modify: `packages/opencode/src/session/reminders.ts` (imports at 11-14; new branch after the `research` branch ends at line 48)
 - Test: `packages/opencode/test/session/dev-cycle-mode.test.ts` (append)
 
 **Interfaces:**
+
 - Consumes: `Session.devcycle` (Task 1), `DevCycle.parseCursor` (Task 2), the `dev-cycle` agent (Task 3), `fsys.existsSafe` / `fsys.readFileStringSafe` (`packages/core/src/fs-util.ts:34-35`).
 - Produces: a synthetic text part appended to the last user message whenever `agent.name === "dev-cycle"`.
 
@@ -536,25 +545,27 @@ import { DevCycle } from "./dev-cycle"
 Then insert this branch immediately after the `research` branch closes (after line 48, before `if (!flags.experimentalPlanMode) {`):
 
 ```typescript
-  // Like research, dev-cycle is independent of the plan-mode flag: its
-  // reminder carries both the output path and the phase cursor, so it always
-  // follows the path-bearing shape above.
-  if (input.agent.name === "dev-cycle") {
-    const ctx = yield* InstanceState.context
-    const file = Session.devcycle(input.session, ctx)
-    const exists = yield* fsys.existsSafe(file)
-    if (!exists) yield* fsys.ensureDir(path.dirname(file)).pipe(Effect.catch(Effect.die))
-    // Read every turn, never cache: the human edits this frontmatter to
-    // approve or rewind a gate, and that must take effect on the next turn.
-    // `readFileStringSafe` carries an Error channel (fs-util.ts:35) that this
-    // file has no precedent for handling — `orElseSucceed` is verified in use
-    // across packages/*/src (26 call sites, e.g. packages/core/src/npm.ts).
-    // A file we cannot read degrades to the default cursor; it never throws.
-    const contents = exists
-      ? yield* fsys.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
-      : undefined
-    const cursor = DevCycle.parseCursor(contents)
-    const part = yield* sessions.updatePart({
+// Like research, dev-cycle is independent of the plan-mode flag: its
+// reminder carries both the output path and the phase cursor, so it always
+// follows the path-bearing shape above.
+if (input.agent.name === "dev-cycle") {
+  const ctx = yield * InstanceState.context
+  const file = Session.devcycle(input.session, ctx)
+  const exists = yield * fsys.existsSafe(file)
+  if (!exists) yield * fsys.ensureDir(path.dirname(file)).pipe(Effect.catch(Effect.die))
+  // Read every turn, never cache: the human edits this frontmatter to
+  // approve or rewind a gate, and that must take effect on the next turn.
+  // `readFileStringSafe` carries an Error channel (fs-util.ts:35) that this
+  // file has no precedent for handling — `orElseSucceed` is verified in use
+  // across packages/*/src (26 call sites, e.g. packages/core/src/npm.ts).
+  // A file we cannot read degrades to the default cursor; it never throws.
+  const contents = exists
+    ? yield * fsys.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
+    : undefined
+  const cursor = DevCycle.parseCursor(contents)
+  const part =
+    yield *
+    sessions.updatePart({
       id: PartID.ascending(),
       messageID: userMessage.info.id,
       sessionID: userMessage.info.sessionID,
@@ -569,9 +580,9 @@ Then insert this branch immediately after the `research` branch closes (after li
       ),
       synthetic: true,
     })
-    userMessage.parts.push(part)
-    return input.messages
-  }
+  userMessage.parts.push(part)
+  return input.messages
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -604,11 +615,13 @@ git commit -m "feat(dev-cycle): steer dev-cycle mode by per-turn phase reminder"
 > `test/agent/agent.test.ts` now pins it at the permission layer.
 
 **Files:**
+
 - Create: `.opencode/agent/architect.md`
 - Create: `.opencode/agent/planner.md`
 - Create: `.opencode/agent/qa.md`
 
 **Interfaces:**
+
 - Consumes: the markdown agent loader that already reads `.opencode/agent/*.md`.
 - Produces: three agents named `architect`, `planner`, `qa`, dispatchable by the `task` tool from the reminder in Task 4.
 
@@ -626,7 +639,7 @@ last-match-wins via `findLast` (`permission/index.ts:32`) — so their trailing
 
 `qa` is different, deliberately. It is granted `bash`, which gates on the
 separate `"bash"` permission key (`tool/shell/id.ts:16`) and is a general write
-channel — redirection, `sed -i`, `git checkout`. So `qa` *can* modify files at
+channel — redirection, `sed -i`, `git checkout`. So `qa` _can_ modify files at
 the permission layer, and its "report, never fix" property is prompt-level
 only. That is the accepted trade: `qa` cannot run the suite without a shell.
 
@@ -755,9 +768,11 @@ git commit -m "feat(dev-cycle): add architect, planner and qa phase subagents"
 ### Task 6: Document the mode
 
 **Files:**
+
 - Modify: `packages/web/src/content/docs/agents.mdx`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: nothing consumed by later tasks.
 
@@ -787,7 +802,7 @@ gate: pending
 
 That position is read from the file at the start of every turn, so editing those two lines is how you approve a gate, rewind to an earlier phase, or redirect a cycle mid-flight.
 
-The gates are advisory. Unlike `plan` and `research`, this agent holds full write permissions for the whole run — it is *instructed* to stop at each gate rather than prevented from continuing, so a cycle that ignores a gate is possible. Review the diff at gate 3 rather than assuming nothing was written before gate 2 opened.
+The gates are advisory. Unlike `plan` and `research`, this agent holds full write permissions for the whole run — it is _instructed_ to stop at each gate rather than prevented from continuing, so a cycle that ignores a gate is possible. Review the diff at gate 3 rather than assuming nothing was written before gate 2 opened.
 ````
 
 - [ ] **Step 3: Verify the docs build**

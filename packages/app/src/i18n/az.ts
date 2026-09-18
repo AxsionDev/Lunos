@@ -669,8 +669,7 @@ export const dict = {
   "error.chain.didYouMean": "Bunu nəzərdə tuturdunuz: {{suggestions}}",
   "error.chain.modelNotFound": "Model tapılmadı: {{provider}}/{{model}}",
   "error.chain.checkConfig": "Konfiqurasiyanızdakı (opencode.json) provayder/model adlarını yoxlayın",
-  "error.chain.mcpFailed":
-    'MCP server "{{name}}" uğursuz oldu. Qeyd: Lunos hələ MCP autentifikasiyasını dəstəkləmir.',
+  "error.chain.mcpFailed": 'MCP server "{{name}}" uğursuz oldu. Qeyd: Lunos hələ MCP autentifikasiyasını dəstəkləmir.',
   "error.chain.providerAuthFailed": "Provayder autentifikasiyası uğursuz oldu ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
     '"{{provider}}" provayderinin işə salınması uğursuz oldu. Giriş məlumatlarını və konfiqurasiyanı yoxlayın.',
@@ -941,8 +940,7 @@ export const dict = {
   "settings.general.row.appearance.title": "Görünüş",
   "settings.general.row.appearance.description": "Lunos-un cihazınızda necə göründüyünü fərdiləşdirin",
   "settings.general.row.colorScheme.title": "Rəng sxemi",
-  "settings.general.row.colorScheme.description":
-    "Lunos-un sistem, açıq və ya tünd mövzudan istifadə etməsini seçin",
+  "settings.general.row.colorScheme.description": "Lunos-un sistem, açıq və ya tünd mövzudan istifadə etməsini seçin",
   "settings.general.row.theme.title": "Mövzu",
   "settings.general.row.theme.description": "Lunos-un mövzusunu fərdiləşdirin.",
   "settings.general.row.font.title": "Kod şrifti",

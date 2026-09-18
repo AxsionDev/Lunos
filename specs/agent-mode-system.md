@@ -7,7 +7,7 @@ produce it (verified with `git diff --stat`).
 
 Note on ticket numbering: XCOD-39's own body text says "XCOD-39, XCOD-40" in
 its "As"/AC lines and "XCOD-39 (rename)" in its sequencing ask — these are
-off by one against the ticket *summaries*, which are consistent: XCOD-39 is
+off by one against the ticket _summaries_, which are consistent: XCOD-39 is
 this research story, XCOD-40 is the rename, XCOD-41 is the new Research Mode.
 This document follows the summaries. Section 6 below is written for XCOD-40
 (rename) and XCOD-41 (Research Mode), and the "link back" AC is satisfied by
@@ -20,15 +20,15 @@ All native agents are defined in one map literal in
 permission ruleset (`agent.ts:119-136`) merged with per-agent overrides and
 finally the user's own config (`user`, from `cfg.permission`).
 
-| Name | `mode` | hidden | Permission summary | System prompt |
-|---|---|---|---|---|
-| `build` | `primary` | no | `defaults` + `question: allow`, `plan_enter: allow` (agent.ts:141-155) | none (uses default) |
-| `plan` | `primary` | no | `defaults` + `question: allow`, `plan_exit: allow`, **`task: { general: "deny" }`**, `external_directory` allow for the plans data dir, `edit` denied except `.opencode/plans/*.md` and the plans data dir (agent.ts:156-181) | none |
-| `general` | `subagent` | no | `defaults` + `todowrite: deny` (agent.ts:182-195) | none |
-| `explore` | `subagent` | no | `defaults` + deny-all except `grep`/`glob`/`list`/`bash`/`webfetch`/`websearch`/`read`, plus a read-only `external_directory` allow-list (agent.ts:196-218) | `PROMPT_EXPLORE` (`agent/prompt/explore.txt`) |
-| `compaction` | `primary` | **yes** | `defaults` + deny-all (agent.ts:219-233) | `PROMPT_COMPACTION` |
-| `title` | `primary` | **yes** | `defaults` + deny-all, `temperature: 0.5` (agent.ts:234-249) | `PROMPT_TITLE` |
-| `summary` | `primary` | **yes** | `defaults` + deny-all (agent.ts:250-264) | `PROMPT_SUMMARY` |
+| Name         | `mode`     | hidden  | Permission summary                                                                                                                                                                                                            | System prompt                                 |
+| ------------ | ---------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `build`      | `primary`  | no      | `defaults` + `question: allow`, `plan_enter: allow` (agent.ts:141-155)                                                                                                                                                        | none (uses default)                           |
+| `plan`       | `primary`  | no      | `defaults` + `question: allow`, `plan_exit: allow`, **`task: { general: "deny" }`**, `external_directory` allow for the plans data dir, `edit` denied except `.opencode/plans/*.md` and the plans data dir (agent.ts:156-181) | none                                          |
+| `general`    | `subagent` | no      | `defaults` + `todowrite: deny` (agent.ts:182-195)                                                                                                                                                                             | none                                          |
+| `explore`    | `subagent` | no      | `defaults` + deny-all except `grep`/`glob`/`list`/`bash`/`webfetch`/`websearch`/`read`, plus a read-only `external_directory` allow-list (agent.ts:196-218)                                                                   | `PROMPT_EXPLORE` (`agent/prompt/explore.txt`) |
+| `compaction` | `primary`  | **yes** | `defaults` + deny-all (agent.ts:219-233)                                                                                                                                                                                      | `PROMPT_COMPACTION`                           |
+| `title`      | `primary`  | **yes** | `defaults` + deny-all, `temperature: 0.5` (agent.ts:234-249)                                                                                                                                                                  | `PROMPT_TITLE`                                |
+| `summary`    | `primary`  | **yes** | `defaults` + deny-all (agent.ts:250-264)                                                                                                                                                                                      | `PROMPT_SUMMARY`                              |
 
 User-defined agents from `cfg.agent` config are merged into the same map at
 runtime (agent.ts:267-294): if a key doesn't already exist as a native agent,
@@ -115,10 +115,11 @@ propagates to both frontends.
 
 **Full `local.agent.*` call-site list** (grep across `packages/tui` and
 `packages/app`, superset of what the tickets found):
+
 - `packages/tui/src/app.tsx:481,701,735`
 - `packages/tui/src/component/dialog-agent.tsx:11,23,26`
 - `packages/tui/src/component/prompt/index.tsx:323,326,961,1291,1293,1303-1306,1325-1327,1446` — this is the **prompt-bar agent name badge**: `Locale.titlecase(agent().name)` is rendered live next to the input box whenever not in shell mode (`prompt/index.tsx:1450`), a user-visible surface neither ticket's Background section names explicitly.
-- `packages/tui/src/routes/session/index.tsx:335,338,1388,1557` — includes two **hardcoded** calls, `local.agent.set("build")` and `local.agent.set("plan")`, i.e. code that already spells out today's two primary names; XCOD-40 doesn't rename agent *names*, only the switcher vocabulary, so these calls themselves don't need to change, just confirm that.
+- `packages/tui/src/routes/session/index.tsx:335,338,1388,1557` — includes two **hardcoded** calls, `local.agent.set("build")` and `local.agent.set("plan")`, i.e. code that already spells out today's two primary names; XCOD-40 doesn't rename agent _names_, only the switcher vocabulary, so these calls themselves don't need to change, just confirm that.
 - `packages/app/src/components/prompt-input/submit.ts:340`
 - `packages/app/src/pages/new-session/new-session-draft-controller.ts:20`
 - `packages/app/src/pages/session/use-composer-commands.tsx:71-80`
@@ -193,7 +194,7 @@ becomes available for delegation without touching Claude Code's own source.
 
 Lunos's subagent model is structurally similar in shape (own prompt,
 permission ruleset, invoked via the `task` tool — `task.ts:46`,
-`subagent_type` parameter) but the *native* roster is fixed at two
+`subagent_type` parameter) but the _native_ roster is fixed at two
 (`general`, `explore`) hardcoded in `agent.ts:182-218`. Lunos does have a
 config-driven extensibility path — `cfg.agent` entries merged at
 agent.ts:267-294 can set `mode: "subagent"` and become delegatable — and a
@@ -240,6 +241,7 @@ allow-list authoring surface) rather than the capability itself.
   epic and aren't part of its scope — but its implementer should know they
   exist so code review doesn't confuse a `mode` reference to one of them for
   the new Tab-switcher concept.
+
 - **G5 — stale docs, not a system gap.** `agents.mdx` references a `Scout`
   subagent and a `switch_agent` keybind that don't exist in this codebase
   (see §2). Doesn't block anything, but XCOD-40 will already be in this
@@ -276,7 +278,7 @@ epic's and both child tickets' explicit "must survive untouched" language,
 only the CLI-facing option name for `agent create` changes, not the schema
 it writes into or the `mode` property on the generated frontmatter
 (`cmd/agent.ts:195-205`, which continues to write `mode: <value>` — only the
-flag used to *collect* that value from the CLI user is renamed).
+flag used to _collect_ that value from the CLI user is renamed).
 
 **(c) "Agent" / "subagent" terminology for workers is unchanged.** The
 `task` tool, `subagent_type` parameter, `general`/`explore` entries,
@@ -294,6 +296,7 @@ this epic and would be unrelated scope creep.
 ## 6. Sequencing note (for XCOD-40 and XCOD-41)
 
 **For XCOD-40 (rename):**
+
 - The Background list in the ticket is a subset of the real surface, and it
   treats `local.agent` as one shared thing — it's actually two independent
   implementations (§2): rename both `createAgent()` in
@@ -316,16 +319,17 @@ this epic and would be unrelated scope creep.
   option and its three prompt/handler branches at cmd/agent.ts:46-50 and
   157-184) — do not touch `lunos agent list`'s output format
   (`cmd/agent.ts:248`, `${agent.name} (${agent.mode})`), which prints the
-  *schema* field, not the CLI flag, and is unaffected by the flag rename.
+  _schema_ field, not the CLI flag, and is unaffected by the flag rename.
 
 **For XCOD-41 (Research Mode):**
+
 - Model the new entry structurally on `plan` (agent.ts:156-181), but do
   **not** copy its `task: { general: "deny" }` line (agent.ts:166) — that's
   precisely the restriction that makes `plan` the wrong template for
   research (G1, §3a). Everything else about `plan`'s shape (deny-all edit
   except a scoped `.md` glob, via the same `edit`/`external_directory`
   pattern at agent.ts:171-176) is the right template.
-- `subagent-permissions.ts:14-27` derives a *spawned subagent's* effective
+- `subagent-permissions.ts:14-27` derives a _spawned subagent's_ effective
   permissions from the parent's deny rules; since this new mode must allow
   `task`, double-check with a permission-system test (as the ticket already
   requires) that a `general`/`explore` subagent spawned from this mode isn't
@@ -356,7 +360,7 @@ boundary rather than trusting the original claim at face value.
   English string values tied to the renamed commands
   (`command.agent.cycle`, `command.agent.cycle.description`,
   `command.agent.cycle.reverse`, `command.agent.cycle.reverse.description`)
-  were updated from "agent" to "mode" wording. The *key paths* were
+  were updated from "agent" to "mode" wording. The _key paths_ were
   deliberately left unchanged (they're lookup identifiers, not user copy —
   renaming them would touch all ~50 locale files for no user-visible
   benefit) and other locales' translated values still say "agent" in their

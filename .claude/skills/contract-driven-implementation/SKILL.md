@@ -33,6 +33,7 @@ When blocked by another developer's work, emit clearly so the orchestrator/team-
 
 ```markdown
 ## HELP NEEDED
+
 **Blocked By**: [database-developer | frontend-developer | backend-developer | integration-developer]
 **Issue**: [what you need]
 **To Proceed**: [what the other developer must provide]
@@ -44,18 +45,23 @@ When blocked by another developer's work, emit clearly so the orchestrator/team-
 ## [Layer] Developer - Implementation Complete
 
 ### Contracts Implemented
+
 | Contract | File | Status |
 
 ### Files Created/Modified
+
 | File | Action | Description |
 
 ### Build Status
+
 ✅ / ❌ [details]
 
 ### Integration Notes
+
 [How to connect this work — for the integration developer]
 
 ### Issues/Deviations
+
 [Any contract deviations or problems; "None" if clean]
 ```
 

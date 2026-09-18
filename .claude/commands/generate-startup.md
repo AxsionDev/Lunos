@@ -12,7 +12,7 @@ Scan the project and fill `.claude/PROJECT_STARTUP.md` with detected values.
 
 1. Scans for frontend frameworks (Angular, React, Vue, Next.js)
 2. Scans for backend frameworks (.NET, Node.js, Python)
-3. Detects start commands from package.json, *.csproj
+3. Detects start commands from package.json, \*.csproj
 4. Finds prerequisites (.nvmrc, global.json, .env.example)
 5. Fills PROJECT_STARTUP.md with detected values
 6. Asks you to review and adjust

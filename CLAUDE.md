@@ -20,16 +20,16 @@ This is a Claude Code configuration repository containing custom agents, command
 
 The agent system follows a **team-based architecture** with specialized roles:
 
-| Role | Agent | Purpose |
-|------|-------|---------|
-| Orchestration | `project-orchestrator` | Breaks down complex projects, coordinates agents |
-| Leadership | `team-lead` | Defines contracts, reviews work, final sign-off |
-| Development | `backend-developer`, `frontend-developer`, `database-developer` | Layer-specific implementation |
-| Integration | `integration-developer` | Connects all layers, helps blocked developers |
-| Review | `security-reviewer`, `performance-reviewer`, `architecture-reviewer`, `code-review-signoff` | Specialized code review |
-| Analysis | `bug-investigator-alpha`, `bug-investigator-beta` | Collaborative debugging |
-| Documentation | `ai-docs-generator`, `user-journey-analyst` | AI-friendly documentation |
-| State | `state-manager` | Session management, context compaction |
+| Role          | Agent                                                                                       | Purpose                                          |
+| ------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Orchestration | `project-orchestrator`                                                                      | Breaks down complex projects, coordinates agents |
+| Leadership    | `team-lead`                                                                                 | Defines contracts, reviews work, final sign-off  |
+| Development   | `backend-developer`, `frontend-developer`, `database-developer`                             | Layer-specific implementation                    |
+| Integration   | `integration-developer`                                                                     | Connects all layers, helps blocked developers    |
+| Review        | `security-reviewer`, `performance-reviewer`, `architecture-reviewer`, `code-review-signoff` | Specialized code review                          |
+| Analysis      | `bug-investigator-alpha`, `bug-investigator-beta`                                           | Collaborative debugging                          |
+| Documentation | `ai-docs-generator`, `user-journey-analyst`                                                 | AI-friendly documentation                        |
+| State         | `state-manager`                                                                             | Session management, context compaction           |
 
 ### Skill-Based Architecture
 
@@ -37,15 +37,15 @@ Following current Anthropic guidance, **agents are thin routers and reusable log
 
 Two loading mechanisms coexist, deliberately: `skills:` frontmatter (a YAML list) **eagerly preloads** a skill's full content at subagent startup — used only for `agent-bootstrap`, which every team agent runs unconditionally as step 1, so there's no discovery cost to save by deferring it. The runtime `Skill` tool call stays the mechanism for every conditionally-invoked skill (`contract-driven-implementation`, `research-mode`, `code-review-methodology`, etc.) — those should stay lazy since not every invocation needs them. Don't add more skills to `skills:` frontmatter by default; it's a latency/cache trade-off that only pays off for something every invocation runs.
 
-| Skill | Used by | Purpose |
-|-------|---------|---------|
-| `agent-bootstrap` | all team agents | State init, project detection, tech-stack patterns, docs lookup, workspace protocol. **Preloaded via `skills:` frontmatter** (not called at runtime via the `Skill` tool) — every agent that always runs it lists `skills: [agent-bootstrap]`, so it's injected in full at subagent startup instead of costing a tool round-trip. |
-| `agent-output-contract` | agents writing workspace artifacts | Standard machine-parseable artifact format |
-| `code-review-methodology` | the 4 reviewers | Shared review engine + `references/{architecture,security,performance,code-quality}.md` |
-| `contract-driven-implementation` | the 4 developers | Contract-first implementation workflow |
-| `research-mode` | developers/designers in investigation | Read-only evidence-gathering protocol |
-| `bug-investigation` | investigators + bug-reviewers | Hypothesis discipline + `references/{bug-triage,collaborative-dialogue}.md` |
-| `worktree-preflight` | action-taking commands (bug-fix, feature, etc.) | First-step reset into a clean git worktree from a chosen base branch; reuse-guarded for nested commands; no-ops outside a git repo |
+| Skill                            | Used by                                         | Purpose                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent-bootstrap`                | all team agents                                 | State init, project detection, tech-stack patterns, docs lookup, workspace protocol. **Preloaded via `skills:` frontmatter** (not called at runtime via the `Skill` tool) — every agent that always runs it lists `skills: [agent-bootstrap]`, so it's injected in full at subagent startup instead of costing a tool round-trip. |
+| `agent-output-contract`          | agents writing workspace artifacts              | Standard machine-parseable artifact format                                                                                                                                                                                                                                                                                        |
+| `code-review-methodology`        | the 4 reviewers                                 | Shared review engine + `references/{architecture,security,performance,code-quality}.md`                                                                                                                                                                                                                                           |
+| `contract-driven-implementation` | the 4 developers                                | Contract-first implementation workflow                                                                                                                                                                                                                                                                                            |
+| `research-mode`                  | developers/designers in investigation           | Read-only evidence-gathering protocol                                                                                                                                                                                                                                                                                             |
+| `bug-investigation`              | investigators + bug-reviewers                   | Hypothesis discipline + `references/{bug-triage,collaborative-dialogue}.md`                                                                                                                                                                                                                                                       |
+| `worktree-preflight`             | action-taking commands (bug-fix, feature, etc.) | First-step reset into a clean git worktree from a chosen base branch; reuse-guarded for nested commands; no-ops outside a git repo                                                                                                                                                                                                |
 
 **When adding/editing agents:** put role-specific judgment in the agent; if logic would be reused by another agent verbatim, put it in a skill instead. The `_gemini-design-hook.md` fragment is the one remaining shared fragment (UI tool hierarchy); the legacy `_state-hook`/`_project-init-hook`/`_docs-lookup-hook` fragments are superseded by `agent-bootstrap`.
 
@@ -59,6 +59,7 @@ Primary workflows:
 - `/discover` - Generate AI-agent-friendly documentation for a feature area
 
 State management commands:
+
 - `/state-init` - Initialize `.agent-state/` directory
 - `/session-start` - Start a new tracked session
 - `/session-status` - Show current session progress
@@ -81,6 +82,7 @@ Phase 5: Doc Refresh → Update docs for future AI agents
 ### Auto-Initialize State Tracking
 
 All major agents auto-initialize state management at start:
+
 1. Check `.agent-state/` exists
 2. Create session if none active
 3. Load existing context if resuming
@@ -88,12 +90,14 @@ All major agents auto-initialize state management at start:
 ### Documentation-First Workflow
 
 Agents are configured to read existing documentation before any work:
+
 - `.claude/docs/` - Discovery and feature documentation
 - `.augment/` - Project reference documentation (CODE_STRUCTURE.md, API_ENDPOINTS.md, etc.)
 
 ### Contract-Driven Development
 
 The team-lead agent defines contracts before implementation:
+
 1. API contracts (endpoints, DTOs)
 2. Interface contracts (service interfaces)
 3. Data models (entities, relationships)
@@ -104,6 +108,7 @@ Developers implement against contracts; team-lead reviews compliance.
 ### Parallel Execution
 
 Implementation uses parallel agent execution where possible:
+
 - Backend, Frontend, and Database developers work simultaneously (each with `isolation: "worktree"`)
 - All four code reviewers run in parallel
 - Integration developer merges worktree branches first, then connects everything
@@ -139,13 +144,14 @@ This fleet is designed to run with an **Opus advisor** ([docs](https://code.clau
 
 - **Opus advisor** pairs validly with the entire fleet (opus/sonnet/haiku agents all ≤ opus).
 - For the opus-tier reasoning agents (orchestrator, team-lead, investigators, ideator/critic) the advisor is a **second-opinion quality boost**, not a cost saver — they already run on opus.
-- To capture advisor *economics* (cheaper main + opus judgment at decision points), demote those reasoning singletons to `sonnet`; not done here, kept on opus by choice.
+- To capture advisor _economics_ (cheaper main + opus judgment at decision points), demote those reasoning singletons to `sonnet`; not done here, kept on opus by choice.
 - **Fable 5.1 ≥ Opus 4.8**, so the Opus advisor detaches for `/fullstack-fable` (pinned to `claude-fable-5-1`) — that command is the strongest model in its own loop and is documented to own judgment without a second opinion.
 - Disable for a session with `/advisor off`.
 
 ## Technology Stack (Target Projects)
 
 The agents are configured for:
+
 - **Backend**: .NET/C#, Entity Framework Core
 - **Database**: SQL Server
 - **Frontend**: Angular 18+, TypeScript, RxJS

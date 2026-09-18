@@ -19817,7 +19817,8 @@
                               "session.last",
                               "prompt.clear",
                               "prompt.submit",
-                              "agent.cycle"
+                              "agent.cycle",
+                              "mode.cycle"
                             ]
                           },
                           {
@@ -23305,7 +23306,8 @@
                       "session.last",
                       "prompt.clear",
                       "prompt.submit",
-                      "agent.cycle"
+                      "agent.cycle",
+                      "mode.cycle"
                     ]
                   },
                   {
@@ -24393,7 +24395,8 @@
                       "session.last",
                       "prompt.clear",
                       "prompt.submit",
-                      "agent.cycle"
+                      "agent.cycle",
+                      "mode.cycle"
                     ]
                   },
                   {
@@ -32832,7 +32835,8 @@
                       "session.last",
                       "prompt.clear",
                       "prompt.submit",
-                      "agent.cycle"
+                      "agent.cycle",
+                      "mode.cycle"
                     ]
                   },
                   {

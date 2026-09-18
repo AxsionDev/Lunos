@@ -20,6 +20,7 @@ Extract the Jira ticket key from `$ARGUMENTS` using these patterns (try in order
 4. **Embedded key:** Match `([A-Z]+-\d+)` anywhere in the arguments
 
 If no match is found, ask the user:
+
 > "I couldn't find a Jira ticket key in your input. Please provide either a Jira URL (e.g., `https://yoursite.atlassian.net/browse/PROJ-123`) or a ticket key (e.g., `PROJ-123`)."
 
 Store the extracted key as `jira_ticket_key` and set `jira_mode = "mcp"`.
@@ -47,6 +48,7 @@ Attempt to find and add the Atlassian MCP server:
 3. Ask the user for configuration:
 
 > "I need to configure the Jira connection. Please provide:
+>
 > 1. Your Jira instance URL (e.g., `https://yourcompany.atlassian.net`)
 > 2. Your Jira username/email
 > 3. Your Jira API token (create one at https://id.atlassian.com/manage-profile/security/api-tokens)"
@@ -142,12 +144,15 @@ Display a concise summary to the user:
 **Type:** {ticket.type} | **Priority:** {ticket.priority} | **Status:** {ticket.status}
 
 ### Description
+
 {ticket.description (truncated to ~500 chars if very long)}
 
 ### Acceptance Criteria
+
 {ticket.acceptance_criteria or "None specified"}
 
 ### Recent Activity
+
 {Summary of recent comments or "No recent comments"}
 ```
 
@@ -161,23 +166,23 @@ Evaluate whether the ticket has enough information to proceed with the workflow.
 
 **For Bug tickets** (type = Bug), check:
 
-| # | Criteria | Status |
-|---|----------|--------|
-| 1 | **Steps to Reproduce** — Clear sequence of actions to trigger the bug | PRESENT / MISSING / VAGUE |
-| 2 | **Expected Behavior** — What should happen | PRESENT / MISSING / VAGUE |
-| 3 | **Actual Behavior** — What actually happens (including error messages) | PRESENT / MISSING / VAGUE |
-| 4 | **Environment** — Browser, OS, app version, user role, or server environment | PRESENT / MISSING / VAGUE |
-| 5 | **Error Messages / Logs** — Stack traces, console errors, API responses | PRESENT / MISSING / VAGUE |
+| #   | Criteria                                                                     | Status                    |
+| --- | ---------------------------------------------------------------------------- | ------------------------- |
+| 1   | **Steps to Reproduce** — Clear sequence of actions to trigger the bug        | PRESENT / MISSING / VAGUE |
+| 2   | **Expected Behavior** — What should happen                                   | PRESENT / MISSING / VAGUE |
+| 3   | **Actual Behavior** — What actually happens (including error messages)       | PRESENT / MISSING / VAGUE |
+| 4   | **Environment** — Browser, OS, app version, user role, or server environment | PRESENT / MISSING / VAGUE |
+| 5   | **Error Messages / Logs** — Stack traces, console errors, API responses      | PRESENT / MISSING / VAGUE |
 
 **For Feature tickets** (type = Story / Feature / Epic / Task), check:
 
-| # | Criteria | Status |
-|---|----------|--------|
-| 1 | **Business Context** — Why this feature is needed, problem it solves | PRESENT / MISSING / VAGUE |
-| 2 | **Acceptance Criteria** — Specific, testable conditions for done | PRESENT / MISSING / VAGUE |
-| 3 | **User-Facing Scope** — What the user sees/interacts with | PRESENT / MISSING / VAGUE |
-| 4 | **Technical Constraints** — API requirements, data model, integrations | PRESENT / MISSING / VAGUE |
-| 5 | **Out of Scope** — What is explicitly NOT included | PRESENT / MISSING / VAGUE |
+| #   | Criteria                                                               | Status                    |
+| --- | ---------------------------------------------------------------------- | ------------------------- |
+| 1   | **Business Context** — Why this feature is needed, problem it solves   | PRESENT / MISSING / VAGUE |
+| 2   | **Acceptance Criteria** — Specific, testable conditions for done       | PRESENT / MISSING / VAGUE |
+| 3   | **User-Facing Scope** — What the user sees/interacts with              | PRESENT / MISSING / VAGUE |
+| 4   | **Technical Constraints** — API requirements, data model, integrations | PRESENT / MISSING / VAGUE |
+| 5   | **Out of Scope** — What is explicitly NOT included                     | PRESENT / MISSING / VAGUE |
 
 ### Step C2: Classify Completeness
 
@@ -195,7 +200,7 @@ For each MISSING or VAGUE criterion, ask the user a specific question. Group que
 >
 > 1. **[Missing criterion]:** [Specific question about it]
 > 2. **[Missing criterion]:** [Specific question about it]
-> ..."
+>    ..."
 
 **Round limit:** Maximum 2 rounds of questions. If still incomplete after 2 rounds, proceed with what's available and note the gaps.
 
@@ -204,6 +209,7 @@ For each MISSING or VAGUE criterion, ask the user a specific question. Group que
 Combine ticket data + user answers into a comprehensive description:
 
 **For Bugs:**
+
 ```
 ## Bug Report: {ticket.key} - {ticket.title}
 
@@ -227,6 +233,7 @@ Combine ticket data + user answers into a comprehensive description:
 ```
 
 **For Features:**
+
 ```
 ## Feature Request: {ticket.key} - {ticket.title}
 
@@ -258,6 +265,7 @@ This enriched description becomes the `$ARGUMENTS` input for the downstream work
 Update the Jira ticket after the workflow completes successfully.
 
 **IMPORTANT:** Skip this entire protocol if `jira_mode = "manual"`. Instead, display:
+
 > "Jira was in manual mode — no ticket updates were made. You may want to manually transition {ticket.key} to 'In Review' and add a summary comment."
 
 ### Step D1: Get Available Transitions
@@ -312,6 +320,7 @@ mcp__MCP_DOCKER__mcp-exec with:
 ```
 
 **Comment template for bugs:**
+
 ```
 *AI-Assisted Bug Fix Summary*
 
@@ -325,6 +334,7 @@ _Workflow: /jira-bug-fix — completed {date}_
 ```
 
 **Comment template for features:**
+
 ```
 *AI-Assisted Feature Implementation Summary*
 
@@ -349,8 +359,10 @@ If transition or comment fails:
 >
 > **Transition:** Move {ticket.key} to "In Review"
 > **Comment to add:**
-> ```
+>
+> ````
 > {comment_text}
 > ```"
+> ````
 
 Do NOT retry or block the workflow completion over Jira update failures.

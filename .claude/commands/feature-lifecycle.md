@@ -18,7 +18,7 @@ Each phase builds on the previous, with user checkpoints between major transitio
 
 ## Pre-flight: Worktree Reset (FIRST — before any action)
 
-Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. *(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)* If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. (Phase 4 delegates to `/feature`, whose own preflight will detect this worktree and reuse it rather than reset again.)
+Before anything else, invoke **`Skill(worktree-preflight)`** to reset into a clean task worktree. _(Fallback: read `.claude/skills/worktree-preflight/SKILL.md` and follow it.)_ If the user passed an override base branch in `$ARGUMENTS` (e.g. a `--base=<branch>` token), pass it through; otherwise the repo default branch is used. If the project is not a git repository, the skill no-ops and this command proceeds normally. (Phase 4 delegates to `/feature`, whose own preflight will detect this worktree and reuse it rather than reset again.)
 
 ---
 
@@ -37,6 +37,7 @@ Before starting the feature lifecycle, establish persistent session tracking.
 2. Note the session ID for reference throughout the workflow
 
 This session will persist across all 5 phases:
+
 - Phase 1: Discovery
 - Phase 2: User Journeys
 - Phase 3: Story Preparation
@@ -46,6 +47,7 @@ This session will persist across all 5 phases:
 ### Resume Check
 
 If user indicates resuming a previous session:
+
 1. Run `/state-resume` to load previous context
 2. Display phase completion status
 3. Ask user which phase to continue from
@@ -53,6 +55,7 @@ If user indicates resuming a previous session:
 ### Session Persistence Note
 
 This session will persist across **all 5 phases**. Context is preserved and compressed at each phase checkpoint, allowing:
+
 - Resume from any phase if interrupted
 - Reference decisions from earlier phases
 - Generate complete handoff at workflow end
@@ -61,19 +64,20 @@ This session will persist across **all 5 phases**. Context is preserved and comp
 
 ## Phase Map
 
-| Phase | Command | Output | Purpose |
-|-------|---------|--------|---------|
-| 1. Discovery | `/discover` | `.claude/docs/{feature}.md` | Explore codebase, document patterns |
-| 2. User Journeys | `/user-journeys` | `.claude/docs/{feature}-user-journeys.md` | Map all actor interactions |
-| 3. Story Prep | `/prepare-stories` | `.claude/stories/{feature}.md` | Create implementable stories |
-| 4. Implementation | `/feature` | Code changes | Execute with multi-dev team |
-| 5. Doc Refresh | `ai-docs-generator` | Updated docs + changelog | Refresh docs for future AI agents |
+| Phase             | Command             | Output                                    | Purpose                             |
+| ----------------- | ------------------- | ----------------------------------------- | ----------------------------------- |
+| 1. Discovery      | `/discover`         | `.claude/docs/{feature}.md`               | Explore codebase, document patterns |
+| 2. User Journeys  | `/user-journeys`    | `.claude/docs/{feature}-user-journeys.md` | Map all actor interactions          |
+| 3. Story Prep     | `/prepare-stories`  | `.claude/stories/{feature}.md`            | Create implementable stories        |
+| 4. Implementation | `/feature`          | Code changes                              | Execute with multi-dev team         |
+| 5. Doc Refresh    | `ai-docs-generator` | Updated docs + changelog                  | Refresh docs for future AI agents   |
 
 ---
 
 ## PHASE 1: Discovery
 
 ### Objective
+
 Thoroughly explore and document the feature area before any planning begins.
 
 ### Execution
@@ -81,6 +85,7 @@ Thoroughly explore and document the feature area before any planning begins.
 **Step 1.1: Check for Existing Documentation**
 
 First, search for any existing documentation:
+
 ```
 Glob: ".claude/docs/*.md"
 ```
@@ -88,11 +93,13 @@ Glob: ".claude/docs/*.md"
 **Step 1.2: Determine Discovery Scope**
 
 If documentation exists for `$ARGUMENTS`:
+
 - Read and summarize existing documentation
 - Identify any gaps or outdated information
 - Ask user: "Existing documentation found. Should I: (1) Use it as-is, (2) Update it, (3) Start fresh?"
 
 If no documentation exists:
+
 - Proceed to discovery execution
 
 **Step 1.3: Execute Discovery**
@@ -126,6 +133,7 @@ Produce comprehensive exploration findings covering:
 **Step 1.4: Generate Discovery Documentation**
 
 Create documentation at `.claude/docs/{feature-name}.md` following the discovery template:
+
 - Overview and purpose
 - Architecture and file structure
 - Dependencies (internal and external)
@@ -145,6 +153,7 @@ Before presenting checkpoint to user:
 2. Log discovery decisions to state:
 
 Use the Task tool with `subagent_type="state-manager"`:
+
 ```
 ## Phase Checkpoint Request
 
@@ -172,12 +181,14 @@ Use the Task tool with `subagent_type="state-manager"`:
 **Documentation saved to:** `.claude/docs/{feature-name}.md`
 
 ### Summary
+
 - **Files identified:** [N]
 - **Entry points:** [List]
 - **Key integrations:** [List]
 - **Patterns to follow:** [List]
 
 ### Key Findings
+
 [2-3 bullet summary of important discoveries]
 
 ---
@@ -185,6 +196,7 @@ Use the Task tool with `subagent_type="state-manager"`:
 **Ready to proceed to Phase 2 (User Journeys)?**
 
 Options:
+
 1. **Continue** - Proceed to User Journey analysis
 2. **Review** - Let me examine the documentation first
 3. **Expand** - Explore additional areas
@@ -198,9 +210,11 @@ Wait for user approval before proceeding to Phase 2.
 ## PHASE 2: User Journeys
 
 ### Objective
+
 Identify and document all user interactions with the feature across all actor types.
 
 ### Prerequisites
+
 - Phase 1 Discovery documentation must exist at `.claude/docs/{feature-name}.md`
 
 ### Execution
@@ -243,6 +257,7 @@ Save to: `.claude/docs/{feature-name}-user-journeys.md`
 **Step 2.2: Interactive Clarification**
 
 If the agent identifies gaps:
+
 - Present questions to user
 - Collect answers
 - Update journey documentation
@@ -250,6 +265,7 @@ If the agent identifies gaps:
 **Step 2.3: Journey Review**
 
 Present journey summaries by actor type for user validation:
+
 - End User Journeys
 - Staff User Journeys
 - Admin Journeys
@@ -268,6 +284,7 @@ Before presenting checkpoint to user:
 2. Log journey decisions to state:
 
 Use the Task tool with `subagent_type="state-manager"`:
+
 ```
 ## Phase Checkpoint Request
 
@@ -296,21 +313,24 @@ Use the Task tool with `subagent_type="state-manager"`:
 **Documentation saved to:** `.claude/docs/{feature-name}-user-journeys.md`
 
 ### Summary
+
 | Actor Type | Journey Count |
-|------------|---------------|
-| End User | [N] |
-| Staff User | [N] |
-| Admin | [N] |
-| System | [N] |
-| External | [N] |
-| **Total** | **[N]** |
+| ---------- | ------------- |
+| End User   | [N]           |
+| Staff User | [N]           |
+| Admin      | [N]           |
+| System     | [N]           |
+| External   | [N]           |
+| **Total**  | **[N]**       |
 
 ### Critical Journeys (Implementation Priority)
+
 1. [Journey ID]: [Title]
 2. [Journey ID]: [Title]
 3. [Journey ID]: [Title]
 
 ### Unresolved Gaps
+
 [List any gaps that couldn't be resolved]
 
 ---
@@ -318,6 +338,7 @@ Use the Task tool with `subagent_type="state-manager"`:
 **Ready to proceed to Phase 3 (Story Preparation)?**
 
 Options:
+
 1. **Continue** - Proceed to Story creation
 2. **Review** - Let me examine the journeys first
 3. **Add Journeys** - I need to add more journeys
@@ -331,9 +352,11 @@ Wait for user approval before proceeding to Phase 3.
 ## PHASE 3: Story Preparation
 
 ### Objective
+
 Transform the documented feature and journeys into structured, implementable stories.
 
 ### Prerequisites
+
 - Phase 1 Discovery: `.claude/docs/{feature-name}.md`
 - Phase 2 User Journeys: `.claude/docs/{feature-name}-user-journeys.md`
 
@@ -342,6 +365,7 @@ Transform the documented feature and journeys into structured, implementable sto
 **Step 3.1: Analyze Available Context**
 
 Read both documentation files to understand:
+
 - Technical implementation requirements
 - All user journeys to cover
 - Patterns to follow
@@ -355,23 +379,29 @@ For each major journey or feature area, create stories:
 # Stories for: {Feature Name}
 
 ## Overview
+
 - **Total Stories:** [N]
 - **Discovery Doc:** .claude/docs/{feature-name}.md
 - **User Journeys:** .claude/docs/{feature-name}-user-journeys.md
 
 ## Phase 1: Foundation Stories
+
 [Database, models, base services]
 
 ## Phase 2: Core Implementation Stories
+
 [Main functionality, primary journeys]
 
 ## Phase 3: Integration Stories
+
 [Connect components, API endpoints, frontend-backend integration]
 
 ## Phase 4: Secondary Journeys
+
 [Admin features, error paths, edge cases]
 
 ## Phase 5: Polish & Testing
+
 [Validation, testing, documentation updates]
 
 ---
@@ -383,17 +413,18 @@ For each major journey or feature area, create stories:
 
 Create a journey-to-story mapping:
 
-| Journey ID | Journey Title | Story/Stories | Status |
-|------------|---------------|---------------|--------|
-| EUSR-001 | Primary end user flow | Story 3, 4, 5 | Planned |
-| ADMN-001 | Admin configuration | Story 1, 2 | Planned |
-| ... | ... | ... | ... |
+| Journey ID | Journey Title         | Story/Stories | Status  |
+| ---------- | --------------------- | ------------- | ------- |
+| EUSR-001   | Primary end user flow | Story 3, 4, 5 | Planned |
+| ADMN-001   | Admin configuration   | Story 1, 2    | Planned |
+| ...        | ...                   | ...           | ...     |
 
 Ensure ALL journeys are covered by at least one story.
 
 **Step 3.4: Story Validation**
 
 Verify each story has:
+
 - [ ] Clear objective
 - [ ] Specific acceptance criteria
 - [ ] Journey references
@@ -411,6 +442,7 @@ Before presenting checkpoint to user:
 2. Log story planning decisions to state:
 
 Use the Task tool with `subagent_type="state-manager"`:
+
 ```
 ## Phase Checkpoint Request
 
@@ -439,20 +471,23 @@ Use the Task tool with `subagent_type="state-manager"`:
 **Stories saved to:** `.claude/stories/{feature-name}.md`
 
 ### Summary
-| Phase | Stories | Complexity |
-|-------|---------|------------|
-| Foundation | [N] | S/M/L breakdown |
-| Core Implementation | [N] | S/M/L breakdown |
-| Integration | [N] | S/M/L breakdown |
-| Secondary Journeys | [N] | S/M/L breakdown |
-| Polish & Testing | [N] | S/M/L breakdown |
-| **Total** | **[N]** | |
+
+| Phase               | Stories | Complexity      |
+| ------------------- | ------- | --------------- |
+| Foundation          | [N]     | S/M/L breakdown |
+| Core Implementation | [N]     | S/M/L breakdown |
+| Integration         | [N]     | S/M/L breakdown |
+| Secondary Journeys  | [N]     | S/M/L breakdown |
+| Polish & Testing    | [N]     | S/M/L breakdown |
+| **Total**           | **[N]** |                 |
 
 ### Journey Coverage
+
 - **Journeys covered:** [N] of [Total]
 - **Uncovered journeys:** [List or "None"]
 
 ### Estimated Effort
+
 [S/M/L/XL distribution]
 
 ---
@@ -460,6 +495,7 @@ Use the Task tool with `subagent_type="state-manager"`:
 **Ready to proceed to Phase 4 (Implementation)?**
 
 Options:
+
 1. **Continue** - Start implementation with multi-dev team
 2. **Review Stories** - Let me examine the stories first
 3. **Adjust Stories** - I need to modify some stories
@@ -473,11 +509,13 @@ Wait for user approval before proceeding to Phase 4.
 ## PHASE 4: Implementation
 
 ### Objective
+
 Execute all stories using the multi-developer team workflow.
 
 ### Implementation Tracking
 
 During implementation, the team will track:
+
 - Files created/modified
 - New patterns introduced
 - API endpoints added
@@ -488,6 +526,7 @@ During implementation, the team will track:
 This information is captured for Phase 5 documentation refresh.
 
 ### Prerequisites
+
 - Stories file: `.claude/stories/{feature-name}.md`
 - Discovery doc: `.claude/docs/{feature-name}.md`
 - User journeys: `.claude/docs/{feature-name}-user-journeys.md`
@@ -539,6 +578,7 @@ Before presenting checkpoint to user:
 2. Log implementation decisions to state:
 
 Use the Task tool with `subagent_type="state-manager"`:
+
 ```
 ## Phase Checkpoint Request
 
@@ -569,22 +609,26 @@ Use the Task tool with `subagent_type="state-manager"`:
 ## Phase 4 Complete: Implementation
 
 ### Implementation Summary
-| Metric | Count |
-|--------|-------|
-| Files Created | [N] |
-| Files Modified | [N] |
-| New API Endpoints | [N] |
-| Database Migrations | [N] |
-| New Components | [N] |
-| New Services | [N] |
+
+| Metric              | Count |
+| ------------------- | ----- |
+| Files Created       | [N]   |
+| Files Modified      | [N]   |
+| New API Endpoints   | [N]   |
+| Database Migrations | [N]   |
+| New Components      | [N]   |
+| New Services        | [N]   |
 
 ### Key Deliverables
+
 [List main deliverables]
 
 ### Patterns Introduced
+
 [Any new patterns that future agents should know about]
 
 ### Deviations from Plan
+
 [Any significant deviations from the original stories]
 
 ---
@@ -592,6 +636,7 @@ Use the Task tool with `subagent_type="state-manager"`:
 **Ready to proceed to Phase 5 (Documentation Refresh)?**
 
 Options:
+
 1. **Continue** - Refresh documentation for future AI agents
 2. **Skip** - Finish without updating documentation
 3. **Review** - Let me review the implementation first
@@ -604,6 +649,7 @@ Wait for user approval before proceeding to Phase 5.
 ## PHASE 5: Documentation Refresh
 
 ### Objective
+
 Update all documentation to reflect implementation reality, ensuring future AI agents have accurate, up-to-date information for discovery.
 
 ### Why This Phase Matters
@@ -670,6 +716,7 @@ Compare implemented behavior against documented journeys:
 ## Verify: `.claude/docs/{feature-name}-user-journeys.md`
 
 ### For Each Journey:
+
 - [ ] Trigger still accurate?
 - [ ] Steps match implementation?
 - [ ] Success path works as documented?
@@ -677,6 +724,7 @@ Compare implemented behavior against documented journeys:
 - [ ] Technical entry points correct?
 
 ### Update Required If:
+
 - Journey was modified during implementation
 - New journeys were added
 - Journeys were descoped
@@ -691,6 +739,7 @@ Mark stories as complete and add implementation notes:
 ## Update: `.claude/stories/{feature-name}.md`
 
 ### For Each Story:
+
 - [ ] Mark status: ✅ Complete | ⏸️ Deferred | ❌ Descoped
 - [ ] Add implementation notes
 - [ ] Link to actual files created
@@ -701,7 +750,7 @@ Mark stories as complete and add implementation notes:
 
 Use the Task tool with `subagent_type="ai-docs-generator"`:
 
-```
+````
 ## AI Documentation Update Request
 
 ### Feature Completed
@@ -740,7 +789,7 @@ $ARGUMENTS
    ### Common Pitfalls
    - [Mistake 1 and how to avoid]
    - [Mistake 2 and how to avoid]
-   ```
+````
 
 3. **Update Cross-References**
    - Link to related features
@@ -752,7 +801,8 @@ $ARGUMENTS
    - "[feature name]" finds this doc
    - "[key functionality]" finds relevant sections
    - "[common task]" finds the right entry point
-```
+
+````
 
 **Step 5.5: Update Project-Wide Documentation**
 
@@ -778,7 +828,7 @@ Check and update project-level documentation:
 4. **Configuration Guide** (if new config)
    - Document new configuration options
    - Add to environment setup guides
-```
+````
 
 **Step 5.6: Create Implementation Changelog Entry**
 
@@ -790,46 +840,56 @@ Add an entry to track what was built:
 Save to: `.claude/docs/changelog/{feature-name}-{date}.md`
 
 ---
+
 type: implementation-record
 feature: {feature-name}
 completed: {YYYY-MM-DD}
 stories_completed: [N]
 files_created: [N]
 files_modified: [N]
+
 ---
 
 # Implementation: {Feature Name}
 
 ## Summary
+
 [2-3 sentence summary of what was built]
 
 ## Deliverables
-| Type | Item | Location |
-|------|------|----------|
-| Controller | {Name} | {path} |
-| Service | {Name} | {path} |
-| Component | {Name} | {path} |
-| Migration | {Name} | {path} |
+
+| Type       | Item   | Location |
+| ---------- | ------ | -------- |
+| Controller | {Name} | {path}   |
+| Service    | {Name} | {path}   |
+| Component  | {Name} | {path}   |
+| Migration  | {Name} | {path}   |
 
 ## API Endpoints Added
+
 | Method | Endpoint | Purpose |
-|--------|----------|---------|
-| GET | /api/... | ... |
-| POST | /api/... | ... |
+| ------ | -------- | ------- |
+| GET    | /api/... | ...     |
+| POST   | /api/... | ...     |
 
 ## Database Changes
+
 [Tables/columns added or modified]
 
 ## Configuration Added
+
 [New config keys and their purpose]
 
 ## Patterns Introduced
+
 [Any new patterns future developers should follow]
 
 ## Known Limitations
+
 [What this implementation doesn't do]
 
 ## Future Enhancements
+
 [Suggested future improvements]
 ```
 
@@ -841,18 +901,21 @@ Final verification checklist:
 ## Documentation Verification
 
 ### Accuracy Checks
+
 - [ ] All file paths in docs exist in codebase
 - [ ] All function/class names match actual code
 - [ ] API endpoint documentation matches implementation
 - [ ] Configuration documentation is complete
 
 ### Discoverability Checks
+
 - [ ] Feature can be found by searching its name
 - [ ] Key functionality is tagged appropriately
 - [ ] Cross-references are bidirectional
 - [ ] Index/overview docs are updated
 
 ### Completeness Checks
+
 - [ ] Discovery doc updated with implementation details
 - [ ] User journeys verified against implementation
 - [ ] Stories marked with completion status
@@ -867,20 +930,23 @@ Final verification checklist:
 ## Phase 5 Complete: Documentation Refresh
 
 ### Documentation Updated
-| Document | Status | Changes |
-|----------|--------|---------|
-| Discovery Doc | ✅ Updated | +[N] sections, [N] files added |
-| User Journeys | ✅ Verified | [N] journeys confirmed |
-| Stories | ✅ Completed | [N] marked complete |
-| Changelog | ✅ Created | Implementation record added |
+
+| Document      | Status       | Changes                        |
+| ------------- | ------------ | ------------------------------ |
+| Discovery Doc | ✅ Updated   | +[N] sections, [N] files added |
+| User Journeys | ✅ Verified  | [N] journeys confirmed         |
+| Stories       | ✅ Completed | [N] marked complete            |
+| Changelog     | ✅ Created   | Implementation record added    |
 
 ### AI Agent Discoverability
+
 - [ ] Quick Start section added
 - [ ] Troubleshooting guide added
 - [ ] Extension points documented
 - [ ] Cross-references updated
 
 ### Project Docs Updated
+
 - [ ] Backend docs: [Updated/N/A]
 - [ ] Frontend docs: [Updated/N/A]
 - [ ] API docs: [Updated/N/A]
@@ -901,6 +967,7 @@ After all 5 phases complete, finalize the session for state persistence and futu
 ### Final Context Compression
 
 Run `/compact` one final time to compress the complete lifecycle context:
+
 - All 5 phase summaries
 - Key decisions across phases
 - Final implementation state
@@ -968,6 +1035,7 @@ Use the Task tool with `subagent_type="state-manager"`:
 ### Display Final Session Status
 
 Run `/session-status` to display:
+
 - Complete lifecycle metrics
 - All phase completion times
 - Decision log summary
@@ -983,42 +1051,48 @@ After all phases complete, provide a comprehensive summary:
 ## Feature Lifecycle Complete: $ARGUMENTS
 
 ### Phase Summary
-| Phase | Status | Key Output |
-|-------|--------|------------|
-| 1. Discovery | ✅ Complete | `.claude/docs/{feature}.md` |
-| 2. User Journeys | ✅ Complete | [N] journeys documented |
-| 3. Story Prep | ✅ Complete | [N] stories created |
-| 4. Implementation | ✅ Complete | [N] files changed |
-| 5. Doc Refresh | ✅ Complete | Docs updated for future agents |
+
+| Phase             | Status      | Key Output                     |
+| ----------------- | ----------- | ------------------------------ |
+| 1. Discovery      | ✅ Complete | `.claude/docs/{feature}.md`    |
+| 2. User Journeys  | ✅ Complete | [N] journeys documented        |
+| 3. Story Prep     | ✅ Complete | [N] stories created            |
+| 4. Implementation | ✅ Complete | [N] files changed              |
+| 5. Doc Refresh    | ✅ Complete | Docs updated for future agents |
 
 ### Documentation Produced
-| Document | Location | For Future Agents |
-|----------|----------|-------------------|
-| Discovery | `.claude/docs/{feature}.md` | Architecture, patterns, entry points |
-| User Journeys | `.claude/docs/{feature}-user-journeys.md` | All actor interactions |
-| Stories | `.claude/stories/{feature}.md` | Implementation spec (completed) |
-| Changelog | `.claude/docs/changelog/{feature}-{date}.md` | What was built |
+
+| Document      | Location                                     | For Future Agents                    |
+| ------------- | -------------------------------------------- | ------------------------------------ |
+| Discovery     | `.claude/docs/{feature}.md`                  | Architecture, patterns, entry points |
+| User Journeys | `.claude/docs/{feature}-user-journeys.md`    | All actor interactions               |
+| Stories       | `.claude/stories/{feature}.md`               | Implementation spec (completed)      |
+| Changelog     | `.claude/docs/changelog/{feature}-{date}.md` | What was built                       |
 
 ### Implementation Summary
-| Metric | Count |
-|--------|-------|
-| Files Created | [N] |
-| Files Modified | [N] |
-| API Endpoints Added | [N] |
-| Components Created | [N] |
-| Services Created | [N] |
+
+| Metric                    | Count      |
+| ------------------------- | ---------- |
+| Files Created             | [N]        |
+| Files Modified            | [N]        |
+| API Endpoints Added       | [N]        |
+| Components Created        | [N]        |
+| Services Created          | [N]        |
 | User Journeys Implemented | [N] of [N] |
 
 ### Code Review Summary
-| Reviewer | Issues Found | Status |
-|----------|--------------|--------|
-| Security | [count] | ✅ Approved |
-| Performance | [count] | ✅ Approved |
-| Architecture | [count] | ✅ Approved |
-| Code Quality | [count] | ✅ Approved |
+
+| Reviewer     | Issues Found | Status      |
+| ------------ | ------------ | ----------- |
+| Security     | [count]      | ✅ Approved |
+| Performance  | [count]      | ✅ Approved |
+| Architecture | [count]      | ✅ Approved |
+| Code Quality | [count]      | ✅ Approved |
 
 ### Documentation Feedback Loop Status
+
 Future AI agents running `/discover {feature}` will now find:
+
 - ✅ Accurate file structure with all new files
 - ✅ Current entry points (controllers, components, services)
 - ✅ Implementation patterns to follow
@@ -1027,12 +1101,14 @@ Future AI agents running `/discover {feature}` will now find:
 - ✅ AI Agent Quick Start section
 
 ### Next Steps
+
 - Run tests: `npm run jest` (frontend), `dotnet test` (backend)
 - Manual testing per journey documentation
 - Deploy to staging for QA
 - Consider: What's the next feature?
 
 ### Team Lead Final Verdict
+
 ✅ APPROVED - Feature is production-ready with documentation for future AI agents
 ```
 
@@ -1041,23 +1117,30 @@ Future AI agents running `/discover {feature}` will now find:
 ## Quick Reference
 
 ### Start Full Lifecycle
+
 ```
 /feature-lifecycle {feature description}
 ```
 
 ### Skip Phases
+
 If you want to skip phases (e.g., documentation already exists):
+
 - Answer "Skip" at any checkpoint to jump ahead
 - Or run individual commands: `/discover`, `/user-journeys`, `/prepare-stories`, `/feature`
 
 ### Resume from Phase
+
 If you need to resume from a specific phase:
+
 - Phase 2: `/user-journeys {feature-name}`
 - Phase 3: `/prepare-stories {feature-name}`
 - Phase 4: `/feature {feature-name}`
 
 ### Prerequisites Check
+
 Before starting, ensure:
+
 - [ ] Feature requirements are clear
 - [ ] You have access to the codebase
 - [ ] Build passes (see PROJECT_STARTUP.md for build commands)
@@ -1073,27 +1156,35 @@ At workflow start, each dispatched agent should consult its `.claude/agent-memor
 ## Error Handling
 
 ### Build Failures
+
 If build fails during any phase:
+
 1. Capture the error output
 2. Diagnose the issue
 3. Fix before continuing
 4. Re-run affected phase steps
 
 ### Missing Documentation
+
 If required documentation is missing:
+
 1. Offer to create it now
 2. Or skip to the next available phase
 3. Note the gap for future resolution
 
 ### Stuck on a Story
+
 If implementation gets stuck:
+
 1. Use Integration Developer to help
 2. Surface the blocker to user
 3. Adjust story scope if needed
 4. Continue with other stories
 
 ### User Questions
+
 At any checkpoint, the user may:
+
 - Ask questions about the feature
 - Request clarification on stories
 - Ask to see specific documentation

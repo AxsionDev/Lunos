@@ -941,8 +941,7 @@ export const dict = {
   "settings.general.row.appearance.title": "ظاہری شکل",
   "settings.general.row.appearance.description": "اپنی مرضی کے مطابق بنائیں کہ آپ کے آلے پر Lunos کیسا لگتا ہے۔",
   "settings.general.row.colorScheme.title": "رنگ سکیم",
-  "settings.general.row.colorScheme.description":
-    "منتخب کریں کہ آیا Lunos سسٹم، لائٹ یا ڈارک تھیم کی پیروی کرتا ہے۔",
+  "settings.general.row.colorScheme.description": "منتخب کریں کہ آیا Lunos سسٹم، لائٹ یا ڈارک تھیم کی پیروی کرتا ہے۔",
   "settings.general.row.theme.title": "تھیم",
   "settings.general.row.theme.description": "Lunos کی تھیم حسب ضرورت بنائیں۔",
   "settings.general.row.font.title": "کوڈ فونٹ",

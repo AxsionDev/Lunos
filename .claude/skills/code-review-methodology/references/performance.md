@@ -7,37 +7,43 @@ Load project query/component examples from `.claude/patterns/{backend,database,f
 ## Checklist
 
 ### 1. Database
+
 - **N+1** — fetch a collection then access a related entity per item in a loop (1+N round trips); lazy loading in loops; missing eager loading (Include/join/prefetch); queries inside foreach/for.
 - **Query efficiency** — materialize-then-filter in memory; `SELECT *` when few columns needed; missing indexes on filtered/sorted columns; missing pagination.
 
 ### 2. Async/Await
+
 Blocking on async (`.Result`, `.Wait()`, `.GetAwaiter().GetResult()`, `asyncio.run()` inside async) in request-handling code; fire-and-forget without error handling; async overhead for purely sync work; thread-pool starvation.
 
 ### 3. Memory & Allocations
+
 String concat in loops (use builder/join); boxing/unboxing; large objects on hot paths; unnecessary collection materialization.
 
 ### 4. Caching
+
 Repeated expensive computations; DB queries for static/rarely-changing data; missing HTTP cache headers; cacheable API calls uncached.
 
 ### 5. Resource Management
+
 Disposables not disposed (streams, connections); HTTP clients created per request (should be singleton/factory); DB connections not scoped; file handles left open.
 
 ### 6. Frontend
+
 Subscription/listener leaks (missing cleanup on destroy); unnecessary re-render (missing OnPush/memo); large lists without virtualization/tracking; excessive change-detection cycles.
 
 ## Severity
 
-| Level | Meaning | Examples |
-|-------|---------|----------|
-| 🔴 Critical | Severe impact | N+1 in main list, blocking async |
-| 🟠 High | Noticeable degradation | Missing caching, inefficient queries |
-| 🟡 Medium | Scales poorly | String concat, unnecessary allocations |
-| 🟢 Low | Micro-optimization | Minor allocation reduction |
+| Level       | Meaning                | Examples                               |
+| ----------- | ---------------------- | -------------------------------------- |
+| 🔴 Critical | Severe impact          | N+1 in main list, blocking async       |
+| 🟠 High     | Noticeable degradation | Missing caching, inefficient queries   |
+| 🟡 Medium   | Scales poorly          | String concat, unnecessary allocations |
+| 🟢 Low      | Micro-optimization     | Minor allocation reduction             |
 
 ## Detection Methodologies (static, via Grep/Glob)
 
 - **N+1** — loop constructs (foreach/for/map) near ORM query calls; check for eager loading (Include/prefetch/join) before the loop.
-- **Blocking async** — `.Result`/`.Wait()`/`.GetAwaiter().GetResult()` in controller/service/handler. *Context matters:* startup/main/test setup is usually OK; request-handling code is a violation.
+- **Blocking async** — `.Result`/`.Wait()`/`.GetAwaiter().GetResult()` in controller/service/handler. _Context matters:_ startup/main/test setup is usually OK; request-handling code is a violation.
 - **Inefficient queries** — ORM materialization (`ToList`/`all()`/`fetchAll`) immediately followed by filter/map (materialize-then-filter); client-side evaluation of untranslatable functions.
 - **Memory** — `+=` string building in loops; large array/collection creation in non-static hot paths.
 
@@ -64,16 +70,22 @@ Lower impact (Medium/Low): rarely-called admin functions; small bounded datasets
 ## Performance Review Report
 
 ### Summary
+
 - Files Reviewed / Critical / High / Medium / Low: [counts]
 
 ### Critical 🔴 / High 🟠 / Medium 🟡 / Low 🟢
+
 #### Issue: [title]
-**Location**: `file:line`   **Impact**: [est. impact, e.g. "~100ms/request"]
-**Code**: [problematic snippet]   **Fix**: [optimized code]
+
+**Location**: `file:line` **Impact**: [est. impact, e.g. "~100ms/request"]
+**Code**: [problematic snippet] **Fix**: [optimized code]
 
 ### Optimization Opportunities 💡
+
 ### Good Patterns Observed ✅
+
 ### Verdict: APPROVED / NEEDS FIXES
+
 ### Required Actions
 ```
 

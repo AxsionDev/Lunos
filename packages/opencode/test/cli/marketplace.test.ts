@@ -177,7 +177,10 @@ describe("marketplace.add.task", () => {
     await using tmp = await tmpdir()
     const global = path.join(tmp.path, "global")
 
-    const run = createMarketplaceAddTask({ source: "pminev1/Lunos" }, addDeps(global, async () => validManifest as never))
+    const run = createMarketplaceAddTask(
+      { source: "pminev1/Lunos" },
+      addDeps(global, async () => validManifest as never),
+    )
     expect(await run(ctx(tmp.path))).toBe(true)
 
     const entries = await listMarketplaces(
@@ -221,7 +224,6 @@ function listDeps(global: string, resolve: FetchDeps): MarketplaceListDeps {
 }
 
 describe("marketplace.list", () => {
-
   test("shows an empty list when nothing is added", async () => {
     await using tmp = await tmpdir()
     const entries = await listMarketplaces(
