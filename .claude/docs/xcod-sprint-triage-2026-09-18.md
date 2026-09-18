@@ -6,18 +6,25 @@ Board: https://axsion.atlassian.net/jira/software/projects/XCOD/boards/169
 
 13 issues. Triaged by _cost to reach in Review_, not by key.
 
-## A. Already in Review
+## A. In Review (4)
 
-| Key     | Summary                                                    |
-| ------- | ---------------------------------------------------------- |
-| XCOD-50 | Release assets named `opencode-*` vs installer's `lunos-*` |
+| Key     | Summary                                                    | How it got there                                     |
+| ------- | ---------------------------------------------------------- | ---------------------------------------------------- |
+| XCOD-50 | Release assets named `opencode-*` vs installer's `lunos-*` | already there at session start                       |
+| XCOD-56 | Home-screen tips name a nonexistent command                | `e3f90f0d0c` → `dev` `394ec88552`, pushed            |
+| XCOD-51 | ITService EOOD copyright line in LICENSE                   | `b08e47a372` → `dev` `91dc770085`, pushed            |
+| XCOD-47 | setup-git-committer needs upstream's GitHub App            | status was stale — fix `04d2340ef4` already on `dev` |
 
-## B. Code landed this session (branches cut from `dev`, not yet pushed)
+## B. In Progress
 
-| Key     | Branch                             | State                                                 |
-| ------- | ---------------------------------- | ----------------------------------------------------- |
-| XCOD-56 | `xcod-56-home-screen-tips-lunos`   | `e3f90f0d0c` — tsgo clean, verified under a pty       |
-| XCOD-51 | `xcod-51-license-entity-copyright` | `b08e47a372` — additive, upstream line byte-identical |
+| Key     | State                                                                                 |
+| ------- | ------------------------------------------------------------------------------------- |
+| XCOD-44 | TUI half complete (`b5861ac517`, `12c61309b4`, both on `dev`). Desktop + docs remain. |
+
+XCOD-44's AC-1 now holds: `grep -rn "OpenCode" packages/tui/src` returns only Zen/Go
+references. Terminal title verified by reading the OSC sequence from a pty capture.
+`packages/cli/src` swept and confirmed clean (0 matches, both exact-case and lowercase
+invocation forms).
 
 ### XCOD-56 notes
 
@@ -50,13 +57,23 @@ its `"license": "MIT"` already resolves here (npm metadata is not a legal instru
 `NOTICE` exists and MIT requires none, unlike Apache-2.0 §4(d); the 21 READMEs already carry
 the XCOD-24 affiliation disclaimer, a different instrument from a copyright assertion.
 
-## C. Status is stale — code already merged to `dev`
+## C. Still To Do — code on `dev` but genuinely incomplete
 
-| Key     | Commit on `dev`                                    | Remaining                                         |
-| ------- | -------------------------------------------------- | ------------------------------------------------- |
-| XCOD-47 | `04d2340ef4` git-committer `GITHUB_TOKEN` fallback | 2 ACs need a real `publish.yml` dispatch          |
-| XCOD-44 | `8a8e19145e` publish CLI as `lunos-ai`             | ticket is broader than the commit — needs scoping |
-| XCOD-46 | `9368d1089b` install usage examples                | gated on `lunos-ai` actually being published      |
+| Key     | Commit on `dev`                     | Remaining                                    |
+| ------- | ----------------------------------- | -------------------------------------------- |
+| XCOD-46 | `9368d1089b` install usage examples | gated on `lunos-ai` actually being published |
+
+## Verification baseline for this session
+
+`bun turbo test` → **715 pass / 9 fail**, matching the documented baseline. All 9 are in
+`packages/app/src/components/prompt-input/submit.test.ts` (`local.mode.current` undefined),
+a package untouched by this session's changes. No regression introduced.
+
+`bun turbo typecheck --filter=@opencode-ai/tui --force` passes on a forced cache miss.
+Note `packages/tui` declares no `test` task, so the pty render is the only runtime check
+available for it — which is why XCOD-56 and XCOD-44 were both verified that way.
+
+Do not use `bun test | tail` — it masks the exit code. The real command is `bun turbo test`.
 
 ## D. No code deliverable — owner decision or external dependency
 
