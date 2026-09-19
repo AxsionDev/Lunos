@@ -15,11 +15,9 @@ Board: https://axsion.atlassian.net/jira/software/projects/XCOD/boards/169
 | XCOD-51 | ITService EOOD copyright line in LICENSE                   | `b08e47a372` → `dev` `91dc770085`, pushed            |
 | XCOD-47 | setup-git-committer needs upstream's GitHub App            | status was stale — fix `04d2340ef4` already on `dev` |
 
-## B. In Progress
+## B. XCOD-44 — complete, in Review
 
-| Key     | State                                                                  |
-| ------- | ---------------------------------------------------------------------- |
-| XCOD-44 | TUI ✅ and desktop ✅ done. Docs site scoped, needs an owner decision. |
+All three items done: TUI ✅ desktop ✅ docs site ✅.
 
 **TUI** (`b5861ac517`, `12c61309b4`) — AC-1 holds: `grep -rn "OpenCode" packages/tui/src`
 returns only Zen/Go. Terminal title verified via the OSC sequence in a pty capture.
@@ -49,17 +47,29 @@ XCOD-24, which declares the inherited translations stale rather than maintained.
 is the source of truth and locale docs are stale by existing policy — that removes ~5,400
 of 5,838 matches without touching anything.
 
-The remaining **413 English `.mdx` matches** split three ways, and only the first is a rename:
+The remaining **413 English `.mdx` matches** were swept (`5ff8b48e44`), sentinel-protecting
+`OpenCode Zen`, `OpenCode Go` and upstream repo paths. `enterprise.mdx` was **removed** —
+it documented upstream's commercial offering — with its nav entry and inbound link fixed.
 
-| Category                                    | Example                          | Verdict              |
-| ------------------------------------------- | -------------------------------- | -------------------- |
-| Generic product reference                   | "OpenCode does not store…"       | → Lunos              |
-| Excluded provider name (19)                 | `OpenCode Zen`                   | leave                |
-| **Upstream products Lunos doesn't operate** | `OpenCode Enterprise`, `zen.mdx` | **neither — decide** |
+**`zen.mdx` was kept, reversing the original plan.** Looking at the file before deleting
+showed OpenCode Zen is a _third-party provider Lunos actively supports_: the TUI ships a
+`/connect` flow pointing at `opencode.ai/zen` (`dialog-provider.tsx:378`) and provider id
+`opencode` is live. Deleting it would have removed docs for a working feature. Only its
+client-references were rebranded; attribution to the OpenCode team is intact.
 
-The third is a content decision, not a rename: rebranding `enterprise.mdx` would advertise
-a "Lunos Enterprise" that does not exist; leaving it implies Lunos operates upstream's
-commercial services. Owner decision pending.
+### The lesson: protecting a product name does not protect the sentence around it
+
+The sweep was sentinel-protected for `OpenCode Zen`/`OpenCode Go`, and **still** produced
+three misattributions, because the damage was in the surrounding prose:
+
+- `providers.mdx` ×2 — Zen and Go "provided by the **Lunos** team" → restored to OpenCode team
+- `zen.mdx` — "provided by Lunos" → restored
+
+Each would have claimed a third-party AI gateway as ours. **Always grep for
+`the Lunos team` / `Lunos <ProductName>` after any rebrand sweep.**
+
+Verified with `astro build` (the real check, since a page was deleted and nav edited), not
+just greps.
 
 ### XCOD-56 notes
 
