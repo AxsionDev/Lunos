@@ -86,4 +86,4 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/pminev1/Lunos/commits/dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/commits/dev

@@ -119,9 +119,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pminev1/Lunos"
+    "url": "https://github.com/AxsionDev/Lunos"
   },
-  "homepage": "https://github.com/pminev1/Lunos",
+  "homepage": "https://github.com/AxsionDev/Lunos",
   "license": "MIT",
   "prettier": {
     "semi": false,
