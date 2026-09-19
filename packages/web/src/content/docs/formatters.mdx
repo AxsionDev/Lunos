@@ -1,15 +1,15 @@
 ---
 title: Formatters
-description: OpenCode uses language specific formatters.
+description: Lunos uses language specific formatters.
 ---
 
-OpenCode can format files after they are written or edited using language-specific formatters. Formatters are disabled by default; enable them in your config before OpenCode will run them.
+Lunos can format files after they are written or edited using language-specific formatters. Formatters are disabled by default; enable them in your config before Lunos will run them.
 
 ---
 
 ## Built-in
 
-OpenCode comes with several built-in formatters for popular languages and frameworks. Below is a list of the formatters, supported file extensions, and commands or config options it needs.
+Lunos comes with several built-in formatters for popular languages and frameworks. Below is a list of the formatters, supported file extensions, and commands or config options it needs.
 
 | Formatter            | Extensions                                                                                               | Requirements                                                                                          |
 | -------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -40,13 +40,13 @@ OpenCode comes with several built-in formatters for popular languages and framew
 | uv                   | .py, .pyi                                                                                                | `uv` command available                                                                                |
 | zig                  | .zig, .zon                                                                                               | `zig` command available                                                                               |
 
-When formatters are enabled, OpenCode will use `prettier` for matching files if your project has `prettier` in `package.json`.
+When formatters are enabled, Lunos will use `prettier` for matching files if your project has `prettier` in `package.json`.
 
 ---
 
 ## How it works
 
-When OpenCode writes or edits a file and formatters are enabled, it:
+When Lunos writes or edits a file and formatters are enabled, it:
 
 1. Checks the file extension against all enabled formatters.
 2. Runs the appropriate formatter command on the file.
@@ -58,7 +58,7 @@ This process happens in the background for enabled formatters.
 
 ## Configure
 
-You can enable and customize formatters through the `formatter` section in your OpenCode config.
+You can enable and customize formatters through the `formatter` section in your Lunos config.
 
 To enable all built-in formatters, set `formatter` to `true`.
 

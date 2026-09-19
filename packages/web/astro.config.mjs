@@ -176,7 +176,6 @@ export default defineConfig({
         "config",
         "providers",
         "network",
-        "enterprise",
         "troubleshooting",
         {
           label: "Windows",
