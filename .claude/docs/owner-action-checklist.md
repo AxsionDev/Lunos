@@ -49,7 +49,18 @@ gh run list --repo AxsionDev/Lunos --workflow=publish.yml --limit 3
 `sign-cli-windows` **skipped** → Electron builds unsigned → Homebrew/AUR skipped → ghcr push →
 `lunos-ai` published.
 
-**This path has never run end to end.** Most likely surprise: the ghcr push to
+**Packages your token will claim** (all verified free on npm):
+`lunos-ai` plus the platform sub-packages `lunos-darwin-arm64`, `lunos-darwin-x64`,
+`lunos-linux-x64`, `lunos-linux-arm64`, `lunos-windows-x64`, and the `-baseline` / `-musl`
+variants. That is why the token needs user-level scope rather than package-scoped.
+
+> ✅ **Fixed 2026-09-19, before you spend a run on it.** The pipeline would have tried to publish
+> these as `opencode-darwin-arm64` etc. — real packages owned by upstream's maintainer — and failed
+> **403** before reaching `lunos-ai`. Also fixed: `postinstall` wrote the binary to
+> `bin/opencode.exe` while the manifest declared `bin/lunos.exe`, so the `lunos` command would have
+> run an error stub; and `install` still pointed at `pminev1/Lunos`, so every download would 404.
+
+**This path has never run end to end.** Most likely remaining surprise: the ghcr push to
 `ghcr.io/axsiondev/lunos` — the org may need package-write permission granted to Actions on first
 use. If it fails there, everything before it still succeeded.
 
