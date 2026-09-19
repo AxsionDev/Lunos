@@ -326,8 +326,11 @@ jobs:
         with:
           install-flags: ${{ matrix.settings.bun_install_flags }}
 
+      # XCOD-49: without Azure Trusted Signing credentials this fails with "Not all values are
+      # present", which failed both Windows matrix legs and — because `publish` needs
+      # build-electron — skipped the publish entirely. Same gate as sign-cli-windows.
       - name: Azure login
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && needs.preflight.outputs.sign_windows == 'true'
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
