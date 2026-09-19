@@ -38,14 +38,26 @@ await prepareReleaseFiles()
 console.log("\n=== cli ===\n")
 await $`bun ./packages/opencode/script/publish.ts`
 
-console.log("\n=== sdk ===\n")
-await $`bun ./packages/sdk/js/script/publish.ts`
+// XCOD-49: the sdk, plugin and ui packages are still named @opencode-ai/* — upstream's scope on
+// npm — so publishing them fails 403 and takes the whole release down with it. Skipped by
+// default rather than renamed: the CLI is a bundled binary that does not depend on them at
+// runtime, and they only matter once third parties build integrations against Lunos.
+//
+// To enable, first give them a Lunos-owned name (a scope needs an npm organisation), then set
+// LUNOS_PUBLISH_LIBS=1.
+if (process.env.LUNOS_PUBLISH_LIBS === "1") {
+  console.log("\n=== sdk ===\n")
+  await $`bun ./packages/sdk/js/script/publish.ts`
 
-console.log("\n=== plugin ===\n")
-await $`bun ./packages/plugin/script/publish.ts`
+  console.log("\n=== plugin ===\n")
+  await $`bun ./packages/plugin/script/publish.ts`
 
-console.log("\n=== ui ===\n")
-await $`bun ./packages/ui/script/publish.ts`
+  console.log("\n=== ui ===\n")
+  await $`bun ./packages/ui/script/publish.ts`
+} else {
+  console.log("\n=== sdk / plugin / ui: skipped ===")
+  console.log("still named @opencode-ai/* (upstream's npm scope); set LUNOS_PUBLISH_LIBS=1 once renamed\n")
+}
 
 if (Script.release) {
   await $`bun ./packages/desktop/scripts/finalize-latest-json.ts`
