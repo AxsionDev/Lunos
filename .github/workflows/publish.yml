@@ -3,7 +3,7 @@ run-name: "${{ format('release {0}', inputs.bump) }}"
 
 on:
   # NOTE: the inherited `push` trigger (ci/dev/beta/snapshot-*) is deliberately
-  # removed. With the repository guards now re-pointed at pminev1/Lunos, leaving
+  # removed. With the repository guards now re-pointed at AxsionDev/Lunos, leaving
   # it in place would turn every merge to dev into a live npm publish and GitHub
   # release. Releases are manual until that is an explicit decision — restore the
   # push block to go back to release-on-merge.
@@ -32,7 +32,7 @@ permissions:
 jobs:
   version:
     runs-on: ubuntu-24.04
-    if: github.repository == 'pminev1/Lunos'
+    if: github.repository == 'AxsionDev/Lunos'
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
@@ -69,7 +69,7 @@ jobs:
   build-cli:
     needs: version
     runs-on: ubuntu-24.04
-    if: github.repository == 'pminev1/Lunos'
+    if: github.repository == 'AxsionDev/Lunos'
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
@@ -120,7 +120,7 @@ jobs:
       - build-cli
       - version
     runs-on: windows-2025
-    if: github.repository == 'pminev1/Lunos'
+    if: github.repository == 'AxsionDev/Lunos'
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -218,7 +218,7 @@ jobs:
   build-electron:
     needs:
       - version
-    if: github.repository == 'pminev1/Lunos'
+    if: github.repository == 'AxsionDev/Lunos'
     continue-on-error: false
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -405,7 +405,7 @@ jobs:
       - build-cli
       - sign-cli-windows
       - build-electron
-    if: github.repository == 'pminev1/Lunos' && always() && !failure() && !cancelled()
+    if: github.repository == 'AxsionDev/Lunos' && always() && !failure() && !cancelled()
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
