@@ -107,6 +107,30 @@ the XCOD-24 affiliation disclaimer, a different instrument from a copyright asse
 | Key     | Commit on `dev`                     | Remaining                                    |
 | ------- | ----------------------------------- | -------------------------------------------- |
 | XCOD-46 | `9368d1089b` install usage examples | gated on `lunos-ai` actually being published |
+| XCOD-49 | `a1c0f89`, `70cdf839ab`             | AC-2 needs `NPM_TOKEN` — see below           |
+
+### XCOD-49 — release pipeline unblocked in code, still blocked on credentials
+
+Two findings the ticket did not anticipate:
+
+1. **Every job in `publish.yml` was silently skipping.** All five `if:` guards still tested
+   `github.repository == 'pminev1/Lunos'` after the 2026-09-18 transfer to `AxsionDev/Lunos`.
+   No red, no error — just empty runs. **The ticket's own failure table is stale**: run
+   35335881462 predates the transfer, so a re-dispatch would not have reached the signing
+   failures it documents.
+2. **`publish.ts`'s Homebrew leg pushed to `anomalyco/homebrew-tap` — upstream's repo** —
+   writing `opencode.rb`. Not a missing credential: given a scoped token it would have written
+   into a third party's repository. Now hard-refuses without `LUNOS_HOMEBREW_TAP`.
+
+Owner decisions: **ship unsigned for now**, **disable Homebrew + AUR**, fix ghcr namespace.
+
+Implementation note worth keeping: signing is gated via a `preflight` job publishing outputs,
+because **`secrets` are not available in job-level `if:`**. It is self-healing — adding the
+secrets re-enables signing with no workflow edit. The subtle part was that `publish` downloads
+`opencode-cli-signed-windows`, produced _only_ by `sign-cli-windows`; skipping that job would
+have traded a signing failure for a missing-artifact failure, so that download is gated too.
+
+**`workflow` OAuth scope is no longer blocking** — confirmed by pushing two workflow commits.
 
 ## Verification baseline for this session
 
