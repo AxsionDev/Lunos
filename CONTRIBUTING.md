@@ -181,6 +181,35 @@ Some debug methods that can be problematic:
 
 With that said, you may want to try these methods, as they might work for you.
 
+## Contributor licensing — sign your commits (DCO)
+
+Lunos uses the [Developer Certificate of Origin](https://developercertificate.org/) (DCO) 1.1.
+Every commit must carry a `Signed-off-by` line:
+
+```
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+Add it automatically with `git commit -s`. To sign off a branch you already wrote, use
+`git rebase --signoff main`.
+
+**What you are certifying.** The DCO is a statement that you have the right to submit the code —
+that you wrote it, or that it came from a compatible source and you are permitted to contribute it.
+Read the full text at [developercertificate.org](https://developercertificate.org/).
+
+**What you are _not_ doing.** Signing off transfers no copyright. You keep ownership of your
+contribution; it is simply licensed under this project's MIT licence, the same terms as the rest of
+Lunos. There is no CLA to sign and no signature database — the sign-off lives in the commit trailer,
+nowhere else.
+
+Use your real name and a reachable email address. `git config user.name` and `user.email` should be
+set accordingly before you start.
+
+> [!NOTE]
+> This requirement is not yet enforced by automation. It will be once the project receives its first
+> external pull request or the repository is made public, whichever comes first. Please follow it
+> regardless — commits without a sign-off will need amending before merge.
+
 ## Pull Request Expectations
 
 ### Issue First Policy

@@ -1,8 +1,12 @@
-# XCOD-52 — Contributor licensing posture: **DCO** (RECOMMENDED — awaiting owner confirmation)
+# XCOD-52 — Contributor licensing posture: **DCO** (DECIDED)
 
-**Status:** recommended, not yet decided · **Date:** 2026-09-19 · **Recommended by:** analysis, for
-Petar Minev (product owner) to confirm
+**Status:** decided · **Date:** 2026-09-19 · **Decided by:** Petar Minev (product owner)
 **Epic:** XCOD-15 · **Follow-up from:** XCOD-17 · **Sibling:** [xcod-17-legal-entity-decision.md](./xcod-17-legal-entity-decision.md)
+
+> **Owner ruling, 2026-09-19.** DCO adopted as recommended below. The open question at the foot of
+> this document was answered at the same time: **Lunos stays MIT-only — no proprietary or
+> dual-licensed edition is planned.** That removes the one scenario that would have favoured a CLA,
+> so this decision rests on settled ground rather than an assumption.
 
 > **This document is analysis, not legal advice.** No counsel was engaged in producing it. Confirm
 > with a qualified Bulgarian/EU practitioner before the first commercial contract.
@@ -111,12 +115,18 @@ assignment independent of this decision. Out of scope here; worth its own ticket
 ## Acceptance criteria status
 
 - [x] Decision recorded with reasoning, in the XCOD-17/22 decision-doc format
-- [ ] `CONTRIBUTING.md` updated to state the requirement — _pending owner confirmation_
+- [x] `CONTRIBUTING.md` updated to state the requirement — see the "Contributor licensing" section
 - [x] Enforcement explicitly deferred with a named trigger (above)
 - [x] Retroactivity addressed — **not applicable**, zero direct external contributions to date;
       all non-owner commits are upstream's and already MIT-licensed by upstream
 
-## Open question for the owner
+## Resolved: the dual-licensing question
 
-Is a **proprietary or dual-licensed Lunos edition** on the roadmap? That is the single fact that
-would flip this recommendation from DCO to CLA. Everything above assumes MIT-only.
+Answered by the owner on 2026-09-19: **MIT-only, no commercial edition planned.** This was the one
+fact that would have flipped the answer to CLA, since a CLA's relicensing right is worthless to a
+project that never intends to relicense. Recorded here so a future reader does not reopen the
+question as though it were still an assumption.
+
+**Revisit this decision if that changes.** A move toward a proprietary or dual-licensed edition
+would make the absence of a CLA a genuine obstacle — and retrofitting one after contributors have
+arrived is materially harder than adopting it now.
