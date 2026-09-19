@@ -22,7 +22,12 @@ on:
         required: false
         type: string
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version || inputs.bump }}
+# XCOD-48: two no-bump dispatches produce an identical key (both `inputs.version` and
+# `inputs.bump` empty), so the second queued behind the first indefinitely — a dead
+# Blacksmith-era run held the group for 15 minutes on 2026-09-18. `github.run_id` makes
+# every dispatch its own group, which is the right behaviour for a manually-triggered
+# release: two deliberate dispatches should not silently block each other.
+concurrency: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version || inputs.bump || github.run_id }}
 
 permissions:
   id-token: write
@@ -560,6 +565,12 @@ jobs:
           GITHUB_TOKEN: ${{ steps.committer.outputs.token }}
           GH_REPO: ${{ needs.version.outputs.repo }}
           NPM_CONFIG_PROVENANCE: false
+          # XCOD-48: `registry-url` is set on setup-node above, which writes an .npmrc
+          # expecting NODE_AUTH_TOKEN — but nothing ever supplied it, so `npm publish`
+          # could never authenticate. Upstream relies on npm Trusted Publishing (OIDC);
+          # this fork uses an automation token instead. Empty until NPM_TOKEN is added
+          # as a repository secret, at which point publishing works with no further edit.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           LATEST_YML_DIR: /tmp/latest-yml
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
