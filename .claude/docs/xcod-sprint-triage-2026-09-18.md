@@ -17,14 +17,49 @@ Board: https://axsion.atlassian.net/jira/software/projects/XCOD/boards/169
 
 ## B. In Progress
 
-| Key     | State                                                                                 |
-| ------- | ------------------------------------------------------------------------------------- |
-| XCOD-44 | TUI half complete (`b5861ac517`, `12c61309b4`, both on `dev`). Desktop + docs remain. |
+| Key     | State                                                                  |
+| ------- | ---------------------------------------------------------------------- |
+| XCOD-44 | TUI ✅ and desktop ✅ done. Docs site scoped, needs an owner decision. |
 
-XCOD-44's AC-1 now holds: `grep -rn "OpenCode" packages/tui/src` returns only Zen/Go
-references. Terminal title verified by reading the OSC sequence from a pty capture.
-`packages/cli/src` swept and confirmed clean (0 matches, both exact-case and lowercase
-invocation forms).
+**TUI** (`b5861ac517`, `12c61309b4`) — AC-1 holds: `grep -rn "OpenCode" packages/tui/src`
+returns only Zen/Go. Terminal title verified via the OSC sequence in a pty capture.
+`packages/cli/src` swept clean (0 matches, exact-case and lowercase invocation forms).
+
+**Desktop** (`25831fbb92`) — `grep -rn "OpenCode" packages/desktop/src` returns nothing.
+62 locale files plus the app name, window titles and `<title>`. Identifiers left alone:
+`APP_IDS` (`ai.opencode.desktop*`) keys the **userData path**, electron-builder appId,
+Linux `executableName` and `StartupWMClass` — renaming orphans existing installs.
+`electron-builder.config.test.ts` asserts those appIds and still passes, which is the
+evidence the boundary was drawn right. 21/21 desktop tests pass.
+
+Two grammar fixes a mechanical sweep gets wrong, worth remembering:
+
+- **fr/ca** `d'OpenCode` → `de Lunos` — those languages elide `de`→`d'` only before a
+  vowel. "OpenCode" starts with O, "Lunos" with L, so a straight swap yields `d'Lunos`.
+- **tk** `OpenCode-iň` → `Lunos-yň` — Turkmen genitive harmonises with the stem; "Lunos"
+  is back-vowel and takes `-yň`. (`tr` `Lunos'un` and `az` `Lunos-un` were already correct.)
+
+The XCOD-42 precedent was validated for "no encoding or identifier damage" — which is
+**not** the same as grammatical correctness. Check elision and vowel harmony separately.
+
+### Docs site — the locales are already out of scope
+
+`docs-locale-sync.yml` is **deferred** by XCOD-19 because it "directly conflicts with
+XCOD-24, which declares the inherited translations stale rather than maintained." English
+is the source of truth and locale docs are stale by existing policy — that removes ~5,400
+of 5,838 matches without touching anything.
+
+The remaining **413 English `.mdx` matches** split three ways, and only the first is a rename:
+
+| Category                                    | Example                          | Verdict              |
+| ------------------------------------------- | -------------------------------- | -------------------- |
+| Generic product reference                   | "OpenCode does not store…"       | → Lunos              |
+| Excluded provider name (19)                 | `OpenCode Zen`                   | leave                |
+| **Upstream products Lunos doesn't operate** | `OpenCode Enterprise`, `zen.mdx` | **neither — decide** |
+
+The third is a content decision, not a rename: rebranding `enterprise.mdx` would advertise
+a "Lunos Enterprise" that does not exist; leaving it implies Lunos operates upstream's
+commercial services. Owner decision pending.
 
 ### XCOD-56 notes
 
