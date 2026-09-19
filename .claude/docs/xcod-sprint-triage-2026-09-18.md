@@ -89,8 +89,25 @@ Still open:
 | Key     | Summary                                            | Blocked on                                                |
 | ------- | -------------------------------------------------- | --------------------------------------------------------- |
 | XCOD-48 | Provision signing/publishing/telemetry credentials | npm token, Azure Trusted Signing, Tauri keys — human-held |
-| XCOD-53 | Trademark clearance — EUIPO and USPTO              | external search/counsel                                   |
+| XCOD-53 | Trademark clearance — EUIPO and USPTO              | **registers are not machine-searchable** — see below      |
 | XCOD-54 | CRA status — manufacturer or open-source steward   | **both its own gates still closed** — see below           |
+
+### XCOD-53 — risk signal recorded, clearance not performable here
+
+Researched 2026-09-19; `xcod-53-trademark-preliminary-risk.md`. **Not moved to in Review** — the ACs
+require actual register results.
+
+**The finding:** the senior user of the identical mark, `LUNOS Lüftungstechnik` (Berlin, 1959), is
+an active international filer **with Class 9 activity** — US serial **79386509**, a 2023 Madrid
+Protocol extension covering "switches, time delays, interval and inverse circuits." Class 9 is where
+downloadable software files. So the collision is not confined to Class 11 ventilation goods, and the
+risk is higher than XCOD-22 assumed — that doc reasoned about _market_ overlap, not _register_
+overlap. Cross-referenced there.
+
+**Why it stops here:** seven sources attempted — USPTO `tmsearch` API, WIPO Global Brand Database,
+TMview, EUIPO eSearch, DPMA, Justia, `uspto.report` — all blocked by anti-bot protection, JS-only
+interfaces, or 403. These are deliberate protections, not transient failures; **do not repeat the
+attempts.** Every remaining step needs a human-operated browser or legal judgement.
 
 ### XCOD-54 is gated by its own description
 
