@@ -74,6 +74,21 @@ paid pilot**. A name freeze is not a trademark clearance, and nothing here shoul
 > now the fallback named above: **before the first paid pilot**, travelling with XCOD-17's own
 > revisit gate. See `.claude/docs/xcod-17-legal-entity-decision.md`.
 
+> **⚠️ Update 2026-09-19 (XCOD-53) — the risk is higher than this section assumed.**
+> Desk research found that `LUNOS Lüftungstechnik` (Berlin, 1959) is an **active international
+> trademark filer with Class 9 activity** — US serial **79386509**, a 2023 Madrid Protocol
+> extension covering "switches, time delays, interval and inverse circuits." Class 9 is the class
+> downloadable software files in.
+>
+> The analysis above reasoned about **market** overlap and concluded the collisions do not occupy
+> Lunos's EU-sovereignty positioning. That reasoning still holds on its own terms — but **register**
+> overlap is a separate axis this document did not consider, and on that axis an identical
+> EU-held word mark active in Class 9 is a materially worse starting position.
+>
+> Still **not a clearance** — no register could be authoritatively searched. The trigger is
+> unchanged (before the first paid pilot), but the question is now concrete rather than theoretical.
+> See `.claude/docs/xcod-53-trademark-preliminary-risk.md` for the evidence and a costed plan.
+
 Also unchecked, and deliberately deferred to the stories that own them: App Store / VS Code
 Marketplace / Open VSX listing conflicts (both publish workflows are deferred by XCOD-19), GitHub
 org availability (XCOD-28), and social handles (XCOD-26).
