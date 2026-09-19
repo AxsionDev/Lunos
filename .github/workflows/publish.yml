@@ -94,8 +94,20 @@ jobs:
           GH_TOKEN: ${{ steps.committer.outputs.token }}
           OPENCODE_BUMP: ${{ inputs.bump }}
           OPENCODE_VERSION: ${{ inputs.version }}
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GH_REPO: ${{ github.repository }}
+          # Changelog generation is provider-agnostic: whichever of these is set gets used, and
+          # NONE is required. A provider is auto-detected when any of its declared env vars is
+          # present (provider.ts:186). If none is set, version.ts falls back to raw-changelog.ts,
+          # which needs no AI at all — so the release never blocks on an AI vendor.
+          # Optionally pin one with the CHANGELOG_MODEL variable, e.g. "anthropic/claude-sonnet-5".
+          CHANGELOG_MODEL: ${{ vars.CHANGELOG_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Upstream's Zen gateway — supported like any other vendor, not privileged over them.
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       release: ${{ steps.version.outputs.release }}
