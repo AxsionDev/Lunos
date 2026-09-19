@@ -51,10 +51,14 @@ import { startBackgroundCli } from "./background-cli"
 import { setNativeTranslations } from "./native-translations"
 
 const APP_NAMES: Record<string, string> = {
-  dev: "OpenCode Dev",
-  beta: "OpenCode Beta",
-  prod: "OpenCode",
+  dev: "Lunos Dev",
+  beta: "Lunos Beta",
+  prod: "Lunos",
 }
+// Identifiers, not display text — deliberately NOT rebranded. These key the
+// userData path (see app.setPath below), the electron-builder appId, the Linux
+// executableName and StartupWMClass. Renaming them would orphan every existing
+// install's data and break electron-builder.config.test.ts, which asserts them.
 const APP_IDS: Record<string, string> = {
   dev: "ai.opencode.desktop.dev",
   beta: "ai.opencode.desktop.beta",
@@ -138,7 +142,7 @@ const main = Effect.gen(function* () {
     process.env.XDG_STATE_HOME = join(root, "state")
     return root
   })()
-  app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "OpenCode Dev")
+  app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "Lunos Dev")
   app.setAppUserModelId(appId)
   app.setPath(
     "userData",
