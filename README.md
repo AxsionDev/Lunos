@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/pminev1/Lunos">
+  <a href="https://github.com/AxsionDev/Lunos">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
@@ -89,7 +89,7 @@ A published roadmap and a feature-parity comparison table are still to come.
      product owner (2026-09-18). This image is upstream opencode's UI, not Lunos's splash or
      default theme. Kept deliberately as a stand-in; replace it whenever someone records one. -->
 
-[![Terminal UI — upstream opencode, pending a Lunos capture](packages/web/src/assets/lander/screenshot.png)](https://github.com/pminev1/Lunos)
+[![Terminal UI — upstream opencode, pending a Lunos capture](packages/web/src/assets/lander/screenshot.png)](https://github.com/AxsionDev/Lunos)
 
 ---
 

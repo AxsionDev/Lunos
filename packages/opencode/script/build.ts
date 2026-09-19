@@ -147,8 +147,11 @@ if (!skipInstall) {
   await $`bun install --os="*" --cpu="*" @ff-labs/fff-bun@${pkg.dependencies["@ff-labs/fff-bun"]}`
 }
 for (const item of targets) {
+  // Must be `brand`, NOT pkg.name. pkg.name is "opencode", and `opencode-darwin-arm64`
+  // et al. are real packages on npm owned by upstream's maintainer — publishing under
+  // those names fails with 403 before the main package is ever reached.
   const name = [
-    pkg.name,
+    brand,
     // changing to win32 flags npm for some reason
     item.os === "win32" ? "windows" : item.os,
     item.arch,
@@ -178,7 +181,7 @@ for (const item of targets) {
       autoloadDotenv: false,
       autoloadTsconfig: true,
       autoloadPackageJson: true,
-      target: name.replace(pkg.name, "bun") as any,
+      target: name.replace(brand, "bun") as any,
       outfile: `dist/${name}/bin/opencode`,
       execArgv: [`--user-agent=opencode/${Script.version}`, "--use-system-ca", "--"],
       windows: {},
@@ -238,14 +241,13 @@ for (const item of targets) {
 
 if (Script.release) {
   for (const key of Object.keys(binaries)) {
-    // Release assets carry the published brand, not the internal package name: the `install`
-    // script asks for "${APP}-${target}" with APP=lunos. `key` stays as-is because it is also
-    // the platform sub-package's npm name and its ./dist directory.
-    const asset = key.replace(pkg.name, brand)
+    // `key` already carries the brand (see the name construction above), so it doubles as the
+    // release asset name the `install` script asks for — "${APP}-${target}" with APP=lunos.
+    // This previously needed a rename because the npm package name was still "opencode-*".
     if (key.includes("linux")) {
-      await $`tar -czf ../../${asset}.tar.gz *`.cwd(`dist/${key}/bin`)
+      await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
     } else {
-      await $`zip -r ../../${asset}.zip *`.cwd(`dist/${key}/bin`)
+      await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
     }
   }
   await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber --repo ${process.env.GH_REPO}`

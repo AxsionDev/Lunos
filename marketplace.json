@@ -2,7 +2,7 @@
   "name": "lunos-community",
   "owner": {
     "name": "Lunos",
-    "url": "https://github.com/pminev1/Lunos"
+    "url": "https://github.com/AxsionDev/Lunos"
   },
   "description": "Community plugins for Lunos, seeded from the ecosystem docs (packages/web/src/content/docs/ecosystem.mdx).",
   "version": "1.0.0",

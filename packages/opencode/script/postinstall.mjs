@@ -22,11 +22,21 @@ const archMap = {
   arm: "arm",
 }
 
+// Published brand identity, mirroring script/build.ts and script/publish.ts.
+const brand = "lunos"
+
 const platform = platformMap[os.platform()] ?? os.platform()
 const arch = archMap[os.arch()] ?? os.arch()
-const base = `opencode-${platform}-${arch}`
+// Platform sub-packages are published as `lunos-<platform>-<arch>` — must match the name
+// build.ts writes into each dist/*/package.json.
+const base = `${brand}-${platform}-${arch}`
+// The binary *inside* the archive is still built as "opencode"; only the package and asset
+// names carry the brand. The `install` script makes the same distinction (see install:346).
 const sourceBinary = platform === "windows" ? "opencode.exe" : "opencode"
-const targetBinary = path.join(__dirname, "bin", "opencode.exe")
+// Must match the `bin` entry in the generated package.json, which publish.ts writes as
+// { lunos: "./bin/lunos.exe" }. Writing opencode.exe here would leave the `lunos` command
+// pointing at the untouched "postinstall did not run" stub.
+const targetBinary = path.join(__dirname, "bin", `${brand}.exe`)
 
 function supportsAvx2() {
   if (arch !== "x64") return false
@@ -175,7 +185,7 @@ function main() {
   }
 
   throw new Error(
-    `It seems your package manager failed to install the right opencode CLI package. Try manually installing ${packageNames()
+    `It seems your package manager failed to install the right Lunos CLI package. Try manually installing ${packageNames()
       .map((name) => JSON.stringify(name))
       .join(" or ")}.`,
   )
