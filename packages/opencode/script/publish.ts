@@ -84,7 +84,8 @@ const tasks = Object.entries(binaries).map(async ([name]) => {
 await Promise.all(tasks)
 await publish(`./dist/${brand}`, `${brand}-ai`, version)
 
-const image = "ghcr.io/pminev1/lunos"
+// Repository moved pminev1 -> AxsionDev on 2026-09-18; ghcr namespaces follow the owner.
+const image = "ghcr.io/axsiondev/lunos"
 const platforms = "linux/amd64,linux/arm64"
 const tags = [`${image}:${version}`, `${image}:${Script.channel}`]
 const tagFlags = tags.flatMap((t) => ["-t", t])
@@ -130,23 +131,30 @@ if (!Script.preview) {
     "",
   ].join("\n")
 
-  for (const [pkg, pkgbuild] of [["lunos-bin", binaryPkgbuild]]) {
-    for (let i = 0; i < 30; i++) {
-      try {
-        await $`rm -rf ./dist/aur-${pkg}`
-        await $`git clone ssh://aur@aur.archlinux.org/${pkg}.git ./dist/aur-${pkg}`
-        await $`cd ./dist/aur-${pkg} && git checkout master`
-        await Bun.file(`./dist/aur-${pkg}/PKGBUILD`).write(pkgbuild)
-        await $`cd ./dist/aur-${pkg} && makepkg --printsrcinfo > .SRCINFO`
-        await $`cd ./dist/aur-${pkg} && git add PKGBUILD .SRCINFO`
-        if ((await $`cd ./dist/aur-${pkg} && git diff --cached --quiet`.nothrow()).exitCode === 0) break
-        await $`cd ./dist/aur-${pkg} && git commit -m "Update to v${Script.version}"`
-        await $`cd ./dist/aur-${pkg} && git push`
-        break
-      } catch {
-        continue
+  // XCOD-49: disabled by default on this fork. The AUR leg needs AUR_KEY and SSH access to
+  // aur.archlinux.org for a `lunos-bin` package that does not exist yet, and it has never been
+  // exercised here. Set LUNOS_PUBLISH_AUR=1 once the package and key are provisioned.
+  if (process.env.LUNOS_PUBLISH_AUR === "1") {
+    for (const [pkg, pkgbuild] of [["lunos-bin", binaryPkgbuild]]) {
+      for (let i = 0; i < 30; i++) {
+        try {
+          await $`rm -rf ./dist/aur-${pkg}`
+          await $`git clone ssh://aur@aur.archlinux.org/${pkg}.git ./dist/aur-${pkg}`
+          await $`cd ./dist/aur-${pkg} && git checkout master`
+          await Bun.file(`./dist/aur-${pkg}/PKGBUILD`).write(pkgbuild)
+          await $`cd ./dist/aur-${pkg} && makepkg --printsrcinfo > .SRCINFO`
+          await $`cd ./dist/aur-${pkg} && git add PKGBUILD .SRCINFO`
+          if ((await $`cd ./dist/aur-${pkg} && git diff --cached --quiet`.nothrow()).exitCode === 0) break
+          await $`cd ./dist/aur-${pkg} && git commit -m "Update to v${Script.version}"`
+          await $`cd ./dist/aur-${pkg} && git push`
+          break
+        } catch {
+          continue
+        }
       }
     }
+  } else {
+    console.log("skipping AUR publish (set LUNOS_PUBLISH_AUR=1 to enable)")
   }
 
   // Homebrew formula
@@ -202,18 +210,33 @@ if (!Script.preview) {
     "",
   ].join("\n")
 
-  const token = process.env.GITHUB_TOKEN
-  if (!token) {
-    console.error("GITHUB_TOKEN is required to update homebrew tap")
-    process.exit(1)
-  }
-  const tap = `https://x-access-token:${token}@github.com/anomalyco/homebrew-tap.git`
-  await $`rm -rf ./dist/homebrew-tap`
-  await $`git clone ${tap} ./dist/homebrew-tap`
-  await Bun.file("./dist/homebrew-tap/opencode.rb").write(homebrewFormula)
-  await $`cd ./dist/homebrew-tap && git add opencode.rb`
-  if ((await $`cd ./dist/homebrew-tap && git diff --cached --quiet`.nothrow()).exitCode !== 0) {
-    await $`cd ./dist/homebrew-tap && git commit -m "Update to v${Script.version}"`
-    await $`cd ./dist/homebrew-tap && git push`
+  // XCOD-49: disabled by default on this fork, and this one is not merely a missing credential.
+  // The tap below is `anomalyco/homebrew-tap` — UPSTREAM's repository — and the formula is written
+  // as `opencode.rb`. Given a token with the right scope this leg would attempt to write into a
+  // third party's repo under the wrong filename. Re-enabling requires pointing LUNOS_HOMEBREW_TAP
+  // at a Lunos-owned tap first; the formula class name would need renaming from Opencode too.
+  if (process.env.LUNOS_PUBLISH_HOMEBREW === "1") {
+    const token = process.env.GITHUB_TOKEN
+    if (!token) {
+      console.error("GITHUB_TOKEN is required to update homebrew tap")
+      process.exit(1)
+    }
+    const tapRepo = process.env.LUNOS_HOMEBREW_TAP
+    if (!tapRepo) {
+      console.error("LUNOS_HOMEBREW_TAP is required (e.g. AxsionDev/homebrew-tap) — refusing to")
+      console.error("fall back to anomalyco/homebrew-tap, which belongs to upstream.")
+      process.exit(1)
+    }
+    const tap = `https://x-access-token:${token}@github.com/${tapRepo}.git`
+    await $`rm -rf ./dist/homebrew-tap`
+    await $`git clone ${tap} ./dist/homebrew-tap`
+    await Bun.file("./dist/homebrew-tap/lunos.rb").write(homebrewFormula)
+    await $`cd ./dist/homebrew-tap && git add lunos.rb`
+    if ((await $`cd ./dist/homebrew-tap && git diff --cached --quiet`.nothrow()).exitCode !== 0) {
+      await $`cd ./dist/homebrew-tap && git commit -m "Update to v${Script.version}"`
+      await $`cd ./dist/homebrew-tap && git push`
+    }
+  } else {
+    console.log("skipping Homebrew publish (set LUNOS_PUBLISH_HOMEBREW=1 and LUNOS_HOMEBREW_TAP)")
   }
 }
