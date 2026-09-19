@@ -75,18 +75,48 @@ available for it — which is why XCOD-56 and XCOD-44 were both verified that wa
 
 Do not use `bun test | tail` — it masks the exit code. The real command is `bun turbo test`.
 
-## D. No code deliverable — owner decision or external dependency
+## D. Owner-decision tickets
 
-| Key     | Summary                                              | Blocked on                                                |
-| ------- | ---------------------------------------------------- | --------------------------------------------------------- |
-| XCOD-48 | Provision signing/publishing/telemetry credentials   | npm token, Azure Trusted Signing, Tauri keys — human-held |
-| XCOD-52 | Contributor licensing posture — DCO, CLA, or neither | owner decision                                            |
-| XCOD-53 | Trademark clearance — EUIPO and USPTO                | external search/counsel                                   |
-| XCOD-54 | CRA status — manufacturer or open-source steward     | research + owner decision                                 |
-| XCOD-55 | Infrastructure sovereignty for hosted Lunos          | owner decision                                            |
+**Decided 2026-09-19** (research → recommendation → owner ruling → recorded):
 
-Per established process these get the decision asked in chat first, then recorded — they do
-not get code.
+| Key     | Decision                                                                      | Artefact                                         |
+| ------- | ----------------------------------------------------------------------------- | ------------------------------------------------ |
+| XCOD-52 | **DCO**, not a CLA. Lunos stays MIT-only. Enforcement deferred, trigger named | `xcod-52-contributor-licensing-decision.md`      |
+| XCOD-55 | Hosted offering **eventually, not near-term**; claim scoped to self-hosted    | `xcod-55-infrastructure-sovereignty-decision.md` |
+
+Still open:
+
+| Key     | Summary                                            | Blocked on                                                |
+| ------- | -------------------------------------------------- | --------------------------------------------------------- |
+| XCOD-48 | Provision signing/publishing/telemetry credentials | npm token, Azure Trusted Signing, Tauri keys — human-held |
+| XCOD-53 | Trademark clearance — EUIPO and USPTO              | external search/counsel                                   |
+| XCOD-54 | CRA status — manufacturer or open-source steward   | **both its own gates still closed** — see below           |
+
+### XCOD-54 is gated by its own description
+
+The ticket says _"do not start before either is live"_ for (1) the CRA/SBOM milestone and (2) the
+monetisation decision. Verified both are closed: the CRA/SBOM mapping sits in the **Phase 1** row of
+`xcod-31-build-in-public-cadence.md:33` and the project is still closing Phase 0; no monetisation
+decision doc exists.
+
+Deliberately not started. Drafting an assessment would mean arbitrarily picking the
+steward-vs-manufacturer branch and producing a compliance document that reads authoritative while
+resting on an assumption — worse than having none.
+
+XCOD-55 narrowed it: "eventually, not near-term" makes **open-source steward the working assumption
+today**, with a foreseeable move to manufacturer.
+
+## D2. Process note — what worked
+
+The owner chose "research, then ask with a recommendation" over asking raw. Both tickets resolved in
+one round each, and in both cases the deciding factor was a **fact found by looking**, not an
+argument:
+
+- XCOD-52 — an authorship audit showed **zero direct external contributions** (all non-owner commits
+  arrived via the upstream merge), which made retroactivity moot and adoption cost nil.
+- XCOD-55 — `deploy.yml:34` targets AWS **`us-east-1`**, a US region, on an EU-sovereignty project.
+
+Worth repeating for XCOD-48/53: find the load-bearing fact first, then recommend.
 
 ## E. Large / dependent
 
@@ -97,9 +127,24 @@ not get code.
 
 ## Findings raised in passing
 
+- **XCOD-58 filed** (2026-09-19) — `deploy.yml:34` deploys to AWS `us-east-1`, a US region, sitting
+  in a public workflow file next to an EU-sovereignty README. Not a live problem (it deploys our own
+  console/web, not customer workloads, and XCOD-19 defers it) but region is baked into SST state
+  once a stack deploys, so moving later means recreating resources.
 - `packages/tui/.../tips-view.tsx:277` advertises `ghcr.io/anomalyco/opencode`, but
   `packages/opencode/script/publish.ts:87` builds `ghcr.io/pminev1/lunos`. Tip is stale.
   Left unchanged because the correct registry path is itself unsettled — see next item.
 - `publish.ts:87` still says `pminev1`, but the repo moved to `AxsionDev/Lunos` on 2026-09-18.
 - `github/action.yml` is wholly un-rebranded: installs from `opencode.ai/install` and pulls
   releases from `anomalyco/opencode`. Plausibly XCOD-44 scope.
+
+## Realistic sprint outcome
+
+"Complete all tasks" is not reachable by the agent alone, and it is worth saying so plainly rather
+than discovering it at sprint end. Of what remains: **XCOD-48** needs credentials only a human
+holds; **XCOD-53** needs an external trademark search; **XCOD-54** is gated by its own description;
+**XCOD-49** depends on XCOD-48; **XCOD-46** is gated on an actual npm publish; **XCOD-14** is a
+multi-day infrastructure build (hosting the registry service), not a sprint-tail item.
+
+Achievable target: every ticket either **in Review** or **blocked with the blocker named and a
+recommendation waiting** — no ticket left in an unexamined state.
