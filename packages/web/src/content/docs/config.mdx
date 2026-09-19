@@ -1,15 +1,15 @@
 ---
 title: Config
-description: Using the OpenCode JSON config.
+description: Using the Lunos JSON config.
 ---
 
-You can configure OpenCode using a JSON config file.
+You can configure Lunos using a JSON config file.
 
 ---
 
 ## Format
 
-OpenCode supports both **JSON** and **JSONC** (JSON with Comments) formats.
+Lunos supports both **JSON** and **JSONC** (JSON with Comments) formats.
 
 ```jsonc title="opencode.jsonc"
 {
@@ -98,7 +98,7 @@ You can enable specific servers in your local config:
 
 ### Global
 
-Place your global OpenCode config in `~/.config/opencode/opencode.json`. Use global config for user-wide server/runtime preferences like providers, models, and permissions.
+Place your global Lunos config in `~/.config/opencode/opencode.json`. Use global config for user-wide server/runtime preferences like providers, models, and permissions.
 
 For TUI-specific settings, use `~/.config/opencode/tui.json`.
 
@@ -116,7 +116,7 @@ For project-specific TUI settings, add `tui.json` alongside it.
 Place project specific config in the root of your project.
 :::
 
-When OpenCode starts up, it first looks for a config file in the current directory, then traverses up to the nearest Git directory.
+When Lunos starts up, it first looks for a config file in the current directory, then traverses up to the nearest Git directory.
 
 This is also safe to be checked into Git and uses the same schema as the global one.
 
@@ -169,9 +169,9 @@ These directories require admin/root access to write, so users cannot modify the
 
 #### macOS managed preferences
 
-On macOS, OpenCode reads managed preferences from the `ai.opencode.managed` preference domain. Deploy a `.mobileconfig` via MDM (Jamf, Kandji, FleetDM) and the settings are enforced automatically.
+On macOS, Lunos reads managed preferences from the `ai.opencode.managed` preference domain. Deploy a `.mobileconfig` via MDM (Jamf, Kandji, FleetDM) and the settings are enforced automatically.
 
-OpenCode checks these paths:
+Lunos checks these paths:
 
 1. `/Library/Managed Preferences/<user>/ai.opencode.managed.plist`
 2. `/Library/Managed Preferences/ai.opencode.managed.plist`
@@ -180,7 +180,7 @@ The plist keys map directly to `opencode.json` fields. MDM metadata keys (`Paylo
 
 **Creating a `.mobileconfig`**
 
-Use the `ai.opencode.managed` PayloadType. The OpenCode config keys go directly in the payload dict:
+Use the `ai.opencode.managed` PayloadType. The Lunos config keys go directly in the payload dict:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -318,7 +318,7 @@ Available options:
 
 - `port` - Port to listen on.
 - `hostname` - Hostname to listen on. When `mdns` is enabled and no hostname is set, defaults to `0.0.0.0`.
-- `mdns` - Enable mDNS service discovery. This allows other devices on the network to discover your OpenCode server.
+- `mdns` - Enable mDNS service discovery. This allows other devices on the network to discover your Lunos server.
 - `mdnsDomain` - Custom domain name for mDNS service. Defaults to `opencode.local`. Useful for running multiple instances on the same network.
 - `cors` - Additional origins to allow for CORS when using the HTTP server from a browser-based client. Values must be full origins (scheme + host + optional port), eg `https://app.example.com`.
 
@@ -337,7 +337,7 @@ You can configure the shell used for the interactive terminal using the `shell` 
 }
 ```
 
-If not specified, OpenCode will automatically discover and use a sensible default based on your operating system (e.g. `pwsh` or `cmd.exe` on Windows, `/bin/zsh` or `/bin/bash` on macOS/Linux). You can provide an absolute path or a short name.
+If not specified, Lunos will automatically discover and use a sensible default based on your operating system (e.g. `pwsh` or `cmd.exe` on Windows, `/bin/zsh` or `/bin/bash` on macOS/Linux). You can provide an absolute path or a short name.
 
 ---
 
@@ -361,7 +361,7 @@ You can manage the tools an LLM can use through the `tools` option.
 
 ### Models
 
-You can configure the providers and models you want to use in your OpenCode config through the `provider`, `model` and `small_model` options.
+You can configure the providers and models you want to use in your Lunos config through the `provider`, `model` and `small_model` options.
 
 ```json title="opencode.json"
 {
@@ -372,7 +372,7 @@ You can configure the providers and models you want to use in your OpenCode conf
 }
 ```
 
-The `small_model` option configures a separate model for lightweight tasks like title generation. By default, OpenCode tries to use a cheaper model if one is available from your provider, otherwise it falls back to your main model.
+The `small_model` option configures a separate model for lightweight tasks like title generation. By default, Lunos tries to use a cheaper model if one is available from your provider, otherwise it falls back to your main model.
 
 Provider options can include `timeout`, `headerTimeout`, `chunkTimeout`, and `setCacheKey`:
 
@@ -402,7 +402,7 @@ You can also configure [local models](/docs/models#local). [Learn more](/docs/mo
 
 ### Policies
 
-Use the `experimental.policies` option to allow or deny OpenCode actions on configured resources. Currently, policies can control which providers OpenCode may use.
+Use the `experimental.policies` option to allow or deny Lunos actions on configured resources. Currently, policies can control which providers Lunos may use.
 
 ```json title="opencode.json"
 {
@@ -425,7 +425,7 @@ Use the `experimental.policies` option to allow or deny OpenCode actions on conf
 
 ### Image attachments
 
-OpenCode normalizes image attachments before sending them to the model. By default, images are resized when they exceed `2000x2000` pixels or `5242880` base64 bytes.
+Lunos normalizes image attachments before sending them to the model. By default, images are resized when they exceed `2000x2000` pixels or `5242880` base64 bytes.
 
 Configure image attachment limits with the `attachment.image` option:
 
@@ -448,7 +448,7 @@ Configure image attachment limits with the `attachment.image` option:
 - `max_height` - Maximum image height in pixels before resizing or rejection.
 - `max_base64_bytes` - Maximum encoded image payload size. This is the base64 payload size, not the original file size.
 
-If an image still cannot fit after resizing, OpenCode omits oversized tool-result images or fails oversized user-provided images with an image size error.
+If an image still cannot fit after resizing, Lunos omits oversized tool-result images or fails oversized user-provided images with an image size error.
 
 ---
 
@@ -539,7 +539,7 @@ You can set the default agent using the `default_agent` option. This determines 
 }
 ```
 
-The default agent must be a primary agent (not a subagent). This can be a built-in agent like `"build"` or `"plan"`, or a [custom agent](/docs/agents) you've defined. If the specified agent doesn't exist or is a subagent, OpenCode will fall back to `"build"` with a warning.
+The default agent must be a primary agent (not a subagent). This can be a built-in agent like `"build"` or `"plan"`, or a [custom agent](/docs/agents) you've defined. If the specified agent doesn't exist or is a subagent, Lunos will fall back to `"build"` with a warning.
 
 This setting applies across all interfaces: TUI, CLI (`opencode run`), desktop app, and GitHub Action.
 
@@ -628,7 +628,7 @@ Customize TUI keyboard shortcuts in `tui.json` with `keybinds`.
 
 ### Snapshot
 
-OpenCode uses snapshots to track file changes during agent operations, enabling you to undo and revert changes within a session. Snapshots are enabled by default.
+Lunos uses snapshots to track file changes during agent operations, enabling you to undo and revert changes within a session. Snapshots are enabled by default.
 
 For large repositories or projects with many submodules, the snapshot system can cause slow indexing and significant disk usage as it tracks all changes using an internal git repository. You can disable snapshots using the `snapshot` option.
 
@@ -645,7 +645,7 @@ Note that disabling snapshots means changes made by the agent cannot be rolled b
 
 ### Autoupdate
 
-OpenCode will automatically download any new updates when it starts up. You can disable this with the `autoupdate` option.
+Lunos will automatically download any new updates when it starts up. You can disable this with the `autoupdate` option.
 
 ```json title="opencode.json"
 {
@@ -797,7 +797,7 @@ You can configure MCP servers you want to use through the `mcp` option.
 
 ### Plugins
 
-[Plugins](/docs/plugins) extend OpenCode with custom tools, hooks, and integrations.
+[Plugins](/docs/plugins) extend Lunos with custom tools, hooks, and integrations.
 
 Place plugin files in `.opencode/plugins/` or `~/.config/opencode/plugins/`. You can also load plugins from npm through the `plugin` option.
 
@@ -862,7 +862,7 @@ You can specify an allowlist of providers through the `enabled_providers` option
 }
 ```
 
-This is useful when you want to restrict OpenCode to only use specific providers rather than disabling them one by one.
+This is useful when you want to restrict Lunos to only use specific providers rather than disabling them one by one.
 
 :::note
 The `disabled_providers` takes priority over `enabled_providers`.
