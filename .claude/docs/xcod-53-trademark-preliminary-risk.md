@@ -1,7 +1,10 @@
 # XCOD-53 — Lunos trademark: **preliminary risk signal — NOT a clearance search**
 
 **Status:** preliminary risk assessment · **Date:** 2026-09-19 · **Prepared by:** desk research
-**Epic:** XCOD-15 · **Follow-up from:** XCOD-17, XCOD-22 · **Ticket status:** remains To Do, blocked
+**Epic:** XCOD-15 · **Follow-up from:** XCOD-17, XCOD-22 · **Ticket status:** remains To Do
+**Owner decision 2026-09-19:** clearance **deferred to the existing trigger** (before the first paid
+pilot) — an informed acceptance of the Class 9 finding below, not an oversight. See the decision
+section at the foot of this document.
 
 > **This is not a trademark clearance and must not be relied on as one.** No register was
 > authoritatively searched (see "What could not be verified"). No counsel was engaged. This document
@@ -110,7 +113,41 @@ Every remaining step requires either a human-operated browser against an anti-bo
 or professional legal judgement. Neither is automatable. The ticket stays **To Do** rather than moving
 to in Review, because its acceptance criteria call for actual register results and there are none.
 
-## Open question for the owner
+## Owner decision, 2026-09-19: **defer to the existing trigger**
 
-Given the Class 9 finding: run the free manual searches first (step 1), or go straight to counsel?
-The finding strengthens the case for counsel, but step 1 costs nothing and makes counsel cheaper.
+Presented with the Class 9 finding, the owner elected to **defer clearance until before the first
+paid pilot** — XCOD-22's existing trigger — rather than run the manual searches or engage counsel
+now.
+
+**This is a deliberate, informed acceptance of a known risk**, recorded as such so it does not read
+later as an oversight. The decision was made _with_ the Class 9 finding in hand, not in ignorance
+of it.
+
+### What is being accepted
+
+- The name may need to change after further brand investment, and **the cost of changing it rises
+  with every month of brand-building**. Note the rebrand from `opencode` is _still not finished_
+  (XCOD-44); a second rename would be materially more expensive than the first.
+- A launch post, a public repo or a conference mention all increase visibility to the senior user.
+  Opposition risk is a function of visibility, not just of filing.
+- If a Class 9 `LUNOS` EUTM does exist, we will discover it at the worst moment — when a pilot is
+  already in motion and the name is load-bearing in a procurement document.
+
+### What makes this reasonable
+
+- No EUTM application is pending, so nothing is presently at stake in an opposition window.
+- No revenue and no pilot exist yet, so the concrete exposure today is near zero.
+- Step 1 remains cheap and available at any time — deferring costs nothing except option value.
+
+### Trigger — unchanged, and now load-bearing
+
+**Before the first paid pilot.** Anyone reaching that point should run the step 1 searches below
+_first_. They take about an hour and they are the gate, not a formality.
+
+Recommend also treating **any of these** as an early prompt to reconsider, since each raises
+visibility ahead of a pilot: the launch post shipping (XCOD-31), the repository going public, or any
+procurement response naming Lunos.
+
+## Clearance plan when the trigger fires
+
+The sequencing below stands; it is what the trigger should initiate.
