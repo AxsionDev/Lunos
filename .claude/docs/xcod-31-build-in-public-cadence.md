@@ -45,9 +45,17 @@ of the file is credible, and it is the first thing to go stale.
 
 ### The CRA angle is time-sensitive
 
-The CRA/SBOM mapping milestone is flagged in the GTM plan as **genuinely newsworthy** given the
-**May 2026 deadline**. When that milestone lands it warrants a milestone post, not a line in a
-sprint note.
+The CRA/SBOM mapping milestone is flagged in the GTM plan as **genuinely newsworthy**. When that
+milestone lands it warrants a milestone post, not a line in a sprint note.
+
+**Corrected 2026-09-20 (XCOD-54):** this previously cited a "May 2026 deadline". No CRA milestone
+falls in May 2026. Article 71 sets three: 11 June 2026 (Chapter IV), **11 September 2026**
+(Article 14 reporting, manufacturers), and 11 December 2027 (general application). Note the news
+hook is weaker than assumed — per
+[xcod-54-cra-status-assessment.md](xcod-54-cra-status-assessment.md), unmonetised Lunos is most
+likely outside CRA scope, so an SBOM is readiness and marketing rather than compliance. Say it that
+way; claiming compliance with an obligation that does not bind us would be an overclaim of the same
+family XCOD-55 warns about.
 
 ---
 
