@@ -14,7 +14,9 @@ const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
 async function published(name: string, version: string) {
-  return (await $`npm view ${name}@${version} version`.nothrow()).exitCode === 0
+  // .quiet() because a not-yet-published package makes `npm view` print a multi-line E404.
+  // That is the expected answer here, and letting it reach the log buries the real errors.
+  return (await $`npm view ${name}@${version} version`.nothrow().quiet()).exitCode === 0
 }
 
 // XCOD-49: npm rate-limits bursts of new-package creation and answers E429. Back off and
@@ -112,13 +114,40 @@ await Bun.file(`./dist/${brand}/package.json`).write(
 // rejects on the first failure — so a single 429 aborted the run before `${brand}-ai`
 // below was ever published, leaving the platform packages on npm with no entry point.
 // Serial publishing costs a couple of minutes and removes both failure modes.
+// A platform package that will not publish must not take `${brand}-ai` down with it. npm
+// treats an optionalDependency that fails to resolve as non-fatal, so the entry point still
+// installs correctly everywhere its binary did land. Throwing here instead — which is what
+// happened on 2026-09-20 when npm's new-package rate limit refused lunos-linux-x64-musl —
+// leaves npm holding platform binaries and no package that can install them.
+const failures: string[] = []
 for (const [name] of Object.entries(binaries)) {
-  await publish(`./dist/${name}`, name, binaries[name])
+  try {
+    await publish(`./dist/${name}`, name, binaries[name])
+  } catch (error) {
+    console.error(`platform package failed: ${name}@${binaries[name]}`)
+    console.error(error instanceof Error ? error.message : error)
+    failures.push(name)
+  }
+}
+
+// If nothing published there is no binary for any platform, and `${brand}-ai` would install
+// only to fail in postinstall. An absent entry point is better than a broken one.
+if (failures.length === Object.keys(binaries).length) {
+  throw new Error(`no platform packages published — refusing to publish ${brand}-ai with no binaries`)
 }
 
 // Must come last: its optionalDependencies point at every platform package above, so
 // publishing it first would briefly advertise versions that do not exist yet.
 await publish(`./dist/${brand}`, `${brand}-ai`, version)
+
+// Fail the run — an incomplete release must be visible, not silently tolerated — but only
+// now that the entry point is on npm. Re-running once the missing packages can be created
+// is a no-op for everything that already published, thanks to the `published()` check.
+if (failures.length > 0) {
+  throw new Error(
+    `published ${brand}-ai@${version}, but ${failures.length} platform package(s) failed: ${failures.join(", ")}`,
+  )
+}
 
 // Repository moved pminev1 -> AxsionDev on 2026-09-18; ghcr namespaces follow the owner.
 const image = "ghcr.io/axsiondev/lunos"
