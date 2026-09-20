@@ -89,6 +89,26 @@ paid pilot**. A name freeze is not a trademark clearance, and nothing here shoul
 > unchanged (before the first paid pilot), but the question is now concrete rather than theoretical.
 > See `.claude/docs/xcod-53-trademark-preliminary-risk.md` for the evidence and a costed plan.
 
+> **✅ Update 2026-09-20 (XCOD-53) — the registers were searched, and the update above names the
+> wrong antagonist.** EUIPO and USPTO were searched successfully via browser automation.
+> `LUNOS Lüftungstechnik` turns out to be a **weaker** risk than the 2026-09-19 note feared: its
+> EUTM **008987471** limits Class 9 by "namely" to HVAC switching gear and Class 42 to engineering
+> services — **no software anywhere** — and it has attracted **zero oppositions** since 2010. The
+> class _numbers_ overlapped; the specifications never did.
+>
+> The real conflict is a party nobody had listed: **`elunos` — EUTM 019192430**, elunos GmbH
+> (Frankfurt), registered 2025 over "artificial intelligence and machine learning software" and
+> "platforms for artificial intelligence as software as a service [SaaS]". Also note both
+> `lunos.ai` and `lunosrouter.com` — the two collisions this document worried about most — hold
+> **no registered marks at all**.
+>
+> Net direction is ambiguous — the threat shrank on one axis and appeared on another. The
+> 2026-09-19 deferral was accordingly reopened and re-decided: **owner decision 2026-09-20 is to
+> explicitly accept the risk** — no EUTM filing and no counsel now, relying on unregistered rights,
+> with the `elunos` conflict acknowledged rather than unknown. Trigger unchanged (**engage counsel
+> before the first paid pilot**). Full results and reasoning in
+> `.claude/docs/xcod-53-trademark-preliminary-risk.md` (2026-09-20 update and appendix).
+
 Also unchecked, and deliberately deferred to the stories that own them: App Store / VS Code
 Marketplace / Open VSX listing conflicts (both publish workflows are deferred by XCOD-19), GitHub
 org availability (XCOD-28), and social handles (XCOD-26).
