@@ -435,7 +435,7 @@ jobs:
           tar -czf "$OUT_NAME" -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
 
       - name: Verify signed Windows Electron artifacts
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && needs.preflight.outputs.sign_windows == 'true'
         shell: pwsh
         run: |
           $files = @()
