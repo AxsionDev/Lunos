@@ -17,6 +17,35 @@ async function published(name: string, version: string) {
   return (await $`npm view ${name}@${version} version`.nothrow()).exitCode === 0
 }
 
+// XCOD-49: npm rate-limits bursts of new-package creation and answers E429. Back off and
+// retry rather than failing the release — a 429 is a "try again", not a rejection. The
+// re-check between attempts matters: npm can create the package server-side and still
+// return 429, in which case retrying would fail with EPUBLISHCONFLICT instead.
+const RETRY_DELAYS_SECONDS = [5, 15, 45, 90, 180]
+
+async function publishWithRetry(dir: string, name: string, version: string) {
+  for (let attempt = 0; ; attempt++) {
+    const result = await $`npm publish *.tgz --access public --tag ${Script.channel}`.cwd(dir).nothrow().quiet()
+    const output = result.stdout.toString() + result.stderr.toString()
+    if (result.exitCode === 0) {
+      console.log(output.trim())
+      return
+    }
+    const rateLimited = /E429|Too Many Requests|rate limit/i.test(output)
+    if (!rateLimited || attempt >= RETRY_DELAYS_SECONDS.length) {
+      console.error(output.trim())
+      throw new Error(`failed to publish ${name}@${version} (exit ${result.exitCode})`)
+    }
+    if (await published(name, version)) {
+      console.log(`already published ${name}@${version} — npm returned 429 but the write landed`)
+      return
+    }
+    const delay = RETRY_DELAYS_SECONDS[attempt]
+    console.log(`npm rate-limited ${name}@${version}; retrying in ${delay}s`)
+    await Bun.sleep(delay * 1000)
+  }
+}
+
 async function publish(dir: string, name: string, version: string) {
   // GitHub artifact downloads can drop the executable bit, and Docker uses the
   // unpacked dist binaries directly rather than the published tarball.
@@ -26,7 +55,7 @@ async function publish(dir: string, name: string, version: string) {
     return
   }
   await $`bun pm pack`.cwd(dir)
-  await $`npm publish *.tgz --access public --tag ${Script.channel}`.cwd(dir)
+  await publishWithRetry(dir, name, version)
 }
 
 const binaries: Record<string, string> = {}
@@ -78,10 +107,17 @@ await Bun.file(`./dist/${brand}/package.json`).write(
   ),
 )
 
-const tasks = Object.entries(binaries).map(async ([name]) => {
+// XCOD-49: published serially, not with Promise.all. Firing ~11 concurrent `npm publish`
+// calls is what trips npm's new-package rate limit in the first place, and Promise.all
+// rejects on the first failure — so a single 429 aborted the run before `${brand}-ai`
+// below was ever published, leaving the platform packages on npm with no entry point.
+// Serial publishing costs a couple of minutes and removes both failure modes.
+for (const [name] of Object.entries(binaries)) {
   await publish(`./dist/${name}`, name, binaries[name])
-})
-await Promise.all(tasks)
+}
+
+// Must come last: its optionalDependencies point at every platform package above, so
+// publishing it first would briefly advertise versions that do not exist yet.
 await publish(`./dist/${brand}`, `${brand}-ai`, version)
 
 // Repository moved pminev1 -> AxsionDev on 2026-09-18; ghcr namespaces follow the owner.
