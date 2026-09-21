@@ -95,13 +95,29 @@ A published roadmap and a feature-parity comparison table are still to come.
 
 ### Installation
 
-> [!IMPORTANT]
-> **These commands install upstream opencode, not Lunos.** They are kept because they work and
-> because opencode is what Lunos forks — running them gives you the base this project builds on.
-> Lunos does not publish an installable artifact yet: there is no Lunos install script, tap, or
-> signed binary, and the `lunos-ai` npm name is unpublished. Publishing is gated on standing up
-> release CI under Lunos-owned credentials. Until then, build from source — see
-> [Contributing](#contributing).
+**Lunos publishes installable artifacts.** Verified end to end at v1.18.35:
+
+```bash
+npm i -g lunos-ai                  # or bun/pnpm/yarn
+lunos --version
+```
+
+Standalone binaries for Linux, macOS and Windows are attached to each
+[release](https://github.com/AxsionDev/Lunos/releases) as `lunos-<os>-<arch>`.
+
+> [!NOTE]
+> **Binaries are not code-signed yet**, so macOS Gatekeeper and Windows SmartScreen will warn.
+> The npm package and building from source are unaffected. There is no Lunos install script,
+> Homebrew tap, or OS package yet.
+>
+> Deploying in a regulated or public-sector environment? See the
+> [self-hosted deployment guide](docs/deployment/self-hosted.md), which covers data flows,
+> EU data-residency controls, and what the sovereignty claim does and does not cover.
+
+<details>
+<summary>Installing upstream opencode instead</summary>
+
+These install **upstream opencode, not Lunos** — the base this project forks from.
 
 ```bash
 # YOLO
@@ -118,6 +134,8 @@ paru -S opencode-bin               # Arch Linux (Latest from AUR)
 mise use -g opencode               # Any OS
 nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
 ```
+
+</details>
 
 > [!TIP]
 > Remove versions older than 0.1.x before installing.

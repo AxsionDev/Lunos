@@ -33,14 +33,22 @@ written for the hosted future being published in the self-hosted present.
 This section exists so external copy can be checked against something. **Anything published about
 sovereignty should be verifiable against this table.**
 
-| Claim                                                          | True today? | Basis                                                              |
-| -------------------------------------------------------------- | ----------- | ------------------------------------------------------------------ |
-| The vendor is EU-incorporated                                  | **Yes**     | ITService EOOD, Bulgaria, UIC 201069485 (XCOD-17)                  |
-| The vendor is outside non-EU compulsory-disclosure reach       | **Yes**     | Bulgarian legal person; not a US-parented subsidiary               |
-| Lunos can be run entirely on infrastructure the buyer controls | **Yes**     | self-hosted is the shipping distribution model                     |
-| Lunos is provider-agnostic for model routing                   | **Yes**     | inherited from opencode                                            |
-| _Lunos-operated_ infrastructure is EU-sovereign                | **N/A**     | there is no Lunos-operated production infrastructure for customers |
-| EU-specific functionality exists in the build                  | **No**      | roadmap, not current build — already stated in `CHANGELOG.md:72`   |
+| Claim                                                          | True today?             | Basis                                                                                                                    |
+| -------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| The vendor is EU-incorporated                                  | **Yes**                 | ITService EOOD, Bulgaria, UIC 201069485 (XCOD-17)                                                                        |
+| The vendor is outside non-EU compulsory-disclosure reach       | **Yes**                 | Bulgarian legal person; not a US-parented subsidiary                                                                     |
+| Lunos can be run entirely on infrastructure the buyer controls | **Yes**                 | self-hosted is the shipping distribution model                                                                           |
+| Lunos is provider-agnostic for model routing                   | **Yes**                 | inherited from opencode                                                                                                  |
+| _Lunos-operated_ infrastructure is EU-sovereign                | **N/A**                 | there is no Lunos-operated production infrastructure for customers                                                       |
+| EU-specific functionality exists in the build                  | **Yes** (since Phase 1) | provider jurisdiction metadata (XCOD-61) and enforceable data-residency controls (XCOD-62); see `docs/data-residency.md` |
+
+> **Amendment 2026-09-21 (XCOD-63).** The last row was **No** when this was decided. Phase 1
+> shipped provider jurisdiction metadata (XCOD-61) and enforceable, audit-logged data-residency
+> controls (XCOD-62), so it is now **Yes**. This is a claim _increase_ and is therefore scoped
+> tightly: what exists is control over **which provider may be used and a record of what left** —
+> it is **not** EU-operated infrastructure, and the `N/A` row above is unchanged. `CHANGELOG.md`'s
+> "no EU-specific functionality exists yet" line was corrected in the same change. No other row
+> has changed, and the wording rules below are unamended.
 
 **The load-bearing distinction:** _entity_ sovereignty is established; _infrastructure_ sovereignty
 is **not claimed** because there is no customer-facing Lunos infrastructure to claim it about.
