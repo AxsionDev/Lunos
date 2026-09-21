@@ -14,10 +14,6 @@
   approve it.
 </p>
 
-> [!WARNING]
-> **Pre-release.** Lunos has not shipped an installable build yet. The install commands below
-> still install **upstream opencode**, not Lunos. Build from source in the meantime.
-
 > **Lunos** is a fork of [opencode](https://github.com/anomalyco/opencode). It is not built by,
 > maintained by, or affiliated with the OpenCode team in any way — see
 > [Building on OpenCode](#building-on-opencode) below.
@@ -47,8 +43,13 @@ itself, whereas an open fork can close a feature gap.
 
 ### Project status
 
-Lunos is **pre-release** and in Phase 0: forking, rebranding, and standing up its own governance,
-CI, and release pipeline. Nothing here is production-ready yet.
+Lunos is **early**. Phase 0 — forking, rebranding, and standing up its own governance, CI and
+release pipeline — is complete, and Lunos now publishes releases under its own name. Phase 1
+(sovereignty foundation) has landed provider jurisdiction metadata and enforceable data-residency
+controls; see the [self-hosted deployment guide](docs/deployment/self-hosted.md).
+
+Treat it as early software rather than production-ready: binaries are not code-signed, and feature
+parity with upstream is not claimed or measured.
 
 Decision records for the work so far live in [`.claude/docs/`](.claude/docs/) — covering the
 upstream sync policy, the CI workflow triage, and the product name freeze.
@@ -95,83 +96,66 @@ A published roadmap and a feature-parity comparison table are still to come.
 
 ### Installation
 
-**Lunos publishes installable artifacts.** Verified end to end at v1.18.35:
-
 ```bash
-npm i -g lunos-ai                  # or bun/pnpm/yarn
+# npm — verified end to end at v1.18.35
+npm i -g lunos-ai@latest           # or bun/pnpm/yarn
 lunos --version
+
+# install script
+curl -fsSL https://raw.githubusercontent.com/AxsionDev/Lunos/dev/install | bash
 ```
 
-Standalone binaries for Linux, macOS and Windows are attached to each
+The install script places the binary in `$HOME/.lunos/bin` and offers to add it to your `PATH`.
+Standalone archives for Linux, macOS and Windows are also attached to each
 [release](https://github.com/AxsionDev/Lunos/releases) as `lunos-<os>-<arch>`.
+
+**Channels Lunos does not publish to yet:** Homebrew, Scoop, Chocolatey, AUR, Nix and `mise`.
+They are listed here as _absent_ rather than shown as commands that would fail.
 
 > [!NOTE]
 > **Binaries are not code-signed yet**, so macOS Gatekeeper and Windows SmartScreen will warn.
-> The npm package and building from source are unaffected. There is no Lunos install script,
-> Homebrew tap, or OS package yet.
+> The npm package and building from source are unaffected.
 >
 > Deploying in a regulated or public-sector environment? See the
 > [self-hosted deployment guide](docs/deployment/self-hosted.md), which covers data flows,
 > EU data-residency controls, and what the sovereignty claim does and does not cover.
-
-<details>
-<summary>Installing upstream opencode instead</summary>
-
-These install **upstream opencode, not Lunos** — the base this project forks from.
-
-```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
-
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
-```
-
-</details>
 
 > [!TIP]
 > Remove versions older than 0.1.x before installing.
 
 ### Desktop App (BETA)
 
-OpenCode is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/opencode/releases) or [opencode.ai/download](https://opencode.ai/download).
+Lunos is also available as a desktop application, attached to each
+[Lunos release](https://github.com/AxsionDev/Lunos/releases).
 
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
+| Platform              | Download                                              |
+| --------------------- | ----------------------------------------------------- |
+| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`                      |
+| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`                        |
+| Windows               | `opencode-desktop-win-x64.exe`                        |
+| Linux                 | `opencode-desktop-linux-*.deb` / `.rpm` / `.AppImage` |
 
-```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
-```
+> [!NOTE]
+> These are Lunos builds from the Lunos release, but the **desktop artifacts are still named
+> `opencode-desktop-*`** — the desktop packaging has not been rebranded yet, unlike the CLI
+> (`lunos-*`). The filenames above are the real ones you will find on the release page. Tracked
+> separately; the CLI is unaffected.
 
 #### Installation Directory
 
-The install script respects the following priority order for the installation path:
+The install script installs to **`$HOME/.lunos/bin`** and offers to add that directory to your
+`PATH`.
 
-1. `$OPENCODE_INSTALL_DIR` - Custom installation directory
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
-3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.opencode/bin` - Default fallback
-
-```bash
-# Examples
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
-```
+> [!NOTE]
+> Upstream's install script honoured `$OPENCODE_INSTALL_DIR`, `$XDG_BIN_DIR` and `$HOME/bin`
+> before falling back to a default. **Lunos's install script does not** — `INSTALL_DIR` is
+> currently fixed (`install:68`), so setting those variables has no effect. This section
+> previously documented the upstream behaviour, which was inaccurate for Lunos.
+>
+> To install somewhere else today, download the archive from the
+> [releases page](https://github.com/AxsionDev/Lunos/releases) and place the `lunos` binary
+> where you want it, or use `npm i -g lunos-ai@latest` and let npm decide. Restoring the
+> override is a code change, tracked separately.
 
 ### Agents
 
