@@ -26,12 +26,7 @@ export * as Jurisdiction from "./jurisdiction"
  * understate a real capability. Callers enforcing a residency policy must treat `configurable`
  * as "not EU unless the deployment proves it" — see `isEuByDefault`.
  */
-export type Region =
-  | "eu"
-  | "us"
-  | "other"
-  | "configurable"
-  | "unknown"
+export type Region = "eu" | "us" | "other" | "configurable" | "unknown"
 
 /**
  * What the `region` claim is actually grounded in. This is the field that stops the table
@@ -114,7 +109,8 @@ const CLAIMS: Record<string, Claim> = {
     region: "configurable",
     basis: "user-configured",
     note: "Microsoft is a US entity, but Azure OpenAI processing location follows the resource's region. EU regions exist and are a genuine option; the region comes from the endpoint URL the deployment is pointed at, so residency is the deployer's choice, not a property of this provider.",
-    euOption: "Create the Azure OpenAI resource in an EU region (e.g. swedencentral, francecentral, germanywestcentral) and use that resource's endpoint.",
+    euOption:
+      "Create the Azure OpenAI resource in an EU region (e.g. swedencentral, francecentral, germanywestcentral) and use that resource's endpoint.",
   },
   "azure-cognitive-services": {
     region: "configurable",
@@ -126,7 +122,8 @@ const CLAIMS: Record<string, Claim> = {
     region: "configurable",
     basis: "user-configured",
     note: "AWS is a US entity; Bedrock processing follows the AWS region in use. eu-* regions are available. Beware cross-region inference profiles, which can route a request outside the region you selected.",
-    euOption: "Set AWS_REGION to an eu-* region (e.g. eu-central-1, eu-west-1) and avoid cross-region inference profiles.",
+    euOption:
+      "Set AWS_REGION to an eu-* region (e.g. eu-central-1, eu-west-1) and avoid cross-region inference profiles.",
   },
   "google-vertex": {
     region: "configurable",
@@ -157,8 +154,16 @@ const CLAIMS: Record<string, Claim> = {
   // US processing.
   // ---------------------------------------------------------------------------------------
   anthropic: { region: "us", basis: "processing", note: "US company, US-hosted inference on the direct API." },
-  openai: { region: "us", basis: "processing", note: "US company. EU data residency exists for some enterprise agreements but is not what this provider entry uses." },
-  google: { region: "us", basis: "processing", note: "Google Gemini direct API (not Vertex). US-operated; no region selection here — use `google-vertex` if residency matters." },
+  openai: {
+    region: "us",
+    basis: "processing",
+    note: "US company. EU data residency exists for some enterprise agreements but is not what this provider entry uses.",
+  },
+  google: {
+    region: "us",
+    basis: "processing",
+    note: "Google Gemini direct API (not Vertex). US-operated; no region selection here — use `google-vertex` if residency matters.",
+  },
   groq: { region: "us", basis: "processing", note: "US company, US-hosted inference." },
   cerebras: { region: "us", basis: "processing", note: "US company, US-hosted inference." },
   deepinfra: { region: "us", basis: "processing", note: "US company." },
@@ -166,14 +171,38 @@ const CLAIMS: Record<string, Claim> = {
   perplexity: { region: "us", basis: "processing", note: "US company." },
   xai: { region: "us", basis: "processing", note: "US company." },
   nvidia: { region: "us", basis: "processing", note: "US company (NVIDIA NIM / integrate.api.nvidia.com)." },
-  vercel: { region: "us", basis: "processing", note: "Vercel is a US company; its AI gateway routes onward to upstream providers." },
+  vercel: {
+    region: "us",
+    basis: "processing",
+    note: "Vercel is a US company; its AI gateway routes onward to upstream providers.",
+  },
   "github-copilot": { region: "us", basis: "processing", note: "GitHub/Microsoft, US-operated for this endpoint." },
-  gitlab: { region: "us", basis: "processing", note: "GitLab Inc. is a US company. GitLab Dedicated regions do not apply to this provider path." },
-  venice: { region: "us", basis: "processing", note: "US company. Privacy-focused, which is not the same property as EU residency." },
+  gitlab: {
+    region: "us",
+    basis: "processing",
+    note: "GitLab Inc. is a US company. GitLab Dedicated regions do not apply to this provider path.",
+  },
+  venice: {
+    region: "us",
+    basis: "processing",
+    note: "US company. Privacy-focused, which is not the same property as EU residency.",
+  },
   kilo: { region: "us", basis: "processing", note: "US-operated gateway service." },
-  cohere: { region: "other", basis: "entity", note: "Cohere is a Canadian company. Canada holds an EU adequacy decision for commercial organisations, which is not the same as EU residency — do not present it as EU." },
-  alibaba: { region: "other", basis: "processing", note: "Alibaba Cloud (Model Studio). Processing in China unless an international region is used; treat as non-EU." },
-  zenmux: { region: "other", basis: "none", note: "Aggregator endpoint; operating jurisdiction not established. Treat as non-EU." },
+  cohere: {
+    region: "other",
+    basis: "entity",
+    note: "Cohere is a Canadian company. Canada holds an EU adequacy decision for commercial organisations, which is not the same as EU residency — do not present it as EU.",
+  },
+  alibaba: {
+    region: "other",
+    basis: "processing",
+    note: "Alibaba Cloud (Model Studio). Processing in China unless an international region is used; treat as non-EU.",
+  },
+  zenmux: {
+    region: "other",
+    basis: "none",
+    note: "Aggregator endpoint; operating jurisdiction not established. Treat as non-EU.",
+  },
 
   // ---------------------------------------------------------------------------------------
   // Cloudflare.
