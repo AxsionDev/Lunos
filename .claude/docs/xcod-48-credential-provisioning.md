@@ -14,14 +14,14 @@ XCOD-48's description records a decision from **2026-09-18**: _"provision the fu
 **XCOD-49's owner decision on 2026-09-19 reversed that** — ship unsigned for now. The two are in
 direct conflict, and the newer one wins. Consequence:
 
-| Credential family                         | Under the old decision | **Under the unsigned decision**            |
-| ----------------------------------------- | ---------------------- | ------------------------------------------ |
+| Credential family                         | Under the old decision | **Under the unsigned decision**             |
+| ----------------------------------------- | ---------------------- | ------------------------------------------- |
 | npm authentication                        | required               | **still required** ⬅ the only real blocker |
-| Azure Trusted Signing (6 secrets)         | required               | not needed — job skips cleanly             |
-| Apple certs (5 secrets, currently broken) | required               | not needed — steps skip cleanly            |
-| Tauri updater signing (2 secrets)         | required               | not needed for Phase 0 (CLI-only)          |
-| AUR key                                   | optional               | not needed — leg disabled                  |
-| Sentry / telemetry                        | optional               | not needed, and see note below             |
+| Azure Trusted Signing (6 secrets)         | required               | not needed — job skips cleanly              |
+| Apple certs (5 secrets, currently broken) | required               | not needed — steps skip cleanly             |
+| Tauri updater signing (2 secrets)         | required               | not needed for Phase 0 (CLI-only)           |
+| AUR key                                   | optional               | not needed — leg disabled                   |
+| Sentry / telemetry                        | optional               | not needed, and see note below              |
 
 **So this ticket is now one task: provision npm auth.** Everything else is deferred, not missing.
 
