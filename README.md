@@ -157,28 +157,47 @@ The install script installs to **`$HOME/.lunos/bin`** and offers to add that dir
 > where you want it, or use `npm i -g lunos-ai@latest` and let npm decide. Restoring the
 > override is a code change, tracked separately.
 
-### Agents
+### Modes
 
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
+Lunos ships four built-in **modes**. Cycle through them with `Tab`, or `Shift+Tab` to go back.
+Each mode is a different permission posture, not a different model.
 
-- **build** - Default, full-access agent for development work
-- **plan** - Read-only agent for analysis and code exploration
-  - Denies file edits by default
-  - Asks permission before running bash commands
-  - Ideal for exploring unfamiliar codebases or planning changes
+- **build** — the default. Executes tools according to your configured permissions.
+- **plan** — disallows every edit tool. Plans are written to `.opencode/plans/`, so it can record
+  its thinking without touching your code.
+- **research** — deep investigation of a topic or goal, with no code changes. Output is Markdown
+  files and specs under `.opencode/research/`.
+- **dev-cycle** — the full development cycle: discover, architect, plan, build and verify, with
+  human approval gates between phases.
 
-Also included is a **general** subagent for complex searches and multistep tasks.
-This is used internally and can be invoked using `@general` in messages.
+Alongside these are **subagents**, which a mode delegates to rather than you selecting directly:
+`general` (complex searches and multi-step tasks), `explore`, `architect`, `planner` and `qa`.
+Invoke one explicitly by mentioning it in a message, e.g. `@general`.
 
-Learn more about [agents](https://opencode.ai/docs/agents).
+> [!NOTE]
+> Modes were called _agents_ before the rename. `agent_cycle` still works as an alias for
+> `mode_cycle` in keybindings, so existing configs keep working.
 
 ### Documentation
 
-For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
+**Lunos has no documentation site yet.** What exists lives in this repository:
+
+- [Self-hosted deployment guide](docs/deployment/self-hosted.md) — deployment, data flows, and what
+  the EU-sovereignty claim covers
+- [Data residency controls](docs/data-residency.md) — restricting provider jurisdictions, and the
+  egress audit log
+- [Model provider jurisdictions](docs/provider-jurisdictions.md) — where each provider processes data
+- [`SECURITY.md`](SECURITY.md) — threat model and vulnerability reporting
+- Decision records in [`.claude/docs/`](.claude/docs/)
+
+For configuration options not covered above, upstream opencode's documentation still largely
+applies, since Lunos inherits its configuration format — but it describes _opencode_, and the two
+have begun to diverge. Treat it as a reference, not as Lunos documentation.
 
 ### Contributing
 
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+If you're interested in contributing to Lunos, please read our
+[contributing docs](./CONTRIBUTING.md) before submitting a pull request.
 
 ### Building on OpenCode
 
@@ -186,4 +205,13 @@ If you are working on a project that's related to OpenCode and is using "opencod
 
 ---
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+<!-- XCOD-65: which channels Lunos should point at is an open product decision (Lunos has no
+     Discord or X presence; LinkedIn only). Until that is decided, these are labelled as
+     upstream's rather than presented as Lunos's own — they were previously captioned
+     "Join our community", which sent Lunos users to opencode's channels. -->
+
+**Lunos has no community channels of its own yet.** For questions about Lunos, open a
+[GitHub issue](https://github.com/AxsionDev/Lunos/issues).
+
+Upstream opencode's community — not affiliated with Lunos —
+is at [Discord](https://discord.gg/opencode) and [X.com](https://x.com/opencode).
