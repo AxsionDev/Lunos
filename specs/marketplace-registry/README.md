@@ -80,14 +80,21 @@ is a working starting point rather than a sketch — but it has not been built o
 
 ## Status
 
-Preserving this design is the whole of XCOD-59. Two things remain open and are **owner decisions**,
-not engineering ones:
+Preserving this design is the whole of XCOD-59. Both open questions were answered by the owner on
+2026-09-21:
 
-1. **Where the separate registry project lives** — a new repository, or an explicit "not yet" with
-   a named owner. Until that is answered, this directory is the durable home, which is the fallback
-   XCOD-59 permits.
-2. **Whether the reverted `packages/registry` implementation is the intended starting point** or is
-   to be rewritten from these specs.
+1. **The registry project lives in the separate `pminev1/lunos-web` repository**, not here. This
+   directory remains the durable source of the design; the work itself is handed off.
+2. **The reverted `packages/registry` implementation is the intended starting point**, not a
+   rewrite.
+
+→ See **[`HANDOFF-lunos-web.md`](HANDOFF-lunos-web.md)** for the brief written for that repo's
+agents.
+
+> **One caveat on (2).** `lunos-web` is a .NET 10 solution; the reverted implementation is
+> TypeScript on Cloudflare Workers + D1. That mismatch was not known when the question was
+> answered, so the handoff carries it as the first decision its agents must confirm — port the
+> Worker as a sub-project, or rewrite in .NET against these specs.
 
 Standing up or hosting the service is explicitly out of scope — hosted infrastructure is deferred
 by [XCOD-55](https://axsion.atlassian.net/browse/XCOD-55), which scoped the public claim to
