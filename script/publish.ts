@@ -60,7 +60,19 @@ if (process.env.LUNOS_PUBLISH_LIBS === "1") {
 }
 
 if (Script.release) {
-  await $`bun ./packages/desktop/scripts/finalize-latest-json.ts`
+  // XCOD-49: finalize-latest-json.ts signs each desktop bundle with the Tauri updater key. This
+  // fork has no TAURI_SIGNING_PRIVATE_KEY, so `tauri signer sign` failed with "Missing comment in
+  // secret key" and took the whole release down at line 63 — after npm and ghcr had both fully
+  // published, but before the tag, the dev sync and `--draft=false` below. The desktop app is not
+  // required for Phase 0 exit (XCOD-20 is CLI-only), so a missing updater key must not block a CLI
+  // release. Keyed off the secret's presence rather than a manual flag: this starts working on its
+  // own the moment XCOD-48 provisions the key, with no further edit here.
+  if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
+    await $`bun ./packages/desktop/scripts/finalize-latest-json.ts`
+  } else {
+    console.log("skipping desktop updater signatures (TAURI_SIGNING_PRIVATE_KEY is not set)")
+  }
+  // Unsigned: this one only rewrites electron-updater's latest.yml metadata, so it runs regardless.
   await $`bun ./packages/desktop/scripts/finalize-latest-yml.ts`
 }
 
