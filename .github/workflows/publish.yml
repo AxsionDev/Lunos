@@ -169,6 +169,67 @@ jobs:
     outputs:
       version: ${{ needs.version.outputs.version }}
 
+  # Software Bill of Materials for the release (XCOD-64).
+  #
+  # This is manufacturer-readiness groundwork, not a compliance obligation: on the XCOD-54
+  # assessment Lunos is outside CRA scope today, so an SBOM is not legally owed. It exists so
+  # the dependency tree can be checked against a newly disclosed upstream vulnerability, and so
+  # a procurement reviewer has something concrete to read.
+  sbom:
+    needs: version
+    runs-on: ubuntu-24.04
+    if: github.repository == 'AxsionDev/Lunos'
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+
+      # Pinned deliberately. syft only learned to read bun's lockfile recently: v1.20.0 parses
+      # bun.lock into ZERO components and still emits a schema-valid CycloneDX document. An
+      # accidental downgrade would therefore publish a convincing, empty SBOM. The verify step
+      # below is what actually catches that, but pin anyway so it does not happen quietly.
+      - name: Install syft
+        env:
+          SYFT_VERSION: v1.52.0
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b "$RUNNER_TEMP/bin" "$SYFT_VERSION"
+          "$RUNNER_TEMP/bin/syft" version
+
+      - name: Generate SBOM
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          "$RUNNER_TEMP/bin/syft" scan file:bun.lock \
+            -o cyclonedx-json > "lunos-sbom-${VERSION}.cdx.json"
+
+      # Same philosophy as `if-no-files-found: error` above: an empty artifact that leaves the
+      # job green is worse than a failure, because it defers the error to whoever trusts the SBOM.
+      - name: Verify SBOM is not empty
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          count=$(jq '.components | length' "lunos-sbom-${VERSION}.cdx.json")
+          echo "SBOM components: $count"
+          if [ "$count" -lt 100 ]; then
+            echo "::error::SBOM has $count components (expected >=100). syft likely failed to" \
+                 "parse bun.lock — check whether the pinned syft version still supports it."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lunos-sbom
+          path: lunos-sbom-*.cdx.json
+          if-no-files-found: error
+
+      - name: Attach SBOM to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+          REPO: ${{ needs.version.outputs.repo }}
+        run: |
+          gh release upload "v${VERSION}" "lunos-sbom-${VERSION}.cdx.json" \
+            --clobber --repo "${REPO}"
+
   sign-cli-windows:
     needs:
       - build-cli
