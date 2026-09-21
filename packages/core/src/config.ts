@@ -21,6 +21,7 @@ import { ConfigMCP } from "./config/mcp"
 import { ConfigPlugin } from "./config/plugin"
 import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
+import { ConfigResidency } from "./config/residency"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
 import { ConfigV1 } from "./v1/config/config"
@@ -104,6 +105,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   experimental: ConfigExperimental.Experimental.pipe(Schema.optional),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(Schema.optional),
+  residency: ConfigResidency.Info.pipe(Schema.optional).annotate({
+    description:
+      "Data-residency policy restricting which provider jurisdictions this deployment may use, with an audit log of outbound model calls",
+  }),
 }) {}
 
 export class Document extends Schema.Class<Document>("Config.Document")({
