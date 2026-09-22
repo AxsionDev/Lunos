@@ -1429,6 +1429,19 @@ const layer = Layer.effect(
         throw error
       }
 
+      // Every skill is promoted to a slash command (Command.state), but that table is
+      // built once per instance with no agent in scope, while skill permissions are
+      // per-agent. The model-facing list already filters via Skill.available(agent);
+      // without this check the same denied skill stays typeable as a command. Listing
+      // is not enforcement, so enforce here, at invocation.
+      if (cmd.source === "skill" && Permission.evaluate("skill", cmd.name, agent.permission).action === "deny") {
+        const error = new NamedError.Unknown({
+          message: `Skill "${cmd.name}" is not permitted for agent "${agent.name}".`,
+        })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw error
+      }
+
       const templateParts = yield* resolvePromptParts(template)
       const inputFiles = new Set(
         input.parts?.filter((part) => new URL(part.url).protocol === "file:").map((part) => fileURLToPath(part.url)),
