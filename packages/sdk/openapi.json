@@ -21177,6 +21177,60 @@
             },
             "additionalProperties": false
           },
+          "hooks": {
+            "type": "object",
+            "properties": {
+              "tool.execute.before": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "tool.execute.after": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "command.execute.before": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.created": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.idle": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.compacted": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.deleted": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.error": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "references": {
             "type": "object",
             "additionalProperties": {
@@ -27024,6 +27078,68 @@
           }
         },
         "required": ["type", "id", "syncEvent"],
+        "additionalProperties": false
+      },
+      "ConfigV2HooksMatcher": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConfigV2HooksEntry": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Command and arguments to run, as an array — not passed through a shell, so no quoting or injection concerns."
+          },
+          "matcher": {
+            "$ref": "#/components/schemas/ConfigV2HooksMatcher"
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "Milliseconds before the command is killed. Defaults to 30000."
+          },
+          "disabled": {
+            "type": "boolean"
+          }
+        },
+        "required": ["command"],
         "additionalProperties": false
       },
       "ConfigV2ReferenceGit": {

@@ -1906,6 +1906,16 @@ export type Config = {
     paths?: Array<string>
     urls?: Array<string>
   }
+  hooks?: {
+    "tool.execute.before"?: Array<ConfigV2HooksEntry>
+    "tool.execute.after"?: Array<ConfigV2HooksEntry>
+    "command.execute.before"?: Array<ConfigV2HooksEntry>
+    "session.created"?: Array<ConfigV2HooksEntry>
+    "session.idle"?: Array<ConfigV2HooksEntry>
+    "session.compacted"?: Array<ConfigV2HooksEntry>
+    "session.deleted"?: Array<ConfigV2HooksEntry>
+    "session.error"?: Array<ConfigV2HooksEntry>
+  }
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal
   }
@@ -3827,6 +3837,27 @@ export type SyncEventSessionNextRevertCommitted = {
       messageID: string
     }
   }
+}
+
+export type ConfigV2HooksMatcher = {
+  tool?: string
+  file?: string
+}
+
+export type ConfigV2HooksEntry = {
+  /**
+   * Command and arguments to run, as an array — not passed through a shell, so no quoting or injection concerns.
+   */
+  command: Array<string>
+  matcher?: ConfigV2HooksMatcher
+  environment?: {
+    [key: string]: string
+  }
+  /**
+   * Milliseconds before the command is killed. Defaults to 30000.
+   */
+  timeout?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  disabled?: boolean
 }
 
 export type ConfigV2ReferenceGit = {
