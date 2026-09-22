@@ -200,28 +200,42 @@ Code has no distinct chaining primitive either.
 
 ## Recommendation on what to close
 
-XCOD-67's AC says to close only gaps load-bearing for XCOD-71 (porting a real Cowork
+XCOD-67's AC says to close only gaps load-bearing for XCOD-71 (porting a real, currently-in-use
 instruction set) or a clearly stated user need, and to avoid speculative parity.
 
-**The v1/v2 split is the prior question.** Before closing individual gaps, XCOD-71 needs a
-decision on which implementation it targets, because several gaps only exist on one side.
-That decision is an owner call, not an audit output.
+**Owner decision, 2026-09-22: XCOD-71 targets v2.** This was the prior question, since
+several gaps exist on only one side of the split. It is now settled, and the list below is
+scoped accordingly — v1-only gaps drop out.
 
-**Close now, independent of that decision:**
+The same decision also dropped the story's original "Cowork instruction set" framing, whose
+named candidates had no grounding in project memory or the repo. The verified candidate pool
+is now the seven in-use instruction sets at `.claude/skills/` — the agent fleet that builds
+Lunos itself, which makes the exit criterion a dogfooding exercise.
+
+**Close now:**
 
 - **G2 (hot reload)** — load-bearing for _authoring_ any skill, which XCOD-71 requires.
-  Highest-value fix in the list.
-- **G7, G8** — small, diagnostic-only, both are failure modes an author hits blind.
+  Highest-value fix in the list, and v2-specific.
+- **G7, G8** — small, diagnostic-only, both v2-specific, both failure modes an author hits
+  blind.
 
-**Hold pending the v1/v2 and instruction-set decisions:**
+**Hold pending the instruction-set choice:**
 
-- **G1, G4, G5** — all are "finish the migration" work in disguise; sizing depends on
-  whether the answer is to wire v2 up or to backport to v1.
-- **G6** — only matters if the ported skill carries more than ten files.
+- **G6** — only matters if the ported skill carries more than ten supporting files.
 - **G3** — only matters if the ported workflow needs per-skill tool constraints.
+
+**Now load-bearing only under one condition:**
+
+- **G1, G4** — v2 skills are model-invoked only. If the ported workflow is triggered by
+  describing the task and letting the model select the skill, these stay deferred. If it
+  must be invoked by a user _typing_ something, both become blocking, and wiring v2 into the
+  command layer is a substantial build rather than a tweak. Settle this before starting the
+  port.
 
 **Defer / reassign:**
 
+- **G5** — v1-only; out of scope given the v2 decision, unless v1 remains user-facing
+  indefinitely.
 - **G9** — rebrand family, not parity.
 - The marketplace decision — belongs to XCOD-69, informed by the answer above.
 
