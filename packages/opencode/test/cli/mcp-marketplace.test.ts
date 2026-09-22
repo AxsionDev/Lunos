@@ -4,8 +4,8 @@ import { mcpConfigFromEntry } from "../../src/mcp/discover"
 import { resolvesFromMarketplace } from "../../src/cli/cmd/mcp"
 
 // The yargs handler is driven by Effect and interactive prompts, so the pure decision logic it
-// delegates to is what gets asserted here. The prompting itself is exercised by hand — see
-// task-5-report.md's manual verification transcript.
+// delegates to is what gets asserted here. The prompting itself -- confirm, --yes, the refusal
+// messages -- is covered end-to-end by the real-subprocess suite in mcp-add-marketplace.test.ts.
 const rows = [
   {
     name: "filesystem",

@@ -73,25 +73,41 @@ export async function searchMcpServers(
 // substitution syntax config already supports (see docs/config.mdx). The generated
 // opencode.json therefore contains no secret and is safe to commit to a repository — which it
 // would not be had we prompted for key values and written them literally.
-function envReferences(names: readonly string[] | undefined) {
+//
+// `environment`/`headers` are a bare `Schema.Array(String)` with no identifier constraint, so
+// nothing stops a third-party marketplace (unlike our own published manifest, which the web repo
+// guards) from declaring a "name" like "API_TOKEN=secret". Left unchecked that would flow
+// straight through as `{env:API_TOKEN=secret}` -- a literal value written into the user's config,
+// exactly what this scheme exists to avoid. We throw rather than silently drop it: every other
+// refusal on the marketplace add path (ambiguous name, existing entry) is a thrown Error the
+// caller turns into a failed `mcp add` with a message, and a malformed declared name deserves the
+// same rather than a server that's silently missing a variable it needs.
+function envReferences(entryName: string, names: readonly string[] | undefined) {
   if (!names?.length) return undefined
+  for (const name of names) {
+    if (name.includes("=")) {
+      throw new Error(`MCP server "${entryName}" declares an invalid environment/header name: "${name}"`)
+    }
+  }
   return Object.fromEntries(names.map((name) => [name, `{env:${name}}`]))
 }
 
 export function mcpConfigFromEntry(entry: Marketplace.McpEntry): ConfigMCPV1.Info {
   if (entry.type === "remote") {
+    const headers = envReferences(entry.name, entry.headers)
     return {
       type: "remote",
       url: entry.url,
       enabled: true,
-      ...(envReferences(entry.headers) ? { headers: envReferences(entry.headers)! } : {}),
+      ...(headers ? { headers } : {}),
     }
   }
+  const environment = envReferences(entry.name, entry.environment)
   return {
     type: "local",
     command: [...entry.command],
     enabled: true,
     ...(entry.cwd ? { cwd: entry.cwd } : {}),
-    ...(envReferences(entry.environment) ? { environment: envReferences(entry.environment)! } : {}),
+    ...(environment ? { environment } : {}),
   }
 }

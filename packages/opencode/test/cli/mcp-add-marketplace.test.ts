@@ -22,14 +22,30 @@ function manifest(name: string, mcp: ManifestMcpEntry[]) {
   return JSON.stringify({ name, owner: { name }, plugins: [], mcp })
 }
 
-async function readGlobalMcpConfig(home: string): Promise<{ mcp?: Record<string, unknown> } | undefined> {
+function globalConfigCandidates(home: string) {
   const dir = path.join(home, ".config", "opencode")
-  for (const file of [path.join(dir, "opencode.json"), path.join(dir, "opencode.jsonc")]) {
+  return [path.join(dir, "opencode.json"), path.join(dir, "opencode.jsonc")]
+}
+
+async function readGlobalMcpConfig(home: string): Promise<{ mcp?: Record<string, unknown> } | undefined> {
+  for (const file of globalConfigCandidates(home)) {
     if (await Filesystem.exists(file)) {
       return parseJsonc(await Filesystem.readText(file))
     }
   }
   return undefined
+}
+
+// Writes back to whichever candidate file `marketplace add` already created (falling back to
+// opencode.json, same default resolveConfigPath in mcp.ts uses), so seeding a config value
+// directly -- without going through a CLI command that only ever writes the full ConfigMCPV1.Info
+// shape -- lands in the file the CLI will actually read next.
+async function writeGlobalConfig(home: string, config: Record<string, unknown>): Promise<string> {
+  const candidates = globalConfigCandidates(home)
+  const file = (await Promise.all(candidates.map((f) => Filesystem.exists(f)))).findIndex(Boolean)
+  const target = file >= 0 ? candidates[file]! : candidates[0]!
+  await Filesystem.write(target, JSON.stringify(config, null, 2))
+  return target
 }
 
 describe("opencode mcp add <name> (marketplace, subprocess)", () => {
@@ -109,6 +125,46 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
   )
 
   cliIt.concurrent(
+    "refuses to overwrite an entry configured only with the {enabled:false} shorthand",
+    ({ home, opencode }) =>
+      Effect.gen(function* () {
+        const mp = path.join(home, "mp.json")
+        yield* Effect.promise(() =>
+          Bun.write(
+            mp,
+            manifest("collide", [{ name: "disabled-server", type: "local", command: ["npx", "-y", "disabled-pkg"] }]),
+          ),
+        )
+        opencode.expectExit(yield* opencode.spawn(["marketplace", "add", mp]), 0, "marketplace add")
+
+        // Seed the shorthand form directly: ConfigV1.mcp accepts `{enabled: boolean}` as an
+        // alternative to the full ConfigMCPV1.Info shape, e.g. for a user disabling a server
+        // without deleting its entry. That shape has no "type" field, so isMcpConfigured returns
+        // false for it -- the guard must key on presence in the record, not on isMcpConfigured,
+        // or a disabled server would be silently overwritten and re-enabled by this add.
+        const seeded = yield* Effect.promise(() => readGlobalMcpConfig(home))
+        yield* Effect.promise(() =>
+          writeGlobalConfig(home, { ...seeded, mcp: { ...(seeded?.mcp ?? {}), "disabled-server": { enabled: false } } }),
+        )
+
+        const before = yield* Effect.promise(() => readGlobalMcpConfig(home))
+
+        const result = yield* opencode.spawn(["mcp", "add", "disabled-server", "--yes"])
+        expect(result.exitCode).not.toBe(0)
+        expect(result.stderr).toContain("disabled-server")
+        expect(result.stderr.toLowerCase()).toContain("already exists")
+
+        // Compare the `mcp` subtree specifically, not the whole file: loading config through the
+        // CLI self-heals a missing top-level "$schema" key (see config.ts), which would make a
+        // whole-file comparison flag an unrelated, harmless side effect as a broken refusal.
+        const after = yield* Effect.promise(() => readGlobalMcpConfig(home))
+        expect(after?.mcp).toEqual(before?.mcp)
+        expect((after?.mcp as Record<string, unknown> | undefined)?.["disabled-server"]).toEqual({ enabled: false })
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
     "the happy path with --yes writes {env:NAME} references and no literal values",
     ({ home, opencode }) =>
       Effect.gen(function* () {
@@ -143,8 +199,59 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
           enabled: true,
           environment: { API_TOKEN: "{env:API_TOKEN}" },
         })
-        // No literal secret value anywhere in the file, only the {env:NAME} reference.
-        expect(JSON.stringify(config)).not.toContain("some-secret-value")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "when the required variable IS set, the value is never written -- only the {env:NAME} reference is",
+    ({ home, opencode }) =>
+      Effect.gen(function* () {
+        const mp = path.join(home, "mp.json")
+        yield* Effect.promise(() =>
+          Bun.write(
+            mp,
+            manifest("env-check-set", [
+              {
+                name: "needs-key-2",
+                type: "local",
+                command: ["npx", "-y", "some-server"],
+                environment: ["API_TOKEN"],
+                description: "Needs a key",
+              },
+            ]),
+          ),
+        )
+        opencode.expectExit(yield* opencode.spawn(["marketplace", "add", mp]), 0, "marketplace add")
+
+        // Spawn with the variable actually set in the environment, so there's something real for
+        // the "no literal secret value" assertion below to catch if it ever regressed. The
+        // sibling test above covers the "unset" branch (the warning); this one covers the branch
+        // where a value exists and must still never be written literally.
+        const result = yield* opencode.spawn(["mcp", "add", "needs-key-2", "--yes"], {
+          env: { API_TOKEN: "leaked-value" },
+        })
+        opencode.expectExit(result, 0, "mcp add needs-key-2 --yes")
+        expect(result.stderr).not.toContain("API_TOKEN is not set")
+
+        const config = yield* Effect.promise(() => readGlobalMcpConfig(home))
+        expect((config?.mcp as Record<string, unknown> | undefined)?.["needs-key-2"]).toEqual({
+          type: "local",
+          command: ["npx", "-y", "some-server"],
+          enabled: true,
+          environment: { API_TOKEN: "{env:API_TOKEN}" },
+        })
+        // Check the raw file text, not just the parsed structure, so a leak written outside the
+        // `mcp` subtree -- or anywhere jsonc-parser's re-serialization might otherwise mask --
+        // would still be caught.
+        const rawText = yield* Effect.promise(async () => {
+          for (const file of globalConfigCandidates(home)) {
+            if (await Filesystem.exists(file)) return Filesystem.readText(file)
+          }
+          return ""
+        })
+        expect(rawText).toContain("{env:API_TOKEN}")
+        expect(rawText).not.toContain("leaked-value")
       }),
     60_000,
   )

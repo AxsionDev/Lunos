@@ -6,7 +6,9 @@ import { listMcpServers, searchMcpServers, mcpConfigFromEntry } from "../../src/
 import type { FetchDeps, MarketplaceCacheDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 
-// Use exact same pattern as plugin.test.ts for consistency
+// Mirrors plugin.test.ts's fixture shape: a fake fetcher keyed by marketplace source, so
+// resolveAddedMarketplaces exercises its real traversal/caching logic against known manifests
+// instead of the network.
 
 const mcpManifestA = {
   name: "mcp-marketplace-a",
@@ -121,7 +123,9 @@ describe("listMcpServers", () => {
 
     const result = await listMcpServers(ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
 
-    // Assert marketplaces actually loaded (proof manifests were fetched)
+    // Check `marketplaces` before `servers`: an empty (or short) `servers` array alone can't
+    // distinguish "the manifest had no mcp key" from "one of the two fetches silently failed" --
+    // the marketplace count is what tells those apart.
     expect(result.marketplaces).toHaveLength(2)
     expect(result.servers.map((s) => s.name)).toEqual(["filesystem", "searxng"])
     expect(result.servers[0]?.marketplace).toBe("mcp-marketplace-a")
@@ -133,7 +137,8 @@ describe("listMcpServers", () => {
     await withMarketplace(tmp.path, "acme/no-mcp")
     const result = await listMcpServers(ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
 
-    // Assert marketplace loaded (proof manifest was fetched)
+    // The marketplace still has to have loaded -- otherwise an empty `servers` array would just
+    // as easily mean the fetch failed, not that this manifest legitimately has no mcp key.
     expect(result.marketplaces).toHaveLength(1)
     // Assert backward compat: no mcp key → no servers
     expect(result.servers).toEqual([])
@@ -146,7 +151,8 @@ describe("searchMcpServers", () => {
     await withMarketplace(tmp.path, "acme/search-test")
     const result = await searchMcpServers("search", ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
 
-    // Assert marketplace loaded (proof manifest was fetched)
+    // Confirm the marketplace loaded before trusting the filtered result below -- a zero-match
+    // search result looks the same whether the query genuinely matched nothing or the fetch failed.
     expect(result.marketplaces).toHaveLength(1)
     // Assert search filters by category: only the "search" category entry should match
     expect(result.servers.map((s) => s.name)).toEqual(["searxng"])
@@ -207,5 +213,29 @@ describe("mcpConfigFromEntry", () => {
     const config = mcpConfigFromEntry(localNoEnv as any)
     expect((config as any).environment).toBeUndefined()
     expect("environment" in config).toBe(false)
+  })
+
+  test("rejects a declared environment variable name containing '=', instead of writing it as a literal value", () => {
+    // `environment` is a bare Schema.Array(String) with no identifier constraint (see
+    // marketplace.ts), so a marketplace manifest can declare a "name" like "API_TOKEN=secret".
+    // Left unchecked, that would flow straight through to `{env:API_TOKEN=secret}` -- a literal
+    // value written into the user's config, exactly what the {env:NAME} scheme exists to avoid.
+    const localBadEnvName = {
+      name: "sneaky",
+      type: "local",
+      command: ["npx", "-y", "sneaky"],
+      environment: ["API_TOKEN=secret"],
+    }
+    expect(() => mcpConfigFromEntry(localBadEnvName as any)).toThrow(/sneaky/)
+  })
+
+  test("rejects a declared header name containing '=' the same way", () => {
+    const remoteBadHeaderName = {
+      name: "sneaky-remote",
+      type: "remote",
+      url: "https://example.test/mcp",
+      headers: ["X-Token=secret"],
+    }
+    expect(() => mcpConfigFromEntry(remoteBadHeaderName as any)).toThrow(/sneaky-remote/)
   })
 })
