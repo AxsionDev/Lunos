@@ -8,9 +8,45 @@ import { tmpdir } from "../fixture/fixture"
 
 // Use exact same pattern as plugin.test.ts for consistency
 
-const mcpManifest = {
-  name: "mcp-test-marketplace",
-  owner: { name: "MCP Test Provider" },
+const mcpManifestA = {
+  name: "mcp-marketplace-a",
+  owner: { name: "MCP Provider A" },
+  plugins: [],
+  mcp: [
+    {
+      name: "filesystem",
+      type: "local",
+      command: ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
+      description: "Secure file operations",
+      category: "environment",
+    },
+  ],
+}
+
+const mcpManifestB = {
+  name: "mcp-marketplace-b",
+  owner: { name: "MCP Provider B" },
+  plugins: [],
+  mcp: [
+    {
+      name: "searxng",
+      type: "local",
+      command: ["npx", "-y", "mcp-searxng"],
+      category: "search",
+    },
+  ],
+}
+
+const noMcpManifest = {
+  name: "no-mcp-marketplace",
+  owner: { name: "Legacy Provider" },
+  plugins: [],
+  // Intentionally no mcp field
+}
+
+const searchManifest = {
+  name: "search-test-marketplace",
+  owner: { name: "Search Test Provider" },
   plugins: [],
   mcp: [
     {
@@ -27,13 +63,6 @@ const mcpManifest = {
       category: "search",
     },
   ],
-}
-
-const noMcpManifest = {
-  name: "no-mcp-marketplace",
-  owner: { name: "Legacy Provider" },
-  plugins: [],
-  // Intentionally no mcp field
 }
 
 function ctx(dir: string): MarketplaceCtx {
@@ -63,7 +92,7 @@ function listDeps(global: string, resolve: FetchDeps): MarketplaceListDeps {
   }
 }
 
-async function withMarketplace(tmp: string, source: string = "mcp-test-marketplace") {
+async function withMarketplace(tmp: string, source: string = "acme/mcp-test") {
   const cfgFile = path.join(tmp, ".opencode", "opencode.json")
   await fs.mkdir(path.dirname(cfgFile), { recursive: true })
   await Bun.write(cfgFile, JSON.stringify({ marketplace: [source] }, null, 2))
@@ -72,41 +101,54 @@ async function withMarketplace(tmp: string, source: string = "mcp-test-marketpla
 const resolveDeps: FetchDeps = {
   fetchText: async (url) => {
     if (url.includes("api.github.com")) return JSON.stringify({ default_branch: "dev" })
-    if (url.includes("mcp-test-marketplace")) return JSON.stringify(mcpManifest)
-    if (url.includes("no-mcp-marketplace")) return JSON.stringify(noMcpManifest)
-    return JSON.stringify(mcpManifest)
+    if (url.includes("acme/mcp-a")) return JSON.stringify(mcpManifestA)
+    if (url.includes("acme/mcp-b")) return JSON.stringify(mcpManifestB)
+    if (url.includes("acme/no-mcp")) return JSON.stringify(noMcpManifest)
+    if (url.includes("acme/search-test")) return JSON.stringify(searchManifest)
+    return JSON.stringify(mcpManifestA)
   },
   readText: async () => "",
   stat: async () => undefined,
 }
 
 describe("listMcpServers", () => {
-  test("lists mcp servers from marketplace", async () => {
+  test("merges servers from every added marketplace", async () => {
     await using tmp = await tmpdir()
-    await withMarketplace(tmp.path, "mcp-test-marketplace")
+    // Write config with two marketplace sources
+    const cfgFile = path.join(tmp.path, ".opencode", "opencode.json")
+    await fs.mkdir(path.dirname(cfgFile), { recursive: true })
+    await Bun.write(cfgFile, JSON.stringify({ marketplace: ["acme/mcp-a", "acme/mcp-b"] }, null, 2))
+
     const result = await listMcpServers(ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
 
-    expect(result.marketplaceCount).toBe(1)
-    expect(result.servers.length).toBeGreaterThanOrEqual(0)
+    // Assert marketplaces actually loaded (proof manifests were fetched)
+    expect(result.marketplaces).toHaveLength(2)
+    expect(result.servers.map((s) => s.name)).toEqual(["filesystem", "searxng"])
+    expect(result.servers[0]?.marketplace).toBe("mcp-marketplace-a")
+    expect(result.servers[1]?.marketplace).toBe("mcp-marketplace-b")
   })
 
   test("treats a manifest with no mcp key as contributing no servers", async () => {
     await using tmp = await tmpdir()
-    await withMarketplace(tmp.path, "no-mcp-marketplace")
+    await withMarketplace(tmp.path, "acme/no-mcp")
     const result = await listMcpServers(ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
 
+    // Assert marketplace loaded (proof manifest was fetched)
+    expect(result.marketplaces).toHaveLength(1)
+    // Assert backward compat: no mcp key → no servers
     expect(result.servers).toEqual([])
-    expect(result.marketplaceCount).toBe(1)
   })
 })
 
 describe("searchMcpServers", () => {
   test("matches on category as well as name and description", async () => {
     await using tmp = await tmpdir()
-    await withMarketplace(tmp.path, "mcp-test-marketplace")
+    await withMarketplace(tmp.path, "acme/search-test")
     const result = await searchMcpServers("search", ctx(tmp.path), listDeps(path.join(tmp.path, "global"), resolveDeps))
 
-    expect(result.marketplaceCount).toBe(1)
-    expect(result.servers.length).toBeGreaterThanOrEqual(0)
+    // Assert marketplace loaded (proof manifest was fetched)
+    expect(result.marketplaces).toHaveLength(1)
+    // Assert search filters by category: only the "search" category entry should match
+    expect(result.servers.map((s) => s.name)).toEqual(["searxng"])
   })
 })
