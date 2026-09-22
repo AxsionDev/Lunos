@@ -3,6 +3,7 @@ import { Marketplace } from "@opencode-ai/core/marketplace"
 import { readFileSync } from "fs"
 import path from "path"
 import valid from "./fixtures/marketplace/valid.json"
+import validMcp from "./fixtures/marketplace/valid-mcp.json"
 import malformed from "./fixtures/marketplace/malformed.json"
 
 // Read from disk rather than statically importing — the seed manifest lives at the repo
@@ -37,5 +38,33 @@ describe("Marketplace", () => {
     for (const plugin of manifest.plugins) {
       expect(plugin.source.type).toBe("github")
     }
+  })
+
+  test("decodes a manifest carrying MCP servers", () => {
+    const manifest = Marketplace.decode(validMcp)
+    expect(manifest.mcp).toHaveLength(2)
+    expect(manifest.mcp?.[0]).toMatchObject({
+      name: "filesystem",
+      type: "local",
+      command: ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
+    })
+    expect(manifest.mcp?.[1]).toMatchObject({ name: "context-api", type: "remote", url: "https://example.test/mcp" })
+  })
+
+  test("keeps decoding a manifest with no mcp key at all", () => {
+    // `mcp` is optional so that every manifest published before this change keeps working.
+    const manifest = Marketplace.decode(valid)
+    expect(manifest.mcp).toBeUndefined()
+  })
+
+  test("rejects an MCP entry whose type is neither local nor remote", () => {
+    expect(() =>
+      Marketplace.decode({
+        name: "x",
+        owner: { name: "o" },
+        plugins: [],
+        mcp: [{ name: "bad", type: "carrier-pigeon", url: "https://example.test" }],
+      }),
+    ).toThrow(/\["mcp"\]\[0\]/)
   })
 })
