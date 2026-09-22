@@ -1,0 +1,124 @@
+---
+title: Hooks
+description: Run shell commands on tool and session events, without writing a plugin.
+---
+
+Lunos uses the `hooks` config to run shell commands when something happens — a tool is about to run, a file was just edited, a session went idle. Anything you can do in a hook you could also do in a [plugin](/docs/plugins), but hooks need no code: they're config.
+
+---
+
+## Example
+
+Format TypeScript after every edit.
+
+```json title="opencode.json"
+{
+  "$schema": "https://lunos.ai/config.json",
+  "hooks": {
+    "tool.execute.after": [
+      {
+        "matcher": { "tool": "edit", "file": "**/*.ts" },
+        "command": ["prettier", "--write", "$LUNOS_FILE"]
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Entries
+
+Each event maps to a list of entries, run in order.
+
+| Key           | Required | Description                                                                   |
+| ------------- | -------- | ----------------------------------------------------------------------------- |
+| `command`     | yes      | Command and arguments, as an array.                                           |
+| `matcher`     | no       | Restricts when the hook fires. Omit to fire on every occurrence of the event. |
+| `environment` | no       | Extra environment variables, on top of the inherited environment.             |
+| `timeout`     | no       | Milliseconds before the command is killed. Defaults to `30000`.               |
+| `disabled`    | no       | Keeps the hook configured but inactive.                                       |
+
+`command` is an array, not a string. It's executed directly rather than through a shell, so there's no quoting to get right and no injection risk from a path containing spaces or `;`.
+
+### Matchers
+
+| Key    | Description                                                           |
+| ------ | --------------------------------------------------------------------- |
+| `tool` | Glob matched against the tool name, e.g. `edit` or `*`.               |
+| `file` | Glob matched against the file path the tool acted on, e.g. `**/*.ts`. |
+
+Both must match for the hook to fire. A matcher that needs information the event doesn't carry never fires — a `file` matcher on a session event stays silent rather than matching everything.
+
+### Environment
+
+Every hook command receives:
+
+| Variable           | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| `LUNOS_HOOK_EVENT` | The event that fired the hook.                 |
+| `LUNOS_TOOL`       | The tool name, when the event has one.         |
+| `LUNOS_FILE`       | The file the tool acted on, when there is one. |
+| `LUNOS_SESSION_ID` | The session, when the event has one.           |
+
+---
+
+## Events
+
+| Event                    | When                              | Blocking |
+| ------------------------ | --------------------------------- | -------- |
+| `tool.execute.before`    | Before a tool runs                | yes      |
+| `tool.execute.after`     | After a tool returns              | no       |
+| `command.execute.before` | Before a custom command runs      | yes      |
+| `session.created`        | A session was created             | no       |
+| `session.idle`           | A session finished working        | no       |
+| `session.compacted`      | A session's context was compacted | no       |
+| `session.deleted`        | A session was deleted             | no       |
+| `session.error`          | A session errored                 | no       |
+
+### Blocking
+
+A `before` hook that exits non-zero **vetoes the action** — the tool or command does not run, and the hook's stderr is surfaced as the reason. This is what makes a guard possible.
+
+```json title="opencode.json"
+{
+  "hooks": {
+    "tool.execute.before": [
+      {
+        "matcher": { "tool": "bash" },
+        "command": ["./scripts/guard-bash.sh"]
+      }
+    ]
+  }
+}
+```
+
+Everything else is observational: a non-zero exit is logged and execution continues. A formatter that fails shouldn't undo a tool call that already succeeded.
+
+A hook that hangs is killed at its `timeout`. On a blocking event that counts as a veto, so keep `timeout` above the slowest legitimate run.
+
+---
+
+## Scope
+
+Lunos hooks cover the events Lunos actually has. If you're coming from another agent, some events have no equivalent here:
+
+| Elsewhere             | Lunos                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| Pre/post tool use     | `tool.execute.before` / `tool.execute.after`                                                      |
+| Session start         | `session.created`                                                                                 |
+| Session end / stop    | `session.idle` is the closest — it fires when a session finishes working, not when it's torn down |
+| Compaction            | `session.compacted`                                                                               |
+| User prompt submitted | No equivalent event is dispatched today                                                           |
+| Subagent lifecycle    | No equivalent — Lunos doesn't model subagents as a separate session lifecycle                     |
+| Notification          | No equivalent                                                                                     |
+
+These are gaps in what Lunos dispatches, not in the hooks feature. Adding an event to this table means dispatching it in the agent loop first.
+
+---
+
+## Plugins
+
+Hooks and [plugins](/docs/plugins) share one execution path — config hooks are implemented as a built-in plugin over the same dispatch, so ordering between them is predictable and there's no second system to reason about.
+
+Reach for a plugin instead of a hook when you need to inspect or rewrite a tool's arguments, talk to the Lunos server, or keep state between events. Hooks are for shelling out.
