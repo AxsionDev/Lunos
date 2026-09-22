@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import fs from "fs/promises"
 import path from "path"
 import { Filesystem } from "@/util/filesystem"
-import { listMcpServers, searchMcpServers } from "../../src/mcp/discover"
+import { listMcpServers, searchMcpServers, mcpConfigFromEntry } from "../../src/mcp/discover"
 import type { FetchDeps, MarketplaceCacheDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 
@@ -150,5 +150,62 @@ describe("searchMcpServers", () => {
     expect(result.marketplaces).toHaveLength(1)
     // Assert search filters by category: only the "search" category entry should match
     expect(result.servers.map((s) => s.name)).toEqual(["searxng"])
+  })
+})
+
+describe("mcpConfigFromEntry", () => {
+  test("turns a local entry into a local config with its command intact", () => {
+    const localEntry = {
+      name: "filesystem",
+      type: "local",
+      command: ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
+      description: "Secure file operations",
+      category: "environment",
+    }
+    const config = mcpConfigFromEntry(localEntry as any)
+    expect(config).toMatchObject({
+      type: "local",
+      command: ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
+      enabled: true,
+    })
+  })
+
+  test("writes an {env:} reference for each required variable, never a value", () => {
+    // The whole point: a generated opencode.json holds no secrets and stays safe to commit.
+    const localWithEnv = {
+      name: "x",
+      type: "local",
+      command: ["npx", "-y", "x"],
+      environment: ["EXAMPLE_API_KEY"],
+    }
+    const config = mcpConfigFromEntry(localWithEnv as any)
+    expect((config as any).environment).toEqual({ EXAMPLE_API_KEY: "{env:EXAMPLE_API_KEY}" })
+  })
+
+  test("turns a remote entry into a remote config with {env:} headers", () => {
+    const remoteEntry = {
+      name: "y",
+      type: "remote",
+      url: "https://example.test/mcp",
+      headers: ["EXAMPLE_API_KEY"],
+    }
+    const config = mcpConfigFromEntry(remoteEntry as any)
+    expect(config).toMatchObject({
+      type: "remote",
+      url: "https://example.test/mcp",
+      headers: { EXAMPLE_API_KEY: "{env:EXAMPLE_API_KEY}" },
+    })
+  })
+
+  test("omits environment entirely when the entry declares none", () => {
+    const localNoEnv = {
+      name: "searxng",
+      type: "local",
+      command: ["npx", "-y", "mcp-searxng"],
+      category: "search",
+    }
+    const config = mcpConfigFromEntry(localNoEnv as any)
+    expect((config as any).environment).toBeUndefined()
+    expect("environment" in config).toBe(false)
   })
 })

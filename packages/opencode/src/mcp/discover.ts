@@ -1,4 +1,5 @@
 import type { Marketplace } from "@opencode-ai/core/marketplace"
+import type { ConfigMCPV1 } from "@opencode-ai/core/v1/config/mcp"
 import {
   resolveAddedMarketplaces,
   defaultMarketplaceListDeps,
@@ -66,4 +67,31 @@ export async function searchMcpServers(
     return haystack.some((value) => value.toLowerCase().includes(needle))
   })
   return { marketplaceCount, marketplaces, servers: matches }
+}
+
+// The manifest carries variable NAMES; config wants name -> value. We write `{env:NAME}`, the
+// substitution syntax config already supports (see docs/config.mdx). The generated
+// opencode.json therefore contains no secret and is safe to commit to a repository — which it
+// would not be had we prompted for key values and written them literally.
+function envReferences(names: readonly string[] | undefined) {
+  if (!names?.length) return undefined
+  return Object.fromEntries(names.map((name) => [name, `{env:${name}}`]))
+}
+
+export function mcpConfigFromEntry(entry: Marketplace.McpEntry): ConfigMCPV1.Info {
+  if (entry.type === "remote") {
+    return {
+      type: "remote",
+      url: entry.url,
+      enabled: true,
+      ...(envReferences(entry.headers) ? { headers: envReferences(entry.headers)! } : {}),
+    }
+  }
+  return {
+    type: "local",
+    command: [...entry.command],
+    enabled: true,
+    ...(entry.cwd ? { cwd: entry.cwd } : {}),
+    ...(envReferences(entry.environment) ? { environment: envReferences(entry.environment)! } : {}),
+  }
 }
