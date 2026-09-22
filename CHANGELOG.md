@@ -66,12 +66,19 @@ reasoning behind a change are published separately as **Lunos Notes**.
 These are open and tracked. They are listed here rather than omitted, because a changelog that
 only records wins is not useful for deciding whether to try something.
 
-- **Installation is not verified end-to-end on a clean machine.** Treat the install instructions
-  as unproven until this changes.
 - **Binaries are not code-signed** on any platform. Downloads will trip OS gatekeepers.
-- **No EU-specific functionality exists yet.** The sovereignty positioning describes the roadmap,
-  not the current build. That work is Phase 1.
+- **No security certification is held.** No CRA, EUCS, ISO or SOC certification, and none is
+  claimed. An SBOM ships with each release as readiness groundwork, not as a compliance claim.
 - **Feature parity with upstream is not claimed or measured.**
+
+Two entries were removed from this list in Phase 1, because they stopped being true:
+
+- ~~Installation is not verified end-to-end on a clean machine.~~ `npm install -g lunos-ai`
+  was verified end to end at v1.18.35.
+- ~~No EU-specific functionality exists yet.~~ Phase 1 shipped provider jurisdiction metadata and
+  enforceable, audit-logged data-residency controls. Scoped precisely: this is control over which
+  provider may be used and a record of what left — **not** EU-operated infrastructure, which
+  remains something Lunos does not have and does not claim. See `docs/deployment/self-hosted.md`.
 
 ---
 

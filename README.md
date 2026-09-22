@@ -14,10 +14,6 @@
   approve it.
 </p>
 
-> [!WARNING]
-> **Pre-release.** Lunos has not shipped an installable build yet. The install commands below
-> still install **upstream opencode**, not Lunos. Build from source in the meantime.
-
 > **Lunos** is a fork of [opencode](https://github.com/anomalyco/opencode). It is not built by,
 > maintained by, or affiliated with the OpenCode team in any way — see
 > [Building on OpenCode](#building-on-opencode) below.
@@ -47,8 +43,13 @@ itself, whereas an open fork can close a feature gap.
 
 ### Project status
 
-Lunos is **pre-release** and in Phase 0: forking, rebranding, and standing up its own governance,
-CI, and release pipeline. Nothing here is production-ready yet.
+Lunos is **early**. Phase 0 — forking, rebranding, and standing up its own governance, CI and
+release pipeline — is complete, and Lunos now publishes releases under its own name. Phase 1
+(sovereignty foundation) has landed provider jurisdiction metadata and enforceable data-residency
+controls; see the [self-hosted deployment guide](docs/deployment/self-hosted.md).
+
+Treat it as early software rather than production-ready: binaries are not code-signed, and feature
+parity with upstream is not claimed or measured.
 
 Decision records for the work so far live in [`.claude/docs/`](.claude/docs/) — covering the
 upstream sync policy, the CI workflow triage, and the product name freeze.
@@ -95,88 +96,108 @@ A published roadmap and a feature-parity comparison table are still to come.
 
 ### Installation
 
-> [!IMPORTANT]
-> **These commands install upstream opencode, not Lunos.** They are kept because they work and
-> because opencode is what Lunos forks — running them gives you the base this project builds on.
-> Lunos does not publish an installable artifact yet: there is no Lunos install script, tap, or
-> signed binary, and the `lunos-ai` npm name is unpublished. Publishing is gated on standing up
-> release CI under Lunos-owned credentials. Until then, build from source — see
-> [Contributing](#contributing).
-
 ```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
+# npm — verified end to end at v1.18.35
+npm i -g lunos-ai@latest           # or bun/pnpm/yarn
+lunos --version
 
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
+# install script
+curl -fsSL https://raw.githubusercontent.com/AxsionDev/Lunos/dev/install | bash
 ```
+
+The install script places the binary in `$HOME/.lunos/bin` and offers to add it to your `PATH`.
+Standalone archives for Linux, macOS and Windows are also attached to each
+[release](https://github.com/AxsionDev/Lunos/releases) as `lunos-<os>-<arch>`.
+
+**Channels Lunos does not publish to yet:** Homebrew, Scoop, Chocolatey, AUR, Nix and `mise`.
+They are listed here as _absent_ rather than shown as commands that would fail.
+
+> [!NOTE]
+> **Binaries are not code-signed yet**, so macOS Gatekeeper and Windows SmartScreen will warn.
+> The npm package and building from source are unaffected.
+>
+> Deploying in a regulated or public-sector environment? See the
+> [self-hosted deployment guide](docs/deployment/self-hosted.md), which covers data flows,
+> EU data-residency controls, and what the sovereignty claim does and does not cover.
 
 > [!TIP]
 > Remove versions older than 0.1.x before installing.
 
 ### Desktop App (BETA)
 
-OpenCode is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/opencode/releases) or [opencode.ai/download](https://opencode.ai/download).
+Lunos is also available as a desktop application, attached to each
+[Lunos release](https://github.com/AxsionDev/Lunos/releases).
 
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
+| Platform              | Download                                              |
+| --------------------- | ----------------------------------------------------- |
+| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`                      |
+| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`                        |
+| Windows               | `opencode-desktop-win-x64.exe`                        |
+| Linux                 | `opencode-desktop-linux-*.deb` / `.rpm` / `.AppImage` |
 
-```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
-```
+> [!NOTE]
+> These are Lunos builds from the Lunos release, but the **desktop artifacts are still named
+> `opencode-desktop-*`** — the desktop packaging has not been rebranded yet, unlike the CLI
+> (`lunos-*`). The filenames above are the real ones you will find on the release page. Tracked
+> separately; the CLI is unaffected.
 
 #### Installation Directory
 
-The install script respects the following priority order for the installation path:
+The install script installs to **`$HOME/.lunos/bin`** and offers to add that directory to your
+`PATH`.
 
-1. `$OPENCODE_INSTALL_DIR` - Custom installation directory
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
-3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.opencode/bin` - Default fallback
+> [!NOTE]
+> Upstream's install script honoured `$OPENCODE_INSTALL_DIR`, `$XDG_BIN_DIR` and `$HOME/bin`
+> before falling back to a default. **Lunos's install script does not** — `INSTALL_DIR` is
+> currently fixed (`install:68`), so setting those variables has no effect. This section
+> previously documented the upstream behaviour, which was inaccurate for Lunos.
+>
+> To install somewhere else today, download the archive from the
+> [releases page](https://github.com/AxsionDev/Lunos/releases) and place the `lunos` binary
+> where you want it, or use `npm i -g lunos-ai@latest` and let npm decide. Restoring the
+> override is a code change, tracked separately.
 
-```bash
-# Examples
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
-```
+### Modes
 
-### Agents
+Lunos ships four built-in **modes**. Cycle through them with `Tab`, or `Shift+Tab` to go back.
+Each mode is a different permission posture, not a different model.
 
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
+- **build** — the default. Executes tools according to your configured permissions.
+- **plan** — disallows every edit tool. Plans are written to `.opencode/plans/`, so it can record
+  its thinking without touching your code.
+- **research** — deep investigation of a topic or goal, with no code changes. Output is Markdown
+  files and specs under `.opencode/research/`.
+- **dev-cycle** — the full development cycle: discover, architect, plan, build and verify, with
+  human approval gates between phases.
 
-- **build** - Default, full-access agent for development work
-- **plan** - Read-only agent for analysis and code exploration
-  - Denies file edits by default
-  - Asks permission before running bash commands
-  - Ideal for exploring unfamiliar codebases or planning changes
+Alongside these are **subagents**, which a mode delegates to rather than you selecting directly:
+`general` (complex searches and multi-step tasks), `explore`, `architect`, `planner` and `qa`.
+Invoke one explicitly by mentioning it in a message, e.g. `@general`.
 
-Also included is a **general** subagent for complex searches and multistep tasks.
-This is used internally and can be invoked using `@general` in messages.
-
-Learn more about [agents](https://opencode.ai/docs/agents).
+> [!NOTE]
+> Modes were called _agents_ before the rename. `agent_cycle` still works as an alias for
+> `mode_cycle` in keybindings, so existing configs keep working.
 
 ### Documentation
 
-For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
+**Lunos has no documentation site yet.** What exists lives in this repository:
+
+- [Self-hosted deployment guide](docs/deployment/self-hosted.md) — deployment, data flows, and what
+  the EU-sovereignty claim covers
+- [Data residency controls](docs/data-residency.md) — restricting provider jurisdictions, and the
+  egress audit log
+- [Model provider jurisdictions](docs/provider-jurisdictions.md) — where each provider processes data
+- [`SECURITY.md`](SECURITY.md) — threat model and vulnerability reporting
+- Decision records in [`.claude/docs/`](.claude/docs/)
+
+For configuration options not covered above, upstream opencode's documentation still largely
+applies, since Lunos inherits its configuration format — but it describes _opencode_, and the two
+have begun to diverge. Treat it as a reference, not as Lunos documentation.
 
 ### Contributing
 
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+If you're interested in contributing to Lunos, please read our
+[contributing docs](./CONTRIBUTING.md) before submitting a pull request.
 
 ### Building on OpenCode
 
@@ -184,4 +205,13 @@ If you are working on a project that's related to OpenCode and is using "opencod
 
 ---
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+<!-- XCOD-65: which channels Lunos should point at is an open product decision (Lunos has no
+     Discord or X presence; LinkedIn only). Until that is decided, these are labelled as
+     upstream's rather than presented as Lunos's own — they were previously captioned
+     "Join our community", which sent Lunos users to opencode's channels. -->
+
+**Lunos has no community channels of its own yet.** For questions about Lunos, open a
+[GitHub issue](https://github.com/AxsionDev/Lunos/issues).
+
+Upstream opencode's community — not affiliated with Lunos —
+is at [Discord](https://discord.gg/opencode) and [X.com](https://x.com/opencode).
