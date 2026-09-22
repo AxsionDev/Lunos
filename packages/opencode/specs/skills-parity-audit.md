@@ -154,15 +154,42 @@ _Size: M._
 footer, the command palette (with a dedicated "skill" badge), the HTTP API and ACP. v2
 skills appear in none of them. A skill registered only through a v2 source is reachable by
 the model but cannot be seen or invoked by the user.
-_Correction: an earlier draft of this audit claimed skills have no TUI surface at all,
-based on a grep over `*.go`. There are zero `.go` files in the repo — the TUI is
-TypeScript under `packages/opencode/src/cli/cmd/run/` and `packages/app/`. The claim was
-vacuously true and substantively wrong._
-_Size: M._
 
-**G5 — v1 has no per-skill availability gating.** Every skill discovered by v1 becomes a
-command for everyone. v2's `PermissionV2` gating has no v1 counterpart.
-_Size: M — or S, if the answer is to finish the v2 migration rather than backport._
+_Two corrections, 2026-09-22._
+
+_First: an earlier draft claimed skills have no TUI surface at all, from a grep over
+`*.go`. There are zero `.go` files in the repo — the TUI is TypeScript under
+`packages/opencode/src/cli/cmd/run/` and `packages/app/`. Vacuously true, substantively
+wrong._
+
+_Second, and more important: **this gap is about v2 in isolation, not about the product.**
+An earlier version of this section was read as meaning users cannot invoke skills as
+commands and that enabling it would be "a substantial build." That is wrong. v1 is the live
+runtime for the CLI and TUI, and it already does both things: `command/index.ts:134-152`
+promotes every skill to a slash command, and `session/system.ts:107-117` injects the skill
+list into the model's system prompt. Skills are user-invocable and model-visible today. The
+v2 gap only matters at the v1→v2 cutover, when these two behaviours must not be silently
+dropped — which is an argument for a regression test, not a build._
+_Size: M, and not currently user-facing._
+
+**G5 — the command surface bypasses the permission gating the model surface respects.**
+
+_Corrected 2026-09-22. The original G5 claimed "v1 has no per-skill availability gating."
+That is false: `skill/index.ts:310-315` exposes `Skill.available(agent)`, which filters via
+`Permission.evaluate("skill", …)`. v1 gates. The claim came from reading v2 in isolation and
+inferring a property of v1._
+
+The real defect is narrower and more serious. Two consumers read the skill list differently:
+
+- `session/system.ts:110` builds the model's system prompt from `skill.available(agent)` —
+  **permission-gated**.
+- `command/index.ts:134` builds the slash-command table from `skill.all()` —
+  **ungated**.
+
+So a skill denied to an agent by permission is correctly withheld from the model, and still
+appears as a typeable slash command. The two surfaces disagree about what the user may
+invoke. This is security-relevant and worth fixing ahead of anything else in this list.
+_Size: S — the gated accessor already exists; the command builder needs the agent context._
 
 **G6 — Silent file-list truncation (v2).** `tool/skill.ts` sets `FILE_LIMIT = 10` and
 slices the glob result, emitting `Note: file list is sampled.` A skill with more than ten
@@ -190,6 +217,33 @@ opencode. Discovered in passing; belongs to the XCOD-44 rebrand family, not pari
 the config paths themselves may legitimately still be `.opencode`, which needs checking
 before any rename.
 _Size: S, contingent on verifying the paths._
+
+### Found by running it, not by reading it
+
+Added 2026-09-22, after exercising `lunos debug skill` against the live v1 runtime. Neither
+of these is visible from source review, and both outrank most of the list above.
+
+**G10 — skill discovery is non-deterministic.** Four identical invocations of
+`bun dev debug skill`, same cwd, same working tree, returned **17, 17, 18 and 7** skills.
+The set is not stable between runs, so a skill the model could use in one session is absent
+from the next, with no error and no warning. `loadSkills` applies
+`Effect.forEach(…, { concurrency: "unbounded" })` over a shared mutable `state.skills`
+object, which is the first place to look; a discovery step completing after `all()` reads
+would produce the same symptom.
+_Size: M. This is the most serious finding in the audit — silent, intermittent, and it
+undermines every other skill behaviour._
+
+**G11 — project-level `.claude/skills/` are not reliably discovered.** This repository
+contains seven valid skills in `.claude/skills/`, each with `SKILL.md` and `name:`
+frontmatter. Across repeated runs, **zero** of them were discovered; in one earlier run
+exactly one (`contract-driven-implementation`) appeared. Global skills from
+`~/.claude/skills`, `~/.agents/skills` and `~/.config/opencode/skills` were found
+consistently, so the failure is specific to the project-level walk —
+`fsys.up({ targets, start: directory, stop: worktree })` in `discoverSkills`. Worth
+confirming whether `up` is inclusive of `stop`, since with cwd at the worktree root there
+may be no interval to walk.
+_Size: S–M once reproduced. Directly blocks XCOD-71, whose candidate pool is exactly these
+seven skills._
 
 ### Fine as-is
 
