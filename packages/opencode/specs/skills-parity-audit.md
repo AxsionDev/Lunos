@@ -188,8 +188,22 @@ The real defect is narrower and more serious. Two consumers read the skill list 
 
 So a skill denied to an agent by permission is correctly withheld from the model, and still
 appears as a typeable slash command. The two surfaces disagree about what the user may
-invoke. This is security-relevant and worth fixing ahead of anything else in this list.
-_Size: S — the gated accessor already exists; the command builder needs the agent context._
+invoke. This is security-relevant.
+
+_Sizing corrected 2026-09-22: this is **not** a one-line swap to `available(agent)`._ The
+command table is built once per instance by `Command.state(ctx)`, and `ctx` carries no
+agent — commands are agent-independent by construction, while permissions are per-agent. So
+there are two real options, and picking between them is a design decision:
+
+1. **Enforce at invocation**, not at listing: leave the command table as-is and check
+   `Permission.evaluate("skill", name, agent.permission)` when a skill command actually
+   runs. Smaller, and consistent with the principle this audit already credits v2 for —
+   filtering the advertisement is not enforcement, so enforcement belongs at the boundary.
+2. **Build the command table per agent**, so a denied skill never appears. Better UX, but it
+   changes the lifetime and shape of `Command.state`.
+
+Recommendation: option 1 for the fix, option 2 only if the listing itself is considered
+sensitive. _Size: S for option 1, M for option 2._
 
 **G6 — Silent file-list truncation (v2).** `tool/skill.ts` sets `FILE_LIMIT = 10` and
 slices the glob result, emitting `Note: file list is sampled.` A skill with more than ten
@@ -223,27 +237,43 @@ _Size: S, contingent on verifying the paths._
 Added 2026-09-22, after exercising `lunos debug skill` against the live v1 runtime. Neither
 of these is visible from source review, and both outrank most of the list above.
 
-**G10 — skill discovery is non-deterministic.** Four identical invocations of
-`bun dev debug skill`, same cwd, same working tree, returned **17, 17, 18 and 7** skills.
-The set is not stable between runs, so a skill the model could use in one session is absent
-from the next, with no error and no warning. `loadSkills` applies
-`Effect.forEach(…, { concurrency: "unbounded" })` over a shared mutable `state.skills`
-object, which is the first place to look; a discovery step completing after `all()` reads
-would produce the same symptom.
-_Size: M. This is the most serious finding in the audit — silent, intermittent, and it
-undermines every other skill behaviour._
+**G10 — skill discovery is non-deterministic and usually incomplete.** Nine invocations of
+`debug skill` on an unchanged working tree returned **7, 16, 16, 17, 17, 17, 18 and 38**
+skills. The set is not stable between runs, so a skill the model can use in one session is
+silently absent from the next — no error, no warning, nothing in stderr.
 
-**G11 — project-level `.claude/skills/` are not reliably discovered.** This repository
-contains seven valid skills in `.claude/skills/`, each with `SKILL.md` and `name:`
-frontmatter. Across repeated runs, **zero** of them were discovered; in one earlier run
-exactly one (`contract-driven-implementation`) appeared. Global skills from
-`~/.claude/skills`, `~/.agents/skills` and `~/.config/opencode/skills` were found
-consistently, so the failure is specific to the project-level walk —
-`fsys.up({ targets, start: directory, stop: worktree })` in `discoverSkills`. Worth
-confirming whether `up` is inclusive of `stop`, since with cwd at the worktree root there
-may be no interval to walk.
-_Size: S–M once reproduced. Directly blocks XCOD-71, whose candidate pool is exactly these
-seven skills._
+The 38-skill run is almost certainly the correct answer: it is the only one that found this
+repo's seven project skills plus two from `.opencode/`. So the common case is not merely
+unstable, it is **under-reporting by more than half**.
+
+Where to look: `loadSkills` applies `Effect.forEach(…, { concurrency: "unbounded" })` over a
+shared mutable `state.skills`, and `discoverSkills` builds `state.matches` through several
+sequential scans. A discovery step whose result lands after `all()` reads would produce
+exactly this. Note the scan error path is asymmetric — `scan()` only logs when
+`opts.scope` is set and otherwise calls `Effect.die`, so a silently swallowed failure in
+the config-directory scans is worth ruling in or out early.
+
+_Size: M. This is the most serious finding in the audit — silent, intermittent, and it
+undermines every other skill behaviour, including anything XCOD-71 tries to prove._
+
+**G11 — project-level `.claude/skills/` are usually missing.** _Folded into G10 on
+2026-09-22: this is a symptom, not a separate defect._ This repository has seven valid
+skills in `.claude/skills/`. Most runs discover **zero** of them; one run discovered all
+seven (alongside two from `.opencode/`, for 38 total). Since a single run does find them,
+the path, glob and frontmatter are all correct — the cause is whatever makes G10 return
+incomplete sets.
+
+Ruled out by direct testing, so the next investigator doesn't repeat it:
+
+- The glob is fine — `new Bun.Glob("skills/**/SKILL.md").scanSync({ cwd: "<repo>/.claude" })`
+  returns all seven.
+- The frontmatter is fine — every file has a string `name:`, so `isSkillFrontmatter` passes.
+- `FSUtil.up` **is** inclusive of `stop` (`fs-util.ts:171-180` tests `current` before
+  breaking), so a start equal to the worktree root still scans that root.
+- Not cold-cache warm-up — counts stay unstable after many runs.
+
+**This blocks XCOD-71**, whose candidate pool is exactly these seven skills. It is the
+practical reason G10 matters rather than a separate item.
 
 ### Fine as-is
 
