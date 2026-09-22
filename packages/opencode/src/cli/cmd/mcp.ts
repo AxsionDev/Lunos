@@ -17,7 +17,7 @@ import { InstanceRef } from "@/effect/instance-ref"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
-import { modify, applyEdits } from "jsonc-parser"
+import { modify, applyEdits, parse as parseJsonc } from "jsonc-parser"
 import { Filesystem } from "@/util/filesystem"
 import { Effect } from "effect"
 import { listMcpServers, mcpConfigFromEntry, searchMcpServers } from "../../mcp/discover"
@@ -464,6 +464,17 @@ async function addMcpToConfig(name: string, mcpConfig: ConfigMCPV1.Info, configP
   return configPath
 }
 
+// The marketplace path resolves by bare name, which risks colliding with a name that already
+// means something in the target config -- possibly from a different marketplace, possibly
+// hand-written. addMcpToConfig would silently overwrite it (it's a plain jsonc-parser `modify`),
+// so the marketplace branch checks first and refuses rather than clobbering.
+async function existingMcpEntry(name: string, configPath: string): Promise<McpConfigured | undefined> {
+  if (!(await Filesystem.exists(configPath))) return undefined
+  const parsed = parseJsonc(await Filesystem.readText(configPath)) as { mcp?: Record<string, McpEntry> } | undefined
+  const entry = parsed?.mcp?.[name]
+  return entry && isMcpConfigured(entry) ? entry : undefined
+}
+
 // Pulled out of the add handler because that handler is Effect + @clack/prompts plumbing that
 // bun test can't drive directly (see mcp-marketplace.test.ts). This is the one decision in the
 // marketplace branch that IS pure: a bare name with none of --url/--env/--header/`--` present
@@ -528,6 +539,19 @@ export const McpAddCommand = effectCmd({
         if (matches.length === 1) {
           const match = matches[0]!
           const mcpConfig = mcpConfigFromEntry(match.entry)
+          const configPath = await resolveConfigPath(Global.Path.config, true)
+
+          // Refuse rather than clobber: addMcpToConfig keys on the bare name, so a second
+          // marketplace (or a hand-written entry) using the same name would otherwise be
+          // silently overwritten with no way back. This check runs before anything is shown or
+          // confirmed, so a doomed add fails fast instead of asking the user to confirm first.
+          const existing = await existingMcpEntry(match.name, configPath)
+          if (existing) {
+            const hint = existing.type === "remote" ? existing.url : existing.command.join(" ")
+            throw new Error(
+              `MCP server "${match.name}" already exists in ${configPath} (${hint}). Remove or rename it there first.`,
+            )
+          }
 
           // Show exactly what will run before anything is written. Installing a local MCP
           // server executes third-party code, so the user reviews the actual command, not a
@@ -555,7 +579,6 @@ export const McpAddCommand = effectCmd({
             }
           }
 
-          const configPath = await resolveConfigPath(Global.Path.config, true)
           await addMcpToConfig(match.name, mcpConfig, configPath)
           prompts.log.success(`MCP server "${match.name}" added to ${configPath}`)
           return
