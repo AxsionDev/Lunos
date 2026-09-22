@@ -154,15 +154,56 @@ _Size: M._
 footer, the command palette (with a dedicated "skill" badge), the HTTP API and ACP. v2
 skills appear in none of them. A skill registered only through a v2 source is reachable by
 the model but cannot be seen or invoked by the user.
-_Correction: an earlier draft of this audit claimed skills have no TUI surface at all,
-based on a grep over `*.go`. There are zero `.go` files in the repo — the TUI is
-TypeScript under `packages/opencode/src/cli/cmd/run/` and `packages/app/`. The claim was
-vacuously true and substantively wrong._
-_Size: M._
 
-**G5 — v1 has no per-skill availability gating.** Every skill discovered by v1 becomes a
-command for everyone. v2's `PermissionV2` gating has no v1 counterpart.
-_Size: M — or S, if the answer is to finish the v2 migration rather than backport._
+_Two corrections, 2026-09-22._
+
+_First: an earlier draft claimed skills have no TUI surface at all, from a grep over
+`*.go`. There are zero `.go` files in the repo — the TUI is TypeScript under
+`packages/opencode/src/cli/cmd/run/` and `packages/app/`. Vacuously true, substantively
+wrong._
+
+_Second, and more important: **this gap is about v2 in isolation, not about the product.**
+An earlier version of this section was read as meaning users cannot invoke skills as
+commands and that enabling it would be "a substantial build." That is wrong. v1 is the live
+runtime for the CLI and TUI, and it already does both things: `command/index.ts:134-152`
+promotes every skill to a slash command, and `session/system.ts:107-117` injects the skill
+list into the model's system prompt. Skills are user-invocable and model-visible today. The
+v2 gap only matters at the v1→v2 cutover, when these two behaviours must not be silently
+dropped — which is an argument for a regression test, not a build._
+_Size: M, and not currently user-facing._
+
+**G5 — the command surface bypasses the permission gating the model surface respects.**
+
+_Corrected 2026-09-22. The original G5 claimed "v1 has no per-skill availability gating."
+That is false: `skill/index.ts:310-315` exposes `Skill.available(agent)`, which filters via
+`Permission.evaluate("skill", …)`. v1 gates. The claim came from reading v2 in isolation and
+inferring a property of v1._
+
+The real defect is narrower and more serious. Two consumers read the skill list differently:
+
+- `session/system.ts:110` builds the model's system prompt from `skill.available(agent)` —
+  **permission-gated**.
+- `command/index.ts:134` builds the slash-command table from `skill.all()` —
+  **ungated**.
+
+So a skill denied to an agent by permission is correctly withheld from the model, and still
+appears as a typeable slash command. The two surfaces disagree about what the user may
+invoke. This is security-relevant.
+
+_Sizing corrected 2026-09-22: this is **not** a one-line swap to `available(agent)`._ The
+command table is built once per instance by `Command.state(ctx)`, and `ctx` carries no
+agent — commands are agent-independent by construction, while permissions are per-agent. So
+there are two real options, and picking between them is a design decision:
+
+1. **Enforce at invocation**, not at listing: leave the command table as-is and check
+   `Permission.evaluate("skill", name, agent.permission)` when a skill command actually
+   runs. Smaller, and consistent with the principle this audit already credits v2 for —
+   filtering the advertisement is not enforcement, so enforcement belongs at the boundary.
+2. **Build the command table per agent**, so a denied skill never appears. Better UX, but it
+   changes the lifetime and shape of `Command.state`.
+
+Recommendation: option 1 for the fix, option 2 only if the listing itself is considered
+sensitive. _Size: S for option 1, M for option 2._
 
 **G6 — Silent file-list truncation (v2).** `tool/skill.ts` sets `FILE_LIMIT = 10` and
 slices the glob result, emitting `Note: file list is sampled.` A skill with more than ten
@@ -190,6 +231,49 @@ opencode. Discovered in passing; belongs to the XCOD-44 rebrand family, not pari
 the config paths themselves may legitimately still be `.opencode`, which needs checking
 before any rename.
 _Size: S, contingent on verifying the paths._
+
+### Found by running it, not by reading it
+
+Added 2026-09-22, after exercising `lunos debug skill` against the live v1 runtime. Neither
+of these is visible from source review, and both outrank most of the list above.
+
+**G10 — skill discovery is non-deterministic and usually incomplete.** Nine invocations of
+`debug skill` on an unchanged working tree returned **7, 16, 16, 17, 17, 17, 18 and 38**
+skills. The set is not stable between runs, so a skill the model can use in one session is
+silently absent from the next — no error, no warning, nothing in stderr.
+
+The 38-skill run is almost certainly the correct answer: it is the only one that found this
+repo's seven project skills plus two from `.opencode/`. So the common case is not merely
+unstable, it is **under-reporting by more than half**.
+
+Where to look: `loadSkills` applies `Effect.forEach(…, { concurrency: "unbounded" })` over a
+shared mutable `state.skills`, and `discoverSkills` builds `state.matches` through several
+sequential scans. A discovery step whose result lands after `all()` reads would produce
+exactly this. Note the scan error path is asymmetric — `scan()` only logs when
+`opts.scope` is set and otherwise calls `Effect.die`, so a silently swallowed failure in
+the config-directory scans is worth ruling in or out early.
+
+_Size: M. This is the most serious finding in the audit — silent, intermittent, and it
+undermines every other skill behaviour, including anything XCOD-71 tries to prove._
+
+**G11 — project-level `.claude/skills/` are usually missing.** _Folded into G10 on
+2026-09-22: this is a symptom, not a separate defect._ This repository has seven valid
+skills in `.claude/skills/`. Most runs discover **zero** of them; one run discovered all
+seven (alongside two from `.opencode/`, for 38 total). Since a single run does find them,
+the path, glob and frontmatter are all correct — the cause is whatever makes G10 return
+incomplete sets.
+
+Ruled out by direct testing, so the next investigator doesn't repeat it:
+
+- The glob is fine — `new Bun.Glob("skills/**/SKILL.md").scanSync({ cwd: "<repo>/.claude" })`
+  returns all seven.
+- The frontmatter is fine — every file has a string `name:`, so `isSkillFrontmatter` passes.
+- `FSUtil.up` **is** inclusive of `stop` (`fs-util.ts:171-180` tests `current` before
+  breaking), so a start equal to the worktree root still scans that root.
+- Not cold-cache warm-up — counts stay unstable after many runs.
+
+**This blocks XCOD-71**, whose candidate pool is exactly these seven skills. It is the
+practical reason G10 matters rather than a separate item.
 
 ### Fine as-is
 
