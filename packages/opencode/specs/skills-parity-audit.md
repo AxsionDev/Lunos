@@ -232,12 +232,55 @@ the config paths themselves may legitimately still be `.opencode`, which needs c
 before any rename.
 _Size: S, contingent on verifying the paths._
 
+### Retracted: G10 and G11
+
+**Both were measurement artifacts. Skill discovery is deterministic and complete.**
+Retracted 2026-09-22 after investigating them under XCOD-73.
+
+The varying counts (7, 16, 17, 18, 38) were not discovery returning different sets. They
+were `lunos debug skill` **truncating its own stdout**. `process.stdout.write` does not
+block on a pipe, so the process exited with the buffer undrained and output stopped dead at
+the pipe's capacity — **exactly 131072 bytes every time**, with the JSON cut mid-string and
+failing to parse. Every count came from `grep -c '"name":'` over that truncated JSON, so it
+varied with how much skill _content_ happened to fit in the buffer. Writing to a file
+instead of a pipe always produced the full ~312 KB.
+
+Instrumenting `scan()` settled it directly. Three consecutive runs were byte-identical:
+
+```
+scan ~/.claude            scope=global   matches=28
+scan ~/.agents            scope=global   matches=14
+scan <repo>/.claude       scope=project  matches=7
+scan ~/.config/opencode   scope=-        matches=14
+scan <repo>/.opencode     scope=-        matches=2
+loadSkills matches=65 → loaded=38
+```
+
+No scan ever failed. The project-level walk found all seven of this repo's skills every
+time. 65 files collapsing to 38 skills is ordinary name-deduplication across overlapping
+directories, not loss.
+
+**So the claimed impact was also wrong.** The system prompt and the command table are built
+in-process from `Skill.all()`, never from CLI stdout, so neither was ever affected. **G10
+did not block XCOD-71**, and the truncation is a debug-command bug — real, but small, and
+fixed in `cli/cmd/debug/skill.ts` by awaiting the write.
+
+The same unawaited `process.stdout.write` pattern exists in `debug/config.ts`,
+`debug/file.ts` and `debug/agent.handler.ts`. Latent there, not demonstrated — those
+outputs have to exceed the pipe buffer to trip it.
+
+**Why this happened, recorded because it is the more useful lesson:** the fix for my earlier
+errors was "exercise the user-facing path instead of reading source." I did — and then
+trusted the _measuring instrument_ without validating it. A number that moves is evidence
+of something; it is not evidence of what you assumed. Cross-checking against a second
+channel (a file instead of a pipe) took one command and would have caught it immediately.
+
 ### Found by running it, not by reading it
 
 Added 2026-09-22, after exercising `lunos debug skill` against the live v1 runtime. Neither
 of these is visible from source review, and both outrank most of the list above.
 
-**G10 — skill discovery is non-deterministic and usually incomplete.** Nine invocations of
+**G10 — RETRACTED (see "Retracted: G10 and G11" above). Originally: skill discovery is non-deterministic and usually incomplete.** Nine invocations of
 `debug skill` on an unchanged working tree returned **7, 16, 16, 17, 17, 17, 18 and 38**
 skills. The set is not stable between runs, so a skill the model can use in one session is
 silently absent from the next — no error, no warning, nothing in stderr.
@@ -256,7 +299,7 @@ the config-directory scans is worth ruling in or out early.
 _Size: M. This is the most serious finding in the audit — silent, intermittent, and it
 undermines every other skill behaviour, including anything XCOD-71 tries to prove._
 
-**G11 — project-level `.claude/skills/` are usually missing.** _Folded into G10 on
+**G11 — RETRACTED (see above). Originally: project-level `.claude/skills/` are usually missing.** _Folded into G10 on
 2026-09-22: this is a symptom, not a separate defect._ This repository has seven valid
 skills in `.claude/skills/`. Most runs discover **zero** of them; one run discovered all
 seven (alongside two from `.opencode/`, for 38 total). Since a single run does find them,
