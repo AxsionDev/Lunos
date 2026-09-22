@@ -58,5 +58,21 @@ export class Entry extends Schema.Class<Entry>("ConfigV2.Hooks.Entry")({
   }),
 }) {}
 
-export const Info = Schema.Record(Event, Schema.Array(Entry))
+/**
+ * Declared as a struct of optional keys rather than `Schema.Record(Event, …)`.
+ * A record keyed by a literal union is *exhaustive* in Effect Schema — it demands
+ * every event be present, so configuring one hook fails with "Missing key" for all
+ * the others. Explicit optional fields keep the typo protection a closed key set
+ * gives you while letting a config declare only the events it cares about.
+ */
+export const Info = Schema.Struct({
+  "tool.execute.before": Schema.Array(Entry).pipe(Schema.optional),
+  "tool.execute.after": Schema.Array(Entry).pipe(Schema.optional),
+  "command.execute.before": Schema.Array(Entry).pipe(Schema.optional),
+  "session.created": Schema.Array(Entry).pipe(Schema.optional),
+  "session.idle": Schema.Array(Entry).pipe(Schema.optional),
+  "session.compacted": Schema.Array(Entry).pipe(Schema.optional),
+  "session.deleted": Schema.Array(Entry).pipe(Schema.optional),
+  "session.error": Schema.Array(Entry).pipe(Schema.optional),
+})
 export type Info = typeof Info.Type

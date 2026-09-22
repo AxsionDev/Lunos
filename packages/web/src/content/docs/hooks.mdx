@@ -76,6 +76,11 @@ Every hook command receives:
 | `session.deleted`        | A session was deleted             | no       |
 | `session.error`          | A session errored                 | no       |
 
+Only these event names are recognised. **A misspelled event is silently ignored** — config
+decoding drops unknown keys rather than rejecting them, so the hook simply never fires and
+you get no warning. If a hook seems to do nothing, check the event name against this table
+first.
+
 ### Blocking
 
 A `before` hook that exits non-zero **vetoes the action** — the tool or command does not run, and the hook's stderr is surfaced as the reason. This is what makes a guard possible.
