@@ -185,8 +185,10 @@ function printPlugins(plugins: PluginListEntry[]) {
 }
 
 // Surfaces a marketplace that's serving a stale, last-known-good cache instead of silently listing
-// its plugins as if the source were fully healthy (XCOD-13 AC4).
-function printStaleMarketplaces(marketplaces: PluginMarketplaceStatus[]) {
+// its plugins as if the source were fully healthy (XCOD-13 AC4). Exported so mcp.ts's search
+// command -- which walks the same marketplace list -- reports staleness the same way rather than
+// growing its own copy.
+export function printStaleMarketplaces(marketplaces: PluginMarketplaceStatus[]) {
   for (const marketplace of marketplaces) {
     if (!marketplace.stale) continue
     log.warn(

@@ -17,9 +17,12 @@ import { InstanceRef } from "@/effect/instance-ref"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
-import { modify, applyEdits } from "jsonc-parser"
+import { modify, applyEdits, parse as parseJsonc } from "jsonc-parser"
 import { Filesystem } from "@/util/filesystem"
 import { Effect } from "effect"
+import { listMcpServers, mcpConfigFromEntry, searchMcpServers } from "../../mcp/discover"
+import { resolveByName } from "../../marketplace/resolve"
+import { printStaleMarketplaces } from "./plug"
 
 function getAuthStatusIcon(status: MCP.AuthStatus): string {
   switch (status) {
@@ -99,6 +102,7 @@ export const McpCommand = cmd({
     yargs
       .command(McpAddCommand)
       .command(McpListCommand)
+      .command(McpSearchCommand)
       .command(McpAuthCommand)
       .command(McpLogoutCommand)
       .command(McpDebugCommand)
@@ -164,6 +168,48 @@ export const McpListCommand = effectCmd({
     }
 
     prompts.outro(`${servers.length} server(s)`)
+  }),
+})
+
+export const McpSearchCommand = effectCmd({
+  command: "search <query>",
+  describe: "search MCP servers across added marketplaces",
+  builder: (yargs) =>
+    yargs.positional("query", {
+      type: "string",
+      describe: "case-insensitive substring match on name/description/tags/category",
+    }),
+  handler: Effect.fn("Cli.mcp.search")(function* (args) {
+    const query = String(args.query ?? "").trim()
+
+    UI.empty()
+    prompts.intro(`Search MCP servers: ${query}`)
+
+    // Same context shape PluginSearchCommand builds (plug.ts:283): { vcs, worktree, directory }
+    // off the InstanceContext, not the project object itself.
+    const ctx = yield* InstanceRef
+    if (!ctx) return
+    const { marketplaceCount, marketplaces, servers } = yield* Effect.promise(() =>
+      searchMcpServers(query, { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }),
+    )
+    printStaleMarketplaces(marketplaces)
+
+    if (!marketplaceCount) {
+      prompts.log.warn("No marketplaces added")
+      prompts.outro("Add one with: lunos marketplace add <owner/repo | url | path>")
+      return
+    }
+
+    if (!servers.length) {
+      prompts.log.warn(`No MCP servers matched "${query}"`)
+      prompts.outro("Done")
+      return
+    }
+
+    for (const server of servers) {
+      prompts.log.info(`${server.marketplace}/${server.name}${server.description ? `  ${server.description}` : ""}`)
+    }
+    prompts.outro(`${servers.length} server(s) matched`)
   }),
 })
 
@@ -426,6 +472,42 @@ async function addMcpToConfig(name: string, mcpConfig: ConfigMCPV1.Info, configP
   return configPath
 }
 
+// The marketplace path resolves by bare name, which risks colliding with a name that already
+// means something in the target config -- possibly from a different marketplace, possibly
+// hand-written. addMcpToConfig would silently overwrite it (it's a plain jsonc-parser `modify`),
+// so the marketplace branch checks first and refuses rather than clobbering.
+//
+// The check is keyed on the key's PRESENCE in the `mcp` record, not on isMcpConfigured: a server
+// the user disabled with the `{enabled: false}` shorthand (a value ConfigV1.mcp's schema allows
+// alongside the full ConfigMCPV1.Info shape) has no "type" field, so isMcpConfigured returns
+// false for it. Gating the refusal on isMcpConfigured let `mcp add` silently overwrite that
+// disabled entry and re-enable it -- precisely the failure this guard exists to prevent.
+// isMcpConfigured is only consulted afterward, to decide whether a command/url hint can be shown
+// alongside the refusal; when it can't, we still refuse and just say the entry exists.
+async function existingMcpEntry(name: string, configPath: string): Promise<{ hint?: string } | undefined> {
+  if (!(await Filesystem.exists(configPath))) return undefined
+  const parsed = parseJsonc(await Filesystem.readText(configPath)) as { mcp?: Record<string, McpEntry> } | undefined
+  if (!parsed?.mcp || !(name in parsed.mcp)) return undefined
+  const entry = parsed.mcp[name]
+  if (entry && isMcpConfigured(entry)) {
+    return { hint: entry.type === "remote" ? entry.url : entry.command.join(" ") }
+  }
+  return {}
+}
+
+// Pulled out of the add handler because that handler is Effect + @clack/prompts plumbing that
+// bun test can't drive directly (see mcp-marketplace.test.ts). This is the one decision in the
+// marketplace branch that IS pure: a bare name with none of --url/--env/--header/`--` present
+// takes the marketplace path; any explicit flag, or no name at all, leaves existing behaviour
+// (the interactive wizard, or the non-interactive validation below) untouched.
+export function resolvesFromMarketplace(
+  args: { name?: string; url?: string; env?: string[]; header?: string[] },
+  command: readonly string[],
+): boolean {
+  const explicit = !!args.url || !!args.env?.length || !!args.header?.length || command.length > 0
+  return !!args.name && !explicit
+}
+
 export const McpAddCommand = effectCmd({
   command: "add [name]",
   describe: "add an MCP server",
@@ -448,6 +530,11 @@ export const McpAddCommand = effectCmd({
         describe: "HTTP header for a remote MCP server (KEY=VALUE)",
         type: "string",
         array: true,
+      })
+      .option("yes", {
+        describe: "skip the confirmation prompt when adding from a marketplace",
+        type: "boolean",
+        default: false,
       }),
   handler: Effect.fn("Cli.mcp.add")(function* (args) {
     const maybeCtx = yield* InstanceRef
@@ -458,6 +545,74 @@ export const McpAddCommand = effectCmd({
       if (!args.name && (args.url || args.env?.length || args.header?.length || command.length)) {
         throw new Error("A server name is required for non-interactive MCP configuration")
       }
+
+      if (resolvesFromMarketplace(args, command)) {
+        const marketplaceCtx = { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }
+        const { servers } = await listMcpServers(marketplaceCtx)
+        const matches = resolveByName(servers, args.name!)
+
+        if (matches.length > 1) {
+          const qualified = matches.map((m) => `${m.marketplace}/${m.name}`).join(", ")
+          throw new Error(`"${args.name}" exists in more than one marketplace. Use one of: ${qualified}`)
+        }
+
+        if (matches.length === 1) {
+          const match = matches[0]!
+          const mcpConfig = mcpConfigFromEntry(match.entry)
+          const configPath = await resolveConfigPath(Global.Path.config, true)
+
+          // Refuse rather than clobber: addMcpToConfig keys on the bare name, so a second
+          // marketplace (or a hand-written entry) using the same name would otherwise be
+          // silently overwritten with no way back. This check runs before anything is shown or
+          // confirmed, so a doomed add fails fast instead of asking the user to confirm first.
+          const existing = await existingMcpEntry(match.name, configPath)
+          if (existing) {
+            const hintSuffix = existing.hint ? ` (${existing.hint})` : ""
+            throw new Error(
+              `MCP server "${match.name}" already exists in ${configPath}${hintSuffix}. Remove or rename it there first.`,
+            )
+          }
+
+          // Show exactly what will run before anything is written. Installing a local MCP
+          // server executes third-party code, so the user reviews the actual command, not a
+          // package name they have to trust. The marketplace path always writes global config,
+          // so say where -- the user shouldn't have to guess that before confirming.
+          UI.println(`${match.marketplace}/${match.name}`)
+          if (match.description) UI.println(`  ${match.description}`)
+          UI.println(
+            mcpConfig.type === "local" ? `  runs: ${mcpConfig.command.join(" ")}` : `  connects to: ${mcpConfig.url}`,
+          )
+          UI.println(`  writes to: ${configPath}`)
+
+          // The manifest carries variable NAMES only; mcpConfigFromEntry already turned them into
+          // {env:NAME} references, so nothing secret is ever written. We only warn when a name the
+          // entry declares isn't set locally yet -- the reference is written regardless, so the
+          // config is correct the moment the user does export it. Printed before the confirm
+          // prompt so the user sees it before deciding, not after.
+          const required =
+            mcpConfig.type === "local" ? Object.keys(mcpConfig.environment ?? {}) : Object.keys(mcpConfig.headers ?? {})
+          for (const key of required) {
+            if (!process.env[key]) {
+              UI.println(`  warning: ${key} is not set in your environment; the reference is written anyway`)
+            }
+          }
+
+          if (!args.yes) {
+            const ok = await prompts.confirm({ message: "Add this server?" })
+            if (prompts.isCancel(ok) || !ok) throw new UI.CancelledError()
+          }
+
+          await addMcpToConfig(match.name, mcpConfig, configPath)
+          prompts.log.success(`MCP server "${match.name}" added to ${configPath}`)
+          return
+        }
+
+        // Unknown name: no marketplace declares it. Fall through to the existing non-interactive
+        // validation below rather than invent a new error shape -- it reports today's message
+        // ("Provide either --url <url> or a command after --"), which is accurate here too: a
+        // bare, unresolvable name is not enough to configure a server either way.
+      }
+
       if (args.name) {
         if (!!args.url === !!command.length) {
           throw new Error("Provide either --url <url> or a command after --")
