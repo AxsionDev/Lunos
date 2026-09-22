@@ -28,7 +28,7 @@ export async function listMcpServers(
   ctx: MarketplaceCtx,
   dep: MarketplaceListDeps = defaultMarketplaceListDeps,
 ): Promise<McpListResult> {
-  const resolved = await ((dep as any).resolveAddedMarketplaces?.() ?? resolveAddedMarketplaces(ctx, dep))
+  const resolved = await resolveAddedMarketplaces(ctx, dep)
   const marketplaces: PluginMarketplaceStatus[] = []
   const servers: McpListEntry[] = []
   for (const entry of resolved) {
