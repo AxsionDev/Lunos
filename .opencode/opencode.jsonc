@@ -12,6 +12,17 @@
       "description": "Contains opencode logs and data",
     },
   },
+  // Enforces the read-only rule of the `research-mode` skill. Lunos skills cannot
+  // declare their own tool restrictions, so the guard script is what actually stops
+  // an edit while .opencode/research-mode.lock is held. XCOD-71.
+  "hooks": {
+    "tool.execute.before": [
+      {
+        "matcher": { "tool": "apply_patch" },
+        "command": ["./.opencode/hooks/research-mode-guard.sh"],
+      },
+    ],
+  },
   "mcp": {},
   "tools": {
     "github-triage": false,
