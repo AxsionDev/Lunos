@@ -144,7 +144,10 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         // or a disabled server would be silently overwritten and re-enabled by this add.
         const seeded = yield* Effect.promise(() => readGlobalMcpConfig(home))
         yield* Effect.promise(() =>
-          writeGlobalConfig(home, { ...seeded, mcp: { ...(seeded?.mcp ?? {}), "disabled-server": { enabled: false } } }),
+          writeGlobalConfig(home, {
+            ...seeded,
+            mcp: { ...(seeded?.mcp ?? {}), "disabled-server": { enabled: false } },
+          }),
         )
 
         const before = yield* Effect.promise(() => readGlobalMcpConfig(home))

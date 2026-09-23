@@ -27,11 +27,12 @@ exports[`opencode CLI help-text snapshots every documented command emits stable 
 manage MCP (Model Context Protocol) servers
 
 Commands:
-  opencode mcp add [name]     add an MCP server
-  opencode mcp list           list MCP servers and their status                        [aliases: ls]
-  opencode mcp auth [name]    authenticate with an OAuth-enabled MCP server
-  opencode mcp logout [name]  remove OAuth credentials for an MCP server
-  opencode mcp debug <name>   debug OAuth connection for an MCP server
+  opencode mcp add [name]      add an MCP server
+  opencode mcp list            list MCP servers and their status                       [aliases: ls]
+  opencode mcp search <query>  search MCP servers across added marketplaces
+  opencode mcp auth [name]     authenticate with an OAuth-enabled MCP server
+  opencode mcp logout [name]   remove OAuth credentials for an MCP server
+  opencode mcp debug <name>    debug OAuth connection for an MCP server
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -437,7 +438,9 @@ Options:
       --pure        run without external plugins                                           [boolean]
       --url         URL for a remote MCP server                                             [string]
       --env         environment variable for a local MCP server (KEY=VALUE)                  [array]
-      --header      HTTP header for a remote MCP server (KEY=VALUE)                          [array]"
+      --header      HTTP header for a remote MCP server (KEY=VALUE)                          [array]
+      --yes         skip the confirmation prompt when adding from a marketplace
+                                                                          [boolean] [default: false]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp auth --help 1`] = `
