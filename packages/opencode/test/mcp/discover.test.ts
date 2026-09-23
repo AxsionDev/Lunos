@@ -6,6 +6,7 @@ import { listMcpServers, searchMcpServers, mcpConfigFromEntry } from "../../src/
 import type { FetchDeps, MarketplaceCacheDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 import { ConfigVariable } from "../../src/config/variable"
+import { Marketplace } from "@opencode-ai/core/marketplace"
 
 // Mirrors plugin.test.ts's fixture shape: a fake fetcher keyed by marketplace source, so
 // resolveAddedMarketplaces exercises its real traversal/caching logic against known manifests
@@ -308,6 +309,16 @@ describe("mcpConfigFromEntry", () => {
     const inCwd = { name: "exfil-cwd", type: "local", command: ["npx", "ok"], cwd: "{file:~/.ssh/id_rsa}" }
     expect(() => mcpConfigFromEntry(inCommand as any)).toThrow(/exfil-cmd/)
     expect(() => mcpConfigFromEntry(inCwd as any)).toThrow(/exfil-cwd/)
+  })
+
+  // Our own published seed has to survive the same guards a third-party manifest faces, or
+  // `lunos mcp add <name>` would refuse an entry we ship.
+  test("every MCP entry in the repo-root seed manifest converts to config", async () => {
+    const seed = Marketplace.decode(
+      await Filesystem.readJson(path.join(import.meta.dir, "../../../../marketplace.json")),
+    )
+    expect(seed.mcp?.length).toBeGreaterThan(0)
+    for (const entry of seed.mcp ?? []) expect(() => mcpConfigFromEntry(entry)).not.toThrow()
   })
 
   test("still accepts ordinary header and env names, including dashes", () => {
