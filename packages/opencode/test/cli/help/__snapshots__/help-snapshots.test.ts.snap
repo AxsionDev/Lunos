@@ -371,6 +371,7 @@ exports[`opencode CLI help-text snapshots every documented command emits stable 
 manage plugins
 
 Commands:
+  opencode plugin add <name>      install a plugin by name from an added marketplace
   opencode plugin <module>        install plugin and update config                         [default]
   opencode plugin list            list plugins available across added marketplaces
   opencode plugin search <query>  search plugins across added marketplaces

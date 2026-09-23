@@ -5,7 +5,7 @@ import { Effect } from "effect"
 import path from "path"
 import { parse as parseJsonc } from "jsonc-parser"
 import { Filesystem } from "@/util/filesystem"
-import { cliIt } from "../lib/cli-process"
+import { cliIt, type OpencodeCli } from "../lib/cli-process"
 
 const allKinds = {
   name: "mp",
@@ -32,7 +32,7 @@ async function readGlobalConfig(home: string): Promise<Record<string, any> | und
   return undefined
 }
 
-function setup(home: string, opencode: any, manifest: unknown = allKinds) {
+function setup(home: string, opencode: OpencodeCli, manifest: unknown = allKinds) {
   return Effect.gen(function* () {
     const file = path.join(home, "mp.json")
     yield* Effect.promise(() => Bun.write(file, JSON.stringify(manifest)))
