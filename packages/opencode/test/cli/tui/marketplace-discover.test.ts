@@ -43,14 +43,21 @@ async function withRuntime(fn: () => Promise<void>) {
       },
     },
   })
-  const globalConfig = path.join(Global.Path.config, "opencode.json")
-  await fs.rm(globalConfig, { force: true })
+  // Global config is shared by the whole test process, and install writes to whichever of these
+  // already exists. Snapshot both and restore them, rather than deleting files other tests made.
+  const candidates = ["opencode.json", "opencode.jsonc"].map((file) => path.join(Global.Path.config, file))
+  const saved = await Promise.all(candidates.map((file) => Filesystem.readText(file).catch(() => undefined)))
+  await Promise.all(candidates.map((file) => fs.rm(file, { force: true })))
   try {
     await TuiPluginRuntime.init({ api, config: createTuiResolvedConfig({ plugin: [] }) })
     await fn()
   } finally {
     await TuiPluginRuntime.dispose()
-    await fs.rm(globalConfig, { force: true })
+    await Promise.all(
+      candidates.map((file, i) =>
+        saved[i] === undefined ? fs.rm(file, { force: true }) : Filesystem.write(file, saved[i]!),
+      ),
+    )
     cwd.mockRestore()
     wait.mockRestore()
     delete process.env.OPENCODE_PLUGIN_META_FILE
@@ -76,8 +83,8 @@ test("plans a hook with what it runs, then installs it into global config", asyn
       details: ["on: tool.execute.after (tool edit)", "runs: prettier --write ."],
     })
     const out = await TuiPluginRuntime.installMarketplace("hook", "demo-marketplace", "fmt")
-    expect(out.ok).toBe(true)
-    const config = parseJsonc(await Filesystem.readText(path.join(Global.Path.config, "opencode.json")))
+    if (!out.ok) throw new Error(out.message)
+    const config = parseJsonc(await Filesystem.readText(out.configPath))
     expect(config.hooks["tool.execute.after"]).toEqual([
       { command: ["prettier", "--write", "."], matcher: { tool: "edit" } },
     ])
@@ -91,6 +98,7 @@ test("a refused entry comes back as ok:false with the reason, and writes nothing
     expect(plan.ok ? "" : plan.message).toContain("does not dispatch")
     const out = await TuiPluginRuntime.installMarketplace("hook", "demo-marketplace", "future")
     expect(out.ok).toBe(false)
-    expect(await Filesystem.exists(path.join(Global.Path.config, "opencode.json"))).toBe(false)
+    for (const file of ["opencode.json", "opencode.jsonc"])
+      expect(await Filesystem.exists(path.join(Global.Path.config, file))).toBe(false)
   })
 })
