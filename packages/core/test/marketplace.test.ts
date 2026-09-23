@@ -5,6 +5,7 @@ import path from "path"
 import valid from "./fixtures/marketplace/valid.json"
 import validMcp from "./fixtures/marketplace/valid-mcp.json"
 import malformed from "./fixtures/marketplace/malformed.json"
+import validAllKinds from "./fixtures/marketplace/valid-all-kinds.json"
 
 // Read from disk rather than statically importing — the seed manifest lives at the repo
 // root (packages/opencode/specs/marketplace-manifest.md documents why), outside this
@@ -66,5 +67,39 @@ describe("Marketplace", () => {
         mcp: [{ name: "bad", type: "carrier-pigeon", url: "https://example.test" }],
       }),
     ).toThrow(/\["mcp"\]\[0\]/)
+  })
+
+  test("decodes a manifest carrying all four content kinds", () => {
+    const manifest = Marketplace.decode(validAllKinds)
+    expect(manifest.plugins.map((x) => x.name)).toEqual(["a-plugin"])
+    expect(manifest.mcp?.map((x) => x.name)).toEqual(["a-server"])
+    expect(manifest.skills?.[0]).toMatchObject({ name: "team-skills", url: "https://example.test/.well-known/skills/" })
+    expect(manifest.hooks?.[0]).toMatchObject({
+      name: "format-on-edit",
+      event: "tool.execute.after",
+      command: ["prettier", "--write", "."],
+      matcher: { tool: "edit", file: "**/*.ts" },
+    })
+  })
+
+  test("keeps decoding a plugin-only manifest with no skills or hooks key", () => {
+    const manifest = Marketplace.decode(valid)
+    expect(manifest.skills).toBeUndefined()
+    expect(manifest.hooks).toBeUndefined()
+  })
+
+  // A hook for an event this Lunos doesn't know must not take the rest of the manifest down with
+  // it; the event is checked when that one hook is installed.
+  test("accepts a hook whose event this version does not know", () => {
+    const manifest = Marketplace.decode({
+      ...validAllKinds,
+      hooks: [{ name: "future", event: "session.someday", command: ["true"] }],
+    })
+    expect(manifest.plugins).toHaveLength(1)
+    expect(manifest.hooks?.[0]?.event).toBe("session.someday")
+  })
+
+  test("rejects a skill entry with no url", () => {
+    expect(() => Marketplace.decode({ ...validAllKinds, skills: [{ name: "no-url" }] })).toThrow(/\["skills"\]\[0\]/)
   })
 })

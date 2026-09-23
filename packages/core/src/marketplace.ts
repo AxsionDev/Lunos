@@ -77,6 +77,47 @@ export class McpRemoteEntry extends Schema.Class<McpRemoteEntry>("Marketplace.Mc
 export const McpEntry = Schema.Union([McpLocalEntry, McpRemoteEntry]).pipe(Schema.toTaggedUnion("type"))
 export type McpEntry = typeof McpEntry.Type
 
+// A skill entry is a skill SOURCE, not one skill: `url` is a base URL serving `index.json`, and
+// installing it appends that URL to config `skills.urls`, which pulls every skill the index
+// lists. Config has no per-skill filter, so the manifest can't honestly describe a single skill.
+export class SkillEntry extends Schema.Class<SkillEntry>("Marketplace.SkillEntry")({
+  name: Schema.String,
+  url: Schema.String.annotate({
+    description: "Base URL of a skill source serving index.json, as accepted by config skills.urls.",
+  }),
+  description: Schema.String.pipe(Schema.optional),
+  category: Schema.String.pipe(Schema.optional),
+  tags: Schema.String.pipe(Schema.Array, Schema.optional),
+}) {}
+
+// `event` is a plain String, NOT ConfigHooks.Event. A literal union here would make an older
+// Lunos reject the whole manifest -- every plugin in it -- the day a marketplace publishes a hook
+// for an event it doesn't know. The event is checked against ConfigHooks.Event at install time.
+// `environment` holds variable NAMES only, for the same reason as the MCP entries above.
+export class HookEntry extends Schema.Class<HookEntry>("Marketplace.HookEntry")({
+  name: Schema.String,
+  event: Schema.String,
+  command: Schema.String.pipe(Schema.Array),
+  matcher: Schema.Struct({
+    tool: Schema.String.pipe(Schema.optional),
+    file: Schema.String.pipe(Schema.optional),
+  }).pipe(Schema.optional),
+  environment: Schema.String.pipe(Schema.Array, Schema.optional).annotate({
+    description: "Names of environment variables the hook requires. Never values.",
+  }),
+  timeout: Schema.Number.pipe(Schema.optional),
+  description: Schema.String.pipe(Schema.optional),
+  category: Schema.String.pipe(Schema.optional),
+  tags: Schema.String.pipe(Schema.Array, Schema.optional),
+}) {}
+
+// The four content kinds a manifest can carry, each in its own typed array below. Parallel
+// arrays rather than one `kind`-tagged list: `plugins` predates the others and is required, and
+// an older client simply ignores arrays it doesn't know.
+export const Kind = Schema.Literals(["plugin", "skill", "hook", "mcp"])
+export type Kind = typeof Kind.Type
+export const KINDS: readonly Kind[] = ["plugin", "skill", "hook", "mcp"]
+
 export class Manifest extends Schema.Class<Manifest>("Marketplace.Manifest")({
   $schema: Schema.String.pipe(Schema.optional).annotate({
     description: "JSON schema reference for manifest validation",
@@ -87,6 +128,8 @@ export class Manifest extends Schema.Class<Manifest>("Marketplace.Manifest")({
   version: Schema.String.pipe(Schema.optional),
   plugins: Entry.pipe(Schema.Array),
   mcp: McpEntry.pipe(Schema.Array, Schema.optional),
+  skills: SkillEntry.pipe(Schema.Array, Schema.optional),
+  hooks: HookEntry.pipe(Schema.Array, Schema.optional),
 }) {}
 
 export const decode = Schema.decodeUnknownSync(Manifest)
