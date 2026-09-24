@@ -31,14 +31,16 @@ describe("Marketplace", () => {
     expect(() => Marketplace.decode(malformed)).toThrow(/\["plugins"\]\[0\]\["source"\]/)
   })
 
-  test("decodes the seed community manifest at the repo root", () => {
-    const json = JSON.parse(readFileSync(seedPath, "utf8"))
-    const manifest = Marketplace.decode(json)
+  // `github` plugin sources install through npm's git-dep path, which npm 12 disables by default
+  // (allow-git=none) and which Arborist cannot prepare for repos with a build step or
+  // `workspace:*` deps. This manifest is what `lunos marketplace add AxsionDev/Lunos` serves, so
+  // every plugin in it must install from the npm registry.
+  test("decodes the seed community manifest and sources every plugin from npm", () => {
+    const manifest = Marketplace.decode(JSON.parse(readFileSync(seedPath, "utf8")))
     expect(manifest.name).toBe("lunos-community")
     expect(manifest.plugins.length).toBeGreaterThan(0)
-    for (const plugin of manifest.plugins) {
-      expect(plugin.source.type).toBe("github")
-    }
+    const notNpm = manifest.plugins.filter((plugin) => plugin.source.type !== "npm").map((plugin) => plugin.name)
+    expect(notNpm).toEqual([])
   })
 
   test("decodes a manifest carrying MCP servers", () => {
