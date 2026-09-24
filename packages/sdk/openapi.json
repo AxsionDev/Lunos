@@ -21231,6 +21231,9 @@
             },
             "additionalProperties": false
           },
+          "residency": {
+            "$ref": "#/components/schemas/ConfigV2Residency"
+          },
           "references": {
             "type": "object",
             "additionalProperties": {
@@ -27140,6 +27143,27 @@
           }
         },
         "required": ["command"],
+        "additionalProperties": false
+      },
+      "ConfigV2Residency": {
+        "type": "object",
+        "properties": {
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["eu", "us", "other", "configurable", "unknown"]
+            },
+            "description": "Regions this deployment may send model requests to, e.g. [\"eu\"]. Providers outside this list are blocked before any request is made. Providers with no recorded jurisdiction are always denied. \"configurable\" providers (Azure, Bedrock, Vertex) are denied unless explicitly listed, because their region cannot be verified from here."
+          },
+          "audit": {
+            "type": "boolean"
+          },
+          "auditPath": {
+            "type": "string"
+          }
+        },
+        "required": ["allow"],
         "additionalProperties": false
       },
       "ConfigV2ReferenceGit": {
