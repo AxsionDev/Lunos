@@ -10,4 +10,7 @@ await $`bun dev generate > ../sdk/openapi.json`.cwd("packages/opencode")
 // governs residency enforcement (packages/core/src/jurisdiction.ts). XCOD-61.
 await $`bun ./script/jurisdictions.ts`
 
+// XCOD-90: keeps packages/opencode/package.json's lunos.upstreamVersion at the last upstream sync.
+await $`bun ./script/upstream-version.ts`
+
 await $`./script/format.ts`

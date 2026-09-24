@@ -1,5 +1,9 @@
 import { Global } from "@opencode-ai/core/global"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import {
+  InstallationChannel,
+  InstallationUpstreamVersion,
+  versionLabel,
+} from "@opencode-ai/core/installation/version"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import os from "os"
 import { Duration, Effect } from "effect"
@@ -48,7 +52,7 @@ const WaitCommand = effectCmd({
 
 const InfoCommand = effectCmd({
   command: "info",
-  describe: "show debug information",
+  describe: "show version, platform and install details to paste into a bug report",
   handler: Effect.fn("Cli.debug.info")(function* () {
     const { Config } = yield* Effect.promise(() => import("@/config/config"))
     const { ConfigPlugin } = yield* Effect.promise(() => import("@/config/plugin"))
@@ -58,7 +62,13 @@ const InfoCommand = effectCmd({
       : undefined
     const terminal = [termProgram, process.env.TERM].filter((item): item is string => Boolean(item)).join(" / ")
 
-    console.log(`opencode version: ${InstallationVersion}`)
+    const { Installation } = yield* Effect.promise(() => import("@/installation"))
+    const method = yield* Effect.promise(() => Installation.method()).pipe(Effect.orElseSucceed(() => "unknown"))
+
+    console.log(`version: ${versionLabel()}`)
+    console.log(`based on: ${InstallationUpstreamVersion ? `opencode ${InstallationUpstreamVersion}` : "unknown (dev build)"}`)
+    console.log(`channel: ${InstallationChannel}`)
+    console.log(`install method: ${method}`)
     console.log(`os: ${os.type()} ${os.release()} ${os.arch()}`)
     console.log(`terminal: ${terminal || "unknown"}`)
     console.log("plugins:")

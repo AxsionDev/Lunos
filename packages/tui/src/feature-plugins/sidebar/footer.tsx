@@ -1,4 +1,5 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
+import { versionLabel } from "@opencode-ai/core/installation/version"
 import type { BuiltinTuiPlugin } from "../builtins"
 import { createMemo, Show } from "solid-js"
 import { abbreviateHome } from "../../runtime"
@@ -74,7 +75,7 @@ function View(props: { api: TuiPluginApi; sessionID: string }) {
         <span style={{ fg: theme().text }}>
           <b>Lunos</b>
         </span>{" "}
-        <span>{props.api.app.version}</span>
+        <span>{versionLabel(props.api.app.version).replace(/^Lunos /, "")}</span>
       </text>
     </box>
   )
