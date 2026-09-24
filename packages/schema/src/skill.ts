@@ -22,7 +22,7 @@ export const Info = Schema.Struct({
   description: Schema.String.pipe(optional),
   slash: Schema.Boolean.pipe(optional),
   /** Tool ids the skill restricts the agent to while active (`allowed-tools`, XCOD-83). */
-  allowedTools: Schema.Array(Schema.String).pipe(optional),
+  allowedTools: Schema.mutable(Schema.Array(Schema.String)).pipe(optional),
   location: AbsolutePath,
   content: Schema.String,
 }).annotate({ identifier: "SkillV2.Info" })
