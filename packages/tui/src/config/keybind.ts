@@ -220,6 +220,7 @@ export const Definitions = {
   "plugins.toggle": keybind("space", "Toggle plugin"),
   "dialog.plugins.install": keybind("shift+i", "Install plugin from plugin dialog"),
   "dialog.plugins.discover": keybind("shift+d", "Discover plugins from plugin dialog"),
+  "dialog.plugins.discover.next_kind": keybind("ctrl+o", "Next content tab (Plugins, Skills, Hooks, MCP) in Discover"),
 
   terminal_suspend: keybind("ctrl+z", "Suspend terminal"),
   terminal_title_toggle: keybind("none", "Toggle terminal title"),

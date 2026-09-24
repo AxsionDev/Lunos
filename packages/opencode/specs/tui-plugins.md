@@ -241,7 +241,8 @@ Top-level API groups exposed to `tui(api, options, meta)`:
 - `api.event.on(type, handler)`
 - `api.renderer`
 - `api.slots.register(plugin)`
-- `api.plugins.list()`, `activate(id)`, `deactivate(id)`, `add(spec)`, `install(spec, options?)`
+- `api.plugins.list()`, `activate(id)`, `deactivate(id)`, `add(spec)`, `install(spec, options?)`, `discover()`
+- `api.marketplace.discover(kind?)`, `plan(kind, marketplace, name)`, `install(kind, marketplace, name)`
 - `api.lifecycle.signal`, `api.lifecycle.onDispose(fn)`
 
 ### Keymap
@@ -459,6 +460,9 @@ Slot notes:
 - `api.plugins.install(spec, { global? })` runs install -> manifest read -> config patch using the same helper flow as CLI install.
 - `api.plugins.install(...)` returns either `{ ok: false, message, missing? }` or `{ ok: true, dir, tui }`.
 - `api.plugins.install(...)` does not load plugins into the current session. Call `api.plugins.add(spec)` to load after install.
+- `api.marketplace.discover(kind?)` lists every content kind across added marketplaces as `{ kind, name, marketplace, description?, spec? }`; `spec` is present only for `kind: "plugin"` and is what `api.plugins.install` takes.
+- `api.marketplace.plan(kind, marketplace, name)` covers skill sources, hooks and MCP servers only. It returns `{ ok: true, details, warnings, configPath }` describing what the entry will run, connect to or fetch, or `{ ok: false, message }` when the entry is refused (duplicate, unknown hook event, config substitution token, invalid variable name).
+- `api.marketplace.install(...)` re-resolves the entry and re-plans before writing, so it refuses exactly what `plan` refuses. It writes global config and does not load anything into the current session; a restart picks it up. Both go through `marketplace/install.ts`, the same planner as `lunos marketplace install`.
 - If activation fails, the plugin can remain `enabled=true` and `active=false`.
 - `api.lifecycle.signal` is aborted before cleanup runs.
 - `api.lifecycle.onDispose(fn)` registers cleanup and returns an unregister function.

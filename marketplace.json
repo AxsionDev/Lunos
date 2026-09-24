@@ -187,5 +187,63 @@
       "source": { "type": "github", "repo": "tavily-ai/opencode-tavily" },
       "description": "Web search, extraction, crawling, and deep research via the Tavily CLI"
     }
+  ],
+  "mcp": [
+    {
+      "name": "memory",
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
+      "description": "Knowledge-graph-based persistent memory across sessions",
+      "category": "memory",
+      "tags": ["official", "knowledge-graph"]
+    },
+    {
+      "name": "sequential-thinking",
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "description": "Structured, revisable step-by-step problem solving",
+      "category": "reasoning",
+      "tags": ["official"]
+    },
+    {
+      "name": "fetch",
+      "type": "local",
+      "command": ["uvx", "mcp-server-fetch"],
+      "description": "Fetch web pages and convert them to markdown for the model (requires uv)",
+      "category": "web",
+      "tags": ["official", "http", "python"]
+    },
+    {
+      "name": "time",
+      "type": "local",
+      "command": ["uvx", "mcp-server-time"],
+      "description": "Current time and timezone conversion (requires uv)",
+      "category": "utility",
+      "tags": ["official", "python"]
+    },
+    {
+      "name": "git",
+      "type": "local",
+      "command": ["uvx", "mcp-server-git"],
+      "description": "Read, search and manipulate git repositories (requires uv)",
+      "category": "development",
+      "tags": ["official", "vcs", "python"]
+    },
+    {
+      "name": "everything",
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-everything"],
+      "description": "Reference server exercising every MCP feature; useful for testing a client",
+      "category": "reference",
+      "tags": ["official", "testing"]
+    },
+    {
+      "name": "context7",
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "description": "Up-to-date library and framework documentation for the model",
+      "category": "documentation",
+      "tags": ["docs", "remote"]
+    }
   ]
 }

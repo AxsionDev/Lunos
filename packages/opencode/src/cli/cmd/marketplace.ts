@@ -2,6 +2,7 @@ import { intro, log, outro, spinner } from "@clack/prompts"
 import { Effect } from "effect"
 
 import { cmd } from "./cmd"
+import { MarketplaceInstallCommand, MarketplaceSearchCommand } from "./marketplace-content"
 import { ConfigPaths } from "@/config/paths"
 import { Global } from "@opencode-ai/core/global"
 import { patchPluginConfig, type PatchDeps } from "../../plugin/install"
@@ -349,12 +350,14 @@ export const MarketplaceUpdateCommand = effectCmd({
 
 export const MarketplaceCommand = cmd({
   command: "marketplace",
-  describe: "manage plugin marketplace sources",
+  describe: "manage marketplace sources and install plugins, skills, hooks and MCP servers",
   builder: (yargs) =>
     yargs
       .command(MarketplaceAddCommand)
       .command(MarketplaceListCommand)
       .command(MarketplaceUpdateCommand)
+      .command(MarketplaceSearchCommand)
+      .command(MarketplaceInstallCommand)
       .demandCommand(),
   async handler() {},
 })

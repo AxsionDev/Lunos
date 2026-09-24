@@ -67,6 +67,22 @@ Your local config values override the remote defaults. See [config precedence](/
 
 ---
 
+## Discover
+
+Marketplaces can list MCP servers alongside plugins, so you can find a server without already knowing its connection details. The Lunos community marketplace ships a starter set, including the official reference servers.
+
+```bash
+lunos marketplace add AxsionDev/Lunos
+lunos mcp search docs
+lunos mcp add context7
+```
+
+`lunos mcp add <name>` shows the command it will run (or the URL it will connect to) and the config file it will write, then asks for confirmation. Pass `--yes` to skip the prompt. If two marketplaces list the same name, qualify it as `<marketplace>/<name>`.
+
+A marketplace entry only declares the _names_ of the environment variables or headers a server needs. Lunos writes them as `{env:NAME}` references, so the generated config holds no secrets. Export the variable before starting Lunos.
+
+---
+
 ## Local
 
 Add local MCP servers using `type` to `"local"` within the MCP object.

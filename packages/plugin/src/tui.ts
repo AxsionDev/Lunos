@@ -593,6 +593,30 @@ export type TuiPluginDiscoverResult = {
   plugins: ReadonlyArray<TuiPluginDiscoverEntry>
 }
 
+export type TuiMarketplaceKind = "plugin" | "skill" | "hook" | "mcp"
+
+export type TuiMarketplaceEntry = {
+  kind: TuiMarketplaceKind
+  name: string
+  marketplace: string
+  description?: string
+  /** Install spec for `plugins.install`; present only for `kind: "plugin"`. */
+  spec?: string
+}
+
+export type TuiMarketplaceDiscoverResult = {
+  marketplaceCount: number
+  marketplaces: ReadonlyArray<TuiPluginMarketplaceStatus>
+  items: ReadonlyArray<TuiMarketplaceEntry>
+}
+
+/** What installing a skill source, hook or MCP server would run, connect to or fetch. */
+export type TuiMarketplacePlan =
+  | { ok: true; details: ReadonlyArray<string>; warnings: ReadonlyArray<string>; configPath: string }
+  | { ok: false; message: string }
+
+export type TuiMarketplaceInstallResult = { ok: true; configPath: string } | { ok: false; message: string }
+
 export type TuiWorkspace = {
   current: () => string | undefined
   set: (workspaceID?: string) => void
@@ -642,6 +666,24 @@ export type TuiPluginApi = {
     add: (spec: string) => Promise<boolean>
     install: (spec: string, options?: TuiPluginInstallOptions) => Promise<TuiPluginInstallResult>
     discover: () => Promise<TuiPluginDiscoverResult>
+  }
+  /**
+   * Every content kind across added marketplaces. Plugins install through `plugins.install(spec)`;
+   * skill sources, hooks and MCP servers are written to global config through `install`, after
+   * `plan` has shown the user what they will run, connect to or fetch.
+   */
+  marketplace: {
+    discover: (kind?: TuiMarketplaceKind) => Promise<TuiMarketplaceDiscoverResult>
+    plan: (
+      kind: Exclude<TuiMarketplaceKind, "plugin">,
+      marketplace: string,
+      name: string,
+    ) => Promise<TuiMarketplacePlan>
+    install: (
+      kind: Exclude<TuiMarketplaceKind, "plugin">,
+      marketplace: string,
+      name: string,
+    ) => Promise<TuiMarketplaceInstallResult>
   }
   lifecycle: TuiLifecycle
 }

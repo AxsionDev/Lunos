@@ -7,6 +7,7 @@ import { installPlugin, patchPluginConfig, readPluginManifest } from "../../plug
 import { resolvePluginTarget } from "../../plugin/shared"
 import { listPlugins, searchPlugins, type PluginListEntry, type PluginMarketplaceStatus } from "../../plugin/discover"
 import { errorMessage } from "../../util/error"
+import { resolveByName } from "../../marketplace/resolve"
 import { Filesystem } from "@/util/filesystem"
 import { Process } from "@/util/process"
 import { UI } from "../ui"
@@ -319,12 +320,68 @@ export const PluginSearchCommand = effectCmd({
   }),
 })
 
+// `lunos plugin <module>` takes a raw npm/GitHub spec; `plugin add <name>` resolves a name through
+// the added marketplaces and hands the resulting spec to the same install task, so the two can't
+// diverge in what an install actually does.
+export const PluginAddCommand = effectCmd({
+  command: "add <name>",
+  describe: "install a plugin by name from an added marketplace",
+  builder: (yargs) =>
+    yargs
+      .positional("name", {
+        type: "string",
+        describe: "plugin name, or <marketplace>/<name> when it appears in more than one",
+      })
+      .option("global", {
+        alias: ["g"],
+        type: "boolean",
+        default: false,
+        describe: "install in global config",
+      })
+      .option("force", {
+        alias: ["f"],
+        type: "boolean",
+        default: false,
+        describe: "replace existing plugin version",
+      }),
+  handler: Effect.fn("Cli.plugin.add")(function* (args) {
+    const name = String(args.name ?? "").trim()
+    const ctx = yield* InstanceRef
+    if (!ctx) return
+    const plugCtx = { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }
+    const { plugins } = yield* Effect.promise(() => listPlugins(plugCtx))
+    const matches = resolveByName(plugins, name)
+    if (matches.length !== 1) {
+      UI.error(
+        matches.length
+          ? `"${name}" exists in more than one marketplace. Use one of: ${matches.map((m) => `${m.marketplace}/${m.name}`).join(", ")}`
+          : `No plugin named "${name}" in added marketplaces. Try: lunos plugin search ${name}`,
+      )
+      process.exitCode = 1
+      return
+    }
+
+    UI.empty()
+    intro(`Install plugin ${matches[0]!.marketplace}/${matches[0]!.name} (${matches[0]!.spec})`)
+    const ok = yield* Effect.promise(() =>
+      createPlugTask({ mod: matches[0]!.spec, global: Boolean(args.global), force: Boolean(args.force) })(plugCtx),
+    )
+    outro("Done")
+    if (!ok) process.exitCode = 1
+  }),
+})
+
 export const PluginCommand = effectCmd({
   command: "plugin",
   aliases: ["plug"],
   describe: "manage plugins",
   instance: false,
   builder: (yargs) =>
-    yargs.command(PluginInstallCommand).command(PluginListCommand).command(PluginSearchCommand).demandCommand(),
+    yargs
+      .command(PluginAddCommand)
+      .command(PluginInstallCommand)
+      .command(PluginListCommand)
+      .command(PluginSearchCommand)
+      .demandCommand(),
   handler: Effect.fn("Cli.plugin")(function* () {}),
 })

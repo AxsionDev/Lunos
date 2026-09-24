@@ -49,6 +49,8 @@ Browse available plugins in the [ecosystem](/docs/ecosystem#plugins).
 
 **Marketplace manifests** (added via `lunos marketplace add`) are likewise cached to disk, in `~/.cache/opencode/marketplace/`, so `marketplace list`, `plugin list`/`search`, and the TUI Discover view don't re-fetch on every run. Run `lunos marketplace update <name>` to force a refresh.
 
+**Marketplaces** can list plugins, skill sources, hooks and MCP servers. Search all of them with `lunos marketplace search <query> [--kind plugin|skill|hook|mcp]`, and install one by name with `lunos marketplace install <name>` (or `lunos plugin add <name>` for plugins). In the TUI, the Discover view has a tab per kind; press `ctrl+o` to switch. Hooks and MCP servers show exactly what they will run, and ask before anything is written to your global config.
+
 **Local plugins** are loaded directly from the plugin directory. To use external packages, you must create a `package.json` within your config directory (see [Dependencies](#dependencies)), or publish the plugin to npm and [add it to your config](/docs/config#plugins).
 
 ---
