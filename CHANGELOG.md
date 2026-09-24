@@ -44,6 +44,15 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **Updates now track Lunos, not upstream opencode, and are never installed silently (behaviour
+  change from upstream).** The update check reads the `lunos-ai` npm package, at most once a day.
+  `lunos upgrade`, the TUI's reminder and the new `/upgrade` command install `lunos-ai` through
+  npm, pnpm or bun; other channels refuse with a plain message instead of running upstream's
+  install script. With `autoupdate` unset Lunos only tells you about a new release (upstream
+  installs patch releases silently); set `"autoupdate": true` to opt back in. The home footer keeps
+  showing "update available" after the reminder is dismissed, and plain CLI commands print one
+  stderr line a day when a newer release exists. `LUNOS_DISABLE_AUTOUPDATE` is accepted as an
+  alias of `OPENCODE_DISABLE_AUTOUPDATE`.
 - **One version label everywhere: `Lunos v1.18.38`** (dev builds show `Lunos dev (local build)`)
   on the home footer, session sidebar, crash screen and `/status`. Builds now record the upstream
   opencode release they are based on, shown as `· based on opencode 1.18.31` in `/status`, the

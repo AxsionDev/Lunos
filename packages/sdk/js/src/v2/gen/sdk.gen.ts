@@ -1353,9 +1353,9 @@ export class Global extends HeyApiClient {
   }
 
   /**
-   * Upgrade opencode
+   * Upgrade Lunos
    *
-   * Upgrade opencode to the specified version.
+   * Upgrade Lunos to the specified version, or to the latest release when no target is given.
    */
   public upgrade<ThrowOnError extends boolean = false>(
     parameters?: {

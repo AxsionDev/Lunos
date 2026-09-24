@@ -17,6 +17,10 @@ describe("updateAction", () => {
     expect(updateAction(true, "1.18.38", "1.19.0")).toBe("notify")
   })
 
+  test("a dev build never gets a reminder instead of throwing", () => {
+    expect(updateAction(undefined, "local", "1.18.40")).toBe("none")
+  })
+
   test("false and up-to-date do nothing", () => {
     expect(updateAction(false, "1.18.38", "1.18.39")).toBe("none")
     expect(updateAction(undefined, "1.18.38", "1.18.38")).toBe("none")
