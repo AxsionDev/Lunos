@@ -25,7 +25,7 @@ test("discovers plugins from a locally added marketplace", async () => {
   await fs.mkdir(path.join(tmp.path, ".opencode"), { recursive: true })
   await Bun.write(
     path.join(tmp.path, ".opencode", "opencode.json"),
-    JSON.stringify({ marketplace: [tmp.path] }, null, 2),
+    JSON.stringify({ marketplace: [tmp.path], marketplace_default: false }, null, 2),
   )
   await Bun.write(path.join(tmp.path, "marketplace.json"), JSON.stringify(manifest, null, 2))
 

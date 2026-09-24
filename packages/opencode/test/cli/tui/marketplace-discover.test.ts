@@ -28,7 +28,10 @@ const manifest = {
 async function withRuntime(fn: () => Promise<void>) {
   await using tmp = await tmpdir()
   await fs.mkdir(path.join(tmp.path, ".opencode"), { recursive: true })
-  await Bun.write(path.join(tmp.path, ".opencode", "opencode.json"), JSON.stringify({ marketplace: [tmp.path] }))
+  await Bun.write(
+    path.join(tmp.path, ".opencode", "opencode.json"),
+    JSON.stringify({ marketplace: [tmp.path], marketplace_default: false }),
+  )
   await Bun.write(path.join(tmp.path, "marketplace.json"), JSON.stringify(manifest))
   process.env.OPENCODE_PLUGIN_META_FILE = path.join(tmp.path, "plugin-meta.json")
   const wait = spyOn(TuiConfig, "waitForDependencies").mockResolvedValue()

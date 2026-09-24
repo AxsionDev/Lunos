@@ -5,7 +5,9 @@ import { Marketplace } from "@opencode-ai/core/marketplace"
 import { listContent, searchContent, type ContentItem } from "../../marketplace/content"
 import { planInstall, resolveConfigPath, type ConfigItem } from "../../marketplace/install"
 import { resolveByName } from "../../marketplace/resolve"
-import { MarketplaceRefusal } from "../../marketplace/guard"
+import { MarketplaceAlreadyInstalled, MarketplaceRefusal } from "../../marketplace/guard"
+import { normalizeSource } from "../../marketplace/shared"
+import { createMarketplaceAddTask } from "./marketplace"
 import { createPlugTask } from "./plug"
 import { printStaleMarketplaces } from "./plug"
 import { UI } from "../ui"
@@ -33,9 +35,12 @@ export function pickOne<T extends ContentItem>(items: readonly T[], name: string
 // Shows exactly what a marketplace entry will run, connect to or fetch, and where it will be
 // written, then asks before writing. Every config-kind install from the CLI goes through here so
 // the preview, the refusals (planInstall throws) and the confirmation can't differ between
-// `mcp add <name>` and `marketplace install`. Marketplace installs always write global config.
-export async function confirmAndInstall(item: ConfigItem, yes: boolean) {
-  const configPath = await resolveConfigPath(Global.Path.config, true)
+// `mcp add <name>` and `marketplace install`. Marketplace installs write global config unless the
+// caller passes a project directory (`marketplace install --local`).
+export async function confirmAndInstall(item: ConfigItem, yes: boolean, localDir?: string) {
+  const configPath = localDir
+    ? await resolveConfigPath(localDir, false)
+    : await resolveConfigPath(Global.Path.config, true)
   const plan = await planInstall(item, configPath)
   UI.println(`${plan.marketplace}/${plan.name}  (${LABEL[plan.kind]})`)
   if (item.description) UI.println(`  ${item.description}`)
@@ -107,7 +112,7 @@ export const MarketplaceSearchCommand = effectCmd({
 
 export const MarketplaceInstallCommand = effectCmd({
   command: "install <name>",
-  describe: "install a plugin, skill source, hook or MCP server from an added marketplace",
+  describe: "install a plugin, skill source, hook or MCP server from a marketplace",
   builder: (yargs) =>
     yargs
       .positional("name", {
@@ -115,6 +120,15 @@ export const MarketplaceInstallCommand = effectCmd({
         describe: "entry name, or <marketplace>/<name> when it appears in more than one",
       })
       .option("kind", kindOption)
+      .option("from", {
+        type: "string",
+        describe: "marketplace source (manifest URL, owner/repo or path); added first if it isn't already",
+      })
+      .option("local", {
+        type: "boolean",
+        default: false,
+        describe: "write to this project's config instead of the global config",
+      })
       .option("yes", {
         describe: "skip the confirmation prompt",
         type: "boolean",
@@ -126,40 +140,77 @@ export const MarketplaceInstallCommand = effectCmd({
     const marketplaceCtx = { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }
     const name = String(args.name ?? "").trim()
     const kind = args.kind as Marketplace.Kind | undefined
+    const local = Boolean(args.local)
+    const yes = Boolean(args.yes)
 
     // Refusals from pickOne/planInstall (ambiguous name, unsupported hook event, duplicate entry)
     // are expected outcomes, so they surface as a CliError: plain message, exit 1, no "Unexpected
-    // error" banner. Anything else -- an I/O fault, a cancelled prompt -- is rethrown to keep its
-    // existing path.
+    // error" banner. "Already installed" is a success. Anything else -- an I/O fault, a cancelled
+    // prompt -- is rethrown to keep its existing path.
     const refusal = (error: unknown) => {
+      if (error instanceof MarketplaceAlreadyInstalled) {
+        prompts.log.success(error.message)
+        return undefined
+      }
       if (error instanceof MarketplaceRefusal) return error.message
       throw error
     }
 
+    // --from: a command copied from a third-party marketplace's page works without a separate
+    // `marketplace add`. The source is added to the same scope the entry is installed into.
+    const from = typeof args.from === "string" && args.from.trim() ? normalizeSource(args.from.trim()) : undefined
+    if (from) {
+      const added = yield* Effect.promise(() => listContent(marketplaceCtx))
+      const known = added.marketplaces.some((marketplace) => normalizeSource(marketplace.source) === from)
+      if (!known) {
+        const ok = yield* Effect.promise(() =>
+          createMarketplaceAddTask({ source: from, global: !local })(marketplaceCtx),
+        )
+        if (!ok) {
+          process.exitCode = 1
+          return
+        }
+      }
+    }
+
     const picked = yield* Effect.promise(() =>
       listContent(marketplaceCtx, kind)
-        .then(({ items }) => ({ item: pickOne(items, name) }))
+        .then((listed) => ({ listed, item: pickOne(listed.items, name) }))
         .catch((error: unknown) => ({ error: refusal(error) })),
     )
-    if ("error" in picked) return yield* fail(picked.error)
+    if ("error" in picked) return picked.error === undefined ? undefined : yield* fail(picked.error)
     const item = picked.item
     if (!item) {
-      UI.error(`No marketplace entry named "${name}"${kind ? ` of kind ${kind}` : ""}. Try: lunos marketplace search`)
-      process.exitCode = 1
-      return
+      const searched = picked.listed.marketplaces.map((marketplace) => marketplace.name)
+      const where = searched.length
+        ? `in ${searched.map((marketplace) => `"${marketplace}"`).join(", ")}`
+        : "because no marketplace could be reached"
+      return yield* fail(
+        `No entry named "${name}"${kind ? ` of kind ${kind}` : ""} was found ${where}. Try: lunos marketplace search ${name.split("/").pop()}`,
+      )
     }
 
     if (item.kind === "plugin") {
       // Plugins keep their own install path, which fetches the package and reads its manifest.
+      // Preview and confirm first, like every other kind: a command pasted from a web page must
+      // never install without the user seeing what it is.
+      UI.println(`${item.marketplace}/${item.name}  (plugin)`)
+      if (item.description) UI.println(`  ${item.description}`)
+      UI.println(`  npm package: ${item.spec}`)
+      UI.println(`  writes to: ${local ? "this project's config" : "global config"}`)
+      if (!yes) {
+        const ok = yield* Effect.promise(() => prompts.confirm({ message: "Install this plugin?" }))
+        if (prompts.isCancel(ok) || !ok) throw new UI.CancelledError()
+      }
       const ok = yield* Effect.promise(() =>
-        createPlugTask({ mod: item.spec, global: true, force: false })(marketplaceCtx),
+        createPlugTask({ mod: item.spec, global: !local, force: false })(marketplaceCtx),
       )
       if (!ok) process.exitCode = 1
       return
     }
 
     const failure = yield* Effect.promise(() =>
-      confirmAndInstall(item, Boolean(args.yes)).then(() => undefined, refusal),
+      confirmAndInstall(item, yes, local ? ctx.directory : undefined).then(() => undefined, refusal),
     )
     if (failure !== undefined) return yield* fail(failure)
   }),

@@ -6,6 +6,7 @@ import { Filesystem } from "@/util/filesystem"
 import { hookConfigFromEntry, planInstall, type ConfigItem } from "../../src/marketplace/install"
 import type { FetchDeps } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
+import { MarketplaceAlreadyInstalled } from "../../src/marketplace/guard"
 
 function skill(url: string, name = "team-skills"): ConfigItem {
   return { kind: "skill", name, marketplace: "mp", entry: new Marketplace.SkillEntry({ name, url }) }
@@ -71,7 +72,8 @@ describe("planInstall: skill source", () => {
     await using tmp = await tmpdir()
     const file = path.join(tmp.path, "opencode.json")
     await Filesystem.write(file, JSON.stringify({ skills: { urls: ["https://example.test/skills"] } }))
-    await expect(planInstall(skill("https://example.test/skills/"), file, offline)).rejects.toThrow(/already/)
+    const error = await planInstall(skill("https://example.test/skills/"), file, offline).catch((e) => e)
+    expect(error).toBeInstanceOf(MarketplaceAlreadyInstalled)
   })
 
   test("still plans when the index is unreachable, but says so", async () => {
@@ -104,11 +106,13 @@ describe("planInstall: hook", () => {
     ])
   })
 
-  test("refuses an identical hook already configured -- config hooks have no name to key on", async () => {
+  test("reports an identical hook as already installed -- config hooks have no name to key on", async () => {
     await using tmp = await tmpdir()
     const file = path.join(tmp.path, "opencode.json")
     await (await planInstall(hook(), file)).apply()
-    await expect(planInstall(hook({ name: "renamed" }), file)).rejects.toThrow(/identical/)
+    const error = await planInstall(hook({ name: "renamed" }), file).catch((e) => e)
+    expect(error).toBeInstanceOf(MarketplaceAlreadyInstalled)
+    expect(error.message).toMatch(/already installed/)
   })
 
   test("a different matcher is a different hook, not a duplicate", async () => {
