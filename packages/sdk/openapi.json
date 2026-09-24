@@ -6885,6 +6885,16 @@
               }
             }
           },
+          "403": {
+            "description": "ShareDisabledError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareDisabledError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "NotFoundError",
             "content": {
@@ -23149,6 +23159,20 @@
             }
           }
         }
+      },
+      "ShareDisabledError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["ShareDisabledError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
       },
       "TextPartInput": {
         "type": "object",

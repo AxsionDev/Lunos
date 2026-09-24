@@ -464,15 +464,28 @@ export function Session() {
 
   const sessionCommandList = createMemo(() => [
     {
-      title: session()?.share?.url ? "Copy share link" : "Share session",
+      title: session()?.share?.url
+        ? "Copy share link"
+        : sync.data.config.share === "disabled"
+          ? "Share session (disabled)"
+          : "Share session",
       value: "session.share",
-      suggested: route.type === "session",
+      suggested: route.type === "session" && sync.data.config.share !== "disabled",
       category: "Session",
-      enabled: sync.data.config.share !== "disabled",
       slash: {
         name: "share",
       },
       run: async () => {
+        // Stay registered while disabled so a typed /share gets a plain answer
+        // instead of being sent to the model as ordinary prompt text.
+        if (!session()?.share?.url && sync.data.config.share === "disabled") {
+          toast.show({
+            message: 'Session sharing is disabled. To enable /share, set "share": "manual" in your Lunos config.',
+            variant: "info",
+          })
+          dialog.clear()
+          return
+        }
         const copy = (url: string) =>
           clipboard
             .write?.(url)

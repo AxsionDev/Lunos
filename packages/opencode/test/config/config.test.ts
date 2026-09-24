@@ -888,6 +888,23 @@ it.instance("migrates autoshare to share field", () =>
   }),
 )
 
+for (const [label, share, expected] of [
+  ["defaults share to disabled when no config layer sets it", undefined, "disabled"],
+  ["keeps an explicit share: disabled", "disabled", "disabled"],
+  ["keeps an explicit share: manual opt-in", "manual", "manual"],
+] as const) {
+  it.instance(label, () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      yield* writeConfigEffect(test.directory, {
+        $schema: "https://opencode.ai/config.json",
+        ...(share ? { share } : {}),
+      })
+      const config = yield* Config.use.get()
+      expect(config.share).toBe(expected)
+    }),
+  )
+}
 it.instance("keeps the residency policy on the live config path", () =>
   Effect.gen(function* () {
     const test = yield* TestInstance

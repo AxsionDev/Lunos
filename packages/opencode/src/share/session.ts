@@ -1,14 +1,23 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
-import { Effect, Layer, Scope, Context } from "effect"
+import { Effect, Layer, Scope, Context, Schema } from "effect"
 import { Config } from "@/config/config"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ShareNext } from "./share-next"
 
+export const DISABLED_MESSAGE =
+  'Session sharing is disabled. To enable /share, set "share": "manual" in your Lunos config.'
+
+export class ShareDisabledError extends Schema.TaggedErrorClass<ShareDisabledError>()("ShareDisabledError", {}) {
+  override get message() {
+    return DISABLED_MESSAGE
+  }
+}
+
 export interface Interface {
   readonly create: (input?: Session.CreateInput) => Effect.Effect<Session.Info>
-  readonly share: (sessionID: SessionID) => Effect.Effect<{ url: string }, unknown>
+  readonly share: (sessionID: SessionID) => Effect.Effect<{ url: string }, ShareDisabledError | unknown>
   readonly unshare: (sessionID: SessionID) => Effect.Effect<void, unknown>
 }
 
@@ -25,7 +34,7 @@ const layer = Layer.effect(
 
     const share = Effect.fn("SessionShare.share")(function* (sessionID: SessionID) {
       const conf = yield* cfg.get()
-      if (conf.share === "disabled") throw new Error("Sharing is disabled in configuration")
+      if (conf.share === "disabled") return yield* new ShareDisabledError()
       const result = yield* shareNext.create(sessionID)
       yield* session.setShare({ sessionID, share: { url: result.url } })
       return result
@@ -40,6 +49,8 @@ const layer = Layer.effect(
       const result = yield* session.create(input)
       if (result.parentID) return result
       const conf = yield* cfg.get()
+      // "disabled" wins over OPENCODE_AUTO_SHARE: the env flag only upgrades manual to auto.
+      if (conf.share === "disabled") return result
       if (!(flags.autoShare || conf.share === "auto")) return result
       yield* share(result.id).pipe(Effect.ignore, Effect.forkIn(scope))
       return result
