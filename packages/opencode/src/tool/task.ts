@@ -1,6 +1,7 @@
 import * as Tool from "./tool"
 import DESCRIPTION from "./task.txt"
 import { ToolJsonSchema } from "./json-schema"
+import type { JSONSchema7, JSONSchema7Definition } from "@ai-sdk/provider"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { BackgroundJob } from "@/background/job"
 import { Session } from "@/session/session"
@@ -14,6 +15,10 @@ import { Effect, Exit, Schema, Scope } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Database } from "@opencode-ai/core/database/database"
+import { Residency } from "@opencode-ai/core/residency"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
+import { SubagentModel } from "../agent/subagent-model"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -49,6 +54,9 @@ const BaseParameterFields = {
       "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
   }),
   command: Schema.optional(Schema.String).annotate({ description: "The command that triggered this task" }),
+  model: Schema.optional(Schema.String).annotate({
+    description: "Model for this task, from the allowed list. Only offered when subagent.dynamic is enabled.",
+  }),
 }
 
 const BaseParameters = Schema.Struct(BaseParameterFields)
@@ -60,6 +68,24 @@ export const Parameters = Schema.Struct({
       "Run the agent in the background. You will be notified when it completes. DO NOT sleep, poll, or proactively check on its progress",
   }),
 })
+
+/**
+ * The task tool's JSON schema with the `model` parameter constrained to `allowed`, or removed when
+ * nothing is allowed (XCOD-82). An enum, so the main agent can't invent a model id; the resolver
+ * still refuses anything off the list.
+ */
+export function withModelParameter(schema: JSONSchema7, allowed: readonly string[]): JSONSchema7 {
+  const properties = { ...(schema.properties ?? {}) } as Record<string, JSONSchema7Definition>
+  delete properties.model
+  if (allowed.length)
+    properties.model = {
+      type: "string",
+      enum: [...allowed],
+      description:
+        "Model for this task. Pick by the nature of the work: a cheap, fast model for broad search or simple lookups; a strong model for design, review or subtle debugging. Omit to use the configured default.",
+    }
+  return { ...schema, properties }
+}
 
 function renderOutput(input: {
   sessionID: SessionID
@@ -88,6 +114,12 @@ export const TaskTool = Tool.define(
     const scope = yield* Scope.Scope
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
+
+    const lastAssistant = Effect.fn("TaskTool.lastAssistant")(function* (sessionID: SessionID) {
+      const messages = yield* sessions.messages({ sessionID }).pipe(Effect.orElseSucceed(() => []))
+      const info = messages.findLast((item) => item.info.role === "assistant")?.info
+      return info?.role === "assistant" ? info : undefined
+    })
 
     const run = Effect.fn("TaskTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
@@ -177,15 +209,46 @@ export const TaskTool = Tool.define(
       )
       if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
       const variant = msg.info.variant
+      const parentModel = { providerID: msg.info.providerID, modelID: msg.info.modelID }
 
-      const model = next.model ?? {
-        modelID: msg.info.modelID,
-        providerID: msg.info.providerID,
+      // XCOD-82: per-call → per-type → global → inherit. Resuming a task keeps the model of its
+      // original run unless this call explicitly (and allowably) overrides it.
+      const previous = session ? yield* lastAssistant(nextSession.id) : undefined
+      const resolved = yield* Effect.try({
+        try: () => {
+          const out = SubagentModel.resolve({
+            subagentType: next.name,
+            parent: { ...parentModel, variant },
+            perCall: params.model,
+            typeModel: next.modelSpec,
+            typeVariant: next.modelSpec ? next.variant : undefined,
+            config: cfg,
+          })
+          const final =
+            previous && params.model === undefined
+              ? {
+                  ...out,
+                  model: { providerID: previous.providerID, modelID: previous.modelID },
+                  variant: previous.variant,
+                  source: "resumed task",
+                }
+              : out
+          SubagentModel.checkResidency(final, Residency.resolve(cfg.residency))
+          return final
+        },
+        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+      })
+      const model = {
+        providerID: ProviderV2.ID.make(resolved.model.providerID),
+        modelID: ModelV2.ID.make(resolved.model.modelID),
       }
       const metadata = {
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
         model,
+        modelRule: resolved.rule,
+        modelSource: resolved.source,
+
         ...(runInBackground ? { background: true } : {}),
       }
 
@@ -206,7 +269,7 @@ export const TaskTool = Tool.define(
             modelID: model.modelID,
             providerID: model.providerID,
           },
-          variant: next.model ? undefined : variant,
+          variant: resolved.variant,
           agent: next.name,
           parts,
         })
@@ -363,7 +426,12 @@ export const TaskTool = Tool.define(
         ? [DESCRIPTION, BACKGROUND_DESCRIPTION].join("\n\n")
         : DESCRIPTION,
       parameters: Parameters,
-      jsonSchema: flags.experimentalBackgroundSubagents ? undefined : ToolJsonSchema.fromSchema(BaseParameters),
+      // `model` is never offered by default; the registry adds it, as an enum of the allowed models,
+      // only when subagent.dynamic is enabled (withModelParameter).
+      jsonSchema: withModelParameter(
+        ToolJsonSchema.fromSchema(flags.experimentalBackgroundSubagents ? Parameters : BaseParameters),
+        [],
+      ),
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         run(params, ctx).pipe(Effect.orDie),
     }

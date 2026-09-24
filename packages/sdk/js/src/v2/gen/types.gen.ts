@@ -1655,6 +1655,15 @@ export type ServerConfig = {
   cors?: Array<string>
 }
 
+export type SubagentConfig = {
+  model?: string
+  variant?: string
+  dynamic?: {
+    enabled?: boolean
+    allow?: Array<string>
+  }
+}
+
 export type PermissionActionConfig = "ask" | "allow" | "deny"
 
 export type PermissionObjectConfig = {
@@ -1947,6 +1956,7 @@ export type Config = {
   model?: string
   small_model?: string
   default_agent?: string
+  subagent?: SubagentConfig
   subagent_depth?: number
   username?: string
   mode?: {
@@ -2377,6 +2387,7 @@ export type Agent = {
     providerID: string
   }
   variant?: string
+  modelSpec?: string
   prompt?: string
   options: {
     [key: string]: unknown

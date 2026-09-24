@@ -18,6 +18,7 @@ import { ConfigServerV1 } from "./server"
 import { ConfigSkillsV1 } from "./skills"
 import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
+import { ConfigSubagent } from "../../config/subagent"
 
 export type Layout = ConfigLayoutV1.Layout
 
@@ -91,6 +92,9 @@ export const Info = Schema.Struct({
   default_agent: Schema.optional(Schema.String).annotate({
     description:
       "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",
+  }),
+  subagent: Schema.optional(ConfigSubagent.Info).annotate({
+    description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
   }),
   subagent_depth: Schema.optional(NonNegativeInt).annotate({
     description: "Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents.",

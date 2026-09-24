@@ -945,6 +945,30 @@ it.instance("decodes the checked-in reference deployment config on the live path
   }),
 )
 
+// XCOD-82: every new subagent key survives the live config path (the XCOD-68 / XCOD-93 lesson).
+it.instance("keeps subagent model selection keys on the live config path", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    yield* writeConfigEffect(test.directory, {
+      $schema: "https://opencode.ai/config.json",
+      subagent: {
+        model: "small",
+        variant: "inherit",
+        dynamic: { enabled: true, allow: ["mistral/codestral-latest"] },
+      },
+      agent: { explore: { model: "small" }, qa: { model: "inherit", variant: "high" } },
+    })
+    const config = yield* Config.use.get()
+    expect(config.subagent).toEqual({
+      model: "small",
+      variant: "inherit",
+      dynamic: { enabled: true, allow: ["mistral/codestral-latest"] },
+    })
+    expect(config.agent?.explore?.model).toBe("small")
+    expect(config.agent?.qa).toMatchObject({ model: "inherit", variant: "high" })
+  }),
+)
+
 it.instance("migrates mode field to agent field", () =>
   Effect.gen(function* () {
     const test = yield* TestInstance

@@ -25,6 +25,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Choose which model each subagent uses.** `agent.<type>.model` now accepts `"inherit"` and
+  `"small"` as well as `provider/model`. The new `subagent.model` sets a default for every
+  subagent, and `subagent.dynamic` lets the main agent pick a model per task, from a list you allow.
+  Subagent models are checked against the residency policy before they start. An inherited model
+  keeps the main agent's reasoning variant; before this, the variant was dropped whenever a model
+  was configured.
 - **Skills can restrict the agent's tools** with `allowed-tools` in `SKILL.md`, in Claude Code's
   format. The restriction applies from when the skill loads to the end of the turn, through the
   permission system. Hook scripts now receive `LUNOS_AGENT` and `LUNOS_SKILL`. `research-mode`
