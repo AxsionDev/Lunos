@@ -48,6 +48,8 @@ That provider is your choice and your contractual relationship. Lunos does not s
 
 The tool also fetches its model catalogue (a list of available models and their capabilities — no prompt data) over the network, and checks for updates unless disabled.
 
+**The update check** reads the `lunos-ai` package entry from your npm registry: `https://registry.npmjs.org/lunos-ai/latest` by default, or whatever registry your npm configuration points at, so a corporate or EU mirror is honoured. It sends no project data, and runs at most once a day; the result is cached in Lunos's state directory. Lunos only _announces_ new releases. It never installs one unless a person chooses to, or you set `"autoupdate": true`. To turn the check off entirely, set `"autoupdate": false` or the environment variable `LUNOS_DISABLE_AUTOUPDATE=1`.
+
 #### Session sharing — off by default
 
 `/share` publishes a session at a public link. **Lunos turns this off unless you enable it**, because a shared session contains the whole transcript: your prompts, the contents of every file the agent read, and tool output. That is more sensitive than any single model request.

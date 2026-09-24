@@ -5,6 +5,7 @@ import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
@@ -164,23 +165,6 @@ function errorMessage(error: unknown) {
     return error.data.message
   }
   return error instanceof Error ? error.message : String(error)
-}
-
-function isVersionGreater(left: string, right: string) {
-  const parse = (value: string) => {
-    const [core, prerelease] = value.replace(/^v/, "").split("-", 2)
-    return { core: core.split(".").map((part) => Number.parseInt(part, 10) || 0), prerelease }
-  }
-  const a = parse(left)
-  const b = parse(right)
-  for (let index = 0; index < Math.max(a.core.length, b.core.length); index++) {
-    const difference = (a.core[index] ?? 0) - (b.core[index] ?? 0)
-    if (difference) return difference > 0
-  }
-  if (a.prerelease === b.prerelease) return false
-  if (!a.prerelease) return true
-  if (!b.prerelease) return false
-  return a.prerelease.localeCompare(b.prerelease, undefined, { numeric: true }) > 0
 }
 
 export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
@@ -840,6 +824,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "System",
       },
       {
+        name: "app.upgrade",
+        title: "Upgrade Lunos",
+        slashName: "upgrade",
+        run: () => {
+          dialog.clear()
+          void runUpgrade(undefined)
+        },
+        category: "System",
+      },
+      {
         name: "app.exit",
         title: "Exit the app",
         slashName: "exit",
@@ -1043,9 +1037,45 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     })
   })
 
+  // One flow for the reminder dialog and /upgrade. `target` undefined means "latest";
+  // the server resolves it from the lunos-ai registry entry.
+  async function runUpgrade(target: string | undefined) {
+    toast.show({
+      variant: "info",
+      message: target ? `Updating to Lunos v${target}…` : "Updating Lunos to the latest release…",
+      duration: 30000,
+    })
+
+    const result = await sdk.client.global.upgrade({ target })
+
+    if (result.error || !result.data?.success) {
+      // A refused upgrade comes back as a 400 whose body is `{ success: false, error }`.
+      const body = (result.error ?? result.data) as { error?: unknown } | undefined
+      const reason =
+        typeof body?.error === "string" ? body.error : result.error ? errorMessage(result.error) : "Update failed"
+      toast.show({
+        variant: "error",
+        title: "Update Failed",
+        message: `${reason}\nTo upgrade manually, run: npm i -g lunos-ai${target ? `@${target}` : ""}`,
+        duration: 15000,
+      })
+      return
+    }
+
+    kv.set("available_version", undefined)
+    await DialogAlert.show(
+      dialog,
+      "Update Complete",
+      `Updated to Lunos v${result.data.version}. Restart Lunos to use it.`,
+    )
+
+    void exit()
+  }
+
   event.on("installation.update-available", async (evt) => {
-    console.log("installation.update-available", evt)
     const version = evt.properties.version
+    // Kept after the dialog is dismissed, so the footer can keep saying an update exists.
+    kv.set("available_version", version)
 
     const skipped = kv.get("skipped_version")
     if (skipped && !isVersionGreater(version, skipped)) return
@@ -1053,7 +1083,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     const choice = await DialogConfirm.show(
       dialog,
       `Update Available`,
-      `A new release v${version} is available. Would you like to update now?`,
+      `Lunos v${version} is available (you have v${InstallationVersion}).\nRelease notes: https://github.com/AxsionDev/Lunos/releases/tag/v${version}\n\nUpdate now?`,
       "skip",
     )
 
@@ -1063,32 +1093,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     }
 
     if (choice !== true) return
-
-    toast.show({
-      variant: "info",
-      message: `Updating to v${version}…`,
-      duration: 30000,
-    })
-
-    const result = await sdk.client.global.upgrade({ target: version })
-
-    if (result.error || !result.data?.success) {
-      toast.show({
-        variant: "error",
-        title: "Update Failed",
-        message: "Update failed",
-        duration: 10000,
-      })
-      return
-    }
-
-    await DialogAlert.show(
-      dialog,
-      "Update Complete",
-      `Successfully updated to Lunos v${result.data.version}. Please restart the application.`,
-    )
-
-    void exit()
+    await runUpgrade(version)
   })
 
   const plugin = createMemo(() => {

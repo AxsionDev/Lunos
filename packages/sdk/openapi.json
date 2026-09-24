@@ -548,8 +548,8 @@
             }
           }
         },
-        "description": "Upgrade opencode to the specified version.",
-        "summary": "Upgrade opencode",
+        "description": "Upgrade Lunos to the specified version, or to the latest release when no target is given.",
+        "summary": "Upgrade Lunos",
         "requestBody": {
           "content": {
             "application/json": {
@@ -560,7 +560,6 @@
                     "type": "string"
                   }
                 },
-                "required": ["target"],
                 "additionalProperties": false
               }
             }

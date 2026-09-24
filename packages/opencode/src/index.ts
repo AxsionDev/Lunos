@@ -33,6 +33,26 @@ import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
 
+// Plain one-shot commands get the once-a-day "new version" stderr line. The TUI has its own
+// reminder, and long-running servers or the upgrade flow itself shouldn't print it.
+const NOTICE_COMMANDS = new Set([
+  "run",
+  "mcp",
+  "marketplace",
+  "plugin",
+  "models",
+  "providers",
+  "agent",
+  "session",
+  "stats",
+  "export",
+  "import",
+  "github",
+  "pr",
+  "db",
+  "debug",
+])
+
 function show(out: string) {
   const text = out.trimStart()
   if (!text.startsWith("lunos ")) {
@@ -126,6 +146,11 @@ try {
     })
   } else {
     await cli.parse()
+    if (NOTICE_COMMANDS.has(args[0] ?? "")) {
+      // Bounded, so a slow registry never holds up a finished command by more than a moment.
+      const { notice } = await import("./cli/upgrade")
+      await Promise.race([notice().catch(() => {}), Bun.sleep(2000)])
+    }
   }
 } catch (e) {
   const formatted = FormatError(e)
