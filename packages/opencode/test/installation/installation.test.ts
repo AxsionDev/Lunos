@@ -68,120 +68,101 @@ function testLayer(
 
 describe("installation", () => {
   describe("latest", () => {
-    testEffect(testLayer(() => jsonResponse({ tag_name: "v1.2.3" }))).effect(
-      "reads release version from GitHub releases",
-      () =>
-        Effect.gen(function* () {
-          const result = yield* Installation.use.latest("unknown")
-          expect(result).toBe("1.2.3")
+    for (const method of ["npm", "pnpm", "bun", "yarn", "curl", "brew", "scoop", "choco", "unknown"] as const) {
+      const calls: string[] = []
+      testEffect(
+        testLayer((request) => {
+          calls.push(request.url)
+          return jsonResponse({ version: "1.5.0" })
         }),
-    )
-
-    testEffect(testLayer(() => jsonResponse({ tag_name: "v4.0.0-beta.1" }))).effect(
-      "strips v prefix from GitHub release tag",
-      () =>
+      ).effect(`reads the lunos-ai npm registry entry for ${method} installs`, () =>
         Effect.gen(function* () {
-          const result = yield* Installation.use.latest("curl")
-          expect(result).toBe("4.0.0-beta.1")
+          const result = yield* Installation.use.latest(method)
+          expect(result).toBe("1.5.0")
+          expect(calls).toEqual([`https://registry.npmjs.org/lunos-ai/${InstallationChannel}`])
         }),
-    )
+      )
+    }
+  })
 
-    const npmCalls: string[] = []
+  describe("method", () => {
     testEffect(
-      testLayer((request) => {
-        npmCalls.push(request.url)
-        return jsonResponse({ version: "1.5.0" })
-      }),
-    ).effect("reads npm versions via registry", () =>
+      testLayer(
+        () => jsonResponse({}),
+        (cmd) => (cmd === "npm" ? "/usr/lib\n├── lunos-ai@1.18.38\n" : ""),
+      ),
+    ).effect("detects a global npm install of lunos-ai", () =>
       Effect.gen(function* () {
-        const result = yield* Installation.use.latest("npm")
-        expect(result).toBe("1.5.0")
-        expect(npmCalls).toContain(`https://registry.npmjs.org/opencode-ai/${InstallationChannel}`)
+        expect(yield* Installation.use.method()).toBe("npm")
       }),
-    )
-
-    const bunCalls: string[] = []
-    testEffect(
-      testLayer((request) => {
-        bunCalls.push(request.url)
-        return jsonResponse({ version: "1.6.0" })
-      }),
-    ).effect("reads bun versions via registry", () =>
-      Effect.gen(function* () {
-        const result = yield* Installation.use.latest("bun")
-        expect(result).toBe("1.6.0")
-        expect(bunCalls).toContain(`https://registry.npmjs.org/opencode-ai/${InstallationChannel}`)
-      }),
-    )
-
-    const pnpmCalls: string[] = []
-    testEffect(
-      testLayer((request) => {
-        pnpmCalls.push(request.url)
-        return jsonResponse({ version: "1.7.0" })
-      }),
-    ).effect("reads pnpm versions via registry", () =>
-      Effect.gen(function* () {
-        const result = yield* Installation.use.latest("pnpm")
-        expect(result).toBe("1.7.0")
-        expect(pnpmCalls).toContain(`https://registry.npmjs.org/opencode-ai/${InstallationChannel}`)
-      }),
-    )
-
-    testEffect(testLayer(() => jsonResponse({ version: "2.3.4" }))).effect("reads scoop manifest versions", () =>
-      Effect.gen(function* () {
-        const result = yield* Installation.use.latest("scoop")
-        expect(result).toBe("2.3.4")
-      }),
-    )
-
-    testEffect(testLayer(() => jsonResponse({ d: { results: [{ Version: "3.4.5" }] } }))).effect(
-      "reads chocolatey feed versions",
-      () =>
-        Effect.gen(function* () {
-          const result = yield* Installation.use.latest("choco")
-          expect(result).toBe("3.4.5")
-        }),
     )
 
     testEffect(
       testLayer(
-        () => jsonResponse({ versions: { stable: "2.0.0" } }),
-        (cmd, args) => {
-          // getBrewFormula: return core formula (no tap)
-          if (cmd === "brew" && args.includes("--formula") && args.includes("anomalyco/tap/opencode")) return ""
-          if (cmd === "brew" && args.includes("--formula") && args.includes("opencode")) return "opencode"
+        () => jsonResponse({}),
+        (cmd) => {
+          if (cmd === "npm") return "/usr/lib\n├── opencode-ai@1.18.30\n"
+          if (cmd === "brew" || cmd === "scoop" || cmd === "choco") return "opencode"
           return ""
         },
       ),
-    ).effect("reads brew formulae API versions", () =>
+    ).effect("does not mistake an upstream opencode install for Lunos", () =>
       Effect.gen(function* () {
-        const result = yield* Installation.use.latest("brew")
-        expect(result).toBe("2.0.0")
-      }),
-    )
-
-    const brewInfoJson = JSON.stringify({
-      formulae: [{ versions: { stable: "2.1.0" } }],
-    })
-    testEffect(
-      testLayer(
-        () => jsonResponse({}), // HTTP not used for tap formula
-        (cmd, args) => {
-          if (cmd === "brew" && args.includes("anomalyco/tap/opencode") && args.includes("--formula")) return "opencode"
-          if (cmd === "brew" && args.includes("--json=v2")) return brewInfoJson
-          return ""
-        },
-      ),
-    ).effect("reads brew tap info JSON via CLI", () =>
-      Effect.gen(function* () {
-        const result = yield* Installation.use.latest("brew")
-        expect(result).toBe("2.1.0")
+        expect(yield* Installation.use.method()).toBe("unknown")
       }),
     )
   })
 
   describe("upgrade", () => {
+    const installs: string[][] = []
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        (cmd, args) => {
+          installs.push([cmd, ...args])
+          return ""
+        },
+      ),
+    ).effect("installs lunos-ai for npm, pnpm and bun", () =>
+      Effect.gen(function* () {
+        yield* Installation.use.upgrade("npm", "9.9.9")
+        yield* Installation.use.upgrade("pnpm", "9.9.9")
+        yield* Installation.use.upgrade("bun", "9.9.9")
+        const managers = installs.filter((cmd) => cmd.some((arg) => arg.includes("@9.9.9")))
+        expect(managers).toEqual([
+          ["npm", "install", "-g", "lunos-ai@9.9.9"],
+          ["pnpm", "install", "-g", "lunos-ai@9.9.9"],
+          ["bun", "install", "-g", "lunos-ai@9.9.9"],
+        ])
+      }),
+    )
+
+    for (const method of ["curl", "brew", "scoop", "choco", "yarn", "unknown"] as const) {
+      const spawned: string[] = []
+      const fetched: string[] = []
+      testEffect(
+        testLayer(
+          (request) => {
+            fetched.push(request.url)
+            return new Response("install script", { status: 200 })
+          },
+          (cmd) => {
+            spawned.push(cmd)
+            return ""
+          },
+        ),
+      ).effect(`refuses ${method} without running or fetching anything`, () =>
+        Effect.gen(function* () {
+          const error = yield* Effect.flip(Installation.use.upgrade(method, "9.9.9"))
+          expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
+          expect(error.stderr).toContain("Lunos isn't published on")
+          expect(error.stderr).toContain("npm i -g lunos-ai")
+          expect(spawned).toEqual([])
+          expect(fetched).toEqual([])
+        }),
+      )
+    }
+
     testEffect(
       testLayer(
         () => jsonResponse({}),
@@ -198,42 +179,6 @@ describe("installation", () => {
         expect(error.message).toBe(error.stderr)
         expect(error.stderr).not.toContain("secret")
         expect(error.stderr).not.toContain("command output")
-      }),
-    )
-
-    testEffect(
-      testLayer(
-        () => new Response("install script with token=secret", { status: 200 }),
-        (cmd, args) => {
-          if (cmd === "bash" && args[0] === "--version") return "GNU bash"
-          if (cmd === "bash" || cmd === "sh") return { code: 1, stderr: "script output with token=secret" }
-          return ""
-        },
-      ),
-    ).effect("returns sanitized typed errors when the curl install script fails", () =>
-      Effect.gen(function* () {
-        const error = yield* Effect.flip(Installation.use.upgrade("curl", "9.9.9"))
-        expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
-        expect(error.stderr).toBe("Upgrade failed for curl (exit code 1).")
-        expect(error.message).toBe(error.stderr)
-        expect(error.stderr).not.toContain("secret")
-        expect(error.stderr).not.toContain("script output")
-      }),
-    )
-
-    testEffect(
-      testLayer(
-        () => new Response("install script", { status: 200 }),
-        (cmd, args) => {
-          if (cmd === "bash" && args[0] === "--version") return { code: 1, stderr: "missing" }
-          if (cmd === "bash") return { code: 1, stderr: "should not execute installer with bash" }
-          if (cmd === "sh") return "ok"
-          return ""
-        },
-      ),
-    ).effect("falls back to sh when bash is unavailable during curl upgrade", () =>
-      Effect.gen(function* () {
-        yield* Installation.use.upgrade("curl", "9.9.9")
       }),
     )
   })

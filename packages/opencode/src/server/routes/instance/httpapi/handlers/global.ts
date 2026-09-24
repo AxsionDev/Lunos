@@ -90,7 +90,7 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       const method = yield* installation.method()
       if (method === "unknown") {
         return HttpServerResponse.jsonUnsafe(
-          { success: false as const, error: "Unknown installation method" },
+          { success: false as const, error: Installation.unpublishedMessage(method) },
           { status: 400 },
         )
       }
