@@ -593,6 +593,20 @@ const scenarios: Scenario[] = [
     .json(200, (body) => {
       check(body === false, "background route should be a no-op without running subagents")
     }),
+  http.protected.get("/experimental/background", "experimental.background.list").json(200, (body) => {
+    array(body)
+    check(body.length === 0, "no background jobs should exist in a fresh instance")
+  }),
+  http.protected
+    .post("/experimental/background/{jobID}/cancel", "experimental.background.cancel")
+    .mutating()
+    .at((ctx) => ({
+      path: route("/experimental/background/{jobID}/cancel", { jobID: "ses_missing" }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      check(body === false, "cancelling an unknown job should be a no-op")
+    }),
   http.protected.get("/experimental/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")

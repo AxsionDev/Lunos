@@ -399,6 +399,20 @@ The model ID in your Lunos config uses the format `provider/model-id`. For examp
 
 ---
 
+### Background subagents
+
+Subagents can run in the background while the main agent keeps working. This is off by default; turn it on with:
+
+```json title="opencode.json"
+{ "subagent": { "background": true } }
+```
+
+Then the main agent can launch a task in the background, and its result arrives in the conversation when it finishes. Run `/tasks` to see every background job with its agent, model, status and elapsed time. Press Enter to open a job's session, or `ctrl+d` to cancel a running one.
+
+Aborting or deleting the parent session cancels its background jobs. Compaction doesn't affect them. If Lunos exits, running jobs stop; the job's session keeps what it did so far and can be continued. Details: `packages/opencode/specs/background-subagents.md`.
+
+---
+
 ### Choosing models for subagents
 
 Every subagent gets a model from the first of these rules that applies:

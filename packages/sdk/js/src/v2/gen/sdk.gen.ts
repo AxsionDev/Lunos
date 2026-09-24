@@ -29,6 +29,10 @@ import type {
   EventTuiPromptAppend,
   EventTuiSessionSelect,
   EventTuiToastShow,
+  ExperimentalBackgroundCancelErrors,
+  ExperimentalBackgroundCancelResponses,
+  ExperimentalBackgroundListErrors,
+  ExperimentalBackgroundListResponses,
   ExperimentalCapabilitiesGetErrors,
   ExperimentalCapabilitiesGetResponses,
   ExperimentalConsoleGetErrors,
@@ -886,6 +890,80 @@ export class Session extends HeyApiClient {
   }
 }
 
+export class Background extends HeyApiClient {
+  /**
+   * List background subagents
+   *
+   * List subagent jobs with status, elapsed time, agent and resolved model. Pass sessionID to list only that session's jobs.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalBackgroundListResponses,
+      ExperimentalBackgroundListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Cancel a background subagent
+   *
+   * Cancel a running background subagent job and its child session.
+   */
+  public cancel<ThrowOnError extends boolean = false>(
+    parameters: {
+      jobID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "jobID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalBackgroundCancelResponses,
+      ExperimentalBackgroundCancelErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background/{jobID}/cancel",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Resource extends HeyApiClient {
   /**
    * Get MCP resources
@@ -1259,6 +1337,11 @@ export class Experimental extends HeyApiClient {
   private _session?: Session
   get session(): Session {
     return (this._session ??= new Session({ client: this.client }))
+  }
+
+  private _background?: Background
+  get background(): Background {
+    return (this._background ??= new Background({ client: this.client }))
   }
 
   private _resource?: Resource

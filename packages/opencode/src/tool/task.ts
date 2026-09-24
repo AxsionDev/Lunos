@@ -14,6 +14,7 @@ import { Config } from "@/config/config"
 import { Effect, Exit, Schema, Scope } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { backgroundEnabled } from "@/background/enabled"
 import { Database } from "@opencode-ai/core/database/database"
 import { Residency } from "@opencode-ai/core/residency"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -127,9 +128,11 @@ export const TaskTool = Tool.define(
     ) {
       const cfg = yield* config.get()
       const runInBackground = params.background === true
-      if (runInBackground && !flags.experimentalBackgroundSubagents) {
+      if (runInBackground && !backgroundEnabled(flags.experimentalBackgroundSubagents, cfg)) {
         return yield* Effect.fail(
-          new Error("Background subagents require OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true"),
+          new Error(
+            'Background subagents are off. Enable them with "subagent": { "background": true } in your Lunos config.',
+          ),
         )
       }
 
@@ -246,6 +249,7 @@ export const TaskTool = Tool.define(
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
         model,
+        agent: next.name,
         modelRule: resolved.rule,
         modelSource: resolved.source,
 
@@ -421,17 +425,16 @@ export const TaskTool = Tool.define(
       )
     })
 
+    // Tool init can run outside an instance (tests, tool listings), where config isn't
+    // reachable; fall back to the env flag there. Execution re-checks with live config.
+    const initialConfig = yield* config.get().pipe(Effect.catchCause(() => Effect.succeed({})))
+    const backgroundOn = backgroundEnabled(flags.experimentalBackgroundSubagents, initialConfig)
     return {
-      description: flags.experimentalBackgroundSubagents
-        ? [DESCRIPTION, BACKGROUND_DESCRIPTION].join("\n\n")
-        : DESCRIPTION,
+      description: backgroundOn ? [DESCRIPTION, BACKGROUND_DESCRIPTION].join("\n\n") : DESCRIPTION,
       parameters: Parameters,
       // `model` is never offered by default; the registry adds it, as an enum of the allowed models,
       // only when subagent.dynamic is enabled (withModelParameter).
-      jsonSchema: withModelParameter(
-        ToolJsonSchema.fromSchema(flags.experimentalBackgroundSubagents ? Parameters : BaseParameters),
-        [],
-      ),
+      jsonSchema: withModelParameter(ToolJsonSchema.fromSchema(backgroundOn ? Parameters : BaseParameters), []),
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         run(params, ctx).pipe(Effect.orDie),
     }

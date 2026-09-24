@@ -1,4 +1,5 @@
 import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
+import { DialogBackground } from "./component/dialog-background"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
@@ -569,6 +570,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         slashAliases: ["resume", "continue"],
         run: () => {
           dialog.replace(() => <DialogSessionList />)
+        },
+      },
+      {
+        name: "background.list",
+        title: "Background subagents",
+        category: "Session",
+        slashName: "tasks",
+        slashAliases: ["background"],
+        run: () => {
+          dialog.replace(() => <DialogBackground />)
         },
       },
       {

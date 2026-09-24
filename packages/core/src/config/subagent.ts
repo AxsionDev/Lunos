@@ -7,6 +7,10 @@ import { Schema } from "effect"
  * the live config path keeps it (the XCOD-68 / XCOD-93 lesson).
  */
 export const Info = Schema.Struct({
+  background: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      "Allow subagents to run in the background while the main agent keeps working (off by default). Replaces OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS, which still works",
+  }),
   model: Schema.String.pipe(Schema.optional).annotate({
     description:
       'Default model for every subagent without its own agent.<name>.model: "inherit" (the main agent\'s model, the default), "small" (small_model) or "provider/model"',

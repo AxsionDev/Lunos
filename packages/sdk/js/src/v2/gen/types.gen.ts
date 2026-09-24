@@ -1656,6 +1656,7 @@ export type ServerConfig = {
 }
 
 export type SubagentConfig = {
+  background?: boolean
   model?: string
   variant?: string
   dynamic?: {
@@ -2269,6 +2270,21 @@ export type GlobalSession = {
     diff?: string
   }
   project: ProjectSummary | null
+}
+
+export type BackgroundJobItem = {
+  id: string
+  title?: string
+  status: "running" | "completed" | "error" | "cancelled"
+  startedAt: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  completedAt?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  elapsedMs: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  agent?: string
+  model?: string
+  modelRule?: string
+  parentSessionID?: string
+  sessionID?: string
+  error?: string
 }
 
 export type McpResource = {
@@ -7922,6 +7938,68 @@ export type ExperimentalSessionBackgroundResponses = {
 
 export type ExperimentalSessionBackgroundResponse =
   ExperimentalSessionBackgroundResponses[keyof ExperimentalSessionBackgroundResponses]
+
+export type ExperimentalBackgroundListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    sessionID?: string
+  }
+  url: "/experimental/background"
+}
+
+export type ExperimentalBackgroundListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalBackgroundListError = ExperimentalBackgroundListErrors[keyof ExperimentalBackgroundListErrors]
+
+export type ExperimentalBackgroundListResponses = {
+  /**
+   * Background subagent jobs
+   */
+  200: Array<BackgroundJobItem>
+}
+
+export type ExperimentalBackgroundListResponse =
+  ExperimentalBackgroundListResponses[keyof ExperimentalBackgroundListResponses]
+
+export type ExperimentalBackgroundCancelData = {
+  body?: never
+  path: {
+    jobID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/background/{jobID}/cancel"
+}
+
+export type ExperimentalBackgroundCancelErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalBackgroundCancelError =
+  ExperimentalBackgroundCancelErrors[keyof ExperimentalBackgroundCancelErrors]
+
+export type ExperimentalBackgroundCancelResponses = {
+  /**
+   * Whether a running job was cancelled
+   */
+  200: boolean
+}
+
+export type ExperimentalBackgroundCancelResponse =
+  ExperimentalBackgroundCancelResponses[keyof ExperimentalBackgroundCancelResponses]
 
 export type ExperimentalResourceListData = {
   body?: never

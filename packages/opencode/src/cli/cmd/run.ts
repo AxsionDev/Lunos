@@ -890,6 +890,9 @@ export const RunCommand = effectCmd({
         }
 
         const model = pick(args.model)
+        // The server answers from `subagent.background` config or the old env flag (XCOD-82).
+        const capabilities = await client.experimental.capabilities.get().catch(() => undefined)
+        const backgroundSubagents = capabilities?.data?.backgroundSubagents ?? flags.experimentalBackgroundSubagents
         const { runInteractiveMode } = await import("./run/runtime")
         try {
           await runInteractiveMode({
@@ -907,7 +910,7 @@ export const RunCommand = effectCmd({
             initialInput,
             createSession: createFreshSession,
             thinking,
-            backgroundSubagents: flags.experimentalBackgroundSubagents,
+            backgroundSubagents,
             demo: args.demo,
           })
         } catch (error) {
