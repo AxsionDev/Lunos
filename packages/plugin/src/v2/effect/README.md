@@ -1,13 +1,15 @@
-# OpenCode V2 Effect Plugin API
+# Lunos v2 Effect Plugin API
 
 The Effect plugin API grants plugins two in-process capabilities:
 
-- `hook` installs behavior at an OpenCode extension point.
+- `hook` installs behavior at a Lunos extension point.
 - `reload` reruns every transform hook for a stateful domain.
 
 The public server client will be exposed separately. It is intentionally not part of `PluginContext` yet.
 
 ## Defining A Plugin
+
+Everything named below (`define`, `PluginContext`, `Plugin`, `Registration`, `Reload`, every `*Draft` and `*Hooks` type) is exported from the package root, so nothing needs a deep import.
 
 ```ts
 import { define } from "@opencode-ai/plugin/v2/effect"
@@ -24,6 +26,8 @@ export const Plugin = define({
   }),
 })
 ```
+
+**The setup key is `effect`, not `setup`.** This is deliberate: the key names what you pass. An Effect plugin passes an Effect-returning function under `effect`. A [Promise plugin](../promise/README.md) passes an async function under `setup`. Using the wrong key is a type error at `define(...)`.
 
 Plugin setup registers hooks imperatively. It does not return a hook object.
 
@@ -45,7 +49,7 @@ yield *
   })
 ```
 
-OpenCode rebuilds the domain when a transform is registered or disposed. A rebuild starts from fresh domain state and runs every active transform in registration order.
+Lunos rebuilds the domain when a transform is registered or disposed. A rebuild starts from fresh domain state and runs every active transform in registration order.
 
 Available transform hooks are namespaced by domain:
 
@@ -59,6 +63,8 @@ ctx.skill.transform
 ```
 
 ## Runtime Hooks
+
+> **Where these hooks run today.** Lunos sessions still resolve models through the v1 provider (`packages/opencode/src/provider/provider.ts`), not through v2's `AISDK.language()`. v2 `aisdk` runtime hooks therefore don't run for live sessions yet. Prove a hook fires in a real `lunos run` before relying on it; see XCOD-93. There is also no `tool` domain yet (XCOD-75).
 
 Runtime hooks intercept live operations rather than rebuilding domain state:
 

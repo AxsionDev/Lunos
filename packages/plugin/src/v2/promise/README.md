@@ -1,13 +1,15 @@
-# OpenCode V2 Promise Plugin API
+# Lunos v2 Promise Plugin API
 
 The Promise plugin API is the async/await equivalent of `@opencode-ai/plugin/v2/effect`. It grants plugins the same two in-process capabilities:
 
-- `hook` installs behavior at an OpenCode extension point.
+- `hook` installs behavior at a Lunos extension point.
 - `reload` reruns every transform hook for a stateful domain.
 
 The only difference from the Effect API is the async boundary: hook callbacks, hook registration, `reload`, and `Registration.dispose` use Promises instead of Effects.
 
 ## Defining A Plugin
+
+Everything named below (`define`, `PluginContext`, `Plugin`, `Registration`, `Reload`, every `*Draft` and `*Hooks` type) is exported from the package root, so nothing needs a deep import.
 
 ```ts
 import { define } from "@opencode-ai/plugin/v2/promise"
@@ -23,6 +25,8 @@ export const Plugin = define({
   },
 })
 ```
+
+**The setup key is `setup`, not `effect`.** This is deliberate: the key names what you pass. A Promise plugin passes an async function under `setup`. An [Effect plugin](../effect/README.md) passes an Effect-returning function under `effect`. Using the wrong key is a type error at `define(...)`.
 
 Plugin setup registers hooks imperatively. It does not return a hook object.
 
@@ -60,6 +64,8 @@ ctx.skill.transform
 ```
 
 ## Runtime Hooks
+
+> **Where these hooks run today.** Lunos sessions still resolve models through the v1 provider (`packages/opencode/src/provider/provider.ts`), not through v2's `AISDK.language()`. v2 `aisdk` runtime hooks therefore don't run for live sessions yet. Prove a hook fires in a real `lunos run` before relying on it; see XCOD-93. There is also no `tool` domain yet (XCOD-75).
 
 Runtime hooks intercept live operations:
 
