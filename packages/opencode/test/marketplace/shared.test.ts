@@ -99,6 +99,66 @@ describe("marketplace.shared.resolveMarketplaceManifest", () => {
     expect(manifest.name).toBe("lunos-community")
   })
 
+  // Claude Code marketplaces are a different format: plugin `source` is a relative path string or an
+  // object keyed by `source` ("url", "git-subdir"), and the file usually lives in .claude-plugin/.
+  // Entries below are trimmed from microsoft/work-iq and anthropics/claude-plugins-official.
+  const claudeManifest = {
+    name: "work-iq",
+    owner: { name: "Microsoft" },
+    plugins: [
+      { name: "workiq", source: "./plugins/workiq", version: "2.0.2" },
+      { name: "remote-one", source: { source: "url", url: "https://github.com/example/remote-one.git" } },
+    ],
+  }
+
+  test("names a Claude Code manifest instead of failing schema validation", async () => {
+    await expect(
+      resolveMarketplaceManifest(
+        "https://example.test/marketplace.json",
+        deps({ fetchText: async () => JSON.stringify(claudeManifest) }),
+      ),
+    ).rejects.toThrow(/Claude Code plugin marketplace/)
+  })
+
+  test("recognises an object-form Claude source even with no string sources", async () => {
+    const objectOnly = { ...claudeManifest, plugins: [claudeManifest.plugins[1]] }
+    await expect(
+      resolveMarketplaceManifest(
+        "https://example.test/marketplace.json",
+        deps({ fetchText: async () => JSON.stringify(objectOnly) }),
+      ),
+    ).rejects.toThrow(/Claude Code plugin marketplace/)
+  })
+
+  test("a github repo with only .claude-plugin/marketplace.json is named as a Claude Code marketplace", async () => {
+    await expect(
+      resolveMarketplaceManifest(
+        "anthropics/claude-plugins-official",
+        deps({
+          fetchText: async (url) => {
+            if (url.startsWith("https://api.github.com/")) return JSON.stringify({ default_branch: "main" })
+            if (url.endsWith("/main/.claude-plugin/marketplace.json")) return JSON.stringify(claudeManifest)
+            throw new Error(`Request to ${url} failed with status 404`)
+          },
+        }),
+      ),
+    ).rejects.toThrow(/Claude Code plugin marketplace/)
+  })
+
+  test("a github repo with no manifest anywhere keeps the original 404", async () => {
+    await expect(
+      resolveMarketplaceManifest(
+        "someone/nothing-here",
+        deps({
+          fetchText: async (url) => {
+            if (url.startsWith("https://api.github.com/")) return JSON.stringify({ default_branch: "main" })
+            throw new Error(`Request to ${url} failed with status 404`)
+          },
+        }),
+      ),
+    ).rejects.toThrow(/nothing-here\/main\/marketplace\.json failed with status 404/)
+  })
+
   test("rejects invalid github shorthand", async () => {
     await expect(resolveMarketplaceManifest("not-a-valid-repo-spec/", deps())).rejects.toThrow()
   })

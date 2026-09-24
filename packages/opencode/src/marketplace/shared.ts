@@ -65,12 +65,43 @@ async function githubDefaultBranch(repo: string, dep: FetchDeps) {
   return data.default_branch
 }
 
+// Claude Code marketplaces look similar but describe Claude Code plugins (commands/agents/skills
+// folders), which Lunos can't install: plugin `source` is a relative path string or an object keyed
+// by `source` ("url", "git-subdir") rather than Lunos's typed `{ type: "npm" | "github" }`, and the
+// file usually lives in .claude-plugin/. Naming the format beats a raw schema error at a path.
+const CLAUDE_MANIFEST_FILE = ".claude-plugin/marketplace.json"
+
+function claudeMarketplaceError(spec: string) {
+  return new Error(
+    `"${spec}" is a Claude Code plugin marketplace. Lunos can't install Claude Code plugins; it reads a marketplace.json whose plugin sources are { "type": "npm" } or { "type": "github" }.`,
+  )
+}
+
+function isClaudeManifest(json: unknown) {
+  const plugins = (json as { plugins?: unknown })?.plugins
+  if (!Array.isArray(plugins)) return false
+  return plugins.some((plugin) => {
+    const source = (plugin as { source?: unknown })?.source
+    if (typeof source === "string") return true
+    return !!source && typeof source === "object" && !("type" in source) && "source" in source
+  })
+}
+
 async function manifestText(spec: string, kind: SourceKind, dep: FetchDeps) {
   if (kind === "url") return dep.fetchText(spec)
   if (kind === "github") {
     if (!GITHUB_SHORTHAND.test(spec)) throw new Error(`Invalid GitHub shorthand: ${spec}. Expected owner/repo`)
     const branch = await githubDefaultBranch(spec, dep)
-    return dep.fetchText(`https://raw.githubusercontent.com/${spec}/${branch}/${MANIFEST_FILE}`)
+    const base = `https://raw.githubusercontent.com/${spec}/${branch}`
+    try {
+      return await dep.fetchText(`${base}/${MANIFEST_FILE}`)
+    } catch (error) {
+      // Only a missing root manifest is worth a second look; a network error stays as it was.
+      if (!/status 404/.test(errorMessage(error))) throw error
+      const claude = await dep.fetchText(`${base}/${CLAUDE_MANIFEST_FILE}`).catch(() => undefined)
+      if (claude !== undefined) throw claudeMarketplaceError(spec)
+      throw error
+    }
   }
   const file = normalizeSource(spec)
   const stat = await dep.stat(file)
@@ -82,6 +113,7 @@ export async function resolveMarketplaceManifest(spec: string, dep: FetchDeps = 
   const kind = sourceKind(spec)
   const text = await manifestText(spec, kind, dep)
   const json = JSON.parse(text)
+  if (isClaudeManifest(json)) throw claudeMarketplaceError(spec)
   return Marketplace.decode(json)
 }
 
