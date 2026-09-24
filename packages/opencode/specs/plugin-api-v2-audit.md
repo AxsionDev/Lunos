@@ -90,6 +90,8 @@ config-driven hooks would need. Until it exists, all tool interception runs thro
 interface that no one can import is the worst of both: it reads as a feature in code review
 and does nothing at runtime. Deleting is defensible — the concrete need is unproven.
 
+> **Resolved 2026-09-24 (XCOD-76):** deleted. `effect/event.ts` is gone and PLAN.md marks the Event API as not implemented.
+
 **P3 — PLAN.md is stale and self-describes as authoritative.** Its "Status" section invites
 readers to treat it as the plan of record, which is how XCOD-68 and XCOD-70 both came to be
 written on false premises. It should be marked superseded and point at README.md, with the
