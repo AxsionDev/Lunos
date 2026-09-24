@@ -132,19 +132,44 @@ For reviewers who require building from audited source. See [`CONTRIBUTING.md`](
 
 This is the control that makes "EU alternative" enforceable rather than advisory.
 
-Create `opencode.json` in your project directory or global config directory:
+The repository ships a reference configuration for exactly this deployment: [`examples/reference-deployment/opencode.json`](../../examples/reference-deployment/opencode.json). Copy it to `opencode.json` in your project directory, or to your global config directory to apply it to every project. A test decodes that file through the same config path `lunos` uses at startup, so it can't drift into describing keys the runtime ignores.
 
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "residency": {
-    "allow": ["eu"]
+    "allow": ["eu"],
+    "audit": true
   },
+  "enabled_providers": ["mistral"],
+  "provider": {
+    "mistral": {
+      "options": {
+        "apiKey": "{env:MISTRAL_API_KEY}"
+      }
+    }
+  },
+  "model": "mistral/mistral-large-latest",
+  "small_model": "mistral/mistral-small-latest",
   "share": "disabled",
-  "model": "mistral/mistral-large-latest"
+  "autoupdate": "notify"
 }
 ```
 
-`"share": "disabled"` is already the default. Set it explicitly anyway, so a later config layer or a colleague's copy of the file can't turn sharing on without it showing up in review. See [Session sharing](#session-sharing--off-by-default).
+Key by key:
+
+| Key                               | Value                            | Why                                                                                                                                                                                                                                                                  |
+| --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `residency.allow`                 | `["eu"]`                         | The enforcement. Model requests may only go to providers that process data in the EU; anything else is refused before a connection is opened. Described in full below                                                                                                |
+| `residency.audit`                 | `true`                           | Records every outbound model call, and every refused one, to a local audit log. This is already the default once `residency` is set; it is written out so a reviewer doesn't have to know that                                                                       |
+| `enabled_providers`               | `["mistral"]`                    | Loads only this provider. Defence in depth: the residency policy would refuse the others anyway, but they don't appear in the model list at all, so nobody picks one and gets an error                                                                               |
+| `provider.mistral.options.apiKey` | `"{env:MISTRAL_API_KEY}"`        | Mistral AI (France) processes in the EU; see [Model provider jurisdictions](../provider-jurisdictions.md). The key is read from the environment, so the file itself holds no secret and can be committed. Scaleway, OVHcloud or Hetzner work the same way (§5 table) |
+| `model`                           | `"mistral/mistral-large-latest"` | The main agent's model, on the provider above                                                                                                                                                                                                                        |
+| `small_model`                     | `"mistral/mistral-small-latest"` | Used for titles and summaries. Set explicitly so it can't fall back to a model on another provider                                                                                                                                                                   |
+| `share`                           | `"disabled"`                     | Already the default. Set explicitly so a later config layer or a copy of this file can't turn sharing on without it showing in review. See [Session sharing](#session-sharing--off-by-default)                                                                       |
+| `autoupdate`                      | `"notify"`                       | Lunos tells you when a new release exists but never installs one without a person choosing it. A procurement reviewer should expect updates to be a decision, not a side effect. The check itself is a network call; set `false` to turn it off entirely             |
+
+To confirm the policy is active, run `lunos debug config` in that directory. The resolved config it prints includes `"residency": { "allow": ["eu"], "audit": true }`.
 
 With that in place:
 

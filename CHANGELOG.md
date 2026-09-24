@@ -25,6 +25,10 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **A checked-in reference deployment config,** `examples/reference-deployment/opencode.json`: an
+  EU-only residency policy with auditing, Mistral as the only enabled provider, sharing disabled
+  and updates set to notify. §5 of the self-hosted deployment guide walks through it key by key,
+  and a test keeps the guide's copy and the file identical.
 - Upstream sync policy documenting how Lunos tracks opencode, with the merge-over-rebase decision
   and its measurement (109 conflicts rebasing vs. 0 merging).
 - A one-page landing site with email capture.

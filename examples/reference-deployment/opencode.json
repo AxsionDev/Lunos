@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "residency": {
+    "allow": ["eu"],
+    "audit": true
+  },
+  "enabled_providers": ["mistral"],
+  "provider": {
+    "mistral": {
+      "options": {
+        "apiKey": "{env:MISTRAL_API_KEY}"
+      }
+    }
+  },
+  "model": "mistral/mistral-large-latest",
+  "small_model": "mistral/mistral-small-latest",
+  "share": "disabled",
+  "autoupdate": "notify"
+}
