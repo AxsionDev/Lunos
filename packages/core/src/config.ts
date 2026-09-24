@@ -23,6 +23,7 @@ import { ConfigPlugin } from "./config/plugin"
 import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
 import { ConfigResidency } from "./config/residency"
+import { ConfigSubagent } from "./config/subagent"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
 import { ConfigV1 } from "./v1/config/config"
@@ -109,6 +110,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   experimental: ConfigExperimental.Experimental.pipe(Schema.optional),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(Schema.optional),
+  subagent: ConfigSubagent.Info.pipe(Schema.optional).annotate({
+    description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
+  }),
   residency: ConfigResidency.Info.pipe(Schema.optional).annotate({
     description:
       "Data-residency policy restricting which provider jurisdictions this deployment may use, with an audit log of outbound model calls",

@@ -20577,6 +20577,33 @@
         "additionalProperties": false,
         "description": "Server configuration for opencode serve and web commands"
       },
+      "SubagentConfig": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "dynamic": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
       "PermissionActionConfig": {
         "type": "string",
         "enum": ["ask", "allow", "deny"]
@@ -21358,6 +21385,9 @@
           },
           "default_agent": {
             "type": "string"
+          },
+          "subagent": {
+            "$ref": "#/components/schemas/SubagentConfig"
           },
           "subagent_depth": {
             "type": "integer",
@@ -22635,6 +22665,9 @@
             "additionalProperties": false
           },
           "variant": {
+            "type": "string"
+          },
+          "modelSpec": {
             "type": "string"
           },
           "prompt": {

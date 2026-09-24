@@ -52,6 +52,8 @@ export const Info = Schema.Struct({
     }),
   ),
   variant: Schema.optional(Schema.String),
+  /** Raw `agent.<name>.model` from config: `"inherit"`, `"small"` or `"provider/model"` (XCOD-82). */
+  modelSpec: Schema.optional(Schema.String),
   prompt: Schema.optional(Schema.String),
   options: Schema.Record(Schema.String, Schema.Unknown),
   steps: Schema.optional(Schema.Finite),
@@ -420,7 +422,11 @@ const layer = Layer.effect(
               options: {},
               native: false,
             }
-          if (value.model) item.model = Provider.parseModel(value.model)
+          if (value.model) {
+            item.modelSpec = value.model
+            // "inherit" and "small" are resolved per task call (agent/subagent-model.ts), not here.
+            if (value.model !== "inherit" && value.model !== "small") item.model = Provider.parseModel(value.model)
+          }
           item.variant = value.variant ?? item.variant
           item.prompt = value.prompt ?? item.prompt
           item.description = value.description ?? item.description

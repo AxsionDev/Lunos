@@ -399,6 +399,55 @@ The model ID in your Lunos config uses the format `provider/model-id`. For examp
 
 ---
 
+### Choosing models for subagents
+
+Every subagent gets a model from the first of these rules that applies:
+
+1. **Per task call:** the main agent picks a model for one task, but only when `subagent.dynamic.enabled` is `true`, and only from `subagent.dynamic.allow`. A model that isn't on the list is refused with an error the main agent can see. It is never silently swapped for another.
+2. **Per type of work:** `agent.<subagent-type>.model`, for example `agent.explore.model`.
+3. **Global default:** `subagent.model`.
+4. **Inherit:** the main agent's current model. This is the default.
+
+Each value can be `"inherit"` (the main agent's model), `"small"` (your `small_model`, or inherit if that isn't set), or `"provider/model"`. The task tool's metadata records which model was chosen and which rule chose it.
+
+**Based on the main agent.** This is the default and needs no config: subagents use whatever model, and reasoning variant, the main agent is running.
+
+**Based on the type of work.** For example, a cheap model for broad search and a strong one for review:
+
+```json title="opencode.json"
+{
+  "model": "mistral/mistral-large-latest",
+  "small_model": "mistral/mistral-small-latest",
+  "agent": {
+    "explore": { "model": "small" },
+    "qa": { "model": "mistral/mistral-large-latest", "variant": "high" }
+  }
+}
+```
+
+**Chosen per task by the main agent,** from a list you allow:
+
+```json title="opencode.json"
+{
+  "subagent": {
+    "dynamic": {
+      "enabled": true,
+      "allow": ["mistral/codestral-latest", "scaleway/llama-3.3-70b-instruct"]
+    }
+  }
+}
+```
+
+The task tool only offers a `model` argument when this is enabled, and only as a choice from `allow`.
+
+**Reasoning effort.** An inherited model keeps the main agent's variant. An overridden model uses the configured `variant` (per agent, or `subagent.variant`), or the model's default.
+
+**Data residency.** The chosen model is checked against your [residency policy](/docs/data-residency) before the subagent starts. A denial names the rule that chose the model (for example `agent.qa.model → anthropic/… denied by residency policy`) and is written to the audit log. Models on `subagent.dynamic.allow` that the policy would deny are never offered to the main agent.
+
+**Resuming a task.** Resuming with `task_id` keeps the model of the original run unless the call explicitly picks another allowed model.
+
+---
+
 ### Tools (deprecated)
 
 `tools` is **deprecated**. Prefer the agent's [`permission`](#permissions) field for new configs, updates and more fine-grained control.

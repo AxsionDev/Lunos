@@ -184,6 +184,7 @@ With that in place:
 - **Every outbound model call is recorded** to a local audit log with timestamp, provider, jurisdiction and destination host. Blocked attempts are recorded too. The log never contains request contents.
 - **Providers whose region cannot be verified are denied,** including ones that _could_ be EU (Azure, AWS Bedrock, Google Vertex). Their region is a choice made in your cloud account, which the software cannot inspect — so permitting them automatically would let an unverified US-region resource pass a policy claiming to enforce EU residency. You may opt in explicitly once you have verified the region.
 - **Providers with no recorded jurisdiction are always denied.**
+- **Subagents are checked too.** A subagent's model is checked against the policy before the subagent starts. If you assign models to subagents, keep them on EU providers with per-type settings: for example `"agent": { "explore": { "model": "small" } }`, where `small_model` is also an EU provider. See "Choosing models for subagents" in the agents documentation.
 
 Full reference, including the audit log format and how to opt into configurable providers: [Data residency controls](../data-residency.md).
 
