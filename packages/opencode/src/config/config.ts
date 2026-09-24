@@ -586,9 +586,13 @@ const layer = Layer.effect(
           }
         }
 
+        // The deprecated `autoshare: true` is an explicit opt-in, so it still maps to "auto".
         if (result.autoshare === true && !result.share) {
           result.share = "auto"
         }
+        // Lunos: sharing uploads the full transcript to a third-party host, so it is off
+        // unless a config layer turns it on. Upstream opencode behaves as "manual".
+        result.share ??= "disabled"
 
         if (Flag.OPENCODE_DISABLE_AUTOCOMPACT) {
           result.compaction = { ...result.compaction, auto: false }

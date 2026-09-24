@@ -888,6 +888,63 @@ it.instance("migrates autoshare to share field", () =>
   }),
 )
 
+for (const [label, share, expected] of [
+  ["defaults share to disabled when no config layer sets it", undefined, "disabled"],
+  ["keeps an explicit share: disabled", "disabled", "disabled"],
+  ["keeps an explicit share: manual opt-in", "manual", "manual"],
+] as const) {
+  it.instance(label, () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      yield* writeConfigEffect(test.directory, {
+        $schema: "https://opencode.ai/config.json",
+        ...(share ? { share } : {}),
+      })
+      const config = yield* Config.use.get()
+      expect(config.share).toBe(expected)
+    }),
+  )
+}
+it.instance("keeps the residency policy on the live config path", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    yield* writeConfigEffect(test.directory, {
+      $schema: "https://opencode.ai/config.json",
+      residency: { allow: ["eu"], auditPath: "/tmp/egress.log" },
+    })
+    const config = yield* Config.use.get()
+    expect(config.residency).toMatchObject({ allow: ["eu"], auditPath: "/tmp/egress.log" })
+  }),
+)
+
+// XCOD-79: the reference deployment config walked through in docs/deployment/self-hosted.md §5.
+// Decoded through the live config path, so a key the runtime strips (the XCOD-68 trap) fails here.
+it.instance("decodes the checked-in reference deployment config on the live path", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    const reference = yield* Effect.promise(() =>
+      Bun.file(path.resolve(import.meta.dir, "../../../../examples/reference-deployment/opencode.json")).json(),
+    )
+    yield* writeConfigEffect(test.directory, reference)
+    const config = yield* Config.use.get()
+    expect(config.residency).toMatchObject({ allow: ["eu"], audit: true })
+    expect(config.share).toBe("disabled")
+    expect(config.autoupdate).toBe("notify")
+    expect(config.enabled_providers).toEqual(["mistral"])
+    expect(config.model).toBe("mistral/mistral-large-latest")
+    expect(config.small_model).toBe("mistral/mistral-small-latest")
+    expect(config.provider?.mistral?.options).toHaveProperty("apiKey")
+
+    // The guide shows the file inline; it must stay byte-for-byte the same config.
+    const guide = yield* Effect.promise(() =>
+      Bun.file(path.resolve(import.meta.dir, "../../../../docs/deployment/self-hosted.md")).text(),
+    )
+    const section = guide.slice(guide.indexOf("examples/reference-deployment/opencode.json"))
+    const shown = section.match(/```json\n([\s\S]*?)```/)?.[1]
+    expect(shown && JSON.parse(shown)).toEqual(reference)
+  }),
+)
+
 it.instance("migrates mode field to agent field", () =>
   Effect.gen(function* () {
     const test = yield* TestInstance

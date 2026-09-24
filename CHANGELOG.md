@@ -25,6 +25,10 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **A checked-in reference deployment config,** `examples/reference-deployment/opencode.json`: an
+  EU-only residency policy with auditing, Mistral as the only enabled provider, sharing disabled
+  and updates set to notify. §5 of the self-hosted deployment guide walks through it key by key,
+  and a test keeps the guide's copy and the file identical.
 - Upstream sync policy documenting how Lunos tracks opencode, with the merge-over-rebase decision
   and its measurement (109 conflicts rebasing vs. 0 merging).
 - A one-page landing site with email capture.
@@ -40,6 +44,18 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **One version label everywhere: `Lunos v1.18.38`** (dev builds show `Lunos dev (local build)`)
+  on the home footer, session sidebar, crash screen and `/status`. Builds now record the upstream
+  opencode release they are based on, shown as `· based on opencode 1.18.31` in `/status`, the
+  debug dialog and `lunos debug info`, which also prints the channel and install method for bug
+  reports. The crash screen's "open an issue" link now goes to `AxsionDev/Lunos` instead of
+  upstream, and `lunos --help` says `lunos`. `lunos --version` still prints the bare number.
+- **Session sharing is now off by default (behaviour change from upstream opencode).** When no
+  config layer sets `share`, Lunos treats it as `"disabled"`: `/share`, `lunos run --share` and the
+  share API route refuse with a message saying how to turn it on, and nothing is uploaded. A shared
+  session contains the full transcript and goes to upstream's `opncd.ai` by default, outside the
+  residency policy. To get the old behaviour back, set `"share": "manual"` (or `"auto"`). The
+  deprecated `"autoshare": true` still counts as an explicit opt-in and maps to `"auto"`.
 - **The product is named Lunos.** The name is frozen after an earlier sequence of renames
   (AXCODE → Ratio → Lunos). Trademark clearance remains a separate, open question.
 - **The CLI publishes as `lunos-ai` and installs a `lunos` binary.**

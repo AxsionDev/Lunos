@@ -36,7 +36,7 @@ import {
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
-import { PermissionNotFoundError } from "../errors"
+import { PermissionNotFoundError, ShareDisabledApiError } from "../errors"
 import * as SessionError from "./session-errors"
 
 const tryParseJson = (text: string) =>
@@ -258,7 +258,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     // every failure to a 400 BadRequest.
     const share = Effect.fn("SessionHttpApi.share")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
-      yield* shareSvc.share(ctx.params.sessionID).pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
+      yield* shareSvc
+        .share(ctx.params.sessionID)
+        .pipe(
+          Effect.mapError((err) =>
+            err instanceof SessionShare.ShareDisabledError
+              ? new ShareDisabledApiError({ message: err.message })
+              : new HttpApiError.InternalServerError({}),
+          ),
+        )
       return yield* requireSession(ctx.params.sessionID)
     })
 

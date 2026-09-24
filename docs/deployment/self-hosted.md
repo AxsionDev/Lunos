@@ -18,14 +18,14 @@ It is a fork of the open-source project [opencode](https://github.com/anomalyco/
 
 This is the claim table maintained in the project's own sovereignty decision record. It is reproduced here without softening.
 
-| Claim                                                          | True today?            | Basis                                                                                                                                                              |
-| -------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The vendor is EU-incorporated                                  | **Yes**                | ITService EOOD, Bulgaria, UIC 201069485                                                                                                                            |
-| The vendor is outside non-EU compulsory-disclosure reach       | **Yes**                | Bulgarian legal person; not a US-parented subsidiary                                                                                                               |
-| Lunos can be run entirely on infrastructure the buyer controls | **Yes**                | Self-hosted is the shipping distribution model                                                                                                                     |
-| Lunos is provider-agnostic for model routing                   | **Yes**                | Inherited from opencode                                                                                                                                            |
-| _Lunos-operated_ infrastructure is EU-sovereign                | **N/A**                | There is no Lunos-operated production infrastructure for customers                                                                                                 |
-| EU-specific functionality exists in the build                  | **Yes, as of Phase 1** | Provider jurisdiction metadata and enforceable data-residency controls — see §5. Previously "No"; this row changed when those shipped and is the only row that has |
+| Claim                                                          | True today? | Basis                                                                                                                                                                                                                                           |
+| -------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The vendor is EU-incorporated                                  | **Yes**     | ITService EOOD, Bulgaria, UIC 201069485                                                                                                                                                                                                         |
+| The vendor is outside non-EU compulsory-disclosure reach       | **Yes**     | Bulgarian legal person; not a US-parented subsidiary                                                                                                                                                                                            |
+| Lunos can be run entirely on infrastructure the buyer controls | **Yes**     | Self-hosted is the shipping distribution model                                                                                                                                                                                                  |
+| Lunos is provider-agnostic for model routing                   | **Yes**     | Inherited from opencode                                                                                                                                                                                                                         |
+| _Lunos-operated_ infrastructure is EU-sovereign                | **N/A**     | There is no Lunos-operated production infrastructure for customers                                                                                                                                                                              |
+| EU-specific functionality exists in the build                  | **Partly**  | Provider jurisdiction metadata ships. Data-residency controls are documented in §5, but in v1.18.38 and earlier they are **not enforced for sessions** (see the correction in §5, XCOD-93). This row said "Yes, as of Phase 1" until 2026-09-24 |
 
 ### Wording rules
 
@@ -47,6 +47,19 @@ If you encounter Lunos marketing that uses the ❌ phrasings, it contradicts thi
 That provider is your choice and your contractual relationship. Lunos does not select one for you and has no commercial arrangement with any of them. Where each provider processes data is documented in [Model provider jurisdictions](../provider-jurisdictions.md).
 
 The tool also fetches its model catalogue (a list of available models and their capabilities — no prompt data) over the network, and checks for updates unless disabled.
+
+#### Session sharing — off by default
+
+`/share` publishes a session at a public link. **Lunos turns this off unless you enable it**, because a shared session contains the whole transcript: your prompts, the contents of every file the agent read, and tool output. That is more sensitive than any single model request.
+
+| Setting               | What happens                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `share` unset         | Same as `"disabled"`. This differs from upstream opencode, where `/share` works out of the box     |
+| `"share": "disabled"` | `/share` is refused with a message saying how to enable it. Nothing is uploaded                    |
+| `"share": "manual"`   | `/share` uploads the session when a person runs it                                                 |
+| `"share": "auto"`     | Every new session is uploaded as it is created. The deprecated `"autoshare": true` also means this |
+
+When sharing is on, uploads go to `enterprise.url` if you set one, and otherwise to **`https://opncd.ai`**, upstream opencode's hosted share service. That host is operated by a non-EU third party, not by Lunos, and **is not covered by the residency policy** (§5, §7). The `OPENCODE_AUTO_SHARE` environment variable only turns `"manual"` into `"auto"`; it cannot re-enable sharing that is disabled.
 
 ### Stays on your infrastructure
 
@@ -119,16 +132,47 @@ For reviewers who require building from audited source. See [`CONTRIBUTING.md`](
 
 This is the control that makes "EU alternative" enforceable rather than advisory.
 
-Create `opencode.json` in your project directory or global config directory:
+> [!WARNING]
+> **Correction (2026-09-24): in Lunos v1.18.38 and earlier, the residency policy is not enforced for sessions.** With `"residency": {"allow": ["eu"]}` set, `lunos run` and the TUI still send model requests to non-EU providers, and no audit log is written. The policy was only wired into a code path that sessions don't use. Until a release containing the fix ships, **do not rely on this policy as a control**: restrict providers with `enabled_providers` and by holding only EU providers' API keys. Tracked as XCOD-93.
+
+The repository ships a reference configuration for exactly this deployment: [`examples/reference-deployment/opencode.json`](../../examples/reference-deployment/opencode.json). Copy it to `opencode.json` in your project directory, or to your global config directory to apply it to every project. A test decodes that file through the same config path `lunos` uses at startup, so it can't drift into describing keys the runtime ignores.
 
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "residency": {
-    "allow": ["eu"]
+    "allow": ["eu"],
+    "audit": true
   },
-  "model": "mistral/mistral-large-latest"
+  "enabled_providers": ["mistral"],
+  "provider": {
+    "mistral": {
+      "options": {
+        "apiKey": "{env:MISTRAL_API_KEY}"
+      }
+    }
+  },
+  "model": "mistral/mistral-large-latest",
+  "small_model": "mistral/mistral-small-latest",
+  "share": "disabled",
+  "autoupdate": "notify"
 }
 ```
+
+Key by key:
+
+| Key                               | Value                            | Why                                                                                                                                                                                                                                                                  |
+| --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `residency.allow`                 | `["eu"]`                         | The enforcement. Model requests may only go to providers that process data in the EU; anything else is refused before a connection is opened. Described in full below                                                                                                |
+| `residency.audit`                 | `true`                           | Records every outbound model call, and every refused one, to a local audit log. This is already the default once `residency` is set; it is written out so a reviewer doesn't have to know that                                                                       |
+| `enabled_providers`               | `["mistral"]`                    | Loads only this provider. Defence in depth: the residency policy would refuse the others anyway, but they don't appear in the model list at all, so nobody picks one and gets an error                                                                               |
+| `provider.mistral.options.apiKey` | `"{env:MISTRAL_API_KEY}"`        | Mistral AI (France) processes in the EU; see [Model provider jurisdictions](../provider-jurisdictions.md). The key is read from the environment, so the file itself holds no secret and can be committed. Scaleway, OVHcloud or Hetzner work the same way (§5 table) |
+| `model`                           | `"mistral/mistral-large-latest"` | The main agent's model, on the provider above                                                                                                                                                                                                                        |
+| `small_model`                     | `"mistral/mistral-small-latest"` | Used for titles and summaries. Set explicitly so it can't fall back to a model on another provider                                                                                                                                                                   |
+| `share`                           | `"disabled"`                     | Already the default. Set explicitly so a later config layer or a copy of this file can't turn sharing on without it showing in review. See [Session sharing](#session-sharing--off-by-default)                                                                       |
+| `autoupdate`                      | `"notify"`                       | Lunos tells you when a new release exists but never installs one without a person choosing it. A procurement reviewer should expect updates to be a decision, not a side effect. The check itself is a network call; set `false` to turn it off entirely             |
+
+To confirm the policy is active, run `lunos debug config` in that directory. The resolved config it prints includes `"residency": { "allow": ["eu"], "audit": true }`.
 
 With that in place:
 
@@ -164,10 +208,12 @@ Lunos requires no database, no message broker and no inbound network access. Ser
 
 ## 7. Known limitations — stated, not buried
 
+- **The residency policy is not enforced for sessions in v1.18.38 and earlier.** See the correction in §5. Until a fixed release ships, the policy is advisory.
 - **Binaries are not code-signed** on any platform. Tracked; blocked on code-signing credentials.
 - **No security certification is held.** Lunos holds no CRA, EUCS, ISO or SOC certification and claims none. On the project's current assessment it falls outside the scope of the EU Cyber Resilience Act entirely, because it is free, MIT-licensed, self-hosted and unmonetised. A CycloneDX **software bill of materials is published with each release** as manufacturer-readiness groundwork, not as a compliance claim.
 - **The agent is not sandboxed.** Lunos can execute shell commands and modify files. Its permission system is a UX safeguard that prompts before acting — it is _not_ a security boundary. For true isolation, run it in a container or VM. This is inherited from upstream and documented in [`SECURITY.md`](../../SECURITY.md).
 - **Model provider data handling is governed by your agreement with that provider,** not by Lunos. Residency controls determine _which_ provider may be used; they do not alter what that provider does with what it receives.
+- **Session sharing, if you turn it on, is not covered by the residency policy.** With `"share": "manual"` or `"auto"`, `/share` uploads the full transcript to `opncd.ai` (or your `enterprise.url`) whatever `residency.allow` says, and no audit-log entry is written. Sharing is off by default; leave it off under a residency policy. Putting share uploads under the policy is tracked as XCOD-80.
 - **Feature parity with upstream opencode is not claimed or measured.**
 - **A vulnerability disclosure process exists** ([`SECURITY.md`](../../SECURITY.md)) but there is no dedicated security contact address yet; reports go through GitHub Security Advisories, which is private to maintainers.
 

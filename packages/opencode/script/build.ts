@@ -203,6 +203,7 @@ for (const item of targets) {
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
+      LUNOS_UPSTREAM_VERSION: JSON.stringify(pkg.lunos?.upstreamVersion ?? ""),
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
       ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },

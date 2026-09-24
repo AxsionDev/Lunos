@@ -167,7 +167,7 @@ const TIPS: Tip[] = [
   (shortcuts) => press(shortcuts.agentCycle(), "to cycle between Build and Plan agents"),
   "Use {highlight}/undo{/highlight} to revert the last message and file changes",
   "Use {highlight}/redo{/highlight} to restore previously undone messages and file changes",
-  "Run {highlight}/share{/highlight} to create a public opencode.ai link",
+  'Sharing is off by default; set {highlight}"share": "manual"{/highlight} to enable {highlight}/share{/highlight}',
   "Drag and drop images or PDFs into the terminal as context",
   (shortcuts) => press(shortcuts.inputPaste(), "to paste images from your clipboard into the prompt"),
   (shortcuts) => `Use ${commandText("/editor", shortcuts.editorOpen())} to compose messages in your external editor`,
