@@ -25,6 +25,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Background subagents are a documented, opt-in setting:** `"subagent": { "background": true }`
+  (the old `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` still works). `/tasks` in the TUI lists every
+  background job with its agent, model, status and elapsed time; Enter opens it and `ctrl+d` cancels
+  it. `GET /experimental/background` and `POST /experimental/background/{id}/cancel` expose the
+  same list to the app and ACP. What happens on abort, delete, compaction and exit is written down
+  in `specs/background-subagents.md`.
 - **Choose which model each subagent uses.** `agent.<type>.model` now accepts `"inherit"` and
   `"small"` as well as `provider/model`. The new `subagent.model` sets a default for every
   subagent, and `subagent.dynamic` lets the main agent pick a model per task, from a list you allow.
