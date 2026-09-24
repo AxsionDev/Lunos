@@ -297,12 +297,16 @@ function Discover(props: { api: TuiPluginApi; kind?: TuiMarketplaceKind }) {
           title: "next tab",
           command: "dialog.plugins.discover.next_kind",
           hidden: loading() || installing(),
+          // A tab can be empty (the community marketplace ships no skills); without this the user
+          // would be stuck on it, unable to cycle on to the MCP tab.
+          withoutSelection: true,
           onTrigger: cycle,
         },
         {
           title: "back",
           command: "dialog.plugins.discover.back",
           hidden: loading() || installing(),
+          withoutSelection: true,
           onTrigger: () => show(props.api),
         },
       ]}
