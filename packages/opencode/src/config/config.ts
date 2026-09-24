@@ -479,6 +479,27 @@ const layer = Layer.effect(
           yield* mergePluginOrigins(dir, list)
         }
 
+        // Claude Code subagents (XCOD-83): `.claude/agents/*.md` in the project and in the home
+        // directory, the same places `.claude/skills` is read from. They only add names; an agent
+        // Lunos config already defines always wins over a Claude file with the same name.
+        if (!process.env.OPENCODE_DISABLE_CLAUDE_CODE) {
+          const claudeDirs = [
+            ...(!Flag.OPENCODE_DISABLE_PROJECT_CONFIG
+              ? yield* fs.up({ targets: [".claude"], start: ctx.directory, stop: ctx.worktree })
+              : []),
+            path.join(Global.Path.home, ".claude"),
+          ]
+          for (const dir of [...new Set(claudeDirs)].toReversed()) {
+            const agents = yield* Effect.promise(() =>
+              ConfigAgent.loadClaude(dir, (message) => Effect.runSync(Effect.logWarning(message))),
+            )
+            for (const [name, agent] of Object.entries(agents)) {
+              if (result.agent?.[name]) continue
+              result.agent = { ...result.agent, [name]: agent }
+            }
+          }
+        }
+
         if (process.env.OPENCODE_CONFIG_CONTENT) {
           const source = "OPENCODE_CONFIG_CONTENT"
           const next = yield* loadConfig(process.env.OPENCODE_CONFIG_CONTENT, {

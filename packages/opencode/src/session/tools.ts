@@ -1,4 +1,5 @@
 import { Agent } from "@/agent/agent"
+import { SkillScope } from "@/skill/scope"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
@@ -84,7 +85,14 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           ...req,
           sessionID: input.session.id,
           tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-          ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+          ruleset: Permission.merge(
+            input.agent.permission,
+            input.session.permission ?? [],
+            SkillScope.rules(
+              input.session.id,
+              input.messages.findLast((message) => message.info.role === "user")?.info.id,
+            ),
+          ),
         })
         .pipe(Effect.orDie),
   })
@@ -105,7 +113,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             const ctx = context(args, options)
             yield* plugin.trigger(
               "tool.execute.before",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
+              { tool: item.id, sessionID: ctx.sessionID, agent: ctx.agent, callID: ctx.callID },
               { args },
             )
             const result = yield* item.execute(args, ctx)
@@ -120,7 +128,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.after",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
+              { tool: item.id, sessionID: ctx.sessionID, agent: ctx.agent, callID: ctx.callID, args },
               output,
             )
             if (options.abortSignal?.aborted) {
@@ -174,7 +182,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               : resourceServers.map((server) => `mcp:${server}:*`)
             yield* plugin.trigger(
               "tool.execute.before",
-              { tool: MCP_RESOURCE_TOOLS.list, sessionID: ctx.sessionID, callID: opts.toolCallId },
+              { tool: MCP_RESOURCE_TOOLS.list, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId },
               { args },
             )
             yield* ctx.ask({
@@ -207,7 +215,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.after",
-              { tool: MCP_RESOURCE_TOOLS.list, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+              {
+                tool: MCP_RESOURCE_TOOLS.list,
+                sessionID: ctx.sessionID,
+                agent: ctx.agent,
+                callID: opts.toolCallId,
+                args,
+              },
               output,
             )
             if (opts.abortSignal?.aborted) {
@@ -257,7 +271,12 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               : resourceServers.map((server) => `mcp:${server}:*`)
             yield* plugin.trigger(
               "tool.execute.before",
-              { tool: MCP_RESOURCE_TOOLS.listTemplates, sessionID: ctx.sessionID, callID: opts.toolCallId },
+              {
+                tool: MCP_RESOURCE_TOOLS.listTemplates,
+                sessionID: ctx.sessionID,
+                agent: ctx.agent,
+                callID: opts.toolCallId,
+              },
               { args },
             )
             yield* ctx.ask({
@@ -290,7 +309,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.after",
-              { tool: MCP_RESOURCE_TOOLS.listTemplates, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+              {
+                tool: MCP_RESOURCE_TOOLS.listTemplates,
+                sessionID: ctx.sessionID,
+                agent: ctx.agent,
+                callID: opts.toolCallId,
+                args,
+              },
               output,
             )
             if (opts.abortSignal?.aborted) {
@@ -337,7 +362,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.before",
-              { tool: MCP_RESOURCE_TOOLS.read, sessionID: ctx.sessionID, callID: opts.toolCallId },
+              { tool: MCP_RESOURCE_TOOLS.read, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId },
               { args },
             )
             yield* ctx.ask({
@@ -372,7 +397,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.after",
-              { tool: MCP_RESOURCE_TOOLS.read, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+              {
+                tool: MCP_RESOURCE_TOOLS.read,
+                sessionID: ctx.sessionID,
+                agent: ctx.agent,
+                callID: opts.toolCallId,
+                args,
+              },
               output,
             )
             if (opts.abortSignal?.aborted) {
@@ -401,7 +432,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           const ctx = context(args, opts)
           yield* plugin.trigger(
             "tool.execute.before",
-            { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
+            { tool: key, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId },
             { args },
           )
           const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.gen(function* () {
@@ -419,7 +450,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           )
           yield* plugin.trigger(
             "tool.execute.after",
-            { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+            { tool: key, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId, args },
             result,
           )
 

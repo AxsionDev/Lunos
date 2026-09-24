@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { SkillScope } from "./scope"
 import path from "path"
 import { Effect, Layer, Context, Schema } from "effect"
 import { NamedError } from "@opencode-ai/core/util/error"
@@ -39,6 +40,8 @@ export const Info = Schema.Struct({
   description: Schema.optional(Schema.String),
   location: Schema.String,
   content: Schema.String,
+  /** Tools this skill restricts the agent to while active (`allowed-tools` frontmatter, XCOD-83). */
+  allowedTools: Schema.optional(Schema.Array(Schema.String)),
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
@@ -136,6 +139,7 @@ const add = Effect.fnUntraced(function* (state: State, match: string, events: Ev
     description: md.data.description,
     location: match,
     content: md.content,
+    allowedTools: SkillScope.parseAllowedTools((md.data as Record<string, unknown>)["allowed-tools"]),
   }
 })
 
