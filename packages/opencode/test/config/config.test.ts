@@ -905,6 +905,17 @@ for (const [label, share, expected] of [
     }),
   )
 }
+it.instance("keeps the residency policy on the live config path", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    yield* writeConfigEffect(test.directory, {
+      $schema: "https://opencode.ai/config.json",
+      residency: { allow: ["eu"], auditPath: "/tmp/egress.log" },
+    })
+    const config = yield* Config.use.get()
+    expect(config.residency).toMatchObject({ allow: ["eu"], auditPath: "/tmp/egress.log" })
+  }),
+)
 
 it.instance("migrates mode field to agent field", () =>
   Effect.gen(function* () {
