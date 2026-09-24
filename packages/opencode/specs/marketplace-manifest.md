@@ -217,6 +217,46 @@ things:
   `https://x/?k={file:~/.ssh/id_rsa}`). Any `name`, `url`, `command`, `cwd` or `matcher` containing
   `{env:` or `{file:` is refused (`packages/opencode/src/marketplace/guard.ts`).
 
+## Install command contract
+
+**This is the source of truth for the "copy install command" on lunos.tech (XCOD-88, XCOD-89).** The website builds each command from manifest data alone, using one form for all four kinds:
+
+```sh
+lunos marketplace install <marketplace>/<name> --kind <kind>
+```
+
+- `<marketplace>` is the manifest's top-level `name`, and `<name>` is the entry's `name`. The prefix disambiguates when two marketplaces use the same entry name.
+- `<kind>` is `plugin`, `skill`, `hook` or `mcp`. It's required in published commands because one name can appear under more than one kind.
+- **Never include `--yes`.** The command always shows a preview (what the entry runs, connects to or fetches, and which file it writes) and asks before installing. A command pasted from a web page must not skip that.
+
+One example per kind, against the built-in `lunos-community` marketplace:
+
+```sh
+lunos marketplace install lunos-community/opencode-helicone-session --kind plugin
+lunos marketplace install lunos-community/fetch --kind mcp
+lunos marketplace install lunos-community/<skill-name> --kind skill
+lunos marketplace install lunos-community/<hook-name> --kind hook
+```
+
+**Built-in marketplace.** `lunos-community` (`https://lunos.tech/marketplace.json`) is available without `marketplace add`, so these commands work on a fresh install. It's fetched only when a marketplace command or the Discover view runs, never at startup, and it's cached like any other source. Turn it off with `"marketplace_default": false` in any config file. `lunos marketplace list` shows it as `[builtin]`.
+
+**Third-party marketplaces** publish the same form plus `--from`:
+
+```sh
+lunos marketplace install acme-tools/linter --kind hook --from https://acme.example/marketplace.json
+```
+
+`--from` accepts anything `marketplace add` accepts (manifest URL, `owner/repo`, local path). It adds the source if it isn't already added, then installs.
+
+**Scope.** `marketplace install` writes to the **global** config by default, so a pasted command behaves the same whichever directory you run it in. Pass `--local` to write to the current project's config instead. With `--from`, the source is added to the same scope. The older `lunos plugin <module>` command keeps its own default (the local project) and its `--global` flag. It isn't the published form.
+
+**Outcomes:**
+
+- Installed: exit 0.
+- **Already installed** exactly as described: reported as such, exit 0.
+- Name not found: a plain message naming the marketplaces that were searched, exit 1, no crash banner.
+- Refusals (ambiguous name, an existing entry under the same name with different settings, unsafe values): a plain message, exit 1.
+
 ## Validation errors
 
 `Marketplace.decode` (`Schema.decodeUnknownSync(Marketplace.Manifest)`) throws a descriptive

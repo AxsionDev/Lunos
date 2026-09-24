@@ -5,7 +5,14 @@ import type { Marketplace } from "@opencode-ai/core/marketplace"
 import { ConfigHooks } from "@opencode-ai/core/config/hooks"
 import { Filesystem } from "@/util/filesystem"
 import { mcpConfigFromEntry } from "../mcp/discover"
-import { MarketplaceRefusal, envReferences, headerEnvName, rejectSubstitution, requireHttpUrl } from "./guard"
+import {
+  MarketplaceRefusal,
+  envReferences,
+  headerEnvName,
+  rejectSubstitution,
+  requireHttpUrl,
+  MarketplaceAlreadyInstalled,
+} from "./guard"
 import type { ContentItem } from "./content"
 import { defaultFetchDeps, type FetchDeps } from "./shared"
 
@@ -88,6 +95,8 @@ async function planMcp(item: Extract<ConfigItem, { kind: "mcp" }>, configPath: s
   const { parsed } = await readConfig(configPath)
   if (parsed.mcp && item.name in parsed.mcp) {
     const existing = parsed.mcp[item.name]
+    if (isDeepStrictEqual(existing, config))
+      throw new MarketplaceAlreadyInstalled(`MCP server "${item.name}" is already installed in ${configPath}.`)
     const hint = existing?.type === "remote" ? existing.url : existing?.command?.join?.(" ")
     throw new MarketplaceRefusal(
       `MCP server "${item.name}" already exists in ${configPath}${hint ? ` (${hint})` : ""}. Remove or rename it there first.`,
@@ -144,7 +153,7 @@ async function planSkill(
     Array.isArray(urls) &&
     urls.some((existing) => typeof existing === "string" && sameUrl(existing, item.entry.url))
   ) {
-    throw new MarketplaceRefusal(`Skill source "${item.entry.url}" is already in ${configPath} (skills.urls).`)
+    throw new MarketplaceAlreadyInstalled(`Skill source "${item.entry.url}" is already installed in ${configPath}.`)
   }
   const preview = await previewSkills(item.entry.url, dep)
   const details = [`skill source: ${item.entry.url}`]
@@ -210,7 +219,7 @@ async function planHook(item: Extract<ConfigItem, { kind: "hook" }>, configPath:
       (hook) => isDeepStrictEqual(hook?.command, config.command) && isDeepStrictEqual(hook?.matcher, config.matcher),
     )
   ) {
-    throw new MarketplaceRefusal(`An identical ${item.entry.event} hook is already in ${configPath}.`)
+    throw new MarketplaceAlreadyInstalled(`This ${item.entry.event} hook is already installed in ${configPath}.`)
   }
   const on = [
     config.matcher?.tool && `tool ${config.matcher.tool}`,

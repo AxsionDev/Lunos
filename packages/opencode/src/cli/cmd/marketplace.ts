@@ -148,7 +148,7 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
 }
 
 export type MarketplaceListEntry = {
-  scope: "local" | "global"
+  scope: "local" | "global" | "builtin"
   source: string
   name?: string
   contents?: string

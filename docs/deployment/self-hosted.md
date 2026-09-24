@@ -50,6 +50,8 @@ The tool also fetches its model catalogue (a list of available models and their 
 
 **The update check** reads the `lunos-ai` package entry from your npm registry: `https://registry.npmjs.org/lunos-ai/latest` by default, or whatever registry your npm configuration points at, so a corporate or EU mirror is honoured. It sends no project data, and runs at most once a day; the result is cached in Lunos's state directory. Lunos only _announces_ new releases. It never installs one unless a person chooses to, or you set `"autoupdate": true`. To turn the check off entirely, set `"autoupdate": false` or the environment variable `LUNOS_DISABLE_AUTOUPDATE=1`.
 
+**The marketplace** (`lunos marketplace …` commands and the TUI's Discover view) fetches `https://lunos.tech/marketplace.json`, the built-in `lunos-community` catalogue: names, descriptions and install sources of community plugins and MCP servers. It sends no project data, runs only when you use those commands, never at startup, and is cached for a day. Installing an entry then fetches that entry's package (for example from npm). Turn off the built-in catalogue with `"marketplace_default": false`. Marketplaces you add yourself are fetched the same way.
+
 #### Session sharing — off by default
 
 `/share` publishes a session at a public link. **Lunos turns this off unless you enable it**, because a shared session contains the whole transcript: your prompts, the contents of every file the agent read, and tool output. That is more sensitive than any single model request.

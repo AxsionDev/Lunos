@@ -16,6 +16,13 @@ export type SourceKind = "github" | "url" | "path"
 // passes it to plugin/install.ts's generic patchPluginConfig as `field`).
 export const FIELD = "marketplace"
 
+// XCOD-88: `lunos-community` ships as a built-in marketplace, so an install command copied from
+// lunos.tech works on a fresh install. It's only fetched when a marketplace command or the Discover
+// view runs (this module's callers), never at startup. `"marketplace_default": false` in any
+// config layer turns it off.
+export const DEFAULT_MARKETPLACE = "https://lunos.tech/marketplace.json"
+export const DEFAULT_FIELD = "marketplace_default"
+
 const MANIFEST_FILE = "marketplace.json"
 const GITHUB_SHORTHAND = /^[\w.-]+\/[\w.-]+$/
 
@@ -189,6 +196,8 @@ export type MarketplaceListDeps = {
   resolve: FetchDeps
   global: string
   cache: MarketplaceCacheDeps
+  /** Built-in marketplace added unless config disables it. Unset in tests that build their own deps. */
+  builtin?: string
 }
 
 export const defaultMarketplaceListDeps: MarketplaceListDeps = {
@@ -198,27 +207,30 @@ export const defaultMarketplaceListDeps: MarketplaceListDeps = {
   resolve: defaultFetchDeps,
   global: Global.Path.config,
   cache: defaultMarketplaceCacheDeps,
+  builtin: DEFAULT_MARKETPLACE,
 }
 
-async function readSources(dir: string, dep: MarketplaceListDeps) {
+async function readSources(dir: string, dep: MarketplaceListDeps): Promise<{ sources: string[]; disabled: boolean }> {
   const files = dep.files(dir, "opencode")
   for (const file of files) {
     if (!(await dep.exists(file))) continue
     const text = await dep.readText(file)
     const data = parseJsonc(text, [], { allowTrailingComma: true })
-    if (!data || typeof data !== "object" || Array.isArray(data)) return []
-    const list = (data as Record<string, unknown>)[FIELD]
-    if (!Array.isArray(list)) return []
-    return list.filter((item): item is string => typeof item === "string")
+    if (!data || typeof data !== "object" || Array.isArray(data)) return { sources: [], disabled: false }
+    const record = data as Record<string, unknown>
+    const list = record[FIELD]
+    const disabled = record[DEFAULT_FIELD] === false
+    if (!Array.isArray(list)) return { sources: [], disabled }
+    return { sources: list.filter((item): item is string => typeof item === "string"), disabled }
   }
-  return []
+  return { sources: [], disabled: false }
 }
 
 type ResolvedSource =
   | { source: string; ok: true; manifest: Marketplace.Manifest; fetchedAt: number; stale?: string }
   | { source: string; ok: false; error: string }
 
-export type ResolvedMarketplace = ResolvedSource & { scope: "local" | "global" }
+export type ResolvedMarketplace = ResolvedSource & { scope: "local" | "global" | "builtin" }
 
 // Fetches live and refreshes the cache; on failure, falls back to whatever is cached (even if
 // stale) so a source that's gone unreachable degrades to last-known-good instead of failing the
@@ -281,11 +293,18 @@ export async function resolveAddedMarketplaces(
   ]
 
   const entries: ResolvedMarketplace[] = []
+  const seen = new Set<string>()
+  let disabled = false
   for (const { scope, dir } of scopes) {
-    const sources = await readSources(dir, dep)
-    for (const source of sources) {
+    const read = await readSources(dir, dep)
+    disabled ||= read.disabled
+    for (const source of read.sources) {
+      seen.add(normalizeSource(source))
       entries.push({ ...(await resolveWithCache(source, dep, false)), scope })
     }
+  }
+  if (dep.builtin && !disabled && !seen.has(dep.builtin)) {
+    entries.push({ ...(await resolveWithCache(dep.builtin, dep, false)), scope: "builtin" })
   }
   return entries
 }

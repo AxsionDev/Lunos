@@ -10,6 +10,7 @@ import {
   type MarketplaceDeps,
 } from "../../src/cli/cmd/marketplace"
 import type { FetchDeps, MarketplaceCacheDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
+import { DEFAULT_MARKETPLACE } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 
 const validManifest = {
@@ -552,5 +553,55 @@ describe("marketplace.update.task", () => {
     // live-check) list right after continues to serve the same last-known-good manifest.
     const entries = await listMarketplaces(ctx(tmp.path), failingListDep)
     expect(entries[0]?.name).toBe("lunos-community")
+  })
+})
+
+describe("marketplace.builtin (XCOD-88)", () => {
+  const builtinFetch = (calls: string[]): FetchDeps => ({
+    fetchText: async (url) => {
+      calls.push(url)
+      return JSON.stringify(validManifest)
+    },
+    readText: async () => "",
+    stat: async () => undefined,
+  })
+
+  test("a fresh install with no config lists lunos-community as a built-in marketplace", async () => {
+    await using tmp = await tmpdir()
+    const calls: string[] = []
+    const entries = await listMarketplaces(ctx(tmp.path), {
+      ...listDeps(path.join(tmp.path, "global"), builtinFetch(calls)),
+      builtin: DEFAULT_MARKETPLACE,
+    })
+    expect(entries).toEqual([
+      expect.objectContaining({ scope: "builtin", source: DEFAULT_MARKETPLACE, name: "lunos-community" }),
+    ])
+    expect(calls).toEqual([DEFAULT_MARKETPLACE])
+  })
+
+  test('"marketplace_default": false in any config layer turns it off without fetching', async () => {
+    await using tmp = await tmpdir()
+    const globalDir = path.join(tmp.path, "global")
+    await fs.mkdir(globalDir, { recursive: true })
+    await Bun.write(path.join(globalDir, "opencode.json"), JSON.stringify({ marketplace_default: false }))
+    const calls: string[] = []
+    const entries = await listMarketplaces(ctx(tmp.path), {
+      ...listDeps(globalDir, builtinFetch(calls)),
+      builtin: DEFAULT_MARKETPLACE,
+    })
+    expect(entries).toEqual([])
+    expect(calls).toEqual([])
+  })
+
+  test("isn't listed twice when the user has already added the same source", async () => {
+    await using tmp = await tmpdir()
+    const globalDir = path.join(tmp.path, "global")
+    await fs.mkdir(globalDir, { recursive: true })
+    await Bun.write(path.join(globalDir, "opencode.json"), JSON.stringify({ marketplace: [DEFAULT_MARKETPLACE] }))
+    const entries = await listMarketplaces(ctx(tmp.path), {
+      ...listDeps(globalDir, builtinFetch([])),
+      builtin: DEFAULT_MARKETPLACE,
+    })
+    expect(entries.map((entry) => entry.scope)).toEqual(["global"])
   })
 })

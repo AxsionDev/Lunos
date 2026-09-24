@@ -16,6 +16,12 @@ export class MarketplaceRefusal extends Error {
   override name = "MarketplaceRefusal"
 }
 
+// The entry is already installed exactly as the marketplace describes it (XCOD-88). Not a failure:
+// re-running a command copied from lunos.tech should say so and exit 0.
+export class MarketplaceAlreadyInstalled extends MarketplaceRefusal {
+  override name = "MarketplaceAlreadyInstalled"
+}
+
 const SUBSTITUTION = /\{(env|file):/
 
 // Environment variable names as a shell can actually export them. Header names additionally

@@ -25,6 +25,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Marketplace install commands copied from lunos.tech work on a fresh install.** `lunos-community`
+  is now a built-in marketplace (fetched only when you use marketplace commands; turn it off with
+  `"marketplace_default": false`). `lunos marketplace install <marketplace>/<name> --kind <kind>` is
+  the one documented form for every kind, and it gains `--from <source>`, which adds a
+  marketplace on the fly, and `--local`. Plugin installs now show the same preview and confirmation
+  as other kinds. Re-installing something already installed reports it and exits 0. An unknown
+  name says which marketplaces were searched.
 - **v2 plugins can hook tool calls:** `ctx.tool["execute.before"]` and `ctx.tool["execute.after"]`,
   in both the Effect and Promise plugin APIs. A failing `before` hook aborts the call, so a plugin can
   act as a guard. They run in real sessions, after v1 plugin and config hooks, and the first tool
