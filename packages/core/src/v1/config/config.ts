@@ -17,6 +17,7 @@ import { ConfigProviderV1 } from "./provider"
 import { ConfigServerV1 } from "./server"
 import { ConfigSkillsV1 } from "./skills"
 import { ConfigHooks } from "../../config/hooks"
+import { ConfigResidency } from "../../config/residency"
 
 export type Layout = ConfigLayoutV1.Layout
 
@@ -45,6 +46,12 @@ export const Info = Schema.Struct({
   skills: Schema.optional(ConfigSkillsV1.Info).annotate({ description: "Additional skill folder paths" }),
   hooks: Schema.optional(ConfigHooks.Info).annotate({
     description: "Shell commands to run on tool, command, and session lifecycle events, without writing a plugin",
+  }),
+  // Declared here as well as in the v2 schema: without it, the live config path strips the key
+  // and the v1 provider (which enforces it for sessions) never sees a policy.
+  residency: Schema.optional(ConfigResidency.Info).annotate({
+    description:
+      "Data-residency policy restricting which provider jurisdictions this deployment may use, with an audit log of outbound model calls",
   }),
   references: Schema.optional(ConfigReference.Info).annotate({
     description: "Named git or local directory references",

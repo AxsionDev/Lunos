@@ -1916,6 +1916,7 @@ export type Config = {
     "session.deleted"?: Array<ConfigV2HooksEntry>
     "session.error"?: Array<ConfigV2HooksEntry>
   }
+  residency?: ConfigV2Residency
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal
   }
@@ -3863,6 +3864,15 @@ export type ConfigV2HooksEntry = {
    */
   timeout?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
   disabled?: boolean
+}
+
+export type ConfigV2Residency = {
+  /**
+   * Regions this deployment may send model requests to, e.g. ["eu"]. Providers outside this list are blocked before any request is made. Providers with no recorded jurisdiction are always denied. "configurable" providers (Azure, Bedrock, Vertex) are denied unless explicitly listed, because their region cannot be verified from here.
+   */
+  allow: Array<"eu" | "us" | "other" | "configurable" | "unknown">
+  audit?: boolean
+  auditPath?: string
 }
 
 export type ConfigV2ReferenceGit = {
