@@ -41,8 +41,29 @@ Only these fields are recognized:
 - `license` (optional)
 - `compatibility` (optional)
 - `metadata` (optional, string-to-string map)
+- `allowed-tools` (optional): see [Restrict tools](#restrict-tools)
 
 Unknown frontmatter fields are ignored.
+
+---
+
+## Restrict tools
+
+A skill can limit which tools the agent may use while it is active:
+
+```markdown
+---
+name: research-mode
+description: Investigate and report without changing code
+allowed-tools: Read, Grep, Glob
+---
+```
+
+- **Format:** Claude Code's comma-separated form and a YAML list both work, and names are case-insensitive.
+- **Active until the end of the turn:** a skill is active from the moment the `skill` tool loads it until the end of that turn. The next message you send starts with no active skills.
+- **Enforced through the permission system:** tools that aren't listed are removed from the agent's tool list, and a call to one is denied. `skill` itself stays available.
+- **Several skills:** when more than one restricting skill is active, a tool must be allowed by all of them. A skill without `allowed-tools` restricts nothing.
+- **Hooks:** hook scripts see the active skills in `LUNOS_SKILL`.
 
 ---
 

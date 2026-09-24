@@ -1,4 +1,5 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import { SkillScope } from "@/skill/scope"
 import { ConfigHooks } from "@opencode-ai/core/config/hooks"
 
 /**
@@ -46,10 +47,16 @@ export function matches(entry: Entry, input: { tool?: string; file?: string }) {
   return true
 }
 
+function skills(sessionID: string | undefined) {
+  if (!sessionID) return undefined
+  const names = SkillScope.active(sessionID).map((skill) => skill.name)
+  return names.length ? names.join(",") : undefined
+}
+
 export async function runEntry(
   entry: Entry,
   event: Event,
-  context: { tool?: string; file?: string; sessionID?: string },
+  context: { tool?: string; file?: string; sessionID?: string; agent?: string },
 ) {
   const [command, ...args] = entry.command
   if (!command) return
@@ -62,6 +69,9 @@ export async function runEntry(
       ...(context.tool ? { LUNOS_TOOL: context.tool } : {}),
       ...(context.file ? { LUNOS_FILE: context.file } : {}),
       ...(context.sessionID ? { LUNOS_SESSION_ID: context.sessionID } : {}),
+      ...(context.agent ? { LUNOS_AGENT: context.agent } : {}),
+      // Skills loaded this turn, comma-separated in load order (XCOD-83). Unset when none are active.
+      ...(skills(context.sessionID) ? { LUNOS_SKILL: skills(context.sessionID) } : {}),
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -84,7 +94,10 @@ export async function runEntry(
 export async function ConfigHooksPlugin(_input: PluginInput): Promise<Hooks> {
   let configured: Partial<Record<Event, readonly Entry[]>> = {}
 
-  const dispatch = async (event: Event, context: { tool?: string; file?: string; sessionID?: string }) => {
+  const dispatch = async (
+    event: Event,
+    context: { tool?: string; file?: string; sessionID?: string; agent?: string },
+  ) => {
     const entries = configured[event]
     if (!entries?.length) return
     for (const entry of entries) {
@@ -102,6 +115,7 @@ export async function ConfigHooksPlugin(_input: PluginInput): Promise<Hooks> {
         tool: input.tool,
         file: filePathFrom((output as { args?: unknown }).args),
         sessionID: input.sessionID,
+        agent: (input as { agent?: string }).agent,
       })
     },
     "tool.execute.after": async (input) => {
@@ -109,6 +123,7 @@ export async function ConfigHooksPlugin(_input: PluginInput): Promise<Hooks> {
         tool: input.tool,
         file: filePathFrom((input as { args?: unknown }).args),
         sessionID: input.sessionID,
+        agent: (input as { agent?: string }).agent,
       })
     },
     "command.execute.before": async (input) => {

@@ -1,5 +1,7 @@
 # Porting a real instruction set onto Lunos
 
+> **Update 2026-09-24 (XCOD-83):** the lock-file workaround described below is gone. `research-mode` now declares `allowed-tools` in its frontmatter; `.opencode/hooks/research-mode-guard.sh` and its `hooks` entry are deleted. Hooks also receive `LUNOS_AGENT` and `LUNOS_SKILL`. The translation gaps 1 and 2 in this report are closed. See `subagent-parity-audit.md`.
+
 Write-up for XCOD-71, the exit criterion of XCOD-66 (Phase 2 — Core parity): prove that
 Skills + Hooks support a real internal workflow, not a synthetic demo.
 

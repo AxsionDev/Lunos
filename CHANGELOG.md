@@ -25,6 +25,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Skills can restrict the agent's tools** with `allowed-tools` in `SKILL.md`, in Claude Code's
+  format. The restriction applies from when the skill loads to the end of the turn, through the
+  permission system. Hook scripts now receive `LUNOS_AGENT` and `LUNOS_SKILL`. `research-mode`
+  uses this instead of its lock file and guard hook.
+- **Claude Code subagents work:** `.claude/agents/*.md` is discovered (project and home), and
+  `tools: Read, Grep, Glob` allow-lists and model aliases like `sonnet` are translated. Before
+  this, one such file made the whole config invalid.
 - **Marketplace install commands copied from lunos.tech work on a fresh install.** `lunos-community`
   is now a built-in marketplace (fetched only when you use marketplace commands; turn it off with
   `"marketplace_default": false`). `lunos marketplace install <marketplace>/<name> --kind <kind>` is

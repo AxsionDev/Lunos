@@ -54,12 +54,14 @@ Both must match for the hook to fire. A matcher that needs information the event
 
 Every hook command receives:
 
-| Variable           | Description                                    |
-| ------------------ | ---------------------------------------------- |
-| `LUNOS_HOOK_EVENT` | The event that fired the hook.                 |
-| `LUNOS_TOOL`       | The tool name, when the event has one.         |
-| `LUNOS_FILE`       | The file the tool acted on, when there is one. |
-| `LUNOS_SESSION_ID` | The session, when the event has one.           |
+| Variable           | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| `LUNOS_HOOK_EVENT` | The event that fired the hook.                             |
+| `LUNOS_TOOL`       | The tool name, when the event has one.                     |
+| `LUNOS_FILE`       | The file the tool acted on, when there is one.             |
+| `LUNOS_SESSION_ID` | The session, when the event has one.                       |
+| `LUNOS_AGENT`      | The agent running the tool, on tool events.                |
+| `LUNOS_SKILL`      | Skills loaded this turn, comma-separated. Unset when none. |
 
 ---
 

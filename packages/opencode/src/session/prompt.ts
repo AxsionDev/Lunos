@@ -306,7 +306,7 @@ const layer = Layer.effect(
       }
       yield* plugin.trigger(
         "tool.execute.before",
-        { tool: TaskTool.id, sessionID, callID: part.id },
+        { tool: TaskTool.id, sessionID, agent: lastUser.agent, callID: part.id },
         { args: taskArgs },
       )
 
@@ -388,7 +388,7 @@ const layer = Layer.effect(
 
       yield* plugin.trigger(
         "tool.execute.after",
-        { tool: TaskTool.id, sessionID, callID: part.id, args: taskArgs },
+        { tool: TaskTool.id, sessionID, agent: lastUser.agent, callID: part.id, args: taskArgs },
         result,
       )
 

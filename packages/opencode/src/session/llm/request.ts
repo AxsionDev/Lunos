@@ -1,4 +1,5 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { SkillScope } from "@/skill/scope"
 import type { Auth } from "@/auth"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import type { RuntimeFlags } from "@/effect/runtime-flags"
@@ -208,7 +209,11 @@ export const prepare = Effect.fn("LLMRequestPrep.prepare")(function* (input: Pre
 function resolveTools(input: Pick<PrepareInput, "tools" | "agent" | "permission" | "user">) {
   const disabled = Permission.disabled(
     Object.keys(input.tools),
-    Permission.merge(input.agent.permission, input.permission ?? []),
+    Permission.merge(
+      input.agent.permission,
+      input.permission ?? [],
+      SkillScope.rules(input.user.sessionID, input.user.id),
+    ),
   )
   return Record.filter(input.tools, (_, k) => input.user.tools?.[k] !== false && !disabled.has(k))
 }

@@ -1,6 +1,7 @@
 ---
 name: research-mode
 description: Use when investigating a bug or tracing behaviour rather than implementing — the request says "Mode: RESEARCH ONLY", "DO NOT propose fixes", or asks you to investigate and report. Gather evidence and form hypotheses; do not modify code.
+allowed-tools: read, grep, glob, list, bash, webfetch, websearch, todowrite
 ---
 
 # Research Mode
@@ -18,23 +19,13 @@ investigate and report rather than fix.
 
 ## Enforcing read-only
 
-Lunos has no per-skill tool restriction, so this skill cannot declare "read-only" and have
-the runtime honour it. Instead, take the lock and let the configured hook enforce it:
+This skill declares `allowed-tools` in its frontmatter. Once it's loaded, and until the end of
+the turn, Lunos offers the agent only those tools. The edit tools (`edit`, `write`,
+`apply_patch`) are not among them, so a slip into fix-mode has no tool to act with.
 
-```bash
-touch .opencode/research-mode.lock
-```
-
-While that file exists, the `research-mode-guard` hook vetoes `apply_patch` and any
-mutating `bash` command, so a slip into fix-mode fails loudly instead of silently editing
-the tree. Release it when the investigation is done:
-
-```bash
-rm -f .opencode/research-mode.lock
-```
-
-Take the lock **before** you start investigating. A guard you enable after the edit has
-already happened is decoration.
+`bash` stays available because it's the main investigation tool (`git log`, `rg`, `ls`).
+Don't use it to change files: that is still this skill's rule, even though the tool list can't
+express it.
 
 ## Workflow
 
