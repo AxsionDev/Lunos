@@ -193,6 +193,8 @@ The shared low-level machinery owns registration order, scope cleanup, disposal,
 
 ## Event API
 
+> **Not implemented, and the draft was deleted (XCOD-76, 2026-09-24).** An unreachable `effect/event.ts` shim sat unused: it wasn't exported, wasn't in `PluginContext`, and wasn't constructed by `plugin/host.ts`. It was removed rather than wired up, because no plugin needed it. If a real plugin needs to react to catalog, config or session changes, reintroduce this together with that consumer. The design below is kept as a sketch only. Core's own `EventV2` is a separate thing and is unaffected.
+
 The Effect API exposes the existing event system as typed streams using generated SDK event discriminants.
 
 ```ts
@@ -491,6 +493,8 @@ The Effect implementation remains the canonical runtime. Promise and embedding w
 - Make add/remove/replacement rely on scoped registration and domain rebuilds.
 
 ### 8. Add Event Adapter
+
+> **Not done; deferred until a consumer exists (XCOD-76).**
 
 - Build the SDK event discriminant map.
 - Resolve public type strings to internal EventV2 definitions.
