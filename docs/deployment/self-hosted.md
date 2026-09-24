@@ -18,14 +18,14 @@ It is a fork of the open-source project [opencode](https://github.com/anomalyco/
 
 This is the claim table maintained in the project's own sovereignty decision record. It is reproduced here without softening.
 
-| Claim                                                          | True today?            | Basis                                                                                                                                                              |
-| -------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The vendor is EU-incorporated                                  | **Yes**                | ITService EOOD, Bulgaria, UIC 201069485                                                                                                                            |
-| The vendor is outside non-EU compulsory-disclosure reach       | **Yes**                | Bulgarian legal person; not a US-parented subsidiary                                                                                                               |
-| Lunos can be run entirely on infrastructure the buyer controls | **Yes**                | Self-hosted is the shipping distribution model                                                                                                                     |
-| Lunos is provider-agnostic for model routing                   | **Yes**                | Inherited from opencode                                                                                                                                            |
-| _Lunos-operated_ infrastructure is EU-sovereign                | **N/A**                | There is no Lunos-operated production infrastructure for customers                                                                                                 |
-| EU-specific functionality exists in the build                  | **Yes, as of Phase 1** | Provider jurisdiction metadata and enforceable data-residency controls — see §5. Previously "No"; this row changed when those shipped and is the only row that has |
+| Claim                                                          | True today? | Basis                                                                                                                                                                                                                                           |
+| -------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The vendor is EU-incorporated                                  | **Yes**     | ITService EOOD, Bulgaria, UIC 201069485                                                                                                                                                                                                         |
+| The vendor is outside non-EU compulsory-disclosure reach       | **Yes**     | Bulgarian legal person; not a US-parented subsidiary                                                                                                                                                                                            |
+| Lunos can be run entirely on infrastructure the buyer controls | **Yes**     | Self-hosted is the shipping distribution model                                                                                                                                                                                                  |
+| Lunos is provider-agnostic for model routing                   | **Yes**     | Inherited from opencode                                                                                                                                                                                                                         |
+| _Lunos-operated_ infrastructure is EU-sovereign                | **N/A**     | There is no Lunos-operated production infrastructure for customers                                                                                                                                                                              |
+| EU-specific functionality exists in the build                  | **Partly**  | Provider jurisdiction metadata ships. Data-residency controls are documented in §5, but in v1.18.38 and earlier they are **not enforced for sessions** (see the correction in §5, XCOD-93). This row said "Yes, as of Phase 1" until 2026-09-24 |
 
 ### Wording rules
 
@@ -132,6 +132,9 @@ For reviewers who require building from audited source. See [`CONTRIBUTING.md`](
 
 This is the control that makes "EU alternative" enforceable rather than advisory.
 
+> [!WARNING]
+> **Correction (2026-09-24): in Lunos v1.18.38 and earlier, the residency policy is not enforced for sessions.** With `"residency": {"allow": ["eu"]}` set, `lunos run` and the TUI still send model requests to non-EU providers, and no audit log is written. The policy was only wired into a code path that sessions don't use. Until a release containing the fix ships, **do not rely on this policy as a control**: restrict providers with `enabled_providers` and by holding only EU providers' API keys. Tracked as XCOD-93.
+
 The repository ships a reference configuration for exactly this deployment: [`examples/reference-deployment/opencode.json`](../../examples/reference-deployment/opencode.json). Copy it to `opencode.json` in your project directory, or to your global config directory to apply it to every project. A test decodes that file through the same config path `lunos` uses at startup, so it can't drift into describing keys the runtime ignores.
 
 ```json
@@ -205,6 +208,7 @@ Lunos requires no database, no message broker and no inbound network access. Ser
 
 ## 7. Known limitations — stated, not buried
 
+- **The residency policy is not enforced for sessions in v1.18.38 and earlier.** See the correction in §5. Until a fixed release ships, the policy is advisory.
 - **Binaries are not code-signed** on any platform. Tracked; blocked on code-signing credentials.
 - **No security certification is held.** Lunos holds no CRA, EUCS, ISO or SOC certification and claims none. On the project's current assessment it falls outside the scope of the EU Cyber Resilience Act entirely, because it is free, MIT-licensed, self-hosted and unmonetised. A CycloneDX **software bill of materials is published with each release** as manufacturer-readiness groundwork, not as a compliance claim.
 - **The agent is not sandboxed.** Lunos can execute shell commands and modify files. Its permission system is a UX safeguard that prompts before acting — it is _not_ a security boundary. For true isolation, run it in a container or VM. This is inherited from upstream and documented in [`SECURITY.md`](../../SECURITY.md).
