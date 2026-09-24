@@ -44,6 +44,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **The npm packages now say what they are.** `lunos-ai` and the 12 `lunos-<os>-<arch>` platform
+  packages are published with a description, homepage (`lunos.tech`), repository and issue
+  tracker (`AxsionDev/Lunos`), author (ITService EOOD) and keywords, and `lunos-ai` ships a README.
+  Releases built in GitHub Actions are published with npm provenance, so the npm page links each
+  version to the workflow run that built it.
 - **Updates now track Lunos, not upstream opencode, and are never installed silently (behaviour
   change from upstream).** The update check reads the `lunos-ai` npm package, at most once a day.
   `lunos upgrade`, the TUI's reminder and the new `/upgrade` command install `lunos-ai` through
