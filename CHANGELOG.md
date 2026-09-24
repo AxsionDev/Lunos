@@ -44,6 +44,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **One version label everywhere: `Lunos v1.18.38`** (dev builds show `Lunos dev (local build)`)
+  on the home footer, session sidebar, crash screen and `/status`. Builds now record the upstream
+  opencode release they are based on, shown as `· based on opencode 1.18.31` in `/status`, the
+  debug dialog and `lunos debug info`, which also prints the channel and install method for bug
+  reports. The crash screen's "open an issue" link now goes to `AxsionDev/Lunos` instead of
+  upstream, and `lunos --help` says `lunos`. `lunos --version` still prints the bare number.
 - **Session sharing is now off by default (behaviour change from upstream opencode).** When no
   config layer sets `share`, Lunos treats it as `"disabled"`: `/share`, `lunos run --share` and the
   share API route refuse with a message saying how to turn it on, and nothing is uploaded. A shared
