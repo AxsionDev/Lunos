@@ -10,7 +10,9 @@ describe("crash screen issue link", () => {
   })
 
   test("fills the Lunos version field the issue template declares", async () => {
-    const template = await Bun.file(new URL("../../../../.github/ISSUE_TEMPLATE/bug-report.yml", import.meta.url)).text()
+    const template = await Bun.file(
+      new URL("../../../../.github/ISSUE_TEMPLATE/bug-report.yml", import.meta.url),
+    ).text()
     expect(template).toContain("id: lunos-version")
     expect(url.searchParams.get("lunos-version")).toStartWith("Lunos ")
     // Every pre-filled key must exist as a field id, or GitHub silently drops it.

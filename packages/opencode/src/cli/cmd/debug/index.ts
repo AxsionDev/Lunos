@@ -1,9 +1,5 @@
 import { Global } from "@opencode-ai/core/global"
-import {
-  InstallationChannel,
-  InstallationUpstreamVersion,
-  versionLabel,
-} from "@opencode-ai/core/installation/version"
+import { InstallationChannel, InstallationUpstreamVersion, versionLabel } from "@opencode-ai/core/installation/version"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import os from "os"
 import { Duration, Effect } from "effect"
@@ -66,7 +62,9 @@ const InfoCommand = effectCmd({
     const method = yield* Effect.promise(() => Installation.method()).pipe(Effect.orElseSucceed(() => "unknown"))
 
     console.log(`version: ${versionLabel()}`)
-    console.log(`based on: ${InstallationUpstreamVersion ? `opencode ${InstallationUpstreamVersion}` : "unknown (dev build)"}`)
+    console.log(
+      `based on: ${InstallationUpstreamVersion ? `opencode ${InstallationUpstreamVersion}` : "unknown (dev build)"}`,
+    )
     console.log(`channel: ${InstallationChannel}`)
     console.log(`install method: ${method}`)
     console.log(`os: ${os.type()} ${os.release()} ${os.arch()}`)
