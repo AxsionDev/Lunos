@@ -5,7 +5,7 @@ import type { Marketplace } from "@opencode-ai/core/marketplace"
 import { ConfigHooks } from "@opencode-ai/core/config/hooks"
 import { Filesystem } from "@/util/filesystem"
 import { mcpConfigFromEntry } from "../mcp/discover"
-import { envReferences, rejectSubstitution, requireHttpUrl } from "./guard"
+import { envReferences, headerEnvName, rejectSubstitution, requireHttpUrl } from "./guard"
 import type { ContentItem } from "./content"
 import { defaultFetchDeps, type FetchDeps } from "./shared"
 
@@ -93,13 +93,17 @@ async function planMcp(item: Extract<ConfigItem, { kind: "mcp" }>, configPath: s
       `MCP server "${item.name}" already exists in ${configPath}${hint ? ` (${hint})` : ""}. Remove or rename it there first.`,
     )
   }
-  const required = config.type === "local" ? Object.keys(config.environment ?? {}) : Object.keys(config.headers ?? {})
+  const headers = config.type === "remote" ? Object.keys(config.headers ?? {}) : []
+  const required = config.type === "local" ? Object.keys(config.environment ?? {}) : headers.map(headerEnvName)
   return {
     kind: "mcp",
     name: item.name,
     marketplace: item.marketplace,
     configPath,
-    details: [config.type === "local" ? `runs: ${config.command.join(" ")}` : `connects to: ${config.url}`],
+    details: [
+      config.type === "local" ? `runs: ${config.command.join(" ")}` : `connects to: ${config.url}`,
+      ...headers.map((header) => `header ${header} <- $${headerEnvName(header)}`),
+    ],
     warnings: unsetVariables(required),
     apply: () => addMcpToConfig(item.name, config, configPath).then(() => {}),
   }

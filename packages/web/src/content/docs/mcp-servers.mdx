@@ -79,7 +79,7 @@ lunos mcp add context7
 
 `lunos mcp add <name>` shows the command it will run (or the URL it will connect to) and the config file it will write, then asks for confirmation. Pass `--yes` to skip the prompt. If two marketplaces list the same name, qualify it as `<marketplace>/<name>`.
 
-A marketplace entry only declares the _names_ of the environment variables or headers a server needs. Lunos writes them as `{env:NAME}` references, so the generated config holds no secrets. Export the variable before starting Lunos.
+A marketplace entry only declares the _names_ of the environment variables or headers a server needs. Lunos writes them as `{env:NAME}` references, so the generated config holds no secrets. A header is read from the variable named after it, upper-cased with `-` replaced by `_`: the `X-Api-Key` header reads `$X_API_KEY`. The install preview shows each mapping. Export the variable before starting Lunos.
 
 ---
 
