@@ -74,6 +74,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **Session sharing is now covered by the residency policy.** With a `residency` policy set, every
+  share upload is checked before any connection. Upstream's `opncd.ai` is refused under an EU-only
+  policy, with a plain message, and each attempt is written to the audit log. A self-hosted
+  `enterprise.url` share server is allowed with `"unknown"` in `residency.allow`, like any other
+  self-hosted endpoint.
 - **The npm packages now say what they are.** `lunos-ai` and the 12 `lunos-<os>-<arch>` platform
   packages are published with a description, homepage (`lunos.tech`), repository and issue
   tracker (`AxsionDev/Lunos`), author (ITService EOOD) and keywords, and `lunos-ai` ships a README.

@@ -506,7 +506,20 @@ export function Session() {
           .share({
             sessionID: route.sessionID,
           })
-          .then((res) => copy(res.data!.share!.url))
+          .then((res) => {
+            // A refused share (sharing disabled, or the residency policy blocked the host) comes
+            // back as an error body with a message, not a thrown error (XCOD-80).
+            const url = res.data?.share?.url
+            if (url) return copy(url)
+            const body = res.error as { message?: unknown; data?: { message?: unknown } } | undefined
+            const message =
+              typeof body?.message === "string"
+                ? body.message
+                : typeof body?.data?.message === "string"
+                  ? body.data.message
+                  : "Failed to share session"
+            toast.show({ message, variant: "error" })
+          })
           .catch((error) => {
             toast.show({
               message: error instanceof Error ? error.message : "Failed to share session",

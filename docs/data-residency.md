@@ -58,6 +58,10 @@ Opting in is a statement that **you** have verified the region. [Model provider 
 
 `unknown` covers providers assessed as indeterminable — gateways, and the generic OpenAI-compatible adapter pointed at an endpoint of your choosing. Allowing it is a deliberate widening. It does **not** permit providers that were never assessed at all; those are always denied.
 
+## Session sharing
+
+Share uploads are checked like model calls. `opncd.ai` (upstream's share service) counts as `us`. A self-hosted share server at `enterprise.url` counts as `unknown`, like any self-hosted endpoint, so you allow it with `"unknown"`. Refused and allowed share uploads both appear in the audit log with a `share:` provider id (`share:opncd`, `share:enterprise`). Sharing is off by default; see the deployment guide.
+
 ## The audit log
 
 One JSON object per line, appended per outbound call:

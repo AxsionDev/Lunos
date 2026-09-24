@@ -253,14 +253,33 @@ const CLAIMS: Record<string, Claim> = {
   },
 }
 
+/**
+ * Session-share upload targets (XCOD-80), evaluated by the residency policy like a provider.
+ * Kept out of `CLAIMS` so they don't appear in the provider jurisdiction table.
+ */
+export const SHARE_OPNCD = "share:opncd"
+export const SHARE_ENTERPRISE = "share:enterprise"
+const SHARE_HOSTS: Record<string, Claim> = {
+  [SHARE_OPNCD]: {
+    region: "us",
+    basis: "entity",
+    note: "Upstream opencode's hosted share service (opncd.ai, and the opencode console's share API for signed-in orgs), operated by opencode's maintainers, a non-EU company. Not Lunos infrastructure.",
+  },
+  [SHARE_ENTERPRISE]: {
+    region: "unknown",
+    basis: "user-endpoint",
+    note: 'A share server at the configured enterprise.url. Tagged like any other self-hosted endpoint: its jurisdiction is wherever you host it, which Lunos can\'t verify, so allowing it under a residency policy takes an explicit "unknown" in residency.allow.',
+  },
+}
+
 /** Look up a provider's jurisdiction claim. Unknown providers are `unknown`/`none`, never assumed safe. */
 export function lookup(providerID: string): Claim {
-  return CLAIMS[providerID] ?? UNKNOWN
+  return CLAIMS[providerID] ?? SHARE_HOSTS[providerID] ?? UNKNOWN
 }
 
 /** Whether a claim is recorded for this provider at all. */
 export function isTagged(providerID: string): boolean {
-  return providerID in CLAIMS
+  return providerID in CLAIMS || providerID in SHARE_HOSTS
 }
 
 /**
