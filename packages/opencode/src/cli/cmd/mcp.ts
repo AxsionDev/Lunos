@@ -1,6 +1,6 @@
 import { cmd } from "./cmd"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, fail } from "../effect-cmd"
 import { Cause } from "effect"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
@@ -23,6 +23,7 @@ import { searchMcpServers } from "../../mcp/discover"
 import { listContent } from "../../marketplace/content"
 import { addMcpToConfig, resolveConfigPath } from "../../marketplace/install"
 import { confirmAndInstall, pickOne } from "./marketplace-content"
+import { MarketplaceRefusal } from "../../marketplace/guard"
 import { printStaleMarketplaces } from "./plug"
 
 function getAuthStatusIcon(status: MCP.AuthStatus): string {
@@ -483,6 +484,9 @@ export const McpAddCommand = effectCmd({
     const maybeCtx = yield* InstanceRef
     if (!maybeCtx) return yield* Effect.die("InstanceRef not provided")
     const ctx = maybeCtx
+    // Set only by the marketplace branch below: an expected refusal is reported through fail() as a
+    // plain message, not thrown into the "Unexpected error" banner.
+    let refused: string | undefined
     yield* Effect.promise(async () => {
       const command = args["--"] ?? []
       if (!args.name && (args.url || args.env?.length || args.header?.length || command.length)) {
@@ -491,9 +495,15 @@ export const McpAddCommand = effectCmd({
 
       if (resolvesFromMarketplace(args, command)) {
         const marketplaceCtx = { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }
-        const match = pickOne((await listContent(marketplaceCtx, "mcp")).items, args.name!)
-        if (match?.kind === "mcp") {
-          await confirmAndInstall(match, Boolean(args.yes))
+        try {
+          const match = pickOne((await listContent(marketplaceCtx, "mcp")).items, args.name!)
+          if (match?.kind === "mcp") {
+            await confirmAndInstall(match, Boolean(args.yes))
+            return
+          }
+        } catch (error) {
+          if (!(error instanceof MarketplaceRefusal)) throw error
+          refused = error.message
           return
         }
 
@@ -698,6 +708,7 @@ export const McpAddCommand = effectCmd({
 
       prompts.outro("MCP server added successfully")
     })
+    if (refused !== undefined) return yield* fail(refused)
   }),
 })
 

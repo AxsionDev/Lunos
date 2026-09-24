@@ -8,6 +8,14 @@
 // manifest author's server. Every kind (MCP, skill, hook) goes through these guards; none may
 // hand-roll its own.
 
+// An expected "no" about a marketplace entry -- an unsafe string, an unsupported hook event, an
+// ambiguous name, a duplicate already in config -- as opposed to a fault (I/O, a bug). CLI surfaces
+// print a refusal as a plain message and exit 1; anything else keeps the "Unexpected error" banner,
+// so a user can tell "Lunos said no" from "Lunos broke".
+export class MarketplaceRefusal extends Error {
+  override name = "MarketplaceRefusal"
+}
+
 const SUBSTITUTION = /\{(env|file):/
 
 // Environment variable names as a shell can actually export them. Header names additionally
@@ -18,7 +26,7 @@ const HEADER_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/
 export function rejectSubstitution(entryName: string, values: readonly (string | undefined)[]) {
   for (const value of [entryName, ...values]) {
     if (value && SUBSTITUTION.test(value)) {
-      throw new Error(`Marketplace entry "${entryName}" contains a config substitution token: "${value}"`)
+      throw new MarketplaceRefusal(`Marketplace entry "${entryName}" contains a config substitution token: "${value}"`)
     }
   }
 }
@@ -35,7 +43,9 @@ function references(
   if (!names?.length) return undefined
   for (const name of names) {
     if (!pattern.test(name)) {
-      throw new Error(`Marketplace entry "${entryName}" declares an invalid environment/header name: "${name}"`)
+      throw new MarketplaceRefusal(
+        `Marketplace entry "${entryName}" declares an invalid environment/header name: "${name}"`,
+      )
     }
   }
   return Object.fromEntries(names.map((name) => [name, `{env:${variable(name)}}`]))
@@ -62,9 +72,9 @@ export function requireHttpUrl(entryName: string, value: string) {
   try {
     url = new URL(value)
   } catch {
-    throw new Error(`Marketplace entry "${entryName}" has an invalid url: "${value}"`)
+    throw new MarketplaceRefusal(`Marketplace entry "${entryName}" has an invalid url: "${value}"`)
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error(`Marketplace entry "${entryName}" url must be http(s): "${value}"`)
+    throw new MarketplaceRefusal(`Marketplace entry "${entryName}" url must be http(s): "${value}"`)
   }
 }

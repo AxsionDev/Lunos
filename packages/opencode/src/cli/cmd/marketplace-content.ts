@@ -5,10 +5,10 @@ import { Marketplace } from "@opencode-ai/core/marketplace"
 import { listContent, searchContent, type ContentItem } from "../../marketplace/content"
 import { planInstall, resolveConfigPath, type ConfigItem } from "../../marketplace/install"
 import { resolveByName } from "../../marketplace/resolve"
+import { MarketplaceRefusal } from "../../marketplace/guard"
 import { createPlugTask } from "./plug"
 import { printStaleMarketplaces } from "./plug"
 import { UI } from "../ui"
-import { errorMessage } from "../../util/error"
 import { effectCmd, fail } from "../effect-cmd"
 import { InstanceRef } from "@/effect/instance-ref"
 
@@ -25,7 +25,7 @@ export function pickOne<T extends ContentItem>(items: readonly T[], name: string
   const matches = resolveByName(items, name)
   if (matches.length > 1) {
     const qualified = matches.map((m) => `${m.marketplace}/${m.name} (${m.kind})`).join(", ")
-    throw new Error(`"${name}" exists in more than one place. Use one of: ${qualified}, or pass --kind`)
+    throw new MarketplaceRefusal(`"${name}" exists in more than one place. Use one of: ${qualified}, or pass --kind`)
   }
   return matches[0]
 }
@@ -129,10 +129,11 @@ export const MarketplaceInstallCommand = effectCmd({
 
     // Refusals from pickOne/planInstall (ambiguous name, unsupported hook event, duplicate entry)
     // are expected outcomes, so they surface as a CliError: plain message, exit 1, no "Unexpected
-    // error" banner. A cancelled prompt is rethrown to keep its existing path.
+    // error" banner. Anything else -- an I/O fault, a cancelled prompt -- is rethrown to keep its
+    // existing path.
     const refusal = (error: unknown) => {
-      if (error instanceof UI.CancelledError) throw error
-      return errorMessage(error)
+      if (error instanceof MarketplaceRefusal) return error.message
+      throw error
     }
 
     const picked = yield* Effect.promise(() =>

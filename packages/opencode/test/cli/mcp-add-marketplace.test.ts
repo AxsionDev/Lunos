@@ -69,6 +69,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("mp-a/filesystem")
         expect(result.stderr).toContain("mp-b/filesystem")
+        expect(result.stderr).not.toContain("Unexpected error")
 
         // Nothing should have been written by the refused add.
         const config = yield* Effect.promise(() => readGlobalMcpConfig(home))
@@ -113,6 +114,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         expect(result.stderr).toContain("seeded")
         expect(result.stderr.toLowerCase()).toContain("already exists")
         expect(result.stderr).toContain("https://seed.example/mcp")
+        expect(result.stderr).not.toContain("Unexpected error")
 
         const after = yield* Effect.promise(() => readGlobalMcpConfig(home))
         expect(after).toEqual(before)

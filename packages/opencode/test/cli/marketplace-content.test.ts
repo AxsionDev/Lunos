@@ -2,6 +2,7 @@
 // mcp-add-marketplace.test.ts: real CLI binary, isolated $HOME, `--yes` for the non-interactive path.
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
+import fs from "fs/promises"
 import path from "path"
 import { parse as parseJsonc } from "jsonc-parser"
 import { Filesystem } from "@/util/filesystem"
@@ -76,6 +77,28 @@ describe("opencode marketplace search (subprocess)", () => {
 })
 
 describe("opencode marketplace install (subprocess)", () => {
+  cliIt.concurrent(
+    "a real fault (unwritable config) keeps the Unexpected error banner",
+    ({ home, opencode }) =>
+      Effect.gen(function* () {
+        // Only expected refusals are demoted to plain messages; a genuine I/O fault must still read
+        // as a crash, or the user can't tell "Lunos said no" from "Lunos broke".
+        yield* setup(home, opencode)
+        const file = path.join(home, ".config", "opencode", "opencode.json")
+        yield* Effect.promise(() => fs.mkdir(path.dirname(file), { recursive: true }))
+        if (!(yield* Effect.promise(() => Filesystem.exists(file)))) yield* Effect.promise(() => Bun.write(file, "{}"))
+        yield* Effect.promise(() => fs.chmod(file, 0o444))
+        try {
+          const result = yield* opencode.spawn(["marketplace", "install", "format-on-edit", "--yes"])
+          opencode.expectExit(result, 1, "marketplace install")
+          expect(result.stderr).toContain("Unexpected error")
+        } finally {
+          yield* Effect.promise(() => fs.chmod(file, 0o644))
+        }
+      }),
+    60_000,
+  )
+
   cliIt.concurrent(
     "reports a refused install as a plain error, without the Unexpected error banner",
     ({ home, opencode }) =>
