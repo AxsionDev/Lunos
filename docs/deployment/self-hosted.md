@@ -48,6 +48,19 @@ That provider is your choice and your contractual relationship. Lunos does not s
 
 The tool also fetches its model catalogue (a list of available models and their capabilities — no prompt data) over the network, and checks for updates unless disabled.
 
+#### Session sharing — off by default
+
+`/share` publishes a session at a public link. **Lunos turns this off unless you enable it**, because a shared session contains the whole transcript: your prompts, the contents of every file the agent read, and tool output. That is more sensitive than any single model request.
+
+| Setting               | What happens                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `share` unset         | Same as `"disabled"`. This differs from upstream opencode, where `/share` works out of the box     |
+| `"share": "disabled"` | `/share` is refused with a message saying how to enable it. Nothing is uploaded                    |
+| `"share": "manual"`   | `/share` uploads the session when a person runs it                                                 |
+| `"share": "auto"`     | Every new session is uploaded as it is created. The deprecated `"autoshare": true` also means this |
+
+When sharing is on, uploads go to `enterprise.url` if you set one, and otherwise to **`https://opncd.ai`**, upstream opencode's hosted share service. That host is operated by a non-EU third party, not by Lunos, and **is not covered by the residency policy** (§5, §7). The `OPENCODE_AUTO_SHARE` environment variable only turns `"manual"` into `"auto"`; it cannot re-enable sharing that is disabled.
+
 ### Stays on your infrastructure
 
 Everything else:
@@ -126,9 +139,12 @@ Create `opencode.json` in your project directory or global config directory:
   "residency": {
     "allow": ["eu"]
   },
+  "share": "disabled",
   "model": "mistral/mistral-large-latest"
 }
 ```
+
+`"share": "disabled"` is already the default. Set it explicitly anyway, so a later config layer or a colleague's copy of the file can't turn sharing on without it showing up in review. See [Session sharing](#session-sharing--off-by-default).
 
 With that in place:
 
@@ -168,6 +184,7 @@ Lunos requires no database, no message broker and no inbound network access. Ser
 - **No security certification is held.** Lunos holds no CRA, EUCS, ISO or SOC certification and claims none. On the project's current assessment it falls outside the scope of the EU Cyber Resilience Act entirely, because it is free, MIT-licensed, self-hosted and unmonetised. A CycloneDX **software bill of materials is published with each release** as manufacturer-readiness groundwork, not as a compliance claim.
 - **The agent is not sandboxed.** Lunos can execute shell commands and modify files. Its permission system is a UX safeguard that prompts before acting — it is _not_ a security boundary. For true isolation, run it in a container or VM. This is inherited from upstream and documented in [`SECURITY.md`](../../SECURITY.md).
 - **Model provider data handling is governed by your agreement with that provider,** not by Lunos. Residency controls determine _which_ provider may be used; they do not alter what that provider does with what it receives.
+- **Session sharing, if you turn it on, is not covered by the residency policy.** With `"share": "manual"` or `"auto"`, `/share` uploads the full transcript to `opncd.ai` (or your `enterprise.url`) whatever `residency.allow` says, and no audit-log entry is written. Sharing is off by default; leave it off under a residency policy. Putting share uploads under the policy is tracked as XCOD-80.
 - **Feature parity with upstream opencode is not claimed or measured.**
 - **A vulnerability disclosure process exists** ([`SECURITY.md`](../../SECURITY.md)) but there is no dedicated security contact address yet; reports go through GitHub Security Advisories, which is private to maintainers.
 

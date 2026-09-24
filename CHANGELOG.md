@@ -40,6 +40,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **Session sharing is now off by default (behaviour change from upstream opencode).** When no
+  config layer sets `share`, Lunos treats it as `"disabled"`: `/share`, `lunos run --share` and the
+  share API route refuse with a message saying how to turn it on, and nothing is uploaded. A shared
+  session contains the full transcript and goes to upstream's `opncd.ai` by default, outside the
+  residency policy. To get the old behaviour back, set `"share": "manual"` (or `"auto"`). The
+  deprecated `"autoshare": true` still counts as an explicit opt-in and maps to `"auto"`.
 - **The product is named Lunos.** The name is frozen after an earlier sequence of renames
   (AXCODE → Ratio → Lunos). Trademark clearance remains a separate, open question.
 - **The CLI publishes as `lunos-ai` and installs a `lunos` binary.**
