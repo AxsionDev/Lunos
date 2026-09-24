@@ -132,6 +132,23 @@ All instruction files are combined with your `AGENTS.md` files.
 
 ---
 
+## Keeping durable notes
+
+Lunos has no automatic memory. To keep facts that should carry across sessions, such as "deploys go out on Tuesdays" or "the billing service owns the invoices table", write them as small Markdown files and load them with `instructions`:
+
+```json title="opencode.json"
+{
+  "instructions": [".opencode/memory/*.md"]
+}
+```
+
+- Keep one fact per file, so each can be reviewed and deleted on its own.
+- Project notes live in the repo and are reviewed like any other change. Personal notes can live in `~/.config/opencode/memory/`, loaded from your global config.
+- These files load alongside `AGENTS.md` and don't compete with it.
+- Don't put secrets in them: their contents are sent to your model provider as part of the prompt.
+
+---
+
 ## Referencing External Files
 
 While opencode doesn't automatically parse file references in `AGENTS.md`, you can achieve similar functionality in two ways:
