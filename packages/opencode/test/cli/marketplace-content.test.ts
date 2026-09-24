@@ -77,6 +77,19 @@ describe("opencode marketplace search (subprocess)", () => {
 
 describe("opencode marketplace install (subprocess)", () => {
   cliIt.concurrent(
+    "reports a refused install as a plain error, without the Unexpected error banner",
+    ({ home, opencode }) =>
+      Effect.gen(function* () {
+        yield* setup(home, opencode, { ...allKinds, hooks: [{ ...allKinds.hooks[0], event: "PostToolUse" }] })
+        const result = yield* opencode.spawn(["marketplace", "install", "format-on-edit", "--yes"])
+        opencode.expectExit(result, 1, "marketplace install")
+        expect(result.stderr).toContain('targets event "PostToolUse"')
+        expect(result.stderr).not.toContain("Unexpected error")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
     "installs a hook under hooks.<event> after showing what it runs",
     ({ home, opencode }) =>
       Effect.gen(function* () {

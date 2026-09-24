@@ -139,3 +139,21 @@ describe("planInstall: hook", () => {
     expect(() => hookConfigFromEntry(dashed)).toThrow(/invalid environment/)
   })
 })
+
+describe("planInstall: remote MCP headers", () => {
+  test("names the env var each header reads from, and warns on that var, not the header", async () => {
+    await using tmp = await tmpdir()
+    const file = path.join(tmp.path, "opencode.json")
+    const entry = new Marketplace.McpRemoteEntry({
+      name: "api",
+      type: "remote",
+      url: "https://example.test/mcp",
+      headers: ["X-Api-Key"],
+    })
+    const plan = await planInstall({ kind: "mcp", name: "api", marketplace: "mp", entry }, file, offline)
+    expect(plan.details).toContain("header X-Api-Key <- $X_API_KEY")
+    expect(plan.warnings).toEqual(["X_API_KEY is not set in your environment; the reference is written anyway"])
+    await plan.apply()
+    expect((await readConfig(file)).mcp.api.headers).toEqual({ "X-Api-Key": "{env:X_API_KEY}" })
+  })
+})

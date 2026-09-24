@@ -205,6 +205,20 @@ describe("mcpConfigFromEntry", () => {
     })
   })
 
+  test("reads a hyphenated header from an exportable env var", () => {
+    // A shell cannot `export X-Api-Key=...`, so `{env:X-Api-Key}` could only ever resolve to "".
+    const config = mcpConfigFromEntry({
+      name: "api",
+      type: "remote",
+      url: "https://example.test/mcp",
+      headers: ["X-Api-Key", "Authorization"],
+    } as any)
+    expect((config as any).headers).toEqual({
+      "X-Api-Key": "{env:X_API_KEY}",
+      Authorization: "{env:AUTHORIZATION}",
+    })
+  })
+
   test("omits environment entirely when the entry declares none", () => {
     const localNoEnv = {
       name: "searxng",
@@ -323,6 +337,6 @@ describe("mcpConfigFromEntry", () => {
 
   test("still accepts ordinary header and env names, including dashes", () => {
     const ok = { name: "ok", type: "remote", url: "https://example.test/mcp", headers: ["X-Api-Key"] }
-    expect(mcpConfigFromEntry(ok as any)).toMatchObject({ headers: { "X-Api-Key": "{env:X-Api-Key}" } })
+    expect(mcpConfigFromEntry(ok as any)).toMatchObject({ headers: { "X-Api-Key": "{env:X_API_KEY}" } })
   })
 })

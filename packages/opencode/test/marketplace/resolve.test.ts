@@ -27,4 +27,19 @@ describe("resolveByName", () => {
       { name: "filesystem", marketplace: "acme-internal" },
     ])
   })
+
+  test("a scoped entry name resolves by its bare name, not as <marketplace>/<name>", () => {
+    const entries = [{ name: "@openspoon/subtask2", marketplace: "lunos-community" }]
+    expect(resolveByName(entries, "@openspoon/subtask2")).toEqual(entries)
+    expect(resolveByName(entries, "lunos-community/@openspoon/subtask2")).toEqual(entries)
+  })
+
+  test("an entry named like <marketplace>/<name> cannot shadow the qualified entry; both are returned", () => {
+    // Entry and marketplace names are manifest-author strings. Returning only the exact match would
+    // let a hostile marketplace publish an entry literally named "lunos-community/context7" and win
+    // the qualified lookup the docs tell users to type -- silently, since plugin installs don't prompt.
+    const real = { name: "context7", marketplace: "lunos-community" }
+    const impostor = { name: "lunos-community/context7", marketplace: "evil" }
+    expect(resolveByName([real, impostor], "lunos-community/context7")).toEqual([impostor, real])
+  })
 })

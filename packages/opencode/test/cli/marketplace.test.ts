@@ -195,7 +195,13 @@ describe("marketplace.add.task", () => {
     )
 
     expect(entries).toEqual([
-      { scope: "local", source: "pminev1/Lunos", name: "lunos-community", plugins: 2, fetchedAt: expect.any(Number) },
+      {
+        scope: "local",
+        source: "pminev1/Lunos",
+        name: "lunos-community",
+        contents: "2 plugin(s)",
+        fetchedAt: expect.any(Number),
+      },
     ])
   })
 })
@@ -237,6 +243,32 @@ describe("marketplace.list", () => {
     expect(entries).toEqual([])
   })
 
+  test("counts MCP servers, skills and hooks, not just plugins", async () => {
+    await using tmp = await tmpdir()
+    const cfgFile = path.join(tmp.path, ".opencode", "opencode.json")
+    await fs.mkdir(path.dirname(cfgFile), { recursive: true })
+    await Bun.write(cfgFile, JSON.stringify({ marketplace: ["pminev1/Lunos"] }, null, 2))
+    const mcpOnly = {
+      name: "mcp-only",
+      owner: { name: "x" },
+      plugins: [],
+      mcp: [{ name: "a", type: "remote", url: "https://example.test/mcp" }],
+      hooks: [{ name: "h", event: "session.idle", command: ["true"] }],
+    }
+
+    const entries = await listMarketplaces(
+      ctx(tmp.path),
+      listDeps(path.join(tmp.path, "global"), {
+        fetchText: async (url) =>
+          url.includes("api.github.com") ? JSON.stringify({ default_branch: "dev" }) : JSON.stringify(mcpOnly),
+        readText: async () => "",
+        stat: async () => undefined,
+      }),
+    )
+
+    expect(entries[0].contents).toBe("1 hook(s), 1 MCP server(s)")
+  })
+
   test("shows plugin count for a resolvable marketplace", async () => {
     await using tmp = await tmpdir()
     const cfgFile = path.join(tmp.path, ".opencode", "opencode.json")
@@ -256,7 +288,13 @@ describe("marketplace.list", () => {
     )
 
     expect(entries).toEqual([
-      { scope: "local", source: "pminev1/Lunos", name: "lunos-community", plugins: 2, fetchedAt: expect.any(Number) },
+      {
+        scope: "local",
+        source: "pminev1/Lunos",
+        name: "lunos-community",
+        contents: "2 plugin(s)",
+        fetchedAt: expect.any(Number),
+      },
     ])
   })
 
@@ -284,8 +322,20 @@ describe("marketplace.list", () => {
     )
 
     expect(entries).toEqual([
-      { scope: "local", source: "local/repo", name: "lunos-community", plugins: 2, fetchedAt: expect.any(Number) },
-      { scope: "global", source: "global/repo", name: "lunos-community", plugins: 2, fetchedAt: expect.any(Number) },
+      {
+        scope: "local",
+        source: "local/repo",
+        name: "lunos-community",
+        contents: "2 plugin(s)",
+        fetchedAt: expect.any(Number),
+      },
+      {
+        scope: "global",
+        source: "global/repo",
+        name: "lunos-community",
+        contents: "2 plugin(s)",
+        fetchedAt: expect.any(Number),
+      },
     ])
   })
 
@@ -309,7 +359,7 @@ describe("marketplace.list", () => {
     expect(entries.length).toBe(1)
     expect(entries[0].source).toBe("pminev1/does-not-exist")
     expect(entries[0].error).toContain("404")
-    expect(entries[0].plugins).toBeUndefined()
+    expect(entries[0].contents).toBeUndefined()
   })
 
   test("reads from cache on a second call instead of fetching again", async () => {
@@ -335,7 +385,13 @@ describe("marketplace.list", () => {
     const entries = await listMarketplaces(ctx(tmp.path), deps)
     expect(fetches).toBe(2) // unchanged: second call served entirely from cache
     expect(entries).toEqual([
-      { scope: "local", source: "pminev1/Lunos", name: "lunos-community", plugins: 2, fetchedAt: expect.any(Number) },
+      {
+        scope: "local",
+        source: "pminev1/Lunos",
+        name: "lunos-community",
+        contents: "2 plugin(s)",
+        fetchedAt: expect.any(Number),
+      },
     ])
   })
 
@@ -373,7 +429,7 @@ describe("marketplace.list", () => {
     const entries = await listMarketplaces(ctx(tmp.path), failingDeps)
     expect(entries.length).toBe(1)
     expect(entries[0].name).toBe("lunos-community")
-    expect(entries[0].plugins).toBe(2)
+    expect(entries[0].contents).toBe("2 plugin(s)")
     expect(entries[0].stale).toContain("network unreachable")
   })
 })

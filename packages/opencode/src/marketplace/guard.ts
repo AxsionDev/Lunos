@@ -26,22 +26,35 @@ export function rejectSubstitution(entryName: string, values: readonly (string |
 // The manifest carries variable NAMES; config wants name -> value. We write `{env:NAME}`, the
 // substitution syntax config already supports, so the generated config holds no secret and stays
 // safe to commit -- which it would not be had we prompted for values and written them literally.
-function references(entryName: string, names: readonly string[] | undefined, pattern: RegExp) {
+function references(
+  entryName: string,
+  names: readonly string[] | undefined,
+  pattern: RegExp,
+  variable: (name: string) => string,
+) {
   if (!names?.length) return undefined
   for (const name of names) {
     if (!pattern.test(name)) {
       throw new Error(`Marketplace entry "${entryName}" declares an invalid environment/header name: "${name}"`)
     }
   }
-  return Object.fromEntries(names.map((name) => [name, `{env:${name}}`]))
+  return Object.fromEntries(names.map((name) => [name, `{env:${variable(name)}}`]))
 }
 
 export function envReferences(entryName: string, names: readonly string[] | undefined) {
-  return references(entryName, names, ENV_NAME)
+  return references(entryName, names, ENV_NAME, (name) => name)
+}
+
+// A header name is not always an exportable variable name: no shell can `export X-Api-Key=...`, so
+// `{env:X-Api-Key}` would always resolve to "". The header keeps its name; the variable it reads
+// is upper-cased with `-` -> `_` (X-Api-Key -> X_API_KEY). HEADER_NAME has already limited the
+// input to [A-Za-z0-9_-], so the result can't carry a brace or a second substitution.
+export function headerEnvName(name: string) {
+  return name.toUpperCase().replaceAll("-", "_")
 }
 
 export function headerReferences(entryName: string, names: readonly string[] | undefined) {
-  return references(entryName, names, HEADER_NAME)
+  return references(entryName, names, HEADER_NAME, headerEnvName)
 }
 
 export function requireHttpUrl(entryName: string, value: string) {
