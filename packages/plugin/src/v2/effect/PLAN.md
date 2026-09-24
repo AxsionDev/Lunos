@@ -2,7 +2,17 @@
 
 ## Status
 
-This document describes the agreed target design for the V2 plugin system. It is an implementation plan, not documentation for the current API.
+> **Superseded (2026-09-24, XCOD-74). This is not a description of the API that exists.**
+> For the current API, read [`effect/README.md`](./README.md) (Effect) and
+> [`../promise/README.md`](../promise/README.md) (Promise). Both describe what is actually built.
+
+This was the original target design for the v2 plugin system. It is kept for its design rationale, but large parts of it were never built. It misled four Phase 2 tickets into building on things that don't exist:
+
+- **There is no `tool` domain.** `ctx.tool.hook(...)`, used in the examples below, does not exist (tracked as XCOD-75). Migration steps 4 and 6 are unstarted for tools.
+- **There is no event API reachable by plugins.** See [Event API](#event-api) below and XCOD-76. Migration step 8 is unstarted.
+- **The v2 runtime hooks (`aisdk.sdk`, `aisdk.language`) run in v2's `AISDK.language()`, which live sessions don't use.** Sessions resolve models through the v1 provider (`packages/opencode/src/provider/provider.ts`). XCOD-93 found the residency policy unenforced for exactly this reason.
+
+Treat everything below as history and rationale, not as a reference.
 
 ## Goals
 
