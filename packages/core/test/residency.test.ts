@@ -206,3 +206,21 @@ describe("Residency.enforce", () => {
     expect(Residency.resolve(undefined)).toBeUndefined()
   })
 })
+
+describe("share hosts (XCOD-80)", () => {
+  const EU = Residency.resolve({ allow: ["eu"] })!
+  test("upstream's share service is denied under an EU-only policy", () => {
+    expect(Residency.evaluate("share:opncd", EU.policy).allowed).toBe(false)
+  })
+
+  test('a self-hosted enterprise.url share server needs an explicit "unknown", like any self-hosted endpoint', () => {
+    expect(Residency.evaluate("share:enterprise", EU.policy).allowed).toBe(false)
+    expect(Residency.evaluate("share:enterprise", { allow: ["eu", "unknown"] }).allowed).toBe(true)
+  })
+
+  test("share hosts don't appear in the provider jurisdiction table", async () => {
+    const { Jurisdiction } = await import("@opencode-ai/core/jurisdiction")
+    expect(Jurisdiction.taggedProviders()).not.toContain("share:opncd")
+    expect(Jurisdiction.isTagged("share:opncd")).toBe(true)
+  })
+})

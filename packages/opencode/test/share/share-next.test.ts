@@ -31,7 +31,7 @@ const json = (req: Parameters<typeof HttpClientResponse.fromWeb>[0], body: unkno
     }),
   )
 
-const none = HttpClient.make(() => Effect.die("unexpected http call"))
+const none = HttpClient.make((req) => Effect.die(`unexpected http call: ${req.method} ${req.url}`))
 
 function requestLayer(client: HttpClient.HttpClient) {
   const replacement = [httpClient, Layer.succeed(HttpClient.HttpClient, client)] as const
@@ -131,7 +131,19 @@ describe("ShareNext", () => {
           authorization: "Bearer st_test_token",
           "x-org-id": "org-1",
         })
-      }).pipe(Effect.provide(requestLayer(none))),
+      }).pipe(
+        // The residency check (XCOD-80) reads config, which for a signed-in org includes the org's
+        // remote config; a running app has already loaded it. Serve an empty one, nothing else.
+        Effect.provide(
+          requestLayer(
+            HttpClient.make((req) =>
+              req.url === "https://control.example.com/api/config"
+                ? Effect.succeed(json(req, {}))
+                : Effect.die(`unexpected http call: ${req.method} ${req.url}`),
+            ),
+          ),
+        ),
+      ),
     ),
   )
 

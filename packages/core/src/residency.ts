@@ -173,6 +173,12 @@ async function append(file: string, text: string) {
   }
 }
 
+/** Record one call in the audit log, if auditing is on. For callers that don't go through a fetch wrapper. */
+export function audit(resolved: Resolved, defaultAuditPath: string, providerID: string, url: string, allowed: boolean) {
+  if (!resolved.audit) return
+  void append(resolved.auditPath ?? defaultAuditPath, line(record(providerID, url, allowed)))
+}
+
 type Fetch = (input: Parameters<typeof fetch>[0], init?: RequestInit) => Promise<Response>
 
 /**

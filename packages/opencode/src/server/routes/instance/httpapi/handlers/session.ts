@@ -5,6 +5,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
 import { Permission } from "@/permission"
 import { SessionShare } from "@/share/session"
+import { ShareNext } from "@/share/share-next"
 import { Session } from "@/session/session"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
@@ -258,15 +259,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     // every failure to a 400 BadRequest.
     const share = Effect.fn("SessionHttpApi.share")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
-      yield* shareSvc
-        .share(ctx.params.sessionID)
-        .pipe(
-          Effect.mapError((err) =>
-            err instanceof SessionShare.ShareDisabledError
-              ? new ShareDisabledApiError({ message: err.message })
-              : new HttpApiError.InternalServerError({}),
-          ),
-        )
+      yield* shareSvc.share(ctx.params.sessionID).pipe(
+        Effect.mapError((err) =>
+          // Sharing switched off, or the residency policy refused the share host (XCOD-80): both
+          // are expected refusals with a message saying what to change, not server faults.
+          err instanceof SessionShare.ShareDisabledError || err instanceof ShareNext.ResidencyDeniedError
+            ? new ShareDisabledApiError({ message: err.message })
+            : new HttpApiError.InternalServerError({}),
+        ),
+      )
       return yield* requireSession(ctx.params.sessionID)
     })
 
