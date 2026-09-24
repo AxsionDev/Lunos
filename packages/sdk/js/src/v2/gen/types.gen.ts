@@ -5069,6 +5069,7 @@ export type SkillV2Info = {
   name: string
   description?: string
   slash?: boolean
+  allowedTools?: Array<string>
   location: string
   content: string
 }
@@ -8420,6 +8421,7 @@ export type AppSkillsResponses = {
     description?: string
     location: string
     content: string
+    allowedTools?: Array<string>
   }>
 }
 

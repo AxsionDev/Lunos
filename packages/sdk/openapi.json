@@ -2818,6 +2818,12 @@
                       },
                       "content": {
                         "type": "string"
+                      },
+                      "allowedTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
                       }
                     },
                     "required": ["name", "location", "content"],
@@ -30861,6 +30867,12 @@
           },
           "slash": {
             "type": "boolean"
+          },
+          "allowedTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "location": {
             "type": "string"
