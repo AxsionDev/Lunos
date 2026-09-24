@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 import { $ } from "bun"
-import pkg from "../package.json"
 import { Script } from "@opencode-ai/script"
 import { fileURLToPath } from "url"
+import { entryMeta } from "./package-meta"
 
 // Published brand identity. Deliberately NOT derived from this package's `name`:
 // the workspace root package is already named "lunos" (XCOD-4), so naming this
@@ -11,6 +11,12 @@ import { fileURLToPath } from "url"
 const brand = "lunos"
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
+
+// npm provenance links each published version to the GitHub Actions run that built it, which is
+// the strongest trust signal a reviewer gets on the npm page. It needs the workflow's OIDC token
+// (`id-token: write` in publish.yml), so it's only requested when that token is available; a
+// local or manual publish still works without it.
+const provenance = process.env.ACTIONS_ID_TOKEN_REQUEST_URL ? ["--provenance"] : []
 process.chdir(dir)
 
 async function published(name: string, version: string) {
@@ -27,7 +33,10 @@ const RETRY_DELAYS_SECONDS = [5, 15, 45, 90, 180]
 
 async function publishWithRetry(dir: string, name: string, version: string) {
   for (let attempt = 0; ; attempt++) {
-    const result = await $`npm publish *.tgz --access public --tag ${Script.channel}`.cwd(dir).nothrow().quiet()
+    const result = await $`npm publish *.tgz --access public --tag ${Script.channel} ${provenance}`
+      .cwd(dir)
+      .nothrow()
+      .quiet()
     const output = result.stdout.toString() + result.stderr.toString()
     if (result.exitCode === 0) {
       console.log(output.trim())
@@ -72,6 +81,7 @@ await $`mkdir -p ./dist/${brand}`
 await $`mkdir -p ./dist/${brand}/bin`
 await $`cp ./script/postinstall.mjs ./dist/${brand}/postinstall.mjs`
 await Bun.file(`./dist/${brand}/LICENSE`).write(await Bun.file("../../LICENSE").text())
+await Bun.file(`./dist/${brand}/README.md`).write(await Bun.file("./script/npm-readme.md").text())
 await Bun.file(`./dist/${brand}/bin/${brand}.exe`).write(
   [
     `echo "Error: ${brand}-ai's postinstall script was not run." >&2`,
@@ -92,6 +102,7 @@ await Bun.file(`./dist/${brand}/package.json`).write(
   JSON.stringify(
     {
       name: brand + "-ai",
+      ...entryMeta(),
       bin: {
         [brand]: `./bin/${brand}.exe`,
       },
@@ -99,7 +110,6 @@ await Bun.file(`./dist/${brand}/package.json`).write(
         postinstall: "node ./postinstall.mjs",
       },
       version: version,
-      license: pkg.license,
       os: ["darwin", "linux", "win32"],
       cpu: ["arm64", "x64"],
       optionalDependencies: binaries,

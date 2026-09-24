@@ -15,6 +15,7 @@ const generated = await import("./generate.ts")
 
 import { Script } from "@opencode-ai/script"
 import pkg from "../package.json"
+import { platformMeta } from "./package-meta"
 
 // Published brand identity, mirroring script/publish.ts. Deliberately NOT derived from this
 // package's `name`, which stays "opencode" to avoid a duplicate workspace name (XCOD-4).
@@ -227,6 +228,7 @@ for (const item of targets) {
     JSON.stringify(
       {
         name,
+        ...platformMeta(`${item.os}-${item.arch}${item.abi ? `-${item.abi}` : ""}`),
         version: Script.version,
         preferUnplugged: true,
         os: [item.os],
