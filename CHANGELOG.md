@@ -25,6 +25,10 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **v2 plugins can hook tool calls:** `ctx.tool["execute.before"]` and `ctx.tool["execute.after"]`,
+  in both the Effect and Promise plugin APIs. A failing `before` hook aborts the call, so a plugin can
+  act as a guard. They run in real sessions, after v1 plugin and config hooks, and the first tool
+  call of a run waits for plugins to finish loading.
 - **A checked-in reference deployment config,** `examples/reference-deployment/opencode.json`: an
   EU-only residency policy with auditing, Mistral as the only enabled provider, sharing disabled
   and updates set to notify. §5 of the self-hosted deployment guide walks through it key by key,

@@ -34,9 +34,16 @@ import type { WorkspaceAdapter } from "@/control-plane/types"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstallationChannel } from "@opencode-ai/core/installation/version"
+import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { Location } from "@opencode-ai/core/location"
+import { AbsolutePath } from "@opencode-ai/core/schema"
+import { PluginV2 } from "@opencode-ai/core/plugin"
+import { ToolHooks } from "@opencode-ai/core/tool-hooks"
+import { ConfigExternalPlugin } from "@opencode-ai/core/config/plugin/external"
 
 type State = {
   hooks: Hooks[]
+  directory: string
 }
 
 // Hook names that follow the (input, output) => Promise<void> trigger pattern
@@ -132,6 +139,34 @@ const layer = Layer.effect(
     const events = yield* EventV2Bridge.Service
     const config = yield* Config.Service
     const flags = yield* RuntimeFlags.Service
+    const locations = yield* LocationServiceMap.Service
+
+    // v2 plugins register tool hooks through `ctx.tool` (XCOD-75), but live sessions dispatch
+    // tool calls through this v1 trigger. Bridge them here: v1 hooks (including config `hooks`)
+    // run first, then v2 hooks, all on the same `output`, so every hook sees earlier mutations.
+    // A failing v2 hook aborts the tool call exactly like a rejecting v1 hook does.
+    const toolBridge = (
+      name: "tool.execute.before" | "tool.execute.after",
+      directory: string,
+      input: any,
+      output: any,
+    ) =>
+      Effect.gen(function* () {
+        yield* (yield* PluginV2.Service).wait(PluginV2.ID.make(ConfigExternalPlugin.LOADED))
+        const tools = yield* ToolHooks.Service
+        if (name === "tool.execute.before") {
+          const event = { tool: input.tool, sessionID: input.sessionID, callID: input.callID, args: output.args }
+          yield* tools.runBefore(event)
+          output.args = event.args
+          return
+        }
+        const event = { tool: input.tool, sessionID: input.sessionID, callID: input.callID, args: input.args, output }
+        yield* tools.runAfter(event)
+        if (event.output !== output) Object.assign(output, event.output)
+      }).pipe(
+        Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(directory) }))),
+        Effect.catch((error) => Effect.die(error instanceof Error ? error : new Error(errorMessage(error)))),
+      )
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Plugin.state")(function* (ctx) {
@@ -279,7 +314,7 @@ const layer = Layer.effect(
           ),
         )
 
-        return { hooks }
+        return { hooks, directory: ctx.directory }
       }),
     )
 
@@ -295,6 +330,8 @@ const layer = Layer.effect(
         if (!fn) continue
         yield* Effect.promise(async () => fn(input, output))
       }
+      if (name === "tool.execute.before" || name === "tool.execute.after")
+        yield* toolBridge(name, s.directory, input, output)
       return output
     })
 
@@ -311,10 +348,18 @@ const layer = Layer.effect(
   }),
 )
 
+// Bound here, as agent.ts does, so the v1 plugin layer also builds on its own (tests). Nodes are
+// keyed by service, so this doesn't create a second map when the app provides one.
+const locationServiceMapNode = LayerNode.make({
+  service: LocationServiceMap.Service,
+  layer: locationServiceMapLayer,
+  deps: [],
+})
+
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [EventV2Bridge.node, Config.node, RuntimeFlags.node],
+  deps: [EventV2Bridge.node, Config.node, RuntimeFlags.node, locationServiceMapNode],
 })
 
 export * as Plugin from "."

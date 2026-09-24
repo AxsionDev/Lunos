@@ -1,5 +1,6 @@
 import { AgentV2 } from "@opencode-ai/core/agent"
 import { AISDK } from "@opencode-ai/core/aisdk"
+import { ToolHooks } from "@opencode-ai/core/tool-hooks"
 import { Catalog } from "@opencode-ai/core/catalog"
 import { CommandV2 } from "@opencode-ai/core/command"
 import { Credential } from "@opencode-ai/core/credential"
@@ -39,6 +40,7 @@ export const PluginTestLayer = AppNodeBuilder.build(
     PluginV2.node,
     AgentV2.node,
     AISDK.node,
+    ToolHooks.node,
     Catalog.node,
     CommandV2.node,
     Integration.node,

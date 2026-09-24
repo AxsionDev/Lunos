@@ -85,6 +85,21 @@ export function fromPromise(plugin: Plugin) {
             transform: transform(host.skill),
             reload: () => run(host.skill.reload()),
           },
+          tool: {
+            // A rejected or throwing callback fails the effect, which aborts the tool call.
+            "execute.before": (callback) =>
+              register(
+                host.tool["execute.before"]((event) =>
+                  Effect.tryPromise({ try: () => Promise.resolve(callback(event)), catch: (error) => error }),
+                ),
+              ),
+            "execute.after": (callback) =>
+              register(
+                host.tool["execute.after"]((event) =>
+                  Effect.tryPromise({ try: () => Promise.resolve(callback(event)), catch: (error) => error }),
+                ),
+              ),
+          },
         }
 
         yield* Effect.promise(() => Promise.resolve(plugin.setup(context2)))
