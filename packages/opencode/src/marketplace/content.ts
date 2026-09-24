@@ -1,4 +1,4 @@
-import type { Marketplace } from "@opencode-ai/core/marketplace"
+import { Marketplace } from "@opencode-ai/core/marketplace"
 import {
   resolveAddedMarketplaces,
   defaultMarketplaceListDeps,
@@ -93,4 +93,21 @@ export async function searchContent(
 ): Promise<ContentListResult> {
   const result = await listContent(ctx, kind, dep)
   return { ...result, items: result.items.filter((item) => matchesQuery(item, query)) }
+}
+
+const COUNT_LABEL: Record<Marketplace.Kind, string> = {
+  plugin: "plugin(s)",
+  skill: "skill source(s)",
+  hook: "hook(s)",
+  mcp: "MCP server(s)",
+}
+
+// One summary for every surface that describes a whole marketplace (`list`, `add`, `update`), so an
+// MCP-only marketplace isn't reported as "0 plugin(s)". Order follows Marketplace.KINDS.
+export function describeContents(manifest: Marketplace.Manifest) {
+  const all = rows(manifest)
+  const parts = Marketplace.KINDS.map((kind) => [kind, all.filter((row) => row.kind === kind).length] as const)
+    .filter(([, count]) => count > 0)
+    .map(([kind, count]) => `${count} ${COUNT_LABEL[kind]}`)
+  return parts.length ? parts.join(", ") : "empty"
 }

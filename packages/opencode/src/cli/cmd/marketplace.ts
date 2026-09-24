@@ -21,6 +21,7 @@ import {
   type MarketplaceListDeps,
 } from "../../marketplace/shared"
 import { errorMessage } from "../../util/error"
+import { describeContents } from "../../marketplace/content"
 import { Filesystem } from "@/util/filesystem"
 import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
@@ -89,7 +90,7 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
       dep.log.error(errorMessage(manifest.error))
       return false
     }
-    resolve.stop(`Validated "${manifest.item.name}" (${manifest.item.plugins.length} plugin(s))`)
+    resolve.stop(`Validated "${manifest.item.name}" (${describeContents(manifest.item)})`)
     // Seed the cache with the manifest already fetched above so the next `list`/`search`/Discover
     // read is a cache hit rather than fetching this same source again immediately after adding it.
     // Local path sources bypass the cache entirely (see resolveWithCache), so seeding one would
@@ -150,7 +151,7 @@ export type MarketplaceListEntry = {
   scope: "local" | "global"
   source: string
   name?: string
-  plugins?: number
+  contents?: string
   error?: string
   fetchedAt?: number
   stale?: string
@@ -167,7 +168,7 @@ export async function listMarketplaces(
           scope: entry.scope,
           source: entry.source,
           name: entry.manifest.name,
-          plugins: entry.manifest.plugins.length,
+          contents: describeContents(entry.manifest),
           fetchedAt: entry.fetchedAt,
           stale: entry.stale,
         }
@@ -209,7 +210,7 @@ export function createMarketplaceUpdateTask(
     spin.start(`Refreshing "${match.source}"...`)
     const result = await refreshMarketplaceCache(match.source, listDep)
     if (result.ok) {
-      spin.stop(`Refreshed "${result.manifest.name}" (${result.manifest.plugins.length} plugin(s))`)
+      spin.stop(`Refreshed "${result.manifest.name}" (${describeContents(result.manifest)})`)
       dep.log.success(`Marketplace "${result.manifest.name}" is up to date`)
       return true
     }
@@ -303,8 +304,8 @@ export const MarketplaceListCommand = effectCmd({
       const detail = entry.error
         ? `unreachable: ${entry.error}`
         : entry.stale
-          ? `${entry.plugins} plugin(s), refresh failed (${entry.stale}) — showing cache from ${updated}`
-          : `${entry.plugins} plugin(s), ${updated}`
+          ? `${entry.contents}, refresh failed (${entry.stale}) — showing cache from ${updated}`
+          : `${entry.contents}, ${updated}`
       log.info(`[${entry.scope}] ${label} ${UI.Style.TEXT_DIM}${detail}`)
     }
 
