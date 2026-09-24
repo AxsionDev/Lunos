@@ -245,25 +245,33 @@ structured artifact derived from the same data, not a replacement for the docs p
 
 Mapping decisions:
 
-- 36 of the table's 38 "Plugins" rows are included, each mapped to a `github` source using
-  the row's linked repository.
-- **2 rows excluded — monorepo subdirectories:** `opencode-daytona`
-  (`daytona/integrations/tree/main/packages/opencode-plugin`) and `@plannotator/opencode`
-  (`backnotprop/plannotator/tree/main/apps/opencode-plugin`) each link to a subdirectory of a
-  larger repository, not a plugin repository root. The `github` source type has no subpath
-  field — `git-subdir` sources are explicitly deferred past v1 (see Overview) — so pointing
-  `repo` at the monorepo root would name the wrong install location. Excluded rather than
-  misrepresented.
+- **Every plugin uses an `npm` source.** The seed was first built with 36 `github` sources, one
+  per linked repository, and none of them installed: `github` sources go through npm's
+  git-dependency path, which npm 12 disables by default (`allow-git=none`) and which Arborist can't
+  prepare for repositories with a build step or `workspace:*` dependencies. A core test
+  (`packages/core/test/marketplace.test.ts`) now fails if any plugin in this file isn't `npm`.
+- **An npm package is only used when it's published by the linked repository's owner**, checked
+  against `npm view <pkg> repository.url` or `maintainers`. A matching name is not enough: 4 of the
+  candidates' npm names belong to a different author, and switching those would install a
+  stranger's code. The npm name often differs from the entry name (e.g.
+  `opencode-dynamic-context-pruning` → `@tarquinen/opencode-dcp`).
+- **25 of the table's 38 "Plugins" rows are included. 13 are excluded:**
+  - **Monorepo subdirectories (2):** `opencode-daytona`
+    (`daytona/integrations/tree/main/packages/opencode-plugin`) and `@plannotator/opencode`
+    (`backnotprop/plannotator/tree/main/apps/opencode-plugin`) link to a subdirectory of a larger
+    repository. There's no subpath field (`git-subdir` sources are deferred past v1, see Overview).
+  - **Not published on npm (6):** `opencode-type-inject`, `opencode-morph-fast-apply`,
+    `opencode-notificator`, `opencode-workspace`, `opencode-firecrawl`, `opencode-tavily`.
+  - **npm name published by a different author (4):** `opencode-shell-strategy`,
+    `opencode-worktree`, `opencode-background-agents`, `opencode-notify`.
+  - **npm package the installer can't load (1):** `opencode-google-antigravity-auth` declares only
+    a `module` field, and the plugin installer reads `main`/`exports`.
 - **"Projects" and "Agents" sections excluded entirely:** those rows (a Discord bot, editor
   frontends, a mobile client, agent/prompt configs, etc.) aren't installable Lunos/opencode
   plugins — they're separate tools and integrations built around the ecosystem, which is why
   `ecosystem.mdx` lists them under different headings in the first place.
-- **`ref` omitted unless the source table states one.** Only one row's link
-  (`opencode-md-table-formatter`, `.../tree/main`) names a branch; that one entry sets
-  `ref: "main"`. For the other 35 included entries, no branch is knowable from the table, and
-  `ref` is optional (defaults to the repository's default branch per the schema) — guessing
-  `"main"` for all of them would fabricate data that's wrong for any repository still on
-  `master`.
+- **Before adding an entry, install it for real** (`lunos marketplace install <name> --yes` in a
+  throwaway `HOME`). Schema validation and unit tests don't catch a package that won't install.
 - `category` and `tags` are omitted throughout — `ecosystem.mdx`'s table doesn't carry that
   data, and the schema doesn't require it.
 - **MCP servers (XCOD-69):** seven `mcp` entries — six official reference servers (memory,

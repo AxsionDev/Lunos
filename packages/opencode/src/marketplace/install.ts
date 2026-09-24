@@ -5,7 +5,7 @@ import type { Marketplace } from "@opencode-ai/core/marketplace"
 import { ConfigHooks } from "@opencode-ai/core/config/hooks"
 import { Filesystem } from "@/util/filesystem"
 import { mcpConfigFromEntry } from "../mcp/discover"
-import { envReferences, headerEnvName, rejectSubstitution, requireHttpUrl } from "./guard"
+import { MarketplaceRefusal, envReferences, headerEnvName, rejectSubstitution, requireHttpUrl } from "./guard"
 import type { ContentItem } from "./content"
 import { defaultFetchDeps, type FetchDeps } from "./shared"
 
@@ -89,7 +89,7 @@ async function planMcp(item: Extract<ConfigItem, { kind: "mcp" }>, configPath: s
   if (parsed.mcp && item.name in parsed.mcp) {
     const existing = parsed.mcp[item.name]
     const hint = existing?.type === "remote" ? existing.url : existing?.command?.join?.(" ")
-    throw new Error(
+    throw new MarketplaceRefusal(
       `MCP server "${item.name}" already exists in ${configPath}${hint ? ` (${hint})` : ""}. Remove or rename it there first.`,
     )
   }
@@ -144,7 +144,7 @@ async function planSkill(
     Array.isArray(urls) &&
     urls.some((existing) => typeof existing === "string" && sameUrl(existing, item.entry.url))
   ) {
-    throw new Error(`Skill source "${item.entry.url}" is already in ${configPath} (skills.urls).`)
+    throw new MarketplaceRefusal(`Skill source "${item.entry.url}" is already in ${configPath} (skills.urls).`)
   }
   const preview = await previewSkills(item.entry.url, dep)
   const details = [`skill source: ${item.entry.url}`]
@@ -177,11 +177,11 @@ export function hookConfigFromEntry(entry: Marketplace.HookEntry): ConfigHooks.E
   // Config silently ignores hooks under an event it doesn't know (XCOD-68), so an unchecked entry
   // would install cleanly and never fire.
   if (!EVENTS.includes(entry.event)) {
-    throw new Error(
+    throw new MarketplaceRefusal(
       `Hook "${entry.name}" targets event "${entry.event}", which this version of Lunos does not dispatch. Supported: ${EVENTS.join(", ")}`,
     )
   }
-  if (!entry.command.length) throw new Error(`Hook "${entry.name}" has an empty command`)
+  if (!entry.command.length) throw new MarketplaceRefusal(`Hook "${entry.name}" has an empty command`)
   const environment = envReferences(entry.name, entry.environment)
   const matcher =
     entry.matcher && (entry.matcher.tool || entry.matcher.file)
@@ -210,7 +210,7 @@ async function planHook(item: Extract<ConfigItem, { kind: "hook" }>, configPath:
       (hook) => isDeepStrictEqual(hook?.command, config.command) && isDeepStrictEqual(hook?.matcher, config.matcher),
     )
   ) {
-    throw new Error(`An identical ${item.entry.event} hook is already in ${configPath}.`)
+    throw new MarketplaceRefusal(`An identical ${item.entry.event} hook is already in ${configPath}.`)
   }
   const on = [
     config.matcher?.tool && `tool ${config.matcher.tool}`,
