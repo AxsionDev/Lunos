@@ -8,7 +8,7 @@
 
 This was the original target design for the v2 plugin system. It is kept for its design rationale, but large parts of it were never built. It misled four Phase 2 tickets into building on things that don't exist:
 
-- **There is no `tool` domain.** `ctx.tool.hook(...)`, used in the examples below, does not exist (tracked as XCOD-75). Migration steps 4 and 6 are unstarted for tools.
+- **The `tool` domain exists, but not in the form sketched below (XCOD-75).** It is `ctx.tool["execute.before"]` / `ctx.tool["execute.after"]`, not `ctx.tool.hook(...)`, and live sessions reach it through a bridge from the v1 tool dispatch. See the READMEs.
 - **There is no event API reachable by plugins.** See [Event API](#event-api) below and XCOD-76. Migration step 8 is unstarted.
 - **The v2 runtime hooks (`aisdk.sdk`, `aisdk.language`) run in v2's `AISDK.language()`, which live sessions don't use.** Sessions resolve models through the v1 provider (`packages/opencode/src/provider/provider.ts`). XCOD-93 found the residency policy unenforced for exactly this reason.
 

@@ -85,6 +85,8 @@ This is the gap that broke XCOD-68's plan, and it is what a v2-native version of
 config-driven hooks would need. Until it exists, all tool interception runs through the v1
 `Plugin.trigger` path.
 
+> **Resolved 2026-09-24 (XCOD-75):** `ctx.tool["execute.before"]` / `["execute.after"]` exist in both APIs, backed by core `ToolHooks` and wired in `plugin/host.ts`. v1 `Plugin.trigger` bridges live tool calls to them, after v1 hooks. Exercised by `test/cli/run/plugin-tool-hooks.test.ts`, a real `lunos run` subprocess. Config `hooks` stay on the v1 dispatch until the v1→v2 cutover.
+
 **P2 — Event API is defined but unreachable.** Either wire `event` into `PluginContext`
 (delegating to `EventV2`, per PLAN.md step 8) or delete `effect/event.ts`. Leaving a typed
 interface that no one can import is the worst of both: it reads as a feature in code review
