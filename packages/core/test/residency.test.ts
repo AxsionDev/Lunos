@@ -138,3 +138,71 @@ describe("Residency.record", () => {
     expect(JSON.parse(text.trim()).providerID).toBe("mistral")
   })
 })
+
+describe("Residency.enforce", () => {
+  const tmp = () => `${require("os").tmpdir()}/residency-enforce-${Math.random().toString(36).slice(2)}.log`
+  const read = async (file: string) => {
+    await Bun.sleep(20)
+    const text = await Bun.file(file)
+      .text()
+      .catch(() => "")
+    return text
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l))
+  }
+
+  test("a denied provider throws before any fetch exists, and the refusal is audited", async () => {
+    const file = tmp()
+    let called = false
+    expect(() =>
+      Residency.enforce({
+        providerID: "anthropic",
+        baseURL: "https://api.anthropic.com/v1",
+        resolved: Residency.resolve({ allow: ["eu"] })!,
+        defaultAuditPath: file,
+        fetch: async () => {
+          called = true
+          return new Response()
+        },
+      }),
+    ).toThrow(Residency.DeniedError)
+    expect(called).toBe(false)
+    expect(await read(file)).toMatchObject([{ providerID: "anthropic", host: "api.anthropic.com", allowed: false }])
+  })
+
+  test("an allowed provider's calls go through the inner fetch and are audited by host", async () => {
+    const file = tmp()
+    const seen: string[] = []
+    const wrapped = Residency.enforce({
+      providerID: "mistral",
+      baseURL: "https://api.mistral.ai/v1",
+      resolved: Residency.resolve({ allow: ["eu"] })!,
+      defaultAuditPath: file,
+      fetch: async (input) => {
+        seen.push(String(input))
+        return new Response("ok")
+      },
+    })!
+    await wrapped("https://api.mistral.ai/v1/chat/completions?secret=x")
+    expect(seen).toEqual(["https://api.mistral.ai/v1/chat/completions?secret=x"])
+    expect(await read(file)).toMatchObject([{ providerID: "mistral", host: "api.mistral.ai", allowed: true }])
+  })
+
+  test("audit: false keeps enforcement but leaves the fetch untouched", () => {
+    const inner = async () => new Response()
+    const out = Residency.enforce({
+      providerID: "mistral",
+      baseURL: "",
+      resolved: Residency.resolve({ allow: ["eu"], audit: false })!,
+      defaultAuditPath: tmp(),
+      fetch: inner,
+    })
+    expect(out).toBe(inner)
+  })
+
+  test("no residency block resolves to no policy", () => {
+    expect(Residency.resolve(undefined)).toBeUndefined()
+  })
+})

@@ -1,5 +1,7 @@
 export * as Residency from "./residency"
 
+import path from "path"
+import { appendFile, mkdir } from "fs/promises"
 import { Jurisdiction } from "./jurisdiction"
 
 /**
@@ -9,10 +11,10 @@ import { Jurisdiction } from "./jurisdiction"
  * and a policy, nothing else. The plugin in `plugin/residency.ts` is the only wiring, so this
  * logic stays directly testable.
  *
- * Enforcement point is `AISDK.language()` by way of the `aisdk.sdk` hook — a hook that throws
- * becomes an `InitError`, so a denied provider never yields a language model. That is request
- * time, not merely selection time: blocking here cannot be bypassed by picking the model
- * through some other surface.
+ * There are two enforcement points, and both call `enforce()` below: the v2 `AISDK.language()`
+ * by way of the `aisdk.sdk` hook (`plugin/residency.ts`), and the v1 provider's SDK resolution
+ * (`packages/opencode/src/provider/provider.ts`), which is the path live sessions take. Either
+ * one throwing becomes an `InitError`, so a denied provider never yields a language model.
  */
 
 export interface Policy {
@@ -136,4 +138,70 @@ function safeHost(url: string): string {
 /** Serialise a record as one JSON line, the format the audit log appends. */
 export function line(entry: EgressRecord): string {
   return JSON.stringify(entry) + "\n"
+}
+
+/** A residency block as it appears in config, whichever config schema decoded it. */
+export interface ConfigBlock {
+  readonly allow: readonly Jurisdiction.Region[]
+  readonly audit?: boolean
+  readonly auditPath?: string
+}
+
+export interface Resolved {
+  readonly policy: Policy
+  readonly audit: boolean
+  readonly auditPath: string | undefined
+}
+
+/** `undefined` when no policy is configured, which means no enforcement and no logging at all. */
+export function resolve(block: ConfigBlock | undefined): Resolved | undefined {
+  if (!block) return undefined
+  // Audit is on by default once a policy exists, so enabling residency does not silently skip
+  // the record of what actually left.
+  return { policy: { allow: block.allow }, audit: block.audit ?? true, auditPath: block.auditPath }
+}
+
+async function append(file: string, text: string) {
+  try {
+    await mkdir(path.dirname(file), { recursive: true })
+    await appendFile(file, text, "utf8")
+  } catch (err) {
+    // A failing audit sink must not take down the user's session. It is reported rather than
+    // swallowed, so a persistently unwritable log is visible instead of quietly producing an
+    // empty audit trail.
+    console.error(`[residency] failed to write audit log at ${file}:`, err)
+  }
+}
+
+type Fetch = (input: Parameters<typeof fetch>[0], init?: RequestInit) => Promise<Response>
+
+/**
+ * Apply a resolved policy to one provider's SDK options, before the SDK is built.
+ *
+ * Denied: records the refusal (an audit trail that only lists successful calls cannot answer
+ * "did anything try to leave the region?") and throws `DeniedError`. Allowed with auditing on:
+ * returns a fetch that records each outbound call's host and then delegates to `inner`.
+ * Otherwise returns `inner` unchanged.
+ */
+export function enforce(input: {
+  readonly providerID: string
+  readonly baseURL: string
+  readonly resolved: Resolved
+  readonly defaultAuditPath: string
+  readonly fetch: Fetch | undefined
+}): Fetch | undefined {
+  const { providerID, resolved } = input
+  const file = resolved.auditPath ?? input.defaultAuditPath
+  const decision = evaluate(providerID, resolved.policy)
+  if (!decision.allowed) {
+    if (resolved.audit) void append(file, line(record(providerID, input.baseURL, false)))
+    throw new DeniedError(decision)
+  }
+  if (!resolved.audit) return input.fetch
+  const inner = input.fetch
+  return async (request, init) => {
+    const url = typeof request === "string" ? request : request instanceof URL ? request.href : (request as Request).url
+    void append(file, line(record(providerID, url, true)))
+    return (inner ?? fetch)(request, init)
+  }
 }
