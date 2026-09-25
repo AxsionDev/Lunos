@@ -12,7 +12,7 @@ An AI coding assistant that runs as a command-line tool on a developer's machine
 
 It is a fork of the open-source project [opencode](https://github.com/anomalyco/opencode), maintained by **ITService EOOD** (Bulgaria, UIC 201069485). MIT licensed.
 
-**The deployment model is self-hosted.** You install it on infrastructure you control. There is no Lunos-operated service involved in running it, and no account to create with us.
+**The deployment model is self-hosted.** You install it on infrastructure you control. No Lunos-operated service is needed to run it, and there is no account to create with us. (The optional built-in marketplace catalogue is a static file on lunos.tech; see §3.)
 
 ## 2. What is true today — the sovereignty claim, stated precisely
 
@@ -86,7 +86,9 @@ Everything else:
 
 ### Touches Lunos-operated infrastructure
 
-**Nothing.** There is no Lunos-operated production infrastructure in the data path, because there is no hosted offering. Nothing is sent to ITService EOOD, and there is no telemetry endpoint we operate for you to disable.
+**No project data.** There is no Lunos-operated production infrastructure in the data path, because there is no hosted offering. Nothing about your code, prompts or sessions is sent to ITService EOOD, and there is no telemetry endpoint we operate for you to disable.
+
+**One Lunos-operated host is contacted, and only on use:** `lunos.tech`, which serves the built-in marketplace catalogue (`https://lunos.tech/marketplace.json`, a static file) when you run a marketplace command or open the Discover view. The request carries nothing from your project, and turning off the built-in catalogue with `"marketplace_default": false` stops it (see "The marketplace" above). The update check goes to your npm registry, not to us.
 
 ```
    ┌──────────────────────────────────────┐

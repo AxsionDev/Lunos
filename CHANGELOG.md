@@ -18,10 +18,25 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
-> [!NOTE]
-> **No public Lunos release has shipped yet.** Everything below is on `dev` and has not been
-> published as an installable release. The install path is not yet verified end-to-end and
-> binaries are not code-signed — see [Known limitations](#known-limitations).
+On `dev`, not yet in a release.
+
+### Changed
+
+- **The built-in marketplace matches what lunos.tech publishes.** `marketplace.json` v1.2.0 adds a
+  category to every plugin and lists the MCP servers lunos.tech shows: filesystem, git, fetch,
+  playwright, github, postgres (`postgres-mcp`) and searxng, in place of memory,
+  sequential-thinking, time, everything and context7. lunos.tech now publishes this file at a
+  pinned commit instead of keeping its own copy (XCOD-95).
+- The install instructions add `--allow-scripts=lunos-ai`: npm 12 no longer runs install scripts by
+  default, so without it `lunos` fails to start after an npm install.
+- The data-residency docs record that sessions enforce the policy from v1.18.39.
+
+### Fixed
+
+- The v1 plugin loader logs v2 plugin files at DEBUG instead of reporting them as errors
+  (XCOD-96).
+
+## [1.18.39] - 2026-09-25
 
 ### Added
 
@@ -63,18 +78,6 @@ reasoning behind a change are published separately as **Lunos Notes**.
   EU-only residency policy with auditing, Mistral as the only enabled provider, sharing disabled
   and updates set to notify. §5 of the self-hosted deployment guide walks through it key by key,
   and a test keeps the guide's copy and the file identical.
-- Upstream sync policy documenting how Lunos tracks opencode, with the merge-over-rebase decision
-  and its measurement (109 conflicts rebasing vs. 0 merging).
-- A one-page landing site with email capture.
-- Build-in-public publishing cadence: note triggers, format, and channel sequencing, with the
-  pre-launch publication gate recorded explicitly.
-- "Why we forked opencode" FAQ, drafted and held until launch.
-- **A named legal entity behind the project: Lunos operates under ITService EOOD (UIC 201069485),
-  registered in Sofia, Bulgaria and trading as Axsion.** Recorded provisionally, with a revisit
-  point named, and with the implications for IP ownership and liability written down rather than
-  left implicit. Bulgarian incorporation puts the counterparty inside the EU — though note this is
-  entity-level sovereignty, not infrastructure sovereignty; self-hosted deployments run on
-  infrastructure you supply.
 
 ### Changed
 
@@ -109,6 +112,84 @@ reasoning behind a change are published separately as **Lunos Notes**.
   session contains the full transcript and goes to upstream's `opncd.ai` by default, outside the
   residency policy. To get the old behaviour back, set `"share": "manual"` (or `"auto"`). The
   deprecated `"autoshare": true` still counts as an explicit opt-in and maps to `"auto"`.
+
+### Fixed
+
+- **The data-residency policy is enforced for sessions.** In v1.18.38 and earlier, `lunos run` and
+  the TUI sent model requests without checking the policy and wrote no audit log, because it was
+  only wired into a code path sessions don't use (XCOD-93). Upgrade before relying on it.
+- Debug commands no longer cut off output piped to another program (XCOD-77).
+- Update checks and `lunos upgrade` stopped tracking upstream opencode (XCOD-91).
+- A Claude Code marketplace is named as such instead of failing with a raw schema error.
+
+## [1.18.38] - 2026-09-24
+
+### Added
+
+- **The marketplace carries all four kinds of extension:** plugins, skills, hooks and MCP servers,
+  searchable and installable from the CLI and shown in a tabbed TUI Discover view (XCOD-72).
+- The community marketplace is seeded with MCP servers (XCOD-69).
+
+### Changed
+
+- Community plugins install from npm; 11 entries that could not be installed were removed.
+
+### Security
+
+- **Fixes a local file disclosure from v1.18.37.** A marketplace MCP entry whose URL or header
+  names carried config substitution tokens (`{file:…}`, `{env:…}`) could make Lunos read a local
+  file and send it to the entry's server. Such entries are now refused.
+
+### Fixed
+
+- Scoped entry names (`@scope/pkg`) resolve; `list`, `add` and `update` count every content kind;
+  install refusals print as plain errors.
+
+## [1.18.37] - 2026-09-22
+
+### Added
+
+- **Data-residency controls and an egress audit log**, with provider jurisdiction metadata
+  (XCOD-61, XCOD-62). Note: not enforced for sessions until v1.18.39.
+- Config-driven lifecycle hooks (XCOD-68), and research mode on Lunos (XCOD-71).
+- Install MCP servers by name from a marketplace.
+- A self-hosted deployment guide for procurement reviewers, a release SBOM, and a
+  vulnerability-handling policy.
+
+### Security
+
+- **Affected by a local file disclosure** when installing an MCP server by name from a
+  third-party marketplace. Fixed in v1.18.38; see that release's notes for how to check your
+  config.
+
+## [1.18.35] - 2026-09-21
+
+### Fixed
+
+- Release versions are computed from `lunos-ai`, not upstream's `opencode-ai`.
+
+## [1.18.32] - 2026-09-21
+
+The first release published under the Lunos name. It also carries the fork's foundation work
+from before releases were cut.
+
+### Added
+
+- Upstream sync policy documenting how Lunos tracks opencode, with the merge-over-rebase decision
+  and its measurement (109 conflicts rebasing vs. 0 merging).
+- A one-page landing site with email capture.
+- Build-in-public publishing cadence: note triggers, format, and channel sequencing, with the
+  pre-launch publication gate recorded explicitly.
+- "Why we forked opencode" FAQ, drafted and held until launch.
+- **A named legal entity behind the project: Lunos operates under ITService EOOD (UIC 201069485),
+  registered in Sofia, Bulgaria and trading as Axsion.** Recorded provisionally, with a revisit
+  point named, and with the implications for IP ownership and liability written down rather than
+  left implicit. Bulgarian incorporation puts the counterparty inside the EU — though note this is
+  entity-level sovereignty, not infrastructure sovereignty; self-hosted deployments run on
+  infrastructure you supply.
+
+### Changed
+
 - **The product is named Lunos.** The name is frozen after an earlier sequence of renames
   (AXCODE → Ratio → Lunos). Trademark clearance remains a separate, open question.
 - **The CLI publishes as `lunos-ai` and installs a `lunos` binary.**
@@ -130,7 +211,7 @@ reasoning behind a change are published separately as **Lunos Notes**.
 - Release publishing failed when no GitHub App was configured; it now falls back to the default
   token.
 
-### Known limitations
+## Known limitations
 
 These are open and tracked. They are listed here rather than omitted, because a changelog that
 only records wins is not useful for deciding whether to try something.
@@ -143,7 +224,8 @@ only records wins is not useful for deciding whether to try something.
 Two entries were removed from this list in Phase 1, because they stopped being true:
 
 - ~~Installation is not verified end-to-end on a clean machine.~~ `npm install -g lunos-ai`
-  was verified end to end at v1.18.35.
+  was verified end to end at v1.18.35, and again at v1.18.39 on npm 10 and npm 12 (with
+  `--allow-scripts=lunos-ai`, which npm 12 needs).
 - ~~No EU-specific functionality exists yet.~~ Phase 1 shipped provider jurisdiction metadata and
   enforceable, audit-logged data-residency controls. Scoped precisely: this is control over which
   provider may be used and a record of what left — **not** EU-operated infrastructure, which
@@ -162,4 +244,9 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/AxsionDev/Lunos/commits/dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.39...dev
+[1.18.39]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.39
+[1.18.38]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.38
+[1.18.37]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.37
+[1.18.35]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.35
+[1.18.32]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.32
