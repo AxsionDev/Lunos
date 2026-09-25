@@ -17,6 +17,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { backgroundEnabled } from "@/background/enabled"
 import { Database } from "@opencode-ai/core/database/database"
 import { Residency } from "@opencode-ai/core/residency"
+import { AuditLog } from "@/audit/log"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { SubagentModel } from "../agent/subagent-model"
@@ -236,7 +237,7 @@ export const TaskTool = Tool.define(
                   source: "resumed task",
                 }
               : out
-          SubagentModel.checkResidency(final, Residency.resolve(cfg.residency))
+          SubagentModel.checkResidency(final, AuditLog.residency(cfg))
           return final
         },
         catch: (error) => (error instanceof Error ? error : new Error(String(error))),

@@ -150,6 +150,13 @@ export interface Resolved {
   readonly policy: Policy
   readonly audit: boolean
   readonly auditPath: string | undefined
+  /** false: record every call but refuse nothing (the XCOD-103 audit trail without a residency policy). */
+  readonly enforce?: boolean
+}
+
+/** Audit without enforcement: `audit.enabled` set and no residency policy (XCOD-103). */
+export function observe(auditPath: string | undefined): Resolved {
+  return { policy: { allow: [] }, audit: true, auditPath, enforce: false }
 }
 
 /** `undefined` when no policy is configured, which means no enforcement and no logging at all. */
@@ -165,7 +172,13 @@ export function resolve(block: ConfigBlock | undefined): Resolved | undefined {
 // provider id, so they get the share events.
 function append(file: string, entry: EgressRecord) {
   const share = entry.providerID.startsWith("share:")
-  const event = share ? (entry.allowed ? "share.upload" : "share.denied") : entry.allowed ? "model.call" : "model.denied"
+  const event = share
+    ? entry.allowed
+      ? "share.upload"
+      : "share.denied"
+    : entry.allowed
+      ? "model.call"
+      : "model.denied"
   void Audit.write({ file }, event, { ...entry })
 }
 
@@ -195,7 +208,7 @@ export function enforce(input: {
   const { providerID, resolved } = input
   const file = resolved.auditPath ?? input.defaultAuditPath
   const decision = evaluate(providerID, resolved.policy)
-  if (!decision.allowed) {
+  if (!decision.allowed && resolved.enforce !== false) {
     if (resolved.audit) append(file, record(providerID, input.baseURL, false))
     throw new DeniedError(decision)
   }

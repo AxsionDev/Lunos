@@ -37,6 +37,7 @@ import { ConfigV2Compat } from "./v2-compat"
 import { Npm } from "@opencode-ai/core/npm"
 import { withTransientReadRetry } from "@/util/effect-http-client"
 import { ConfigPolicy } from "./policy"
+import { AuditLog } from "@/audit/log"
 
 // Custom merge function that concatenates array fields instead of replacing them
 // Keep remeda's deep conditional merge type out of hot config-loading paths; TS profiling showed it dominates here.
@@ -347,7 +348,11 @@ const layer = Layer.effect(
     const getGlobal = Effect.fn("Config.getGlobal")(function* () {
       const global = yield* cachedGlobal
       const managed = yield* loadManaged().pipe(Effect.orElseSucceed(() => ({ doc: {} as Info, locked: [] })))
-      return managed.locked.length ? ConfigPolicy.apply(global, managed.doc, managed.locked) : global
+      const result = managed.locked.length ? ConfigPolicy.apply(global, managed.doc, managed.locked) : global
+      // Commands that never load a project (the upgrade check) still need the trail on; a later
+      // project load re-activates with the full config.
+      if (!AuditLog.current()) AuditLog.activate(AuditLog.resolve(result))
+      return result
     })
 
     const ensureGitignore = Effect.fn("Config.ensureGitignore")(function* (dir: string) {
@@ -664,6 +669,9 @@ const layer = Layer.effect(
           const layer = managedLayers.layers.findLast((item) => ConfigPolicy.get(item.info, key) !== undefined)
           origins[top] = { layer: "managed", source: layer?.source ?? "managed policy (unset: default)" }
         }
+
+        // XCOD-103: the audit trail follows the fully resolved (and locked) config.
+        AuditLog.activate(AuditLog.resolve(result))
 
         // Lunos: sharing uploads the full transcript to a third-party host, so it is off
         // unless a config layer turns it on. Upstream opencode behaves as "manual".

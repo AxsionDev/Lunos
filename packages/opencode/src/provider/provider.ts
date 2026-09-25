@@ -17,6 +17,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
 import { Residency } from "@opencode-ai/core/residency"
+import { AuditLog } from "@/audit/log"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -1729,7 +1730,7 @@ const layer = Layer.effect(
           sdk,
           modelLoaders,
           varsLoaders,
-          residency: Residency.resolve(cfg.residency),
+          residency: AuditLog.residency(cfg),
         }
       }),
     )

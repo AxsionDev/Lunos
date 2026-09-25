@@ -1,4 +1,5 @@
 import { intro, log, outro, spinner } from "@clack/prompts"
+import { AuditLog } from "@/audit/log"
 import { Effect } from "effect"
 
 import { cmd } from "./cmd"
@@ -93,6 +94,7 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
         : "marketplace_allow"
     if (lockedKey) {
       await Effect.runPromise(ConfigPolicy.refused(lockedKey, `marketplace add ${source}`))
+      AuditLog.emit("marketplace.refused", { source, key: lockedKey, reason: ConfigPolicy.message(lockedKey) })
       dep.log.error(`Not added: ${ConfigPolicy.message(lockedKey)}.`)
       if (lockedKey !== FIELD) dep.log.info(`${source} is not on the allowed marketplace list.`)
       return false

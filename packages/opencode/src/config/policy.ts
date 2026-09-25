@@ -21,6 +21,10 @@ export const KNOWN = [
   "autoupdate",
   "memory",
   "memory.enabled",
+  "audit",
+  "audit.enabled",
+  "audit.path",
+  "audit.forward",
 ] as const
 
 type Record_ = Record<string, unknown>

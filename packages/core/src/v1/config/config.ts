@@ -54,6 +54,38 @@ export const Info = Schema.Struct({
   }),
   // Declared here as well as in the v2 schema: without it, the live config path strips the key
   // and the v1 provider (which enforces it for sessions) never sees a policy.
+  audit: Schema.optional(
+    Schema.Struct({
+      enabled: Schema.optional(Schema.Boolean).annotate({
+        description:
+          "Write the organisation audit trail: model calls, tool runs, permission decisions, MCP connections, marketplace installs, policy refusals and upgrades. Also on whenever a residency policy is set with audit on",
+      }),
+      path: Schema.optional(Schema.String).annotate({
+        description:
+          "Audit log path. Takes precedence over residency.auditPath. Default: residency-egress.log in the Lunos log directory",
+      }),
+      redact: Schema.optional(Schema.Array(Schema.String)).annotate({
+        description:
+          "Regular expressions whose matches are masked in recorded paths and command lines, on top of the built-in secret patterns",
+      }),
+      max_bytes: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))).annotate({
+        description: "Rotate the log when it reaches this size (default 10 MB)",
+      }),
+      max_age_days: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))).annotate({
+        description: "Delete rotated log files older than this (default 90)",
+      }),
+      forward: Schema.optional(
+        Schema.Struct({
+          syslog: Schema.optional(Schema.String).annotate({
+            description: "Forward every line to a syslog receiver, e.g. udp://siem.internal:514",
+          }),
+          otlp: Schema.optional(Schema.String).annotate({
+            description: "Forward every line as an OTLP log record, e.g. https://collector.internal:4318",
+          }),
+        }),
+      ),
+    }),
+  ),
   residency: Schema.optional(ConfigResidency.Info).annotate({
     description:
       "Data-residency policy restricting which provider jurisdictions this deployment may use, with an audit log of outbound model calls",

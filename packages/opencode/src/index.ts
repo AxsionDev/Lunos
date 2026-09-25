@@ -1,4 +1,7 @@
 import yargs from "yargs"
+import { ConfigPolicy } from "@/config/policy"
+import { AuditLog } from "@/audit/log"
+import { AuditForward } from "@/audit/forward"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
@@ -29,6 +32,7 @@ import { DbCommand } from "./cli/cmd/db"
 import { errorMessage } from "./util/error"
 import { PluginCommand } from "./cli/cmd/plug"
 import { MarketplaceCommand } from "./cli/cmd/marketplace"
+import { AuditCommand } from "./cli/cmd/audit"
 import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
@@ -122,6 +126,7 @@ const cli = yargs(args)
   .command(SessionCommand)
   .command(PluginCommand)
   .command(MarketplaceCommand)
+  .command(AuditCommand)
   .command(DbCommand)
   .fail((msg, err) => {
     if (
@@ -136,6 +141,10 @@ const cli = yargs(args)
     process.exit(1)
   })
   .strict()
+
+// XCOD-103: every refused policy override lands in the audit trail, whichever surface refused it.
+ConfigPolicy.onRefused((refusal) => AuditLog.emit("policy.override_refused", { key: refusal.key, via: refusal.via }))
+AuditLog.onActivate(AuditForward.start)
 
 try {
   if (args.includes("-h") || args.includes("--help")) {
@@ -164,6 +173,10 @@ try {
   // Some subprocesses don't react properly to SIGTERM and similar signals.
   // Most notably, some docker-container-based MCP servers don't handle such signals unless
   // run using `docker run --init`.
-  // Explicitly exit to avoid any hanging subprocesses.
+  // Explicitly exit to avoid any hanging subprocesses. Audit events are flushed first, bounded, so
+  // a short-lived command can't exit before its last events are written (XCOD-103).
+  await Promise.race([AuditLog.flush(), Bun.sleep(3000)])
+  // Forwarded lines are sent asynchronously; give them a moment to leave before exiting.
+  if (AuditLog.current()?.enabled && AuditLog.current()?.forward) await Bun.sleep(200)
   process.exit()
 }
