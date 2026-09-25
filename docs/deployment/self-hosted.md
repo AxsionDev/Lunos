@@ -126,11 +126,11 @@ Everything else:
 ### Method A — npm (recommended)
 
 ```sh
-npm install -g lunos-ai
+npm install -g lunos-ai --allow-scripts=lunos-ai
 lunos --version
 ```
 
-Verified against version **1.18.35**: the package installs and the `lunos` command reports its version.
+Verified against version **1.18.39** on npm 10 and npm 12: the package installs and the `lunos` command reports its version. npm 12 skips install scripts unless they're allowed, and without `--allow-scripts=lunos-ai` the postinstall that fetches the binary never runs, so `lunos` refuses to start. Earlier npm versions accept the flag.
 
 ### Method B — standalone binary
 
