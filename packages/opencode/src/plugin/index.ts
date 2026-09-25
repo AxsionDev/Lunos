@@ -28,7 +28,7 @@ import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { errorMessage } from "@/util/error"
 import { PluginLoader } from "./loader"
-import { parsePluginSpecifier, readPluginId, readV1Plugin, resolvePluginId } from "./shared"
+import { isV2PluginModule, parsePluginSpecifier, readPluginId, readV1Plugin, resolvePluginId } from "./shared"
 import { registerAdapter } from "@/control-plane/adapters"
 import type { WorkspaceAdapter } from "@/control-plane/types"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -120,17 +120,24 @@ function getLegacyPlugins(mod: Record<string, unknown>) {
   return result
 }
 
-async function applyPlugin(load: PluginLoader.Loaded, input: PluginInput, hooks: Hooks[]) {
+type ApplyPluginResult =
+  | { readonly _tag: "Loaded" }
+  | { readonly _tag: "SkippedV2"; readonly spec: string; readonly path: string }
+
+async function applyPlugin(load: PluginLoader.Loaded, input: PluginInput, hooks: Hooks[]): Promise<ApplyPluginResult> {
   const plugin = readV1Plugin(load.mod, load.spec, "server", "detect")
   if (plugin) {
     await resolvePluginId(load.source, load.spec, load.target, readPluginId(plugin.id, load.spec), load.pkg)
     hooks.push(await (plugin as PluginModule).server(input, load.options))
-    return
+    return { _tag: "Loaded" }
   }
+
+  if (isV2PluginModule(load.mod)) return { _tag: "SkippedV2", spec: load.spec, path: load.entry }
 
   for (const server of getLegacyPlugins(load.mod)) {
     hooks.push(await server(input, load.options))
   }
+  return { _tag: "Loaded" }
 }
 
 const layer = Layer.effect(
@@ -265,6 +272,14 @@ const layer = Layer.effect(
               return message
             },
           }).pipe(
+            Effect.flatMap((result) =>
+              result._tag === "SkippedV2"
+                ? Effect.logDebug("skipping v2 plugin module in v1 loader", {
+                    spec: result.spec,
+                    path: result.path,
+                  })
+                : Effect.void,
+            ),
             Effect.tapError((error) => Effect.logError("failed to load plugin", { path: load.spec, error })),
             Effect.catch(() => {
               // TODO: make proper events for this
