@@ -72,3 +72,39 @@ describe("organisation policy: locked share (subprocess)", () => {
     60_000,
   )
 })
+
+describe("organisation policy: marketplace allowlist (subprocess)", () => {
+  const manifest = (name: string) => ({
+    name,
+    owner: { name },
+    plugins: [],
+    mcp: [{ name: "srv", type: "remote", url: "https://example.test/mcp" }],
+  })
+
+  cliIt.live(
+    "add and install --from are refused for a source off a locked allow list; the built-in is listed as refused",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const allowed = path.join(home, "allowed.json")
+        const other = path.join(home, "other.json")
+        yield* Effect.promise(() => fs.writeFile(allowed, JSON.stringify(manifest("allowed-mp"))))
+        yield* Effect.promise(() => fs.writeFile(other, JSON.stringify(manifest("other-mp"))))
+        const env = yield* setup(home, { $locked: ["marketplace_allow"], marketplace_allow: [allowed] }, {})
+
+        const add = yield* opencode.spawn(["marketplace", "add", other], { env })
+        expect(add.exitCode).not.toBe(0)
+        expect(add.stdout + add.stderr).toContain("marketplace_allow is set by your organisation's policy")
+
+        const install = yield* opencode.spawn(["marketplace", "install", "srv", "--from", other, "--yes"], { env })
+        expect(install.exitCode).not.toBe(0)
+        expect(install.stdout + install.stderr).toContain("marketplace_allow is set by your organisation's policy")
+
+        opencode.expectExit(yield* opencode.spawn(["marketplace", "add", allowed], { env }), 0, "add allowed")
+        const list = yield* opencode.spawn(["marketplace", "list"], { env })
+        const out = list.stdout + list.stderr
+        expect(out).toContain("allowed-mp")
+        expect(out).toContain("not on your organisation's allowed marketplace list")
+      }),
+    90_000,
+  )
+})

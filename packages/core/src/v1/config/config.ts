@@ -149,6 +149,16 @@ export const Info = Schema.Struct({
   attachment: Schema.optional(ConfigAttachmentV1.Info).annotate({
     description: "Attachment processing configuration, including image size limits and resizing behavior",
   }),
+  marketplace: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description: "Marketplace sources (manifest URL, owner/repo or path) to list and install from",
+  }),
+  marketplace_default: Schema.optional(Schema.Boolean).annotate({
+    description: "Whether the built-in lunos-community marketplace is used (default: true)",
+  }),
+  marketplace_allow: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description:
+      "Organisation policy: the only marketplace sources that may be listed and installed from, when locked in managed config",
+  }),
   enterprise: Schema.optional(
     Schema.Struct({ url: Schema.optional(Schema.String).annotate({ description: "Enterprise URL" }) }),
   ),

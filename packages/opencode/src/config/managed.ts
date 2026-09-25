@@ -48,6 +48,21 @@ export function managedConfigDir() {
   return managedConfigLocation().dir
 }
 
+/** Every managed document, raw, in precedence order: the system directory, then the MDM profile. */
+export async function readManagedDocs(): Promise<unknown[]> {
+  const { parse } = await import("jsonc-parser")
+  const { readFile } = await import("fs/promises")
+  const docs: unknown[] = []
+  const { dir } = managedConfigLocation()
+  for (const file of ["managed.json", "opencode.json", "opencode.jsonc"]) {
+    const text = await readFile(path.join(dir, file), "utf8").catch(() => undefined)
+    if (text !== undefined) docs.push(parse(text, [], { allowTrailingComma: true }))
+  }
+  const plist = await readManagedPreferences()
+  if (plist) docs.push(JSON.parse(plist.text))
+  return docs
+}
+
 export function parseManagedPlist(json: string): string {
   const raw = JSON.parse(json)
   for (const key of Object.keys(raw)) {
