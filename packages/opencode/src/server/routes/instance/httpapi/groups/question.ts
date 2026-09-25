@@ -15,6 +15,13 @@ const ReplyPayload = Schema.Struct({
   }),
 })
 
+// Optional: a reject with no body (`lunos run`, ACP, SDK clients) behaves exactly as before.
+const RejectPayload = Schema.Struct({
+  drafts: Schema.optional(Question.Drafts).annotate({
+    description: "What the user had answered when they dismissed the question; kept on the rejected tool part",
+  }),
+})
+
 export const QuestionApi = HttpApi.make("question")
   .add(
     HttpApiGroup.make("question")
@@ -45,6 +52,7 @@ export const QuestionApi = HttpApi.make("question")
         HttpApiEndpoint.post("reject", `${root}/:requestID/reject`, {
           params: { requestID: QuestionID },
           query: WorkspaceRoutingQuery,
+          payload: [RejectPayload, Schema.Null],
           success: described(Schema.Boolean, "Question rejected successfully"),
           error: [HttpApiError.BadRequest, QuestionNotFoundError],
         }).annotateMerge(

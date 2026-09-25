@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test"
-import { versionDetail, versionLabel } from "@opencode-ai/core/installation/version"
+import { manualInstallCommand, versionDetail, versionLabel } from "@opencode-ai/core/installation/version"
+
+describe("manualInstallCommand", () => {
+  test("allows lunos-ai's postinstall, which npm 12 skips by default", () => {
+    expect(manualInstallCommand("1.18.40")).toBe("npm i -g lunos-ai@1.18.40 --allow-scripts=lunos-ai")
+  })
+
+  test("leaves the version off when there's no target", () => {
+    expect(manualInstallCommand()).toBe("npm i -g lunos-ai --allow-scripts=lunos-ai")
+  })
+})
 
 describe("versionLabel", () => {
   test("names the product next to the version", () => {

@@ -24,7 +24,19 @@ export const Replied = QuestionV1.Replied
 export const Rejected = QuestionV1.Rejected
 export const Event = QuestionV1.Event
 
-export class RejectedError extends Schema.TaggedErrorClass<RejectedError>()("QuestionRejectedError", {}) {
+// What the user had picked or typed when they dismissed a question. A client (the TUI) sends it
+// with the reject so the rejected tool part keeps it and the question can be answered later.
+export const Drafts = Schema.Struct({
+  answers: Schema.Array(Answer).annotate({ description: "Answers picked so far, in question order" }),
+  custom: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description: "Typed custom answers so far, in question order",
+  }),
+}).annotate({ identifier: "QuestionDrafts" })
+export type Drafts = typeof Drafts.Type
+
+export class RejectedError extends Schema.TaggedErrorClass<RejectedError>()("QuestionRejectedError", {
+  drafts: Schema.optional(Drafts),
+}) {
   override get message() {
     return "The user dismissed this question"
   }
@@ -55,7 +67,7 @@ export interface Interface {
     requestID: QuestionID
     answers: ReadonlyArray<Answer>
   }) => Effect.Effect<void, NotFoundError>
-  readonly reject: (requestID: QuestionID) => Effect.Effect<void, NotFoundError>
+  readonly reject: (requestID: QuestionID, drafts?: Drafts) => Effect.Effect<void, NotFoundError>
   readonly list: () => Effect.Effect<ReadonlyArray<Request>>
 }
 
@@ -131,7 +143,7 @@ const layer = Layer.effect(
       yield* Deferred.succeed(existing.deferred, input.answers)
     })
 
-    const reject = Effect.fn("Question.reject")(function* (requestID: QuestionID) {
+    const reject = Effect.fn("Question.reject")(function* (requestID: QuestionID, drafts?: Drafts) {
       const pending = (yield* InstanceState.get(state)).pending
       const existing = pending.get(requestID)
       if (!existing) {
@@ -144,7 +156,7 @@ const layer = Layer.effect(
         sessionID: existing.info.sessionID,
         requestID: existing.info.id,
       })
-      yield* Deferred.fail(existing.deferred, new RejectedError())
+      yield* Deferred.fail(existing.deferred, new RejectedError({ drafts }))
     })
 
     const list = Effect.fn("Question.list")(function* () {

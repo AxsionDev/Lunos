@@ -17,10 +17,12 @@ import {
   defaultMarketplaceListDeps,
   defaultMarketplaceCacheDeps,
   FIELD,
+  DEFAULT_FIELD,
   type MarketplaceCacheDeps,
   type MarketplaceCtx,
   type MarketplaceListDeps,
   type MarketplacePolicy,
+  type ResolvedMarketplace,
   allowedSource,
 } from "../../marketplace/shared"
 import { ConfigPolicy } from "@/config/policy"
@@ -54,6 +56,8 @@ export type MarketplaceDeps = {
   cache: MarketplaceCacheDeps
   /** Organisation policy from managed config (XCOD-102). Unset means no policy. */
   policy?: () => Promise<MarketplacePolicy>
+  /** Marketplaces already added in every scope, built-in included. Unset skips the name check. */
+  added?: (ctx: MarketplaceCtx) => Promise<ResolvedMarketplace[]>
 }
 
 export type MarketplaceAddInput = {
@@ -78,6 +82,7 @@ const defaultMarketplaceDeps: MarketplaceDeps = {
   global: Global.Path.config,
   cache: defaultMarketplaceCacheDeps,
   policy: defaultMarketplaceListDeps.policy,
+  added: (ctx) => resolveAddedMarketplaces(ctx, defaultMarketplaceListDeps),
 }
 
 export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: MarketplaceDeps = defaultMarketplaceDeps) {
@@ -112,6 +117,25 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
       return false
     }
     resolve.stop(`Validated "${manifest.item.name}" (${describeContents(manifest.item)})`)
+
+    // Entries are addressed as <marketplace>/<name>, so a second source publishing under a name
+    // already in use would make every entry of both ambiguous, and would let a third-party
+    // manifest pose as the built-in one. Refuse, and say which source holds the name.
+    const name = manifest.item.name
+    const clash = (await dep.added?.(ctx))?.find(
+      (entry) => entry.ok && entry.manifest.name === name && normalizeSource(entry.source) !== source,
+    )
+    if (clash) {
+      const where = clash.scope === "builtin" ? "the built-in marketplace" : `your ${clash.scope} config`
+      dep.log.error(`Not added: a marketplace named "${name}" is already added from ${clash.source} (${where}).`)
+      dep.log.error(`Two marketplaces with one name would make every "${name}/<entry>" ambiguous.`)
+      dep.log.info(
+        clash.scope === "builtin"
+          ? `To use ${source} instead, set "${DEFAULT_FIELD}": false in your config, then run this again.`
+          : `To use ${source} instead, remove ${clash.source} from "${FIELD}" in your ${clash.scope} config, then run this again.`,
+      )
+      return false
+    }
     // Seed the cache with the manifest already fetched above so the next `list`/`search`/Discover
     // read is a cache hit rather than fetching this same source again immediately after adding it.
     // Local path sources bypass the cache entirely (see resolveWithCache), so seeding one would

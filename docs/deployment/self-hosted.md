@@ -138,11 +138,47 @@ Verified against version **1.18.39** on npm 10 and npm 12: the package installs 
 
 Download the archive for your platform from the [releases page](https://github.com/AxsionDev/Lunos/releases), extract it, and place the `lunos` binary on your `PATH`. Assets are named `lunos-<os>-<arch>`.
 
-> **Binaries are not code-signed on any platform.** macOS Gatekeeper and Windows SmartScreen will warn, and release artifacts cannot currently be verified by signature. This is a known and tracked limitation — see §7. If signature verification is a procurement requirement, Method A or building from source is the better route today.
+> **Binaries are not OS code-signed.** macOS Gatekeeper and Windows SmartScreen will warn when you first run them. You can still check that a download is genuine: see [Verify your download](#verify-your-download) below. To avoid the OS warning, install with Method A (npm), or allow the binary manually: on macOS, `xattr -d com.apple.quarantine ./lunos`; on Windows, "More info → Run anyway" in the SmartScreen dialog. See §7.
 
 ### Method C — build from source
 
 For reviewers who require building from audited source. See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) in the repository.
+
+### Verify your download
+
+Releases can be checked without trusting the download location. None of this needs a certificate from us.
+
+**npm (Method A): provenance.** `lunos-ai` and its platform packages are published from this repository's GitHub Actions workflow with npm provenance (SLSA attestations) and registry signatures. In any directory:
+
+```sh
+npm init -y
+npm install lunos-ai@<version> --ignore-scripts
+npm audit signatures
+```
+
+Expected: `2 packages have verified registry signatures` and `2 packages have verified attestations` (`lunos-ai` and your platform's package). This was checked against 1.18.39. `--ignore-scripts` only skips the binary download, which the audit doesn't need.
+
+**Release assets (Method B): signed checksums.** Starting with the first release after 1.18.39, each GitHub release also carries:
+
+- `SHA256SUMS`: the SHA-256 of every asset on the release
+- `SHA256SUMS.sigstore.json`: a [Sigstore](https://www.sigstore.dev/) signature bundle for `SHA256SUMS`, made keylessly by the release workflow
+- `lunos-sbom-<version>.cdx.json.sigstore.json`: the same for the SBOM
+
+With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) installed, download `SHA256SUMS`, its bundle and your archive into one directory, then:
+
+```sh
+cosign verify-blob SHA256SUMS \
+  --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity-regexp '^https://github\.com/AxsionDev/Lunos/\.github/workflows/publish\.yml@' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+sha256sum --check --ignore-missing SHA256SUMS      # Linux
+shasum -a 256 --check --ignore-missing SHA256SUMS  # macOS
+```
+
+The first command proves `SHA256SUMS` was produced by this repository's release workflow and hasn't changed since. The second proves your archive matches it; a modified file fails with `FAILED`. The SBOM verifies the same way, with `--bundle lunos-sbom-<version>.cdx.json.sigstore.json` and the SBOM file in place of `SHA256SUMS`.
+
+Releases up to and including 1.18.39 have no `SHA256SUMS`. For those, use Method A and `npm audit signatures`.
 
 ## 5. Configuring data residency
 
@@ -244,7 +280,7 @@ Lunos requires no database, no message broker and no inbound network access. Ser
 ## 7. Known limitations — stated, not buried
 
 - **The residency policy is not enforced for sessions in v1.18.38 and earlier.** See the correction in §5. It is enforced from v1.18.39; on older versions the policy is advisory only.
-- **Binaries are not code-signed** on any platform. Tracked; blocked on code-signing credentials.
+- **Binaries are not OS code-signed** on any platform: no Apple Developer ID or notarization, no Windows Authenticode. Gatekeeper and SmartScreen will warn. What you _can_ verify is that a download came from this repository's release workflow unchanged: npm provenance for the npm packages, and a Sigstore-signed `SHA256SUMS` for the release archives (see [Verify your download](#verify-your-download)). OS signing needs certificates that haven't been bought; it's deferred, not dropped.
 - **No security certification is held.** Lunos holds no CRA, EUCS, ISO or SOC certification and claims none. On the project's current assessment it falls outside the scope of the EU Cyber Resilience Act entirely, because it is free, MIT-licensed, self-hosted and unmonetised. A CycloneDX **software bill of materials is published with each release** as manufacturer-readiness groundwork, not as a compliance claim.
 - **The agent is not sandboxed.** Lunos can execute shell commands and modify files. Its permission system is a UX safeguard that prompts before acting — it is _not_ a security boundary. For true isolation, run it in a container or VM. This is inherited from upstream and documented in [`SECURITY.md`](../../SECURITY.md).
 - **Model provider data handling is governed by your agreement with that provider,** not by Lunos. Residency controls determine _which_ provider may be used; they do not alter what that provider does with what it receives.

@@ -24,11 +24,26 @@ const LABEL: Record<Marketplace.Kind, string> = {
 
 // Resolves a bare or `<marketplace>/<name>` reference to exactly one item, or explains why not.
 // `undefined` means nothing matched, so the caller decides what an unknown name means for it.
-export function pickOne<T extends ContentItem>(items: readonly T[], name: string): T | undefined {
+// `kind` is the kind the caller already filtered on (`--kind`, or `mcp add`), if any.
+export function pickOne<T extends ContentItem>(
+  items: readonly T[],
+  name: string,
+  options: { kind?: Marketplace.Kind } = {},
+): T | undefined {
   const matches = resolveByName(items, name)
   if (matches.length > 1) {
-    const qualified = matches.map((m) => `${m.marketplace}/${m.name} (${m.kind})`).join(", ")
-    throw new MarketplaceRefusal(`"${name}" exists in more than one place. Use one of: ${qualified}, or pass --kind`)
+    const label = (m: T) => `${m.marketplace}/${m.name} (${m.kind})`
+    // Two added sources can publish under one marketplace name. Their labels are then identical,
+    // so name the source to keep every choice distinguishable.
+    const choices = matches.map((m) =>
+      matches.filter((other) => label(other) === label(m)).length > 1 ? `${label(m)} from ${m.source}` : label(m),
+    )
+    // --kind only helps when it was not already given and the matches differ in kind.
+    const kindHelps = !options.kind && new Set(matches.map((m) => m.kind)).size > 1
+    throw new MarketplaceRefusal(
+      `"${name}" exists in more than one place: ${choices.join(", ")}.` +
+        (kindHelps ? " Pass --kind, or use the qualified <marketplace>/<name> form." : ""),
+    )
   }
   return matches[0]
 }
@@ -185,7 +200,7 @@ export const MarketplaceInstallCommand = effectCmd({
 
     const picked = yield* Effect.promise(() =>
       listContent(marketplaceCtx, kind)
-        .then((listed) => ({ listed, item: pickOne(listed.items, name) }))
+        .then((listed) => ({ listed, item: pickOne(listed.items, name, { kind }) }))
         .catch((error: unknown) => ({ error: refusal(error) })),
     )
     if ("error" in picked) return picked.error === undefined ? undefined : yield* fail(picked.error)
