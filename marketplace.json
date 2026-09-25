@@ -464,7 +464,7 @@
       "matcher": {
         "tool": "{edit,write,apply_patch}"
       },
-      "description": "After every file edit (edit, write or apply_patch), runs git diff --check and reports trailing whitespace or leftover conflict markers the edit introduced. Needs git; changes nothing.",
+      "description": "After every file edit (edit, write or apply_patch), runs git diff --check, which reports trailing whitespace and leftover conflict markers in all uncommitted changes, not only the latest edit. Needs git and a git repository (outside one it reports a failure after every edit); changes nothing.",
       "category": "quality",
       "review": {
         "status": "community"
