@@ -354,3 +354,73 @@ describe("dev-cycle mode reminder", () => {
     }),
   )
 })
+
+// XCOD-99: the agent loop reloads messages from storage and re-applies
+// reminders on every step. Replay that loop and count what the model is sent.
+describe("reminders across the steps of one turn", () => {
+  const steps = (agentName: string, between?: (step: number, file: string) => Promise<void>) =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const agent = yield* (yield* Agent.Service).get(agentName)
+      const ctx = yield* InstanceState.context
+      const session = yield* sessions.create({})
+      const file = agentName === "research" ? SessionNs.research(session, ctx) : SessionNs.devcycle(session, ctx)
+      yield* sessions.updateMessage({
+        id: MessageID.ascending(),
+        sessionID: session.id,
+        role: "user",
+        time: { created: Date.now() },
+        agent: "user",
+        model: { providerID: "test", modelID: "test" },
+        tools: {},
+        mode: "",
+      } as unknown as SessionV1.Info)
+
+      const sent: string[][] = []
+      for (const step of [1, 2, 3]) {
+        if (between) yield* Effect.promise(() => between(step, file))
+        const msgs = yield* sessions.messages({ sessionID: session.id })
+        yield* SessionReminders.apply({ messages: msgs, agent, session })
+        const user = msgs.findLast((msg) => msg.info.role === "user")!
+        sent.push(user.parts.filter((part) => part.type === "text").map((part) => part.text))
+      }
+      const stored = yield* sessions.messages({ sessionID: session.id })
+      return { sent, stored }
+    })
+
+  it.instance("sends exactly one dev-cycle reminder per step, and saves none", () =>
+    Effect.gen(function* () {
+      const { sent, stored } = yield* steps("dev-cycle")
+      for (const texts of sent) {
+        expect(texts.filter((text) => text.includes("Dev-cycle mode is active"))).toHaveLength(1)
+      }
+      expect(stored.flatMap((msg) => msg.parts)).toEqual([])
+    }),
+  )
+
+  it.instance("picks up a hand edit of the frontmatter at the next step", () =>
+    Effect.gen(function* () {
+      const { sent } = yield* steps("dev-cycle", async (step, file) => {
+        if (step === 1) await Bun.write(file, "---\nphase: plan\ngate: pending\n---\n\n# Cycle\n")
+        // A human rewinds the cycle mid-turn.
+        if (step === 3) await Bun.write(file, "---\nphase: discover\ngate: approved\n---\n\n# Cycle\n")
+      })
+      const cursor = (texts: string[]) => texts.find((text) => text.includes("Dev-cycle mode is active"))!
+
+      expect(cursor(sent[1])).toContain("Current phase: plan. Gate at the end of this phase: pending.")
+      expect(sent[2]).toHaveLength(1)
+      expect(cursor(sent[2])).toContain("Current phase: discover. Gate at the end of this phase: approved.")
+      expect(cursor(sent[2])).not.toContain("Current phase: plan.")
+    }),
+  )
+
+  it.instance("sends exactly one research reminder per step, and saves none", () =>
+    Effect.gen(function* () {
+      const { sent, stored } = yield* steps("research")
+      for (const texts of sent) {
+        expect(texts.filter((text) => text.includes("Research mode is active"))).toHaveLength(1)
+      }
+      expect(stored.flatMap((msg) => msg.parts)).toEqual([])
+    }),
+  )
+})
