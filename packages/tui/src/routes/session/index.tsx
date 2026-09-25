@@ -195,6 +195,21 @@ export function Session() {
   const kv = useKV()
   const { theme } = useTheme()
   const promptRef = usePromptRef()
+  const dismissal = createQuestionDismissal({
+    sessionID: () => route.sessionID,
+    sdk: useSDK(),
+    sync,
+    toast: useToast(),
+    config: tuiConfig,
+  })
+  // A held dismissal belongs to the session it was made in; switching away sends it.
+  createEffect(
+    on(
+      () => route.sessionID,
+      () => dismissal.flush(),
+      { defer: true },
+    ),
+  )
   const session = createMemo(() => sync.session.get(route.sessionID))
   const location = createMemo(() => {
     const current = session()
@@ -286,21 +301,6 @@ export function Session() {
   const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
   const toast = useToast()
   const sdk = useSDK()
-  const dismissal = createQuestionDismissal({
-    sessionID: () => route.sessionID,
-    sdk,
-    sync,
-    toast,
-    config: tuiConfig,
-  })
-  // A held dismissal belongs to the session it was made in; switching away sends it.
-  createEffect(
-    on(
-      () => route.sessionID,
-      () => dismissal.flush(),
-      { defer: true },
-    ),
-  )
   const editor = useEditorContext()
 
   createEffect(() => {
@@ -1366,7 +1366,7 @@ export function Session() {
                     <QuestionPrompt
                       request={questions()[0]}
                       directory={sync.session.get(questions()[0].sessionID)?.directory}
-                      initial={dismissal.takeRestored(questions()[0].id)}
+                      initial={dismissal.restoredDraft(questions()[0].id)}
                       onDismiss={(draft) =>
                         dismissal.dismiss(questions()[0], sync.session.get(questions()[0].sessionID)?.directory, draft)
                       }

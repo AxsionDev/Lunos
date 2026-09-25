@@ -89,12 +89,11 @@ export function createQuestionDismissal(input: {
       })
       input.toast.show({ variant: "success", message: "Question restored", duration: 1500 })
     },
-    /** The draft to reopen a restored question with; read once. */
-    takeRestored(id: string) {
-      const draft = restored.get(id)
-      restored.delete(id)
-      return draft
-    },
+    /**
+     * The draft to reopen a restored question with. Not consumed on read: Solid props are getters,
+     * so the panel may read it more than once while mounting.
+     */
+    restoredDraft: (id: string) => restored.get(id),
 
     answering,
     openAnswer,

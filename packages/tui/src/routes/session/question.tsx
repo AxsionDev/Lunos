@@ -40,11 +40,12 @@ export function QuestionPrompt(props: {
   const single = createMemo(() => questions().length === 1 && questions()[0]?.multiple !== true)
   const tabs = createMemo(() => (single() ? 1 : questions().length + 1)) // questions + confirm tab (no confirm for single select)
   const [tabHover, setTabHover] = createSignal<number | "confirm" | null>(null)
+  const initial = props.initial
   const [store, setStore] = createStore({
-    tab: props.initial?.tab ?? 0,
-    answers: [...(props.initial?.answers ?? [])] as QuestionAnswer[],
-    custom: [...(props.initial?.custom ?? [])] as string[],
-    selected: props.initial?.selected ?? 0,
+    tab: initial?.tab ?? 0,
+    answers: [...(initial?.answers ?? [])] as QuestionAnswer[],
+    custom: [...(initial?.custom ?? [])] as string[],
+    selected: initial?.selected ?? 0,
     editing: false,
   })
 
