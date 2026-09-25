@@ -1,8 +1,7 @@
 export * as Residency from "./residency"
 
-import path from "path"
-import { appendFile, mkdir } from "fs/promises"
 import { Jurisdiction } from "./jurisdiction"
+import { Audit } from "./audit"
 
 /**
  * Data-residency policy evaluation (XCOD-62).
@@ -161,22 +160,19 @@ export function resolve(block: ConfigBlock | undefined): Resolved | undefined {
   return { policy: { allow: block.allow }, audit: block.audit ?? true, auditPath: block.auditPath }
 }
 
-async function append(file: string, text: string) {
-  try {
-    await mkdir(path.dirname(file), { recursive: true })
-    await appendFile(file, text, "utf8")
-  } catch (err) {
-    // A failing audit sink must not take down the user's session. It is reported rather than
-    // swallowed, so a persistently unwritable log is visible instead of quietly producing an
-    // empty audit trail.
-    console.error(`[residency] failed to write audit log at ${file}:`, err)
-  }
+// XCOD-103: egress records go into the one audit stream (core/audit.ts). The v0 fields keep their
+// names; the writer adds `v`, `event`, `seq` and the hash chain. Share uploads use a `share:`
+// provider id, so they get the share events.
+function append(file: string, entry: EgressRecord) {
+  const share = entry.providerID.startsWith("share:")
+  const event = share ? (entry.allowed ? "share.upload" : "share.denied") : entry.allowed ? "model.call" : "model.denied"
+  void Audit.write({ file }, event, { ...entry })
 }
 
 /** Record one call in the audit log, if auditing is on. For callers that don't go through a fetch wrapper. */
 export function audit(resolved: Resolved, defaultAuditPath: string, providerID: string, url: string, allowed: boolean) {
   if (!resolved.audit) return
-  void append(resolved.auditPath ?? defaultAuditPath, line(record(providerID, url, allowed)))
+  append(resolved.auditPath ?? defaultAuditPath, record(providerID, url, allowed))
 }
 
 type Fetch = (input: Parameters<typeof fetch>[0], init?: RequestInit) => Promise<Response>
@@ -200,14 +196,14 @@ export function enforce(input: {
   const file = resolved.auditPath ?? input.defaultAuditPath
   const decision = evaluate(providerID, resolved.policy)
   if (!decision.allowed) {
-    if (resolved.audit) void append(file, line(record(providerID, input.baseURL, false)))
+    if (resolved.audit) append(file, record(providerID, input.baseURL, false))
     throw new DeniedError(decision)
   }
   if (!resolved.audit) return input.fetch
   const inner = input.fetch
   return async (request, init) => {
     const url = typeof request === "string" ? request : request instanceof URL ? request.href : (request as Request).url
-    void append(file, line(record(providerID, url, true)))
+    append(file, record(providerID, url, true))
     return (inner ?? fetch)(request, init)
   }
 }
