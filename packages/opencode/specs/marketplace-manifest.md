@@ -312,11 +312,22 @@ Mapping decisions:
   `ecosystem.mdx` lists them under different headings in the first place.
 - **Before adding an entry, install it for real** (`lunos marketplace install <name> --yes` in a
   throwaway `HOME`). Schema validation and unit tests don't catch a package that won't install.
-- `category` and `tags` are omitted throughout — `ecosystem.mdx`'s table doesn't carry that
-  data, and the schema doesn't require it.
-- **MCP servers (XCOD-69):** seven `mcp` entries — six official reference servers (memory,
-  sequential-thinking, fetch, time, git, everything) and the remote context7 docs server.
-  `filesystem` is left out: it needs a user-chosen path argument a static manifest can't supply.
+- **Every entry has a `category`** from one closed set of eleven: `auth`, `agents`, `workflow`,
+  `environment`, `context`, `editing`, `notifications`, `search`, `observability`, `security`,
+  `integrations`. `marketplace search` matches on it, and lunos.tech shows it as a badge. A new
+  value is an editorial decision, not a typo fix; lunos-web's tests reject anything outside the set.
+  `tags` are still omitted.
+- **MCP servers (XCOD-69, reconciled in XCOD-95):** the seven servers lunos.tech has listed since
+  2026-09-22, chosen in lunos-web's `docs/superpowers/specs/2026-09-22-marketplace-mcp-design.md`:
+  `filesystem`, `git`, `fetch` (reference servers), `playwright`, `github` (vendor-maintained),
+  `postgres` (`postgres-mcp`, for its restricted read-only mode) and `searxng` (self-hosted search).
+  `filesystem` needs no path argument: Lunos answers the MCP roots request with the project
+  directory (`src/mcp/index.ts`). Deliberately **not** listed: `@modelcontextprotocol/server-postgres`
+  (archived with an unpatched SQL injection), `everything` (a test server) and `context7` (paid,
+  US-hosted, API-keyed).
+- **This file is what lunos.tech publishes.** lunos-web fetches it at a pinned commit and fails its
+  build if its copy differs (XCOD-95), so an edit here reaches the built-in `lunos-community`
+  marketplace on the next site deploy. Bump `version` when entries change.
 - **No seed skills or hooks yet.** XCOD-72 provides the schema and install path; curated content
   for those kinds belongs to the stories that own them.
 

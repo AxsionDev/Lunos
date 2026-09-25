@@ -5,190 +5,219 @@
     "url": "https://github.com/AxsionDev/Lunos"
   },
   "description": "Community plugins for Lunos, seeded from the ecosystem docs (packages/web/src/content/docs/ecosystem.mdx).",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "plugins": [
     {
       "name": "opencode-helicone-session",
       "source": { "type": "npm", "package": "opencode-helicone-session" },
-      "description": "Automatically inject Helicone session headers for request grouping"
+      "description": "Automatically inject Helicone session headers for request grouping",
+      "category": "observability"
     },
     {
       "name": "opencode-openai-codex-auth",
       "source": { "type": "npm", "package": "opencode-openai-codex-auth" },
-      "description": "Use your ChatGPT Plus/Pro subscription instead of API credits"
+      "description": "Use your ChatGPT Plus/Pro subscription instead of API credits",
+      "category": "auth"
     },
     {
       "name": "opencode-gemini-auth",
       "source": { "type": "npm", "package": "opencode-gemini-auth" },
-      "description": "Use your existing Gemini plan instead of API billing"
+      "description": "Use your existing Gemini plan instead of API billing",
+      "category": "auth"
     },
     {
       "name": "opencode-antigravity-auth",
       "source": { "type": "npm", "package": "opencode-antigravity-auth" },
-      "description": "Use Antigravity's free models instead of API billing"
+      "description": "Use Antigravity's free models instead of API billing",
+      "category": "auth"
     },
     {
       "name": "opencode-devcontainers",
       "source": { "type": "npm", "package": "opencode-devcontainers" },
-      "description": "Multi-branch devcontainer isolation with shallow clones and auto-assigned ports"
+      "description": "Multi-branch devcontainer isolation with shallow clones and auto-assigned ports",
+      "category": "environment"
     },
     {
       "name": "opencode-dynamic-context-pruning",
       "source": { "type": "npm", "package": "@tarquinen/opencode-dcp" },
-      "description": "Optimize token usage by pruning obsolete tool outputs"
+      "description": "Optimize token usage by pruning obsolete tool outputs",
+      "category": "context"
     },
     {
       "name": "opencode-vibeguard",
       "source": { "type": "npm", "package": "opencode-vibeguard" },
-      "description": "Redact secrets/PII into VibeGuard-style placeholders before LLM calls; restore locally"
+      "description": "Redact secrets/PII into VibeGuard-style placeholders before LLM calls; restore locally",
+      "category": "security"
     },
     {
       "name": "opencode-websearch-cited",
       "source": { "type": "npm", "package": "opencode-websearch-cited" },
-      "description": "Add native websearch support for supported providers with Google grounded style"
+      "description": "Add native websearch support for supported providers with Google grounded style",
+      "category": "search"
     },
     {
       "name": "opencode-pty",
       "source": { "type": "npm", "package": "opencode-pty" },
-      "description": "Enables AI agents to run background processes in a PTY, send interactive input to them."
+      "description": "Enables AI agents to run background processes in a PTY, send interactive input to them.",
+      "category": "environment"
     },
     {
       "name": "opencode-wakatime",
       "source": { "type": "npm", "package": "opencode-wakatime" },
-      "description": "Track OpenCode usage with Wakatime"
+      "description": "Track OpenCode usage with Wakatime",
+      "category": "observability"
     },
     {
       "name": "opencode-md-table-formatter",
       "source": { "type": "npm", "package": "@franlol/opencode-md-table-formatter" },
-      "description": "Clean up markdown tables produced by LLMs"
+      "description": "Clean up markdown tables produced by LLMs",
+      "category": "editing"
     },
     {
       "name": "opencode-morph-plugin",
       "source": { "type": "npm", "package": "@morphllm/opencode-morph-plugin" },
-      "description": "Fast Apply editing, WarpGrep codebase search, and context compaction via Morph"
+      "description": "Fast Apply editing, WarpGrep codebase search, and context compaction via Morph",
+      "category": "editing"
     },
     {
       "name": "oh-my-opencode",
       "source": { "type": "npm", "package": "oh-my-opencode" },
-      "description": "Background agents, pre-built LSP/AST/MCP tools, curated agents, Claude Code compatible"
+      "description": "Background agents, pre-built LSP/AST/MCP tools, curated agents, Claude Code compatible",
+      "category": "agents"
     },
     {
       "name": "opencode-notifier",
       "source": { "type": "npm", "package": "@mohak34/opencode-notifier" },
-      "description": "Desktop notifications and sound alerts for permission, completion, and error events"
+      "description": "Desktop notifications and sound alerts for permission, completion, and error events",
+      "category": "notifications"
     },
     {
       "name": "opencode-zellij-namer",
       "source": { "type": "npm", "package": "opencode-zellij-namer" },
-      "description": "AI-powered automatic Zellij session naming based on OpenCode context"
+      "description": "AI-powered automatic Zellij session naming based on OpenCode context",
+      "category": "environment"
     },
     {
       "name": "opencode-skillful",
       "source": { "type": "npm", "package": "@zenobius/opencode-skillful" },
-      "description": "Allow OpenCode agents to lazy load prompts on demand with skill discovery and injection"
+      "description": "Allow OpenCode agents to lazy load prompts on demand with skill discovery and injection",
+      "category": "context"
     },
     {
       "name": "opencode-supermemory",
       "source": { "type": "npm", "package": "opencode-supermemory" },
-      "description": "Persistent memory across sessions using Supermemory"
+      "description": "Persistent memory across sessions using Supermemory",
+      "category": "context"
     },
     {
       "name": "@openspoon/subtask2",
       "source": { "type": "npm", "package": "@spoons-and-mirrors/subtask2" },
-      "description": "Extend opencode /commands into a powerful orchestration system with granular flow control"
+      "description": "Extend opencode /commands into a powerful orchestration system with granular flow control",
+      "category": "agents"
     },
     {
       "name": "opencode-scheduler",
       "source": { "type": "npm", "package": "opencode-scheduler" },
-      "description": "Schedule recurring jobs using launchd (Mac) or systemd (Linux) with cron syntax"
+      "description": "Schedule recurring jobs using launchd (Mac) or systemd (Linux) with cron syntax",
+      "category": "workflow"
     },
     {
       "name": "opencode-conductor",
       "source": { "type": "npm", "package": "opencode-conductor-plugin" },
-      "description": "Protocol-Driven Workflow: Automation of the Context -> Spec -> Plan -> Implement lifecycle."
+      "description": "Protocol-Driven Workflow: Automation of the Context -> Spec -> Plan -> Implement lifecycle.",
+      "category": "workflow"
     },
     {
       "name": "micode",
       "source": { "type": "npm", "package": "micode" },
-      "description": "Structured Brainstorm → Plan → Implement workflow with session continuity"
+      "description": "Structured Brainstorm → Plan → Implement workflow with session continuity",
+      "category": "workflow"
     },
     {
       "name": "octto",
       "source": { "type": "npm", "package": "octto" },
-      "description": "Interactive browser UI for AI brainstorming with multi-question forms"
+      "description": "Interactive browser UI for AI brainstorming with multi-question forms",
+      "category": "workflow"
     },
     {
       "name": "opencode-sentry-monitor",
       "source": { "type": "npm", "package": "opencode-sentry-monitor" },
-      "description": "Trace and debug your AI agents with Sentry AI Monitoring"
+      "description": "Trace and debug your AI agents with Sentry AI Monitoring",
+      "category": "observability"
     },
     {
       "name": "opencode-jfrog-plugin",
       "source": { "type": "npm", "package": "@jfrog/opencode-jfrog-plugin" },
-      "description": "JFrog Plugin for seamless integration of Opencode users to JFrog platform"
+      "description": "JFrog Plugin for seamless integration of Opencode users to JFrog platform",
+      "category": "integrations"
     },
     {
       "name": "opencode-goal-plugin",
       "source": { "type": "npm", "package": "opencode-goal-plugin" },
-      "description": "Session-scoped /goal workflow that keeps objectives in context and auto-continues until complete"
+      "description": "Session-scoped /goal workflow that keeps objectives in context and auto-continues until complete",
+      "category": "workflow"
     }
   ],
   "mcp": [
     {
-      "name": "memory",
+      "name": "filesystem",
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
-      "description": "Knowledge-graph-based persistent memory across sessions",
-      "category": "memory",
-      "tags": ["official", "knowledge-graph"]
-    },
-    {
-      "name": "sequential-thinking",
-      "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
-      "description": "Structured, revisable step-by-step problem solving",
-      "category": "reasoning",
-      "tags": ["official"]
-    },
-    {
-      "name": "fetch",
-      "type": "local",
-      "command": ["uvx", "mcp-server-fetch"],
-      "description": "Fetch web pages and convert them to markdown for the model (requires uv)",
-      "category": "web",
-      "tags": ["official", "http", "python"]
-    },
-    {
-      "name": "time",
-      "type": "local",
-      "command": ["uvx", "mcp-server-time"],
-      "description": "Current time and timezone conversion (requires uv)",
-      "category": "utility",
-      "tags": ["official", "python"]
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
+      "description": "Secure file operations with configurable access controls. A protocol reference implementation, published for demonstration rather than production use.",
+      "category": "environment"
     },
     {
       "name": "git",
       "type": "local",
       "command": ["uvx", "mcp-server-git"],
-      "description": "Read, search and manipulate git repositories (requires uv)",
-      "category": "development",
-      "tags": ["official", "vcs", "python"]
+      "description": "Read, search, and manipulate Git repositories. A protocol reference implementation, published for demonstration rather than production use.",
+      "category": "environment"
     },
     {
-      "name": "everything",
+      "name": "fetch",
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-everything"],
-      "description": "Reference server exercising every MCP feature; useful for testing a client",
-      "category": "reference",
-      "tags": ["official", "testing"]
+      "command": ["uvx", "mcp-server-fetch"],
+      "description": "Fetch a web page and convert it for efficient use by a model. A protocol reference implementation, published for demonstration rather than production use.",
+      "category": "search"
     },
     {
-      "name": "context7",
-      "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
-      "description": "Up-to-date library and framework documentation for the model",
-      "category": "documentation",
-      "tags": ["docs", "remote"]
+      "name": "playwright",
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@latest"],
+      "description": "Browser automation driven by accessibility snapshots rather than screenshots. Maintained by Microsoft under Playwright's own licence.",
+      "category": "environment"
+    },
+    {
+      "name": "github",
+      "type": "local",
+      "command": [
+        "docker",
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "environment": ["GITHUB_PERSONAL_ACCESS_TOKEN"],
+      "description": "Repository management and GitHub API access, maintained by GitHub. Runs as a container, so it needs Docker.",
+      "category": "integrations"
+    },
+    {
+      "name": "postgres",
+      "type": "local",
+      "command": ["uvx", "postgres-mcp"],
+      "environment": ["DATABASE_URI"],
+      "description": "PostgreSQL schema browsing and SQL execution, with a restricted read-only mode.",
+      "category": "integrations"
+    },
+    {
+      "name": "searxng",
+      "type": "local",
+      "command": ["npx", "-y", "mcp-searxng"],
+      "environment": ["SEARXNG_URL"],
+      "description": "Web search through a SearXNG instance you host yourself. No API key, and no query leaves your infrastructure.",
+      "category": "search"
     }
   ]
 }
