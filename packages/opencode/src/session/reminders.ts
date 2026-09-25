@@ -26,6 +26,20 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
   if (!userMessage) return input.messages
 
+  // Research and dev-cycle run on every step of the agent loop, and the loop
+  // reloads messages from storage each step. Their reminders are therefore
+  // built per request and never saved: saving one per step stacked a new copy
+  // onto the user message every tool call (27 copies, ~96 KB, in one turn).
+  const inject = (text: string) =>
+    userMessage.parts.push({
+      id: PartID.ascending(),
+      messageID: userMessage.info.id,
+      sessionID: userMessage.info.sessionID,
+      type: "text",
+      text,
+      synthetic: true,
+    })
+
   // Research mode is independent of the plan-mode flag: its reminder carries
   // the output path, so it always follows the path-bearing shape below.
   if (input.agent.name === "research") {
@@ -33,19 +47,13 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
     const file = Session.research(input.session, ctx)
     const exists = yield* fsys.existsSafe(file)
     if (!exists) yield* fsys.ensureDir(path.dirname(file)).pipe(Effect.catch(Effect.die))
-    const part = yield* sessions.updatePart({
-      id: PartID.ascending(),
-      messageID: userMessage.info.id,
-      sessionID: userMessage.info.sessionID,
-      type: "text",
-      text: RESEARCH_MODE.replace("${researchInfo}", () =>
+    inject(
+      RESEARCH_MODE.replace("${researchInfo}", () =>
         exists
           ? `A research file already exists at ${file}. You can read it and make incremental edits using the edit tool.`
           : `No research file exists yet. You should create it at ${file} using the write tool.`,
       ),
-      synthetic: true,
-    })
-    userMessage.parts.push(part)
+    )
     return input.messages
   }
 
@@ -57,8 +65,8 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
     const file = Session.devcycle(input.session, ctx)
     const exists = yield* fsys.existsSafe(file)
     if (!exists) yield* fsys.ensureDir(path.dirname(file)).pipe(Effect.catch(Effect.die))
-    // Read every turn, never cache: the human edits this frontmatter to
-    // approve or rewind a gate, and that must take effect on the next turn.
+    // Read every step, never cache: the human edits this frontmatter to
+    // approve or rewind a gate, and that must take effect on the next step.
     // `readFileStringSafe` carries an Error channel (fs-util.ts:35) that this
     // file has no precedent for handling — `orElseSucceed` is verified in use
     // across packages/*/src (26 call sites, e.g. packages/core/src/npm.ts).
@@ -76,12 +84,8 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
     // (`phase: Architect`, `phase: architect  # waiting`). Say the position is
     // unknown rather than assert a position nobody wrote.
     const unreadable = exists && !!contents?.trim() && !parsed.ok
-    const part = yield* sessions.updatePart({
-      id: PartID.ascending(),
-      messageID: userMessage.info.id,
-      sessionID: userMessage.info.sessionID,
-      type: "text",
-      text: DEV_CYCLE_MODE.replace("${cycleInfo}", () =>
+    inject(
+      DEV_CYCLE_MODE.replace("${cycleInfo}", () =>
         [
           exists
             ? `A cycle file already exists at ${file}. Read it and make incremental edits using the edit tool.`
@@ -94,9 +98,7 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
             : []),
         ].join("\n"),
       ),
-      synthetic: true,
-    })
-    userMessage.parts.push(part)
+    )
     return input.messages
   }
 
