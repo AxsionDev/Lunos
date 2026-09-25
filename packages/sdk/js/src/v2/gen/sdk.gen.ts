@@ -174,6 +174,7 @@ import type {
   PtyUpdateErrors,
   PtyUpdateResponses,
   QuestionAnswer,
+  QuestionDrafts,
   QuestionListErrors,
   QuestionListResponses,
   QuestionRejectErrors,
@@ -3187,6 +3188,7 @@ export class Question extends HeyApiClient {
       requestID: string
       directory?: string
       workspace?: string
+      drafts?: QuestionDrafts
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3198,6 +3200,7 @@ export class Question extends HeyApiClient {
             { in: "path", key: "requestID" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "body", key: "drafts" },
           ],
         },
       ],
@@ -3206,6 +3209,11 @@ export class Question extends HeyApiClient {
       url: "/question/{requestID}/reject",
       ...options,
       ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }

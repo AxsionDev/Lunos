@@ -2514,6 +2514,14 @@ export type QuestionNotFoundError = {
   message: string
 }
 
+export type QuestionDrafts = {
+  /**
+   * Answers picked so far, in question order
+   */
+  answers: Array<QuestionAnswer>
+  custom?: Array<string>
+}
+
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -9381,7 +9389,9 @@ export type QuestionReplyResponses = {
 export type QuestionReplyResponse = QuestionReplyResponses[keyof QuestionReplyResponses]
 
 export type QuestionRejectData = {
-  body?: never
+  body?: {
+    drafts?: QuestionDrafts
+  }
   path: {
     requestID: string
   }
