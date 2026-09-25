@@ -2272,6 +2272,13 @@ export type GlobalSession = {
   project: ProjectSummary | null
 }
 
+export type ArtifactItem = {
+  kind: "plan" | "research" | "dev-cycle"
+  title: string
+  path: string
+  created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
 export type BackgroundJobItem = {
   id: string
   title?: string
@@ -7938,6 +7945,36 @@ export type ExperimentalSessionBackgroundResponses = {
 
 export type ExperimentalSessionBackgroundResponse =
   ExperimentalSessionBackgroundResponses[keyof ExperimentalSessionBackgroundResponses]
+
+export type ExperimentalArtifactListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    kind?: "plan" | "research" | "dev-cycle"
+  }
+  url: "/experimental/artifact"
+}
+
+export type ExperimentalArtifactListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalArtifactListError = ExperimentalArtifactListErrors[keyof ExperimentalArtifactListErrors]
+
+export type ExperimentalArtifactListResponses = {
+  /**
+   * Plans, research notes and dev-cycle records
+   */
+  200: Array<ArtifactItem>
+}
+
+export type ExperimentalArtifactListResponse =
+  ExperimentalArtifactListResponses[keyof ExperimentalArtifactListResponses]
 
 export type ExperimentalBackgroundListData = {
   body?: never

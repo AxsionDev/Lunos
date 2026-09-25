@@ -607,6 +607,9 @@ const scenarios: Scenario[] = [
     .json(200, (body) => {
       check(body === false, "cancelling an unknown job should be a no-op")
     }),
+  http.protected.get("/experimental/artifact", "experimental.artifact.list").json(200, (body) => {
+    array(body)
+  }),
   http.protected.get("/experimental/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")

@@ -1693,6 +1693,73 @@
         ]
       }
     },
+    "/experimental/artifact": {
+      "get": {
+        "tags": ["experimental"],
+        "operationId": "experimental.artifact.list",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["plan", "research", "dev-cycle"]
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plans, research notes and dev-cycle records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArtifactItem"
+                  },
+                  "description": "Plans, research notes and dev-cycle records"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.",
+        "summary": "List artifacts",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.artifact.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/experimental/background": {
       "get": {
         "tags": ["experimental"],
@@ -22441,6 +22508,46 @@
           }
         },
         "required": ["id", "slug", "projectID", "directory", "title", "version", "time", "project"],
+        "additionalProperties": false
+      },
+      "ArtifactItem": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["plan", "research", "dev-cycle"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          }
+        },
+        "required": ["kind", "title", "path", "created"],
         "additionalProperties": false
       },
       "BackgroundJobItem": {

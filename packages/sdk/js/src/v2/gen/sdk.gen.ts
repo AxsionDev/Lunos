@@ -29,6 +29,8 @@ import type {
   EventTuiPromptAppend,
   EventTuiSessionSelect,
   EventTuiToastShow,
+  ExperimentalArtifactListErrors,
+  ExperimentalArtifactListResponses,
   ExperimentalBackgroundCancelErrors,
   ExperimentalBackgroundCancelResponses,
   ExperimentalBackgroundListErrors,
@@ -890,6 +892,44 @@ export class Session extends HeyApiClient {
   }
 }
 
+export class Artifact extends HeyApiClient {
+  /**
+   * List artifacts
+   *
+   * List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      kind?: "plan" | "research" | "dev-cycle"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "kind" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalArtifactListResponses,
+      ExperimentalArtifactListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/artifact",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Background extends HeyApiClient {
   /**
    * List background subagents
@@ -1337,6 +1377,11 @@ export class Experimental extends HeyApiClient {
   private _session?: Session
   get session(): Session {
     return (this._session ??= new Session({ client: this.client }))
+  }
+
+  private _artifact?: Artifact
+  get artifact(): Artifact {
+    return (this._artifact ??= new Artifact({ client: this.client }))
   }
 
   private _background?: Background

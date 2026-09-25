@@ -25,6 +25,10 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **`/artifacts`** (alias `/plans`) lists this project's plans, research notes and dev-cycle records,
+  newest first, and opens the file itself in `$EDITOR`. Without an editor it copies the path instead.
+  `GET /experimental/artifact` serves the same list to the app. The deployment guide now names
+  export and committed artifacts as the supported way to share inside your perimeter.
 - **Background subagents are a documented, opt-in setting:** `"subagent": { "background": true }`
   (the old `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` still works). `/tasks` in the TUI lists every
   background job with its agent, model, status and elapsed time; Enter opens it and `ctrl+d` cancels

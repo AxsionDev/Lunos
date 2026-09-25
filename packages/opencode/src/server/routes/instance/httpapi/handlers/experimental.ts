@@ -1,4 +1,5 @@
 import { Account } from "@/account/account"
+import { SessionArtifacts } from "@/session/artifacts"
 import * as BackgroundList from "@/background/list"
 import { backgroundEnabled } from "@/background/enabled"
 import { Agent } from "@/agent/agent"
@@ -175,6 +176,13 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return promoted.some((job) => job !== undefined)
     })
 
+    const artifacts = Effect.fn("ExperimentalHttpApi.artifacts")(function* (ctx: {
+      query: { kind?: SessionArtifacts.Kind }
+    }) {
+      const instance = yield* InstanceState.context
+      return yield* Effect.promise(() => SessionArtifacts.list(instance, ctx.query.kind))
+    })
+
     // XCOD-82: the list the TUI, app and ACP render. Task jobs only; newest first.
     const backgroundJobs = Effect.fn("ExperimentalHttpApi.backgroundJobs")(function* (ctx: {
       query: { sessionID?: string }
@@ -210,6 +218,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("session", session)
       .handle("sessionBackground", sessionBackground)
       .handle("backgroundJobs", backgroundJobs)
+      .handle("artifacts", artifacts)
       .handle("backgroundJobCancel", backgroundJobCancel)
       .handle("resource", resource)
   }),

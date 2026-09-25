@@ -480,7 +480,8 @@ export function Session() {
         // instead of being sent to the model as ordinary prompt text.
         if (!session()?.share?.url && sync.data.config.share === "disabled") {
           toast.show({
-            message: 'Session sharing is disabled. To enable /share, set "share": "manual" in your Lunos config.',
+            message:
+              'Session sharing is disabled. To share without uploading anything, use /export to save the transcript as a file. To enable /share, set "share": "manual" in your Lunos config.',
             variant: "info",
           })
           dialog.clear()
