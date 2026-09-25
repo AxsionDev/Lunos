@@ -363,7 +363,8 @@ export const ShellTool = Tool.define(
         }
         return FSUtil.normalizePath(path.resolve(root, FSUtil.windowsPath(text)))
       }
-      return path.resolve(root, text)
+      // Spelled as on disk, so a wrong-case project path isn't treated as external.
+      return FSUtil.onDiskCase(path.resolve(root, text))
     })
 
     const argPath = Effect.fn("ShellTool.argPath")(function* (arg: string, cwd: string, ps: boolean, shell: string) {

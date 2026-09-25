@@ -2,6 +2,8 @@ import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { describe, expect } from "bun:test"
 import path from "path"
+import os from "os"
+import { existsSync } from "fs"
 import { Effect } from "effect"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import type { Tool } from "@/tool/tool"
@@ -153,4 +155,36 @@ describe("tool.assertExternalDirectory", () => {
       { git: true },
     )
   }
+
+  // XCOD-100: macOS and Windows ignore case, and models reproduce paths in the wrong case.
+  // Skipped on case-sensitive filesystems, where a wrong-case path is a different path.
+  const insensitive = existsSync(os.tmpdir().toUpperCase()) && existsSync(os.tmpdir().toLowerCase())
+  const caseTest = insensitive ? it.instance : it.instance.skip
+
+  caseTest("does not ask for a project path spelled in a different case", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const { requests, ctx } = makeCtx()
+
+      const upper = path.join(path.dirname(test.directory), path.basename(test.directory).toUpperCase())
+      yield* assertExternalDirectoryEffect(ctx, path.join(upper, "file.txt"))
+
+      expect(requests.length).toBe(0)
+    }),
+  )
+
+  caseTest("saves an external directory under its on-disk spelling, not the model's", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const { requests, ctx } = makeCtx()
+
+      const outside = path.dirname(test.directory)
+      const wrong = path.join(outside.toUpperCase(), "file.txt")
+      yield* assertExternalDirectoryEffect(ctx, wrong)
+
+      const req = requests.find((r) => r.permission === "external_directory")
+      expect(req!.patterns).toEqual([glob(path.join(outside, "*"))])
+      expect(req!.always).toEqual([glob(path.join(outside, "*"))])
+    }),
+  )
 })
