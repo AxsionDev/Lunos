@@ -442,5 +442,34 @@
       },
       "license": "MIT"
     }
+  ],
+  "skills": [
+    {
+      "name": "lunos-seed-skills",
+      "url": "https://raw.githubusercontent.com/AxsionDev/Lunos/dcfe4a6013c963afd5bbbf1dd65e162ef4ae4b00/marketplace/skills/",
+      "description": "Three workflow skills from the Lunos repository: research-mode (investigate and report without changing code), bug-investigation (evidence-based root-cause analysis) and code-review-methodology (a structured review by dimension).",
+      "category": "workflow",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "egress": ["raw.githubusercontent.com"]
+    }
+  ],
+  "hooks": [
+    {
+      "name": "whitespace-check-after-edit",
+      "event": "tool.execute.after",
+      "command": ["git", "diff", "--check"],
+      "matcher": {
+        "tool": "{edit,write,apply_patch}"
+      },
+      "description": "After every file edit (edit, write or apply_patch), runs git diff --check and reports trailing whitespace or leftover conflict markers the edit introduced. Needs git; changes nothing.",
+      "category": "quality",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT"
+    }
   ]
 }
