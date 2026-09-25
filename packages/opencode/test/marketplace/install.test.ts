@@ -9,7 +9,7 @@ import { tmpdir } from "../fixture/fixture"
 import { MarketplaceAlreadyInstalled } from "../../src/marketplace/guard"
 
 function skill(url: string, name = "team-skills"): ConfigItem {
-  return { kind: "skill", name, marketplace: "mp", entry: new Marketplace.SkillEntry({ name, url }) }
+  return { kind: "skill", name, marketplace: "mp", source: "mp.json", entry: new Marketplace.SkillEntry({ name, url }) }
 }
 
 function hook(fields: Partial<ConstructorParameters<typeof Marketplace.HookEntry>[0]> = {}): ConfigItem {
@@ -20,7 +20,7 @@ function hook(fields: Partial<ConstructorParameters<typeof Marketplace.HookEntry
     matcher: { tool: "edit" },
     ...fields,
   })
-  return { kind: "hook", name: entry.name, marketplace: "mp", entry }
+  return { kind: "hook", name: entry.name, marketplace: "mp", source: "mp.json", entry }
 }
 
 function fetchIndex(body: unknown): FetchDeps {
@@ -154,7 +154,7 @@ describe("planInstall: remote MCP headers", () => {
       url: "https://example.test/mcp",
       headers: ["X-Api-Key"],
     })
-    const plan = await planInstall({ kind: "mcp", name: "api", marketplace: "mp", entry }, file, offline)
+    const plan = await planInstall({ kind: "mcp", name: "api", marketplace: "mp", source: "mp.json", entry }, file, offline)
     expect(plan.details).toContain("header X-Api-Key <- $X_API_KEY")
     expect(plan.warnings).toEqual(["X_API_KEY is not set in your environment; the reference is written anyway"])
     await plan.apply()

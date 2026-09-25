@@ -178,6 +178,36 @@ describe("opencode marketplace install (subprocess)", () => {
   )
 
   cliIt.concurrent(
+    "--from a manifest named like an added marketplace refuses plainly, never as ambiguous (XCOD-112)",
+    ({ home, opencode }) =>
+      Effect.gen(function* () {
+        yield* setup(home, opencode)
+        // A second manifest publishing under the same name, e.g. a local checkout of the site copy.
+        const copy = path.join(home, "copy", "marketplace.json")
+        yield* Effect.promise(() => Bun.write(copy, JSON.stringify(allKinds)))
+        const result = yield* opencode.spawn([
+          "marketplace",
+          "install",
+          "mp/a-plugin",
+          "--kind",
+          "plugin",
+          "--from",
+          copy,
+          "--yes",
+        ])
+        opencode.expectExit(result, 1, "marketplace install --from")
+        const out = result.stdout + result.stderr
+        expect(out).toContain('a marketplace named "mp" is already added from')
+        expect(out).not.toContain("more than one place")
+        expect(out).not.toContain("Unexpected error")
+        const config = yield* Effect.promise(() => readGlobalConfig(home))
+        expect(JSON.stringify(config?.marketplace ?? [])).not.toContain("copy")
+        expect(config?.plugin).toBeUndefined()
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
     "an unknown name fails with a pointer to search",
     ({ home, opencode }) =>
       Effect.gen(function* () {

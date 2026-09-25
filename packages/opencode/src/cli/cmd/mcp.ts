@@ -496,7 +496,7 @@ export const McpAddCommand = effectCmd({
       if (resolvesFromMarketplace(args, command)) {
         const marketplaceCtx = { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }
         try {
-          const match = pickOne((await listContent(marketplaceCtx, "mcp")).items, args.name!)
+          const match = pickOne((await listContent(marketplaceCtx, "mcp")).items, args.name!, { kind: "mcp" })
           if (match?.kind === "mcp") {
             await confirmAndInstall(match, Boolean(args.yes))
             return
