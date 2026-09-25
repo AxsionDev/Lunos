@@ -5,7 +5,7 @@ Restrict which jurisdictions this deployment may send model requests to, and kee
 Intended for regulated and public-sector deployments where "we told everyone to pick an EU model" is not an adequate control. Companion to [Model provider jurisdictions](provider-jurisdictions.md), which records where each provider processes data.
 
 > [!WARNING]
-> **Correction (2026-09-24): in Lunos v1.18.38 and earlier, the residency policy is not enforced for sessions.** With `"residency": {"allow": ["eu"]}` set, `lunos run` and the TUI still send model requests to non-EU providers, and no audit log is written. The policy was only wired into a code path that sessions don't use. Until a release containing the fix ships, **do not rely on this policy as a control**: restrict providers with `enabled_providers` and by holding only EU providers' API keys. Tracked as XCOD-93.
+> **Correction (2026-09-24): in Lunos v1.18.38 and earlier, the residency policy is not enforced for sessions.** With `"residency": {"allow": ["eu"]}` set, `lunos run` and the TUI still send model requests to non-EU providers, and no audit log is written. The policy was only wired into a code path that sessions don't use. **Fixed in v1.18.39 (2026-09-25):** sessions now enforce the policy and write the audit log. If you run v1.18.38 or earlier, upgrade before relying on this policy as a control; until you do, restrict providers with `enabled_providers` and by holding only EU providers' API keys. Tracked as XCOD-93.
 
 ## The shortest useful config
 
