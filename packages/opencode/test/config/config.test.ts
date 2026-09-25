@@ -972,6 +972,25 @@ it.instance("decodes the checked-in reference deployment config on the live path
   }),
 )
 
+// XCOD-102: the sample organisation policy decodes on the live path and holds against user config.
+it.instance(
+  "decodes the checked-in managed policy example as managed config, and its locks hold",
+  Effect.gen(function* () {
+    const policy = yield* Effect.promise(() =>
+      Bun.file(path.resolve(import.meta.dir, "../../../../examples/managed-policy/managed.json")).json(),
+    )
+    yield* writeManagedSettingsEffect(policy, "managed.json")
+    const config = yield* Config.use.get()
+    expect(config.residency).toEqual({ allow: ["eu"], audit: true })
+    expect(config.share).toBe("disabled")
+    expect(config.enabled_providers).toEqual(["mistral"])
+    expect(config.marketplace_allow).toEqual(["https://lunos.tech/marketplace.json"])
+    expect(config.autoupdate).toBe("notify")
+    expect(config.$locked).toEqual(policy.$locked)
+  }),
+  { config: { share: "auto", enabled_providers: ["openai"], residency: { allow: ["us"] }, autoupdate: true } },
+)
+
 // XCOD-82: every new subagent key survives the live config path (the XCOD-68 / XCOD-93 lesson).
 it.instance("keeps subagent model selection keys on the live config path", () =>
   Effect.gen(function* () {
