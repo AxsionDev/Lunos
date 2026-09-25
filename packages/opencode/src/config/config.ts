@@ -258,6 +258,40 @@ const layer = Layer.effect(
       return yield* loadConfig(text, { path: filepath }, env)
     })
 
+    // XCOD-102: the managed layers, in precedence order: the system directory, then the MDM profile.
+    const loadManaged = Effect.fnUntraced(function* () {
+      const layers: { source: string; info: Info }[] = []
+      const location = ConfigManaged.managedConfigLocation()
+      if (existsSync(location.dir)) {
+        if (location.legacy)
+          yield* Effect.logWarning(
+            `managed config in ${location.dir} is deprecated; move it to ${ConfigManaged.systemManagedConfigDir()}`,
+          )
+        for (const file of ["managed.json", "opencode.json", "opencode.jsonc"]) {
+          const source = path.join(location.dir, file)
+          layers.push({ source, info: yield* loadFile(source) })
+        }
+      }
+      // macOS managed preferences (.mobileconfig deployed via MDM) override everything
+      const plist = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
+      if (plist) {
+        if (plist.legacy)
+          yield* Effect.logWarning(
+            `managed preferences domain ${ConfigManaged.LEGACY_PLIST_DOMAIN} is deprecated; deploy ${ConfigManaged.MANAGED_PLIST_DOMAIN} instead`,
+          )
+        layers.push({
+          source: plist.source,
+          info: yield* loadConfig(plist.text, { dir: path.dirname(plist.source), source: plist.source }),
+        })
+      }
+      const doc = layers.reduce(
+        (acc, layer) => mergeConfigConcatArrays(acc, ConfigPolicy.strip(layer.info)),
+        {} as Info,
+      )
+      const locked = ConfigPolicy.union(...layers.map((layer) => ConfigPolicy.lockList(layer.info)))
+      return { layers, doc, locked }
+    })
+
     const loadGlobal = Effect.fnUntraced(function* (env?: Record<string, string>) {
       let result: Info = {}
       // Seed the default global config with the schema for editor completion, but avoid writing when the user
@@ -303,8 +337,12 @@ const layer = Layer.effect(
       Duration.infinity,
     )
 
+    // Global config alone, except that locked keys already hold the managed value: the upgrade
+    // check reads this, and a locked `autoupdate` must reach it (XCOD-102).
     const getGlobal = Effect.fn("Config.getGlobal")(function* () {
-      return yield* cachedGlobal
+      const global = yield* cachedGlobal
+      const managed = yield* loadManaged().pipe(Effect.orElseSucceed(() => ({ doc: {} as Info, locked: [] })))
+      return managed.locked.length ? ConfigPolicy.apply(global, managed.doc, managed.locked) : global
     })
 
     const ensureGitignore = Effect.fn("Config.ensureGitignore")(function* (dir: string) {
@@ -368,13 +406,7 @@ const layer = Layer.effect(
           result = mergeConfigConcatArrays(result, ConfigPolicy.strip(next))
           return mergePluginOrigins(source, next.plugin, kind)
         }
-        let managedDoc: Info = {}
-        const managedLocks: string[][] = []
-        const mergeManaged = (source: string, next: Info) => {
-          managedLocks.push(ConfigPolicy.lockList(next))
-          managedDoc = mergeConfigConcatArrays(managedDoc, ConfigPolicy.strip(next))
-          return merge(source, next, "global")
-        }
+        const mergeManaged = (source: string, next: Info) => merge(source, next, "global")
 
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
@@ -557,33 +589,8 @@ const layer = Layer.effect(
           )
         }
 
-        const location = ConfigManaged.managedConfigLocation()
-        if (existsSync(location.dir)) {
-          if (location.legacy)
-            yield* Effect.logWarning(
-              `managed config in ${location.dir} is deprecated; move it to ${ConfigManaged.systemManagedConfigDir()}`,
-            )
-          for (const file of ["managed.json", "opencode.json", "opencode.jsonc"]) {
-            const source = path.join(location.dir, file)
-            yield* mergeManaged(source, yield* loadFile(source))
-          }
-        }
-
-        // macOS managed preferences (.mobileconfig deployed via MDM) override everything
-        const managed = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
-        if (managed) {
-          if (managed.legacy)
-            yield* Effect.logWarning(
-              `managed preferences domain ${ConfigManaged.LEGACY_PLIST_DOMAIN} is deprecated; deploy ${ConfigManaged.MANAGED_PLIST_DOMAIN} instead`,
-            )
-          yield* mergeManaged(
-            managed.source,
-            yield* loadConfig(managed.text, {
-              dir: path.dirname(managed.source),
-              source: managed.source,
-            }),
-          )
-        }
+        const managedLayers = yield* loadManaged()
+        for (const layer of managedLayers.layers) yield* mergeManaged(layer.source, layer.info)
 
         for (const [name, mode] of Object.entries(result.mode ?? {})) {
           result.agent = mergeDeep(result.agent ?? {}, {
@@ -630,11 +637,11 @@ const layer = Layer.effect(
         }
         // XCOD-102: locked keys hold exactly the managed value. Runs after every layer, after
         // OPENCODE_PERMISSION and after the autoshare mapping above, so nothing later reopens them.
-        const locked = ConfigPolicy.union(...managedLocks)
+        const locked = managedLayers.locked
         const unknownLocks = ConfigPolicy.unknownKeys(locked)
         if (unknownLocks.length)
           yield* Effect.logWarning(`$locked lists keys this version doesn't know: ${unknownLocks.join(", ")}`)
-        result = ConfigPolicy.apply(result, managedDoc, locked)
+        result = ConfigPolicy.apply(result, managedLayers.doc, locked)
 
         // Lunos: sharing uploads the full transcript to a third-party host, so it is off
         // unless a config layer turns it on. Upstream opencode behaves as "manual".
@@ -685,7 +692,21 @@ const layer = Layer.effect(
       )
     })
 
-    const update = Effect.fn("Config.update")(function* (config: Info) {
+    // XCOD-102: a write can't change a locked key (the lock pass would ignore it anyway), and must
+    // never copy the organisation's `$locked` list into a user or project file.
+    const withoutLocked = Effect.fnUntraced(function* (config: Info, via: string) {
+      const { locked } = yield* loadManaged().pipe(Effect.orElseSucceed(() => ({ locked: [] as string[] })))
+      let next = ConfigPolicy.strip(config)
+      for (const key of locked) {
+        if (ConfigPolicy.get(next, key) === undefined) continue
+        yield* ConfigPolicy.refused(key, via)
+        next = ConfigPolicy.omit(next, key)
+      }
+      return next
+    })
+
+    const update = Effect.fn("Config.update")(function* (input: Info) {
+      const config = yield* withoutLocked(input, "project config update")
       const dir = yield* InstanceState.directory
       const file = path.join(dir, "config.json")
       const existing = yield* loadFile(file)
@@ -703,7 +724,8 @@ const layer = Layer.effect(
       yield* invalidateGlobal
     })
 
-    const updateGlobal = Effect.fn("Config.updateGlobal")(function* (config: Info) {
+    const updateGlobal = Effect.fn("Config.updateGlobal")(function* (input: Info) {
+      const config = yield* withoutLocked(input, "global config update")
       const file = globalConfigFile()
       const before = (yield* readConfigFile(file)) ?? "{}"
       const patch = writableGlobal(config)

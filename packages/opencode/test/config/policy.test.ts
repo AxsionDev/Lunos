@@ -10,14 +10,22 @@ describe("ConfigPolicy (XCOD-102)", () => {
   })
 
   test("apply replaces dotted keys and leaves siblings alone", () => {
-    const next = ConfigPolicy.apply({ memory: { enabled: true, scope: ["user"] } }, { memory: { enabled: false } }, [
-      "memory.enabled",
-    ])
+    const next: Record<string, unknown> = ConfigPolicy.apply(
+      { memory: { enabled: true, scope: ["user"] } } as Record<string, unknown>,
+      { memory: { enabled: false } },
+      ["memory.enabled"],
+    )
     expect(next).toEqual({ memory: { enabled: false, scope: ["user"] }, $locked: ["memory.enabled"] })
   })
 
   test("strip drops $locked before a write", () => {
-    expect(ConfigPolicy.strip({ $locked: ["share"], share: "manual" })).toEqual({ share: "manual" })
+    const doc: Record<string, unknown> = { $locked: ["share"], share: "manual" }
+    expect(ConfigPolicy.strip(doc)).toEqual({ share: "manual" })
+  })
+
+  test("omit removes a dotted leaf only", () => {
+    const doc: Record<string, unknown> = { memory: { enabled: true, scope: ["user"] } }
+    expect(ConfigPolicy.omit(doc, "memory.enabled")).toEqual({ memory: { scope: ["user"] } })
   })
 
   test("unknown lock keys are reported, not dropped", () => {

@@ -384,6 +384,33 @@ it.effect("updates global config and omits empty shell key in json", () =>
   ),
 )
 
+// XCOD-102: a config write can't change a locked key or copy the org's lock list into user config.
+it.effect("a global config write drops locked keys and $locked", () =>
+  withGlobalConfig({ config: { model: "test/model" } }, ({ dir }) =>
+    Effect.gen(function* () {
+      yield* writeManagedSettingsEffect({ $locked: ["share"], share: "disabled" })
+      yield* Config.use.updateGlobal({ share: "auto", $locked: ["nothing"], username: "kept" })
+
+      const written = yield* FSUtil.use.readJson(path.join(dir, "opencode.json"))
+      expect(written).not.toHaveProperty("share")
+      expect(written).not.toHaveProperty("$locked")
+      expect(written).toMatchObject({ username: "kept", model: "test/model" })
+    }),
+  ),
+)
+
+it.effect("getGlobal holds a locked autoupdate at the managed value (the upgrade check reads it)", () =>
+  withGlobalConfig({ config: { autoupdate: true } }, () =>
+    Effect.gen(function* () {
+      yield* writeManagedSettingsEffect({ $locked: ["autoupdate"], autoupdate: "notify" })
+      yield* Config.use.invalidate()
+      const global = yield* Config.use.getGlobal()
+      expect(global.autoupdate).toBe("notify")
+      expect(global.$locked).toEqual(["autoupdate"])
+    }),
+  ),
+)
+
 it.effect("updates global config and omits empty shell key in jsonc", () =>
   withGlobalConfig({ config: { shell: "bash", model: "test/model" }, name: "opencode.jsonc" }, ({ dir }) =>
     Effect.gen(function* () {

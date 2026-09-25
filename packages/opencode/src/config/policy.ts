@@ -1,5 +1,7 @@
 export * as ConfigPolicy from "./policy"
 
+import { Effect } from "effect"
+
 // XCOD-102: organisation policy. Managed config (the system directory, or an MDM profile) can list
 // keys under `$locked`. A locked key takes its value from managed config only: whatever user or
 // project config, environment variables, CLI flags or in-session commands say is ignored, and every
@@ -75,6 +77,35 @@ export function apply<T extends Record_>(resolved: T, managed: Record_, locked: 
   else delete next[FIELD]
   return next as T
 }
+
+/** A copy of `doc` without `key` (dotted keys remove the leaf only). */
+export function omit<T>(doc: T, key: string): T {
+  if (!isRecord(doc)) return doc
+  const next = structuredClone(doc) as Record_
+  set(next, key, undefined)
+  return next as T
+}
+
+export type Refusal = { key: string; via: string; at: string }
+const listeners = new Set<(refusal: Refusal) => void>()
+
+/** Observe refusals. The audit trail (XCOD-103) subscribes here to write `policy.override_refused`. */
+export function onRefused(listener: (refusal: Refusal) => void) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+/**
+ * The one seam every refused override goes through, whichever surface it came from: an env var,
+ * a CLI flag, an in-session command or a config write.
+ */
+export const refused = (key: string, via: string) =>
+  Effect.gen(function* () {
+    const refusal = { key, via, at: new Date().toISOString() }
+    yield* Effect.logWarning(message(key), { via })
+    for (const listener of listeners) listener(refusal)
+    return refusal
+  })
 
 /** `$locked` means nothing outside managed config, and must never be written back to it. */
 export function strip<T>(doc: T): T {
