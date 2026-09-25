@@ -188,21 +188,6 @@
       "integrity": "sha512-IOct8As/lg9xz+CoG1C5yVSuDci73LNWBadwNZ8bM9n7CrUnAkfo4qKcDWptw/z4ZZ6SFDzOoWv182EBwIXFug=="
     },
     {
-      "name": "oh-my-opencode",
-      "source": {
-        "type": "npm",
-        "package": "oh-my-opencode",
-        "version": "4.19.4"
-      },
-      "description": "Background agents, pre-built LSP/AST/MCP tools, curated agents, Claude Code compatible",
-      "category": "agents",
-      "review": {
-        "status": "community"
-      },
-      "license": "SUL-1.0",
-      "integrity": "sha512-MlL8JiB9zhpF+Cl7J6ilyuUS39dTzj2d2t14hhaSUc5v4jYldnfEuZfY+43vkPUzfjrWbQOvuPm3kd8yFvtL4g=="
-    },
-    {
       "name": "opencode-notifier",
       "source": {
         "type": "npm",
@@ -261,21 +246,6 @@
       },
       "license": "MIT",
       "integrity": "sha512-jijWMzZLkB4HmXkc4mkkGfEVUfrvld8a5euWKbyYvFZTSy32NzMzsh/59cASImv18YLVKLdIwh9vrluVMvC7bw=="
-    },
-    {
-      "name": "@openspoon/subtask2",
-      "source": {
-        "type": "npm",
-        "package": "@spoons-and-mirrors/subtask2",
-        "version": "0.3.5"
-      },
-      "description": "Extend opencode /commands into a powerful orchestration system with granular flow control",
-      "category": "agents",
-      "review": {
-        "status": "community"
-      },
-      "license": "PolyForm-Noncommercial-1.0.0",
-      "integrity": "sha512-sN9pRz5ER3xcLJNme2PGaT7VfJxEr1NXsk5A87/GFZGeDlm8RegynnNk49bKnbw8zx2S8n+0bGkEq/se+XOp4g=="
     },
     {
       "name": "opencode-scheduler",
