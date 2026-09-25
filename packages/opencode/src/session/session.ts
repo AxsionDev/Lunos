@@ -335,9 +335,13 @@ export const Event = {
 // `dev-cycle` the keyed entry is `external_directory` rather than `edit`
 // (agent.ts:230) — it does not restrict edits, but an unmirrored rename there
 // sends every artifact write outside the worktree to the `"*": "ask"` default.
+/** Directory an artifact kind lives in: in the worktree (reviewable, committable) under VCS. */
+export function artifactDir(dir: string, instance: InstanceContext) {
+  return instance.project.vcs ? path.join(instance.worktree, ".opencode", dir) : path.join(Global.Path.data, dir)
+}
+
 function artifact(dir: string, input: { slug: string; time: { created: number } }, instance: InstanceContext) {
-  const base = instance.project.vcs ? path.join(instance.worktree, ".opencode", dir) : path.join(Global.Path.data, dir)
-  return path.join(base, [input.time.created, input.slug].join("-") + ".md")
+  return path.join(artifactDir(dir, instance), [input.time.created, input.slug].join("-") + ".md")
 }
 
 export function plan(input: { slug: string; time: { created: number } }, instance: InstanceContext) {

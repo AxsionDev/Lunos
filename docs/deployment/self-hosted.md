@@ -70,6 +70,11 @@ When sharing is on, uploads go to `enterprise.url` if you set one, and otherwise
 - `opncd.ai`, and the opencode console's share service for signed-in orgs, count as non-EU (`us`). An EU-only policy refuses them: `/share` says "Session sharing to opncd.ai is blocked by the data-residency policy", and nothing is uploaded.
 - A self-hosted share server at `enterprise.url` is treated like any other self-hosted endpoint. Lunos can't verify where it runs, so its region is `unknown`, and you allow it explicitly with `"residency": { "allow": ["eu", "unknown"] }`. That is the supported way to share under an EU-only policy. The `OPENCODE_AUTO_SHARE` environment variable only turns `"manual"` into `"auto"`; it cannot re-enable sharing that is disabled.
 
+**Sharing without any upload (the supported path).** Lunos runs no share service. The way to share inside your perimeter is to share files you already control:
+
+- **A session:** `/export` in the TUI (or `lunos export <session-id>` for JSON, with `--sanitize` to redact file contents and tool output) writes the transcript to a local file. Send it through whatever channel your organisation already approves. Nothing is uploaded.
+- **Plans, research notes and dev-cycle records:** these are Markdown files in `.opencode/plans/`, `.opencode/research/` and `.opencode/dev-cycle/`. Commit them and review them like any other document. `/artifacts` in the TUI lists and opens them.
+
 ### Stays on your infrastructure
 
 Everything else:

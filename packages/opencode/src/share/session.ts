@@ -7,7 +7,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ShareNext } from "./share-next"
 
 export const DISABLED_MESSAGE =
-  'Session sharing is disabled. To enable /share, set "share": "manual" in your Lunos config.'
+  'Session sharing is disabled. To share without uploading anything, use /export to save the transcript as a file. To enable /share, set "share": "manual" in your Lunos config.'
 
 export class ShareDisabledError extends Schema.TaggedErrorClass<ShareDisabledError>()("ShareDisabledError", {}) {
   override get message() {

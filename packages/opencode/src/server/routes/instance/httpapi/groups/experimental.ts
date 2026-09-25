@@ -45,6 +45,14 @@ export const BackgroundJobItem = Schema.Struct({
   error: Schema.optional(Schema.String),
 }).annotate({ identifier: "BackgroundJobItem" })
 
+// XCOD-84: a plan, research note or dev-cycle record an agent wrote. The file is the source of truth.
+export const ArtifactItem = Schema.Struct({
+  kind: Schema.Literals(["plan", "research", "dev-cycle"]),
+  title: Schema.String,
+  path: Schema.String,
+  created: Schema.Number,
+}).annotate({ identifier: "ArtifactItem" })
+
 const ConsoleOrgOption = Schema.Struct({
   accountID: Schema.String,
   accountEmail: Schema.String,
@@ -115,6 +123,7 @@ export const ExperimentalPaths = {
   session: "/experimental/session",
   sessionBackground: "/experimental/session/:sessionID/background",
   backgroundJobs: "/experimental/background",
+  artifacts: "/experimental/artifact",
   backgroundJobCancel: "/experimental/background/:jobID/cancel",
   resource: "/experimental/resource",
 } as const
@@ -261,6 +270,20 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Background subagents",
             description:
               "Detach any synchronous subagents currently blocking the session and continue them in the background.",
+          }),
+        ),
+        HttpApiEndpoint.get("artifacts", ExperimentalPaths.artifacts, {
+          query: Schema.Struct({
+            ...WorkspaceRoutingQueryFields,
+            kind: Schema.optional(Schema.Literals(["plan", "research", "dev-cycle"])),
+          }),
+          success: described(Schema.Array(ArtifactItem), "Plans, research notes and dev-cycle records"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.artifact.list",
+            summary: "List artifacts",
+            description:
+              "List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.",
           }),
         ),
         HttpApiEndpoint.get("backgroundJobs", ExperimentalPaths.backgroundJobs, {
