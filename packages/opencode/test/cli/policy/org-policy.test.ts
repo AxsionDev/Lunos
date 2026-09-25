@@ -55,8 +55,9 @@ describe("organisation policy: locked share (subprocess)", () => {
 
   cliIt.live(
     "debug config shows the managed value and the lock, not the user's",
-    ({ opencode, home }) =>
+    ({ llm, opencode, home }) =>
       Effect.gen(function* () {
+        yield* llm.text("hello")
         const env = yield* setup(
           home,
           { $locked: ["residency"], residency: { allow: ["eu"] } },
@@ -68,6 +69,10 @@ describe("organisation policy: locked share (subprocess)", () => {
         const config = JSON.parse(result.stdout.slice(result.stdout.indexOf("{")))
         expect(config.residency).toEqual({ allow: ["eu"] })
         expect(config.$locked).toEqual(["residency"])
+        // The server's config endpoint must still encode a locked residency (a deep clone once broke
+        // the Schema class instance, and `run` silently got no config).
+        const run = yield* opencode.run("hi", { printLogs: true, env })
+        expect(run.stdout + run.stderr).not.toContain("schema rejection")
       }),
     60_000,
   )

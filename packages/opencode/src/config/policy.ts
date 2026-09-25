@@ -35,16 +35,19 @@ export function get(doc: unknown, key: string): unknown {
   return current
 }
 
+// Copies only the containers along the key's path and passes values through untouched: decoded
+// config holds Schema class instances (e.g. ConfigV2.Residency), and a deep clone would turn them
+// into plain objects that the config endpoint then refuses to encode.
 function set(doc: Record_, key: string, value: unknown) {
   const parts = key.split(".")
   let current = doc
   for (const part of parts.slice(0, -1)) {
-    if (!isRecord(current[part])) current[part] = {}
+    current[part] = isRecord(current[part]) ? { ...(current[part] as Record_) } : {}
     current = current[part] as Record_
   }
   const last = parts.at(-1)!
   if (value === undefined) delete current[last]
-  else current[last] = structuredClone(value)
+  else current[last] = value
 }
 
 /** `$locked` from one managed document: string entries only. */
@@ -69,7 +72,7 @@ export function isLocked(locked: ReadonlyArray<string> | undefined, key: string)
  * A locked key managed config doesn't set becomes unset, falling back to the default.
  */
 export function apply<T extends Record_>(resolved: T, managed: Record_, locked: ReadonlyArray<string>): T {
-  const next = structuredClone(resolved) as Record_
+  const next = { ...resolved } as Record_
   for (const key of locked) set(next, key, get(managed, key))
   // The deprecated `autoshare: true` still maps to `share: "auto"`, so it can't survive a lock.
   if (isLocked(locked, "share")) delete next.autoshare
@@ -81,7 +84,7 @@ export function apply<T extends Record_>(resolved: T, managed: Record_, locked: 
 /** A copy of `doc` without `key` (dotted keys remove the leaf only). */
 export function omit<T>(doc: T, key: string): T {
   if (!isRecord(doc)) return doc
-  const next = structuredClone(doc) as Record_
+  const next = { ...doc } as Record_
   set(next, key, undefined)
   return next as T
 }
