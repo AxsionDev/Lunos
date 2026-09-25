@@ -86,6 +86,10 @@ export const Info = Schema.Struct({
   diff_style: Schema.optional(DiffStyle),
   cursor: Schema.optional(Cursor),
   mouse: Schema.optional(Schema.Boolean).annotate({ description: "Enable or disable mouse capture (default: true)" }),
+  reduced_motion: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "true turns off every animation (the home screen's moon reflection, spinners, placeholder cycling) and the in-app toggle can't turn them back on. Unset: off by default when NO_COLOR is set or TERM=dumb",
+  }),
   question: Schema.optional(QuestionPrompt),
 })
 export type Info = Schema.Schema.Type<typeof Info>
