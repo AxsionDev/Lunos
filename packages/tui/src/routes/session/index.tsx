@@ -65,6 +65,8 @@ import { useEpilogue } from "../../context/epilogue"
 import { normalizePath } from "../../util/path"
 import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
+import { createQuestionDismissal, type QuestionDismissal } from "./question-dismissal"
+import { isDismissedQuestion } from "../../util/dismiss"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
 import * as Model from "../../util/model"
 import { formatTranscript } from "../../util/transcript"
@@ -166,6 +168,7 @@ const context = createContext<{
   providers: () => ReadonlyMap<string, Provider>
   sync: ReturnType<typeof useSync>
   tui: ReturnType<typeof useTuiConfig>
+  dismissal: QuestionDismissal
 }>()
 
 function use() {
@@ -237,8 +240,10 @@ export function Session() {
     if (session()?.parentID) return []
     return children().flatMap((x) => sync.data.question[x.id] ?? [])
   })
-  const visible = createMemo(() => !session()?.parentID && permissions().length === 0 && questions().length === 0)
-  const disabled = createMemo(() => permissions().length > 0 || questions().length > 0)
+  const visible = createMemo(
+    () => !session()?.parentID && permissions().length === 0 && questions().length === 0 && !dismissal.answering(),
+  )
+  const disabled = createMemo(() => permissions().length > 0 || questions().length > 0 || !!dismissal.answering())
 
   const pending = createMemo(() => {
     const completed = messages().findLastIndex((message) => message.role === "assistant" && message.time.completed)
@@ -281,6 +286,21 @@ export function Session() {
   const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
   const toast = useToast()
   const sdk = useSDK()
+  const dismissal = createQuestionDismissal({
+    sessionID: () => route.sessionID,
+    sdk,
+    sync,
+    toast,
+    config: tuiConfig,
+  })
+  // A held dismissal belongs to the session it was made in; switching away sends it.
+  createEffect(
+    on(
+      () => route.sessionID,
+      () => dismissal.flush(),
+      { defer: true },
+    ),
+  )
   const editor = useEditorContext()
 
   createEffect(() => {
@@ -528,6 +548,19 @@ export function Session() {
             })
           })
         dialog.clear()
+      },
+    },
+    {
+      title: "Answer a dismissed question",
+      value: "session.answer",
+      category: "Session",
+      slash: {
+        name: "answer",
+      },
+      run: () => {
+        dialog.clear()
+        if (!dismissal.openLatest())
+          toast.show({ variant: "info", message: "There is no dismissed question to answer in this session." })
       },
     },
     {
@@ -1199,6 +1232,7 @@ export function Session() {
           providers,
           sync,
           tui: tuiConfig,
+          dismissal,
         }}
       >
         <box flexDirection="row" flexGrow={1} minHeight={0}>
@@ -1328,10 +1362,26 @@ export function Session() {
                   />
                 </Show>
                 <Show when={permissions().length === 0 && questions().length > 0}>
-                  <QuestionPrompt
-                    request={questions()[0]}
-                    directory={sync.session.get(questions()[0].sessionID)?.directory}
-                  />
+                  <Show when={!dismissal.isHeld(questions()[0].id)} fallback={<DismissedQuestionBar />}>
+                    <QuestionPrompt
+                      request={questions()[0]}
+                      directory={sync.session.get(questions()[0].sessionID)?.directory}
+                      initial={dismissal.takeRestored(questions()[0].id)}
+                      onDismiss={(draft) =>
+                        dismissal.dismiss(questions()[0], sync.session.get(questions()[0].sessionID)?.directory, draft)
+                      }
+                    />
+                  </Show>
+                </Show>
+                <Show when={permissions().length === 0 && questions().length === 0 && dismissal.answering()}>
+                  {(current) => (
+                    <QuestionPrompt
+                      request={current().request}
+                      initial={current().draft}
+                      onAnswer={(answers) => void dismissal.sendAnswer(answers)}
+                      onDismiss={() => dismissal.closeAnswer()}
+                    />
+                  )}
                 </Show>
                 <Show when={session()?.parentID}>
                   <SubagentFooter />
@@ -2563,8 +2613,29 @@ function TodoWrite(props: ToolProps) {
   )
 }
 
+// Shown in the question's place while a dismissal can still be undone. The agent is still waiting.
+function DismissedQuestionBar() {
+  const { theme } = useTheme()
+  const ctx = use()
+  useBindings(() => ({
+    mode: OPENCODE_BASE_MODE,
+    enabled: ctx.dismissal.heldCount() > 0,
+    priority: 10,
+    bindings: [{ key: "ctrl+z", desc: "Undo question dismissal", group: "Question", cmd: () => ctx.dismissal.undo() }],
+  }))
+  return (
+    <box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor={theme.backgroundPanel}>
+      <text fg={theme.textMuted}>
+        Question dismissed · <span style={{ fg: theme.text }}>ctrl+z</span> undo
+      </text>
+    </box>
+  )
+}
+
 function Question(props: ToolProps) {
   const { theme } = useTheme()
+  const ctx = use()
+  const [hover, setHover] = createSignal(false)
   const questions = createMemo(() => parseQuestions(props.input.questions))
   const answers = createMemo(() => parseQuestionAnswers(props.metadata.answers))
   const count = createMemo(() => questions().length)
@@ -2576,6 +2647,20 @@ function Question(props: ToolProps) {
 
   return (
     <Switch>
+      <Match when={isDismissedQuestion(props.part)}>
+        <box
+          paddingLeft={3}
+          onMouseOver={() => setHover(true)}
+          onMouseOut={() => setHover(false)}
+          onMouseUp={() => ctx.dismissal.openAnswer(props.part)}
+        >
+          <text fg={theme.textMuted}>
+            ? Dismissed {count()} question{count() !== 1 ? "s" : ""} —{" "}
+            <span style={{ fg: hover() ? theme.accent : theme.warning }}>Answer now</span>
+            <span style={{ fg: theme.textMuted }}> (/answer)</span>
+          </text>
+        </box>
+      </Match>
       <Match when={answers()}>
         <BlockTool title="# Questions" part={props.part}>
           <box gap={1}>

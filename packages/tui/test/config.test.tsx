@@ -153,3 +153,14 @@ test("provides resolved config through Solid context", async () => {
 test("requires the config provider", () => {
   expect(() => useTuiConfig()).toThrow("TuiConfigProvider is missing")
 })
+
+test("question dismissal guards decode through Info and resolve to defaults (XCOD-98)", () => {
+  const defaults = resolve(decodeInfo({}), { terminalSuspend: true })
+  expect(defaults.question).toEqual({ dismiss_window: 2000, undo_window: 5000 })
+
+  const legacy = resolve(decodeInfo({ question: { dismiss_window: 0, undo_window: 0 } }), { terminalSuspend: true })
+  expect(legacy.question).toEqual({ dismiss_window: 0, undo_window: 0 })
+
+  expect(() => decodeInfo({ question: { dismiss_window: -1 } })).toThrow()
+  expect(() => decodeInfo({ question: { undo_window: 1.5 } })).toThrow()
+})
