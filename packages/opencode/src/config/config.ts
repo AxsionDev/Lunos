@@ -116,8 +116,12 @@ type Info = ConfigV1.Info & {
   plugin_origins?: ConfigPlugin.Origin[]
 }
 
+/** Which config layer last set a top-level key (XCOD-102, `lunos debug config --sources`). */
+export type Origin = { layer: "managed" | "global" | "project" | "env" | "remote"; source: string }
+
 type State = {
   config: Info
+  origins: Record<string, Origin>
   directories: string[]
   deps: Fiber.Fiber<void>[]
   consoleState: ConsoleState
@@ -126,6 +130,7 @@ type State = {
 export interface Interface {
   readonly get: () => Effect.Effect<Info>
   readonly getGlobal: () => Effect.Effect<Info>
+  readonly origins: () => Effect.Effect<Record<string, Origin>>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
   readonly update: (config: Info) => Effect.Effect<void>
   readonly updateGlobal: (config: Info) => Effect.Effect<{ info: Info; changed: boolean }>
@@ -402,11 +407,22 @@ const layer = Layer.effect(
         })
 
         // XCOD-102: `$locked` only counts in managed config; any other layer's copy is dropped.
-        const merge = (source: string, next: Info, kind?: ConfigPlugin.Scope) => {
-          result = mergeConfigConcatArrays(result, ConfigPolicy.strip(next))
+        const origins: Record<string, Origin> = {}
+        const merge = (source: string, next: Info, kind?: ConfigPlugin.Scope, layer?: Origin["layer"]) => {
+          const stripped = ConfigPolicy.strip(next)
+          const from: Origin["layer"] =
+            layer ??
+            (source === Flag.OPENCODE_CONFIG ||
+            (Flag.OPENCODE_CONFIG_DIR && source.startsWith(Flag.OPENCODE_CONFIG_DIR))
+              ? "env"
+              : kind === "global"
+                ? "global"
+                : "project")
+          for (const key of Object.keys(stripped)) origins[key] = { layer: from, source }
+          result = mergeConfigConcatArrays(result, stripped)
           return mergePluginOrigins(source, next.plugin, kind)
         }
-        const mergeManaged = (source: string, next: Info) => merge(source, next, "global")
+        const mergeManaged = (source: string, next: Info) => merge(source, next, "global", "managed")
 
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
@@ -445,7 +461,7 @@ const layer = Layer.effect(
               },
               authEnv,
             )
-            yield* merge(source, next, "global")
+            yield* merge(source, next, "global", "remote")
             yield* Effect.logDebug("loaded remote config from well-known", { url })
           }
         }
@@ -547,7 +563,7 @@ const layer = Layer.effect(
             dir: ctx.directory,
             source,
           })
-          yield* merge(source, next, "local")
+          yield* merge(source, next, "local", "env")
           yield* Effect.logDebug("loaded custom config from OPENCODE_CONFIG_CONTENT")
         }
 
@@ -577,7 +593,7 @@ const layer = Layer.effect(
               for (const providerID of Object.keys(next.provider ?? {})) {
                 consoleManagedProviders.add(providerID)
               }
-              yield* merge(source, next, "global")
+              yield* merge(source, next, "global", "remote")
             }
           }).pipe(
             Effect.withSpan("Config.loadActiveOrgConfig"),
@@ -604,6 +620,7 @@ const layer = Layer.effect(
         if (Flag.OPENCODE_PERMISSION) {
           try {
             result.permission = mergeDeep(result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+            origins.permission = { layer: "env", source: "OPENCODE_PERMISSION" }
           } catch (err) {
             yield* Effect.logWarning("OPENCODE_PERMISSION contains invalid JSON, skipping", { err })
           }
@@ -642,6 +659,11 @@ const layer = Layer.effect(
         if (unknownLocks.length)
           yield* Effect.logWarning(`$locked lists keys this version doesn't know: ${unknownLocks.join(", ")}`)
         result = ConfigPolicy.apply(result, managedLayers.doc, locked)
+        for (const key of locked) {
+          const top = key.split(".")[0]
+          const layer = managedLayers.layers.findLast((item) => ConfigPolicy.get(item.info, key) !== undefined)
+          origins[top] = { layer: "managed", source: layer?.source ?? "managed policy (unset: default)" }
+        }
 
         // Lunos: sharing uploads the full transcript to a third-party host, so it is off
         // unless a config layer turns it on. Upstream opencode behaves as "manual".
@@ -656,6 +678,7 @@ const layer = Layer.effect(
 
         return {
           config: result,
+          origins,
           directories,
           deps,
           consoleState: {
@@ -680,6 +703,10 @@ const layer = Layer.effect(
 
     const directories = Effect.fn("Config.directories")(function* () {
       return yield* InstanceState.use(state, (s) => s.directories)
+    })
+
+    const origins = Effect.fn("Config.origins")(function* () {
+      return yield* InstanceState.use(state, (s) => s.origins)
     })
 
     const getConsoleState = Effect.fn("Config.getConsoleState")(function* () {
@@ -755,6 +782,7 @@ const layer = Layer.effect(
       get,
       getGlobal,
       getConsoleState,
+      origins,
       update,
       updateGlobal,
       invalidate,

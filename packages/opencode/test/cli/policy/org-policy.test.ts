@@ -73,6 +73,28 @@ describe("organisation policy: locked share (subprocess)", () => {
   )
 })
 
+describe("lunos debug config --sources (subprocess)", () => {
+  cliIt.live(
+    "shows which layer set each key and which keys are locked",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const env = yield* setup(
+          home,
+          { $locked: ["share"], share: "disabled", autoupdate: "notify" },
+          { share: "manual", username: "someone" },
+        )
+        const result = yield* opencode.spawn(["debug", "config", "--sources"], { env })
+        opencode.expectExit(result, 0, "debug config --sources")
+        const row = (key: string) => result.stdout.split("\n").find((line) => line.startsWith(key + " "))
+        expect(row("share")).toMatch(/managed\s+locked\s+.*managed\.json/)
+        expect(row("autoupdate")).toMatch(/managed\s+\S*managed\.json/)
+        expect(row("autoupdate")).not.toContain("locked")
+        expect(row("username")).toMatch(/global\s+/)
+      }),
+    60_000,
+  )
+})
+
 describe("organisation policy: marketplace allowlist (subprocess)", () => {
   const manifest = (name: string) => ({
     name,
