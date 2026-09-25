@@ -5002,6 +5002,21 @@
         },
         "description": "Reject a question request from the AI assistant.",
         "summary": "Reject question request",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "drafts": {
+                    "$ref": "#/components/schemas/QuestionDrafts"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "x-codeSamples": [
           {
             "lang": "js",
@@ -23294,6 +23309,26 @@
           }
         },
         "required": ["_tag", "requestID", "message"],
+        "additionalProperties": false
+      },
+      "QuestionDrafts": {
+        "type": "object",
+        "properties": {
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionAnswer"
+            },
+            "description": "Answers picked so far, in question order"
+          },
+          "custom": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["answers"],
         "additionalProperties": false
       },
       "PermissionRequest": {
