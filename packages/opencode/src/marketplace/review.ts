@@ -76,14 +76,16 @@ export function gate(item: ContentItem, input: { allowUnreviewed: boolean; polic
 export type RegistryLookup = (pkg: string, version: string) => Promise<string | undefined>
 
 /**
- * The npm spec to install for a plugin entry: pinned to `reviewed_version` when there is one,
- * after checking `integrity` against the registry. Throws on a mismatch.
+ * The npm spec to install for a plugin entry: pinned to `reviewed_version`, else to the listed
+ * `source.version`, after checking `integrity` against the registry. Throws on a mismatch.
  */
 export async function pinnedSpec(item: ContentItem & { kind: "plugin" }, lookup: RegistryLookup) {
   const { review, integrity } = curation(item)
   const source = item.entry.source
-  if (source.type !== "npm" || !review?.reviewed_version) return item.spec
-  const version = review.reviewed_version
+  // The reviewed version for a verified entry; otherwise the version the catalogue recorded
+  // (`source.version`), which pins what was listed without implying it was reviewed.
+  const version = review?.reviewed_version ?? (source.type === "npm" ? source.version : undefined)
+  if (source.type !== "npm" || !version) return item.spec
   if (integrity) {
     const actual = await lookup(source.package, version)
     if (actual !== integrity)

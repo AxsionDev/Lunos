@@ -5,187 +5,428 @@
     "url": "https://github.com/AxsionDev/Lunos"
   },
   "description": "Community plugins for Lunos, seeded from the ecosystem docs (packages/web/src/content/docs/ecosystem.mdx).",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "plugins": [
     {
       "name": "opencode-helicone-session",
-      "source": { "type": "npm", "package": "opencode-helicone-session" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-helicone-session",
+        "version": "1.0.1"
+      },
       "description": "Automatically inject Helicone session headers for request grouping",
-      "category": "observability"
+      "category": "observability",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-XlPwwA9X9STm/WQ1BzAIjWCvndrNUn4pjEVozEja312UeGyFG4I1Nq9XsbKUtvzImWYs9XhLfSEJ1noV+qFGoQ=="
     },
     {
       "name": "opencode-openai-codex-auth",
-      "source": { "type": "npm", "package": "opencode-openai-codex-auth" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-openai-codex-auth",
+        "version": "4.4.0"
+      },
       "description": "Use your ChatGPT Plus/Pro subscription instead of API credits",
-      "category": "auth"
+      "category": "auth",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-sRmcbAAIMHH38wPgQLQB0n1WzQPN7R+kegXgyKWQgRb65+PKbeum8fgbrQelUaESVc7ibBJ9mKLCfI58mBTjOg=="
     },
     {
       "name": "opencode-gemini-auth",
-      "source": { "type": "npm", "package": "opencode-gemini-auth" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-gemini-auth",
+        "version": "2.0.1"
+      },
       "description": "Use your existing Gemini plan instead of API billing",
-      "category": "auth"
+      "category": "auth",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-txV23q60qvdFLa6SEH4jzqUt7NvsjzhP5SIGwut44dUkGKrt13IFtcn60037pUcvyEdHvFRvf11pUzBy2gifFQ=="
     },
     {
       "name": "opencode-antigravity-auth",
-      "source": { "type": "npm", "package": "opencode-antigravity-auth" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-antigravity-auth",
+        "version": "1.6.0"
+      },
       "description": "Use Antigravity's free models instead of API billing",
-      "category": "auth"
+      "category": "auth",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-8HLksis3yfHxZ6hzye78eEWNV6lRDL/yCtSD8sUaernyGFvIxSywFVwLsfum50wZ6ZEwJqs6moeiSGb6EE1p+Q=="
     },
     {
       "name": "opencode-devcontainers",
-      "source": { "type": "npm", "package": "opencode-devcontainers" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-devcontainers",
+        "version": "0.5.1"
+      },
       "description": "Multi-branch devcontainer isolation with shallow clones and auto-assigned ports",
-      "category": "environment"
+      "category": "environment",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-XLAhMr0ZO1dEvKvjPrPq3JyJdLflZ+lQQ8E3rnBc3dotwK8KyQ0w6woITQu1HF8SAHHrBU3IUAjfAj5uP69fPg=="
     },
     {
       "name": "opencode-dynamic-context-pruning",
-      "source": { "type": "npm", "package": "@tarquinen/opencode-dcp" },
+      "source": {
+        "type": "npm",
+        "package": "@tarquinen/opencode-dcp",
+        "version": "3.2.0"
+      },
       "description": "Optimize token usage by pruning obsolete tool outputs",
-      "category": "context"
+      "category": "context",
+      "review": {
+        "status": "community"
+      },
+      "license": "AGPL-3.0-or-later",
+      "integrity": "sha512-6tUjeYlbHgMx+0xfB2DiHkknC9G3U5Rk+F4FBsPqAI3vzjaMXGkgsBUNzjL0e5StsEGDmyDTbxtozg6p9mnhng=="
     },
     {
       "name": "opencode-vibeguard",
-      "source": { "type": "npm", "package": "opencode-vibeguard" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-vibeguard",
+        "version": "0.1.0"
+      },
       "description": "Redact secrets/PII into VibeGuard-style placeholders before LLM calls; restore locally",
-      "category": "security"
+      "category": "security",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-qAyTC4ob0aoCAxiqq9Jw2CM9CYGBVg1VBl9MS7HWOuYIoZWl13Ukv8CeD1Ieg2BYp0jj6zAxzSK8GKClBxaJcg=="
     },
     {
       "name": "opencode-websearch-cited",
-      "source": { "type": "npm", "package": "opencode-websearch-cited" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-websearch-cited",
+        "version": "1.2.0"
+      },
       "description": "Add native websearch support for supported providers with Google grounded style",
-      "category": "search"
+      "category": "search",
+      "review": {
+        "status": "community"
+      },
+      "license": "Apache-2.0",
+      "integrity": "sha512-6p7ZuMSddiwkI+8gRklJ6trN+hhDfuIv6yV/uW/Eh+3J2Cz9xUnc6ExhigtibJ8hTJnGFJgNpltYOK/a+dNsiw=="
     },
     {
       "name": "opencode-pty",
-      "source": { "type": "npm", "package": "opencode-pty" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-pty",
+        "version": "0.4.0"
+      },
       "description": "Enables AI agents to run background processes in a PTY, send interactive input to them.",
-      "category": "environment"
+      "category": "environment",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-7p0VSsSvZuXrcS6A2rDWc7PBNXZ7EkKyVBjfxT+ftqQG4r4VHz/bUtVx89Pp90KJ//PY0crFbMGY8K+V0WQ7rA=="
     },
     {
       "name": "opencode-wakatime",
-      "source": { "type": "npm", "package": "opencode-wakatime" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-wakatime",
+        "version": "1.3.9"
+      },
       "description": "Track OpenCode usage with Wakatime",
-      "category": "observability"
+      "category": "observability",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-HLvPITvjdK/n8zFqiFCD8OHpxXedQzN+4Gijhup4hyNnaV6C6lDw4BkXGwa/uHo4sK/DvAopmDuyfqXiVRluFg=="
     },
     {
       "name": "opencode-md-table-formatter",
-      "source": { "type": "npm", "package": "@franlol/opencode-md-table-formatter" },
+      "source": {
+        "type": "npm",
+        "package": "@franlol/opencode-md-table-formatter",
+        "version": "0.0.6"
+      },
       "description": "Clean up markdown tables produced by LLMs",
-      "category": "editing"
+      "category": "editing",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-+mi9ZtTDyo7m77UlrzWb3wimYDJhyuGFTTAsNw7PpIm1Aesr5SZPe7GHSURp8Q0b6K7JlVGxPU8XCZJzK/fdiA=="
     },
     {
       "name": "opencode-morph-plugin",
-      "source": { "type": "npm", "package": "@morphllm/opencode-morph-plugin" },
+      "source": {
+        "type": "npm",
+        "package": "@morphllm/opencode-morph-plugin",
+        "version": "2.0.17"
+      },
       "description": "Fast Apply editing, WarpGrep codebase search, and context compaction via Morph",
-      "category": "editing"
+      "category": "editing",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-IOct8As/lg9xz+CoG1C5yVSuDci73LNWBadwNZ8bM9n7CrUnAkfo4qKcDWptw/z4ZZ6SFDzOoWv182EBwIXFug=="
     },
     {
       "name": "oh-my-opencode",
-      "source": { "type": "npm", "package": "oh-my-opencode" },
+      "source": {
+        "type": "npm",
+        "package": "oh-my-opencode",
+        "version": "4.19.4"
+      },
       "description": "Background agents, pre-built LSP/AST/MCP tools, curated agents, Claude Code compatible",
-      "category": "agents"
+      "category": "agents",
+      "review": {
+        "status": "community"
+      },
+      "license": "SUL-1.0",
+      "integrity": "sha512-MlL8JiB9zhpF+Cl7J6ilyuUS39dTzj2d2t14hhaSUc5v4jYldnfEuZfY+43vkPUzfjrWbQOvuPm3kd8yFvtL4g=="
     },
     {
       "name": "opencode-notifier",
-      "source": { "type": "npm", "package": "@mohak34/opencode-notifier" },
+      "source": {
+        "type": "npm",
+        "package": "@mohak34/opencode-notifier",
+        "version": "0.3.0"
+      },
       "description": "Desktop notifications and sound alerts for permission, completion, and error events",
-      "category": "notifications"
+      "category": "notifications",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-ynFiWiUBWAyHkbY7u2sGWMHBY5bWRmirPev8hTcXJom5VdKUgmRWQijrUOGu0GF2j0aCZx0KeBXxeMvnL+Xnqg=="
     },
     {
       "name": "opencode-zellij-namer",
-      "source": { "type": "npm", "package": "opencode-zellij-namer" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-zellij-namer",
+        "version": "1.1.3"
+      },
       "description": "AI-powered automatic Zellij session naming based on OpenCode context",
-      "category": "environment"
+      "category": "environment",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-CgwEdf8Q1W8lYviqyWIJ6hMQp98DP4gnzGUoEP4UkSjH8sEnq4spGm5EbUhQCGvyFDOh0X8aJt341jmRAZAuNA=="
     },
     {
       "name": "opencode-skillful",
-      "source": { "type": "npm", "package": "@zenobius/opencode-skillful" },
+      "source": {
+        "type": "npm",
+        "package": "@zenobius/opencode-skillful",
+        "version": "1.2.5"
+      },
       "description": "Allow OpenCode agents to lazy load prompts on demand with skill discovery and injection",
-      "category": "context"
+      "category": "context",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-CSl/6FgcXGf2aiJvcFPHE07KkHclVOdvI5ldnFc1Ejy8YGQBG3hjkPIqkrmr4Py1h4q8zqUlhyBP6I9bVSxBgw=="
     },
     {
       "name": "opencode-supermemory",
-      "source": { "type": "npm", "package": "opencode-supermemory" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-supermemory",
+        "version": "2.0.13"
+      },
       "description": "Persistent memory across sessions using Supermemory",
-      "category": "context"
+      "category": "context",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-jijWMzZLkB4HmXkc4mkkGfEVUfrvld8a5euWKbyYvFZTSy32NzMzsh/59cASImv18YLVKLdIwh9vrluVMvC7bw=="
     },
     {
       "name": "@openspoon/subtask2",
-      "source": { "type": "npm", "package": "@spoons-and-mirrors/subtask2" },
+      "source": {
+        "type": "npm",
+        "package": "@spoons-and-mirrors/subtask2",
+        "version": "0.3.5"
+      },
       "description": "Extend opencode /commands into a powerful orchestration system with granular flow control",
-      "category": "agents"
+      "category": "agents",
+      "review": {
+        "status": "community"
+      },
+      "license": "PolyForm-Noncommercial-1.0.0",
+      "integrity": "sha512-sN9pRz5ER3xcLJNme2PGaT7VfJxEr1NXsk5A87/GFZGeDlm8RegynnNk49bKnbw8zx2S8n+0bGkEq/se+XOp4g=="
     },
     {
       "name": "opencode-scheduler",
-      "source": { "type": "npm", "package": "opencode-scheduler" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-scheduler",
+        "version": "1.3.0"
+      },
       "description": "Schedule recurring jobs using launchd (Mac) or systemd (Linux) with cron syntax",
-      "category": "workflow"
+      "category": "workflow",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-zloAazOZDiPop1V6B5jMKcG1M+ogl0VI5Ym3xu7vj3siAncU26Wn+hMbn9FfvpHqEBGWbzLrhJVZPb9yIRvESw=="
     },
     {
       "name": "opencode-conductor",
-      "source": { "type": "npm", "package": "opencode-conductor-plugin" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-conductor-plugin",
+        "version": "1.32.0"
+      },
       "description": "Protocol-Driven Workflow: Automation of the Context -> Spec -> Plan -> Implement lifecycle.",
-      "category": "workflow"
+      "category": "workflow",
+      "review": {
+        "status": "community"
+      },
+      "license": "Apache-2.0",
+      "integrity": "sha512-Si1RmnyQi/D6Oqls3nIve5GlG7Izb3KIS3SbSIOq2wIFKHjnWQB1FZ8ImbtcS1sNLj1wv52/mZ2GaCPmWxH5lQ=="
     },
     {
       "name": "micode",
-      "source": { "type": "npm", "package": "micode" },
+      "source": {
+        "type": "npm",
+        "package": "micode",
+        "version": "0.11.0"
+      },
       "description": "Structured Brainstorm → Plan → Implement workflow with session continuity",
-      "category": "workflow"
+      "category": "workflow",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-3T7S30RpGTw2u7T5OJ6AHnFpu57DEHaj4933M8GRdHF+vVkHbw5x3Pbhru6IY8W2Hu8AI56M7qejeiwDtXzmJA=="
     },
     {
       "name": "octto",
-      "source": { "type": "npm", "package": "octto" },
+      "source": {
+        "type": "npm",
+        "package": "octto",
+        "version": "0.4.5"
+      },
       "description": "Interactive browser UI for AI brainstorming with multi-question forms",
-      "category": "workflow"
+      "category": "workflow",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-sqRzdkuew8RJdgysdVBwWfsc32ePvcMAN9BEZAzeD9x2lilAqyM1kpNQEemxsDZ76ZRwMwGj+Cm154ojFaJIYw=="
     },
     {
       "name": "opencode-sentry-monitor",
-      "source": { "type": "npm", "package": "opencode-sentry-monitor" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-sentry-monitor",
+        "version": "0.1.7"
+      },
       "description": "Trace and debug your AI agents with Sentry AI Monitoring",
-      "category": "observability"
+      "category": "observability",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-NoyRt0pPcuGfCI3F3oAFSld+GXvmssyXV0/thdsHKUPsjyNHbNRDCHPk71WgjhxsZdRjRHmsyKi7QF8R3ojBfg=="
     },
     {
       "name": "opencode-jfrog-plugin",
-      "source": { "type": "npm", "package": "@jfrog/opencode-jfrog-plugin" },
+      "source": {
+        "type": "npm",
+        "package": "@jfrog/opencode-jfrog-plugin",
+        "version": "0.3.2"
+      },
       "description": "JFrog Plugin for seamless integration of Opencode users to JFrog platform",
-      "category": "integrations"
+      "category": "integrations",
+      "review": {
+        "status": "community"
+      },
+      "license": "Apache-2.0",
+      "integrity": "sha512-NDNRVU2YJP53Y4ZGLxtwM2Ee2puURu5HYarTsnkiKwoaRlnGEGlOJ2bI1BYN3dMfI1iJOU7cHdPHxSAhdpbyeA=="
     },
     {
       "name": "opencode-goal-plugin",
-      "source": { "type": "npm", "package": "opencode-goal-plugin" },
+      "source": {
+        "type": "npm",
+        "package": "opencode-goal-plugin",
+        "version": "0.10.0"
+      },
       "description": "Session-scoped /goal workflow that keeps objectives in context and auto-continues until complete",
-      "category": "workflow"
+      "category": "workflow",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT",
+      "integrity": "sha512-PQ3AgNQcVwdEnoQzDz42NVtov1yKbxOKlrnLdKXOykP0+0OV6eXSUSxKuyjVFVItbbWzoNTc2XjWIsIKF+F4AA=="
     }
   ],
   "mcp": [
     {
       "name": "filesystem",
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem@2026.8.31"],
       "description": "Secure file operations with configurable access controls. A protocol reference implementation, published for demonstration rather than production use.",
-      "category": "environment"
+      "category": "environment",
+      "review": {
+        "status": "community"
+      },
+      "license": "Apache-2.0 AND MIT"
     },
     {
       "name": "git",
       "type": "local",
-      "command": ["uvx", "mcp-server-git"],
+      "command": ["uvx", "mcp-server-git==2026.8.18"],
       "description": "Read, search, and manipulate Git repositories. A protocol reference implementation, published for demonstration rather than production use.",
-      "category": "environment"
+      "category": "environment",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT"
     },
     {
       "name": "fetch",
       "type": "local",
-      "command": ["uvx", "mcp-server-fetch"],
+      "command": ["uvx", "mcp-server-fetch==2026.8.18"],
       "description": "Fetch a web page and convert it for efficient use by a model. A protocol reference implementation, published for demonstration rather than production use.",
-      "category": "search"
+      "category": "search",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT"
     },
     {
       "name": "playwright",
       "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp@latest"],
+      "command": ["npx", "-y", "@playwright/mcp@0.0.82"],
       "description": "Browser automation driven by accessibility snapshots rather than screenshots. Maintained by Microsoft under Playwright's own licence.",
-      "category": "environment"
+      "category": "environment",
+      "review": {
+        "status": "community"
+      },
+      "license": "Apache-2.0"
     },
     {
       "name": "github",
@@ -197,27 +438,39 @@
         "--rm",
         "-e",
         "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "ghcr.io/github/github-mcp-server"
+        "ghcr.io/github/github-mcp-server@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"
       ],
       "environment": ["GITHUB_PERSONAL_ACCESS_TOKEN"],
       "description": "Repository management and GitHub API access, maintained by GitHub. Runs as a container, so it needs Docker.",
-      "category": "integrations"
+      "category": "integrations",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT"
     },
     {
       "name": "postgres",
       "type": "local",
-      "command": ["uvx", "postgres-mcp"],
+      "command": ["uvx", "postgres-mcp==0.3.0"],
       "environment": ["DATABASE_URI"],
       "description": "PostgreSQL schema browsing and SQL execution, with a restricted read-only mode.",
-      "category": "integrations"
+      "category": "integrations",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT"
     },
     {
       "name": "searxng",
       "type": "local",
-      "command": ["npx", "-y", "mcp-searxng"],
+      "command": ["npx", "-y", "mcp-searxng@2.4.0"],
       "environment": ["SEARXNG_URL"],
       "description": "Web search through a SearXNG instance you host yourself. No API key, and no query leaves your infrastructure.",
-      "category": "search"
+      "category": "search",
+      "review": {
+        "status": "community"
+      },
+      "license": "MIT"
     }
   ]
 }

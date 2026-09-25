@@ -58,6 +58,13 @@ describe("marketplace review (XCOD-105)", () => {
     expect(asked).toEqual(["pkg@1.2.3"])
   })
 
+  test("a community entry is pinned to its listed version and integrity-checked too", async () => {
+    const item = plugin({ status: "community" }, { integrity: INTEGRITY })
+    ;(item.entry.source as { version?: string }).version = "0.9.0"
+    expect(await MarketplaceReview.pinnedSpec(item, async () => INTEGRITY)).toBe("pkg@0.9.0")
+    await expect(MarketplaceReview.pinnedSpec(item, async () => "sha512-other")).rejects.toThrow("integrity")
+  })
+
   test("a tampered integrity is refused", async () => {
     await expect(
       MarketplaceReview.pinnedSpec(plugin(verified, { integrity: INTEGRITY }), async () => "sha512-other"),
