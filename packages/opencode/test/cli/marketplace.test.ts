@@ -12,6 +12,8 @@ import {
 import type { FetchDeps, MarketplaceCacheDeps, MarketplaceCtx, MarketplaceListDeps } from "../../src/marketplace/shared"
 import { DEFAULT_MARKETPLACE } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
+import { pickOne } from "../../src/cli/cmd/marketplace-content"
+import type { ContentItem } from "../../src/marketplace/content"
 
 const validManifest = {
   name: "lunos-community",
@@ -204,6 +206,109 @@ describe("marketplace.add.task", () => {
         fetchedAt: expect.any(Number),
       },
     ])
+  })
+})
+
+// XCOD-112: `--from ./marketplace.json` for a manifest named like the built-in one used to add a
+// second "lunos-community", after which every lunos-community/<name> was ambiguous.
+describe("marketplace.add.task name clash", () => {
+  const added = (entries: Array<{ source: string; scope: "local" | "global" | "builtin"; name: string }>) => async () =>
+    entries.map((entry) => ({
+      source: entry.source,
+      scope: entry.scope,
+      ok: true as const,
+      manifest: { ...validManifest, name: entry.name } as never,
+      fetchedAt: 0,
+    }))
+  const capture = (deps: MarketplaceDeps) => {
+    const lines: string[] = []
+    return {
+      lines,
+      deps: {
+        ...deps,
+        log: {
+          error: (msg: string) => lines.push(msg),
+          info: (msg: string) => lines.push(msg),
+          success: (msg: string) => lines.push(msg),
+        },
+      },
+    }
+  }
+
+  test("refuses a source whose name the built-in marketplace already uses, and says so", async () => {
+    await using tmp = await tmpdir()
+    const { lines, deps } = capture({
+      ...addDeps(path.join(tmp.path, "global"), async () => validManifest as never),
+      added: added([{ source: DEFAULT_MARKETPLACE, scope: "builtin", name: "lunos-community" }]),
+    })
+
+    const ok = await createMarketplaceAddTask({ source: "./marketplace.json" }, deps)(ctx(tmp.path))
+
+    expect(ok).toBe(false)
+    const out = lines.join("\n")
+    expect(out).toContain(`"lunos-community" is already added from ${DEFAULT_MARKETPLACE} (the built-in marketplace)`)
+    expect(out).toContain(`"marketplace_default": false`)
+    expect(await Filesystem.exists(path.join(tmp.path, ".opencode", "opencode.jsonc"))).toBe(false)
+  })
+
+  test("names the config holding the clash when it isn't the built-in one", async () => {
+    await using tmp = await tmpdir()
+    const { lines, deps } = capture({
+      ...addDeps(path.join(tmp.path, "global"), async () => validManifest as never),
+      added: added([{ source: "acme/marketplace", scope: "global", name: "lunos-community" }]),
+    })
+
+    expect(await createMarketplaceAddTask({ source: "pminev1/Lunos" }, deps)(ctx(tmp.path))).toBe(false)
+    expect(lines.join("\n")).toContain('remove acme/marketplace from "marketplace" in your global config')
+  })
+
+  test("re-adding the same source is not a clash", async () => {
+    await using tmp = await tmpdir()
+    const deps = {
+      ...addDeps(path.join(tmp.path, "global"), async () => validManifest as never),
+      added: added([{ source: "pminev1/Lunos", scope: "local", name: "lunos-community" }]),
+    }
+    expect(await createMarketplaceAddTask({ source: "pminev1/Lunos" }, deps)(ctx(tmp.path))).toBe(true)
+  })
+
+  test("a different name is not a clash", async () => {
+    await using tmp = await tmpdir()
+    const deps = {
+      ...addDeps(path.join(tmp.path, "global"), async () => validManifest as never),
+      added: added([{ source: DEFAULT_MARKETPLACE, scope: "builtin", name: "something-else" }]),
+    }
+    expect(await createMarketplaceAddTask({ source: "pminev1/Lunos" }, deps)(ctx(tmp.path))).toBe(true)
+  })
+})
+
+describe("pickOne ambiguity", () => {
+  const row = (marketplace: string, source: string, kind: "plugin" | "mcp" = "plugin") =>
+    ({ kind, name: "thing", marketplace, source, entry: {} }) as never as ContentItem
+
+  test("never lists two identical choices: it names the source", () => {
+    const items = [row("lunos-community", DEFAULT_MARKETPLACE), row("lunos-community", "./marketplace.json")]
+    expect(() => pickOne(items, "lunos-community/thing", { kind: "plugin" })).toThrow(
+      `lunos-community/thing (plugin) from ${DEFAULT_MARKETPLACE}, lunos-community/thing (plugin) from ./marketplace.json`,
+    )
+  })
+
+  test("doesn't suggest --kind when it was already passed", () => {
+    const items = [row("a", "a.json"), row("b", "b.json", "mcp")]
+    expect(() => pickOne(items, "thing", { kind: "plugin" })).toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining("--kind") }),
+    )
+  })
+
+  test("doesn't suggest --kind when every match is the same kind", () => {
+    const items = [row("a", "a.json"), row("b", "b.json")]
+    expect(() => pickOne(items, "thing")).toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining("--kind") }),
+    )
+  })
+
+  test("suggests --kind when it wasn't passed and would narrow the matches", () => {
+    const items = [row("a", "a.json"), row("b", "b.json", "mcp")]
+    expect(() => pickOne(items, "thing")).toThrow("Pass --kind")
   })
 })
 

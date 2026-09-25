@@ -14,6 +14,8 @@ type Row<K extends Marketplace.Kind, E> = {
   kind: K
   name: string
   marketplace: string
+  /** The added source the row came from; tells apart two marketplaces that share a name. */
+  source: string
   description?: string
   category?: string
   tags?: readonly string[]
@@ -32,11 +34,12 @@ export type ContentListResult = {
   items: ContentItem[]
 }
 
-function rows(manifest: Marketplace.Manifest): ContentItem[] {
+function rows(manifest: Marketplace.Manifest, source: string): ContentItem[] {
   const marketplace = manifest.name
   const meta = (entry: { name: string; description?: string; category?: string; tags?: readonly string[] }) => ({
     name: entry.name,
     marketplace,
+    source,
     description: entry.description,
     category: entry.category,
     tags: entry.tags,
@@ -71,7 +74,7 @@ export async function listContent(
       fetchedAt: entry.fetchedAt,
       stale: entry.stale,
     })
-    for (const item of rows(entry.manifest)) {
+    for (const item of rows(entry.manifest, entry.source)) {
       if (!kind || item.kind === kind) items.push(item)
     }
   }
@@ -105,7 +108,7 @@ const COUNT_LABEL: Record<Marketplace.Kind, string> = {
 // One summary for every surface that describes a whole marketplace (`list`, `add`, `update`), so an
 // MCP-only marketplace isn't reported as "0 plugin(s)". Order follows Marketplace.KINDS.
 export function describeContents(manifest: Marketplace.Manifest) {
-  const all = rows(manifest)
+  const all = rows(manifest, "")
   const parts = Marketplace.KINDS.map((kind) => [kind, all.filter((row) => row.kind === kind).length] as const)
     .filter(([, count]) => count > 0)
     .map(([kind, count]) => `${count} ${COUNT_LABEL[kind]}`)
