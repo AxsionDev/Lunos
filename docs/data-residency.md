@@ -68,14 +68,24 @@ One JSON object per line, appended per outbound call:
 
 ```json
 {
+  "v": 1,
+  "event": "model.call",
   "timestamp": "2026-09-21T12:00:00.000Z",
   "providerID": "scaleway",
   "region": "eu",
   "basis": "both",
   "host": "api.scaleway.ai",
-  "allowed": true
+  "allowed": true,
+  "seq": 42,
+  "prev": "9f86d0…"
 }
 ```
+
+Since schema v1 (XCOD-103) this file is the organisation audit trail: the same stream also records
+tool runs, permission decisions, MCP connections, marketplace installs and policy refusals, and
+each line is hash-chained to the one before it. The residency fields above are unchanged; `v`,
+`event`, `seq` and `prev` are added. Lines written before v1 have none of the added fields. The
+full schema, `lunos audit verify`, export and SIEM forwarding are in [The audit log](audit-log.md).
 
 Default location is `residency-egress.log` in the Lunos log directory. Override it:
 
@@ -92,7 +102,7 @@ Notes for reviewers:
 
 - **Blocked attempts are recorded too**, with `"allowed": false`. A log that only shows successful calls cannot answer "did anything try to leave the region?", which is the question that matters.
 - **Only the destination host is recorded — never the request path or body.** An audit trail of what left must not itself become a copy of what left.
-- The log is a local file. Nothing is sent anywhere; Lunos is self-hosted and operates no service that could receive it.
+- The log is a local file. Nothing is sent to ITService EOOD; Lunos is self-hosted and operates no service that could receive it. You can forward it to your own SIEM ([Forwarding](audit-log.md#forwarding-to-a-siem)), which is off unless you configure it.
 - Turn logging off, keeping enforcement, with `"audit": false`.
 
 ## Full example

@@ -82,7 +82,7 @@ Everything else:
 - Your source code, except the portions sent to your chosen model provider as context
 - Conversation history and session state, stored in local files
 - Configuration and credentials, stored locally
-- The data-residency audit log (§5)
+- The audit log: model calls, tool runs, permission decisions, installs and policy refusals, with no prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
 
 ### Touches Lunos-operated infrastructure
 
