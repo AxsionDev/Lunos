@@ -4,6 +4,7 @@ import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
 import { MCP } from "@/mcp"
+import { AuditLog } from "@/audit/log"
 import { McpCatalog } from "@/mcp/catalog"
 import { Permission } from "@/permission"
 import { Tool } from "@/tool/tool"
@@ -116,6 +117,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { tool: item.id, sessionID: ctx.sessionID, agent: ctx.agent, callID: ctx.callID },
               { args },
             )
+            AuditLog.toolRun({ tool: item.id, agent: ctx.agent, session: ctx.sessionID, args })
             const result = yield* item.execute(args, ctx)
             const output = {
               ...result,
@@ -435,6 +437,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             { tool: key, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId },
             { args },
           )
+          AuditLog.toolRun({ tool: key, agent: ctx.agent, session: ctx.sessionID, args })
           const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.gen(function* () {
             yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
             return yield* Effect.promise(() => execute(args, opts))

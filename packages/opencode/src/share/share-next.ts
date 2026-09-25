@@ -2,6 +2,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import { Residency } from "@opencode-ai/core/residency"
+import { AuditLog } from "@/audit/log"
 import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import type * as SDK from "@opencode-ai/sdk/v2"
@@ -216,7 +217,7 @@ const layer = Layer.effect(
     // residency policy applies. A denied target fails closed and is written to the audit log,
     // exactly like a denied model provider.
     const enforce = Effect.fnUntraced(function* (target: string, baseUrl: string) {
-      const residency = Residency.resolve((yield* cfg.get()).residency)
+      const residency = AuditLog.residency(yield* cfg.get())
       if (!residency) return
       yield* Effect.try({
         try: () =>

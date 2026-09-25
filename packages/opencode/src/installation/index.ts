@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { AuditLog } from "@/audit/log"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { Effect, Layer, Schema, Context } from "effect"
@@ -178,6 +179,12 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         if (!UPGRADABLE.has(m)) return yield* new UpgradeFailedError({ stderr: unpublishedMessage(m) })
         const manager = m === "bun" ? ["bun", "install", "-g"] : [m, "install", "-g"]
         const upgradeResult = yield* run([...manager, `${PACKAGE}@${target}`])
+        AuditLog.emit("upgrade", {
+          method: m,
+          version: target,
+          from: InstallationVersion,
+          allowed: !!upgradeResult && upgradeResult.code === 0,
+        })
         if (!upgradeResult || upgradeResult.code !== 0) {
           return yield* new UpgradeFailedError({ stderr: upgradeFailure(m, upgradeResult) })
         }
