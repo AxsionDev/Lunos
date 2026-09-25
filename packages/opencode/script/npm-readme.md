@@ -3,7 +3,7 @@
 **EU-sovereign, open-source AI coding agent for the terminal.**
 
 ```sh
-npm i -g lunos-ai
+npm i -g lunos-ai --allow-scripts=lunos-ai
 lunos
 ```
 

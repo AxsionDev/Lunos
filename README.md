@@ -97,13 +97,18 @@ A published roadmap and a feature-parity comparison table are still to come.
 ### Installation
 
 ```bash
-# npm — verified end to end at v1.18.35
-npm i -g lunos-ai@latest           # or bun/pnpm/yarn
+# npm — verified end to end at v1.18.39 on npm 10 and npm 12
+npm i -g lunos-ai@latest --allow-scripts=lunos-ai   # or bun/pnpm/yarn
 lunos --version
 
 # install script
 curl -fsSL https://raw.githubusercontent.com/AxsionDev/Lunos/dev/install | bash
 ```
+
+**npm 12 needs `--allow-scripts=lunos-ai`.** npm 12 no longer runs install scripts by default,
+so without the flag the package installs but its postinstall (which fetches the `lunos` binary)
+is skipped, and `lunos` exits with "lunos-ai's postinstall script was not run". Earlier npm
+versions accept the flag and run the script either way.
 
 The install script places the binary in `$HOME/.lunos/bin` and offers to add it to your `PATH`.
 Standalone archives for Linux, macOS and Windows are also attached to each
@@ -154,7 +159,7 @@ The install script installs to **`$HOME/.lunos/bin`** and offers to add that dir
 >
 > To install somewhere else today, download the archive from the
 > [releases page](https://github.com/AxsionDev/Lunos/releases) and place the `lunos` binary
-> where you want it, or use `npm i -g lunos-ai@latest` and let npm decide. Restoring the
+> where you want it, or use `npm i -g lunos-ai@latest --allow-scripts=lunos-ai` and let npm decide. Restoring the
 > override is a code change, tracked separately.
 
 ### Modes
