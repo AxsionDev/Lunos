@@ -1,6 +1,6 @@
 import { NodeFileSystem } from "@effect/platform-node"
-import { dirname, isAbsolute, join, relative, resolve as pathResolve, sep } from "path"
-import { realpathSync } from "fs"
+import { dirname, isAbsolute, join, parse, relative, resolve as pathResolve, sep } from "path"
+import { existsSync, readdirSync, realpathSync } from "fs"
 import * as NFS from "fs/promises"
 import { lookup } from "mime-types"
 import { Context, Effect, FileSystem, Layer, Schema } from "effect"
@@ -233,6 +233,45 @@ export namespace FSUtil {
     } catch {
       return resolved
     }
+  }
+
+  /**
+   * An absolute path with each existing component spelled the way it is on disk.
+   * macOS's default filesystem ignores case, so `…/Axcode/src` and `…/AxCode/src` are the
+   * same directory, but containment checks and permission patterns compare strings. Models
+   * regularly reproduce paths in the wrong case. Symlinks are kept as given, not resolved,
+   * and components that don't exist yet are kept as given.
+   */
+  export function onDiskCase(p: string): string {
+    if (process.platform === "win32") return normalizePath(p)
+    const resolved = pathResolve(p)
+    try {
+      if (realpathSync.native(resolved) === resolved) return resolved
+    } catch {}
+    const root = parse(resolved).root
+    const parts = resolved.slice(root.length).split(sep).filter(Boolean)
+    let current = root
+    for (const [i, part] of parts.entries()) {
+      const given = join(current, part)
+      // Missing, or unreadable: nothing on disk to take the spelling from.
+      if (!existsSync(given)) return join(given, ...parts.slice(i + 1))
+      const entries = (() => {
+        try {
+          return readdirSync(current)
+        } catch {
+          return undefined
+        }
+      })()
+      if (!entries || entries.includes(part)) {
+        current = given
+        continue
+      }
+      // The given spelling exists but isn't an entry, so the filesystem matched it
+      // case-insensitively. Take the entry's spelling if exactly one fits.
+      const matches = entries.filter((entry) => entry.toLowerCase() === part.toLowerCase())
+      current = matches.length === 1 ? join(current, matches[0]) : given
+    }
+    return current
   }
 
   export function normalizePathPattern(p: string): string {
