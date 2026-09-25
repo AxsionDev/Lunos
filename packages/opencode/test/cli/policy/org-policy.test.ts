@@ -57,9 +57,13 @@ describe("organisation policy: locked share (subprocess)", () => {
     "debug config shows the managed value and the lock, not the user's",
     ({ opencode, home }) =>
       Effect.gen(function* () {
-        const env = yield* setup(home, { $locked: ["residency"], residency: { allow: ["eu"] } }, {
-          residency: { allow: ["eu", "us"], audit: false },
-        })
+        const env = yield* setup(
+          home,
+          { $locked: ["residency"], residency: { allow: ["eu"] } },
+          {
+            residency: { allow: ["eu", "us"], audit: false },
+          },
+        )
         const result = yield* opencode.spawn(["debug", "config"], { env })
         const config = JSON.parse(result.stdout.slice(result.stdout.indexOf("{")))
         expect(config.residency).toEqual({ allow: ["eu"] })
