@@ -6,7 +6,7 @@ import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationVersion, manualInstallCommand } from "@opencode-ai/core/installation/version"
 import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
@@ -1078,7 +1078,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       toast.show({
         variant: "error",
         title: "Update Failed",
-        message: `${reason}\nTo upgrade manually, run: npm i -g lunos-ai${target ? `@${target}` : ""}`,
+        message: `${reason}\nTo upgrade manually, run: ${manualInstallCommand(target)}`,
         duration: 15000,
       })
       return

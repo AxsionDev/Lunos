@@ -11,7 +11,12 @@ import { AppProcess } from "@opencode-ai/core/process"
 import path from "path"
 import { makeRuntime } from "@opencode-ai/core/effect/runtime"
 import semver from "semver"
-import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
+import {
+  InstallationChannel,
+  InstallationVersion,
+  NPM_ALLOW_SCRIPTS,
+  manualInstallCommand,
+} from "@opencode-ai/core/installation/version"
 import { NpmConfig } from "@opencode-ai/core/npm-config"
 import { InstallationEvent } from "@opencode-ai/schema/installation-event"
 
@@ -27,7 +32,7 @@ const UPGRADABLE: ReadonlySet<Method> = new Set(["npm", "pnpm", "bun"])
 
 export function unpublishedMessage(method: Method) {
   const channel = method === "unknown" ? "this installation" : method
-  return `Lunos isn't published on ${channel} yet; install with npm i -g ${PACKAGE}`
+  return `Lunos isn't published on ${channel} yet; install with ${manualInstallCommand()}`
 }
 
 export const Event = InstallationEvent
@@ -177,7 +182,10 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
       upgrade: Effect.fn("Installation.upgrade")(function* (m: Method, target: string) {
         if (!UPGRADABLE.has(m)) return yield* new UpgradeFailedError({ stderr: unpublishedMessage(m) })
         const manager = m === "bun" ? ["bun", "install", "-g"] : [m, "install", "-g"]
-        const upgradeResult = yield* run([...manager, `${PACKAGE}@${target}`])
+        // Without the flag, npm 12 upgrades the package but skips the postinstall that fetches
+        // the new binary, leaving a `lunos` that won't start.
+        const flags = m === "npm" ? [NPM_ALLOW_SCRIPTS] : []
+        const upgradeResult = yield* run([...manager, `${PACKAGE}@${target}`, ...flags])
         if (!upgradeResult || upgradeResult.code !== 0) {
           return yield* new UpgradeFailedError({ stderr: upgradeFailure(m, upgradeResult) })
         }

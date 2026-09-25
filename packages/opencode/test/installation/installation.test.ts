@@ -130,7 +130,8 @@ describe("installation", () => {
         yield* Installation.use.upgrade("bun", "9.9.9")
         const managers = installs.filter((cmd) => cmd.some((arg) => arg.includes("@9.9.9")))
         expect(managers).toEqual([
-          ["npm", "install", "-g", "lunos-ai@9.9.9"],
+          // npm 12 skips lunos-ai's postinstall (the binary download) without the flag.
+          ["npm", "install", "-g", "lunos-ai@9.9.9", "--allow-scripts=lunos-ai"],
           ["pnpm", "install", "-g", "lunos-ai@9.9.9"],
           ["bun", "install", "-g", "lunos-ai@9.9.9"],
         ])
@@ -156,7 +157,7 @@ describe("installation", () => {
           const error = yield* Effect.flip(Installation.use.upgrade(method, "9.9.9"))
           expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
           expect(error.stderr).toContain("Lunos isn't published on")
-          expect(error.stderr).toContain("npm i -g lunos-ai")
+          expect(error.stderr).toContain("npm i -g lunos-ai --allow-scripts=lunos-ai")
           expect(spawned).toEqual([])
           expect(fetched).toEqual([])
         }),

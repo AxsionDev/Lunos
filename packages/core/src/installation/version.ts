@@ -16,6 +16,17 @@ export function versionLabel(version = InstallationVersion) {
   return version === "local" ? "Lunos dev (local build)" : `Lunos v${version}`
 }
 
+/**
+ * npm 12 skips install scripts unless they're allowed, and `lunos-ai`'s postinstall fetches the
+ * binary. Without this flag the package installs but `lunos` won't start. npm 10 accepts it too.
+ */
+export const NPM_ALLOW_SCRIPTS = "--allow-scripts=lunos-ai"
+
+/** The copy-paste command for installing by hand: "npm i -g lunos-ai@1.2.3 --allow-scripts=lunos-ai". */
+export function manualInstallCommand(target?: string) {
+  return `npm i -g lunos-ai${target ? `@${target}` : ""} ${NPM_ALLOW_SCRIPTS}`
+}
+
 /** `versionLabel()` plus the upstream base when known, for bug reports and debug surfaces. */
 export function versionDetail(version = InstallationVersion, upstream = InstallationUpstreamVersion) {
   return upstream ? `${versionLabel(version)} · based on opencode ${upstream}` : versionLabel(version)
