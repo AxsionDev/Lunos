@@ -1,4 +1,8 @@
 import * as prompts from "@clack/prompts"
+import * as MarketplaceReview from "../../marketplace/review"
+import { defaultMarketplaceListDeps, forbidsUnreviewed } from "../../marketplace/shared"
+import { ConfigPolicy } from "@/config/policy"
+import { NpmConfig } from "@opencode-ai/core/npm-config"
 import { AuditLog } from "@/audit/log"
 import { Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
@@ -53,13 +57,20 @@ export function pickOne<T extends ContentItem>(
 // the preview, the refusals (planInstall throws) and the confirmation can't differ between
 // `mcp add <name>` and `marketplace install`. Marketplace installs write global config unless the
 // caller passes a project directory (`marketplace install --local`).
-export async function confirmAndInstall(item: ConfigItem, yes: boolean, localDir?: string) {
+export async function confirmAndInstall(
+  item: ConfigItem,
+  yes: boolean,
+  localDir?: string,
+  review: { allowUnreviewed?: boolean } = {},
+) {
+  await checkReview(item, review.allowUnreviewed ?? false)
   const configPath = localDir
     ? await resolveConfigPath(localDir, false)
     : await resolveConfigPath(Global.Path.config, true)
   const plan = await planInstall(item, configPath)
   UI.println(`${plan.marketplace}/${plan.name}  (${LABEL[plan.kind]})`)
   if (item.description) UI.println(`  ${item.description}`)
+  for (const line of MarketplaceReview.describe(item)) UI.println(`  ${line}`)
   for (const line of plan.details) UI.println(`  ${line}`)
   UI.println(`  writes to: ${plan.configPath}`)
   for (const warning of plan.warnings) UI.println(`  warning: ${warning}`)
@@ -77,6 +88,25 @@ export async function confirmAndInstall(item: ConfigItem, yes: boolean, localDir
     path: plan.configPath,
   })
   prompts.log.success(`${LABEL[plan.kind]} "${plan.name}" added to ${plan.configPath}`)
+}
+
+// XCOD-105: refuses an entry that isn't verified unless --allow-unreviewed was passed and org
+// policy doesn't forbid it. A policy refusal goes through the XCOD-102 seam, so it is audited.
+async function checkReview(item: ContentItem, allowUnreviewed: boolean) {
+  const policy = await defaultMarketplaceListDeps.policy?.()
+  try {
+    MarketplaceReview.gate(item, { allowUnreviewed, policyForbidsUnreviewed: forbidsUnreviewed(policy) })
+  } catch (error) {
+    if (error instanceof MarketplaceReview.ReviewRefusal && error.key)
+      await Effect.runPromise(ConfigPolicy.refused(error.key, `marketplace install ${item.marketplace}/${item.name}`))
+    throw error
+  }
+}
+
+const allowUnreviewedOption = {
+  type: "boolean" as const,
+  default: false,
+  describe: "install an entry the marketplace hasn't verified (community or no review)",
 }
 
 const kindOption = {
@@ -142,6 +172,7 @@ export const MarketplaceInstallCommand = effectCmd({
         describe: "entry name, or <marketplace>/<name> when it appears in more than one",
       })
       .option("kind", kindOption)
+      .option("allow-unreviewed", allowUnreviewedOption)
       .option("from", {
         type: "string",
         describe: "marketplace source (manifest URL, owner/repo or path); added first if it isn't already",
@@ -163,6 +194,7 @@ export const MarketplaceInstallCommand = effectCmd({
     const name = String(args.name ?? "").trim()
     const kind = args.kind as Marketplace.Kind | undefined
     const local = Boolean(args.local)
+    const allowUnreviewed = Boolean(args["allow-unreviewed"])
     const yes = Boolean(args.yes)
 
     // Refusals from pickOne/planInstall (ambiguous name, unsupported hook event, duplicate entry)
@@ -219,29 +251,43 @@ export const MarketplaceInstallCommand = effectCmd({
       // Plugins keep their own install path, which fetches the package and reads its manifest.
       // Preview and confirm first, like every other kind: a command pasted from a web page must
       // never install without the user seeing what it is.
+      const plugin = item
+      const reviewed = yield* Effect.promise(() =>
+        checkReview(plugin, allowUnreviewed)
+          .then(async () => {
+            const registry = await Effect.runPromise(NpmConfig.registry(ctx.directory))
+            return { spec: await MarketplaceReview.pinnedSpec(plugin, MarketplaceReview.registryLookup(registry)) }
+          })
+          .catch((error: unknown) => ({ error: refusal(error) })),
+      )
+      if ("error" in reviewed) return reviewed.error === undefined ? undefined : yield* fail(reviewed.error)
       UI.println(`${item.marketplace}/${item.name}  (plugin)`)
       if (item.description) UI.println(`  ${item.description}`)
-      UI.println(`  npm package: ${item.spec}`)
+      for (const line of MarketplaceReview.describe(item)) UI.println(`  ${line}`)
+      UI.println(`  npm package: ${reviewed.spec}`)
       UI.println(`  writes to: ${local ? "this project's config" : "global config"}`)
       if (!yes) {
         const ok = yield* Effect.promise(() => prompts.confirm({ message: "Install this plugin?" }))
         if (prompts.isCancel(ok) || !ok) throw new UI.CancelledError()
       }
       const ok = yield* Effect.promise(() =>
-        createPlugTask({ mod: item.spec, global: !local, force: false })(marketplaceCtx),
+        createPlugTask({ mod: reviewed.spec, global: !local, force: false })(marketplaceCtx),
       )
       AuditLog.emit(ok ? "marketplace.install" : "marketplace.refused", {
         kind: "plugin",
         name: item.name,
         marketplace: item.marketplace,
-        package: item.spec,
+        package: reviewed.spec,
       })
       if (!ok) process.exitCode = 1
       return
     }
 
     const failure = yield* Effect.promise(() =>
-      confirmAndInstall(item, yes, local ? ctx.directory : undefined).then(() => undefined, refusal),
+      confirmAndInstall(item, yes, local ? ctx.directory : undefined, { allowUnreviewed }).then(
+        () => undefined,
+        refusal,
+      ),
     )
     if (failure !== undefined) return yield* fail(failure)
   }),

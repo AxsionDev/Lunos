@@ -65,7 +65,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         opencode.expectExit(yield* opencode.spawn(["marketplace", "add", mpA]), 0, "marketplace add mp-a")
         opencode.expectExit(yield* opencode.spawn(["marketplace", "add", mpB]), 0, "marketplace add mp-b")
 
-        const result = yield* opencode.spawn(["mcp", "add", "filesystem", "--yes"])
+        const result = yield* opencode.spawn(["mcp", "add", "filesystem", "--yes", "--allow-unreviewed"])
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("mp-a/filesystem")
         expect(result.stderr).toContain("mp-b/filesystem")
@@ -109,7 +109,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
 
         const before = yield* Effect.promise(() => readGlobalMcpConfig(home))
 
-        const result = yield* opencode.spawn(["mcp", "add", "seeded", "--yes"])
+        const result = yield* opencode.spawn(["mcp", "add", "seeded", "--yes", "--allow-unreviewed"])
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("seeded")
         expect(result.stderr.toLowerCase()).toContain("already exists")
@@ -154,7 +154,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
 
         const before = yield* Effect.promise(() => readGlobalMcpConfig(home))
 
-        const result = yield* opencode.spawn(["mcp", "add", "disabled-server", "--yes"])
+        const result = yield* opencode.spawn(["mcp", "add", "disabled-server", "--yes", "--allow-unreviewed"])
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("disabled-server")
         expect(result.stderr.toLowerCase()).toContain("already exists")
@@ -192,7 +192,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
 
         // Everything the command prints (progress, prompts, warnings) goes through
         // UI.println / @clack/prompts, both of which write to stderr, not stdout.
-        const result = yield* opencode.spawn(["mcp", "add", "needs-key", "--yes"])
+        const result = yield* opencode.spawn(["mcp", "add", "needs-key", "--yes", "--allow-unreviewed"])
         opencode.expectExit(result, 0, "mcp add needs-key --yes")
         expect(result.stderr).toContain("npx -y some-server")
         expect(result.stderr).toContain("API_TOKEN is not set")
@@ -233,7 +233,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         // the "no literal secret value" assertion below to catch if it ever regressed. The
         // sibling test above covers the "unset" branch (the warning); this one covers the branch
         // where a value exists and must still never be written literally.
-        const result = yield* opencode.spawn(["mcp", "add", "needs-key-2", "--yes"], {
+        const result = yield* opencode.spawn(["mcp", "add", "needs-key-2", "--yes", "--allow-unreviewed"], {
           env: { API_TOKEN: "leaked-value" },
         })
         opencode.expectExit(result, 0, "mcp add needs-key-2 --yes")

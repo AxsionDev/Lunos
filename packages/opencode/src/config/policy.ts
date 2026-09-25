@@ -18,6 +18,7 @@ export const KNOWN = [
   "marketplace",
   "marketplace_default",
   "marketplace_allow",
+  "marketplace_unreviewed",
   "autoupdate",
   "memory",
   "memory.enabled",

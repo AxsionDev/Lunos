@@ -30,6 +30,33 @@ export class GithubSource extends Schema.Class<GithubSource>("Marketplace.Github
 export const Source = Schema.Union([NpmSource, GithubSource]).pipe(Schema.toTaggedUnion("type"))
 export type Source = typeof Source.Type
 
+// XCOD-105: curation, all optional so older manifests and older clients keep working. `review` is
+// what the manifest's owner asserts about an entry; a client says whose assertion it is
+// ("verified by <marketplace>") and treats an entry without a review block as unreviewed.
+export class Review extends Schema.Class<Review>("Marketplace.Review")({
+  status: Schema.Literals(["verified", "community"]).annotate({
+    description:
+      "verified: reviewed against docs/marketplace-review.md by a named reviewer. community: listed, not reviewed",
+  }),
+  reviewed_version: Schema.String.pipe(Schema.optional).annotate({
+    description: "The exact version that was reviewed. Installs are pinned to it",
+  }),
+  reviewed_at: Schema.String.pipe(Schema.optional).annotate({ description: "ISO date of the review" }),
+  reviewer: Schema.String.pipe(Schema.optional).annotate({ description: "The person who did the review" }),
+}) {}
+
+const Curation = {
+  review: Review.pipe(Schema.optional),
+  license: Schema.String.pipe(Schema.optional).annotate({ description: "SPDX licence identifier" }),
+  integrity: Schema.String.pipe(Schema.optional).annotate({
+    description:
+      "npm dist.integrity (sha512-…) of reviewed_version. The installer refuses a package that doesn't match",
+  }),
+  egress: Schema.String.pipe(Schema.Array, Schema.optional).annotate({
+    description: "Hosts the entry contacts at runtime, as declared by the reviewer",
+  }),
+}
+
 export class Entry extends Schema.Class<Entry>("Marketplace.Entry")({
   name: Schema.String,
   source: Source,
@@ -38,6 +65,7 @@ export class Entry extends Schema.Class<Entry>("Marketplace.Entry")({
   author: Schema.String.pipe(Schema.optional),
   category: Schema.String.pipe(Schema.optional),
   tags: Schema.String.pipe(Schema.Array, Schema.optional),
+  ...Curation,
 }) {}
 
 // MCP servers are a SIBLING array, never entries in `plugins[]`. Validation fails the whole
@@ -60,6 +88,7 @@ export class McpLocalEntry extends Schema.Class<McpLocalEntry>("Marketplace.McpL
   description: Schema.String.pipe(Schema.optional),
   category: Schema.String.pipe(Schema.optional),
   tags: Schema.String.pipe(Schema.Array, Schema.optional),
+  ...Curation,
 }) {}
 
 export class McpRemoteEntry extends Schema.Class<McpRemoteEntry>("Marketplace.McpRemoteEntry")({
@@ -72,6 +101,7 @@ export class McpRemoteEntry extends Schema.Class<McpRemoteEntry>("Marketplace.Mc
   description: Schema.String.pipe(Schema.optional),
   category: Schema.String.pipe(Schema.optional),
   tags: Schema.String.pipe(Schema.Array, Schema.optional),
+  ...Curation,
 }) {}
 
 export const McpEntry = Schema.Union([McpLocalEntry, McpRemoteEntry]).pipe(Schema.toTaggedUnion("type"))
@@ -88,6 +118,7 @@ export class SkillEntry extends Schema.Class<SkillEntry>("Marketplace.SkillEntry
   description: Schema.String.pipe(Schema.optional),
   category: Schema.String.pipe(Schema.optional),
   tags: Schema.String.pipe(Schema.Array, Schema.optional),
+  ...Curation,
 }) {}
 
 // `event` is a plain String, NOT ConfigHooks.Event. A literal union here would make an older
@@ -109,6 +140,7 @@ export class HookEntry extends Schema.Class<HookEntry>("Marketplace.HookEntry")(
   description: Schema.String.pipe(Schema.optional),
   category: Schema.String.pipe(Schema.optional),
   tags: Schema.String.pipe(Schema.Array, Schema.optional),
+  ...Curation,
 }) {}
 
 // The four content kinds a manifest can carry, each in its own typed array below. Parallel

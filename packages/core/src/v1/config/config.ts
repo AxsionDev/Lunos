@@ -187,6 +187,10 @@ export const Info = Schema.Struct({
   marketplace_default: Schema.optional(Schema.Boolean).annotate({
     description: "Whether the built-in lunos-community marketplace is used (default: true)",
   }),
+  marketplace_unreviewed: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Organisation policy: false forbids installing marketplace entries that aren't verified (--allow-unreviewed), when locked in managed config",
+  }),
   marketplace_allow: Schema.optional(Schema.Array(Schema.String)).annotate({
     description:
       "Organisation policy: the only marketplace sources that may be listed and installed from, when locked in managed config",

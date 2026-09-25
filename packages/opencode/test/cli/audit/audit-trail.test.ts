@@ -65,7 +65,7 @@ describe("audit trail (subprocess)", () => {
         // 2. A marketplace install.
         opencode.expectExit(yield* opencode.spawn(["marketplace", "add", manifest], { env }), 0, "add")
         opencode.expectExit(
-          yield* opencode.spawn(["marketplace", "install", "srv", "--yes"], { env }),
+          yield* opencode.spawn(["marketplace", "install", "srv", "--yes", "--allow-unreviewed"], { env }),
           0,
           "marketplace install",
         )

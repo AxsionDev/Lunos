@@ -89,7 +89,13 @@ describe("opencode marketplace install (subprocess)", () => {
         if (!(yield* Effect.promise(() => Filesystem.exists(file)))) yield* Effect.promise(() => Bun.write(file, "{}"))
         yield* Effect.promise(() => fs.chmod(file, 0o444))
         try {
-          const result = yield* opencode.spawn(["marketplace", "install", "format-on-edit", "--yes"])
+          const result = yield* opencode.spawn([
+            "marketplace",
+            "install",
+            "format-on-edit",
+            "--yes",
+            "--allow-unreviewed",
+          ])
           opencode.expectExit(result, 1, "marketplace install")
           expect(result.stderr).toContain("Unexpected error")
         } finally {
@@ -104,7 +110,13 @@ describe("opencode marketplace install (subprocess)", () => {
     ({ home, opencode }) =>
       Effect.gen(function* () {
         yield* setup(home, opencode, { ...allKinds, hooks: [{ ...allKinds.hooks[0], event: "PostToolUse" }] })
-        const result = yield* opencode.spawn(["marketplace", "install", "format-on-edit", "--yes"])
+        const result = yield* opencode.spawn([
+          "marketplace",
+          "install",
+          "format-on-edit",
+          "--yes",
+          "--allow-unreviewed",
+        ])
         opencode.expectExit(result, 1, "marketplace install")
         expect(result.stderr).toContain('targets event "PostToolUse"')
         expect(result.stderr).not.toContain("Unexpected error")
@@ -117,7 +129,13 @@ describe("opencode marketplace install (subprocess)", () => {
     ({ home, opencode }) =>
       Effect.gen(function* () {
         yield* setup(home, opencode)
-        const result = yield* opencode.spawn(["marketplace", "install", "format-on-edit", "--yes"])
+        const result = yield* opencode.spawn([
+          "marketplace",
+          "install",
+          "format-on-edit",
+          "--yes",
+          "--allow-unreviewed",
+        ])
         opencode.expectExit(result, 0, "marketplace install hook")
         const out = result.stdout + result.stderr
         expect(out).toContain("on: tool.execute.after (tool edit)")
@@ -135,7 +153,7 @@ describe("opencode marketplace install (subprocess)", () => {
     ({ home, opencode }) =>
       Effect.gen(function* () {
         yield* setup(home, opencode)
-        const result = yield* opencode.spawn(["marketplace", "install", "team-skills", "--yes"])
+        const result = yield* opencode.spawn(["marketplace", "install", "team-skills", "--yes", "--allow-unreviewed"])
         opencode.expectExit(result, 0, "marketplace install skill")
         expect(result.stdout + result.stderr).toContain("could not read")
         const config = yield* Effect.promise(() => readGlobalConfig(home))
@@ -150,7 +168,7 @@ describe("opencode marketplace install (subprocess)", () => {
       Effect.gen(function* () {
         yield* setup(home, opencode)
         opencode.expectExit(
-          yield* opencode.spawn(["marketplace", "install", "a-server", "--yes"]),
+          yield* opencode.spawn(["marketplace", "install", "a-server", "--yes", "--allow-unreviewed"]),
           0,
           "marketplace install mcp",
         )
@@ -168,7 +186,7 @@ describe("opencode marketplace install (subprocess)", () => {
           ...allKinds,
           hooks: [{ name: "future", event: "session.someday", command: ["true"] }],
         })
-        const result = yield* opencode.spawn(["marketplace", "install", "future", "--yes"])
+        const result = yield* opencode.spawn(["marketplace", "install", "future", "--yes", "--allow-unreviewed"])
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("does not dispatch")
         const config = yield* Effect.promise(() => readGlobalConfig(home))
@@ -207,12 +225,86 @@ describe("opencode marketplace install (subprocess)", () => {
     60_000,
   )
 
+  // XCOD-105: review status at install time.
+  cliIt.concurrent(
+    "a community entry is refused without --allow-unreviewed, writing nothing",
+    ({ home, opencode }) =>
+      Effect.gen(function* () {
+        yield* setup(home, opencode, {
+          ...allKinds,
+          mcp: [{ ...allKinds.mcp[0], review: { status: "community" }, license: "MIT" }],
+        })
+        const result = yield* opencode.spawn(["marketplace", "install", "a-server", "--yes"])
+        expect(result.exitCode).not.toBe(0)
+        expect(result.stdout + result.stderr).toContain("is a community entry")
+        expect(result.stdout + result.stderr).toContain("--allow-unreviewed")
+        const config = yield* Effect.promise(() => readGlobalConfig(home))
+        expect(config?.mcp?.["a-server"]).toBeUndefined()
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "org policy that locks marketplace_unreviewed: false refuses --allow-unreviewed",
+    ({ home, opencode }) =>
+      Effect.gen(function* () {
+        yield* setup(home, opencode)
+        const managed = path.join(home, "managed")
+        yield* Effect.promise(async () => {
+          await fs.mkdir(managed, { recursive: true })
+          await fs.writeFile(
+            path.join(managed, "managed.json"),
+            JSON.stringify({ $locked: ["marketplace_unreviewed"], marketplace_unreviewed: false }),
+          )
+        })
+        const result = yield* opencode.spawn(["marketplace", "install", "a-server", "--yes", "--allow-unreviewed"], {
+          env: { OPENCODE_TEST_MANAGED_CONFIG_DIR: managed },
+        })
+        expect(result.exitCode).not.toBe(0)
+        expect(result.stdout + result.stderr).toContain("marketplace_unreviewed is set by your organisation's policy")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "a verified plugin whose integrity doesn't match the registry is refused before anything is installed",
+    ({ home, opencode }) =>
+      Effect.gen(function* () {
+        const registry = Bun.serve({
+          port: 0,
+          fetch: (request) =>
+            new URL(request.url).pathname === "/a-plugin/1.2.3"
+              ? Response.json({ name: "a-plugin", version: "1.2.3", dist: { integrity: "sha512-REPUBLISHED" } })
+              : new Response("not found", { status: 404 }),
+        })
+        yield* Effect.addFinalizer(() => Effect.sync(() => registry.stop(true)))
+        yield* setup(home, opencode, {
+          ...allKinds,
+          plugins: [
+            {
+              ...allKinds.plugins[0],
+              review: { status: "verified", reviewed_version: "1.2.3", reviewer: "Jane Doe" },
+              integrity: "sha512-REVIEWED",
+            },
+          ],
+        })
+        const result = yield* opencode.spawn(["marketplace", "install", "a-plugin", "--yes"], {
+          env: { npm_config_registry: `http://127.0.0.1:${registry.port}` },
+        })
+        expect(result.exitCode).not.toBe(0)
+        expect(result.stdout + result.stderr).toContain("the reviewed integrity is sha512-REVIEWED")
+        const config = yield* Effect.promise(() => readGlobalConfig(home))
+        expect(config?.plugin).toBeUndefined()
+      }),
+    60_000,
+  )
+
   cliIt.concurrent(
     "an unknown name fails with a pointer to search",
     ({ home, opencode }) =>
       Effect.gen(function* () {
         yield* setup(home, opencode)
-        const result = yield* opencode.spawn(["marketplace", "install", "nope", "--yes"])
+        const result = yield* opencode.spawn(["marketplace", "install", "nope", "--yes", "--allow-unreviewed"])
         expect(result.exitCode).not.toBe(0)
         expect(result.stdout + result.stderr).toContain("marketplace search")
       }),

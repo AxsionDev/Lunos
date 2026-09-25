@@ -475,6 +475,11 @@ export const McpAddCommand = effectCmd({
         type: "string",
         array: true,
       })
+      .option("allow-unreviewed", {
+        describe: "when adding from a marketplace, allow an entry the marketplace hasn't verified",
+        type: "boolean",
+        default: false,
+      })
       .option("yes", {
         describe: "skip the confirmation prompt when adding from a marketplace",
         type: "boolean",
@@ -498,7 +503,9 @@ export const McpAddCommand = effectCmd({
         try {
           const match = pickOne((await listContent(marketplaceCtx, "mcp")).items, args.name!, { kind: "mcp" })
           if (match?.kind === "mcp") {
-            await confirmAndInstall(match, Boolean(args.yes))
+            await confirmAndInstall(match, Boolean(args.yes), undefined, {
+              allowUnreviewed: Boolean(args["allow-unreviewed"]),
+            })
             return
           }
         } catch (error) {
