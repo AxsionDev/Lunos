@@ -36,6 +36,7 @@ import { ConfigVariable } from "./variable"
 import { ConfigV2Compat } from "./v2-compat"
 import { Npm } from "@opencode-ai/core/npm"
 import { withTransientReadRetry } from "@/util/effect-http-client"
+import { ConfigPolicy } from "./policy"
 
 // Custom merge function that concatenates array fields instead of replacing them
 // Keep remeda's deep conditional merge type out of hot config-loading paths; TS profiling showed it dominates here.
@@ -362,9 +363,17 @@ const layer = Layer.effect(
           result.plugin_origins = plugins
         })
 
+        // XCOD-102: `$locked` only counts in managed config; any other layer's copy is dropped.
         const merge = (source: string, next: Info, kind?: ConfigPlugin.Scope) => {
-          result = mergeConfigConcatArrays(result, next)
+          result = mergeConfigConcatArrays(result, ConfigPolicy.strip(next))
           return mergePluginOrigins(source, next.plugin, kind)
+        }
+        let managedDoc: Info = {}
+        const managedLocks: string[][] = []
+        const mergeManaged = (source: string, next: Info) => {
+          managedLocks.push(ConfigPolicy.lockList(next))
+          managedDoc = mergeConfigConcatArrays(managedDoc, ConfigPolicy.strip(next))
+          return merge(source, next, "global")
         }
 
         for (const [key, value] of Object.entries(auth)) {
@@ -548,19 +557,27 @@ const layer = Layer.effect(
           )
         }
 
-        const managedDir = ConfigManaged.managedConfigDir()
-        if (existsSync(managedDir)) {
-          for (const file of ["opencode.json", "opencode.jsonc"]) {
-            const source = path.join(managedDir, file)
-            yield* merge(source, yield* loadFile(source), "global")
+        const location = ConfigManaged.managedConfigLocation()
+        if (existsSync(location.dir)) {
+          if (location.legacy)
+            yield* Effect.logWarning(
+              `managed config in ${location.dir} is deprecated; move it to ${ConfigManaged.systemManagedConfigDir()}`,
+            )
+          for (const file of ["managed.json", "opencode.json", "opencode.jsonc"]) {
+            const source = path.join(location.dir, file)
+            yield* mergeManaged(source, yield* loadFile(source))
           }
         }
 
         // macOS managed preferences (.mobileconfig deployed via MDM) override everything
         const managed = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
         if (managed) {
-          result = mergeConfigConcatArrays(
-            result,
+          if (managed.legacy)
+            yield* Effect.logWarning(
+              `managed preferences domain ${ConfigManaged.LEGACY_PLIST_DOMAIN} is deprecated; deploy ${ConfigManaged.MANAGED_PLIST_DOMAIN} instead`,
+            )
+          yield* mergeManaged(
+            managed.source,
             yield* loadConfig(managed.text, {
               dir: path.dirname(managed.source),
               source: managed.source,
@@ -611,6 +628,14 @@ const layer = Layer.effect(
         if (result.autoshare === true && !result.share) {
           result.share = "auto"
         }
+        // XCOD-102: locked keys hold exactly the managed value. Runs after every layer, after
+        // OPENCODE_PERMISSION and after the autoshare mapping above, so nothing later reopens them.
+        const locked = ConfigPolicy.union(...managedLocks)
+        const unknownLocks = ConfigPolicy.unknownKeys(locked)
+        if (unknownLocks.length)
+          yield* Effect.logWarning(`$locked lists keys this version doesn't know: ${unknownLocks.join(", ")}`)
+        result = ConfigPolicy.apply(result, managedDoc, locked)
+
         // Lunos: sharing uploads the full transcript to a third-party host, so it is off
         // unless a config layer turns it on. Upstream opencode behaves as "manual".
         result.share ??= "disabled"

@@ -5,7 +5,10 @@ import os from "os"
 import path from "path"
 import { Process } from "@/util/process"
 
-const MANAGED_PLIST_DOMAIN = "ai.opencode.managed"
+// XCOD-102: Lunos-branded locations. The upstream opencode ones are still read, with a
+// deprecation warning, but only when no Lunos location exists, so the two never mix.
+export const MANAGED_PLIST_DOMAIN = "tech.lunos.managed"
+export const LEGACY_PLIST_DOMAIN = "ai.opencode.managed"
 
 // Keys injected by macOS/MDM into the managed plist that are not OpenCode config
 const PLIST_META = new Set([
@@ -17,19 +20,32 @@ const PLIST_META = new Set([
   "_manualProfile",
 ])
 
-function systemManagedConfigDir(): string {
-  switch (process.platform) {
+export function systemManagedConfigDir(platform: NodeJS.Platform = process.platform, legacy = false): string {
+  switch (platform) {
     case "darwin":
-      return "/Library/Application Support/opencode"
+      return legacy ? "/Library/Application Support/opencode" : "/Library/Application Support/Lunos"
     case "win32":
-      return path.join(process.env.ProgramData || "C:\\ProgramData", "opencode")
+      return path.join(process.env.ProgramData || "C:\\ProgramData", legacy ? "opencode" : "Lunos")
     default:
-      return "/etc/opencode"
+      return legacy ? "/etc/opencode" : "/etc/lunos"
   }
 }
 
+/** The Lunos location if it exists, else the legacy one if that exists, else the Lunos one. */
+export function pickManagedDir(lunos: string, legacy: string, exists: (dir: string) => boolean) {
+  if (exists(lunos)) return { dir: lunos, legacy: false }
+  if (exists(legacy)) return { dir: legacy, legacy: true }
+  return { dir: lunos, legacy: false }
+}
+
+export function managedConfigLocation() {
+  const hook = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+  if (hook) return { dir: hook, legacy: false }
+  return pickManagedDir(systemManagedConfigDir(), systemManagedConfigDir(process.platform, true), existsSync)
+}
+
 export function managedConfigDir() {
-  return process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR || systemManagedConfigDir()
+  return managedConfigLocation().dir
 }
 
 export function parseManagedPlist(json: string): string {
@@ -50,18 +66,21 @@ export async function readManagedPreferences() {
       return "user"
     }
   })()
-  const paths = [
-    path.join("/Library/Managed Preferences", user, `${MANAGED_PLIST_DOMAIN}.plist`),
-    path.join("/Library/Managed Preferences", `${MANAGED_PLIST_DOMAIN}.plist`),
+  const paths = (domain: string) => [
+    path.join("/Library/Managed Preferences", user, `${domain}.plist`),
+    path.join("/Library/Managed Preferences", `${domain}.plist`),
   ]
+  const existing = paths(MANAGED_PLIST_DOMAIN).filter(existsSync)
+  const legacy = existing.length === 0
+  const candidates = legacy ? paths(LEGACY_PLIST_DOMAIN).filter(existsSync) : existing
 
-  for (const plist of paths) {
-    if (!existsSync(plist)) continue
+  for (const plist of candidates) {
     const result = await Process.run(["plutil", "-convert", "json", "-o", "-", plist], { nothrow: true })
     if (result.code !== 0) continue
     return {
       source: `mobileconfig:${plist}`,
       text: parseManagedPlist(result.stdout.toString()),
+      legacy,
     }
   }
 

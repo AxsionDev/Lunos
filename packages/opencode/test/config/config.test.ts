@@ -1493,6 +1493,72 @@ it.instance("managed jsonc settings override managed json settings", () =>
   }),
 )
 
+// XCOD-102: organisation policy with locked keys.
+it.instance(
+  "a locked key holds the managed value, replacing the whole subtree",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({
+      $locked: ["residency", "share"],
+      residency: { allow: ["eu"] },
+      share: "disabled",
+    })
+
+    const config = yield* Config.use.get()
+    // The project's audit: false and its extra "us" are gone, not merged in.
+    expect(config.residency).toEqual({ allow: ["eu"] })
+    expect(config.share).toBe("disabled")
+    expect(config.$locked).toEqual(["residency", "share"])
+  }),
+  { config: { residency: { allow: ["eu", "us"], audit: false }, share: "manual" } },
+)
+
+it.instance(
+  "keys that aren't locked keep their normal precedence",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["autoupdate"], autoupdate: "notify", model: "managed/model" })
+
+    const config = yield* Config.use.get()
+    expect(config.model).toBe("managed/model")
+    // Not locked, not set by managed config: the user's value stands.
+    expect(config.share).toBe("manual")
+  }),
+  { config: { share: "manual", model: "user/model" } },
+)
+
+it.instance(
+  "a locked key managed config doesn't set becomes unset, not the user's value",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["share", "autoupdate"] })
+
+    const config = yield* Config.use.get()
+    // Unset share falls back to Lunos's default; the deprecated autoshare can't sneak "auto" back.
+    expect(config.share).toBe("disabled")
+    expect(config.autoshare).toBeUndefined()
+    expect(config.autoupdate).toBeUndefined()
+  }),
+  { config: { share: "auto", autoshare: true, autoupdate: true } },
+)
+
+it.instance(
+  "$locked outside managed config is ignored",
+  Effect.gen(function* () {
+    const config = yield* Config.use.get()
+    expect(config.$locked).toBeUndefined()
+    expect(config.share).toBe("manual")
+  }),
+  { config: { $locked: ["share"], share: "manual" } },
+)
+
+it.instance("lock lists from several managed files are unioned", () =>
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["share"], share: "disabled" }, "managed.json")
+    yield* writeManagedSettingsEffect({ $locked: ["autoupdate"], autoupdate: "notify" })
+
+    const config = yield* Config.use.get()
+    expect([...(config.$locked ?? [])].sort()).toEqual(["autoupdate", "share"])
+  }),
+)
+
 it.instance(
   "missing managed settings file is not an error",
   Effect.gen(function* () {
