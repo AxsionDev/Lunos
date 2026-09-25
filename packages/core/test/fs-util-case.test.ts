@@ -16,7 +16,9 @@ symlinkSync(path.join(root, "Project"), path.join(root, "Alias"))
 
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
-describe("FSUtil.onDiskCase", () => {
+// On Windows onDiskCase defers to normalizePath (realpath.native), which also expands 8.3 short
+// names such as RUNNER~1; normalizePath has its own tests.
+describe.skipIf(process.platform === "win32")("FSUtil.onDiskCase", () => {
   test("leaves a correctly spelled path alone", () => {
     const file = path.join(root, "Project", "Src", "Main.ts")
     expect(FSUtil.onDiskCase(file)).toBe(file)
