@@ -1,25 +1,31 @@
 [
  {
-  "domain": null,
-  "control": null,
+  "domain": "Application & Interface Security",
+  "control": "AIS-01",
+  "id": "AIS-01.1",
+  "q": "Do you use industry standards (Build Security in Maturity Model [BSIMM] benchmarks, Open Group ACS Trusted Technology Provider Framework, NIST, etc.) to build in security for your Systems/Software Development Lifecycle (SDLC)?"
+ },
+ {
+  "domain": "Application & Interface Security",
+  "control": "",
   "id": "AIS-01.2",
   "q": "Do you use an automated source code analysis tool to detect security defects in code prior to production?"
  },
  {
-  "domain": null,
-  "control": null,
+  "domain": "Application & Interface Security",
+  "control": "",
   "id": "AIS-01.3",
   "q": "Do you use manual source-code analysis to detect security defects in code prior to production?"
  },
  {
-  "domain": null,
-  "control": null,
+  "domain": "Application & Interface Security",
+  "control": "",
   "id": "AIS-01.4",
   "q": "Do you verify that all of your software suppliers adhere to industry standards for Systems/Software Development Lifecycle (SDLC) security?"
  },
  {
-  "domain": null,
-  "control": null,
+  "domain": "Application & Interface Security",
+  "control": "",
   "id": "AIS-01.5",
   "q": "(SaaS only) Do you review your applications for security vulnerabilities and address any issues prior to deployment to production?"
  },
@@ -31,9 +37,9 @@
  },
  {
   "domain": "Application & Interface Security",
-  "control": null,
-  "id": "AIS- 02.2",
-  "q": "Are all requirements and trust levels for customers\u2019 access defined and documented?"
+  "control": "",
+  "id": "AIS-02.2",
+  "q": "Are all requirements and trust levels for customers’ access defined and documented?"
  },
  {
   "domain": "Application & Interface Security",
@@ -97,7 +103,7 @@
  },
  {
   "domain": "Audit Assurance & Compliance",
-  "control": null,
+  "control": "",
   "id": "AAC-02.8",
   "q": "Do you have an internal audit program that allows for cross-functional audit of assessments?"
  },
@@ -115,13 +121,13 @@
  },
  {
   "domain": "Audit Assurance & Compliance",
-  "control": null,
+  "control": "",
   "id": "AAC-03.3",
   "q": "Do you have the capability to restrict the storage of customer data to specific countries or geographic locations?"
  },
  {
   "domain": "Audit Assurance & Compliance",
-  "control": null,
+  "control": "",
   "id": "AAC-03.4",
   "q": "Do you have a program in place that includes the ability to monitor changes to the regulatory requirements in relevant jurisdictions, adjust your security program for changes to legal requirements, and ensure compliance with relevant regulatory requirements?"
  },
@@ -231,7 +237,7 @@
   "domain": "Business Continuity Management & Operational Resilience",
   "control": "BCR-10",
   "id": "BCR-10.1",
-  "q": "Are policies and procedures established and made available for all personnel to adequately support services operations\u2019 roles?"
+  "q": "Are policies and procedures established and made available for all personnel to adequately support services operations’ roles?"
  },
  {
   "domain": "Business Continuity Management & Operational Resilience",
@@ -247,13 +253,13 @@
  },
  {
   "domain": "Business Continuity Management & Operational Resilience",
-  "control": null,
+  "control": "",
   "id": "BCR-11.4",
   "q": "Have you implemented backup or redundancy mechanisms to ensure compliance with regulatory, statutory, contractual or business requirements?"
  },
  {
   "domain": "Business Continuity Management & Operational Resilience",
-  "control": null,
+  "control": "",
   "id": "BCR-11.5",
   "q": "Do you test your backup or redundancy mechanisms at least annually?"
  },
@@ -265,7 +271,7 @@
  },
  {
   "domain": "Change Control & Configuration Management",
-  "control": null,
+  "control": "",
   "id": "CCC-01.2",
   "q": "Is documentation available that describes the installation, configuration, and use of products/services/features?"
  },
@@ -289,19 +295,19 @@
  },
  {
   "domain": "Change Control & Configuration Management",
-  "control": null,
+  "control": "",
   "id": "CCC-03.2",
   "q": "Is documentation describing known issues with certain products/services available?"
  },
  {
   "domain": "Change Control & Configuration Management",
-  "control": null,
+  "control": "",
   "id": "CCC-03.3",
   "q": "Are there policies and procedures in place to triage and remedy reported bugs and security vulnerabilities for product and service offerings?"
  },
  {
   "domain": "Change Control & Configuration Management",
-  "control": null,
+  "control": "",
   "id": "CCC-03.4",
   "q": "Are mechanisms in place to ensure that all debugging and test code elements are removed from released software versions?"
  },
@@ -339,7 +345,7 @@
   "domain": "Data Security & Information Lifecycle Management",
   "control": "DG-02",
   "id": "DSI-01.4",
-  "q": "Can you provide the physical location/geography of storage of a tenant\u2019s data upon request?"
+  "q": "Can you provide the physical location/geography of storage of a tenant’s data upon request?"
  },
  {
   "domain": "Data Security & Information Lifecycle Management",
@@ -349,13 +355,13 @@
  },
  {
   "domain": "Data Security & Information Lifecycle Management",
-  "control": null,
+  "control": "",
   "id": "DSI-01.6",
   "q": "Do you follow a structured data-labeling standard (e.g., ISO 15489, Oasis XML Catalog Specification, CSA data type guidance)?"
  },
  {
   "domain": "Data Security & Information Lifecycle Management",
-  "control": null,
+  "control": "",
   "id": "DSI-01.7",
   "q": "Do you allow tenants to define acceptable geographical locations for data routing or resource instantiation?"
  },
@@ -367,7 +373,7 @@
  },
  {
   "domain": "Data Security & Information Lifecycle Management",
-  "control": null,
+  "control": "",
   "id": "DSI-02.2",
   "q": "Can you ensure that data does not migrate beyond a defined geographical residency?"
  },
@@ -463,7 +469,7 @@
  },
  {
   "domain": "Datacenter Security",
-  "control": null,
+  "control": "",
   "id": "DCS-06.2",
   "q": "Can you provide evidence that your personnel and involved third parties have been trained regarding your documented policies, standards, and procedures?"
  },
@@ -517,7 +523,7 @@
  },
  {
   "domain": "Encryption & Key Management",
-  "control": null,
+  "control": "",
   "id": "EKM-02.5",
   "q": "Do you utilize any third party/open source/proprietary frameworks to manage encryption keys?"
  },
@@ -535,13 +541,13 @@
  },
  {
   "domain": "Encryption & Key Management",
-  "control": null,
+  "control": "",
   "id": "EKM-03.3",
   "q": "Do you support tenant-generated encryption keys or permit tenants to encrypt data to an identity without access to a public key certificate (e.g., identity-based encryption)?"
  },
  {
   "domain": "Encryption & Key Management",
-  "control": null,
+  "control": "",
   "id": "EKM-03.4",
   "q": "Do you have documentation establishing and defining your encryption management policies, procedures, and guidelines?"
  },
@@ -553,19 +559,19 @@
  },
  {
   "domain": "Encryption & Key Management",
-  "control": null,
+  "control": "",
   "id": "EKM-04.2",
   "q": "Are your encryption keys maintained by the cloud consumer or a trusted key management provider?"
  },
  {
   "domain": "Encryption & Key Management",
-  "control": null,
+  "control": "",
   "id": "EKM-04.3",
   "q": "Do you store encryption keys in the cloud?"
  },
  {
   "domain": "Encryption & Key Management",
-  "control": null,
+  "control": "",
   "id": "EKM-04.4",
   "q": "Do you have separate key management and key usage duties?"
  },
@@ -595,7 +601,7 @@
  },
  {
   "domain": "Governance and Risk Management",
-  "control": null,
+  "control": "",
   "id": "GRM-02.2",
   "q": "Do you conduct risk assessments associated with data governance requirements at least once a year?"
  },
@@ -613,7 +619,7 @@
  },
  {
   "domain": "Governance and Risk Management",
-  "control": null,
+  "control": "",
   "id": "GRM-04.2",
   "q": "Do you review your Information Security Management Program (ISMP) at least once a year?"
  },
@@ -631,19 +637,19 @@
  },
  {
   "domain": "Governance and Risk Management",
-  "control": null,
+  "control": "",
   "id": "GRM-06.2",
   "q": "Do you have agreements to ensure your providers adhere to your information security and privacy policies?"
  },
  {
   "domain": "Governance and Risk Management",
-  "control": null,
+  "control": "",
   "id": "GRM-06.3",
   "q": "Can you provide evidence of due diligence mapping of your controls, architecture, and processes to regulations and/or standards?"
  },
  {
   "domain": "Governance and Risk Management",
-  "control": null,
+  "control": "",
   "id": "GRM-06.4",
   "q": "Do you disclose which controls, standards, certifications, and/or regulations you comply with?"
  },
@@ -673,7 +679,7 @@
  },
  {
   "domain": "Governance and Risk Management",
-  "control": null,
+  "control": "",
   "id": "GRM-09.2",
   "q": "Do you perform, at minimum, annual reviews to your privacy and security policies?"
  },
@@ -733,19 +739,19 @@
  },
  {
   "domain": "Human Resources",
-  "control": null,
+  "control": "",
   "id": "HRS-03.3",
   "q": "Are all personnel required to sign NDA or Confidentiality Agreements as a condition of employment to protect customer/tenant information?"
  },
  {
   "domain": "Human Resources",
-  "control": null,
+  "control": "",
   "id": "HRS-03.4",
   "q": "Is successful and timed completion of the training program considered a prerequisite for acquiring and maintaining access to sensitive systems?"
  },
  {
   "domain": "Human Resources",
-  "control": null,
+  "control": "",
   "id": "HRS-03.5",
   "q": "Are personnel trained and provided with awareness programs at least once a year?"
  },
@@ -757,7 +763,7 @@
  },
  {
   "domain": "Human Resources",
-  "control": null,
+  "control": "",
   "id": "HRS-04.2",
   "q": "Do the above procedures and guidelines account for timely revocation of access and return of assets?"
  },
@@ -765,7 +771,7 @@
   "domain": "Human Resources",
   "control": "HRS-05",
   "id": "HRS-05.1",
-  "q": "Are policies and procedures established and measures implemented to strictly limit access to your sensitive data and tenant data from portable and mobile devices (e.g., laptops, cell phones, and personal digital assistants (PDAs)), which are generally higher-risk than non-portable devices (e.g., desktop computers at the provider organization\u2019s facilities)?"
+  "q": "Are policies and procedures established and measures implemented to strictly limit access to your sensitive data and tenant data from portable and mobile devices (e.g., laptops, cell phones, and personal digital assistants (PDAs)), which are generally higher-risk than non-portable devices (e.g., desktop computers at the provider organization’s facilities)?"
  },
  {
   "domain": "Human Resources",
@@ -853,7 +859,7 @@
  },
  {
   "domain": "Identity & Access Management",
-  "control": null,
+  "control": "",
   "id": "IAM-01.2",
   "q": "Do you monitor and log privileged access (e.g., administrator level) to information security management systems?"
  },
@@ -883,7 +889,7 @@
  },
  {
   "domain": "Identity & Access Management",
-  "control": null,
+  "control": "",
   "id": "IAM-04.2",
   "q": "Do you manage and store the user identity of all personnel who have network access, including their level of access?"
  },
@@ -967,7 +973,7 @@
  },
  {
   "domain": "Identity & Access Management",
-  "control": null,
+  "control": "",
   "id": "IAM-09.2",
   "q": "Do you provide upon request user access (e.g., employees, contractors, customers (tenants), business partners and/or suppliers) to data and any owned or managed (physical and virtual) applications, infrastructure systems and network components?"
  },
@@ -1045,25 +1051,25 @@
  },
  {
   "domain": "Identity & Access Management",
-  "control": null,
+  "control": "",
   "id": "IAM-12.8",
   "q": "Do you support password (e.g., minimum length, age, history, complexity) and account lockout (e.g., lockout threshold, lockout duration) policy enforcement?"
  },
  {
   "domain": "Identity & Access Management",
-  "control": null,
+  "control": "",
   "id": "IAM-12.9",
   "q": "Do you allow tenants/customers to define password and account lockout policies for their accounts?"
  },
  {
   "domain": "Identity & Access Management",
-  "control": null,
+  "control": "",
   "id": "IAM-12.10",
   "q": "Do you support the ability to force password changes upon first logon?"
  },
  {
   "domain": "Identity & Access Management",
-  "control": null,
+  "control": "",
   "id": "IAM-12.11",
   "q": "Do you have mechanisms in place for unlocking accounts that have been locked out (e.g., self-service via email, defined challenge questions, manual unlock)?"
  },
@@ -1105,13 +1111,13 @@
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-01.4",
   "q": "Are audit logs centrally stored and retained?"
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-01.5",
   "q": "Are audit logs reviewed on a regular basis for security events (e.g., with automated tools)?"
  },
@@ -1123,7 +1129,7 @@
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-02.2",
   "q": "Are changes made to virtual machines, or moving of an image and subsequent validation of the image's integrity, made immediately available to customers through electronic methods (e.g., portals or alerts)?"
  },
@@ -1147,13 +1153,13 @@
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-04.3",
   "q": "Do your system capacity requirements take into account current, projected, and anticipated capacity needs for all systems used to provide services to the tenants?"
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-04.4",
   "q": "Is system performance monitored and tuned in order to continuously meet regulatory, contractual, and business requirements for all the systems used to provide services to the tenants?"
  },
@@ -1171,19 +1177,19 @@
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-06.2",
   "q": "Do you regularly update network architecture diagrams that include data flows between security domains/zones?"
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-06.3",
   "q": "Do you regularly review for appropriateness the allowed access/connectivity (e.g., firewall rules) between security domains/zones within the network?"
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-06.4",
   "q": "Are all firewall access control lists documented with business justification?"
  },
@@ -1207,7 +1213,7 @@
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-08.3",
   "q": "Do you logically and physically segregate production and non-production environments?"
  },
@@ -1243,7 +1249,7 @@
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-10.2",
   "q": "Do you use a network segregated from production-level networks when migrating physical servers, applications, or data to virtual servers?"
  },
@@ -1279,7 +1285,7 @@
  },
  {
   "domain": "Infrastructure & Virtualization Security",
-  "control": null,
+  "control": "",
   "id": "IVS-13.2",
   "q": "Do you implement technical measures and apply defense-in-depth techniques (e.g., deep packet analysis, traffic throttling and black-holing) for detection and timely response to network-based attacks associated with anomalous ingress or egress traffic patterns (e.g., MAC spoofing and ARP poisoning attacks) and/or distributed denial-of-service (DDoS) attacks?"
  },
@@ -1303,7 +1309,7 @@
  },
  {
   "domain": "Interoperability & Portability",
-  "control": null,
+  "control": "",
   "id": "IPY-03.2",
   "q": "Do you provide policies and procedures (i.e. service level agreements) governing the migration of application data to and from your service?"
  },
@@ -1315,7 +1321,7 @@
  },
  {
   "domain": "Interoperability & Portability",
-  "control": null,
+  "control": "",
   "id": "IPY-04.2",
   "q": "Do you provide consumers (tenants) with documentation detailing the relevant interoperability and portability network protocol standards that are involved?"
  },
@@ -1327,7 +1333,7 @@
  },
  {
   "domain": "Interoperability & Portability",
-  "control": null,
+  "control": "",
   "id": "IPY-05.2",
   "q": "Do you have documented custom changes made to any hypervisor in use, and all solution-specific virtualization hooks available for customer review?"
  },
@@ -1405,7 +1411,7 @@
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-12.2",
   "q": "Do you have detective and preventative controls on the device or via a centralized device management system which prohibit the circumvention of built-in security controls?"
  },
@@ -1417,7 +1423,7 @@
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-13.2",
   "q": "Do you have detective and preventative controls on the device or via a centralized device management system which prohibit the circumvention of built-in security controls?"
  },
@@ -1441,13 +1447,13 @@
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-16.2",
   "q": "Are your password policies enforced through technical controls (i.e. MDM)?"
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-16.3",
   "q": "Do your password policies prohibit the changing of authentication requirements (i.e. password/PIN length) via a mobile device?"
  },
@@ -1459,13 +1465,13 @@
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-17.2",
   "q": "Do you have a policy that requires BYOD users to prohibit the usage of unapproved application stores?"
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-17.3",
   "q": "Do you have a policy that requires BYOD users to use anti-malware software (where supported)?"
  },
@@ -1477,7 +1483,7 @@
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-18.2",
   "q": "Does your IT provide remote wipe or corporate data wipe for all company-assigned mobile devices?"
  },
@@ -1489,7 +1495,7 @@
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-19.2",
   "q": "Do your mobile devices allow for remote validation to download the latest security patches by company IT personnel?"
  },
@@ -1501,7 +1507,7 @@
  },
  {
   "domain": "Mobile Security",
-  "control": null,
+  "control": "",
   "id": "MOS-20.2",
   "q": "Does your BYOD policy specify the user roles that are allowed access via a BYOD-enabled device?"
  },
@@ -1531,7 +1537,7 @@
  },
  {
   "domain": "Security Incident Management, E-Discovery, & Cloud Forensics",
-  "control": null,
+  "control": "",
   "id": "SEF-02.4",
   "q": "Have you tested your security incident response plans in the last year?"
  },
@@ -1591,7 +1597,7 @@
  },
  {
   "domain": "Supply Chain Management, Transparency, and Accountability",
-  "control": null,
+  "control": "",
   "id": "STA-01.2",
   "q": "Do you design and implement controls to mitigate and contain data security risks through proper separation of duties, role-based access, and least-privileged access for all personnel within your supply chain?"
  },
@@ -1639,13 +1645,13 @@
  },
  {
   "domain": "Supply Chain Management, Transparency, and Accountability",
-  "control": null,
+  "control": "",
   "id": "STA-05.4",
   "q": "Do third-party agreements include provision for the security and protection of information and assets?"
  },
  {
   "domain": "Supply Chain Management, Transparency, and Accountability",
-  "control": null,
+  "control": "",
   "id": "STA-05.5",
   "q": "Do you provide the client with a list and copies of all subprocessing agreements and keep this updated?"
  },
@@ -1663,19 +1669,19 @@
  },
  {
   "domain": "Supply Chain Management, Transparency, and Accountability",
-  "control": null,
+  "control": "",
   "id": "STA-07.2",
   "q": "Do you have the ability to measure and address non-conformance of provisions and/or terms across the entire supply chain (upstream/downstream)?"
  },
  {
   "domain": "Supply Chain Management, Transparency, and Accountability",
-  "control": null,
+  "control": "",
   "id": "STA-07.3",
   "q": "Can you manage service-level conflicts or inconsistencies resulting from disparate supplier relationships?"
  },
  {
   "domain": "Supply Chain Management, Transparency, and Accountability",
-  "control": null,
+  "control": "",
   "id": "STA-07.4",
   "q": "Do you review all agreements, policies, and processes at least annually?"
  },
@@ -1687,7 +1693,7 @@
  },
  {
   "domain": "Supply Chain Management, Transparency, and Accountability",
-  "control": null,
+  "control": "",
   "id": "STA-08.2",
   "q": "Does your annual review include all partners/third-party providers upon which your information supply chain depends?"
  },
@@ -1699,7 +1705,7 @@
  },
  {
   "domain": "Supply Chain Management, Transparency, and Accountability",
-  "control": null,
+  "control": "",
   "id": "STA-09.2",
   "q": "Do you have external third party services conduct vulnerability scans and periodic penetration tests on your applications and networks?"
  },

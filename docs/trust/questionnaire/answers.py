@@ -2,7 +2,7 @@
 # XCOD-108: pre-filled answers to the CSA Consensus Assessments Initiative Questionnaire v3.0.1.
 #
 # Questions: caiq-v3.0.1-questions.json, extracted from the CSA's published workbook
-# (csa-caiq-v3.0.1-09-01-2017.xlsx, as distributed in github.com/metanorma/csa-ccm-tools, Apache-2.0).
+# (csa-caiq-v3.0.1-09-01-2017.xlsx, 295 questions, as distributed in github.com/metanorma/csa-ccm-tools, Apache-2.0).
 # CAIQ is written for cloud-service providers. Lunos is self-hosted software with no Lunos-operated
 # service in the data path, so many questions don't apply; those say so and why.
 #
@@ -12,6 +12,7 @@
 #   Axsion to answer          an organisational fact about ITService EOOD not documented here
 #
 # Regenerate the Markdown and CSV with:  python3 docs/trust/questionnaire/answers.py
+# then format:                           bunx prettier --write docs/trust/questionnaire-caiq-v3.0.1.md
 
 import csv, json, os
 
@@ -44,6 +45,7 @@ NEXT = " (from the next release; not in v1.18.39)"
 
 O = {
     # Application & Interface Security
+    "AIS-01.1": ("No", "Changes go through pull requests with typecheck, unit and end-to-end checks in CI, but no named SDLC security framework (BSIMM, NIST SSDF, etc.) is adopted.", ".github/workflows/test.yml"),
     "AIS-01.2": ("No", "No static application security testing (SAST) tool is in CI yet. Type checking and tests run on every pull request, but they are not security analysis.", ".github/workflows/typecheck.yml"),
     "AIS-01.3": ("Partial", "Changes are made through pull requests. A mandatory independent reviewer is not enforced: branch protection is not enabled on `dev`.", ""),
     "AIS-01.4": ("No", "Lunos is a fork of opencode and depends on open-source packages; their SDLC is not verified. A software bill of materials is published per release so the dependency tree can be checked.", "docs/trust/supply-chain.md"),
@@ -73,7 +75,7 @@ O = {
     "DSI-01.5": ("Yes", "As above: the customer chooses where Lunos runs and stores its local state.", "docs/deployment/self-hosted.md"),
     "DSI-01.7": ("Yes", "The data-residency policy restricts the jurisdictions model requests may be routed to.", "docs/data-residency.md"),
     "DSI-02.1": ("Yes", "Data flows are documented in the deployment guide.", "docs/deployment/self-hosted.md#3-where-your-data-goes"),
-    "DSI-02.2": ("Partial", "Lunos refuses model requests to providers outside the allowed jurisdictions and records every call. What a permitted provider does with the data is governed by the customer's agreement with it.", "docs/data-residency.md"),
+    "DSI-02.2": ("Partial", "With a residency policy set, Lunos refuses model requests to providers outside the allowed jurisdictions and records every call in the audit log. What a permitted provider does with the data is governed by the customer's agreement with it.", "docs/data-residency.md"),
     "DSI-03.1": ("Partial", "Lunos connects to model providers over the endpoints the customer configures; hosted providers use HTTPS. Transport security for self-hosted endpoints is the customer's configuration.", ""),
     "DSI-06.1": ("Yes", "Responsibilities are documented: the customer operates Lunos and chooses the provider; ITService EOOD is not in the data path.", "docs/deployment/self-hosted.md#6-what-you-need-to-provide"),
     # Encryption: none held
@@ -82,7 +84,7 @@ O = {
     "GRM-04.1": ("Partial", "The security posture is documented in SECURITY.md and this Trust pack. There is no formal ISMS.", "docs/trust/README.md"),
     "GRM-06.4": ("Yes", "The claim table states exactly what is claimed; no certification or regulatory compliance is claimed.", "docs/deployment/self-hosted.md#2-what-is-true-today--the-sovereignty-claim-stated-precisely"),
     # HR: access to tenant data
-    "HRS-08.1": ("Yes", "Documented: ITService EOOD has no access to customer data or metadata; Lunos sends none to it and has no telemetry.", "docs/deployment/self-hosted.md#touches-lunos-operated-infrastructure"),
+    "HRS-08.1": ("Yes", "Documented: ITService EOOD has no access to customer data or metadata, and there is no telemetry. The only Lunos-operated host contacted is lunos.tech, for the static marketplace catalogue, and the request carries nothing from the project.", "docs/deployment/self-hosted.md#touches-lunos-operated-infrastructure"),
     "HRS-08.2": ("No", "No metadata about customer data is collected. Lunos has no telemetry.", "docs/deployment/self-hosted.md"),
     "HRS-08.3": ("N/A", "No customer data or metadata is accessed.", ""),
     "HRS-01.1": ("N/A", "ITService EOOD holds no customer data, so has no privacy breach of customer data to detect. The data-protection note is under legal review.", "docs/trust/data-protection.md"),
@@ -120,15 +122,14 @@ O = {
 
 def main():
     qs = json.load(open(os.path.join(HERE, "caiq-v3.0.1-questions.json")))
-    domain = None
     rows = []
     for q in qs:
-        domain = q["domain"] or domain or "Application & Interface Security"
-        qid = q["id"].replace(" ", "")
+        domain = q["domain"]
+        qid = q["id"]
         status, note, src = O.get(qid) or DEFAULTS[domain]
         rows.append({"domain": domain, "id": qid, "question": q["q"], "answer": status, "notes": note, "source": (REL + src) if src else ""})
     with open(os.path.join(HERE, "caiq-v3.0.1-answers.csv"), "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
         w.writeheader(); w.writerows(rows)
     counts = {}
     for r in rows: counts[r["answer"]] = counts.get(r["answer"], 0) + 1

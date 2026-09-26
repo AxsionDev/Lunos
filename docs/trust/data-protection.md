@@ -10,6 +10,6 @@ What can be stated from the product documentation today, without legal interpret
   data path and receives no data from your deployment: no account, no telemetry
   ([deployment guide §3](../deployment/self-hosted.md#3-where-your-data-goes)).
 - What leaves your infrastructure is the model requests you make, to the provider **you** configure,
-  under **your** agreement with it. The data-residency policy restricts which providers may be used
+  under **your** agreement with it. When set, the data-residency policy restricts which providers may be used
   and records every call ([data residency](../data-residency.md)).
 - Session sharing, which would upload a transcript, is off by default.

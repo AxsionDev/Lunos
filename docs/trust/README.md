@@ -17,7 +17,7 @@ says **Planned**. Nothing here is a certification or a claim of compliance.
 | [CRA readiness](cra-readiness.md)                                                                                                   | Where Lunos stands under the EU Cyber Resilience Act, the SBOM, vulnerability handling, support           |
 | [Data protection](data-protection.md)                                                                                               | Status of the GDPR note (under legal review; not yet published)                                           |
 | [Accessibility](accessibility.md)                                                                                                   | Status of the accessibility statement and conformance report                                              |
-| [Questionnaire: CSA CAIQ v3.0.1](questionnaire-caiq-v3.0.1.md)                                                                      | Pre-filled answers to all 294 CAIQ questions; organisational ones are marked for ITService EOOD to answer |
+| [Questionnaire: CSA CAIQ v3.0.1](questionnaire-caiq-v3.0.1.md)                                                                      | Pre-filled answers to all 295 CAIQ questions; organisational ones are marked for ITService EOOD to answer |
 
 Related reference documents:
 [Self-hosted deployment guide](../deployment/self-hosted.md) ·
