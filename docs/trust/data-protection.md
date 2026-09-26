@@ -26,7 +26,7 @@ headers or git output, or personal data in fixtures, logs or databases the agent
 Lunos does not classify or filter it.
 
 Session sharing, which would upload a whole transcript, is **off by default**. Long-term memory
-(from the next release) is also off by default and stored locally
+(from v1.18.40) is also off by default and stored locally
 ([security overview](security-overview.md#memory)).
 
 ## How the residency controls help

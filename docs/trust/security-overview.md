@@ -1,6 +1,6 @@
 # Security overview
 
-Applies to release **v1.18.39** and the `dev` branch. Controls marked **next release** are on `dev`
+Applies to release **v1.18.40** and the `dev` branch. Controls marked **v1.18.40** first shipped in that release; anything marked **next release** is on `dev`
 but not in a published release yet.
 
 ## Architecture
@@ -29,7 +29,7 @@ the built-in marketplace catalogue, and only when a marketplace command runs
 | Lunos ↔ tools on your machine   | Shell commands, file writes                         | Gated by the permission system, which is **not a sandbox**                                                                                                        |
 | Lunos ↔ MCP servers and plugins | Tool calls and their results                        | Code you chose to install. Outside Lunos's trust boundary ([`SECURITY.md`](../../SECURITY.md#out-of-scope))                                                       |
 | Lunos ↔ content it reads        | Web pages, files, tool output                       | **Untrusted.** Any of it may contain instructions aimed at the model (prompt injection)                                                                           |
-| Organisation ↔ developer        | Managed policy                                      | The organisation's policy wins over the developer's config for locked keys (**next release**)                                                                     |
+| Organisation ↔ developer        | Managed policy                                      | The organisation's policy wins over the developer's config for locked keys (**v1.18.40**)                                                                         |
 
 ## Threat model
 
@@ -46,9 +46,9 @@ model may follow.
   unless the user has allowed them ([docs: permissions](../../packages/web/src/content/docs/permissions.mdx)).
 - **Access outside the project directory** asks separately (`external_directory`), and paths are
   compared in their on-disk case so a differently cased path can't slip past a rule
-  (`packages/opencode/src/tool/external-directory.ts`; case handling **next release**).
+  (`packages/opencode/src/tool/external-directory.ts`; case handling **v1.18.40**).
 - **Read-only agent modes** (for example research mode) remove edit tools from the agent.
-- **Organisation policy** can lock permission-relevant settings (**next release**,
+- **Organisation policy** can lock permission-relevant settings (**v1.18.40**,
   [deployment guide](../deployment/self-hosted.md#organisation-policy-settings-developers-cant-change)).
 
 **Not mitigated:** Lunos cannot tell injected instructions from legitimate ones. A user who approves
@@ -62,7 +62,7 @@ The agent can run shell commands and change files with the user's permissions.
 
 **Mitigated by:** per-command permission prompts and allow/deny rules
 (`packages/opencode/src/permission/index.ts`); every tool run and permission decision recorded in
-the audit log (**next release**, [audit log](../audit-log.md)).
+the audit log (**v1.18.40**, [audit log](../audit-log.md)).
 
 **Not mitigated:** there is no sandbox. An allowed command runs with the user's full rights.
 
@@ -79,9 +79,9 @@ Extensions run code on the user's machine.
   (`packages/opencode/src/marketplace/guard.ts`).
 - The `lunos-community` catalogue records a review status, licence and pinned version for every
   entry; plugins install at the pinned version and are checked against the reviewed integrity hash;
-  MCP launch commands are pinned (**next release**, [marketplace review](../marketplace-review.md)).
+  MCP launch commands are pinned (**v1.18.40**, [marketplace review](../marketplace-review.md)).
 - Organisation policy can restrict marketplaces to an allow-list and forbid unreviewed entries
-  (**next release**).
+  (**v1.18.40**).
 
 **Not mitigated:** no entry in `lunos-community` has been verified by a human reviewer yet; all are
 `community` ([review log](../marketplace-review.md#review-log)). Extensions installed outside the
@@ -90,7 +90,7 @@ marketplace are not reviewed at all.
 ### Lunos's own releases
 
 See [Supply chain](supply-chain.md). npm packages carry provenance today; signed checksums for
-release archives start with the next release. Binaries are **not OS code-signed**.
+release archives start with v1.18.40. Binaries are **not OS code-signed**.
 
 ### Data leaving the machine
 
@@ -108,14 +108,14 @@ jurisdiction.
 **Mitigated by:** provider credentials are stored in a local file written with mode `0600`
 (`packages/opencode/src/auth/index.ts`); config files can reference environment variables instead of
 holding values; marketplace-installed MCP servers get `{env:NAME}` references only; the audit log
-masks key-shaped strings in recorded command lines (**next release**, [audit log](../audit-log.md#fields-that-can-hold-user-data)).
+masks key-shaped strings in recorded command lines (**v1.18.40**, [audit log](../audit-log.md#fields-that-can-hold-user-data)).
 
 **Not mitigated:** secrets the agent reads from files, or that appear in tool output, are sent to the
 model provider like any other context. Keep secrets out of the files the agent works on.
 
 ### Memory
 
-**Next release.** Long-term memory ([rules](../../packages/web/src/content/docs/rules.mdx), design in
+**From v1.18.40.** Long-term memory ([rules](../../packages/web/src/content/docs/rules.mdx), design in
 [`specs/memory-layer.md` §7](../../packages/opencode/specs/memory-layer.md)) keeps facts across
 sessions. A stored fact is a standing prompt-injection candidate for every later session.
 
@@ -146,7 +146,7 @@ which Lunos does not install.
 
 ### The audit log itself
 
-**Next release.** The log is hash-chained, so a line edited, removed or inserted in the middle is
+**From v1.18.40.** The log is hash-chained, so a line edited, removed or inserted in the middle is
 detected by `lunos audit verify`. It **cannot** detect the last lines being removed, or a rewrite by
 someone with write access to the file. Forwarding it to a SIEM is what anchors it
 ([audit log](../audit-log.md#verifying-the-log)).
