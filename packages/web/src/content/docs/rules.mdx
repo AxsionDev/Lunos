@@ -178,6 +178,11 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
 - **Where it's stored.**
   - Project memory: `.opencode/memory/graph/`, which is never committed. Lunos writes a `.gitignore` there.
   - `"user"` scope: in the Lunos data directory.
+- **Reviewing it.**
+  - In the TUI, `/memory` opens a browser: every fact with where it came from, the entities and relationships around the highlighted fact, and `ctrl+d` twice to forget it.
+  - `lunos memory list`, `show <id>` and `search <query>` show what is stored and where each fact came from.
+  - `lunos memory export` writes one Markdown file per fact for review in git.
+  - `lunos memory forget <id>` removes a fact. `lunos memory purge --scope project --yes` deletes the whole memory.
 - **Turning it off:**
   - `"memory": { "enabled": false }`, or remove the key
   - `LUNOS_DISABLE_MEMORY=1`, which overrides config

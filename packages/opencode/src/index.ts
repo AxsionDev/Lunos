@@ -33,6 +33,7 @@ import { errorMessage } from "./util/error"
 import { PluginCommand } from "./cli/cmd/plug"
 import { MarketplaceCommand } from "./cli/cmd/marketplace"
 import { AuditCommand } from "./cli/cmd/audit"
+import { MemoryCommand } from "./cli/cmd/memory"
 import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
@@ -127,6 +128,7 @@ const cli = yargs(args)
   .command(PluginCommand)
   .command(MarketplaceCommand)
   .command(AuditCommand)
+  .command(MemoryCommand)
   .command(DbCommand)
   .fail((msg, err) => {
     if (

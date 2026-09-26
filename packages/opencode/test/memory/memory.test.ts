@@ -223,3 +223,31 @@ describe("Memory service: remember", () => {
     ),
   )
 })
+
+describe("Memory service: review", () => {
+  it.live("facts reads the ledger, and purge deletes the store and nothing else, without starting the engine", () =>
+    provideTmpdirInstance((dir) =>
+      Effect.gen(function* () {
+        const memory = yield* Memory.Service
+        const root = MemoryStore.dir("project", dir)
+        const fact = {
+          id: "f1",
+          datasetID: "d",
+          text: "The billing service owns the invoices table.",
+          provenance: { sessionID: "ses", agent: "build", source: "user message", date: "2026-09-26" },
+        }
+        yield* Effect.promise(async () => {
+          await MemoryStore.ensure("project", dir)
+          await MemoryStore.add(root, fact)
+          await fs.writeFile(path.join(dir, ".opencode", "memory", "team.md"), "A hand-written note.\n")
+        })
+        expect(yield* memory.facts("project")).toEqual([fact])
+        expect(yield* memory.facts("user")).toEqual([])
+        expect(yield* memory.purge("project")).toBe(1)
+        expect(yield* Effect.promise(() => exists(root))).toBe(false)
+        expect(yield* Effect.promise(() => exists(path.join(dir, ".opencode", "memory", "team.md")))).toBe(true)
+        expect(yield* Effect.promise(() => exists(MemoryStore.sidecarDir()))).toBe(false)
+      }),
+    ),
+  )
+})

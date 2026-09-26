@@ -29,6 +29,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "@/memory"
 import { MemoryGuard } from "@/memory/guard"
 import { MemoryRecall } from "@/memory/recall"
+import { MemoryStore } from "@/memory/store"
 import MEMORY_REMEMBER from "@/memory/remember.txt"
 import MEMORY_SEARCH from "@/memory/search.txt"
 
@@ -159,7 +160,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     )
     const scopes = yield* memory.scopes()
     const parent = { providerID: input.model.providerID, modelID: input.model.id }
-    const worktree = (yield* InstanceState.context).worktree
+    const worktree = MemoryStore.projectRoot(yield* InstanceState.context)
     const finish = (title: string, output: string, metadata: Record<string, unknown> = {}) => ({
       title,
       output,

@@ -463,6 +463,25 @@ opencode stats
 
 ---
 
+### memory
+
+Review long-term memory (see [Rules: long-term memory](/docs/rules#long-term-memory)). `list`, `show` and `export` read what is stored without starting memory.
+
+```bash
+opencode memory list [--scope project|user]
+opencode memory show <id>
+opencode memory search <query>
+opencode memory forget <id>
+opencode memory purge --scope project|user --yes
+opencode memory export [--scope project|user] [--dir <path>]
+```
+
+- `export` writes one Markdown file per fact, with its provenance, to `.opencode/memory/export/` so you can review memory in git.
+- `forget` removes the fact from memory and from that export folder.
+- `purge` deletes a memory's stored facts and graph. Your notes in `.opencode/memory/*.md` are kept.
+
+---
+
 ### export
 
 Export session data as JSON.
