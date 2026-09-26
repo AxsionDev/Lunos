@@ -33,7 +33,8 @@ function View(props: { api: TuiPluginApi }) {
                   fg: item.status === "connected" ? theme().success : theme().error,
                 }}
               >
-                •
+                {/* XCOD-107: a distinct glyph, so the state doesn't rely on colour alone. */}
+                {item.status === "connected" ? "•" : "✕"}
               </text>
               <text fg={theme().textMuted}>
                 {item.id} {item.root}

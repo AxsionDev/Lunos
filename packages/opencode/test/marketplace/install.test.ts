@@ -154,7 +154,11 @@ describe("planInstall: remote MCP headers", () => {
       url: "https://example.test/mcp",
       headers: ["X-Api-Key"],
     })
-    const plan = await planInstall({ kind: "mcp", name: "api", marketplace: "mp", source: "mp.json", entry }, file, offline)
+    const plan = await planInstall(
+      { kind: "mcp", name: "api", marketplace: "mp", source: "mp.json", entry },
+      file,
+      offline,
+    )
     expect(plan.details).toContain("header X-Api-Key <- $X_API_KEY")
     expect(plan.warnings).toEqual(["X_API_KEY is not set in your environment; the reference is written anyway"])
     await plan.apply()
