@@ -39,7 +39,6 @@ Server mode is opt-in only. When enabled, set `OPENCODE_SERVER_PASSWORD` to requ
 These are open, tracked, and listed here rather than omitted:
 
 - **Binaries are not code-signed on any platform.** Downloads will trip OS gatekeepers, and release artifacts cannot currently be verified by signature. Also recorded in [`CHANGELOG.md`](CHANGELOG.md); the CI signing jobs exist but skip when credentials are absent.
-- **No dedicated security contact address exists yet.** Use the GitHub advisory channel below, which is private and works today.
 
 ---
 
@@ -50,6 +49,8 @@ We appreciate your efforts to responsibly disclose your findings, and will make 
 **Report Lunos vulnerabilities to the Lunos project**, not to upstream opencode:
 
 → **[Report a Vulnerability](https://github.com/AxsionDev/Lunos/security/advisories/new)** (GitHub Security Advisories — private to maintainers)
+
+→ Or email **[security@lunos.tech](mailto:security@lunos.tech)**, if you can't use GitHub.
 
 Please do **not** open a public issue for a suspected vulnerability.
 

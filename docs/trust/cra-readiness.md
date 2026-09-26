@@ -24,7 +24,7 @@ questions for counsel are listed in the assessment.
 | Software bill of materials         | Generated for every release; licence data from the next release                              | [Supply chain](supply-chain.md#software-bill-of-materials)                           |
 | Documented vulnerability handling  | Intake, assessment, remediation, release, disclosure; acknowledgement within 6 business days | [`SECURITY.md`](../../SECURITY.md#vulnerability-handling-process)                    |
 | Private vulnerability reporting    | Enabled (GitHub Security Advisories)                                                         | [Report a vulnerability](https://github.com/AxsionDev/Lunos/security/advisories/new) |
-| Dedicated security contact address | **Not yet**                                                                                  | Pending: a `security@` address to be provided by ITService EOOD                      |
+| Dedicated security contact address | security@lunos.tech                                                                          | [`SECURITY.md`](../../SECURITY.md#reporting-security-issues)                         |
 | Verifiable releases                | npm provenance now; signed checksums from the next release                                   | [Supply chain](supply-chain.md)                                                      |
 | Support periods                    | **Not yet defined**                                                                          | To be decided by ITService EOOD. Until then, fixes ship in the latest release only   |
 
