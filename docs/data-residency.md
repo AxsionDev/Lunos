@@ -81,7 +81,7 @@ One JSON object per line, appended per outbound call:
 }
 ```
 
-From the next release (schema v1, XCOD-103; v1.18.39 writes the residency fields only, without `v`, `event`, `seq` and `prev`), this file is the organisation audit trail: the same stream also records
+From v1.18.40 (schema v1, XCOD-103; v1.18.39 and earlier write the residency fields only, without `v`, `event`, `seq` and `prev`), this file is the organisation audit trail: the same stream also records
 tool runs, permission decisions, MCP connections, marketplace installs and policy refusals, and
 each line is hash-chained to the one before it. The residency fields above are unchanged; `v`,
 `event`, `seq` and `prev` are added. Lines written before v1 have none of the added fields. The

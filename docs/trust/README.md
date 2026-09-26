@@ -5,7 +5,7 @@ data-protection and accessibility checklists ask, with every statement linked to
 code that backs it.
 
 **Versioning.** This pack is versioned with the repository: the copy on a release tag describes that
-release. The latest published release is **v1.18.39**. Where a control exists on the `dev` branch
+release. The latest published release is **v1.18.40**. Where a control exists on the `dev` branch
 but has not been released yet, it says **"from the next release"**. Where it doesn't exist yet, it
 says **Planned**. Nothing here is a certification or a claim of compliance.
 

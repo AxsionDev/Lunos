@@ -5,10 +5,10 @@ ran, what it was allowed or refused, and what it installed. It is written for se
 compliance reviews after an incident or during an audit, using your own tools. Nothing is sent to
 ITService EOOD.
 
-**Release status:** v1.18.39 records model calls and share uploads (the residency fields, see
+**Release status:** v1.18.39 and earlier record model calls and share uploads (the residency fields, see
 [data residency](data-residency.md#the-audit-log)). Everything else on this page (the other
 events, the hash chain, `lunos audit verify` and `export`, `"audit": { "enabled": true }` and SIEM
-forwarding) is **from the next release**.
+forwarding) is **from v1.18.40**.
 
 ## Turning it on
 

@@ -41,7 +41,7 @@ DEFAULTS = {
     "Application & Interface Security": SELF_HOSTED,
 }
 
-NEXT = " (from the next release; not in v1.18.39)"
+NEXT = " (from v1.18.40)"
 
 O = {
     # Application & Interface Security
@@ -93,7 +93,7 @@ O = {
     "IAM-06.2": ("N/A", "Customer source code stays on the customer's machines; ITService EOOD has no access to it.", "docs/deployment/self-hosted.md"),
     "IAM-12.1": ("N/A", "Lunos has no user login to integrate SSO with. The admin-console/SSO decision is recorded in specs/admin-console-sso.md (deferred).", "packages/opencode/specs/admin-console-sso.md"),
     # IVS: audit logging in the product
-    "IVS-01.4": ("N/A", "No Lunos-operated service produces audit logs. For customers: the product writes a local, hash-chained audit log the customer controls, and can forward it to the customer's SIEM" + NEXT + ". For v1.18.39: model calls and share uploads are recorded when a residency policy is set.", "docs/audit-log.md"),
+    "IVS-01.4": ("N/A", "No Lunos-operated service produces audit logs. For customers: the product writes a local, hash-chained audit log the customer controls, and can forward it to the customer's SIEM" + NEXT + ". v1.18.39 and earlier record model calls and share uploads only, when a residency policy is set.", "docs/audit-log.md"),
     "IVS-01.5": ("N/A", "The audit log is the customer's; reviewing it is the customer's process. `lunos audit verify` checks its integrity" + NEXT + ".", "docs/audit-log.md"),
     "IVS-01.2": ("N/A", "The audit log is a local file on the customer's machine, under the customer's access controls.", "docs/audit-log.md"),
     # Interoperability
@@ -137,7 +137,7 @@ def main():
         "# CSA CAIQ v3.0.1: pre-filled answers for Lunos",
         "",
         "Pre-filled answers to the Cloud Security Alliance's Consensus Assessments Initiative Questionnaire,",
-        "version 3.0.1, for reviewers to copy. **Applies to release v1.18.39**; answers that depend on",
+        "version 3.0.1, for reviewers to copy. **Applies to release v1.18.40**; answers that depend on",
         "unreleased work say so. Generated from [`questionnaire/answers.py`](questionnaire/answers.py); a spreadsheet version is",
         "[`questionnaire/caiq-v3.0.1-answers.csv`](questionnaire/caiq-v3.0.1-answers.csv).",
         "",
