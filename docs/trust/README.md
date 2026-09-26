@@ -9,15 +9,15 @@ release. The latest published release is **v1.18.39**. Where a control exists on
 but has not been released yet, it says **"from the next release"**. Where it doesn't exist yet, it
 says **Planned**. Nothing here is a certification or a claim of compliance.
 
-| Document | What it answers |
-| --- | --- |
-| [What Lunos claims, and what it doesn't](../deployment/self-hosted.md#2-what-is-true-today--the-sovereignty-claim-stated-precisely) | The claim table every other document must agree with (checked in CI by `script/check-claims.ts`) |
-| [Security overview](security-overview.md) | Architecture, trust boundaries, and a threat model: what is mitigated and what isn't |
-| [Supply chain](supply-chain.md) | How releases are built and how to verify them; how marketplace entries are reviewed |
-| [CRA readiness](cra-readiness.md) | Where Lunos stands under the EU Cyber Resilience Act, the SBOM, vulnerability handling, support |
-| [Data protection](data-protection.md) | Status of the GDPR note (under legal review; not yet published) |
-| [Accessibility](accessibility.md) | Status of the accessibility statement and conformance report |
-| [Questionnaire: CSA CAIQ v3.0.1](questionnaire-caiq-v3.0.1.md) | Pre-filled answers to all 294 CAIQ questions; organisational ones are marked for ITService EOOD to answer |
+| Document                                                                                                                            | What it answers                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [What Lunos claims, and what it doesn't](../deployment/self-hosted.md#2-what-is-true-today--the-sovereignty-claim-stated-precisely) | The claim table every other document must agree with (checked in CI by `script/check-claims.ts`)          |
+| [Security overview](security-overview.md)                                                                                           | Architecture, trust boundaries, and a threat model: what is mitigated and what isn't                      |
+| [Supply chain](supply-chain.md)                                                                                                     | How releases are built and how to verify them; how marketplace entries are reviewed                       |
+| [CRA readiness](cra-readiness.md)                                                                                                   | Where Lunos stands under the EU Cyber Resilience Act, the SBOM, vulnerability handling, support           |
+| [Data protection](data-protection.md)                                                                                               | Status of the GDPR note (under legal review; not yet published)                                           |
+| [Accessibility](accessibility.md)                                                                                                   | Status of the accessibility statement and conformance report                                              |
+| [Questionnaire: CSA CAIQ v3.0.1](questionnaire-caiq-v3.0.1.md)                                                                      | Pre-filled answers to all 294 CAIQ questions; organisational ones are marked for ITService EOOD to answer |
 
 Related reference documents:
 [Self-hosted deployment guide](../deployment/self-hosted.md) ·

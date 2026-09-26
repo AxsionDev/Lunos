@@ -22,14 +22,14 @@ the built-in marketplace catalogue, and only when a marketplace command runs
 
 ## Trust boundaries
 
-| Boundary | What crosses it | Who is trusted |
-| --- | --- | --- |
-| User ↔ Lunos | Prompts, approvals | The user is trusted; their config is theirs ([`SECURITY.md`](../../SECURITY.md#out-of-scope)) |
-| Lunos ↔ model provider | Prompts, file contents the agent reads, tool output | The provider **you** configure, under **your** contract. Lunos restricts *which* providers may be used (residency policy), not what a provider does with the data |
-| Lunos ↔ tools on your machine | Shell commands, file writes | Gated by the permission system, which is **not a sandbox** |
-| Lunos ↔ MCP servers and plugins | Tool calls and their results | Code you chose to install. Outside Lunos's trust boundary ([`SECURITY.md`](../../SECURITY.md#out-of-scope)) |
-| Lunos ↔ content it reads | Web pages, files, tool output | **Untrusted.** Any of it may contain instructions aimed at the model (prompt injection) |
-| Organisation ↔ developer | Managed policy | The organisation's policy wins over the developer's config for locked keys (**next release**) |
+| Boundary                         | What crosses it                                     | Who is trusted                                                                                                                                                    |
+| -------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User ↔ Lunos                    | Prompts, approvals                                  | The user is trusted; their config is theirs ([`SECURITY.md`](../../SECURITY.md#out-of-scope))                                                                     |
+| Lunos ↔ model provider          | Prompts, file contents the agent reads, tool output | The provider **you** configure, under **your** contract. Lunos restricts _which_ providers may be used (residency policy), not what a provider does with the data |
+| Lunos ↔ tools on your machine   | Shell commands, file writes                         | Gated by the permission system, which is **not a sandbox**                                                                                                        |
+| Lunos ↔ MCP servers and plugins | Tool calls and their results                        | Code you chose to install. Outside Lunos's trust boundary ([`SECURITY.md`](../../SECURITY.md#out-of-scope))                                                       |
+| Lunos ↔ content it reads        | Web pages, files, tool output                       | **Untrusted.** Any of it may contain instructions aimed at the model (prompt injection)                                                                           |
+| Organisation ↔ developer        | Managed policy                                      | The organisation's policy wins over the developer's config for locked keys (**next release**)                                                                     |
 
 ## Threat model
 
@@ -41,6 +41,7 @@ Content the agent reads (a web page, a file, an issue, tool output) can carry in
 model may follow.
 
 **Mitigated by:**
+
 - The **permission system** asks before shell commands, file edits and access outside the project,
   unless the user has allowed them ([docs: permissions](../../packages/web/src/content/docs/permissions.mdx)).
 - **Access outside the project directory** asks separately (`external_directory`), and paths are
@@ -70,6 +71,7 @@ the audit log (**next release**, [audit log](../audit-log.md)).
 Extensions run code on the user's machine.
 
 **Mitigated by:**
+
 - Marketplace installs show exactly what will run or connect, and where it writes, before asking
   (`packages/opencode/src/marketplace/install.ts`).
 - Manifests can't carry credentials: they name environment variables, and Lunos writes

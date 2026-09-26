@@ -12,12 +12,12 @@
 
 ## Verifying what you install
 
-| What | Available | How to verify |
-| --- | --- | --- |
-| npm packages (`lunos-ai` and platform packages) | **Now** (v1.18.39) | `npm audit signatures`: npm provenance (SLSA attestations) links each package to the workflow run that built it |
-| Release archives (`SHA256SUMS`, Sigstore-signed) | **From the next release** | `cosign verify-blob` against the repository's workflow identity, then `sha256sum --check` |
-| SBOM (CycloneDX), Sigstore-signed | SBOM **now** on every release; signature and licence data **from the next release** | `cosign verify-blob` on the SBOM's bundle |
-| OS code signing (Apple Developer ID, Windows Authenticode) | **Not available** | Gatekeeper and SmartScreen will warn. Install through npm, or allow the binary manually |
+| What                                                       | Available                                                                           | How to verify                                                                                                   |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| npm packages (`lunos-ai` and platform packages)            | **Now** (v1.18.39)                                                                  | `npm audit signatures`: npm provenance (SLSA attestations) links each package to the workflow run that built it |
+| Release archives (`SHA256SUMS`, Sigstore-signed)           | **From the next release**                                                           | `cosign verify-blob` against the repository's workflow identity, then `sha256sum --check`                       |
+| SBOM (CycloneDX), Sigstore-signed                          | SBOM **now** on every release; signature and licence data **from the next release** | `cosign verify-blob` on the SBOM's bundle                                                                       |
+| OS code signing (Apple Developer ID, Windows Authenticode) | **Not available**                                                                   | Gatekeeper and SmartScreen will warn. Install through npm, or allow the binary manually                         |
 
 Copy-paste commands: [deployment guide, "Verify your download"](../deployment/self-hosted.md#verify-your-download).
 
