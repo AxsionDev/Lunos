@@ -2,11 +2,7 @@
   "skills": [
     {
       "name": "bug-investigation",
-      "files": [
-        "SKILL.md",
-        "references/bug-triage.md",
-        "references/collaborative-dialogue.md"
-      ],
+      "files": ["SKILL.md", "references/bug-triage.md", "references/collaborative-dialogue.md"],
       "version": "1.0.0"
     },
     {
@@ -22,9 +18,7 @@
     },
     {
       "name": "research-mode",
-      "files": [
-        "SKILL.md"
-      ],
+      "files": ["SKILL.md"],
       "version": "1.0.0"
     }
   ]

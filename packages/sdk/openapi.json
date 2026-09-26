@@ -21851,6 +21851,9 @@
           "marketplace_default": {
             "type": "boolean"
           },
+          "marketplace_unreviewed": {
+            "type": "boolean"
+          },
           "marketplace_allow": {
             "type": "array",
             "items": {
