@@ -1,3 +1,5 @@
+import fs from "node:fs/promises"
+import path from "node:path"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { LLMEvent } from "@opencode-ai/llm"
 import { Context, Effect, Layer, Stream } from "effect"
@@ -75,6 +77,16 @@ export interface Interface {
    * one turn don't each start a recall. Undefined when memory is off, empty, or unavailable: a
    * failing recall never stops a turn.
    */
+  /** Every stored fact in a scope, from the ledger. Never starts the engine. */
+  readonly facts: (scope: MemoryStore.Scope) => Effect.Effect<MemoryStore.Fact[]>
+  /** Remove one fact, from whichever scope holds it. False if no scope does. */
+  readonly forget: (input: {
+    id: string
+    parent: MemoryModel.Model
+    sessionID?: string
+  }) => Effect.Effect<{ scope: MemoryStore.Scope; fact: MemoryStore.Fact } | undefined, Error>
+  /** Delete a scope's memory directory, and nothing else. Hand-written notes are kept. */
+  readonly purge: (scope: MemoryStore.Scope) => Effect.Effect<number, Error>
   readonly recallFor: (input: {
     sessionID: string
     userMessageID: string
@@ -100,7 +112,12 @@ const layer = Layer.effect(
     const llm = yield* LLM.Service
     const state = yield* InstanceState.make<State>(
       Effect.fn("Memory.state")(function* (ctx) {
-        const state: State = { sessionOff: new Set(), running: new Map(), recalled: new Map(), worktree: ctx.worktree }
+        const state: State = {
+          sessionOff: new Set(),
+          running: new Map(),
+          recalled: new Map(),
+          worktree: MemoryStore.projectRoot(ctx),
+        }
         yield* Effect.addFinalizer(() =>
           Effect.promise(async () => {
             const running = [...state.running.values()]
@@ -292,7 +309,58 @@ const layer = Layer.effect(
       return text
     })
 
-    return Service.of({ decision, setSessionOff, scopes, backend, remember, search, recallFor })
+    const facts = Effect.fn("Memory.facts")(function* (scope: MemoryStore.Scope) {
+      const s = yield* InstanceState.get(state)
+      return yield* Effect.promise(() => MemoryStore.facts(MemoryStore.dir(scope, s.worktree)))
+    })
+
+    const forget = Effect.fn("Memory.forget")(function* (input: {
+      id: string
+      parent: MemoryModel.Model
+      sessionID?: string
+    }) {
+      for (const scope of ["project", "user"] as const) {
+        const fact = (yield* facts(scope)).find((item) => item.id === input.id)
+        if (!fact) continue
+        const store = yield* backend({ scope, sessionID: input.sessionID, parent: input.parent })
+        yield* Effect.tryPromise({ try: () => store.forget(fact.id), catch: toError })
+        AuditLog.emit("memory.forget", { scope, id: fact.id, session: input.sessionID })
+        const s = yield* InstanceState.get(state)
+        // A forgotten fact must not live on in memory's own export, where the agent could find it.
+        yield* Effect.promise(() =>
+          fs.rm(path.join(MemoryStore.exportDir(s.worktree), scope, `${fact.id}.md`), { force: true }),
+        )
+        s.recalled.clear()
+        return { scope, fact }
+      }
+      return undefined
+    })
+
+    const purge = Effect.fn("Memory.purge")(function* (scope: MemoryStore.Scope) {
+      const s = yield* InstanceState.get(state)
+      const running = s.running.get(scope)
+      s.running.delete(scope)
+      if (running) yield* Effect.promise(() => running.then((item) => item.close()).catch(() => {}))
+      const root = MemoryStore.dir(scope, s.worktree)
+      const count = (yield* Effect.promise(() => MemoryStore.facts(root))).length
+      yield* Effect.tryPromise({ try: () => fs.rm(root, { recursive: true, force: true }), catch: toError })
+      AuditLog.emit("memory.forget", { scope, id: "*", count })
+      s.recalled.clear()
+      return count
+    })
+
+    return Service.of({
+      decision,
+      setSessionOff,
+      scopes,
+      backend,
+      remember,
+      search,
+      facts,
+      forget,
+      purge,
+      recallFor,
+    })
   }),
 )
 

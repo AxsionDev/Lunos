@@ -19,6 +19,7 @@ line, so running the script by hand can't phone home either.
 """
 
 import os
+import re
 import sys
 
 ROOT = os.environ["LUNOS_MEMORY_DIR"]
@@ -124,7 +125,31 @@ async def recall(query: str, dataset: str, top_k: int = 10) -> dict:
         for c in chunks
         if getattr(c, "metadata", None) and c.metadata.get("data_id")
     ]
-    return {"facts": facts, "graph": "\n".join(str(g.text) for g in graph)}
+    return {"facts": facts, "graph": "\n".join(_relations("\n".join(str(g.text) for g in graph)))}
+
+
+_EDGE = re.compile(r"^(?P<a>.+?) --\[(?P<rel>[^\]]+)\]--> (?P<b>.+?)(?:  \(.*\))?`?$")
+
+
+def _relations(context: str) -> list:
+    """Entity-to-entity relationships from cognee's graph context, and nothing else.
+
+    The context cognee builds for its own completion prompt wraps the graph in instructions
+    ("The question is: ...") and includes chunk nodes and document ids. Only lines like
+    ``billing service --[owns]--> invoices table`` between named entities are kept.
+    """
+    out = []
+    for line in context.split("Connections:", 1)[-1].splitlines():
+        match = _EDGE.match(line.strip())
+        if not match:
+            continue
+        a, b = match["a"].strip(), match["b"].strip()
+        if any("..." in side or side.startswith("text_") or "[" in side for side in (a, b)):
+            continue
+        edge = f"{a} --[{match['rel']}]--> {b}"
+        if edge not in out:
+            out.append(edge)
+    return out
 
 
 @server.tool()

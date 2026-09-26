@@ -20,10 +20,23 @@ export type Scope = "project" | "user"
 
 export const DATASET = "lunos"
 
+/**
+ * The project memory belongs to: the git worktree, or the working directory when there is no git
+ * repository (the instance reports its worktree as "/" then).
+ */
+export function projectRoot(ctx: { worktree: string; directory: string }) {
+  return ctx.worktree && ctx.worktree !== "/" ? ctx.worktree : ctx.directory
+}
+
 export function dir(scope: Scope, worktree: string) {
   return scope === "project"
     ? path.join(worktree, ".opencode", "memory", "graph")
     : path.join(Global.Path.data, "memory", "user")
+}
+
+/** Where `lunos memory export` writes by default: one `<scope>/<id>.md` per fact. */
+export function exportDir(worktree: string) {
+  return path.join(worktree, ".opencode", "memory", "export")
 }
 
 export function models() {
