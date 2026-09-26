@@ -201,6 +201,25 @@ jobs:
           "$RUNNER_TEMP/bin/syft" scan file:bun.lock \
             -o cyclonedx-json > "lunos-sbom-${VERSION}.cdx.json"
 
+      # XCOD-108: bun.lock carries no licences, so the SBOM had none (the XCOD-64 gap). Install the
+      # locked tree, then add each component's declared licence from its package.json (or, for
+      # other-platform optional packages not installed here, from the registry's metadata).
+      - uses: ./.github/actions/setup-bun
+
+      - name: Add licences to the SBOM
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          bun install --frozen-lockfile
+          bun script/sbom-licenses.ts "lunos-sbom-${VERSION}.cdx.json"
+          with=$(jq '[.components[] | select(.licenses)] | length' "lunos-sbom-${VERSION}.cdx.json")
+          total=$(jq '.components | length' "lunos-sbom-${VERSION}.cdx.json")
+          echo "Components with a licence: $with of $total"
+          if [ $((with * 100 / total)) -lt 95 ]; then
+            echo "::error::Only $with of $total SBOM components have a licence (expected >=95%)."
+            exit 1
+          fi
+
       # Same philosophy as `if-no-files-found: error` above: an empty artifact that leaves the
       # job green is worse than a failure, because it defers the error to whoever trusts the SBOM.
       - name: Verify SBOM is not empty
