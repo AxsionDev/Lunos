@@ -87,7 +87,7 @@ O = {
     "HRS-08.1": ("Yes", "Documented: ITService EOOD has no access to customer data or metadata, and there is no telemetry. The only Lunos-operated host contacted is lunos.tech, for the static marketplace catalogue, and the request carries nothing from the project.", "docs/deployment/self-hosted.md#touches-lunos-operated-infrastructure"),
     "HRS-08.2": ("No", "No metadata about customer data is collected. Lunos has no telemetry.", "docs/deployment/self-hosted.md"),
     "HRS-08.3": ("N/A", "No customer data or metadata is accessed.", ""),
-    "HRS-01.1": ("N/A", "ITService EOOD holds no customer data, so has no privacy breach of customer data to detect. The data-protection note is under legal review.", "docs/trust/data-protection.md"),
+    "HRS-01.1": ("N/A", "ITService EOOD holds no customer data, so has no privacy breach of customer data to detect. See the data-protection note.", "docs/trust/data-protection.md"),
     # IAM
     "IAM-06.1": ("Partial", "Write access to the source repository is restricted to the AxsionDev GitHub organisation's members. Branch protection is not enabled on `dev`.", ""),
     "IAM-06.2": ("N/A", "Customer source code stays on the customer's machines; ITService EOOD has no access to it.", "docs/deployment/self-hosted.md"),

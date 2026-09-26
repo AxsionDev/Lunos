@@ -153,5 +153,6 @@ someone with write access to the file. Forwarding it to a SIEM is what anchors i
 
 ## Reporting a vulnerability
 
-Privately, through [GitHub Security Advisories](https://github.com/AxsionDev/Lunos/security/advisories/new).
+Privately, through [GitHub Security Advisories](https://github.com/AxsionDev/Lunos/security/advisories/new),
+or by email to security@lunos.tech.
 Process and response targets: [`SECURITY.md`](../../SECURITY.md).

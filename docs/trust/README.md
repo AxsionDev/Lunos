@@ -15,7 +15,7 @@ says **Planned**. Nothing here is a certification or a claim of compliance.
 | [Security overview](security-overview.md)                                                                                           | Architecture, trust boundaries, and a threat model: what is mitigated and what isn't                      |
 | [Supply chain](supply-chain.md)                                                                                                     | How releases are built and how to verify them; how marketplace entries are reviewed                       |
 | [CRA readiness](cra-readiness.md)                                                                                                   | Where Lunos stands under the EU Cyber Resilience Act, the SBOM, vulnerability handling, support           |
-| [Data protection](data-protection.md)                                                                                               | Status of the GDPR note (under legal review; not yet published)                                           |
+| [Data protection](data-protection.md)                                                                                               | GDPR: controller and processor roles, what reaches model providers, and a DPIA-support checklist          |
 | [Accessibility](accessibility.md)                                                                                                   | Status of the accessibility statement and conformance report                                              |
 | [Questionnaire: CSA CAIQ v3.0.1](questionnaire-caiq-v3.0.1.md)                                                                      | Pre-filled answers to all 295 CAIQ questions; organisational ones are marked for ITService EOOD to answer |
 
@@ -28,5 +28,5 @@ Related reference documents:
 [`SECURITY.md`](../../SECURITY.md)
 
 **Reporting a vulnerability:** privately through
-[GitHub Security Advisories](https://github.com/AxsionDev/Lunos/security/advisories/new). See
-[`SECURITY.md`](../../SECURITY.md).
+[GitHub Security Advisories](https://github.com/AxsionDev/Lunos/security/advisories/new), or by email
+to security@lunos.tech. See [`SECURITY.md`](../../SECURITY.md).
