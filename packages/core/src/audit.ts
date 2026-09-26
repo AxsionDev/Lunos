@@ -11,7 +11,7 @@ export * as Audit from "./audit"
 // `seq` lets the SIEM see a gap. The log never holds prompt text, model output or file contents.
 
 import { createHash } from "crypto"
-import { closeSync, openSync, readFileSync, statSync, unlinkSync, writeSync } from "fs"
+import { closeSync, fstatSync, openSync, readSync, statSync, unlinkSync, writeSync } from "fs"
 import { mkdir, readdir, readFile, rename, stat, unlink } from "fs/promises"
 import path from "path"
 
@@ -101,15 +101,37 @@ export function hashLine(line: string) {
 }
 
 /** The last line of a file, read from its tail, and how many v1 lines it holds so far (`seq`). */
-function tail(file: string): { last?: string; seq: number } {
-  let text: string
+// Reads backwards from the end of the file until it holds a whole last line, so the cost is the
+// size of one line, not the size of the log (up to max_bytes, 10 MB by default) on every event.
+const TAIL_CHUNK = 64 * 1024
+export function lastLine(file: string): string | undefined {
+  let fd: number
   try {
-    text = readFileSync(file, "utf8")
+    fd = openSync(file, "r")
   } catch {
-    return { seq: 0 }
+    return undefined
   }
-  const lines = text.split("\n").filter(Boolean)
-  const last = lines.at(-1)
+  try {
+    const size = fstatSync(fd).size
+    let start = size
+    let text = ""
+    while (start > 0) {
+      const length = Math.min(TAIL_CHUNK, start)
+      start -= length
+      const buffer = Buffer.alloc(length)
+      readSync(fd, buffer, 0, length, start)
+      text = buffer.toString("utf8") + text
+      // A newline before the final line's own trailing newline means the whole line is in hand.
+      if (text.trimEnd().includes("\n")) break
+    }
+    return text.split("\n").filter(Boolean).at(-1)
+  } finally {
+    closeSync(fd)
+  }
+}
+
+function tail(file: string): { last?: string; seq: number } {
+  const last = lastLine(file)
   let seq = 0
   if (last) {
     try {
@@ -211,7 +233,21 @@ async function rotateIfNeeded(options: Options) {
   if (size >= max) {
     // The new file's first line chains to the rotated file's last line, so `verify` can walk
     // the whole stream across the boundary.
-    await rename(options.file, `${options.file}.${new Date().toISOString().replaceAll(":", "-")}`).catch(() => {})
+    // Two rotations in the same millisecond must not overwrite each other (that silently dropped
+    // a whole rotated file), so the name carries a counter when the timestamp is taken. Names stay
+    // sortable: `<ts>` sorts before `<ts>.1`, `<ts>.2`.
+    const stamp = `${options.file}.${new Date().toISOString().replaceAll(":", "-")}`
+    let target = stamp
+    for (
+      let n = 1;
+      await stat(target).then(
+        () => true,
+        () => false,
+      );
+      n++
+    )
+      target = `${stamp}.${String(n).padStart(3, "0")}`
+    await rename(options.file, target).catch(() => {})
   }
   const cutoff = Date.now() - (options.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS) * 86_400_000
   for (const old of await rotated(options.file)) {
