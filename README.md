@@ -192,6 +192,8 @@ Invoke one explicitly by mentioning it in a message, e.g. `@general`.
 - [Data residency controls](docs/data-residency.md) — restricting provider jurisdictions, and the
   egress audit log
 - [Model provider jurisdictions](docs/provider-jurisdictions.md) — where each provider processes data
+- [Trust pack](docs/trust/README.md) — security overview, supply chain, CRA readiness and pre-filled
+  CAIQ answers for procurement and security reviewers
 - [`SECURITY.md`](SECURITY.md) — threat model and vulnerability reporting
 - Decision records in [`.claude/docs/`](.claude/docs/)
 

@@ -81,13 +81,13 @@ One JSON object per line, appended per outbound call:
 }
 ```
 
-Since schema v1 (XCOD-103) this file is the organisation audit trail: the same stream also records
+From the next release (schema v1, XCOD-103; v1.18.39 writes the residency fields only, without `v`, `event`, `seq` and `prev`), this file is the organisation audit trail: the same stream also records
 tool runs, permission decisions, MCP connections, marketplace installs and policy refusals, and
 each line is hash-chained to the one before it. The residency fields above are unchanged; `v`,
 `event`, `seq` and `prev` are added. Lines written before v1 have none of the added fields. The
 full schema, `lunos audit verify`, export and SIEM forwarding are in [The audit log](audit-log.md).
 
-Default location is `residency-egress.log` in the Lunos log directory. Override it:
+Default location is `~/.local/share/opencode/log/residency-egress.log` (or `$XDG_DATA_HOME/opencode/log/` when that is set), on every platform. The directory is named `opencode` because Lunos keeps upstream's data directory. Override it:
 
 ```json
 {
