@@ -4,6 +4,8 @@ For procurement, security and compliance reviewers evaluating Lunos, and for the
 
 Written to be read without any familiarity with the codebase. It states what Lunos is, exactly where data goes, what the EU-sovereignty claim does and does not cover, and how to deploy it under a data-residency policy.
 
+The rest of the reviewer documentation (security overview and threat model, supply chain, CRA readiness, and pre-filled CAIQ answers) is in the [Trust pack](../trust/README.md).
+
 ---
 
 ## 1. What Lunos is
@@ -50,7 +52,7 @@ The tool also fetches its model catalogue (a list of available models and their 
 
 **The update check** reads the `lunos-ai` package entry from your npm registry: `https://registry.npmjs.org/lunos-ai/latest` by default, or whatever registry your npm configuration points at, so a corporate or EU mirror is honoured. It sends no project data, and runs at most once a day; the result is cached in Lunos's state directory. Lunos only _announces_ new releases. It never installs one unless a person chooses to, or you set `"autoupdate": true`. To turn the check off entirely, set `"autoupdate": false` or the environment variable `LUNOS_DISABLE_AUTOUPDATE=1`.
 
-**Long-term memory, if you turn it on** (`"memory": { "enabled": true }`; off by default). Measured on 2026-09-26:
+**Long-term memory, if you turn it on** (from the next release; `"memory": { "enabled": true }`; off by default). Measured on 2026-09-26:
 
 - **First start.** It downloads its Python packages from PyPI (`pypi.org`, `files.pythonhosted.org`), pinned by hash, and the local embedding model from Hugging Face (`huggingface.co` and its CDN hosts).
 - **After that, no network of its own.** Every remember and recall ran with all outbound connections blocked.
@@ -89,8 +91,8 @@ Everything else:
 - Your source code, except the portions sent to your chosen model provider as context
 - Conversation history and session state, stored in local files
 - Configuration and credentials, stored locally
-- Long-term memory, when on: the knowledge graph and its provenance ledger, in local files
-- The audit log: model calls, tool runs, permission decisions, installs and policy refusals, with no prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
+- Long-term memory, when on (from the next release): the knowledge graph and its provenance ledger, in local files
+- The audit log: model calls and share uploads (v1.18.39); tool runs, permission decisions, installs and policy refusals from the next release. No prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
 
 ### Touches Lunos-operated infrastructure
 
@@ -256,6 +258,8 @@ Full reference, including the audit log format and how to opt into configurable 
 Each is an EU-incorporated company processing in the EU. Per-provider detail, and what "EU" rests on in each case, is in [Model provider jurisdictions](../provider-jurisdictions.md).
 
 ### Organisation policy: settings developers can't change
+
+**From the next release; not in v1.18.39.**
 
 To set company-wide settings and stop developers turning them off, put a policy file in a system
 location only administrators can write: `/etc/lunos/managed.json` (Linux),
