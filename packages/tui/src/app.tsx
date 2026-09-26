@@ -1,4 +1,5 @@
 import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
+import { animationsEnabled } from "./util/motion"
 import { DialogArtifacts } from "./component/dialog-artifacts"
 import { DialogBackground } from "./component/dialog-background"
 import { registerOpencodeSpinner } from "./component/register-spinner"
@@ -923,10 +924,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       },
       {
         name: "app.toggle.animations",
-        title: kv.get("animations_enabled", true) ? "Disable animations" : "Enable animations",
+        title:
+          tuiConfig.reduced_motion === true
+            ? "Animations are off (reduced_motion in config)"
+            : animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled"))
+              ? "Disable animations"
+              : "Enable animations",
         category: "System",
         run: () => {
-          kv.set("animations_enabled", !kv.get("animations_enabled", true))
+          if (tuiConfig.reduced_motion !== true)
+            kv.set("animations_enabled", !animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled")))
           dialog.clear()
         },
       },

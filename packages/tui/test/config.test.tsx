@@ -164,3 +164,9 @@ test("question dismissal guards decode through Info and resolve to defaults (XCO
   expect(() => decodeInfo({ question: { dismiss_window: -1 } })).toThrow()
   expect(() => decodeInfo({ question: { undo_window: 1.5 } })).toThrow()
 })
+
+test("reduced_motion decodes through Info and survives resolve (XCOD-107)", () => {
+  expect(resolve(decodeInfo({ reduced_motion: true }), { terminalSuspend: true }).reduced_motion).toBe(true)
+  expect(resolve(decodeInfo({}), { terminalSuspend: true }).reduced_motion).toBeUndefined()
+  expect(() => decodeInfo({ reduced_motion: "yes" })).toThrow()
+})

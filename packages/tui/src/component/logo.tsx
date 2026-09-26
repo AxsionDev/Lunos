@@ -1,4 +1,5 @@
 import { RGBA, TextAttributes } from "@opentui/core"
+import { useAnimationsEnabled } from "../context/motion"
 import { createMemo, For } from "solid-js"
 import { tint, useTheme } from "../context/theme"
 import { useKV } from "../context/kv"
@@ -26,8 +27,7 @@ const WATER_SIDE_REMAINDER = splash.waterWidth - splash.reflectionWidth - WATER_
 
 export function Logo() {
   const { theme } = useTheme()
-  const kv = useKV()
-  const animationsEnabled = createMemo(() => kv.get("animations_enabled", true))
+  const animationsEnabled = useAnimationsEnabled()
   const reflectionAlpha = createPulse(animationsEnabled)
   const glow = createMemo(() => tint(theme.background, MOON_COLOR, 0.12))
 
