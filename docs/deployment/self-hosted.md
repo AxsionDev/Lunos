@@ -4,6 +4,8 @@ For procurement, security and compliance reviewers evaluating Lunos, and for the
 
 Written to be read without any familiarity with the codebase. It states what Lunos is, exactly where data goes, what the EU-sovereignty claim does and does not cover, and how to deploy it under a data-residency policy.
 
+The rest of the reviewer documentation (security overview and threat model, supply chain, CRA readiness, and pre-filled CAIQ answers) is in the [Trust pack](../trust/README.md).
+
 ---
 
 ## 1. What Lunos is
