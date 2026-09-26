@@ -1655,6 +1655,20 @@ export type ServerConfig = {
   cors?: Array<string>
 }
 
+export type MemoryConfig = {
+  enabled?: boolean
+  scope?: Array<"project" | "user">
+  model?: string
+  embedding?: string
+  retrieval?: {
+    max_tokens?: number
+  }
+  limits?: {
+    max_facts?: number
+    max_fact_chars?: number
+  }
+}
+
 export type SubagentConfig = {
   background?: boolean
   model?: string
@@ -1938,6 +1952,7 @@ export type Config = {
       otlp?: string
     }
   }
+  memory?: MemoryConfig
   residency?: ConfigV2Residency
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal

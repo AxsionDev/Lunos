@@ -19,6 +19,7 @@ import { ConfigSkillsV1 } from "./skills"
 import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
 import { ConfigSubagent } from "../../config/subagent"
+import { ConfigMemory } from "../../config/memory"
 
 export type Layout = ConfigLayoutV1.Layout
 
@@ -86,6 +87,9 @@ export const Info = Schema.Struct({
       ),
     }),
   ),
+  memory: Schema.optional(ConfigMemory.Info).annotate({
+    description: "Graph-based long-term memory, off by default",
+  }),
   residency: Schema.optional(ConfigResidency.Info).annotate({
     description:
       "Data-residency policy restricting which provider jurisdictions this deployment may use, with an audit log of outbound model calls",

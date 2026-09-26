@@ -2,6 +2,8 @@
 
 **Status:** decision document. No code is built by this spike. **Recommendation: defer,** and ship the zero-build convention in §2 as documentation now. §6 gives the reasoning. The build / don't build / defer call is Petar's and is recorded on XCOD-85.
 
+> **Superseded by the build decision (XCOD-94, 2026-09-25):** Petar chose to build graph-based memory on Cognee, overriding §6. The §3 sovereignty constraints and §5 prompt-injection bounds still apply. How the build meets them is in §7 below. §1–§6 are kept as the spike's record.
+
 Checked against `origin/dev` on 2026-09-24.
 
 ## What exists today
@@ -86,3 +88,50 @@ Until then, memory written by people (shape B, today) carries no new risk. It's 
 - **Don't build:** a structured or hosted store (shape C), at any point, under the current positioning.
 
 If the decision is **build**, the implementation story to create from this doc covers: the memory write tool with §5 bounds 1–5, `/memory` in the TUI, docs, and a real-run test that a written memory is loaded in the next session and that a memory derived from `webfetch` output is refused.
+
+## 7. Build (XCOD-94)
+
+Code: `packages/opencode/src/memory/`. Everything below applies only when memory is on. It is off by default.
+
+### Engine and how Lunos runs it
+
+- **Cognee 1.6.1** (Apache-2.0, a Berlin company) runs in a Python sidecar, `memory/sidecar.py`. `uv` runs it from `sidecar.py.lock`, which pins 183 packages with hashes; `uv run --locked` refuses a stale lock. `uv` and Python 3.10–3.13 are **prerequisites**, never bundled, and uv's own Python download is off (`UV_PYTHON_DOWNLOADS=never`). Without them, memory refuses to start and says why.
+- **Deviation from the ticket:** the ticket suggested Cognee's own MCP server (`cognee-mcp`). Lunos ships its own 100-line sidecar on the Cognee library instead, for three reasons:
+  1. `cognee-mcp` can only forget whole datasets, while the review surface needs per-fact forget.
+  2. It pulls in the Neo4j and Postgres extras.
+  3. Its tool wrapper would be one more thing to audit.
+- **Private client, no model access to the sidecar.** Memory talks to the sidecar over its own MCP client. The sidecar is not registered with the MCP service, so its tools are never offered to the model. Only Lunos's memory tools reach it, after their own checks.
+- **The model comes back through Lunos (MCP sampling).** Cognee is set to `LLM_PROVIDER=mcp-sampling`. Its extraction calls come back to Lunos, which answers them with the model resolved from `memory.model`, through the normal model path. That keeps the residency hook and audit log in place, and no API key is handed to the sidecar. Only the memory client grants `sampling`. Other MCP servers still don't get it, and the sidecar can't choose the model.
+- **The sidecar's environment is an allow-list** (`PATH`, `HOME`, temp and proxy variables), so provider keys and tokens never reach Python.
+- **Settings pinned by Lunos:**
+  - `GRAPH_EXTRACTOR=llm`: without it, Cognee falls back to a "GLiNER demo" extractor that downloads about 200 MB of PyTorch and a model at first use, and whose full version is enterprise-licensed.
+  - `STRUCTURED_OUTPUT_FRAMEWORK=instructor`: the default `litellm_native` path ignores sampling.
+  - `GLINER_AUTO_INSTALL=false`
+  - `COGNEE_SKIP_CONNECTION_TEST=true`: the pre-check doesn't know sampling.
+  - `TELEMETRY_DISABLED=1`
+  - `LITELLM_LOCAL_MODEL_COST_MAP=True`
+  - Local `fastembed` embeddings (`all-MiniLM-L6-v2`, 384 dimensions).
+
+### Where data lives
+
+- Project memory: `.opencode/memory/graph/`, with a `.gitignore` of `*` written into it.
+- User memory: `memory/user/` in the Lunos data directory.
+- The embedding model: `memory/models/` in the data directory.
+- uv's package cache stays in uv's default cache directory (`UV_CACHE_DIR` moves it).
+- `facts.jsonl` in each store is Lunos's provenance ledger: every fact's text, engine ids and provenance. Listing and export read only this file. Recall drops any engine result the ledger doesn't know, so a fact with no provenance is never shown.
+
+### Network: measured 2026-09-26 on macOS
+
+The measurement was the sidecar end-to-end test: remember with extraction through sampling, recall, forget, recall again. Direct outbound connections were denied at the OS (`sandbox-exec`), except to a logging CONNECT proxy.
+
+| Run                                                     | Hosts contacted                                                         | Why                                                   |
+| ------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
+| First start, cold caches                                | `pypi.org`, `files.pythonhosted.org`                                    | uv installs the locked packages                       |
+|                                                         | `huggingface.co`, `cas-server.xethub.hf.co`, `us.aws.cdn.hf.co`         | fastembed downloads the embedding model (about 87 MB) |
+| Every later start and every remember, recall and forget | **none**: the same test passes with **all** outbound connections denied |                                                       |
+
+Extraction model calls go through Lunos (sampling), so they appear as ordinary model calls in the audit log, under the residency policy. Admins can pre-seed the uv cache and `memory/models/` to avoid the first-start downloads.
+
+### Forget
+
+`forget` removes the fact's data item, plus the graph nodes and edges that only it produced. The end-to-end test checks this: after forgetting "the billing service owns the invoices table", neither the facts nor the graph context mention the billing service. Nodes shared with other facts, such as a generic "table" entity, stay.
