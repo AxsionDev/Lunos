@@ -131,6 +131,17 @@ const layer = Layer.effect(
           question: "deny",
           plan_enter: "deny",
           plan_exit: "deny",
+          // XCOD-94: a person approves every fact before it enters long-term memory. The model may
+          // not write memory through files either: notes in .opencode/memory/ become trusted facts,
+          // so editing them asks, and the stored graph and its provenance ledger are off limits.
+          // One "edit" rule covers edit, write and apply_patch. Shell commands can still write
+          // files; the rules doc says so.
+          memory: "ask",
+          edit: {
+            "*": "allow",
+            [path.join(".opencode", "memory", "*")]: "ask",
+            [path.join(".opencode", "memory", "graph", "*")]: "deny",
+          },
           // mirrors github.com/github/gitignore Node.gitignore pattern for .env files
           read: {
             "*": "allow",
