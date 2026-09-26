@@ -94,4 +94,30 @@ describe("Audit writer (XCOD-103)", () => {
     expect(await Audit.verify(file)).toEqual({ ok: true, lines: 50, files: 1 })
     expect((await readdir(path.dirname(file))).filter((name) => name.endsWith(".lock"))).toEqual([])
   })
+
+  test("the last line is read from the end, whatever the file size or line length", async () => {
+    const file = await tmp()
+    const long = "x".repeat(200 * 1024)
+    await writeFile(file, `${JSON.stringify({ n: 1 })}\n${JSON.stringify({ n: 2, pad: long })}\n`)
+    expect(JSON.parse(Audit.lastLine(file)!).n).toBe(2)
+    await writeFile(file, Array.from({ length: 50_000 }, (_, i) => JSON.stringify({ n: i })).join("\n") + "\n")
+    expect(JSON.parse(Audit.lastLine(file)!).n).toBe(49_999)
+    await writeFile(file, "")
+    expect(Audit.lastLine(file)).toBeUndefined()
+    expect(Audit.lastLine(file + ".missing")).toBeUndefined()
+  })
+
+  test("an event on a large log reads a tail, not the whole file", async () => {
+    const file = await tmp()
+    for (let i = 0; i < 3; i++) await Audit.write({ file }, "tool.run", { tool: "bash", command: String(i) })
+    const filler = (await readFile(file, "utf8")).split("\n").filter(Boolean).at(-1)!
+    // Grow the log to ~9 MB of unchained filler lines, then chain one more real line after them.
+    await writeFile(file, (await readFile(file, "utf8")) + (filler + "\n").repeat(40_000))
+    const started = performance.now()
+    await Audit.write({ file }, "tool.run", { tool: "bash", command: "after" })
+    const elapsed = performance.now() - started
+    const last = JSON.parse(Audit.lastLine(file)!)
+    expect(last).toMatchObject({ command: "after", prev: Audit.hashLine(filler) })
+    expect(elapsed).toBeLessThan(50)
+  })
 })
