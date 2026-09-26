@@ -84,7 +84,7 @@ Everything else:
 - Your source code, except the portions sent to your chosen model provider as context
 - Conversation history and session state, stored in local files
 - Configuration and credentials, stored locally
-- The audit log: model calls, tool runs, permission decisions, installs and policy refusals, with no prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
+- The audit log: model calls and share uploads (v1.18.39); tool runs, permission decisions, installs and policy refusals from the next release. No prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
 
 ### Touches Lunos-operated infrastructure
 
@@ -250,6 +250,8 @@ Full reference, including the audit log format and how to opt into configurable 
 Each is an EU-incorporated company processing in the EU. Per-provider detail, and what "EU" rests on in each case, is in [Model provider jurisdictions](../provider-jurisdictions.md).
 
 ### Organisation policy: settings developers can't change
+
+**From the next release; not in v1.18.39.**
 
 To set company-wide settings and stop developers turning them off, put a policy file in a system
 location only administrators can write: `/etc/lunos/managed.json` (Linux),
