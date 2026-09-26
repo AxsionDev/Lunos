@@ -882,3 +882,19 @@ it.instance(
     },
   },
 )
+
+// XCOD-94: by default a person approves every fact before it enters long-term memory, and the
+// model can't write memory through files instead: editing notes asks, the stored graph is denied.
+it.instance("build asks before memory_remember and guards memory files from edits", () =>
+  Effect.gen(function* () {
+    const build = yield* load((svc) => svc.get("build"))
+    expect(
+      Permission.evaluate("memory", "The billing service owns the invoices table.", build!.permission).action,
+    ).toBe("ask")
+    expect(Permission.evaluate("edit", "src/index.ts", build!.permission).action).toBe("allow")
+    expect(Permission.evaluate("edit", ".opencode/memory/team.md", build!.permission).action).toBe("ask")
+    expect(Permission.evaluate("edit", ".opencode/memory/graph/facts.jsonl", build!.permission).action).toBe("deny")
+    // apply_patch and write are checked under the same "edit" permission.
+    expect(Permission.disabled(["memory_remember", "memory_search"], build!.permission).size).toBe(0)
+  }),
+)

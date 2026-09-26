@@ -171,6 +171,8 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
   - anything that looks like a key, token or password
 - **Recalling.** Relevant facts are added to your message in a `<memory>` block, each with where and when it was learned, capped at `retrieval.max_tokens`. The agent can also look things up with `memory_search`.
 - **Your notes.** Paragraphs in `.opencode/memory/*.md` are part of project memory, with no approval needed. When you edit or delete one, memory follows.
+  - The agent's file edits in `.opencode/memory/` ask first, and edits to the stored graph are refused by default. This stops the agent from writing memory through a file instead of the tool.
+  - Shell commands can still write files, so review changes to that folder like any other change.
 - **Which model.** `memory.model` picks the model that extracts facts and relationships: `"small"` (your `small_model`, the default), `"inherit"` (the main model) or `"provider/model"`. It runs through your normal provider setup and data-residency policy. If the policy denies it, memory doesn't start and the error names `memory.model`.
 - **Embeddings** are computed locally (`"local"`). The embedding model (about 87 MB) is downloaded once, from Hugging Face.
 - **Where it's stored.**
