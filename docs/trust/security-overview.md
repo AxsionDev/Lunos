@@ -115,9 +115,34 @@ model provider like any other context. Keep secrets out of the files the agent w
 
 ### Memory
 
-**Planned.** Long-term memory (XCOD-94) does not exist in any release. When it does, it will be off
-by default. Until then, the only cross-session context is the instruction files the user writes
-(`AGENTS.md` and similar).
+**Next release.** Long-term memory ([rules](../../packages/web/src/content/docs/rules.mdx), design in
+[`specs/memory-layer.md` §7](../../packages/opencode/specs/memory-layer.md)) keeps facts across
+sessions. A stored fact is a standing prompt-injection candidate for every later session.
+
+**Mitigated by:**
+
+- **Off by default.** It is controlled by `memory.enabled`, `LUNOS_DISABLE_MEMORY=1`, `/memory off`,
+  and a per-agent `memory` permission. When off, no memory process starts, no files are written and
+  no memory tools are offered (`packages/opencode/src/memory/switch.ts`).
+- **A person approves every fact** (`memory` permission, `ask` by default). The model can't write
+  memory through files instead: edits under `.opencode/memory/` ask, and the stored graph is denied
+  (`packages/opencode/src/agent/agent.ts`).
+- **Outside content is refused.** Nothing is remembered in a turn that used `webfetch`,
+  `websearch`, an MCP resource or a read outside the project. Key-shaped strings and `{env:}` /
+  `{file:}` substitutions are also refused (`packages/opencode/src/memory/guard.ts`).
+- **Every fact carries provenance** (session, agent, source, date). Recall shows it, and presents
+  memory as reference context, not instructions. Facts can be reviewed, exported, forgotten and
+  purged (`lunos memory`, TUI `/memory`).
+- **Residency and egress.** Fact extraction uses the configured `memory.model` through Lunos's
+  normal model path, so the residency policy applies and memory refuses to start if the policy
+  denies that model. Embeddings are computed locally. The memory process gets no API keys, and its
+  Python packages are pinned by hash. Writes and forgets are recorded in the audit log, never with
+  the fact's text.
+
+**Not mitigated:** shell commands can still write files in `.opencode/memory/`, so review changes to
+that folder. Hand-written notes there are trusted by design. The first start downloads packages from
+PyPI and an embedding model from Hugging Face (pre-seedable). Memory needs uv and Python 3.10–3.13,
+which Lunos does not install.
 
 ### The audit log itself
 
