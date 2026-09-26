@@ -20788,6 +20788,52 @@
         "additionalProperties": false,
         "description": "Server configuration for opencode serve and web commands"
       },
+      "MemoryConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["project", "user"]
+            }
+          },
+          "model": {
+            "type": "string"
+          },
+          "embedding": {
+            "type": "string"
+          },
+          "retrieval": {
+            "type": "object",
+            "properties": {
+              "max_tokens": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "max_facts": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "max_fact_chars": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
       "SubagentConfig": {
         "type": "object",
         "properties": {
@@ -21530,6 +21576,9 @@
               }
             },
             "additionalProperties": false
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryConfig"
           },
           "residency": {
             "$ref": "#/components/schemas/ConfigV2Residency"

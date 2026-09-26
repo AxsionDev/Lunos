@@ -24,6 +24,7 @@ import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
 import { ConfigResidency } from "./config/residency"
 import { ConfigSubagent } from "./config/subagent"
+import { ConfigMemory } from "./config/memory"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
 import { ConfigV1 } from "./v1/config/config"
@@ -112,6 +113,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(Schema.optional),
   subagent: ConfigSubagent.Info.pipe(Schema.optional).annotate({
     description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
+  }),
+  memory: ConfigMemory.Info.pipe(Schema.optional).annotate({
+    description: "Graph-based long-term memory, off by default",
   }),
   residency: ConfigResidency.Info.pipe(Schema.optional).annotate({
     description:
