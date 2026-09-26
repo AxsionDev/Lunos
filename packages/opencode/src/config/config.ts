@@ -36,6 +36,8 @@ import { ConfigVariable } from "./variable"
 import { ConfigV2Compat } from "./v2-compat"
 import { Npm } from "@opencode-ai/core/npm"
 import { withTransientReadRetry } from "@/util/effect-http-client"
+import { ConfigPolicy } from "./policy"
+import { AuditLog } from "@/audit/log"
 
 // Custom merge function that concatenates array fields instead of replacing them
 // Keep remeda's deep conditional merge type out of hot config-loading paths; TS profiling showed it dominates here.
@@ -115,8 +117,12 @@ type Info = ConfigV1.Info & {
   plugin_origins?: ConfigPlugin.Origin[]
 }
 
+/** Which config layer last set a top-level key (XCOD-102, `lunos debug config --sources`). */
+export type Origin = { layer: "managed" | "global" | "project" | "env" | "remote"; source: string }
+
 type State = {
   config: Info
+  origins: Record<string, Origin>
   directories: string[]
   deps: Fiber.Fiber<void>[]
   consoleState: ConsoleState
@@ -125,6 +131,7 @@ type State = {
 export interface Interface {
   readonly get: () => Effect.Effect<Info>
   readonly getGlobal: () => Effect.Effect<Info>
+  readonly origins: () => Effect.Effect<Record<string, Origin>>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
   readonly update: (config: Info) => Effect.Effect<void>
   readonly updateGlobal: (config: Info) => Effect.Effect<{ info: Info; changed: boolean }>
@@ -257,6 +264,40 @@ const layer = Layer.effect(
       return yield* loadConfig(text, { path: filepath }, env)
     })
 
+    // XCOD-102: the managed layers, in precedence order: the system directory, then the MDM profile.
+    const loadManaged = Effect.fnUntraced(function* () {
+      const layers: { source: string; info: Info }[] = []
+      const location = ConfigManaged.managedConfigLocation()
+      if (existsSync(location.dir)) {
+        if (location.legacy)
+          yield* Effect.logWarning(
+            `managed config in ${location.dir} is deprecated; move it to ${ConfigManaged.systemManagedConfigDir()}`,
+          )
+        for (const file of ["managed.json", "opencode.json", "opencode.jsonc"]) {
+          const source = path.join(location.dir, file)
+          layers.push({ source, info: yield* loadFile(source) })
+        }
+      }
+      // macOS managed preferences (.mobileconfig deployed via MDM) override everything
+      const plist = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
+      if (plist) {
+        if (plist.legacy)
+          yield* Effect.logWarning(
+            `managed preferences domain ${ConfigManaged.LEGACY_PLIST_DOMAIN} is deprecated; deploy ${ConfigManaged.MANAGED_PLIST_DOMAIN} instead`,
+          )
+        layers.push({
+          source: plist.source,
+          info: yield* loadConfig(plist.text, { dir: path.dirname(plist.source), source: plist.source }),
+        })
+      }
+      const doc = layers.reduce(
+        (acc, layer) => mergeConfigConcatArrays(acc, ConfigPolicy.strip(layer.info)),
+        {} as Info,
+      )
+      const locked = ConfigPolicy.union(...layers.map((layer) => ConfigPolicy.lockList(layer.info)))
+      return { layers, doc, locked }
+    })
+
     const loadGlobal = Effect.fnUntraced(function* (env?: Record<string, string>) {
       let result: Info = {}
       // Seed the default global config with the schema for editor completion, but avoid writing when the user
@@ -302,8 +343,16 @@ const layer = Layer.effect(
       Duration.infinity,
     )
 
+    // Global config alone, except that locked keys already hold the managed value: the upgrade
+    // check reads this, and a locked `autoupdate` must reach it (XCOD-102).
     const getGlobal = Effect.fn("Config.getGlobal")(function* () {
-      return yield* cachedGlobal
+      const global = yield* cachedGlobal
+      const managed = yield* loadManaged().pipe(Effect.orElseSucceed(() => ({ doc: {} as Info, locked: [] })))
+      const result = managed.locked.length ? ConfigPolicy.apply(global, managed.doc, managed.locked) : global
+      // Commands that never load a project (the upgrade check) still need the trail on; a later
+      // project load re-activates with the full config.
+      if (!AuditLog.current()) AuditLog.activate(AuditLog.resolve(result))
+      return result
     })
 
     const ensureGitignore = Effect.fn("Config.ensureGitignore")(function* (dir: string) {
@@ -362,10 +411,23 @@ const layer = Layer.effect(
           result.plugin_origins = plugins
         })
 
-        const merge = (source: string, next: Info, kind?: ConfigPlugin.Scope) => {
-          result = mergeConfigConcatArrays(result, next)
+        // XCOD-102: `$locked` only counts in managed config; any other layer's copy is dropped.
+        const origins: Record<string, Origin> = {}
+        const merge = (source: string, next: Info, kind?: ConfigPlugin.Scope, layer?: Origin["layer"]) => {
+          const stripped = ConfigPolicy.strip(next)
+          const from: Origin["layer"] =
+            layer ??
+            (source === Flag.OPENCODE_CONFIG ||
+            (Flag.OPENCODE_CONFIG_DIR && source.startsWith(Flag.OPENCODE_CONFIG_DIR))
+              ? "env"
+              : kind === "global"
+                ? "global"
+                : "project")
+          for (const key of Object.keys(stripped)) origins[key] = { layer: from, source }
+          result = mergeConfigConcatArrays(result, stripped)
           return mergePluginOrigins(source, next.plugin, kind)
         }
+        const mergeManaged = (source: string, next: Info) => merge(source, next, "global", "managed")
 
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
@@ -404,7 +466,7 @@ const layer = Layer.effect(
               },
               authEnv,
             )
-            yield* merge(source, next, "global")
+            yield* merge(source, next, "global", "remote")
             yield* Effect.logDebug("loaded remote config from well-known", { url })
           }
         }
@@ -506,7 +568,7 @@ const layer = Layer.effect(
             dir: ctx.directory,
             source,
           })
-          yield* merge(source, next, "local")
+          yield* merge(source, next, "local", "env")
           yield* Effect.logDebug("loaded custom config from OPENCODE_CONFIG_CONTENT")
         }
 
@@ -536,7 +598,7 @@ const layer = Layer.effect(
               for (const providerID of Object.keys(next.provider ?? {})) {
                 consoleManagedProviders.add(providerID)
               }
-              yield* merge(source, next, "global")
+              yield* merge(source, next, "global", "remote")
             }
           }).pipe(
             Effect.withSpan("Config.loadActiveOrgConfig"),
@@ -548,25 +610,8 @@ const layer = Layer.effect(
           )
         }
 
-        const managedDir = ConfigManaged.managedConfigDir()
-        if (existsSync(managedDir)) {
-          for (const file of ["opencode.json", "opencode.jsonc"]) {
-            const source = path.join(managedDir, file)
-            yield* merge(source, yield* loadFile(source), "global")
-          }
-        }
-
-        // macOS managed preferences (.mobileconfig deployed via MDM) override everything
-        const managed = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
-        if (managed) {
-          result = mergeConfigConcatArrays(
-            result,
-            yield* loadConfig(managed.text, {
-              dir: path.dirname(managed.source),
-              source: managed.source,
-            }),
-          )
-        }
+        const managedLayers = yield* loadManaged()
+        for (const layer of managedLayers.layers) yield* mergeManaged(layer.source, layer.info)
 
         for (const [name, mode] of Object.entries(result.mode ?? {})) {
           result.agent = mergeDeep(result.agent ?? {}, {
@@ -580,6 +625,7 @@ const layer = Layer.effect(
         if (Flag.OPENCODE_PERMISSION) {
           try {
             result.permission = mergeDeep(result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+            origins.permission = { layer: "env", source: "OPENCODE_PERMISSION" }
           } catch (err) {
             yield* Effect.logWarning("OPENCODE_PERMISSION contains invalid JSON, skipping", { err })
           }
@@ -611,6 +657,22 @@ const layer = Layer.effect(
         if (result.autoshare === true && !result.share) {
           result.share = "auto"
         }
+        // XCOD-102: locked keys hold exactly the managed value. Runs after every layer, after
+        // OPENCODE_PERMISSION and after the autoshare mapping above, so nothing later reopens them.
+        const locked = managedLayers.locked
+        const unknownLocks = ConfigPolicy.unknownKeys(locked)
+        if (unknownLocks.length)
+          yield* Effect.logWarning(`$locked lists keys this version doesn't know: ${unknownLocks.join(", ")}`)
+        result = ConfigPolicy.apply(result, managedLayers.doc, locked)
+        for (const key of locked) {
+          const top = key.split(".")[0]
+          const layer = managedLayers.layers.findLast((item) => ConfigPolicy.get(item.info, key) !== undefined)
+          origins[top] = { layer: "managed", source: layer?.source ?? "managed policy (unset: default)" }
+        }
+
+        // XCOD-103: the audit trail follows the fully resolved (and locked) config.
+        AuditLog.activate(AuditLog.resolve(result))
+
         // Lunos: sharing uploads the full transcript to a third-party host, so it is off
         // unless a config layer turns it on. Upstream opencode behaves as "manual".
         result.share ??= "disabled"
@@ -624,6 +686,7 @@ const layer = Layer.effect(
 
         return {
           config: result,
+          origins,
           directories,
           deps,
           consoleState: {
@@ -650,6 +713,10 @@ const layer = Layer.effect(
       return yield* InstanceState.use(state, (s) => s.directories)
     })
 
+    const origins = Effect.fn("Config.origins")(function* () {
+      return yield* InstanceState.use(state, (s) => s.origins)
+    })
+
     const getConsoleState = Effect.fn("Config.getConsoleState")(function* () {
       return yield* InstanceState.use(state, (s) => s.consoleState)
     })
@@ -660,7 +727,21 @@ const layer = Layer.effect(
       )
     })
 
-    const update = Effect.fn("Config.update")(function* (config: Info) {
+    // XCOD-102: a write can't change a locked key (the lock pass would ignore it anyway), and must
+    // never copy the organisation's `$locked` list into a user or project file.
+    const withoutLocked = Effect.fnUntraced(function* (config: Info, via: string) {
+      const { locked } = yield* loadManaged().pipe(Effect.orElseSucceed(() => ({ locked: [] as string[] })))
+      let next = ConfigPolicy.strip(config)
+      for (const key of locked) {
+        if (ConfigPolicy.get(next, key) === undefined) continue
+        yield* ConfigPolicy.refused(key, via)
+        next = ConfigPolicy.omit(next, key)
+      }
+      return next
+    })
+
+    const update = Effect.fn("Config.update")(function* (input: Info) {
+      const config = yield* withoutLocked(input, "project config update")
       const dir = yield* InstanceState.directory
       const file = path.join(dir, "config.json")
       const existing = yield* loadFile(file)
@@ -678,7 +759,8 @@ const layer = Layer.effect(
       yield* invalidateGlobal
     })
 
-    const updateGlobal = Effect.fn("Config.updateGlobal")(function* (config: Info) {
+    const updateGlobal = Effect.fn("Config.updateGlobal")(function* (input: Info) {
+      const config = yield* withoutLocked(input, "global config update")
       const file = globalConfigFile()
       const before = (yield* readConfigFile(file)) ?? "{}"
       const patch = writableGlobal(config)
@@ -708,6 +790,7 @@ const layer = Layer.effect(
       get,
       getGlobal,
       getConsoleState,
+      origins,
       update,
       updateGlobal,
       invalidate,

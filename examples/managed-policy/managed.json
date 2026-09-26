@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "$locked": ["residency", "share", "enabled_providers", "marketplace_default", "marketplace_allow", "autoupdate"],
+  "residency": {
+    "allow": ["eu"],
+    "audit": true
+  },
+  "share": "disabled",
+  "enabled_providers": ["mistral"],
+  "marketplace_default": true,
+  "marketplace_allow": ["https://lunos.tech/marketplace.json"],
+  "autoupdate": "notify"
+}

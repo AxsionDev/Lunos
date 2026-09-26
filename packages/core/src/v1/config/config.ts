@@ -36,6 +36,10 @@ export const Info = Schema.Struct({
   $schema: Schema.optional(Schema.String).annotate({
     description: "JSON schema reference for configuration validation",
   }),
+  $locked: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description:
+      "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile)",
+  }),
   shell: Schema.optional(Schema.String).annotate({ description: "Default shell to use for terminal and bash tool" }),
   logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
   server: Schema.optional(ConfigServerV1.Server).annotate({
@@ -50,6 +54,38 @@ export const Info = Schema.Struct({
   }),
   // Declared here as well as in the v2 schema: without it, the live config path strips the key
   // and the v1 provider (which enforces it for sessions) never sees a policy.
+  audit: Schema.optional(
+    Schema.Struct({
+      enabled: Schema.optional(Schema.Boolean).annotate({
+        description:
+          "Write the organisation audit trail: model calls, tool runs, permission decisions, MCP connections, marketplace installs, policy refusals and upgrades. Also on whenever a residency policy is set with audit on",
+      }),
+      path: Schema.optional(Schema.String).annotate({
+        description:
+          "Audit log path. Takes precedence over residency.auditPath. Default: residency-egress.log in the Lunos log directory",
+      }),
+      redact: Schema.optional(Schema.Array(Schema.String)).annotate({
+        description:
+          "Regular expressions whose matches are masked in recorded paths and command lines, on top of the built-in secret patterns",
+      }),
+      max_bytes: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))).annotate({
+        description: "Rotate the log when it reaches this size (default 10 MB)",
+      }),
+      max_age_days: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))).annotate({
+        description: "Delete rotated log files older than this (default 90)",
+      }),
+      forward: Schema.optional(
+        Schema.Struct({
+          syslog: Schema.optional(Schema.String).annotate({
+            description: "Forward every line to a syslog receiver, e.g. udp://siem.internal:514",
+          }),
+          otlp: Schema.optional(Schema.String).annotate({
+            description: "Forward every line as an OTLP log record, e.g. https://collector.internal:4318",
+          }),
+        }),
+      ),
+    }),
+  ),
   residency: Schema.optional(ConfigResidency.Info).annotate({
     description:
       "Data-residency policy restricting which provider jurisdictions this deployment may use, with an audit log of outbound model calls",
@@ -144,6 +180,16 @@ export const Info = Schema.Struct({
   tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
   attachment: Schema.optional(ConfigAttachmentV1.Info).annotate({
     description: "Attachment processing configuration, including image size limits and resizing behavior",
+  }),
+  marketplace: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description: "Marketplace sources (manifest URL, owner/repo or path) to list and install from",
+  }),
+  marketplace_default: Schema.optional(Schema.Boolean).annotate({
+    description: "Whether the built-in lunos-community marketplace is used (default: true)",
+  }),
+  marketplace_allow: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description:
+      "Organisation policy: the only marketplace sources that may be listed and installed from, when locked in managed config",
   }),
   enterprise: Schema.optional(
     Schema.Struct({ url: Schema.optional(Schema.String).annotate({ description: "Enterprise URL" }) }),

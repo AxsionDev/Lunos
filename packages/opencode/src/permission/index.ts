@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { AuditLog } from "@/audit/log"
 import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { InstanceState } from "@/effect/instance-state"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
@@ -73,6 +74,12 @@ const layer = Layer.effect(
         const rule = evaluate(request.permission, pattern, ruleset, approved)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
+          AuditLog.emit("permission.decision", {
+            session: request.sessionID,
+            permission: request.permission,
+            patterns: request.patterns,
+            decision: "denied by rule",
+          })
           return yield* new PermissionV1.DeniedError({
             ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
           })
@@ -97,6 +104,12 @@ const layer = Layer.effect(
 
       const deferred = yield* Deferred.make<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>()
       pending.set(id, { info, deferred })
+      AuditLog.emit("permission.decision", {
+        session: info.sessionID,
+        permission: info.permission,
+        patterns: info.patterns,
+        decision: "asked",
+      })
       yield* events.publish(Event.Asked, info)
       return yield* Effect.ensuring(
         Deferred.await(deferred),
@@ -112,6 +125,12 @@ const layer = Layer.effect(
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
       pending.delete(input.requestID)
+      AuditLog.emit("permission.decision", {
+        session: existing.info.sessionID,
+        permission: existing.info.permission,
+        patterns: existing.info.patterns,
+        decision: input.reply === "reject" ? "denied" : input.reply === "always" ? "allowed always" : "allowed once",
+      })
       yield* events.publish(Event.Replied, {
         sessionID: existing.info.sessionID,
         requestID: existing.info.id,

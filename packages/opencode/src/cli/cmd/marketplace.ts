@@ -1,4 +1,5 @@
 import { intro, log, outro, spinner } from "@clack/prompts"
+import { AuditLog } from "@/audit/log"
 import { Effect } from "effect"
 
 import { cmd } from "./cmd"
@@ -20,8 +21,11 @@ import {
   type MarketplaceCacheDeps,
   type MarketplaceCtx,
   type MarketplaceListDeps,
+  type MarketplacePolicy,
   type ResolvedMarketplace,
+  allowedSource,
 } from "../../marketplace/shared"
+import { ConfigPolicy } from "@/config/policy"
 import { errorMessage } from "../../util/error"
 import { describeContents } from "../../marketplace/content"
 import { Filesystem } from "@/util/filesystem"
@@ -50,6 +54,8 @@ export type MarketplaceDeps = {
   files: (dir: string, name: "opencode" | "tui") => string[]
   global: string
   cache: MarketplaceCacheDeps
+  /** Organisation policy from managed config (XCOD-102). Unset means no policy. */
+  policy?: () => Promise<MarketplacePolicy>
   /** Marketplaces already added in every scope, built-in included. Unset skips the name check. */
   added?: (ctx: MarketplaceCtx) => Promise<ResolvedMarketplace[]>
 }
@@ -75,6 +81,7 @@ const defaultMarketplaceDeps: MarketplaceDeps = {
   files: (dir, name) => ConfigPaths.fileInDirectory(dir, name),
   global: Global.Path.config,
   cache: defaultMarketplaceCacheDeps,
+  policy: defaultMarketplaceListDeps.policy,
   added: (ctx) => resolveAddedMarketplaces(ctx, defaultMarketplaceListDeps),
 }
 
@@ -83,6 +90,20 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
   const global = Boolean(input.global)
 
   return async (ctx: MarketplaceCtx) => {
+    // XCOD-102: refused before anything is fetched or written.
+    const policy = await dep.policy?.()
+    const lockedKey = ConfigPolicy.isLocked(policy?.locked, FIELD)
+      ? FIELD
+      : allowedSource(policy, source)
+        ? undefined
+        : "marketplace_allow"
+    if (lockedKey) {
+      await Effect.runPromise(ConfigPolicy.refused(lockedKey, `marketplace add ${source}`))
+      AuditLog.emit("marketplace.refused", { source, key: lockedKey, reason: ConfigPolicy.message(lockedKey) })
+      dep.log.error(`Not added: ${ConfigPolicy.message(lockedKey)}.`)
+      if (lockedKey !== FIELD) dep.log.info(`${source} is not on the allowed marketplace list.`)
+      return false
+    }
     const resolve = dep.spinner()
     resolve.start("Fetching and validating marketplace manifest...")
     const manifest = await dep.resolve(source).then(

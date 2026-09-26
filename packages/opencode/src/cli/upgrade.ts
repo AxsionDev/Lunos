@@ -1,4 +1,6 @@
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
+import { Effect } from "effect"
 import { AppRuntime } from "@/effect/app-runtime"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Installation } from "@/installation"
@@ -39,9 +41,20 @@ export async function cachedLatest(now = Date.now()): Promise<string | undefined
  * One stderr line, at most once a day, for plain CLI commands. Never stdout (piped output stays
  * clean) and never a prompt (these commands can run unattended).
  */
+/**
+ * `OPENCODE_DISABLE_AUTOUPDATE` / `LUNOS_DISABLE_AUTOUPDATE` switch update checks off, unless an
+ * organisation policy locks `autoupdate` (XCOD-102): then only the managed value counts.
+ */
+async function envDisables(config: { $locked?: ReadonlyArray<string> } | undefined) {
+  if (!Flag.OPENCODE_DISABLE_AUTOUPDATE) return false
+  if (!ConfigPolicy.isLocked(config?.$locked, "autoupdate")) return true
+  await Effect.runPromise(ConfigPolicy.refused("autoupdate", "OPENCODE_DISABLE_AUTOUPDATE")).catch(() => undefined)
+  return false
+}
+
 export async function notice(now = Date.now()) {
-  if (Flag.OPENCODE_DISABLE_AUTOUPDATE) return
   const config = await AppRuntime.runPromise(Config.Service.use((cfg) => cfg.getGlobal())).catch(() => undefined)
+  if (await envDisables(config)) return
   if (config?.autoupdate === false) return
   const latest = await cachedLatest(now)
   if (!latest || !semver.valid(InstallationVersion) || !semver.gt(latest, InstallationVersion)) return
@@ -67,7 +80,7 @@ export function updateAction(
 
 export async function upgrade() {
   const config = await AppRuntime.runPromise(Config.Service.use((cfg) => cfg.getGlobal()))
-  if (config.autoupdate === false || Flag.OPENCODE_DISABLE_AUTOUPDATE) return
+  if (config.autoupdate === false || (await envDisables(config))) return
   const method = await Installation.method()
   const latest = await cachedLatest()
   if (!latest) return

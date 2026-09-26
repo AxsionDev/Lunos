@@ -82,7 +82,7 @@ Everything else:
 - Your source code, except the portions sent to your chosen model provider as context
 - Conversation history and session state, stored in local files
 - Configuration and credentials, stored locally
-- The data-residency audit log (§5)
+- The audit log: model calls, tool runs, permission decisions, installs and policy refusals, with no prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
 
 ### Touches Lunos-operated infrastructure
 
@@ -246,6 +246,24 @@ Full reference, including the audit log format and how to opt into configurable 
 | Hetzner  | Germany | `HETZNER_API_KEY`  |
 
 Each is an EU-incorporated company processing in the EU. Per-provider detail, and what "EU" rests on in each case, is in [Model provider jurisdictions](../provider-jurisdictions.md).
+
+### Organisation policy: settings developers can't change
+
+To set company-wide settings and stop developers turning them off, put a policy file in a system
+location only administrators can write: `/etc/lunos/managed.json` (Linux),
+`/Library/Application Support/Lunos/managed.json` or an MDM profile in the `tech.lunos.managed`
+domain (macOS), or `%ProgramData%\Lunos\managed.json` (Windows). No server is involved.
+
+Keys listed under `$locked` take their value from the policy only. User and project config,
+environment variables such as `OPENCODE_AUTO_SHARE`, CLI flags such as `lunos run --share`, and
+in-session commands such as `/share` can't change them; each attempt says "_&lt;key&gt; is set by your
+organisation's policy_". A locked key the policy doesn't set falls back to the Lunos default.
+`marketplace_allow`, when locked, is the only list of marketplace sources that may be used; the
+built-in catalogue counts as one.
+
+A sample policy with a macOS profile and Windows and Linux deployment notes is in
+[`examples/managed-policy/`](../../examples/managed-policy/). To check a machine, run
+`lunos debug config --sources`: it shows which layer set each key and which are locked.
 
 ## 6. What you need to provide
 

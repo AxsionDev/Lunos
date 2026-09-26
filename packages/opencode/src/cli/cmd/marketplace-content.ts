@@ -1,4 +1,5 @@
 import * as prompts from "@clack/prompts"
+import { AuditLog } from "@/audit/log"
 import { Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Marketplace } from "@opencode-ai/core/marketplace"
@@ -69,6 +70,12 @@ export async function confirmAndInstall(item: ConfigItem, yes: boolean, localDir
   }
 
   await plan.apply()
+  AuditLog.emit("marketplace.install", {
+    kind: plan.kind,
+    name: plan.name,
+    marketplace: plan.marketplace,
+    path: plan.configPath,
+  })
   prompts.log.success(`${LABEL[plan.kind]} "${plan.name}" added to ${plan.configPath}`)
 }
 
@@ -167,7 +174,10 @@ export const MarketplaceInstallCommand = effectCmd({
         prompts.log.success(error.message)
         return undefined
       }
-      if (error instanceof MarketplaceRefusal) return error.message
+      if (error instanceof MarketplaceRefusal) {
+        AuditLog.emit("marketplace.refused", { name, kind, reason: error.message })
+        return error.message
+      }
       throw error
     }
 
@@ -220,6 +230,12 @@ export const MarketplaceInstallCommand = effectCmd({
       const ok = yield* Effect.promise(() =>
         createPlugTask({ mod: item.spec, global: !local, force: false })(marketplaceCtx),
       )
+      AuditLog.emit(ok ? "marketplace.install" : "marketplace.refused", {
+        kind: "plugin",
+        name: item.name,
+        marketplace: item.marketplace,
+        package: item.spec,
+      })
       if (!ok) process.exitCode = 1
       return
     }

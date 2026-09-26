@@ -384,6 +384,33 @@ it.effect("updates global config and omits empty shell key in json", () =>
   ),
 )
 
+// XCOD-102: a config write can't change a locked key or copy the org's lock list into user config.
+it.effect("a global config write drops locked keys and $locked", () =>
+  withGlobalConfig({ config: { model: "test/model" } }, ({ dir }) =>
+    Effect.gen(function* () {
+      yield* writeManagedSettingsEffect({ $locked: ["share"], share: "disabled" })
+      yield* Config.use.updateGlobal({ share: "auto", $locked: ["nothing"], username: "kept" })
+
+      const written = yield* FSUtil.use.readJson(path.join(dir, "opencode.json"))
+      expect(written).not.toHaveProperty("share")
+      expect(written).not.toHaveProperty("$locked")
+      expect(written).toMatchObject({ username: "kept", model: "test/model" })
+    }),
+  ),
+)
+
+it.effect("getGlobal holds a locked autoupdate at the managed value (the upgrade check reads it)", () =>
+  withGlobalConfig({ config: { autoupdate: true } }, () =>
+    Effect.gen(function* () {
+      yield* writeManagedSettingsEffect({ $locked: ["autoupdate"], autoupdate: "notify" })
+      yield* Config.use.invalidate()
+      const global = yield* Config.use.getGlobal()
+      expect(global.autoupdate).toBe("notify")
+      expect(global.$locked).toEqual(["autoupdate"])
+    }),
+  ),
+)
+
 it.effect("updates global config and omits empty shell key in jsonc", () =>
   withGlobalConfig({ config: { shell: "bash", model: "test/model" }, name: "opencode.jsonc" }, ({ dir }) =>
     Effect.gen(function* () {
@@ -945,6 +972,25 @@ it.instance("decodes the checked-in reference deployment config on the live path
   }),
 )
 
+// XCOD-102: the sample organisation policy decodes on the live path and holds against user config.
+it.instance(
+  "decodes the checked-in managed policy example as managed config, and its locks hold",
+  Effect.gen(function* () {
+    const policy = yield* Effect.promise(() =>
+      Bun.file(path.resolve(import.meta.dir, "../../../../examples/managed-policy/managed.json")).json(),
+    )
+    yield* writeManagedSettingsEffect(policy, "managed.json")
+    const config = yield* Config.use.get()
+    expect(config.residency).toEqual({ allow: ["eu"], audit: true })
+    expect(config.share).toBe("disabled")
+    expect(config.enabled_providers).toEqual(["mistral"])
+    expect(config.marketplace_allow).toEqual(["https://lunos.tech/marketplace.json"])
+    expect(config.autoupdate).toBe("notify")
+    expect(config.$locked).toEqual(policy.$locked)
+  }),
+  { config: { share: "auto", enabled_providers: ["openai"], residency: { allow: ["us"] }, autoupdate: true } },
+)
+
 // XCOD-82: every new subagent key survives the live config path (the XCOD-68 / XCOD-93 lesson).
 it.instance("keeps subagent model selection keys on the live config path", () =>
   Effect.gen(function* () {
@@ -1490,6 +1536,72 @@ it.instance("managed jsonc settings override managed json settings", () =>
 
     const config = yield* Config.use.get()
     expect(config.model).toBe("managed/jsonc")
+  }),
+)
+
+// XCOD-102: organisation policy with locked keys.
+it.instance(
+  "a locked key holds the managed value, replacing the whole subtree",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({
+      $locked: ["residency", "share"],
+      residency: { allow: ["eu"] },
+      share: "disabled",
+    })
+
+    const config = yield* Config.use.get()
+    // The project's audit: false and its extra "us" are gone, not merged in.
+    expect(config.residency).toEqual({ allow: ["eu"] })
+    expect(config.share).toBe("disabled")
+    expect(config.$locked).toEqual(["residency", "share"])
+  }),
+  { config: { residency: { allow: ["eu", "us"], audit: false }, share: "manual" } },
+)
+
+it.instance(
+  "keys that aren't locked keep their normal precedence",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["autoupdate"], autoupdate: "notify", model: "managed/model" })
+
+    const config = yield* Config.use.get()
+    expect(config.model).toBe("managed/model")
+    // Not locked, not set by managed config: the user's value stands.
+    expect(config.share).toBe("manual")
+  }),
+  { config: { share: "manual", model: "user/model" } },
+)
+
+it.instance(
+  "a locked key managed config doesn't set becomes unset, not the user's value",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["share", "autoupdate"] })
+
+    const config = yield* Config.use.get()
+    // Unset share falls back to Lunos's default; the deprecated autoshare can't sneak "auto" back.
+    expect(config.share).toBe("disabled")
+    expect(config.autoshare).toBeUndefined()
+    expect(config.autoupdate).toBeUndefined()
+  }),
+  { config: { share: "auto", autoshare: true, autoupdate: true } },
+)
+
+it.instance(
+  "$locked outside managed config is ignored",
+  Effect.gen(function* () {
+    const config = yield* Config.use.get()
+    expect(config.$locked).toBeUndefined()
+    expect(config.share).toBe("manual")
+  }),
+  { config: { $locked: ["share"], share: "manual" } },
+)
+
+it.instance("lock lists from several managed files are unioned", () =>
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["share"], share: "disabled" }, "managed.json")
+    yield* writeManagedSettingsEffect({ $locked: ["autoupdate"], autoupdate: "notify" })
+
+    const config = yield* Config.use.get()
+    expect([...(config.$locked ?? [])].sort()).toEqual(["autoupdate", "share"])
   }),
 )
 

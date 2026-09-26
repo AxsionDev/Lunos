@@ -8,6 +8,8 @@ import { Filesystem } from "@/util/filesystem"
 import { Marketplace } from "@opencode-ai/core/marketplace"
 import { patchDir } from "../plugin/install"
 import { errorMessage } from "../util/error"
+import { ConfigPolicy } from "@/config/policy"
+import { ConfigManaged } from "@/config/managed"
 
 export type SourceKind = "github" | "url" | "path"
 
@@ -22,6 +24,7 @@ export const FIELD = "marketplace"
 // config layer turns it off.
 export const DEFAULT_MARKETPLACE = "https://lunos.tech/marketplace.json"
 export const DEFAULT_FIELD = "marketplace_default"
+export const ALLOW_FIELD = "marketplace_allow"
 
 const MANIFEST_FILE = "marketplace.json"
 const GITHUB_SHORTHAND = /^[\w.-]+\/[\w.-]+$/
@@ -198,7 +201,38 @@ export type MarketplaceListDeps = {
   cache: MarketplaceCacheDeps
   /** Built-in marketplace added unless config disables it. Unset in tests that build their own deps. */
   builtin?: string
+  /** Organisation policy from managed config (XCOD-102). Unset means no policy. */
+  policy?: () => Promise<MarketplacePolicy>
 }
+
+// XCOD-102: what managed config says about marketplaces, and which of it is locked.
+export type MarketplacePolicy = {
+  locked: string[]
+  sources?: string[]
+  defaultOn?: boolean
+  allow?: string[]
+}
+
+export function marketplacePolicy(docs: readonly unknown[]): MarketplacePolicy {
+  const policy: MarketplacePolicy = { locked: ConfigPolicy.union(...docs.map(ConfigPolicy.lockList)) }
+  for (const doc of docs) {
+    const sources = ConfigPolicy.get(doc, FIELD)
+    const defaultOn = ConfigPolicy.get(doc, DEFAULT_FIELD)
+    const allow = ConfigPolicy.get(doc, ALLOW_FIELD)
+    if (Array.isArray(sources)) policy.sources = sources.filter((item) => typeof item === "string")
+    if (typeof defaultOn === "boolean") policy.defaultOn = defaultOn
+    if (Array.isArray(allow)) policy.allow = allow.filter((item) => typeof item === "string")
+  }
+  return policy
+}
+
+/** Whether a locked `marketplace_allow` list permits `source`. No locked list permits everything. */
+export function allowedSource(policy: MarketplacePolicy | undefined, source: string) {
+  if (!policy?.allow || !ConfigPolicy.isLocked(policy.locked, ALLOW_FIELD)) return true
+  return policy.allow.map(normalizeSource).includes(normalizeSource(source))
+}
+
+export const NOT_ALLOWED = "not on your organisation's allowed marketplace list"
 
 export const defaultMarketplaceListDeps: MarketplaceListDeps = {
   exists: (file) => Filesystem.exists(file),
@@ -208,6 +242,7 @@ export const defaultMarketplaceListDeps: MarketplaceListDeps = {
   global: Global.Path.config,
   cache: defaultMarketplaceCacheDeps,
   builtin: DEFAULT_MARKETPLACE,
+  policy: async () => marketplacePolicy(await ConfigManaged.readManagedDocs().catch(() => [])),
 }
 
 async function readSources(dir: string, dep: MarketplaceListDeps): Promise<{ sources: string[]; disabled: boolean }> {
@@ -292,19 +327,38 @@ export async function resolveAddedMarketplaces(
     { scope: "global", dir: globalDir },
   ]
 
+  const policy = await dep.policy?.()
+  const locked = (key: string) => ConfigPolicy.isLocked(policy?.locked, key)
+  // A source off the allow list is listed as refused, never fetched, so `marketplace list` says why.
+  const resolve = async (source: string, scope: ResolvedMarketplace["scope"]): Promise<ResolvedMarketplace> =>
+    allowedSource(policy, source)
+      ? { ...(await resolveWithCache(source, dep, false)), scope }
+      : { source, ok: false, error: NOT_ALLOWED, scope }
+
   const entries: ResolvedMarketplace[] = []
   const seen = new Set<string>()
-  let disabled = false
-  for (const { scope, dir } of scopes) {
-    const read = await readSources(dir, dep)
-    disabled ||= read.disabled
-    for (const source of read.sources) {
+  let disabled = policy?.defaultOn === false
+  // A locked `marketplace` list replaces the user's and project's sources entirely.
+  const sourced: Array<{ scope: ResolvedMarketplace["scope"]; sources: string[] }> = locked(FIELD)
+    ? []
+    : await Promise.all(
+        scopes.map(async ({ scope, dir }) => {
+          const read = await readSources(dir, dep)
+          if (!locked(DEFAULT_FIELD)) disabled ||= read.disabled
+          return { scope, sources: read.sources }
+        }),
+      )
+  if (policy?.sources) sourced.push({ scope: "global", sources: policy.sources })
+  if (locked(DEFAULT_FIELD)) disabled = policy?.defaultOn === false
+  for (const { scope, sources } of sourced) {
+    for (const source of sources) {
+      if (seen.has(normalizeSource(source))) continue
       seen.add(normalizeSource(source))
-      entries.push({ ...(await resolveWithCache(source, dep, false)), scope })
+      entries.push(await resolve(source, scope))
     }
   }
   if (dep.builtin && !disabled && !seen.has(dep.builtin)) {
-    entries.push({ ...(await resolveWithCache(dep.builtin, dep, false)), scope: "builtin" })
+    entries.push(await resolve(dep.builtin, "builtin"))
   }
   return entries
 }
