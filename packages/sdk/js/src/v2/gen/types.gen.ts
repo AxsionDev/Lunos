@@ -1899,6 +1899,7 @@ export type AttachmentConfig = {
 
 export type Config = {
   $schema?: string
+  $locked?: Array<string>
   shell?: string
   logLevel?: LogLevel
   server?: ServerConfig
@@ -1925,6 +1926,17 @@ export type Config = {
     "session.compacted"?: Array<ConfigV2HooksEntry>
     "session.deleted"?: Array<ConfigV2HooksEntry>
     "session.error"?: Array<ConfigV2HooksEntry>
+  }
+  audit?: {
+    enabled?: boolean
+    path?: string
+    redact?: Array<string>
+    max_bytes?: number
+    max_age_days?: number
+    forward?: {
+      syslog?: string
+      otlp?: string
+    }
   }
   residency?: ConfigV2Residency
   references?: {
@@ -2030,6 +2042,9 @@ export type Config = {
     [key: string]: boolean
   }
   attachment?: AttachmentConfig
+  marketplace?: Array<string>
+  marketplace_default?: boolean
+  marketplace_allow?: Array<string>
   enterprise?: {
     url?: string
   }

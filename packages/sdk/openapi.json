@@ -21378,6 +21378,12 @@
           "$schema": {
             "type": "string"
           },
+          "$locked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "shell": {
             "type": "string"
           },
@@ -21483,6 +21489,44 @@
                 "items": {
                   "$ref": "#/components/schemas/ConfigV2HooksEntry"
                 }
+              }
+            },
+            "additionalProperties": false
+          },
+          "audit": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "redact": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "max_bytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "max_age_days": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "forward": {
+                "type": "object",
+                "properties": {
+                  "syslog": {
+                    "type": "string"
+                  },
+                  "otlp": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -21797,6 +21841,21 @@
           },
           "attachment": {
             "$ref": "#/components/schemas/AttachmentConfig"
+          },
+          "marketplace": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "marketplace_default": {
+            "type": "boolean"
+          },
+          "marketplace_allow": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "enterprise": {
             "type": "object",
