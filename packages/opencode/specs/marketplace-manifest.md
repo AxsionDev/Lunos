@@ -103,6 +103,18 @@ caching and install flows are described in the later sections.
 | `category`    | no       | `string`          |            |
 | `tags`        | no       | array of `string` |            |
 
+### Curation fields (every entry kind, XCOD-105)
+
+All optional, so older manifests and older clients are unaffected. Criteria and the review log:
+[`docs/marketplace-review.md`](../../../docs/marketplace-review.md).
+
+| Field       | Type                                                                                | Notes                                                                                                                                           |
+| ----------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `review`    | `{ status: "verified" \| "community", reviewed_version?, reviewed_at?, reviewer? }` | Absent means unreviewed. Only `verified` installs without `--allow-unreviewed`                                                                  |
+| `license`   | `string`                                                                            | SPDX identifier                                                                                                                                 |
+| `integrity` | `string`                                                                            | npm `dist.integrity` of the pinned version (`review.reviewed_version`, else `source.version`); a mismatch with the registry refuses the install |
+| `egress`    | array of `string`                                                                   | Hosts the entry contacts at runtime, declared by the reviewer                                                                                   |
+
 ### `source` (tagged on `type`)
 
 Exactly two shapes are valid in v1:

@@ -1,0 +1,31 @@
+{
+  "skills": [
+    {
+      "name": "bug-investigation",
+      "files": [
+        "SKILL.md",
+        "references/bug-triage.md",
+        "references/collaborative-dialogue.md"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "name": "code-review-methodology",
+      "files": [
+        "SKILL.md",
+        "references/architecture.md",
+        "references/code-quality.md",
+        "references/performance.md",
+        "references/security.md"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "name": "research-mode",
+      "files": [
+        "SKILL.md"
+      ],
+      "version": "1.0.0"
+    }
+  ]
+}

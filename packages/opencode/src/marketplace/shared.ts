@@ -25,6 +25,12 @@ export const FIELD = "marketplace"
 export const DEFAULT_MARKETPLACE = "https://lunos.tech/marketplace.json"
 export const DEFAULT_FIELD = "marketplace_default"
 export const ALLOW_FIELD = "marketplace_allow"
+export const UNREVIEWED_FIELD = "marketplace_unreviewed"
+
+/** Whether a locked policy forbids installing entries that aren't verified. */
+export function forbidsUnreviewed(policy: MarketplacePolicy | undefined) {
+  return !!policy && ConfigPolicy.isLocked(policy.locked, UNREVIEWED_FIELD) && policy.unreviewed === false
+}
 
 const MANIFEST_FILE = "marketplace.json"
 const GITHUB_SHORTHAND = /^[\w.-]+\/[\w.-]+$/
@@ -211,6 +217,8 @@ export type MarketplacePolicy = {
   sources?: string[]
   defaultOn?: boolean
   allow?: string[]
+  /** `marketplace_unreviewed: false` forbids `--allow-unreviewed` when locked (XCOD-105). */
+  unreviewed?: boolean
 }
 
 export function marketplacePolicy(docs: readonly unknown[]): MarketplacePolicy {
@@ -222,6 +230,8 @@ export function marketplacePolicy(docs: readonly unknown[]): MarketplacePolicy {
     if (Array.isArray(sources)) policy.sources = sources.filter((item) => typeof item === "string")
     if (typeof defaultOn === "boolean") policy.defaultOn = defaultOn
     if (Array.isArray(allow)) policy.allow = allow.filter((item) => typeof item === "string")
+    const unreviewed = ConfigPolicy.get(doc, UNREVIEWED_FIELD)
+    if (typeof unreviewed === "boolean") policy.unreviewed = unreviewed
   }
   return policy
 }
