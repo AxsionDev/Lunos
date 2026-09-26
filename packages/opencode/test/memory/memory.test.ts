@@ -189,3 +189,37 @@ describe("Memory service: off means off", () => {
     ),
   )
 })
+
+describe("Memory service: remember", () => {
+  it.live("a fact from a turn that used webfetch is refused with the reason, before memory starts", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const memory = yield* Memory.Service
+          const messages = [
+            { info: { id: "msg_u", role: "user", sessionID: "ses" }, parts: [{ type: "text", text: "read the docs" }] },
+            {
+              info: { id: "msg_a", role: "assistant", sessionID: "ses" },
+              parts: [{ type: "tool", tool: "webfetch", state: { status: "completed", input: {} } }],
+            },
+          ] as never
+          const error = yield* memory
+            .remember({
+              fact: "The billing service owns the invoices table.",
+              source: "user message",
+              scope: "project",
+              sessionID: "ses",
+              agent: "build",
+              parent,
+              messages,
+            })
+            .pipe(Effect.flip)
+          expect(error.message).toBe(
+            "Not remembered: this turn used webfetch, and memory never stores content from outside sources.",
+          )
+          yield* Effect.promise(() => expectNothingStarted(dir))
+        }),
+      { config: { memory: { enabled: true } } },
+    ),
+  )
+})

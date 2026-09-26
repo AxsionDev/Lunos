@@ -29,7 +29,7 @@ export const EVENTS = [
   "marketplace.install",
   "marketplace.refused",
   "policy.override_refused",
-  // Defined for XCOD-94; nothing emits them until graph memory exists.
+  // Long-term memory (XCOD-94). `memory.forget` is emitted by the review surface (part 3).
   "memory.write",
   "memory.forget",
   "upgrade",

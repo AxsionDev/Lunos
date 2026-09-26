@@ -52,6 +52,13 @@ The tool also fetches its model catalogue (a list of available models and their 
 
 **The update check** reads the `lunos-ai` package entry from your npm registry: `https://registry.npmjs.org/lunos-ai/latest` by default, or whatever registry your npm configuration points at, so a corporate or EU mirror is honoured. It sends no project data, and runs at most once a day; the result is cached in Lunos's state directory. Lunos only _announces_ new releases. It never installs one unless a person chooses to, or you set `"autoupdate": true`. To turn the check off entirely, set `"autoupdate": false` or the environment variable `LUNOS_DISABLE_AUTOUPDATE=1`.
 
+**Long-term memory, if you turn it on** (from the next release; `"memory": { "enabled": true }`; off by default). Measured on 2026-09-26:
+
+- **First start.** It downloads its Python packages from PyPI (`pypi.org`, `files.pythonhosted.org`), pinned by hash, and the local embedding model from Hugging Face (`huggingface.co` and its CDN hosts).
+- **After that, no network of its own.** Every remember and recall ran with all outbound connections blocked.
+- **Fact extraction** uses the model you set as `memory.model`, through your normal provider and residency policy, so it is one more model request like any other.
+- **Avoiding the downloads.** You can pre-seed the uv cache and the model directory. Details are in [`specs/memory-layer.md` §7](../../packages/opencode/specs/memory-layer.md).
+
 **The marketplace** (`lunos marketplace …` commands and the TUI's Discover view) fetches `https://lunos.tech/marketplace.json`, the built-in `lunos-community` catalogue: names, descriptions and install sources of community plugins and MCP servers. It sends no project data, runs only when you use those commands, never at startup, and is cached for a day. Installing an entry then fetches that entry's package (for example from npm). Turn off the built-in catalogue with `"marketplace_default": false`. Marketplaces you add yourself are fetched the same way.
 
 #### Session sharing — off by default
@@ -84,6 +91,7 @@ Everything else:
 - Your source code, except the portions sent to your chosen model provider as context
 - Conversation history and session state, stored in local files
 - Configuration and credentials, stored locally
+- Long-term memory, when on (from the next release): the knowledge graph and its provenance ledger, in local files
 - The audit log: model calls and share uploads (v1.18.39); tool runs, permission decisions, installs and policy refusals from the next release. No prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
 
 ### Touches Lunos-operated infrastructure
