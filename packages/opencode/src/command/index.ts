@@ -92,7 +92,7 @@ const layer = Layer.effect(
       // reaches a model, so the template is only a placeholder.
       commands[Default.MEMORY] = {
         name: Default.MEMORY,
-        description: "turn long-term memory off or on for this session: /memory off | on",
+        description: "long-term memory: /memory off | on for this session; /memory alone opens the browser in the TUI",
         source: "command",
         template: "",
         hints: [],

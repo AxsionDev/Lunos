@@ -50,6 +50,7 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { createFadeIn } from "../../util/signal"
 import { DialogSkill } from "../dialog-skill"
+import { DialogMemory } from "../dialog-memory"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
@@ -959,6 +960,14 @@ export function Prompt(props: PromptProps) {
     if (workspace.creating() || move.creating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
+    // XCOD-94: bare /memory opens the memory browser, before any session is created.
+    // `/memory off|on` has arguments and goes to the server like any other command.
+    if (store.prompt.input.trim() === "/memory") {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      dialog.replace(() => <DialogMemory />)
+      return false
+    }
     const agent = local.mode.current()
     if (!agent) return false
     const trimmed = store.prompt.input.trim()

@@ -2553,6 +2553,36 @@ export type QuestionDrafts = {
   custom?: Array<string>
 }
 
+export type MemoryFact = {
+  id: string
+  scope: "project" | "user"
+  text: string
+  sessionID: string
+  agent: string
+  source: string
+  date: string
+}
+
+export type MemoryList = {
+  /**
+   * Whether memory is on
+   */
+  on: boolean
+  reason?: string
+  facts: Array<MemoryFact>
+}
+
+export type MemoryNotFoundError = {
+  _tag: "MemoryNotFoundError"
+  id: string
+  message: string
+}
+
+export type MemoryUnavailableError = {
+  _tag: "MemoryUnavailableError"
+  message: string
+}
+
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -9454,6 +9484,110 @@ export type QuestionRejectResponses = {
 }
 
 export type QuestionRejectResponse = QuestionRejectResponses[keyof QuestionRejectResponses]
+
+export type MemoryListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory"
+}
+
+export type MemoryListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemoryListError = MemoryListErrors[keyof MemoryListErrors]
+
+export type MemoryListResponses = {
+  /**
+   * Stored facts, with provenance
+   */
+  200: MemoryList
+}
+
+export type MemoryListResponse = MemoryListResponses[keyof MemoryListResponses]
+
+export type MemoryRelatedData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/{id}/related"
+}
+
+export type MemoryRelatedErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * MemoryNotFoundError
+   */
+  404: MemoryNotFoundError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryRelatedError = MemoryRelatedErrors[keyof MemoryRelatedErrors]
+
+export type MemoryRelatedResponses = {
+  /**
+   * Relationships between entities around this fact
+   */
+  200: Array<string>
+}
+
+export type MemoryRelatedResponse = MemoryRelatedResponses[keyof MemoryRelatedResponses]
+
+export type MemoryForgetData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/{id}/forget"
+}
+
+export type MemoryForgetErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * MemoryNotFoundError
+   */
+  404: MemoryNotFoundError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryForgetError = MemoryForgetErrors[keyof MemoryForgetErrors]
+
+export type MemoryForgetResponses = {
+  /**
+   * Fact forgotten
+   */
+  200: boolean
+}
+
+export type MemoryForgetResponse = MemoryForgetResponses[keyof MemoryForgetResponses]
 
 export type PermissionListData = {
   body?: never
