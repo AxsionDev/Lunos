@@ -134,7 +134,7 @@ All instruction files are combined with your `AGENTS.md` files.
 
 ## Keeping durable notes
 
-Lunos has no automatic memory. To keep facts that should carry across sessions, such as "deploys go out on Tuesdays" or "the billing service owns the invoices table", write them as small Markdown files and load them with `instructions`:
+To keep facts that should carry across sessions, such as "deploys go out on Tuesdays" or "the billing service owns the invoices table", write them as small Markdown files and load them with `instructions`:
 
 ```json title="opencode.json"
 {
@@ -146,6 +146,43 @@ Lunos has no automatic memory. To keep facts that should carry across sessions, 
 - Project notes live in the repo and are reviewed like any other change. Personal notes can live in `~/.config/opencode/memory/`, loaded from your global config.
 - These files load alongside `AGENTS.md` and don't compete with it.
 - Don't put secrets in them: their contents are sent to your model provider as part of the prompt.
+
+### Long-term memory
+
+Lunos can also keep a knowledge graph of what it learns, and recall the relevant parts in later sessions. It is **off unless you turn it on**:
+
+```json title="opencode.json"
+{
+  "memory": {
+    "enabled": true,
+    "scope": ["project"],
+    "model": "small",
+    "embedding": "local",
+    "retrieval": { "max_tokens": 1500 },
+    "limits": { "max_facts": 5000, "max_fact_chars": 2000 }
+  }
+}
+```
+
+**What you need:** [uv](https://docs.astral.sh/uv/) and Python 3.10–3.13. Memory runs [Cognee](https://github.com/topoteretes/cognee) (Apache-2.0) in a local Python process. Lunos never installs Python for you: without it, memory stays off and says why.
+
+- **Remembering.** The agent saves facts with a `memory_remember` tool. You approve each one: the tool asks by default. It refuses:
+  - anything in a turn that used `webfetch`, `websearch`, an MCP resource, or read a file outside the project
+  - anything that looks like a key, token or password
+- **Recalling.** Relevant facts are added to your message in a `<memory>` block, each with where and when it was learned, capped at `retrieval.max_tokens`. The agent can also look things up with `memory_search`.
+- **Your notes.** Paragraphs in `.opencode/memory/*.md` are part of project memory, with no approval needed. When you edit or delete one, memory follows.
+- **Which model.** `memory.model` picks the model that extracts facts and relationships: `"small"` (your `small_model`, the default), `"inherit"` (the main model) or `"provider/model"`. It runs through your normal provider setup and data-residency policy. If the policy denies it, memory doesn't start and the error names `memory.model`.
+- **Embeddings** are computed locally (`"local"`). The embedding model (about 87 MB) is downloaded once, from Hugging Face.
+- **Where it's stored.**
+  - Project memory: `.opencode/memory/graph/`, which is never committed. Lunos writes a `.gitignore` there.
+  - `"user"` scope: in the Lunos data directory.
+- **Turning it off:**
+  - `"memory": { "enabled": false }`, or remove the key
+  - `LUNOS_DISABLE_MEMORY=1`, which overrides config
+  - `/memory off` for the current session
+  - `"permission": { "memory": "deny" }`, for all agents or one agent
+
+  When memory is off, no memory process starts, no memory files are created and the memory tools aren't offered.
 
 ---
 

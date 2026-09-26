@@ -1,0 +1,7 @@
+Save one durable fact to long-term memory, so later sessions know it without rediscovering it: who owns what, a decision and its reason, a convention this project follows, a gotcha that cost time.
+
+A person approves every fact before it is stored. Memory refuses:
+- anything in a turn that used webfetch, websearch, an MCP resource, or read a file outside this project. Memory never stores outside content, so remember facts from the user's own words or this project's files before fetching anything;
+- anything shaped like a key, token or password.
+
+Keep each fact to one self-contained sentence that will still make sense months from now. Don't save things that are already in the code or in AGENTS.md, and don't save task progress.

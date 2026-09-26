@@ -25,6 +25,12 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { InstanceState } from "@/effect/instance-state"
+import { Memory } from "@/memory"
+import { MemoryGuard } from "@/memory/guard"
+import { MemoryRecall } from "@/memory/recall"
+import MEMORY_REMEMBER from "@/memory/remember.txt"
+import MEMORY_SEARCH from "@/memory/search.txt"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -57,6 +63,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
+  const memory = yield* Memory.Service
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -141,6 +148,108 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         )
       },
     })
+  }
+
+  // XCOD-94: memory tools exist only while memory is on for this session, and not for an agent
+  // whose permission denies "memory". memory_remember asks a person before anything is stored.
+  if ((yield* memory.decision(input.session.id)).on) {
+    const hidden = Permission.disabled(
+      ["memory_remember", "memory_search"],
+      Permission.merge(input.agent.permission, input.session.permission ?? []),
+    )
+    const scopes = yield* memory.scopes()
+    const parent = { providerID: input.model.providerID, modelID: input.model.id }
+    const worktree = (yield* InstanceState.context).worktree
+    const finish = (title: string, output: string, metadata: Record<string, unknown> = {}) => ({
+      title,
+      output,
+      metadata,
+    })
+    if (!hidden.has("memory_remember"))
+      tools.memory_remember = tool({
+        description: MEMORY_REMEMBER,
+        inputSchema: jsonSchema(
+          ProviderTransform.schema(input.model, {
+            type: "object",
+            properties: {
+              fact: { type: "string", description: "One durable fact, in a single sentence or short paragraph" },
+              source: {
+                type: "string",
+                description:
+                  'Where it came from: "user message", or the worktree-relative path of the file it was read from',
+              },
+              ...(scopes.length > 1
+                ? { scope: { type: "string", enum: scopes, description: "Which memory to store it in" } }
+                : {}),
+            },
+            required: ["fact", "source"],
+            additionalProperties: false,
+          }),
+        ),
+        execute(args, opts) {
+          return run.promise(
+            Effect.gen(function* () {
+              const params = toRecord(args)
+              const fact = String(params.fact ?? "").trim()
+              const source = String(params.source ?? "user message")
+              const scope = (scopes.includes(params.scope as never) ? params.scope : scopes[0]) as "project" | "user"
+              const ctx = context(params, opts)
+              AuditLog.toolRun({ tool: "memory_remember", agent: ctx.agent, session: ctx.sessionID, args: {} })
+              // Check first, so a person is never asked to approve something that would be refused.
+              const refusal = MemoryGuard.taint(input.messages, worktree) ?? MemoryGuard.secret(fact)
+              if (refusal) return finish("Not remembered", `Not remembered: ${refusal}.`, { refused: true })
+              yield* ctx.ask({
+                permission: "memory",
+                patterns: [fact],
+                always: ["*"],
+                metadata: { fact, source, scope },
+              })
+              const result = yield* memory
+                .remember({
+                  fact,
+                  source,
+                  scope,
+                  sessionID: ctx.sessionID,
+                  agent: ctx.agent,
+                  parent,
+                  messages: input.messages,
+                })
+                .pipe(Effect.result)
+              if (result._tag === "Failure") return finish("Not remembered", result.failure.message, { refused: true })
+              return finish("Remembered", `Remembered in ${scope} memory as ${result.success.id}.`, {
+                id: result.success.id,
+                scope,
+              })
+            }),
+          )
+        },
+      })
+    if (!hidden.has("memory_search"))
+      tools.memory_search = tool({
+        description: MEMORY_SEARCH,
+        inputSchema: jsonSchema(
+          ProviderTransform.schema(input.model, {
+            type: "object",
+            properties: { query: { type: "string", description: "What to look up" } },
+            required: ["query"],
+            additionalProperties: false,
+          }),
+        ),
+        execute(args, opts) {
+          return run.promise(
+            Effect.gen(function* () {
+              const params = toRecord(args)
+              const ctx = context(params, opts)
+              AuditLog.toolRun({ tool: "memory_search", agent: ctx.agent, session: ctx.sessionID, args: {} })
+              const result = yield* memory
+                .search({ query: String(params.query ?? ""), sessionID: ctx.sessionID, parent })
+                .pipe(Effect.result)
+              if (result._tag === "Failure") return finish("Memory search failed", result.failure.message)
+              return finish("Memory", MemoryRecall.block(result.success) ?? "Nothing in memory matches.")
+            }),
+          )
+        },
+      })
   }
 
   const hasMcpResourceServer = Object.values(yield* mcp.clients()).some(

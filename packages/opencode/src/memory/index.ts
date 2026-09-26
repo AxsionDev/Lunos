@@ -9,7 +9,11 @@ import { InstanceState } from "@/effect/instance-state"
 import { Provider } from "@/provider/provider"
 import { LLM } from "@/session/llm"
 import { MessageID, SessionID } from "@/session/schema"
+import type { SessionV1 } from "@opencode-ai/core/v1/session"
 import { MemoryBackend } from "./backend"
+import { MemoryGuard } from "./guard"
+import { MemoryNotes } from "./notes"
+import { MemoryRecall } from "./recall"
 import { MemoryModel } from "./model"
 import { MemorySidecar } from "./sidecar"
 import { MemoryStore } from "./store"
@@ -46,6 +50,37 @@ export interface Interface {
     sessionID?: string
     parent: MemoryModel.Model
   }) => Effect.Effect<MemoryBackend.Backend, Error>
+  /**
+   * Store one fact, after the §5 checks: refused when the turn brought in outside content or the
+   * fact looks like a secret. The caller has already had a person approve it.
+   */
+  readonly remember: (input: {
+    fact: string
+    source: string
+    scope: MemoryStore.Scope
+    sessionID: string
+    agent: string
+    parent: MemoryModel.Model
+    messages: readonly SessionV1.WithParts[]
+  }) => Effect.Effect<MemoryStore.Fact, Error>
+  /** Facts closest to a query, from every configured scope, closest first. */
+  readonly search: (input: {
+    query: string
+    sessionID?: string
+    parent: MemoryModel.Model
+    limit?: number
+  }) => Effect.Effect<{ scope: MemoryStore.Scope; facts: MemoryBackend.Recalled[]; graph: string }[], Error>
+  /**
+   * The `<memory>` block for a user message, computed once per message and cached, so the steps of
+   * one turn don't each start a recall. Undefined when memory is off, empty, or unavailable: a
+   * failing recall never stops a turn.
+   */
+  readonly recallFor: (input: {
+    sessionID: string
+    userMessageID: string
+    query: string
+    parent: MemoryModel.Model
+  }) => Effect.Effect<string | undefined>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Memory") {}
@@ -53,6 +88,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Me
 interface State {
   sessionOff: Set<string>
   running: Map<MemoryStore.Scope, Promise<MemoryBackend.Backend>>
+  recalled: Map<string, string | undefined>
   worktree: string
 }
 
@@ -64,7 +100,7 @@ const layer = Layer.effect(
     const llm = yield* LLM.Service
     const state = yield* InstanceState.make<State>(
       Effect.fn("Memory.state")(function* (ctx) {
-        const state: State = { sessionOff: new Set(), running: new Map(), worktree: ctx.worktree }
+        const state: State = { sessionOff: new Set(), running: new Map(), recalled: new Map(), worktree: ctx.worktree }
         yield* Effect.addFinalizer(() =>
           Effect.promise(async () => {
             const running = [...state.running.values()]
@@ -163,14 +199,100 @@ const layer = Layer.effect(
       const starting = (async () => {
         const root = await MemoryStore.ensure(input.scope, s.worktree)
         const handle = await MemorySidecar.start({ root, sample })
-        return MemoryBackend.cognee({ root, handle, limits })
+        const backend = MemoryBackend.cognee({ root, handle, limits })
+        if (input.scope === "project") await MemoryNotes.sync({ backend, worktree: s.worktree })
+        return backend
       })()
       s.running.set(input.scope, starting)
       starting.catch(() => s.running.delete(input.scope))
       return yield* Effect.tryPromise({ try: () => starting, catch: toError })
     })
 
-    return Service.of({ decision, setSessionOff, scopes, backend })
+    const remember = Effect.fn("Memory.remember")(function* (input: {
+      fact: string
+      source: string
+      scope: MemoryStore.Scope
+      sessionID: string
+      agent: string
+      parent: MemoryModel.Model
+      messages: readonly SessionV1.WithParts[]
+    }) {
+      const s = yield* InstanceState.get(state)
+      const refusal = MemoryGuard.taint(input.messages, s.worktree) ?? MemoryGuard.secret(input.fact)
+      if (refusal) return yield* Effect.fail(new MemoryGuard.RefusedError(`Not remembered: ${refusal}.`))
+      const store = yield* backend({ scope: input.scope, sessionID: input.sessionID, parent: input.parent })
+      const fact = yield* Effect.tryPromise({
+        try: () =>
+          store.remember(input.fact, {
+            sessionID: input.sessionID,
+            agent: input.agent,
+            source: input.source,
+            date: new Date().toISOString(),
+          }),
+        catch: toError,
+      })
+      AuditLog.emit("memory.write", {
+        session: input.sessionID,
+        agent: input.agent,
+        scope: input.scope,
+        id: fact.id,
+        source: input.source,
+        chars: fact.text.length,
+      })
+      s.recalled.clear()
+      return fact
+    })
+
+    const search = Effect.fn("Memory.search")(function* (input: {
+      query: string
+      sessionID?: string
+      parent: MemoryModel.Model
+      limit?: number
+    }) {
+      const s = yield* InstanceState.get(state)
+      const results: { scope: MemoryStore.Scope; facts: MemoryBackend.Recalled[]; graph: string }[] = []
+      for (const scope of yield* scopes()) {
+        // Don't start a sidecar just to learn that a scope is empty.
+        const stored = yield* Effect.promise(() => MemoryStore.facts(MemoryStore.dir(scope, s.worktree)))
+        if (stored.length === 0 && !(scope === "project" && (yield* Effect.promise(() => MemoryNotes.any(s.worktree)))))
+          continue
+        const store = yield* backend({ scope, sessionID: input.sessionID, parent: input.parent })
+        const found = yield* Effect.tryPromise({
+          try: () => store.recall(input.query, input.limit ?? 10),
+          catch: toError,
+        })
+        results.push({ scope, ...found })
+      }
+      return results
+    })
+
+    const recallFor = Effect.fn("Memory.recallFor")(function* (input: {
+      sessionID: string
+      userMessageID: string
+      query: string
+      parent: MemoryModel.Model
+    }) {
+      const s = yield* InstanceState.get(state)
+      if (s.recalled.has(input.userMessageID)) return s.recalled.get(input.userMessageID)
+      if (!(yield* decision(input.sessionID)).on) return undefined
+      const cfg = yield* config.get()
+      const text = yield* search({ query: input.query, sessionID: input.sessionID, parent: input.parent }).pipe(
+        Effect.tap((results) =>
+          Effect.logInfo("memory recalled", {
+            session: input.sessionID,
+            facts: results.flatMap((result) => result.facts.map((item) => `${result.scope}:${item.fact.id}`)),
+          }),
+        ),
+        Effect.map((results) => MemoryRecall.block(results, cfg.memory?.retrieval?.max_tokens)),
+        Effect.catch((error) =>
+          Effect.logWarning("memory recall failed", { error: error.message }).pipe(Effect.as(undefined)),
+        ),
+      )
+      s.recalled.set(input.userMessageID, text)
+      return text
+    })
+
+    return Service.of({ decision, setSessionOff, scopes, backend, remember, search, recallFor })
   }),
 )
 

@@ -46,6 +46,7 @@ export function hints(template: string) {
 export const Default = {
   INIT: "init",
   REVIEW: "review",
+  MEMORY: "memory",
 } as const
 
 export interface Interface {
@@ -85,6 +86,16 @@ const layer = Layer.effect(
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      }
+
+      // Handled by SessionPrompt.command itself: it switches memory for the session and never
+      // reaches a model, so the template is only a placeholder.
+      commands[Default.MEMORY] = {
+        name: Default.MEMORY,
+        description: "turn long-term memory off or on for this session: /memory off | on",
+        source: "command",
+        template: "",
+        hints: [],
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {
