@@ -1,6 +1,7 @@
 import { EOL } from "os"
 import { Effect } from "effect"
 import { effectCmd } from "../../effect-cmd"
+import { redactConfig } from "./redact"
 import { writeStdoutEffect } from "../../stdout"
 
 export const ConfigCommand = effectCmd({
@@ -16,7 +17,8 @@ export const ConfigCommand = effectCmd({
     const { Config } = yield* Effect.promise(() => import("@/config/config"))
     const { ConfigPolicy } = yield* Effect.promise(() => import("@/config/policy"))
     const config = yield* Config.Service.use((cfg) => cfg.get())
-    if (!args.sources) return yield* writeStdoutEffect(JSON.stringify(config, null, 2) + EOL)
+    // Upstream's redaction (#50956) with Lunos's drain-safe write (XCOD-77) and --sources (XCOD-102).
+    if (!args.sources) return yield* writeStdoutEffect(JSON.stringify(redactConfig(config), null, 2) + EOL)
     const origins = yield* Config.Service.use((cfg) => cfg.origins())
     const rows = Object.entries(origins)
       .filter(([key]) => key !== "$schema" && key !== ConfigPolicy.FIELD)
