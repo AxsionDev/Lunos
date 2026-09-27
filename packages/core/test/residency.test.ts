@@ -141,11 +141,15 @@ describe("Residency.record", () => {
 
 describe("Residency.enforce", () => {
   const tmp = () => `${require("os").tmpdir()}/residency-enforce-${Math.random().toString(36).slice(2)}.log`
+  // The audit line is written asynchronously; a fixed 20ms wait flaked on a loaded CI runner.
   const read = async (file: string) => {
-    await Bun.sleep(20)
-    const text = await Bun.file(file)
-      .text()
-      .catch(() => "")
+    let text = ""
+    for (let i = 0; i < 100 && !text.trim(); i++) {
+      await Bun.sleep(20)
+      text = await Bun.file(file)
+        .text()
+        .catch(() => "")
+    }
     return text
       .trim()
       .split("\n")

@@ -3,6 +3,7 @@ import { ConfigPolicy } from "@/config/policy"
 import { Effect } from "effect"
 import { AppRuntime } from "@/effect/app-runtime"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import { Offline } from "@opencode-ai/core/offline"
 import { Installation } from "@/installation"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { GlobalBus } from "@/bus/global"
@@ -46,6 +47,8 @@ export async function cachedLatest(now = Date.now()): Promise<string | undefined
  * organisation policy locks `autoupdate` (XCOD-102): then only the managed value counts.
  */
 async function envDisables(config: { $locked?: ReadonlyArray<string> } | undefined) {
+  // Offline mode (XCOD-121) isn't a preference a policy can override: there is no network to check.
+  if (Offline.enabled()) return true
   if (!Flag.OPENCODE_DISABLE_AUTOUPDATE) return false
   if (!ConfigPolicy.isLocked(config?.$locked, "autoupdate")) return true
   await Effect.runPromise(ConfigPolicy.refused("autoupdate", "OPENCODE_DISABLE_AUTOUPDATE")).catch(() => undefined)

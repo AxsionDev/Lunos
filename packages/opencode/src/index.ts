@@ -13,6 +13,7 @@ import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
 import { UI } from "./cli/ui"
 import { InstallationVersion, versionVerbose } from "@opencode-ai/core/installation/version"
+import { Offline } from "@opencode-ai/core/offline"
 import { FormatError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { DebugCommand } from "./cli/cmd/debug"
@@ -38,9 +39,10 @@ import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
 
-// XCOD-118: `lunos --version --verbose` adds the upstream base and the lag at the last sync.
+// XCOD-118: `lunos --version --verbose` adds the upstream base and the lag at the last sync, and
+// (XCOD-121) whether offline mode is on and which outbound calls it turned off.
 if (args.length === 2 && args.includes("--verbose") && (args.includes("--version") || args.includes("-v"))) {
-  process.stdout.write(versionVerbose() + EOL)
+  process.stdout.write(versionVerbose() + EOL + Offline.report() + EOL)
   process.exit(0)
 }
 

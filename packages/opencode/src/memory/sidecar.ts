@@ -9,6 +9,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import SCRIPT from "./sidecar.py" with { type: "text" }
 import LOCK from "./sidecar.py.lock" with { type: "text" }
 import { MemoryStore } from "./store"
+import { Offline } from "@opencode-ai/core/offline"
 
 /**
  * The Cognee sidecar (XCOD-94): `sidecar.py`, run with `uv` from its hash-pinned lock file, spoken
@@ -79,6 +80,8 @@ export function environment(input: {
     UV_PYTHON_DOWNLOADS: "never",
     TELEMETRY_DISABLED: "1",
     PYTHONUNBUFFERED: "1",
+    // Offline mode (XCOD-121): only what uv and Hugging Face have already cached.
+    ...(Offline.enabled() ? { UV_OFFLINE: "1", HF_HUB_OFFLINE: "1" } : {}),
   }
 }
 

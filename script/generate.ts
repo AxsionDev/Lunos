@@ -13,4 +13,7 @@ await $`bun ./script/jurisdictions.ts`
 // XCOD-90: keeps packages/opencode/package.json's lunos.upstreamVersion at the last upstream sync.
 await $`bun ./script/upstream-version.ts`
 
+// XCOD-121: the outbound-call table in docs/deployment/self-hosted.md comes from Offline.CALLS.
+await $`bun ./script/offline-calls.ts`
+
 await $`./script/format.ts`
