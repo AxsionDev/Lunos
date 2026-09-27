@@ -1,0 +1,47 @@
+name: upstream-sync-report
+
+# XCOD-118: when `test` finishes on an upstream-sync branch, write the results into the sync PR and
+# name any failures that aren't in the latest `dev` run. A separate file so that every `test` run
+# doesn't add a skipped run to upstream-sync's history, which the README badge links to.
+
+on:
+  workflow_run:
+    workflows: [test]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    if: >-
+      github.repository == 'AxsionDev/Lunos' && startsWith(github.event.workflow_run.head_branch, 'upstream-sync/')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      RUN: ${{ github.event.workflow_run.id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: dev
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Compare with the dev baseline
+        run: |
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -z "$pr" ]; then echo "No open PR for $BRANCH"; exit 0; fi
+          baseline=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow test --branch dev --event push \
+            --status completed --limit 1 --json databaseId --jq '.[0].databaseId')
+          typecheck=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow typecheck --commit "$SHA" \
+            --limit 1 --json databaseId --jq '.[0].databaseId // ""')
+          bun script/upstream-sync.ts report --pr "$pr" --run "$RUN" --baseline "$baseline" \
+            ${typecheck:+--typecheck "$typecheck"} | tee -a "$GITHUB_STEP_SUMMARY"
