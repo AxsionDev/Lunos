@@ -2,6 +2,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
+import opencodePackage from "../opencode/package.json"
 
 const OPENCODE_SERVER_DIST = "../opencode/dist/node"
 
@@ -35,6 +36,8 @@ export default defineConfig({
   main: {
     define: {
       "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel),
+      // XCOD-123: the About box shows the upstream opencode release this build is based on (XCOD-90).
+      "import.meta.env.LUNOS_UPSTREAM_VERSION": JSON.stringify(opencodePackage.lunos?.upstreamVersion ?? ""),
     },
     build: {
       rollupOptions: {
