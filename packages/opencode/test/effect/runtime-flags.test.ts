@@ -371,4 +371,13 @@ describe("RuntimeFlags", () => {
       expect(flags.disableClaudeCodeSkills).toBe(true)
     }),
   )
+
+  it.effect("LUNOS_OFFLINE turns off LSP downloads and the web UI proxy (XCOD-121)", () =>
+    Effect.gen(function* () {
+      const flags = yield* readFlags.pipe(Effect.provide(fromConfig({ LUNOS_OFFLINE: "1" })))
+
+      expect(flags.disableLspDownload).toBe(true)
+      expect(flags.disableEmbeddedWebUi).toBe(true)
+    }),
+  )
 })

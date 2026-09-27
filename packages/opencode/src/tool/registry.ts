@@ -57,6 +57,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
+import { Offline } from "@opencode-ai/core/offline"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -241,9 +242,10 @@ const layer = Layer.effect(
             tool.edit,
             tool.write,
             tool.task,
-            tool.fetch,
+            // Offline mode (XCOD-121) doesn't offer the tools that reach the internet.
+            ...(Offline.enabled() ? [] : [tool.fetch]),
             tool.todo,
-            tool.search,
+            ...(Offline.enabled() ? [] : [tool.search]),
             tool.skill,
             tool.patch,
             ...(tool.execute ? [tool.execute] : []),

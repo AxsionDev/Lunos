@@ -3,6 +3,7 @@ import { fileURLToPath } from "url"
 import { parse as parseJsonc } from "jsonc-parser"
 import * as ConfigPaths from "@/config/paths"
 import { Global } from "@opencode-ai/core/global"
+import { Offline } from "@opencode-ai/core/offline"
 import { Hash } from "@opencode-ai/core/util/hash"
 import { Filesystem } from "@/util/filesystem"
 import { Marketplace } from "@opencode-ai/core/marketplace"
@@ -61,6 +62,7 @@ export type FetchDeps = {
 }
 
 async function fetchText(url: string) {
+  if (Offline.enabled()) throw new Offline.DisabledError(`Fetching ${url}`)
   const response = await fetch(url, { headers: { Accept: "application/json" } })
   if (!response.ok) throw new Error(`Request to ${url} failed with status ${response.status}`)
   return response.text()

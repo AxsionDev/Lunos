@@ -83,8 +83,11 @@ import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
 import { LocationProvider } from "../../context/location"
+import { Offline } from "@opencode-ai/core/offline"
 
-addDefaultParsers(parsers.parsers)
+// The grammars are fetched from GitHub on first use, so offline mode (XCOD-121) skips them and
+// code renders without syntax highlighting.
+if (!Offline.enabled()) addDefaultParsers(parsers.parsers)
 
 const GO_UPSELL_FREE_TIER_LAST_SEEN_AT = "go_upsell_last_seen_at"
 const GO_UPSELL_FREE_TIER_DONT_SHOW = "go_upsell_dont_show"
