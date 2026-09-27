@@ -1,7 +1,17 @@
 name: publish-vscode
 
+# XCOD-122: publishes the Lunos extension to the VS Code Marketplace and Open VSX under Axsion's
+# publisher, and attaches the .vsix with a checksum and build provenance to a GitHub release.
+# script/publish refuses any other publisher. Run it by hand with dry_run to check that guard and
+# the packaging without publishing.
+
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Package and check the publisher only; publish nothing
+        type: boolean
+        default: true
   push:
     tags:
       - "vscode-v*.*.*"
@@ -9,13 +19,20 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   publish:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.repository == 'AxsionDev/Lunos'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
@@ -29,9 +46,30 @@ jobs:
         working-directory: ./sdks/vscode
 
       - name: Publish
-        run: |
-          ./script/publish
+        run: ./script/publish
         working-directory: ./sdks/vscode
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-          OPENVSX_TOKEN: ${{ secrets.OPENVSX_TOKEN }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+      - name: Attest build provenance
+        if: env.DRY_RUN != '1'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: sdks/vscode/dist/lunos.vsix
+
+      - name: Attach to GitHub release
+        if: env.DRY_RUN != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Lunos for VS Code ${GITHUB_REF_NAME#vscode-v}" \
+            --notes "VS Code Marketplace and Open VSX: publisher \`axsion\`, extension \`lunos\`. Verify with \`sha256sum -c lunos.vsix.sha256\` or \`gh attestation verify lunos.vsix --repo $GITHUB_REPOSITORY\`." \
+            sdks/vscode/dist/lunos.vsix sdks/vscode/dist/lunos.vsix.sha256
+
+      - name: Upload package
+        if: env.DRY_RUN == '1'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lunos-vsix
+          path: sdks/vscode/dist/lunos.vsix*
