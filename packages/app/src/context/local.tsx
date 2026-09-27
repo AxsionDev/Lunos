@@ -8,7 +8,7 @@ import { useSettings } from "@/context/settings"
 import { useProviders } from "@/hooks/use-providers"
 import { resolveDefaultModel } from "@/hooks/provider-catalog"
 import { Persist, persisted } from "@/utils/persist"
-import { hasCustomAgent, resolveAgent } from "./local-agent"
+import { hasCustomMode, resolveMode } from "./local-mode"
 import { cycleModelVariant, getConfiguredAgentVariant, resolveModelVariant } from "./model-variant"
 import { useSDK } from "./sdk"
 import { useSync } from "./sync"
@@ -69,7 +69,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const id = createMemo(() => params.id || undefined)
     const list = createMemo(() => sync().data.agent.filter((item) => item.mode !== "subagent" && !item.hidden))
-    const agentsVisible = createMemo(() => settings.visibility.customAgents() || hasCustomAgent(list()))
+    const modeVisible = createMemo(() => settings.visibility.customAgents() || hasCustomMode(list()))
     const connected = createMemo(() => new Set(providers.connected().map((item) => item.id)))
 
     const [saved, setSaved, , savedReady] = persisted(
@@ -111,8 +111,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       }
     }
 
-    const pickAgent = (name: string | undefined) => {
-      return resolveAgent(list(), name)
+    const pickMode = (name: string | undefined) => {
+      return resolveMode(list(), name)
     }
 
     createEffect(() => {
@@ -179,14 +179,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const fallback = createMemo<ModelKey | undefined>(() => configuredModel() ?? recentModel() ?? defaultModel())
 
-    const agent = {
+    const mode = {
       list,
-      visible: agentsVisible,
+      visible: modeVisible,
       current() {
-        return pickAgent(agentsVisible() ? (scope()?.agent ?? store.current) : "build")
+        return pickMode(modeVisible() ? (scope()?.agent ?? store.current) : "build")
       },
       set(name: string | undefined) {
-        const item = pickAgent(name)
+        const item = pickMode(name)
         if (!item) {
           setStore("current", undefined)
           return
@@ -221,19 +221,19 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           return
         }
 
-        let next = items.findIndex((item) => item.name === agent.current()?.name) + direction
+        let next = items.findIndex((item) => item.name === mode.current()?.name) + direction
         if (next < 0) next = items.length - 1
         if (next >= items.length) next = 0
         const item = items[next]
         if (!item) return
-        agent.set(item.name)
+        mode.set(item.name)
       },
     }
 
     const current = () => {
       const item = firstModel(
         () => scope()?.model,
-        () => agent.current()?.model,
+        () => mode.current()?.model,
         fallback,
       )
       if (!item) return
@@ -241,7 +241,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     }
 
     const configured = () => {
-      const item = agent.current()
+      const item = mode.current()
       const model = current()
       if (!item || !model) return
       return getConfiguredAgentVariant({
@@ -255,7 +255,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const snapshot = () => {
       const model = current()
       return {
-        agent: agent.current()?.name,
+        agent: mode.current()?.name,
         model: model ? { providerID: model.provider.id, modelID: model.id } : undefined,
         variant: selected(),
       } satisfies State
@@ -263,7 +263,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const write = (next: Partial<State>) => {
       const state = {
-        ...(scope() ?? { agent: agent.current()?.name }),
+        ...(scope() ?? { agent: mode.current()?.name }),
         ...next,
       } satisfies State
 
@@ -303,7 +303,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           batch(() => {
             setStore("last", {
               type: "model",
-              agent: agent.current()?.name,
+              agent: mode.current()?.name,
               model: item ?? null,
               variant: selected(),
             })
@@ -347,7 +347,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               const model = current()
               setStore("last", {
                 type: "variant",
-                agent: agent.current()?.name,
+                agent: mode.current()?.name,
                 model: model ? { providerID: model.provider.id, modelID: model.id } : null,
                 variant: value ?? null,
               })
@@ -375,7 +375,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const result = {
       slug: createMemo(() => base64Encode(sdk().directory)),
       model,
-      agent,
+      mode,
       session: {
         ready: savedReady,
         reset() {

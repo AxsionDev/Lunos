@@ -22,7 +22,9 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
   if (options?.bypass) return false
 
   const ins = yield* InstanceState.context
-  const full = process.platform === "win32" ? FSUtil.normalizePath(target) : target
+  // On-disk case: on macOS and Windows a wrong-case spelling of a project path is still
+  // the project, and an "Allow always" must be saved under the real spelling.
+  const full = FSUtil.onDiskCase(target)
   if (containsPath(full, ins)) return false
 
   const kind = options?.kind ?? "file"

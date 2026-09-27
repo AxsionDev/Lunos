@@ -917,6 +917,61 @@ it.instance("glob tool keeps instance context during prompt runs", () =>
   }),
 )
 
+// XCOD-98: a dismissed question keeps what the user had answered on the stored, rejected tool
+// part, so the TUI can reopen it after the turn ends. A reject without drafts is unchanged.
+for (const drafts of [{ answers: [["Blue"], []], custom: ["", "half-typed"] }, undefined]) {
+  it.instance(
+    `rejected question part ${drafts ? "keeps the drafts it was dismissed with" : "is unchanged without drafts"}`,
+    () =>
+      Effect.gen(function* () {
+        const { llm } = yield* useServerConfig(providerCfg)
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const question = yield* Question.Service
+        const session = yield* sessions.create({
+          title: "Dismissed question",
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        })
+        yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [{ type: "text", text: "ask me" }],
+        })
+        const questions = [
+          { question: "Colour?", header: "Colour", options: [{ label: "Blue", description: "blue" }] },
+          { question: "Name?", header: "Name", options: [{ label: "Ada", description: "ada" }] },
+        ]
+        yield* llm.tool("question", { questions })
+
+        const loop = yield* prompt.loop({ sessionID: session.id }).pipe(Effect.forkScoped)
+        const pending = yield* Effect.gen(function* () {
+          for (;;) {
+            const [item] = yield* question.list()
+            if (item) return item
+            yield* Effect.sleep("20 millis")
+          }
+        }).pipe(Effect.timeout("10 seconds"))
+        yield* question.reject(pending.id, drafts)
+        yield* Fiber.join(loop)
+
+        const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+        const part = msgs
+          .flatMap((msg) => msg.parts)
+          .find((item): item is SessionV1.ToolPart => item.type === "tool" && item.tool === "question")
+        expect(part?.state.status).toBe("error")
+        if (part?.state.status !== "error") return
+        expect(part.state.error).toContain("dismissed")
+        // The card is rendered from the input, which the part keeps either way.
+        expect(part.state.input).toEqual({ questions })
+        if (drafts) expect(part.state.metadata?.dismissed).toEqual(drafts)
+        else expect(part.state.metadata?.dismissed).toBeUndefined()
+        // The turn still ends on the rejection, as before.
+        expect(yield* llm.calls).toBe(1)
+      }),
+  )
+}
+
 it.instance("loop continues when finish is stop but assistant has tool parts", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)

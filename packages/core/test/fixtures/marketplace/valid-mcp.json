@@ -1,0 +1,22 @@
+{
+  "name": "lunos-community",
+  "owner": { "name": "Lunos" },
+  "plugins": [],
+  "mcp": [
+    {
+      "name": "filesystem",
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
+      "description": "Secure file operations with configurable access controls",
+      "category": "environment"
+    },
+    {
+      "name": "context-api",
+      "type": "remote",
+      "url": "https://example.test/mcp",
+      "headers": ["EXAMPLE_API_KEY"],
+      "description": "A remote server used only in tests",
+      "category": "integrations"
+    }
+  ]
+}

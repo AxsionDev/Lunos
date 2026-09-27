@@ -1428,6 +1428,7 @@ export type GlobalEvent = {
             | "prompt.clear"
             | "prompt.submit"
             | "agent.cycle"
+            | "mode.cycle"
             | string
         }
       }
@@ -1652,6 +1653,30 @@ export type ServerConfig = {
   mdns?: boolean
   mdnsDomain?: string
   cors?: Array<string>
+}
+
+export type MemoryConfig = {
+  enabled?: boolean
+  scope?: Array<"project" | "user">
+  model?: string
+  embedding?: string
+  retrieval?: {
+    max_tokens?: number
+  }
+  limits?: {
+    max_facts?: number
+    max_fact_chars?: number
+  }
+}
+
+export type SubagentConfig = {
+  background?: boolean
+  model?: string
+  variant?: string
+  dynamic?: {
+    enabled?: boolean
+    allow?: Array<string>
+  }
 }
 
 export type PermissionActionConfig = "ask" | "allow" | "deny"
@@ -1888,6 +1913,7 @@ export type AttachmentConfig = {
 
 export type Config = {
   $schema?: string
+  $locked?: Array<string>
   shell?: string
   logLevel?: LogLevel
   server?: ServerConfig
@@ -1905,6 +1931,29 @@ export type Config = {
     paths?: Array<string>
     urls?: Array<string>
   }
+  hooks?: {
+    "tool.execute.before"?: Array<ConfigV2HooksEntry>
+    "tool.execute.after"?: Array<ConfigV2HooksEntry>
+    "command.execute.before"?: Array<ConfigV2HooksEntry>
+    "session.created"?: Array<ConfigV2HooksEntry>
+    "session.idle"?: Array<ConfigV2HooksEntry>
+    "session.compacted"?: Array<ConfigV2HooksEntry>
+    "session.deleted"?: Array<ConfigV2HooksEntry>
+    "session.error"?: Array<ConfigV2HooksEntry>
+  }
+  audit?: {
+    enabled?: boolean
+    path?: string
+    redact?: Array<string>
+    max_bytes?: number
+    max_age_days?: number
+    forward?: {
+      syslog?: string
+      otlp?: string
+    }
+  }
+  memory?: MemoryConfig
+  residency?: ConfigV2Residency
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal
   }
@@ -1935,6 +1984,7 @@ export type Config = {
   model?: string
   small_model?: string
   default_agent?: string
+  subagent?: SubagentConfig
   subagent_depth?: number
   username?: string
   mode?: {
@@ -2007,6 +2057,10 @@ export type Config = {
     [key: string]: boolean
   }
   attachment?: AttachmentConfig
+  marketplace?: Array<string>
+  marketplace_default?: boolean
+  marketplace_unreviewed?: boolean
+  marketplace_allow?: Array<string>
   enterprise?: {
     url?: string
   }
@@ -2249,6 +2303,28 @@ export type GlobalSession = {
   project: ProjectSummary | null
 }
 
+export type ArtifactItem = {
+  kind: "plan" | "research" | "dev-cycle"
+  title: string
+  path: string
+  created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
+export type BackgroundJobItem = {
+  id: string
+  title?: string
+  status: "running" | "completed" | "error" | "cancelled"
+  startedAt: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  completedAt?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  elapsedMs: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  agent?: string
+  model?: string
+  modelRule?: string
+  parentSessionID?: string
+  sessionID?: string
+  error?: string
+}
+
 export type McpResource = {
   name: string
   uri: string
@@ -2365,6 +2441,7 @@ export type Agent = {
     providerID: string
   }
   variant?: string
+  modelSpec?: string
   prompt?: string
   options: {
     [key: string]: unknown
@@ -2468,6 +2545,44 @@ export type QuestionNotFoundError = {
   message: string
 }
 
+export type QuestionDrafts = {
+  /**
+   * Answers picked so far, in question order
+   */
+  answers: Array<QuestionAnswer>
+  custom?: Array<string>
+}
+
+export type MemoryFact = {
+  id: string
+  scope: "project" | "user"
+  text: string
+  sessionID: string
+  agent: string
+  source: string
+  date: string
+}
+
+export type MemoryList = {
+  /**
+   * Whether memory is on
+   */
+  on: boolean
+  reason?: string
+  facts: Array<MemoryFact>
+}
+
+export type MemoryNotFoundError = {
+  _tag: "MemoryNotFoundError"
+  id: string
+  message: string
+}
+
+export type MemoryUnavailableError = {
+  _tag: "MemoryUnavailableError"
+  message: string
+}
+
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -2548,6 +2663,11 @@ export type NotFoundError = {
   data: {
     message: string
   }
+}
+
+export type ShareDisabledError = {
+  _tag: "ShareDisabledError"
+  message: string
 }
 
 export type TextPartInput = {
@@ -2631,6 +2751,7 @@ export type EventTuiCommandExecute = {
       | "prompt.clear"
       | "prompt.submit"
       | "agent.cycle"
+      | "mode.cycle"
       | string
   }
 }
@@ -2993,6 +3114,7 @@ export type EventTuiCommandExecute2 = {
       | "prompt.clear"
       | "prompt.submit"
       | "agent.cycle"
+      | "mode.cycle"
       | string
   }
 }
@@ -3824,6 +3946,36 @@ export type SyncEventSessionNextRevertCommitted = {
       messageID: string
     }
   }
+}
+
+export type ConfigV2HooksMatcher = {
+  tool?: string
+  file?: string
+}
+
+export type ConfigV2HooksEntry = {
+  /**
+   * Command and arguments to run, as an array — not passed through a shell, so no quoting or injection concerns.
+   */
+  command: Array<string>
+  matcher?: ConfigV2HooksMatcher
+  environment?: {
+    [key: string]: string
+  }
+  /**
+   * Milliseconds before the command is killed. Defaults to 30000.
+   */
+  timeout?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  disabled?: boolean
+}
+
+export type ConfigV2Residency = {
+  /**
+   * Regions this deployment may send model requests to, e.g. ["eu"]. Providers outside this list are blocked before any request is made. Providers with no recorded jurisdiction are always denied. "configurable" providers (Azure, Bedrock, Vertex) are denied unless explicitly listed, because their region cannot be verified from here.
+   */
+  allow: Array<"eu" | "us" | "other" | "configurable" | "unknown">
+  audit?: boolean
+  auditPath?: string
 }
 
 export type ConfigV2ReferenceGit = {
@@ -5020,6 +5172,7 @@ export type SkillV2Info = {
   name: string
   description?: string
   slash?: boolean
+  allowedTools?: Array<string>
   location: string
   content: string
 }
@@ -5790,6 +5943,7 @@ export type TuiCommandExecute = {
       | "prompt.clear"
       | "prompt.submit"
       | "agent.cycle"
+      | "mode.cycle"
       | string
   }
 }
@@ -7356,7 +7510,7 @@ export type GlobalDisposeResponse = GlobalDisposeResponses[keyof GlobalDisposeRe
 
 export type GlobalUpgradeData = {
   body?: {
-    target: string
+    target?: string
   }
   path?: never
   query?: never
@@ -7860,6 +8014,98 @@ export type ExperimentalSessionBackgroundResponses = {
 
 export type ExperimentalSessionBackgroundResponse =
   ExperimentalSessionBackgroundResponses[keyof ExperimentalSessionBackgroundResponses]
+
+export type ExperimentalArtifactListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    kind?: "plan" | "research" | "dev-cycle"
+  }
+  url: "/experimental/artifact"
+}
+
+export type ExperimentalArtifactListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalArtifactListError = ExperimentalArtifactListErrors[keyof ExperimentalArtifactListErrors]
+
+export type ExperimentalArtifactListResponses = {
+  /**
+   * Plans, research notes and dev-cycle records
+   */
+  200: Array<ArtifactItem>
+}
+
+export type ExperimentalArtifactListResponse =
+  ExperimentalArtifactListResponses[keyof ExperimentalArtifactListResponses]
+
+export type ExperimentalBackgroundListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    sessionID?: string
+  }
+  url: "/experimental/background"
+}
+
+export type ExperimentalBackgroundListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalBackgroundListError = ExperimentalBackgroundListErrors[keyof ExperimentalBackgroundListErrors]
+
+export type ExperimentalBackgroundListResponses = {
+  /**
+   * Background subagent jobs
+   */
+  200: Array<BackgroundJobItem>
+}
+
+export type ExperimentalBackgroundListResponse =
+  ExperimentalBackgroundListResponses[keyof ExperimentalBackgroundListResponses]
+
+export type ExperimentalBackgroundCancelData = {
+  body?: never
+  path: {
+    jobID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/background/{jobID}/cancel"
+}
+
+export type ExperimentalBackgroundCancelErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalBackgroundCancelError =
+  ExperimentalBackgroundCancelErrors[keyof ExperimentalBackgroundCancelErrors]
+
+export type ExperimentalBackgroundCancelResponses = {
+  /**
+   * Whether a running job was cancelled
+   */
+  200: boolean
+}
+
+export type ExperimentalBackgroundCancelResponse =
+  ExperimentalBackgroundCancelResponses[keyof ExperimentalBackgroundCancelResponses]
 
 export type ExperimentalResourceListData = {
   body?: never
@@ -8370,6 +8616,7 @@ export type AppSkillsResponses = {
     description?: string
     location: string
     content: string
+    allowedTools?: Array<string>
   }>
 }
 
@@ -9203,7 +9450,9 @@ export type QuestionReplyResponses = {
 export type QuestionReplyResponse = QuestionReplyResponses[keyof QuestionReplyResponses]
 
 export type QuestionRejectData = {
-  body?: never
+  body?: {
+    drafts?: QuestionDrafts
+  }
   path: {
     requestID: string
   }
@@ -9235,6 +9484,110 @@ export type QuestionRejectResponses = {
 }
 
 export type QuestionRejectResponse = QuestionRejectResponses[keyof QuestionRejectResponses]
+
+export type MemoryListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory"
+}
+
+export type MemoryListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemoryListError = MemoryListErrors[keyof MemoryListErrors]
+
+export type MemoryListResponses = {
+  /**
+   * Stored facts, with provenance
+   */
+  200: MemoryList
+}
+
+export type MemoryListResponse = MemoryListResponses[keyof MemoryListResponses]
+
+export type MemoryRelatedData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/{id}/related"
+}
+
+export type MemoryRelatedErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * MemoryNotFoundError
+   */
+  404: MemoryNotFoundError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryRelatedError = MemoryRelatedErrors[keyof MemoryRelatedErrors]
+
+export type MemoryRelatedResponses = {
+  /**
+   * Relationships between entities around this fact
+   */
+  200: Array<string>
+}
+
+export type MemoryRelatedResponse = MemoryRelatedResponses[keyof MemoryRelatedResponses]
+
+export type MemoryForgetData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/{id}/forget"
+}
+
+export type MemoryForgetErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * MemoryNotFoundError
+   */
+  404: MemoryNotFoundError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryForgetError = MemoryForgetErrors[keyof MemoryForgetErrors]
+
+export type MemoryForgetResponses = {
+  /**
+   * Fact forgotten
+   */
+  200: boolean
+}
+
+export type MemoryForgetResponse = MemoryForgetResponses[keyof MemoryForgetResponses]
 
 export type PermissionListData = {
   body?: never
@@ -10082,6 +10435,10 @@ export type SessionShareErrors = {
    * Bad request
    */
   400: BadRequestError
+  /**
+   * ShareDisabledError
+   */
+  403: ShareDisabledError
   /**
    * NotFoundError
    */

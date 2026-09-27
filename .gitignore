@@ -32,3 +32,7 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Headroom per-session wrap state — machine-generated, churns every session
+.claude/.headroom_wrap_marker.json
+.claude/.headroom_wrap_owners.json

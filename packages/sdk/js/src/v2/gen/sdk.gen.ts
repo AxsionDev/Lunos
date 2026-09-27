@@ -29,6 +29,12 @@ import type {
   EventTuiPromptAppend,
   EventTuiSessionSelect,
   EventTuiToastShow,
+  ExperimentalArtifactListErrors,
+  ExperimentalArtifactListResponses,
+  ExperimentalBackgroundCancelErrors,
+  ExperimentalBackgroundCancelResponses,
+  ExperimentalBackgroundListErrors,
+  ExperimentalBackgroundListResponses,
   ExperimentalCapabilitiesGetErrors,
   ExperimentalCapabilitiesGetResponses,
   ExperimentalConsoleGetErrors,
@@ -111,6 +117,12 @@ import type {
   McpRemoteConfig,
   McpStatusErrors,
   McpStatusResponses,
+  MemoryForgetErrors,
+  MemoryForgetResponses,
+  MemoryListErrors,
+  MemoryListResponses,
+  MemoryRelatedErrors,
+  MemoryRelatedResponses,
   ModelRef,
   MoveSessionDestination,
   OutputFormat,
@@ -168,6 +180,7 @@ import type {
   PtyUpdateErrors,
   PtyUpdateResponses,
   QuestionAnswer,
+  QuestionDrafts,
   QuestionListErrors,
   QuestionListResponses,
   QuestionRejectErrors,
@@ -886,6 +899,118 @@ export class Session extends HeyApiClient {
   }
 }
 
+export class Artifact extends HeyApiClient {
+  /**
+   * List artifacts
+   *
+   * List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      kind?: "plan" | "research" | "dev-cycle"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "kind" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalArtifactListResponses,
+      ExperimentalArtifactListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/artifact",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Background extends HeyApiClient {
+  /**
+   * List background subagents
+   *
+   * List subagent jobs with status, elapsed time, agent and resolved model. Pass sessionID to list only that session's jobs.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalBackgroundListResponses,
+      ExperimentalBackgroundListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Cancel a background subagent
+   *
+   * Cancel a running background subagent job and its child session.
+   */
+  public cancel<ThrowOnError extends boolean = false>(
+    parameters: {
+      jobID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "jobID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalBackgroundCancelResponses,
+      ExperimentalBackgroundCancelErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background/{jobID}/cancel",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Resource extends HeyApiClient {
   /**
    * Get MCP resources
@@ -1261,6 +1386,16 @@ export class Experimental extends HeyApiClient {
     return (this._session ??= new Session({ client: this.client }))
   }
 
+  private _artifact?: Artifact
+  get artifact(): Artifact {
+    return (this._artifact ??= new Artifact({ client: this.client }))
+  }
+
+  private _background?: Background
+  get background(): Background {
+    return (this._background ??= new Background({ client: this.client }))
+  }
+
   private _resource?: Resource
   get resource(): Resource {
     return (this._resource ??= new Resource({ client: this.client }))
@@ -1353,9 +1488,9 @@ export class Global extends HeyApiClient {
   }
 
   /**
-   * Upgrade opencode
+   * Upgrade Lunos
    *
-   * Upgrade opencode to the specified version.
+   * Upgrade Lunos to the specified version, or to the latest release when no target is given.
    */
   public upgrade<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -3059,6 +3194,7 @@ export class Question extends HeyApiClient {
       requestID: string
       directory?: string
       workspace?: string
+      drafts?: QuestionDrafts
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3070,12 +3206,114 @@ export class Question extends HeyApiClient {
             { in: "path", key: "requestID" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "body", key: "drafts" },
           ],
         },
       ],
     )
     return (options?.client ?? this.client).post<QuestionRejectResponses, QuestionRejectErrors, ThrowOnError>({
       url: "/question/{requestID}/reject",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Memory extends HeyApiClient {
+  /**
+   * List memory
+   *
+   * List facts in long-term memory with where each came from. Does not start memory.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryListResponses, MemoryListErrors, ThrowOnError>({
+      url: "/memory",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Fact connections
+   *
+   * Entities and relationships in the memory graph around one fact.
+   */
+  public related<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryRelatedResponses, MemoryRelatedErrors, ThrowOnError>({
+      url: "/memory/{id}/related",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Forget a fact
+   *
+   * Remove one fact from long-term memory.
+   */
+  public forget<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryForgetResponses, MemoryForgetErrors, ThrowOnError>({
+      url: "/memory/{id}/forget",
       ...options,
       ...params,
     })
@@ -7180,6 +7418,11 @@ export class OpencodeClient extends HeyApiClient {
   private _question?: Question
   get question(): Question {
     return (this._question ??= new Question({ client: this.client }))
+  }
+
+  private _memory?: Memory
+  get memory(): Memory {
+    return (this._memory ??= new Memory({ client: this.client }))
   }
 
   private _permission?: Permission

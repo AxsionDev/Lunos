@@ -1,8 +1,10 @@
 import { Agent } from "@/agent/agent"
+import { SkillScope } from "@/skill/scope"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
 import { MCP } from "@/mcp"
+import { AuditLog } from "@/audit/log"
 import { McpCatalog } from "@/mcp/catalog"
 import { Permission } from "@/permission"
 import { Tool } from "@/tool/tool"
@@ -23,6 +25,13 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { InstanceState } from "@/effect/instance-state"
+import { Memory } from "@/memory"
+import { MemoryGuard } from "@/memory/guard"
+import { MemoryRecall } from "@/memory/recall"
+import { MemoryStore } from "@/memory/store"
+import MEMORY_REMEMBER from "@/memory/remember.txt"
+import MEMORY_SEARCH from "@/memory/search.txt"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -55,6 +64,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
+  const memory = yield* Memory.Service
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -84,7 +94,14 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           ...req,
           sessionID: input.session.id,
           tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-          ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+          ruleset: Permission.merge(
+            input.agent.permission,
+            input.session.permission ?? [],
+            SkillScope.rules(
+              input.session.id,
+              input.messages.findLast((message) => message.info.role === "user")?.info.id,
+            ),
+          ),
         })
         .pipe(Effect.orDie),
   })
@@ -105,9 +122,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             const ctx = context(args, options)
             yield* plugin.trigger(
               "tool.execute.before",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
+              { tool: item.id, sessionID: ctx.sessionID, agent: ctx.agent, callID: ctx.callID },
               { args },
             )
+            AuditLog.toolRun({ tool: item.id, agent: ctx.agent, session: ctx.sessionID, args })
             const result = yield* item.execute(args, ctx)
             const output = {
               ...result,
@@ -120,7 +138,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.after",
-              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
+              { tool: item.id, sessionID: ctx.sessionID, agent: ctx.agent, callID: ctx.callID, args },
               output,
             )
             if (options.abortSignal?.aborted) {
@@ -131,6 +149,108 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         )
       },
     })
+  }
+
+  // XCOD-94: memory tools exist only while memory is on for this session, and not for an agent
+  // whose permission denies "memory". memory_remember asks a person before anything is stored.
+  if ((yield* memory.decision(input.session.id)).on) {
+    const hidden = Permission.disabled(
+      ["memory_remember", "memory_search"],
+      Permission.merge(input.agent.permission, input.session.permission ?? []),
+    )
+    const scopes = yield* memory.scopes()
+    const parent = { providerID: input.model.providerID, modelID: input.model.id }
+    const worktree = MemoryStore.projectRoot(yield* InstanceState.context)
+    const finish = (title: string, output: string, metadata: Record<string, unknown> = {}) => ({
+      title,
+      output,
+      metadata,
+    })
+    if (!hidden.has("memory_remember"))
+      tools.memory_remember = tool({
+        description: MEMORY_REMEMBER,
+        inputSchema: jsonSchema(
+          ProviderTransform.schema(input.model, {
+            type: "object",
+            properties: {
+              fact: { type: "string", description: "One durable fact, in a single sentence or short paragraph" },
+              source: {
+                type: "string",
+                description:
+                  'Where it came from: "user message", or the worktree-relative path of the file it was read from',
+              },
+              ...(scopes.length > 1
+                ? { scope: { type: "string", enum: scopes, description: "Which memory to store it in" } }
+                : {}),
+            },
+            required: ["fact", "source"],
+            additionalProperties: false,
+          }),
+        ),
+        execute(args, opts) {
+          return run.promise(
+            Effect.gen(function* () {
+              const params = toRecord(args)
+              const fact = String(params.fact ?? "").trim()
+              const source = String(params.source ?? "user message")
+              const scope = (scopes.includes(params.scope as never) ? params.scope : scopes[0]) as "project" | "user"
+              const ctx = context(params, opts)
+              AuditLog.toolRun({ tool: "memory_remember", agent: ctx.agent, session: ctx.sessionID, args: {} })
+              // Check first, so a person is never asked to approve something that would be refused.
+              const refusal = MemoryGuard.taint(input.messages, worktree) ?? MemoryGuard.secret(fact)
+              if (refusal) return finish("Not remembered", `Not remembered: ${refusal}.`, { refused: true })
+              yield* ctx.ask({
+                permission: "memory",
+                patterns: [fact],
+                always: ["*"],
+                metadata: { fact, source, scope },
+              })
+              const result = yield* memory
+                .remember({
+                  fact,
+                  source,
+                  scope,
+                  sessionID: ctx.sessionID,
+                  agent: ctx.agent,
+                  parent,
+                  messages: input.messages,
+                })
+                .pipe(Effect.result)
+              if (result._tag === "Failure") return finish("Not remembered", result.failure.message, { refused: true })
+              return finish("Remembered", `Remembered in ${scope} memory as ${result.success.id}.`, {
+                id: result.success.id,
+                scope,
+              })
+            }),
+          )
+        },
+      })
+    if (!hidden.has("memory_search"))
+      tools.memory_search = tool({
+        description: MEMORY_SEARCH,
+        inputSchema: jsonSchema(
+          ProviderTransform.schema(input.model, {
+            type: "object",
+            properties: { query: { type: "string", description: "What to look up" } },
+            required: ["query"],
+            additionalProperties: false,
+          }),
+        ),
+        execute(args, opts) {
+          return run.promise(
+            Effect.gen(function* () {
+              const params = toRecord(args)
+              const ctx = context(params, opts)
+              AuditLog.toolRun({ tool: "memory_search", agent: ctx.agent, session: ctx.sessionID, args: {} })
+              const result = yield* memory
+                .search({ query: String(params.query ?? ""), sessionID: ctx.sessionID, parent })
+                .pipe(Effect.result)
+              if (result._tag === "Failure") return finish("Memory search failed", result.failure.message)
+              return finish("Memory", MemoryRecall.block(result.success) ?? "Nothing in memory matches.")
+            }),
+          )
+        },
+      })
   }
 
   const hasMcpResourceServer = Object.values(yield* mcp.clients()).some(
@@ -174,7 +294,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               : resourceServers.map((server) => `mcp:${server}:*`)
             yield* plugin.trigger(
               "tool.execute.before",
-              { tool: MCP_RESOURCE_TOOLS.list, sessionID: ctx.sessionID, callID: opts.toolCallId },
+              { tool: MCP_RESOURCE_TOOLS.list, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId },
               { args },
             )
             yield* ctx.ask({
@@ -207,7 +327,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.after",
-              { tool: MCP_RESOURCE_TOOLS.list, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+              {
+                tool: MCP_RESOURCE_TOOLS.list,
+                sessionID: ctx.sessionID,
+                agent: ctx.agent,
+                callID: opts.toolCallId,
+                args,
+              },
               output,
             )
             if (opts.abortSignal?.aborted) {
@@ -257,7 +383,12 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               : resourceServers.map((server) => `mcp:${server}:*`)
             yield* plugin.trigger(
               "tool.execute.before",
-              { tool: MCP_RESOURCE_TOOLS.listTemplates, sessionID: ctx.sessionID, callID: opts.toolCallId },
+              {
+                tool: MCP_RESOURCE_TOOLS.listTemplates,
+                sessionID: ctx.sessionID,
+                agent: ctx.agent,
+                callID: opts.toolCallId,
+              },
               { args },
             )
             yield* ctx.ask({
@@ -290,7 +421,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.after",
-              { tool: MCP_RESOURCE_TOOLS.listTemplates, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+              {
+                tool: MCP_RESOURCE_TOOLS.listTemplates,
+                sessionID: ctx.sessionID,
+                agent: ctx.agent,
+                callID: opts.toolCallId,
+                args,
+              },
               output,
             )
             if (opts.abortSignal?.aborted) {
@@ -337,7 +474,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.before",
-              { tool: MCP_RESOURCE_TOOLS.read, sessionID: ctx.sessionID, callID: opts.toolCallId },
+              { tool: MCP_RESOURCE_TOOLS.read, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId },
               { args },
             )
             yield* ctx.ask({
@@ -372,7 +509,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             }
             yield* plugin.trigger(
               "tool.execute.after",
-              { tool: MCP_RESOURCE_TOOLS.read, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+              {
+                tool: MCP_RESOURCE_TOOLS.read,
+                sessionID: ctx.sessionID,
+                agent: ctx.agent,
+                callID: opts.toolCallId,
+                args,
+              },
               output,
             )
             if (opts.abortSignal?.aborted) {
@@ -401,9 +544,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           const ctx = context(args, opts)
           yield* plugin.trigger(
             "tool.execute.before",
-            { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
+            { tool: key, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId },
             { args },
           )
+          AuditLog.toolRun({ tool: key, agent: ctx.agent, session: ctx.sessionID, args })
           const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.gen(function* () {
             yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
             return yield* Effect.promise(() => execute(args, opts))
@@ -419,7 +563,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           )
           yield* plugin.trigger(
             "tool.execute.after",
-            { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+            { tool: key, sessionID: ctx.sessionID, agent: ctx.agent, callID: opts.toolCallId, args },
             result,
           )
 

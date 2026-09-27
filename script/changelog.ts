@@ -11,6 +11,7 @@ const { values, positionals } = parseArgs({
   options: {
     from: { type: "string", short: "f" },
     to: { type: "string", short: "t" },
+    model: { type: "string", short: "m" },
     variant: { type: "string", default: "low" },
     quiet: { type: "boolean", default: false },
     print: { type: "boolean", default: false },
@@ -32,6 +33,8 @@ Generates UPCOMING_CHANGELOG.md by running the opencode changelog command.
 Options:
   -f, --from <version>   Starting version (default: latest non-draft GitHub release)
   -t, --to <ref>         Ending ref (default: HEAD)
+  -m, --model <id>       Model as provider/model (default: $CHANGELOG_MODEL, else whatever
+                         provider is configured — any vendor with its API key set works)
       --variant <name>   Thinking variant for opencode run (default: low)
       --quiet            Suppress opencode command output unless it fails
       --print            Print the generated UPCOMING_CHANGELOG.md after success
@@ -49,6 +52,13 @@ await rm(file, { force: true })
 
 const quiet = values.quiet
 const cmd = ["opencode", "run"]
+// Provider-agnostic by design: no vendor is required. Any provider whose API key is present in
+// the environment is auto-detected (see provider.ts — a provider is available when any of its
+// declared env vars is set), so this works with Anthropic, OpenAI, Google, a local model, or
+// OpenCode Zen equally. `--model provider/model` pins one explicitly; leaving it unset uses
+// whatever is configured. CHANGELOG_MODEL lets CI choose without editing this script.
+const model = values.model ?? process.env.CHANGELOG_MODEL
+if (model) cmd.push("--model", model)
 cmd.push("--variant", values.variant)
 cmd.push("--command", "changelog", "--", ...args)
 

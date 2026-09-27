@@ -235,9 +235,8 @@ export const ReadTool = Tool.define<
       if (!path.isAbsolute(filepath)) {
         filepath = path.resolve(instance.directory, filepath)
       }
-      if (process.platform === "win32") {
-        filepath = FSUtil.normalizePath(filepath)
-      }
+      // Permission patterns are matched as strings; spell the path as it is on disk.
+      filepath = FSUtil.onDiskCase(filepath)
       const title = path.relative(instance.worktree, filepath)
 
       const stat = yield* fs.stat(filepath).pipe(

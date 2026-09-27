@@ -1,34 +1,51 @@
-# opencode VS Code Extension
+# Lunos for VS Code
 
-A Visual Studio Code extension that integrates [opencode](https://opencode.ai) directly into your development workflow.
+Start [Lunos](https://lunos.tech), the EU-sovereign, self-hostable AI coding agent, from VS Code, VSCodium or any other editor that installs from the VS Code Marketplace or Open VSX.
 
-## Prerequisites
+## Install
 
-This extension requires the [opencode CLI](https://opencode.ai) to be installed on your system. Visit [opencode.ai](https://opencode.ai) for installation instructions.
+1. **Install the Lunos CLI.** The extension starts it; it doesn't include it.
+
+   ```bash
+   npm i -g lunos-ai@latest --allow-scripts=lunos-ai
+   lunos --version
+   ```
+
+   npm 12 needs `--allow-scripts=lunos-ai`. Other ways to install are in the [installation guide](https://github.com/AxsionDev/Lunos#installation).
+
+2. **Install this extension.** Search for "Lunos" in the Extensions view: VS Code installs from the VS Code Marketplace, VSCodium from Open VSX.
+
+3. **Open Lunos** with `Cmd+Esc` (macOS) or `Ctrl+Esc` (Windows, Linux).
+
+If the extension can't find `lunos` on your `PATH`, it tells you how to install it. It never starts a different program in its place. To use a `lunos` that isn't on your `PATH`, set **`lunos.path`** to its full path.
 
 ## Features
 
-- **Quick Launch**: Use `Cmd+Esc` (Mac) or `Ctrl+Esc` (Windows/Linux) to open opencode in a split terminal view, or focus an existing terminal session if one is already running.
-- **New Session**: Use `Cmd+Shift+Esc` (Mac) or `Ctrl+Shift+Esc` (Windows/Linux) to start a new opencode terminal session, even if one is already open. You can also click the opencode button in the UI.
-- **Context Awareness**: Automatically share your current selection or tab with opencode.
-- **File Reference Shortcuts**: Use `Cmd+Option+K` (Mac) or `Alt+Ctrl+K` (Linux/Windows) to insert file references. For example, `@File#L37-42`.
+- **Quick launch:** `Cmd+Esc` / `Ctrl+Esc` opens Lunos in a split terminal, or focuses the one already open.
+- **New session:** `Cmd+Shift+Esc` / `Ctrl+Shift+Esc`, or the Lunos button in the editor title bar, starts another Lunos terminal.
+- **File references:** `Cmd+Option+K` / `Ctrl+Alt+K` adds the current file to the prompt, with the selected lines, for example `@src/app.ts#L37-42`.
+- **Version check:** the status bar shows which Lunos CLI version started. The extension warns you if it's older than the oldest version it supports.
 
-## Support
+## Where your data goes
 
-This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/anomalyco/opencode/issues.
+The extension itself sends nothing anywhere. It starts the Lunos CLI on your machine and talks to it on `localhost`.
+
+The CLI sends prompts and code context only to the model provider **you** configure. Its other outbound calls, such as the model catalogue and the update check, carry no project data. With a data-residency policy it can be restricted to EU providers. There is no Lunos-operated service in the data path.
+
+The details, including what is and isn't claimed, are in the [self-hosted deployment guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md).
+
+## Documentation and support
+
+- [Lunos on GitHub](https://github.com/AxsionDev/Lunos) and its [documentation](https://github.com/AxsionDev/Lunos/tree/dev/docs)
+- Report issues at [github.com/AxsionDev/Lunos/issues](https://github.com/AxsionDev/Lunos/issues)
+
+Lunos is MIT-licensed. It is a fork of opencode and is not affiliated with the opencode team. See [LICENSE](https://github.com/AxsionDev/Lunos/blob/dev/LICENSE).
 
 ## Development
 
-1. `code sdks/vscode` - Open the `sdks/vscode` directory in VS Code. **Do not open from repo root.**
-2. `bun install` - Run inside the `sdks/vscode` directory.
-3. Press `F5` to start debugging - This launches a new VS Code window with the extension loaded.
+1. `code sdks/vscode`: open the `sdks/vscode` directory in VS Code. **Don't open it from the repo root.**
+2. `bun install` in `sdks/vscode`.
+3. Press `F5` to launch a VS Code window with the extension loaded.
+4. `bun test ./test` runs the unit tests.
 
-#### Making Changes
-
-`tsc` and `esbuild` watchers run automatically during debugging (visible in the Terminal tab). Changes to the extension are automatically rebuilt in the background.
-
-To test your changes:
-
-1. In the debug VS Code window, press `Cmd+Shift+P`
-2. Search for `Developer: Reload Window`
-3. Reload to see your changes without restarting the debug session
+`tsc` and `esbuild` watchers rebuild in the background while debugging. To see a change, run **Developer: Reload Window** in the debug window.

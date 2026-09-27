@@ -1,4 +1,5 @@
 import path from "node:path"
+import { AuditLog } from "@/audit/log"
 import { pathToFileURL } from "node:url"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
@@ -379,6 +380,25 @@ const layer = Layer.effect(
           mcp.type === "remote"
             ? yield* connectRemote(key, mcp as ConfigMCPV1.Info & { type: "remote" })
             : yield* connectLocal(key, mcp as ConfigMCPV1.Info & { type: "local" })
+        // XCOD-103: the server's name, transport and where it runs (host or command), never its
+        // environment or headers.
+        AuditLog.emit("mcp.connect", {
+          server: key,
+          transport: mcp.type,
+          host:
+            mcp.type === "remote"
+              ? (() => {
+                  try {
+                    return new URL((mcp as { url: string }).url).host
+                  } catch {
+                    return "unknown"
+                  }
+                })()
+              : undefined,
+          command: mcp.type === "local" ? ((mcp as { command?: string[] }).command ?? []).join(" ") : undefined,
+          allowed: status.status === "connected",
+          reason: status.status,
+        })
 
         if (!mcpClient) {
           if (status.status !== "connected" && status.status !== "disabled") {

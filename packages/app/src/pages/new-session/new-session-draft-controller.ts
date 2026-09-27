@@ -17,7 +17,7 @@ export function createNewSessionDraftController(workspace: { worktree: () => str
   const local = useLocal()
   const route = useSessionKey()
   const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string }>()
-  const model = createPromptModelSelection({ agent: () => local.agent.current() })
+  const model = createPromptModelSelection({ agent: () => local.mode.current() })
 
   useComposerCommands({ model })
 

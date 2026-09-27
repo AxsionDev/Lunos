@@ -10,8 +10,11 @@ import { Auth } from "../auth"
 import { ProviderTransform } from "@/provider/transform"
 
 import PROMPT_GENERATE from "./generate.txt"
+import PROMPT_ARCHITECT from "./prompt/architect.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
+import PROMPT_PLANNER from "./prompt/planner.txt"
+import PROMPT_QA from "./prompt/qa.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
@@ -49,6 +52,8 @@ export const Info = Schema.Struct({
     }),
   ),
   variant: Schema.optional(Schema.String),
+  /** Raw `agent.<name>.model` from config: `"inherit"`, `"small"` or `"provider/model"` (XCOD-82). */
+  modelSpec: Schema.optional(Schema.String),
   prompt: Schema.optional(Schema.String),
   options: Schema.Record(Schema.String, Schema.Unknown),
   steps: Schema.optional(Schema.Finite),
@@ -126,6 +131,17 @@ const layer = Layer.effect(
           question: "deny",
           plan_enter: "deny",
           plan_exit: "deny",
+          // XCOD-94: a person approves every fact before it enters long-term memory. The model may
+          // not write memory through files either: notes in .opencode/memory/ become trusted facts,
+          // so editing them asks, and the stored graph and its provenance ledger are off limits.
+          // One "edit" rule covers edit, write and apply_patch. Shell commands can still write
+          // files; the rules doc says so.
+          memory: "ask",
+          edit: {
+            "*": "allow",
+            [path.join(".opencode", "memory", "*")]: "ask",
+            [path.join(".opencode", "memory", "graph", "*")]: "deny",
+          },
           // mirrors github.com/github/gitignore Node.gitignore pattern for .env files
           read: {
             "*": "allow",
@@ -179,6 +195,64 @@ const layer = Layer.effect(
             mode: "primary",
             native: true,
           },
+          research: {
+            name: "research",
+            description:
+              "Deep research and understanding of a topic or goal — no code changes. Output is Markdown files and specs.",
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                question: "allow",
+                // Unlike `plan`, no `task: { general: "deny" }` — this mode
+                // must be able to delegate research legwork to subagents.
+                external_directory: {
+                  [path.join(Global.Path.data, "research", "*")]: "allow",
+                },
+                edit: {
+                  "*": "deny",
+                  [path.join(".opencode", "research", "*.md")]: "allow",
+                  [path.relative(ctx.worktree, path.join(Global.Path.data, path.join("research", "*.md")))]: "allow",
+                },
+              }),
+              user,
+            ),
+            mode: "primary",
+            native: true,
+            // Deliberately no `prompt` — for a primary agent that field
+            // *replaces* SystemPrompt.provider() (see session/llm/request.ts),
+            // which would strip the provider prompt's tool-use discipline and
+            // leave research mode answering from memory. Like `plan`, research
+            // mode is steered by a per-turn reminder instead
+            // (session/reminders.ts).
+          },
+          "dev-cycle": {
+            name: "dev-cycle",
+            description:
+              "Full development cycle — discover, architect, plan, build and verify, with human approval gates between phases.",
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                // Every gate is a `question` call, and question is denied by default.
+                question: "allow",
+                // Unlike `plan`, no `task: { general: "deny" }` — each phase
+                // delegates to a subagent.
+                //
+                // Also unlike `plan`/`research`, no `edit` restriction: this
+                // mode implements code and inherits "*": "allow" from defaults.
+                // The gates are prompt-level, not permission-level.
+                external_directory: {
+                  [path.join(Global.Path.data, "dev-cycle", "*")]: "allow",
+                },
+              }),
+              user,
+            ),
+            mode: "primary",
+            native: true,
+            // Deliberately no `prompt` — see the note on the `research` entry
+            // above. Steered by a per-turn reminder (session/reminders.ts).
+          },
           general: {
             name: "general",
             description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
@@ -212,6 +286,87 @@ const layer = Layer.effect(
             ),
             description: `Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.`,
             prompt: PROMPT_EXPLORE,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          // The three dev-cycle phase subagents. They are native rather than
+          // project markdown in `.opencode/agent/` because `dev-cycle` itself
+          // is native: `config/paths.ts` only scans the global config dir and
+          // `.opencode` dirs walked up from the cwd, so against any other
+          // project the mode would ship without the agents its own prompt
+          // names, and `task.ts` would reject them as unknown agent types.
+          // Setting `prompt` here is correct — it only replaces
+          // SystemPrompt.provider() for *primary* agents; `explore` above is
+          // the precedent.
+          architect: {
+            name: "architect",
+            description:
+              "Designs the approach for a feature — interfaces, trade-offs, and rejected alternatives. Read-only: produces a design, never an edit.",
+            color: "#7C8EF5",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                webfetch: "allow",
+                websearch: "allow",
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_ARCHITECT,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          planner: {
+            name: "planner",
+            description: "Breaks an approved architecture into ordered, independently testable implementation steps.",
+            color: "#5FB37E",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_PLANNER,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          qa: {
+            name: "qa",
+            description:
+              "Reviews and tests an implementation written by another agent. Runs the suite, reports what actually happened.",
+            color: "#D98A4B",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                // `bash` is a separate permission key from `edit`, so this is
+                // a write channel the "report, never fix" rule in qa.txt holds
+                // shut by instruction only. It is the accepted trade: qa
+                // cannot run the suite without a shell. See spec §5.2.
+                bash: "allow",
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_QA,
             options: {},
             mode: "subagent",
             native: true,
@@ -278,7 +433,11 @@ const layer = Layer.effect(
               options: {},
               native: false,
             }
-          if (value.model) item.model = Provider.parseModel(value.model)
+          if (value.model) {
+            item.modelSpec = value.model
+            // "inherit" and "small" are resolved per task call (agent/subagent-model.ts), not here.
+            if (value.model !== "inherit" && value.model !== "small") item.model = Provider.parseModel(value.model)
+          }
           item.variant = value.variant ?? item.variant
           item.prompt = value.prompt ?? item.prompt
           item.description = value.description ?? item.description

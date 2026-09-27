@@ -1,10 +1,14 @@
 import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
+import { animationsEnabled } from "./util/motion"
+import { DialogArtifacts } from "./component/dialog-artifacts"
+import { DialogBackground } from "./component/dialog-background"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationVersion, manualInstallCommand } from "@opencode-ai/core/installation/version"
+import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
@@ -46,7 +50,7 @@ import { DialogStatus } from "./component/dialog-status"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
-import { DialogAgent } from "./component/dialog-agent"
+import { DialogMode } from "./component/dialog-mode"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
@@ -110,10 +114,10 @@ const appBindingCommands = [
   "model.cycle_recent_reverse",
   "model.cycle_favorite",
   "model.cycle_favorite_reverse",
-  "agent.list",
+  "mode.list",
   "mcp.list",
-  "agent.cycle",
-  "agent.cycle.reverse",
+  "mode.cycle",
+  "mode.cycle.reverse",
   "variant.cycle",
   "variant.list",
   "provider.connect",
@@ -164,23 +168,6 @@ function errorMessage(error: unknown) {
     return error.data.message
   }
   return error instanceof Error ? error.message : String(error)
-}
-
-function isVersionGreater(left: string, right: string) {
-  const parse = (value: string) => {
-    const [core, prerelease] = value.replace(/^v/, "").split("-", 2)
-    return { core: core.split(".").map((part) => Number.parseInt(part, 10) || 0), prerelease }
-  }
-  const a = parse(left)
-  const b = parse(right)
-  for (let index = 0; index < Math.max(a.core.length, b.core.length); index++) {
-    const difference = (a.core[index] ?? 0) - (b.core[index] ?? 0)
-    if (difference) return difference > 0
-  }
-  if (a.prerelease === b.prerelease) return false
-  if (!a.prerelease) return true
-  if (!b.prerelease) return false
-  return a.prerelease.localeCompare(b.prerelease, undefined, { numeric: true }) > 0
 }
 
 export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
@@ -456,14 +443,14 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
 
     if (route.data.type === "home") {
-      renderer.setTerminalTitle("OpenCode")
+      renderer.setTerminalTitle("Lunos")
       return
     }
 
     if (route.data.type === "session") {
       const session = sync.session.get(route.data.sessionID)
       if (!session || isDefaultTitle(session.title)) {
-        renderer.setTerminalTitle("OpenCode")
+        renderer.setTerminalTitle("Lunos")
         return
       }
 
@@ -479,8 +466,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
 
   const args = useArgs()
   onMount(() => {
+    for (const item of tuiConfig.deprecatedKeybinds) {
+      toast.show({
+        variant: "warning",
+        message: `Keybind "${item.legacy}" is deprecated, use "${item.canonical}" instead`,
+        duration: 5000,
+      })
+    }
     batch(() => {
-      if (args.agent) local.agent.set(args.agent)
+      if (args.mode) local.mode.set(args.mode)
       if (args.model) {
         const { providerID, modelID } = Model.parse(args.model)
         if (!providerID || !modelID)
@@ -581,6 +575,26 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         },
       },
       {
+        name: "artifact.list",
+        title: "Plans and research notes",
+        category: "Session",
+        slashName: "artifacts",
+        slashAliases: ["plans"],
+        run: () => {
+          dialog.replace(() => <DialogArtifacts />)
+        },
+      },
+      {
+        name: "background.list",
+        title: "Background subagents",
+        category: "Session",
+        slashName: "tasks",
+        slashAliases: ["background"],
+        run: () => {
+          dialog.replace(() => <DialogBackground />)
+        },
+      },
+      {
         name: "session.new",
         title: "New session",
         suggested: route.data.type === "session",
@@ -632,7 +646,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "model.list",
         title: "Switch model",
         suggested: true,
-        category: "Agent",
+        category: "Mode",
         slashName: "models",
         // Bias /mo toward /models over /move without changing global fuzzy scoring.
         slashAliases: ["mo"],
@@ -643,7 +657,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_recent",
         title: "Model cycle",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycle(1)
@@ -652,7 +666,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_recent_reverse",
         title: "Model cycle reverse",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycle(-1)
@@ -661,7 +675,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_favorite",
         title: "Favorite cycle",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycleFavorite(1)
@@ -670,43 +684,49 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_favorite_reverse",
         title: "Favorite cycle reverse",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycleFavorite(-1)
         },
       },
       {
-        name: "agent.list",
-        title: "Switch agent",
-        category: "Agent",
-        slashName: "agents",
+        name: "mode.list",
+        title: "Switch mode",
+        category: "Mode",
+        slashName: "modes",
+        // Deprecated alias (XCOD-40): "/agents" still resolves here via fuzzy
+        // slash matching (isVisiblePaletteCommand excludes hidden commands
+        // from the slash list, so a separate hidden alias command would
+        // never actually be reachable — this must be an alias on the visible
+        // command, not a second entry).
+        slashAliases: ["agents"],
         run: () => {
-          dialog.replace(() => <DialogAgent />)
+          dialog.replace(() => <DialogMode />)
         },
       },
       {
         name: "mcp.list",
         title: "Toggle MCPs",
-        category: "Agent",
+        category: "Mode",
         slashName: "mcps",
         run: () => {
           dialog.replace(() => <DialogMcp />)
         },
       },
       {
-        name: "agent.cycle",
-        title: "Agent cycle",
-        category: "Agent",
+        name: "mode.cycle",
+        title: "Mode cycle",
+        category: "Mode",
         hidden: true,
         run: () => {
-          local.agent.move(1)
+          local.mode.move(1)
         },
       },
       {
         name: "variant.cycle",
         title: "Variant cycle",
-        category: "Agent",
+        category: "Mode",
         run: () => {
           local.model.variant.cycle()
         },
@@ -714,7 +734,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "variant.list",
         title: "Switch model variant",
-        category: "Agent",
+        category: "Mode",
         hidden: local.model.variant.list().length === 0,
         slashName: "variants",
         run: () => {
@@ -729,12 +749,12 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         },
       },
       {
-        name: "agent.cycle.reverse",
-        title: "Agent cycle reverse",
-        category: "Agent",
+        name: "mode.cycle.reverse",
+        title: "Mode cycle reverse",
+        category: "Mode",
         hidden: true,
         run: () => {
-          local.agent.move(-1)
+          local.mode.move(-1)
         },
       },
       {
@@ -827,6 +847,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "System",
       },
       {
+        name: "app.upgrade",
+        title: "Upgrade Lunos",
+        slashName: "upgrade",
+        run: () => {
+          dialog.clear()
+          void runUpgrade(undefined)
+        },
+        category: "System",
+      },
+      {
         name: "app.exit",
         title: "Exit the app",
         slashName: "exit",
@@ -894,10 +924,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       },
       {
         name: "app.toggle.animations",
-        title: kv.get("animations_enabled", true) ? "Disable animations" : "Enable animations",
+        title:
+          tuiConfig.reduced_motion === true
+            ? "Animations are off (reduced_motion in config)"
+            : animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled"))
+              ? "Disable animations"
+              : "Enable animations",
         category: "System",
         run: () => {
-          kv.set("animations_enabled", !kv.get("animations_enabled", true))
+          if (tuiConfig.reduced_motion !== true)
+            kv.set("animations_enabled", !animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled")))
           dialog.clear()
         },
       },
@@ -1030,9 +1066,45 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     })
   })
 
+  // One flow for the reminder dialog and /upgrade. `target` undefined means "latest";
+  // the server resolves it from the lunos-ai registry entry.
+  async function runUpgrade(target: string | undefined) {
+    toast.show({
+      variant: "info",
+      message: target ? `Updating to Lunos v${target}…` : "Updating Lunos to the latest release…",
+      duration: 30000,
+    })
+
+    const result = await sdk.client.global.upgrade({ target })
+
+    if (result.error || !result.data?.success) {
+      // A refused upgrade comes back as a 400 whose body is `{ success: false, error }`.
+      const body = (result.error ?? result.data) as { error?: unknown } | undefined
+      const reason =
+        typeof body?.error === "string" ? body.error : result.error ? errorMessage(result.error) : "Update failed"
+      toast.show({
+        variant: "error",
+        title: "Update Failed",
+        message: `${reason}\nTo upgrade manually, run: ${manualInstallCommand(target)}`,
+        duration: 15000,
+      })
+      return
+    }
+
+    kv.set("available_version", undefined)
+    await DialogAlert.show(
+      dialog,
+      "Update Complete",
+      `Updated to Lunos v${result.data.version}. Restart Lunos to use it.`,
+    )
+
+    void exit()
+  }
+
   event.on("installation.update-available", async (evt) => {
-    console.log("installation.update-available", evt)
     const version = evt.properties.version
+    // Kept after the dialog is dismissed, so the footer can keep saying an update exists.
+    kv.set("available_version", version)
 
     const skipped = kv.get("skipped_version")
     if (skipped && !isVersionGreater(version, skipped)) return
@@ -1040,7 +1112,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     const choice = await DialogConfirm.show(
       dialog,
       `Update Available`,
-      `A new release v${version} is available. Would you like to update now?`,
+      `Lunos v${version} is available (you have v${InstallationVersion}).\nRelease notes: https://github.com/AxsionDev/Lunos/releases/tag/v${version}\n\nUpdate now?`,
       "skip",
     )
 
@@ -1050,32 +1122,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     }
 
     if (choice !== true) return
-
-    toast.show({
-      variant: "info",
-      message: `Updating to v${version}…`,
-      duration: 30000,
-    })
-
-    const result = await sdk.client.global.upgrade({ target: version })
-
-    if (result.error || !result.data?.success) {
-      toast.show({
-        variant: "error",
-        title: "Update Failed",
-        message: "Update failed",
-        duration: 10000,
-      })
-      return
-    }
-
-    await DialogAlert.show(
-      dialog,
-      "Update Complete",
-      `Successfully updated to OpenCode v${result.data.version}. Please restart the application.`,
-    )
-
-    void exit()
+    await runUpgrade(version)
   })
 
   const plugin = createMemo(() => {

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
+import * as BackgroundList from "@/background/list"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Database } from "@opencode-ai/core/database/database"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -652,6 +653,37 @@ describe("tool.task", () => {
     },
   )
 
+  // XCOD-82: the documented config key turns background subagents on without the env flag.
+  it.instance(
+    "subagent.background in config enables background execution without the env flag",
+    () =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        const result = yield* def.execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+            background: true,
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps: { ...stubOps(), prompt: () => Effect.never } satisfies TaskPromptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        expect(result.metadata).toMatchObject({ background: true })
+      }),
+    { config: { subagent: { background: true } } },
+  )
+
   it.instance("rejects background execution when the experiment is disabled", () =>
     Effect.gen(function* () {
       const { chat, assistant } = yield* seed()
@@ -968,6 +1000,48 @@ describe("tool.task", () => {
       const waited = yield* jobs.wait({ id: result.metadata.sessionId, timeout: 1_000 })
       expect(waited.timedOut).toBe(false)
       expect(waited.info?.status).toBe("cancelled")
+    }),
+  )
+
+  // XCOD-82: what the monitoring route lists for a running job, and cancelling it through the
+  // same run-state path the cancel route uses.
+  background.instance("lists a running background task with agent and resolved model, then cancels it", () =>
+    Effect.gen(function* () {
+      const jobs = yield* BackgroundJob.Service
+      const runState = yield* SessionRunState.Service
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const result = yield* def.execute(
+        { description: "inspect bug", prompt: "look", subagent_type: "general", background: true },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps: { ...stubOps(), prompt: () => Effect.never } satisfies TaskPromptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+      const listed = BackgroundList.list(yield* jobs.list(), chat.id)
+      expect(listed).toHaveLength(1)
+      expect(listed[0]).toMatchObject({
+        id: result.metadata.sessionId,
+        title: "inspect bug",
+        status: "running",
+        agent: "general",
+        modelRule: "inherit",
+        parentSessionID: chat.id,
+      })
+      expect(listed[0].model).toContain("/")
+      expect(BackgroundList.list(yield* jobs.list(), "ses_other")).toEqual([])
+
+      yield* runState.cancel(SessionID.make(result.metadata.sessionId))
+      const waited = yield* jobs.wait({ id: result.metadata.sessionId, timeout: 1_000 })
+      expect(waited.info?.status).toBe("cancelled")
+      expect(BackgroundList.list(yield* jobs.list(), chat.id)[0].status).toBe("cancelled")
     }),
   )
 

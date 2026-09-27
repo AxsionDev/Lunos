@@ -15,6 +15,11 @@ const generated = await import("./generate.ts")
 
 import { Script } from "@opencode-ai/script"
 import pkg from "../package.json"
+import { platformMeta } from "./package-meta"
+
+// Published brand identity, mirroring script/publish.ts. Deliberately NOT derived from this
+// package's `name`, which stays "opencode" to avoid a duplicate workspace name (XCOD-4).
+const brand = "lunos"
 
 const singleFlag = process.argv.includes("--single")
 const baselineFlag = process.argv.includes("--baseline")
@@ -143,8 +148,11 @@ if (!skipInstall) {
   await $`bun install --os="*" --cpu="*" @ff-labs/fff-bun@${pkg.dependencies["@ff-labs/fff-bun"]}`
 }
 for (const item of targets) {
+  // Must be `brand`, NOT pkg.name. pkg.name is "opencode", and `opencode-darwin-arm64`
+  // et al. are real packages on npm owned by upstream's maintainer — publishing under
+  // those names fails with 403 before the main package is ever reached.
   const name = [
-    pkg.name,
+    brand,
     // changing to win32 flags npm for some reason
     item.os === "win32" ? "windows" : item.os,
     item.arch,
@@ -174,7 +182,7 @@ for (const item of targets) {
       autoloadDotenv: false,
       autoloadTsconfig: true,
       autoloadPackageJson: true,
-      target: name.replace(pkg.name, "bun") as any,
+      target: name.replace(brand, "bun") as any,
       outfile: `dist/${name}/bin/opencode`,
       execArgv: [`--user-agent=opencode/${Script.version}`, "--use-system-ca", "--"],
       windows: {},
@@ -196,6 +204,9 @@ for (const item of targets) {
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
+      LUNOS_UPSTREAM_VERSION: JSON.stringify(pkg.lunos?.upstreamVersion ?? ""),
+      // Written by script/upstream-sync.ts on each upstream merge (XCOD-118); absent until the first one.
+      LUNOS_UPSTREAM_SYNC: JSON.stringify("upstreamSync" in pkg.lunos ? pkg.lunos.upstreamSync : null),
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
       ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },
@@ -219,6 +230,7 @@ for (const item of targets) {
     JSON.stringify(
       {
         name,
+        ...platformMeta(`${item.os}-${item.arch}${item.abi ? `-${item.abi}` : ""}`),
         version: Script.version,
         preferUnplugged: true,
         os: [item.os],
@@ -234,6 +246,9 @@ for (const item of targets) {
 
 if (Script.release) {
   for (const key of Object.keys(binaries)) {
+    // `key` already carries the brand (see the name construction above), so it doubles as the
+    // release asset name the `install` script asks for — "${APP}-${target}" with APP=lunos.
+    // This previously needed a rename because the npm package name was still "opencode-*".
     if (key.includes("linux")) {
       await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
     } else {

@@ -34,7 +34,13 @@ const IS_PREVIEW = CHANNEL !== "latest"
 const VERSION = await (async () => {
   if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
-  const version = await fetch("https://registry.npmjs.org/opencode-ai/latest")
+  // XCOD-49: derive the next version from THIS fork's published package, not upstream's. Reading
+  // opencode-ai meant `bump=patch` computed from whatever upstream last shipped: on 2026-09-21 that
+  // was 1.18.31, so the bump produced 1.18.32 — behind lunos-ai's own 1.18.34 — and published it as
+  // `latest`, downgrading every install channel including the `releases/latest` the installer reads.
+  // The fork's version line diverged from upstream's the moment it published independently, so the
+  // fork's own registry entry is the only correct base.
+  const version = await fetch("https://registry.npmjs.org/lunos-ai/latest")
     .then((res) => {
       if (!res.ok) throw new Error(res.statusText)
       return res.json()

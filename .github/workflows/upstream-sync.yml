@@ -1,0 +1,153 @@
+name: upstream-sync
+
+# XCOD-118: merge anomalyco/opencode `dev` into Lunos as a reviewed PR every week (XCOD-16:
+# merge, never rebase), and measure how far behind upstream Lunos is.
+#
+# - measure: daily and after every merge to dev. Publishes the lag to the workflow summary and to
+#   `upstream-lag.json` on the `badges` branch, which the README badge reads.
+# - sync: weekly, or by hand. Opens the merge PR; on conflicts a draft labelled `upstream-conflict`.
+# - upstream-sync-report.yml: when `test` finishes on a sync branch, names new failures in the PR.
+#
+# Guardrails: nothing here publishes, pushes tags, force-pushes or resolves conflicts. The sync
+# branch needs a token that can push workflow-file changes (upstream edits .github/ often) and
+# whose PRs trigger CI, so it uses the UPSTREAM_SYNC_TOKEN secret rather than GITHUB_TOKEN.
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # sync, Mondays 05:00 UTC
+    - cron: "30 5 * * *" # measure, daily
+  push:
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Lunos branch to merge upstream into (use a scratch branch to test conflicts)
+        default: dev
+      upstream_ref:
+        description: anomalyco/opencode branch to merge
+        default: dev
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_URL: https://github.com/anomalyco/opencode.git
+
+jobs:
+  measure:
+    if: github.repository == 'AxsionDev/Lunos' && github.event.schedule != '0 5 * * 1'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: upstream-sync-measure
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Measure lag
+        id: lag
+        run: |
+          git remote add upstream "$UPSTREAM_URL"
+          git fetch --no-tags --quiet upstream dev
+          bun script/upstream-sync.ts measure --base origin/dev --upstream upstream/dev > "$RUNNER_TEMP/lag.json"
+          echo "### Lunos is $(jq -r .text "$RUNNER_TEMP/lag.json")" >> "$GITHUB_STEP_SUMMARY"
+          echo "Oldest upstream commit not in dev: \`$(jq -r '.oldest // "none"' "$RUNNER_TEMP/lag.json")\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish badge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          dir="$RUNNER_TEMP/badges"
+          if git fetch --no-tags --quiet origin badges; then
+            git worktree add --quiet "$dir" FETCH_HEAD
+            git -C "$dir" checkout --quiet -B badges
+          else
+            git worktree add --quiet --orphan -b badges "$dir"
+          fi
+          jq .badge "$RUNNER_TEMP/lag.json" > "$dir/upstream-lag.json"
+          git -C "$dir" add upstream-lag.json
+          if git -C "$dir" diff --cached --quiet; then exit 0; fi
+          git -C "$dir" commit --quiet -m "upstream lag: $(jq -r .text "$RUNNER_TEMP/lag.json")"
+          git -C "$dir" push --quiet origin badges
+
+  sync:
+    if: github.repository == 'AxsionDev/Lunos' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 5 * * 1')
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: upstream-sync
+      cancel-in-progress: false
+    env:
+      BASE: ${{ inputs.base || 'dev' }}
+      UPSTREAM_REF: ${{ inputs.upstream_ref || 'dev' }}
+      GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
+    steps:
+      - name: Check token
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::UPSTREAM_SYNC_TOKEN is not set. It needs Contents, Pull requests and Workflows read/write on AxsionDev/Lunos."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.BASE }}
+          fetch-depth: 0
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Merge upstream
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "$UPSTREAM_URL"
+          git fetch --no-tags --quiet upstream "$UPSTREAM_REF"
+
+          branch="upstream-sync/$(date -u +%F)"
+          if [ "$BASE" != "dev" ]; then branch="$branch-$BASE"; fi
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then branch="$branch-${{ github.run_number }}"; fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+          bun script/upstream-sync.ts merge --base "origin/$BASE" --upstream "upstream/$UPSTREAM_REF" \
+            --branch "$branch" --out "$RUNNER_TEMP/sync"
+          echo "status=$(jq -r .status "$RUNNER_TEMP/sync/result.json")" >> "$GITHUB_OUTPUT"
+          echo "behind=$(jq -r .before.commits "$RUNNER_TEMP/sync/result.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Open PR
+        if: steps.merge.outputs.behind != '0'
+        env:
+          BRANCH: ${{ steps.merge.outputs.branch }}
+          STATUS: ${{ steps.merge.outputs.status }}
+        run: |
+          git push --quiet origin "HEAD:refs/heads/$BRANCH"
+          title="Upstream sync: anomalyco/opencode $UPSTREAM_REF into $BASE ($(date -u +%F))"
+          if [ "$STATUS" = "conflict" ]; then
+            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" --head "$BRANCH" --draft \
+              --label upstream-conflict --title "$title (conflicts)" --body-file "$RUNNER_TEMP/sync/body.md")
+          else
+            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" --head "$BRANCH" \
+              --title "$title" --body-file "$RUNNER_TEMP/sync/body.md")
+          fi
+          echo "PR: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ ! -f "$RUNNER_TEMP/sync/result.json" ]; then exit 0; fi
+          {
+            echo "### Before: Lunos was $(jq -r .before.text "$RUNNER_TEMP/sync/result.json")"
+            echo "### After this PR merges: $(jq -r .after.text "$RUNNER_TEMP/sync/result.json")"
+            echo
+            cat "$RUNNER_TEMP/sync/body.md"
+          } >> "$GITHUB_STEP_SUMMARY"

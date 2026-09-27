@@ -8,6 +8,7 @@ import {
   type KeyEvent,
   type Renderable,
 } from "@opentui/core"
+import { useAnimationsEnabled } from "../../context/motion"
 import type { CommandContext } from "@opentui/keymap"
 import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match } from "solid-js"
 import { registerOpencodeSpinner } from "../register-spinner"
@@ -49,6 +50,7 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { createFadeIn } from "../../util/signal"
 import { DialogSkill } from "../dialog-skill"
+import { DialogMemory } from "../dialog-memory"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
@@ -164,14 +166,14 @@ export function Prompt(props: PromptProps) {
   const history = usePromptHistory()
   const stash = usePromptStash()
   const keymap = useOpencodeKeymap()
-  const agentShortcut = useCommandShortcut("agent.cycle")
+  const modeShortcut = useCommandShortcut("mode.cycle")
   const paletteShortcut = useCommandShortcut("command.palette.show")
   const renderer = useRenderer()
   const exit = useExit()
   const dimensions = useTerminalDimensions()
   const { theme, syntax } = useTheme()
   const kv = useKV()
-  const animationsEnabled = createMemo(() => kv.get("animations_enabled", true))
+  const animationsEnabled = useAnimationsEnabled()
   const list = createMemo(() => props.placeholders?.normal ?? [])
   const shell = createMemo(() => props.placeholders?.shell ?? [])
   const fileContextEnabled = createMemo(() => kv.get("file_context_enabled", true))
@@ -319,11 +321,11 @@ export function Prompt(props: PromptProps) {
 
       syncedSessionID = sessionID
 
-      // Only set agent if it's a primary agent (not a subagent)
-      const isPrimaryAgent = local.agent.list().some((x) => x.name === msg.agent)
+      // Only set mode if it's a primary agent (not a subagent)
+      const isPrimaryAgent = local.mode.list().some((x) => x.name === msg.agent)
       if (msg.agent && isPrimaryAgent) {
-        // Keep command line --agent if specified.
-        if (!args.agent) local.agent.set(msg.agent)
+        // Keep command line --mode if specified.
+        if (!args.mode) local.mode.set(msg.agent)
         if (msg.model) {
           local.model.set(msg.model)
           local.model.variant.set(msg.model.variant)
@@ -958,7 +960,15 @@ export function Prompt(props: PromptProps) {
     if (workspace.creating() || move.creating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
-    const agent = local.agent.current()
+    // XCOD-94: bare /memory opens the memory browser, before any session is created.
+    // `/memory off|on` has arguments and goes to the server like any other command.
+    if (store.prompt.input.trim() === "/memory") {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      dialog.replace(() => <DialogMemory />)
+      return false
+    }
+    const agent = local.mode.current()
     if (!agent) return false
     const trimmed = store.prompt.input.trim()
     if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
@@ -1288,9 +1298,9 @@ export function Prompt(props: PromptProps) {
   const highlight = createMemo(() => {
     if (leader()) return theme.border
     if (store.mode === "shell") return theme.primary
-    const agent = local.agent.current()
+    const agent = local.mode.current()
     if (!agent) return theme.border
-    return local.agent.color(agent.name)
+    return local.mode.color(agent.name)
   })
 
   const showVariant = createMemo(() => {
@@ -1300,10 +1310,10 @@ export function Prompt(props: PromptProps) {
     return !!current
   })
 
-  const agentMetaAlpha = createFadeIn(() => !!local.agent.current(), animationsEnabled)
-  const modelMetaAlpha = createFadeIn(() => !!local.agent.current() && store.mode === "normal", animationsEnabled)
+  const agentMetaAlpha = createFadeIn(() => !!local.mode.current(), animationsEnabled)
+  const modelMetaAlpha = createFadeIn(() => !!local.mode.current() && store.mode === "normal", animationsEnabled)
   const variantMetaAlpha = createFadeIn(
-    () => !!local.agent.current() && store.mode === "normal" && showVariant(),
+    () => !!local.mode.current() && store.mode === "normal" && showVariant(),
     animationsEnabled,
   )
   const borderHighlight = createMemo(() => tint(theme.border, highlight(), agentMetaAlpha()))
@@ -1322,9 +1332,9 @@ export function Prompt(props: PromptProps) {
   const spinnerDef = createMemo(() => {
     const agent =
       status().type !== "idle"
-        ? (local.agent.list().find((a) => a.name === lastUserMessage()?.agent) ?? local.agent.current())
-        : local.agent.current()
-    const color = agent ? local.agent.color(agent.name) : theme.border
+        ? (local.mode.list().find((a) => a.name === lastUserMessage()?.agent) ?? local.mode.current())
+        : local.mode.current()
+    const color = agent ? local.mode.color(agent.name) : theme.border
     return {
       frames: createFrames({
         color,
@@ -1443,7 +1453,7 @@ export function Prompt(props: PromptProps) {
             />
             <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
               <box flexDirection="row" gap={1}>
-                <Show when={local.agent.current()} fallback={<box height={1} />}>
+                <Show when={local.mode.current()} fallback={<box height={1} />}>
                   {(agent) => (
                     <>
                       <text fg={fadeColor(highlight(), agentMetaAlpha())}>
@@ -1521,7 +1531,7 @@ export function Prompt(props: PromptProps) {
               >
                 <box flexShrink={0} flexDirection="row" gap={1}>
                   <box marginLeft={1}>
-                    <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
+                    <Show when={animationsEnabled()} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
                       <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
                     </Show>
                   </box>
@@ -1671,7 +1681,7 @@ export function Prompt(props: PromptProps) {
                     </Match>
                     <Match when={true}>
                       <text fg={theme.text}>
-                        {agentShortcut()} <span style={{ fg: theme.textMuted }}>agents</span>
+                        {modeShortcut()} <span style={{ fg: theme.textMuted }}>modes</span>
                       </text>
                     </Match>
                   </Switch>

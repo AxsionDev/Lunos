@@ -1,6 +1,15 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "1.18.32",
+  "version": "1.18.40",
+  "lunos": {
+    "upstreamVersion": "1.18.32",
+    "upstreamSync": {
+      "commit": "b471c2b4495747353af768fbf2e0790c9d820ce2",
+      "measuredAt": "2026-09-27",
+      "daysBehind": 0,
+      "commitsBehind": 0
+    }
+  },
   "name": "opencode",
   "type": "module",
   "license": "MIT",

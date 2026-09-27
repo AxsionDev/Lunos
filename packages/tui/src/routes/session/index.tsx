@@ -65,6 +65,8 @@ import { useEpilogue } from "../../context/epilogue"
 import { normalizePath } from "../../util/path"
 import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
+import { createQuestionDismissal, type QuestionDismissal } from "./question-dismissal"
+import { isDismissedQuestion } from "../../util/dismiss"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
 import * as Model from "../../util/model"
 import { formatTranscript } from "../../util/transcript"
@@ -81,8 +83,11 @@ import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
 import { LocationProvider } from "../../context/location"
+import { Offline } from "@opencode-ai/core/offline"
 
-addDefaultParsers(parsers.parsers)
+// The grammars are fetched from GitHub on first use, so offline mode (XCOD-121) skips them and
+// code renders without syntax highlighting.
+if (!Offline.enabled()) addDefaultParsers(parsers.parsers)
 
 const GO_UPSELL_FREE_TIER_LAST_SEEN_AT = "go_upsell_last_seen_at"
 const GO_UPSELL_FREE_TIER_DONT_SHOW = "go_upsell_dont_show"
@@ -166,6 +171,7 @@ const context = createContext<{
   providers: () => ReadonlyMap<string, Provider>
   sync: ReturnType<typeof useSync>
   tui: ReturnType<typeof useTuiConfig>
+  dismissal: QuestionDismissal
 }>()
 
 function use() {
@@ -192,6 +198,21 @@ export function Session() {
   const kv = useKV()
   const { theme } = useTheme()
   const promptRef = usePromptRef()
+  const dismissal = createQuestionDismissal({
+    sessionID: () => route.sessionID,
+    sdk: useSDK(),
+    sync,
+    toast: useToast(),
+    config: tuiConfig,
+  })
+  // A held dismissal belongs to the session it was made in; switching away sends it.
+  createEffect(
+    on(
+      () => route.sessionID,
+      () => dismissal.flush(),
+      { defer: true },
+    ),
+  )
   const session = createMemo(() => sync.session.get(route.sessionID))
   const location = createMemo(() => {
     const current = session()
@@ -237,8 +258,10 @@ export function Session() {
     if (session()?.parentID) return []
     return children().flatMap((x) => sync.data.question[x.id] ?? [])
   })
-  const visible = createMemo(() => !session()?.parentID && permissions().length === 0 && questions().length === 0)
-  const disabled = createMemo(() => permissions().length > 0 || questions().length > 0)
+  const visible = createMemo(
+    () => !session()?.parentID && permissions().length === 0 && questions().length === 0 && !dismissal.answering(),
+  )
+  const disabled = createMemo(() => permissions().length > 0 || questions().length > 0 || !!dismissal.answering())
 
   const pending = createMemo(() => {
     const completed = messages().findLastIndex((message) => message.role === "assistant" && message.time.completed)
@@ -332,10 +355,10 @@ export function Session() {
     if (part.id === lastSwitch) return
 
     if (part.tool === "plan_exit") {
-      local.agent.set("build")
+      local.mode.set("build")
       lastSwitch = part.id
     } else if (part.tool === "plan_enter") {
-      local.agent.set("plan")
+      local.mode.set("plan")
       lastSwitch = part.id
     }
   })
@@ -464,15 +487,29 @@ export function Session() {
 
   const sessionCommandList = createMemo(() => [
     {
-      title: session()?.share?.url ? "Copy share link" : "Share session",
+      title: session()?.share?.url
+        ? "Copy share link"
+        : sync.data.config.share === "disabled"
+          ? "Share session (disabled)"
+          : "Share session",
       value: "session.share",
-      suggested: route.type === "session",
+      suggested: route.type === "session" && sync.data.config.share !== "disabled",
       category: "Session",
-      enabled: sync.data.config.share !== "disabled",
       slash: {
         name: "share",
       },
       run: async () => {
+        // Stay registered while disabled so a typed /share gets a plain answer
+        // instead of being sent to the model as ordinary prompt text.
+        if (!session()?.share?.url && sync.data.config.share === "disabled") {
+          toast.show({
+            message:
+              'Session sharing is disabled. To share without uploading anything, use /export to save the transcript as a file. To enable /share, set "share": "manual" in your Lunos config.',
+            variant: "info",
+          })
+          dialog.clear()
+          return
+        }
         const copy = (url: string) =>
           clipboard
             .write?.(url)
@@ -493,7 +530,20 @@ export function Session() {
           .share({
             sessionID: route.sessionID,
           })
-          .then((res) => copy(res.data!.share!.url))
+          .then((res) => {
+            // A refused share (sharing disabled, or the residency policy blocked the host) comes
+            // back as an error body with a message, not a thrown error (XCOD-80).
+            const url = res.data?.share?.url
+            if (url) return copy(url)
+            const body = res.error as { message?: unknown; data?: { message?: unknown } } | undefined
+            const message =
+              typeof body?.message === "string"
+                ? body.message
+                : typeof body?.data?.message === "string"
+                  ? body.data.message
+                  : "Failed to share session"
+            toast.show({ message, variant: "error" })
+          })
           .catch((error) => {
             toast.show({
               message: error instanceof Error ? error.message : "Failed to share session",
@@ -501,6 +551,19 @@ export function Session() {
             })
           })
         dialog.clear()
+      },
+    },
+    {
+      title: "Answer a dismissed question",
+      value: "session.answer",
+      category: "Session",
+      slash: {
+        name: "answer",
+      },
+      run: () => {
+        dialog.clear()
+        if (!dismissal.openLatest())
+          toast.show({ variant: "info", message: "There is no dismissed question to answer in this session." })
       },
     },
     {
@@ -1172,6 +1235,7 @@ export function Session() {
           providers,
           sync,
           tui: tuiConfig,
+          dismissal,
         }}
       >
         <box flexDirection="row" flexGrow={1} minHeight={0}>
@@ -1301,10 +1365,26 @@ export function Session() {
                   />
                 </Show>
                 <Show when={permissions().length === 0 && questions().length > 0}>
-                  <QuestionPrompt
-                    request={questions()[0]}
-                    directory={sync.session.get(questions()[0].sessionID)?.directory}
-                  />
+                  <Show when={!dismissal.isHeld(questions()[0].id)} fallback={<DismissedQuestionBar />}>
+                    <QuestionPrompt
+                      request={questions()[0]}
+                      directory={sync.session.get(questions()[0].sessionID)?.directory}
+                      initial={dismissal.restoredDraft(questions()[0].id)}
+                      onDismiss={(draft) =>
+                        dismissal.dismiss(questions()[0], sync.session.get(questions()[0].sessionID)?.directory, draft)
+                      }
+                    />
+                  </Show>
+                </Show>
+                <Show when={permissions().length === 0 && questions().length === 0 && dismissal.answering()}>
+                  {(current) => (
+                    <QuestionPrompt
+                      request={current().request}
+                      initial={current().draft}
+                      onAnswer={(answers) => void dismissal.sendAnswer(answers)}
+                      onDismiss={() => dismissal.closeAnswer()}
+                    />
+                  )}
                 </Show>
                 <Show when={session()?.parentID}>
                   <SubagentFooter />
@@ -1385,7 +1465,7 @@ function UserMessage(props: {
   const { theme } = useTheme()
   const [hover, setHover] = createSignal(false)
   const queued = createMemo(() => props.pending !== undefined && props.index > props.pending)
-  const color = createMemo(() => local.agent.color(props.message.agent))
+  const color = createMemo(() => local.mode.color(props.message.agent))
   const queuedFg = createMemo(() => selectedForeground(theme, color()))
   const metadataVisible = createMemo(() => queued() || ctx.showTimestamps())
 
@@ -1554,7 +1634,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                   fg:
                     props.message.error?.name === "MessageAbortedError"
                       ? theme.textMuted
-                      : local.agent.color(props.message.agent),
+                      : local.mode.color(props.message.agent),
                 }}
               >
                 ▣{" "}
@@ -2536,8 +2616,29 @@ function TodoWrite(props: ToolProps) {
   )
 }
 
+// Shown in the question's place while a dismissal can still be undone. The agent is still waiting.
+function DismissedQuestionBar() {
+  const { theme } = useTheme()
+  const ctx = use()
+  useBindings(() => ({
+    mode: OPENCODE_BASE_MODE,
+    enabled: ctx.dismissal.heldCount() > 0,
+    priority: 10,
+    bindings: [{ key: "ctrl+z", desc: "Undo question dismissal", group: "Question", cmd: () => ctx.dismissal.undo() }],
+  }))
+  return (
+    <box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor={theme.backgroundPanel}>
+      <text fg={theme.textMuted}>
+        Question dismissed · <span style={{ fg: theme.text }}>ctrl+z</span> undo
+      </text>
+    </box>
+  )
+}
+
 function Question(props: ToolProps) {
   const { theme } = useTheme()
+  const ctx = use()
+  const [hover, setHover] = createSignal(false)
   const questions = createMemo(() => parseQuestions(props.input.questions))
   const answers = createMemo(() => parseQuestionAnswers(props.metadata.answers))
   const count = createMemo(() => questions().length)
@@ -2549,6 +2650,20 @@ function Question(props: ToolProps) {
 
   return (
     <Switch>
+      <Match when={isDismissedQuestion(props.part)}>
+        <box
+          paddingLeft={3}
+          onMouseOver={() => setHover(true)}
+          onMouseOut={() => setHover(false)}
+          onMouseUp={() => ctx.dismissal.openAnswer(props.part)}
+        >
+          <text fg={theme.textMuted}>
+            ? Dismissed {count()} question{count() !== 1 ? "s" : ""} —{" "}
+            <span style={{ fg: hover() ? theme.accent : theme.warning }}>Answer now</span>
+            <span style={{ fg: theme.textMuted }}> (/answer)</span>
+          </text>
+        </box>
+      </Match>
       <Match when={answers()}>
         <BlockTool title="# Questions" part={props.part}>
           <box gap={1}>

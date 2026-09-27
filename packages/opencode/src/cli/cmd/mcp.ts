@@ -1,6 +1,6 @@
 import { cmd } from "./cmd"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, fail } from "../effect-cmd"
 import { Cause } from "effect"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
@@ -17,9 +17,14 @@ import { InstanceRef } from "@/effect/instance-ref"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
-import { modify, applyEdits } from "jsonc-parser"
 import { Filesystem } from "@/util/filesystem"
 import { Effect } from "effect"
+import { searchMcpServers } from "../../mcp/discover"
+import { listContent } from "../../marketplace/content"
+import { addMcpToConfig, resolveConfigPath } from "../../marketplace/install"
+import { confirmAndInstall, pickOne } from "./marketplace-content"
+import { MarketplaceRefusal } from "../../marketplace/guard"
+import { printStaleMarketplaces } from "./plug"
 
 function getAuthStatusIcon(status: MCP.AuthStatus): string {
   switch (status) {
@@ -99,6 +104,7 @@ export const McpCommand = cmd({
     yargs
       .command(McpAddCommand)
       .command(McpListCommand)
+      .command(McpSearchCommand)
       .command(McpAuthCommand)
       .command(McpLogoutCommand)
       .command(McpDebugCommand)
@@ -164,6 +170,48 @@ export const McpListCommand = effectCmd({
     }
 
     prompts.outro(`${servers.length} server(s)`)
+  }),
+})
+
+export const McpSearchCommand = effectCmd({
+  command: "search <query>",
+  describe: "search MCP servers across added marketplaces",
+  builder: (yargs) =>
+    yargs.positional("query", {
+      type: "string",
+      describe: "case-insensitive substring match on name/description/tags/category",
+    }),
+  handler: Effect.fn("Cli.mcp.search")(function* (args) {
+    const query = String(args.query ?? "").trim()
+
+    UI.empty()
+    prompts.intro(`Search MCP servers: ${query}`)
+
+    // Same context shape PluginSearchCommand builds (plug.ts:283): { vcs, worktree, directory }
+    // off the InstanceContext, not the project object itself.
+    const ctx = yield* InstanceRef
+    if (!ctx) return
+    const { marketplaceCount, marketplaces, servers } = yield* Effect.promise(() =>
+      searchMcpServers(query, { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }),
+    )
+    printStaleMarketplaces(marketplaces)
+
+    if (!marketplaceCount) {
+      prompts.log.warn("No marketplaces added")
+      prompts.outro("Add one with: lunos marketplace add <owner/repo | url | path>")
+      return
+    }
+
+    if (!servers.length) {
+      prompts.log.warn(`No MCP servers matched "${query}"`)
+      prompts.outro("Done")
+      return
+    }
+
+    for (const server of servers) {
+      prompts.log.info(`${server.marketplace}/${server.name}${server.description ? `  ${server.description}` : ""}`)
+    }
+    prompts.outro(`${servers.length} server(s) matched`)
   }),
 })
 
@@ -391,39 +439,17 @@ export const McpLogoutCommand = effectCmd({
   }),
 })
 
-async function resolveConfigPath(baseDir: string, global = false) {
-  // Check for existing config files (prefer .jsonc over .json, check .opencode/ subdirectory too)
-  const candidates = [path.join(baseDir, "opencode.json"), path.join(baseDir, "opencode.jsonc")]
-
-  if (!global) {
-    candidates.push(path.join(baseDir, ".opencode", "opencode.json"), path.join(baseDir, ".opencode", "opencode.jsonc"))
-  }
-
-  for (const candidate of candidates) {
-    if (await Filesystem.exists(candidate)) {
-      return candidate
-    }
-  }
-
-  // Default to opencode.json if none exist
-  return candidates[0]
-}
-
-async function addMcpToConfig(name: string, mcpConfig: ConfigMCPV1.Info, configPath: string) {
-  let text = "{}"
-  if (await Filesystem.exists(configPath)) {
-    text = await Filesystem.readText(configPath)
-  }
-
-  // Use jsonc-parser to modify while preserving comments
-  const edits = modify(text, ["mcp", name], mcpConfig, {
-    formattingOptions: { tabSize: 2, insertSpaces: true },
-  })
-  const result = applyEdits(text, edits)
-
-  await Filesystem.write(configPath, result)
-
-  return configPath
+// Pulled out of the add handler because that handler is Effect + @clack/prompts plumbing that
+// bun test can't drive directly (see mcp-marketplace.test.ts). This is the one decision in the
+// marketplace branch that IS pure: a bare name with none of --url/--env/--header/`--` present
+// takes the marketplace path; any explicit flag, or no name at all, leaves existing behaviour
+// (the interactive wizard, or the non-interactive validation below) untouched.
+export function resolvesFromMarketplace(
+  args: { name?: string; url?: string; env?: string[]; header?: string[] },
+  command: readonly string[],
+): boolean {
+  const explicit = !!args.url || !!args.env?.length || !!args.header?.length || command.length > 0
+  return !!args.name && !explicit
 }
 
 export const McpAddCommand = effectCmd({
@@ -448,16 +474,52 @@ export const McpAddCommand = effectCmd({
         describe: "HTTP header for a remote MCP server (KEY=VALUE)",
         type: "string",
         array: true,
+      })
+      .option("allow-unreviewed", {
+        describe: "when adding from a marketplace, allow an entry the marketplace hasn't verified",
+        type: "boolean",
+        default: false,
+      })
+      .option("yes", {
+        describe: "skip the confirmation prompt when adding from a marketplace",
+        type: "boolean",
+        default: false,
       }),
   handler: Effect.fn("Cli.mcp.add")(function* (args) {
     const maybeCtx = yield* InstanceRef
     if (!maybeCtx) return yield* Effect.die("InstanceRef not provided")
     const ctx = maybeCtx
+    // Set only by the marketplace branch below: an expected refusal is reported through fail() as a
+    // plain message, not thrown into the "Unexpected error" banner.
+    let refused: string | undefined
     yield* Effect.promise(async () => {
       const command = args["--"] ?? []
       if (!args.name && (args.url || args.env?.length || args.header?.length || command.length)) {
         throw new Error("A server name is required for non-interactive MCP configuration")
       }
+
+      if (resolvesFromMarketplace(args, command)) {
+        const marketplaceCtx = { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }
+        try {
+          const match = pickOne((await listContent(marketplaceCtx, "mcp")).items, args.name!, { kind: "mcp" })
+          if (match?.kind === "mcp") {
+            await confirmAndInstall(match, Boolean(args.yes), undefined, {
+              allowUnreviewed: Boolean(args["allow-unreviewed"]),
+            })
+            return
+          }
+        } catch (error) {
+          if (!(error instanceof MarketplaceRefusal)) throw error
+          refused = error.message
+          return
+        }
+
+        // Unknown name: no marketplace declares it. Fall through to the existing non-interactive
+        // validation below rather than invent a new error shape -- it reports today's message
+        // ("Provide either --url <url> or a command after --"), which is accurate here too: a
+        // bare, unresolvable name is not enough to configure a server either way.
+      }
+
       if (args.name) {
         if (!!args.url === !!command.length) {
           throw new Error("Provide either --url <url> or a command after --")
@@ -653,6 +715,7 @@ export const McpAddCommand = effectCmd({
 
       prompts.outro("MCP server added successfully")
     })
+    if (refused !== undefined) return yield* fail(refused)
   }),
 })
 
