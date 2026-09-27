@@ -137,18 +137,24 @@ They are listed here as _absent_ rather than shown as commands that would fail.
 Lunos is also available as a desktop application, attached to each
 [Lunos release](https://github.com/AxsionDev/Lunos/releases).
 
-| Platform              | Download                                              |
-| --------------------- | ----------------------------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`                      |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`                        |
-| Windows               | `opencode-desktop-win-x64.exe`                        |
-| Linux                 | `opencode-desktop-linux-*.deb` / `.rpm` / `.AppImage` |
+| Platform              | Download                                           |
+| --------------------- | -------------------------------------------------- |
+| macOS (Apple Silicon) | `lunos-desktop-mac-arm64.dmg`                      |
+| macOS (Intel)         | `lunos-desktop-mac-x64.dmg`                        |
+| Windows               | `lunos-desktop-win-x64.exe`                        |
+| Linux                 | `lunos-desktop-linux-*.deb` / `.rpm` / `.AppImage` |
 
-> [!NOTE]
-> These are Lunos builds from the Lunos release, but the **desktop artifacts are still named
-> `opencode-desktop-*`** — the desktop packaging has not been rebranded yet, unlike the CLI
-> (`lunos-*`). The filenames above are the real ones you will find on the release page. Tracked
-> separately; the CLI is unaffected.
+It installs as **Lunos** (app ID `tech.lunos.desktop`) and checks for updates on Lunos releases
+only. It downloads an update in the background and installs it only when you choose to restart.
+
+> [!WARNING]
+> **Don't use the `opencode-desktop-*` files attached to v1.18.40 and earlier.** Those builds
+> install as "OpenCode" and check upstream opencode's releases for updates, so they offer to
+> replace themselves with upstream opencode (XCOD-123). If you installed one, uninstall it and
+> install the `lunos-desktop-*` build from a later release.
+
+The desktop builds are **not code-signed**, so macOS Gatekeeper and Windows SmartScreen warn on
+first launch. See [Verify your download](docs/deployment/self-hosted.md#verify-your-download).
 
 #### Installation Directory
 
