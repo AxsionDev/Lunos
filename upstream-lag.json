@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
   "label": "behind upstream",
-  "message": "9 days (63 commits)",
-  "color": "yellow"
+  "message": "up to date",
+  "color": "brightgreen"
 }
