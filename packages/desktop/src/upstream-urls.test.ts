@@ -6,12 +6,16 @@ import path from "node:path"
 // upstream. This fails on any such URL in the desktop package's own code, scripts or config.
 const ROOT = path.join(import.meta.dir, "..")
 const UPSTREAM = /anomalyco\/|github\.com\/sst\/|sst-dev|opencode\.ai|owner:\s*"anomalyco"/
-const SKIP = [/node_modules\//, /\.test\.tsx?$/, /\/i18n\//, /^dist\//, /^out\//, /^src\/main\/migrate\.ts$/]
+const SKIP = [/\.test\.tsx?$/, /\/i18n\//, /^src\/main\/migrate\.ts$/]
+const TYPES = /\.(?:ts|tsx|js|mjs|json|ya?ml|xml|desktop|html)$/
 
 test("no update, install or link URL points at upstream opencode", async () => {
+  // Tracked files only: skips node_modules and build output, and gives "/" paths on Windows too.
+  const files = Bun.spawnSync(["git", "ls-files"], { cwd: ROOT }).stdout.toString().split("\n")
+  expect(files.length).toBeGreaterThan(20)
   const hits: string[] = []
-  for await (const file of new Bun.Glob("**/*.{ts,tsx,js,mjs,json,yml,yaml,xml,desktop,html}").scan(ROOT)) {
-    if (SKIP.some((pattern) => pattern.test(file))) continue
+  for (const file of files) {
+    if (!TYPES.test(file) || SKIP.some((pattern) => pattern.test(file))) continue
     const lines = (await Bun.file(path.join(ROOT, file)).text()).split("\n")
     lines.forEach((line, index) => {
       if (UPSTREAM.test(line)) hits.push(`${file}:${index + 1}: ${line.trim()}`)
