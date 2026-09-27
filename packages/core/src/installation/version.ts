@@ -49,7 +49,7 @@ export function versionVerbose(
   const lag =
     sync.commitsBehind === 0
       ? "up to date with upstream"
-      : `${sync.daysBehind} days behind upstream (${sync.commitsBehind} commits)`
+      : `${sync.daysBehind} ${sync.daysBehind === 1 ? "day" : "days"} behind upstream (${sync.commitsBehind} commits)`
   return [
     versionDetail(version, upstream),
     `upstream: anomalyco/opencode dev @ ${sync.commit.slice(0, 10)}, ${lag} as of ${sync.measuredAt}`,

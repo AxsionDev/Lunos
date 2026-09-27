@@ -5,6 +5,7 @@
 //
 //   bun script/upstream-sync.ts measure [--base origin/dev] [--upstream upstream/dev]
 //   bun script/upstream-sync.ts merge --branch upstream-sync/2026-09-27 [--base ...] [--upstream ...]
+//   bun script/upstream-sync.ts stamp --upstream <sha>   (after resolving a conflicting sync by hand)
 //   bun script/upstream-sync.ts report --pr <n> --run <test run id> --baseline <dev test run id> [--typecheck <run id>]
 //
 // "Days behind upstream" is the age of the oldest upstream commit that isn't in the base branch.
@@ -75,17 +76,22 @@ export function newFailures(branch: string[], baseline: string[]) {
 /** shields.io endpoint JSON for the README badge. */
 export function badge(value: Lag) {
   const color = value.days <= 7 ? "brightgreen" : value.days <= 14 ? "yellow" : "red"
-  const message = value.commits === 0 ? "up to date" : `${value.days} days (${value.commits} commits)`
+  const message = value.commits === 0 ? "up to date" : `${days(value.days)} (${value.commits} commits)`
   return { schemaVersion: 1, label: "behind upstream", message, color }
+}
+
+function days(n: number) {
+  return `${n} ${n === 1 ? "day" : "days"}`
 }
 
 export function describeLag(value: Lag) {
   if (value.commits === 0) return "up to date with upstream"
-  return `${value.days} days behind upstream (${value.commits} commits)`
+  return `${days(value.days)} behind upstream (${value.commits} commits)`
 }
 
 export type Body = {
   status: "clean" | "conflict"
+  branch: string
   upstreamSha: string
   before: Lag
   after: Lag
@@ -112,8 +118,15 @@ export function prBody(input: Body) {
     lines.push(
       "## ⚠️ Merge conflicts",
       "",
-      "This branch is the upstream tip, not a merge: the workflow never resolves conflicts. To resolve,",
-      "check out this branch, run `git merge origin/dev`, fix the files below, and push a normal commit.",
+      "This branch is the upstream tip, not a merge: the workflow never resolves conflicts. Resolve it",
+      "with a normal merge commit (never squash or rebase, or upstream drops out of `dev`'s history):",
+      "",
+      "```sh",
+      `git fetch origin && git checkout ${input.branch} && git merge origin/dev`,
+      "# fix the files below, then record the upstream base and lag this build will report:",
+      `bun script/upstream-version.ts && bun script/upstream-sync.ts stamp --upstream ${input.upstreamSha}`,
+      "git add -A && git commit --no-edit && git push",
+      "```",
       "",
       ...input.conflicts.map((file) => `- \`${file}\``),
       "",
@@ -140,6 +153,8 @@ export function prBody(input: Body) {
     )
   } else lines.push("None.")
   lines.push(
+    "",
+    "**Merge with a merge commit**, not squash or rebase: otherwise the upstream commits never reach `dev` and the lag doesn't fall.",
     "",
     "## Tests",
     "",
@@ -187,7 +202,10 @@ async function measure(base: string, upstream: string) {
   )
 }
 
-async function stamp(sha: string, value: Lag) {
+/** Records the upstream base and lag in packages/opencode/package.json, for `--version --verbose`. */
+async function stamp(upstream: string) {
+  const sha = await git("rev-parse", upstream)
+  const value = await measure("HEAD", upstream)
   const text = await Bun.file(PACKAGE_FILE).text()
   const pkg = JSON.parse(text)
   pkg.lunos = {
@@ -233,7 +251,7 @@ async function merge(args: string[]) {
     await git("checkout", "-B", branch, upstream)
   } else if (before.commits) {
     await $`bun ./script/upstream-version.ts`.cwd(root).quiet()
-    await stamp(sha, await measure("HEAD", upstream))
+    await stamp(upstream)
     await git("add", PACKAGE_FILE)
     await git("commit", "-m", `chore(upstream-sync): record upstream lag after ${branch}`)
   }
@@ -242,6 +260,7 @@ async function merge(args: string[]) {
 
   const body = prBody({
     status,
+    branch,
     upstreamSha: sha,
     before,
     after,
@@ -318,9 +337,12 @@ if (import.meta.main) {
     const value = await measure(flag(args, "base", "origin/dev"), flag(args, "upstream", "upstream/dev"))
     console.log(JSON.stringify({ ...value, text: describeLag(value), badge: badge(value) }))
   } else if (command === "merge") await merge(args)
-  else if (command === "report") await report(args)
+  else if (command === "stamp") {
+    await stamp(flag(args, "upstream"))
+    console.log(JSON.stringify(JSON.parse(await Bun.file(PACKAGE_FILE).text()).lunos))
+  } else if (command === "report") await report(args)
   else {
-    console.error("usage: upstream-sync.ts measure|merge|report [options]")
+    console.error("usage: upstream-sync.ts measure|merge|stamp|report [options]")
     process.exit(1)
   }
 }

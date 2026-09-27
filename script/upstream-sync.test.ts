@@ -36,6 +36,7 @@ describe("upstream sync", () => {
     expect(badge({ commits: 5, days: 7 }).color).toBe("brightgreen")
     expect(badge({ commits: 5, days: 8 })).toMatchObject({ color: "yellow", message: "8 days (5 commits)" })
     expect(badge({ commits: 5, days: 15 }).color).toBe("red")
+    expect(badge({ commits: 1, days: 1 }).message).toBe("1 day (1 commits)")
   })
 
   test("reads the owned-paths file, skipping comments and blanks", () => {
@@ -91,6 +92,7 @@ describe("upstream sync", () => {
 
   const base: Body = {
     status: "clean",
+    branch: "upstream-sync/2026-09-27",
     upstreamSha: "b471c2b4495747353af768fbf2e0790c9d820ce2",
     before: { commits: 63, days: 8 },
     after: { commits: 0, days: 0 },
@@ -115,6 +117,8 @@ describe("upstream sync", () => {
     const body = prBody({ ...base, status: "conflict", conflicts: ["bun.lock", "packages/core/package.json"] })
     expect(body).toContain("## ⚠️ Merge conflicts")
     expect(body).toContain("- `bun.lock`\n- `packages/core/package.json`")
+    expect(body).toContain("git checkout upstream-sync/2026-09-27 && git merge origin/dev")
+    expect(body).toContain("bun script/upstream-sync.ts stamp --upstream b471c2b4495747353af768fbf2e0790c9d820ce2")
   })
 
   test("the tests section can be replaced in place", () => {
