@@ -23,7 +23,11 @@ packages/opencode/src/cli/cmd/upgrade.ts
 packages/opencode/src/cli/cmd/uninstall.ts
 packages/core/src/installation/**
 
-# Residency and data flows.
+# Residency and data flows, and offline mode (XCOD-121).
+packages/core/src/offline.ts
+packages/core/src/npm.ts
+script/offline-calls.ts
+script/offline-egress.ts
 packages/opencode/src/provider/provider.ts
 packages/opencode/src/share/**
 packages/core/src/jurisdiction.ts
