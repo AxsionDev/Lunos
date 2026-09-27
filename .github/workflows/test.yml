@@ -64,8 +64,11 @@ jobs:
             turbo-${{ runner.os }}-
 
       - name: Run unit tests
-        timeout-minutes: 20
-        run: GITHUB_ACTIONS=false bun turbo test
+        # 45, not 20: with --continue every package runs, and Windows needs about 25 minutes.
+        timeout-minutes: 45
+        # --continue: without it turbo stops at the first failing package, which hides failures in
+        # later packages from the upstream-sync baseline comparison (XCOD-118).
+        run: GITHUB_ACTIONS=false bun turbo test --continue
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 
