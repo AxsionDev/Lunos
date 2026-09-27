@@ -72,7 +72,7 @@ describe("Npm offline", () => {
     const exit = await add(tmp.path)
     expect(Exit.isFailure(exit)).toBe(true)
     expect(String(exit)).toContain("disabled because LUNOS_OFFLINE is set")
-    expect(await fs.exists(path.join(tmp.path, "cache", "packages"))).toBe(false)
+    expect(await fs.stat(path.join(tmp.path, "cache", "packages")).catch(() => undefined)).toBeUndefined()
   })
 
   test("the same install works with offline mode off", async () => {
