@@ -91,6 +91,8 @@ export function describeLag(value: Lag) {
 
 export type Body = {
   status: "clean" | "conflict"
+  /** package.json files whose only conflicts were the version line, settled to Lunos's version. */
+  versionsKept?: string[]
   branch: string
   upstreamSha: string
   before: Lag
@@ -144,6 +146,14 @@ export function prBody(input: Body) {
       "",
     )
   }
+  if (input.versionsKept?.length) {
+    lines.push(
+      "## Version lines kept automatically",
+      "",
+      `Only the \`"version"\` line conflicted in ${input.versionsKept.length} package.json files; the workflow kept Lunos's version in each (the one conflict it resolves by itself). Everything else in those files merged normally.`,
+      "",
+    )
+  }
   lines.push("## Lunos-owned paths touched by upstream", "")
   if (input.owned.length) {
     lines.push(
@@ -177,6 +187,46 @@ export function withTests(body: string, section: string) {
     /<!-- upstream-sync:tests -->[\s\S]*?<!-- \/upstream-sync:tests -->/,
     `<!-- upstream-sync:tests -->\n${section}\n<!-- /upstream-sync:tests -->`,
   )
+}
+
+/** A conflict hunk whose sides are each only a `"version": "…"` line. */
+const VERSION_LINE = /^\s*"version":\s*"[^"]*",?\s*$/
+
+/**
+ * Resolves the conflict hunks in a package.json that are only the `"version"` line, keeping
+ * Lunos's side (Petar, 2026-09-27: both projects bump every package's version on each release, so
+ * these lines conflict on nearly every sync). Any other hunk is left exactly as it was.
+ * `remaining` counts the hunks still needing a person.
+ */
+export function resolveVersionLines(text: string) {
+  const lines = text.split("\n")
+  const out: string[] = []
+  let resolved = 0
+  let remaining = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith("<<<<<<< ")) {
+      out.push(lines[i])
+      continue
+    }
+    const middle = lines.findIndex((line, j) => j > i && line.startsWith("======="))
+    const end = lines.findIndex((line, j) => j > middle && line.startsWith(">>>>>>> "))
+    if (middle === -1 || end === -1) {
+      out.push(...lines.slice(i))
+      remaining++
+      break
+    }
+    const ours = lines.slice(i + 1, middle)
+    const theirs = lines.slice(middle + 1, end)
+    if (ours.length === 1 && theirs.length === 1 && VERSION_LINE.test(ours[0]) && VERSION_LINE.test(theirs[0])) {
+      out.push(ours[0])
+      resolved++
+    } else {
+      out.push(...lines.slice(i, end + 1))
+      remaining++
+    }
+    i = end
+  }
+  return { text: out.join("\n"), resolved, remaining }
 }
 
 function flag(args: string[], name: string, fallback?: string) {
@@ -243,13 +293,30 @@ async function merge(args: string[]) {
       .nothrow()
   let status: Body["status"] = "clean"
   let conflicts: string[] = []
+  const versionsKept: string[] = []
   if (result.exitCode !== 0) {
     conflicts = (await git("diff", "--name-only", "--diff-filter=U")).split("\n").filter(Boolean)
     if (!conflicts.length) throw new Error(`upstream-sync: merge failed without conflicts\n${result.stderr}`)
-    status = "conflict"
-    await git("merge", "--abort")
-    await git("checkout", "-B", branch, upstream)
-  } else if (before.commits) {
+    // Settle version-only conflicts in package.json files; anything else stays for a person.
+    for (const file of conflicts.filter((file) => file.endsWith("package.json"))) {
+      const full = path.join(root, file)
+      const fixed = resolveVersionLines(await Bun.file(full).text())
+      if (fixed.resolved > 0 && fixed.remaining === 0) {
+        await Bun.write(full, fixed.text)
+        await git("add", file)
+        versionsKept.push(file)
+      }
+    }
+    conflicts = conflicts.filter((file) => !versionsKept.includes(file))
+    if (conflicts.length) {
+      status = "conflict"
+      await git("merge", "--abort")
+      await git("checkout", "-B", branch, upstream)
+    } else {
+      await git("commit", "--no-edit")
+    }
+  }
+  if (status === "clean" && before.commits) {
     await $`bun ./script/upstream-version.ts`.cwd(root).quiet()
     await stamp(upstream)
     await git("add", PACKAGE_FILE)
@@ -266,6 +333,7 @@ async function merge(args: string[]) {
     after,
     commits,
     prs: upstreamPRs(commits),
+    versionsKept,
     changed,
     owned,
     conflicts,
