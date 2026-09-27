@@ -48,6 +48,7 @@ import { spawnWslSidecar } from "./wsl/sidecar"
 import { cleanupStoreFiles } from "./store-cleanup"
 import { startBackgroundCli } from "./background-cli"
 import { setNativeTranslations } from "./native-translations"
+import { aboutPanel } from "./about"
 
 const APP_NAMES: Record<string, string> = {
   dev: "Lunos Dev",
@@ -143,6 +144,7 @@ const main = Effect.gen(function* () {
   })()
   app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "Lunos Dev")
   app.setAppUserModelId(appId)
+  app.setAboutPanelOptions(aboutPanel(app.getVersion(), import.meta.env.LUNOS_UPSTREAM_VERSION))
   app.setPath(
     "userData",
     onboardingTestRoot ? join(onboardingTestRoot, "desktop") : join(app.getPath("appData"), appId),

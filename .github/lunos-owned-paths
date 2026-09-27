@@ -42,6 +42,9 @@ packages/plugin/src/**
 packages/opencode/src/marketplace/**
 
 # Rebrand surfaces and versioning.
+packages/desktop/**
+packages/app/src/desktop-menu.ts
+sdks/vscode/**
 README.md
 packages/opencode/package.json
 packages/opencode/src/index.ts

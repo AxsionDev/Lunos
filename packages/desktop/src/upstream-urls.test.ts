@@ -23,3 +23,11 @@ test("no update, install or link URL points at upstream opencode", async () => {
   }
   expect(hits).toEqual([])
 })
+
+// The desktop menu is defined in the app package, so the scan above doesn't reach it.
+test("no Help menu link points at upstream opencode", async () => {
+  const menu = await Bun.file(path.join(ROOT, "../app/src/desktop-menu.ts")).text()
+  const links = [...menu.matchAll(/href: "([^"]+)"/g)].map((match) => match[1])
+  expect(links.length).toBeGreaterThan(0)
+  expect(links.filter((link) => UPSTREAM.test(link) || /discord/.test(link))).toEqual([])
+})
