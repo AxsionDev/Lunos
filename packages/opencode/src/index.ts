@@ -12,7 +12,7 @@ import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
 import { UI } from "./cli/ui"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationVersion, versionVerbose } from "@opencode-ai/core/installation/version"
 import { FormatError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { DebugCommand } from "./cli/cmd/debug"
@@ -37,6 +37,12 @@ import { MemoryCommand } from "./cli/cmd/memory"
 import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
+
+// XCOD-118: `lunos --version --verbose` adds the upstream base and the lag at the last sync.
+if (args.length === 2 && args.includes("--verbose") && (args.includes("--version") || args.includes("-v"))) {
+  process.stdout.write(versionVerbose() + EOL)
+  process.exit(0)
+}
 
 // Plain one-shot commands get the once-a-day "new version" stderr line. The TUI has its own
 // reminder, and long-running servers or the upgrade flow itself shouldn't print it.

@@ -205,6 +205,8 @@ for (const item of targets) {
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
       LUNOS_UPSTREAM_VERSION: JSON.stringify(pkg.lunos?.upstreamVersion ?? ""),
+      // Written by script/upstream-sync.ts on each upstream merge (XCOD-118); absent until the first one.
+      LUNOS_UPSTREAM_SYNC: JSON.stringify("upstreamSync" in pkg.lunos ? pkg.lunos.upstreamSync : null),
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
       ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },
