@@ -2,11 +2,21 @@
   "lunosVersion": "1.18.40",
   "seed": 20260927,
   "budget": {
+    "name": "pilot",
     "total": 100,
-    "classes": { "eu-api": 45, "frontier": 45 }
+    "classes": {
+      "eu-api": 45,
+      "frontier": 45
+    }
   },
-  "usdToEur": { "rate": 0, "date": "YYYY-MM-DD" },
-  "estimate": { "inputTokensPerTask": 60000, "outputTokensPerTask": 6000 },
+  "usdToEur": {
+    "rate": 0,
+    "date": "YYYY-MM-DD"
+  },
+  "estimate": {
+    "inputTokensPerTask": 60000,
+    "outputTokensPerTask": 6000
+  },
   "models": [
     {
       "id": "mistral",
@@ -19,5 +29,10 @@
     }
   ],
   "prices": {},
-  "datasets": [{ "name": "lunos", "harbor": "./packages/eval/tasks" }]
+  "datasets": [
+    {
+      "name": "lunos",
+      "harbor": "./packages/eval/tasks"
+    }
+  ]
 }

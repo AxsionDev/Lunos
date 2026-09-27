@@ -4,7 +4,7 @@ import type { EvalConfig } from "../src/config"
 import { build, markdown, type TaskResult } from "../src/report"
 
 const config = {
-  budget: { total: 10, classes: { eu: 5, frontier: 5 } },
+  budget: { name: "test", total: 10, classes: { eu: 5, frontier: 5 } },
   usdToEur: { rate: 0.9, date: "2026-09-27" },
   estimate: { inputTokensPerTask: 1, outputTokensPerTask: 1 },
   models: [

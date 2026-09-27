@@ -10,7 +10,7 @@ import { harborJob, lunosConfig } from "../src/job"
 const config = (): EvalConfig => ({
   lunosVersion: "1.18.40",
   seed: 1,
-  budget: { total: 100, classes: { "eu-api": 45, frontier: 45 } },
+  budget: { name: "test", total: 100, classes: { "eu-api": 45, frontier: 45 } },
   usdToEur: { rate: 0.9, date: "2026-09-27" },
   estimate: { inputTokensPerTask: 60_000, outputTokensPerTask: 6_000 },
   models: [

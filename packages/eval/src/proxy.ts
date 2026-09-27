@@ -10,7 +10,7 @@ import { BudgetExceeded, type Ledger } from "./budget"
 import { cost, worstCase, type ApiPrice, type Usage } from "./prices"
 
 export type Route = {
-  /** Path segment the container uses: http://proxy/<id>/v1/chat/completions */
+  /** Path segment the container uses: http://proxy/<token>/<id>/v1/chat/completions */
   id: string
   model: string
   cls: string
@@ -48,7 +48,18 @@ function refusal(message: string) {
   )
 }
 
-export function startProxy(input: { routes: Route[]; ledger: Ledger; port?: number; hostname?: string }) {
+/**
+ * `token` is the first path segment of every route. The proxy holds real keys and may listen on
+ * a LAN address so containers can reach it; without the token, anything on that network could
+ * spend through it.
+ */
+export function startProxy(input: {
+  routes: Route[]
+  ledger: Ledger
+  token: string
+  port?: number
+  hostname?: string
+}) {
   const routes = new Map(input.routes.map((route) => [route.id, route]))
   return Bun.serve({
     hostname: input.hostname ?? "127.0.0.1",
@@ -56,7 +67,8 @@ export function startProxy(input: { routes: Route[]; ledger: Ledger; port?: numb
     idleTimeout: 255,
     async fetch(request) {
       const url = new URL(request.url)
-      const [, id, ...rest] = url.pathname.split("/")
+      const [, token, id, ...rest] = url.pathname.split("/")
+      if (token !== input.token) return new Response("eval proxy: not found", { status: 404 })
       const route = routes.get(id)
       if (!route) return new Response(`eval proxy: unknown route "${id}"`, { status: 404 })
       const target = `${route.upstream.replace(/\/+$/, "")}/${rest.join("/").replace(/^v1\/?/, "")}${url.search}`
@@ -81,8 +93,10 @@ export function startProxy(input: { routes: Route[]; ledger: Ledger; port?: numb
         input.ledger.refuse(route.model, route.cls, upstreamHost, needed)
         return refusal(error.message)
       }
+      let httpStatus: number | undefined
       const done = (usage: Usage | undefined) =>
         settle({
+          httpStatus,
           model: route.model,
           upstream: upstreamHost,
           usage,
@@ -94,6 +108,7 @@ export function startProxy(input: { routes: Route[]; ledger: Ledger; port?: numb
         done(undefined)
         throw error
       })
+      httpStatus = response.status
       if (!response.body || !(response.headers.get("content-type") ?? "").includes("text/event-stream")) {
         const raw = await response.text()
         let usage: Usage | undefined

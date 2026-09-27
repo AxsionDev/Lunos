@@ -39,6 +39,7 @@ function setup(caps = { total: 1, classes: { eu: 1 } }) {
   const ledger = new Ledger(caps)
   const proxy = startProxy({
     ledger,
+    token: "t0k",
     routes: [
       {
         id: "mistral",
@@ -51,7 +52,7 @@ function setup(caps = { total: 1, classes: { eu: 1 } }) {
     ],
   })
   const post = (body: object) =>
-    fetch(`http://127.0.0.1:${proxy.port}/mistral/v1/chat/completions`, {
+    fetch(`http://127.0.0.1:${proxy.port}/t0k/mistral/v1/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer dummy" },
       body: JSON.stringify(body),
@@ -115,6 +116,17 @@ describe("metering proxy", () => {
     await Bun.sleep(50)
     expect(ledger.entries).toHaveLength(1)
     expect(ledger.spentTotal()).toBeGreaterThan(0)
+    proxy.stop(true)
+  })
+
+  test("a request without the run's token is rejected and costs nothing", async () => {
+    const { ledger, proxy } = setup()
+    const response = await fetch(`http://127.0.0.1:${proxy.port}/wrong/mistral/v1/chat/completions`, {
+      method: "POST",
+      body: JSON.stringify({ model: "test", messages: [] }),
+    })
+    expect(response.status).toBe(404)
+    expect(ledger.entries).toHaveLength(0)
     proxy.stop(true)
   })
 

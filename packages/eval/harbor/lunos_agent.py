@@ -46,8 +46,9 @@ class Lunos(OpenCode):
 
     @override
     async def install(self, environment: BaseEnvironment) -> None:
+        # ripgrep: offline mode can't download it, and Lunos's grep and glob tools need it.
         await self.ensure_system_dependencies(
-            environment, ("curl", "bash", "coreutils", "nodejs", "npm")
+            environment, ("curl", "bash", "coreutils", "nodejs", "npm", "ripgrep")
         )
         version = self._version or "latest"
         # npm 12 skips install scripts unless allowed; lunos-ai's postinstall fetches the binary.

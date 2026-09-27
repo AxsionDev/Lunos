@@ -110,7 +110,9 @@ export function markdown(report: ReturnType<typeof build>) {
       ? "All model runs completed."
       : "> [!WARNING]\n> **This report is incomplete.** Models marked INCOMPLETE did not finish every task in every trial, or hit a budget cap. Their pass rates are not shown, because a partial run's rate is not comparable.",
     "",
-    `Lunos ${report.lunosVersion}, task-order seed ${report.seed}. Spend €${report.totalSpend.toFixed(2)} of a €${report.budget.total} cap, metered by the harness's proxy at its own prices (USD converted at ${report.usdToEur.rate} on ${report.usdToEur.date}).`,
+    `Lunos ${report.lunosVersion}, run seed ${report.seed}. Spend €${report.totalSpend.toFixed(2)} of the €${report.budget.total} "${report.budget.name}" budget, metered by the harness's proxy at its own € prices (USD list prices converted at ${report.usdToEur.rate}, ${report.usdToEur.date}).`,
+    "",
+    "**Method:** pass@1, one attempt per task with no test feedback; the grading tests are hidden from the agent and copied in only to grade. Lunos runs with `LUNOS_OFFLINE=1`: no web tools, and only LSP servers and formatters already in the image. These numbers measure Lunos's own agent and are not comparable with Aider's leaderboard, which uses Aider's harness and protocol.",
     "",
     "| Model | Class | Residency | Pass rate (mean, min–max) | Cost / run | Cost / solved | Median time | Tool error rate | Status |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",

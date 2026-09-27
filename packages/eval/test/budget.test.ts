@@ -49,6 +49,23 @@ describe("ledger", () => {
     expect(ledger.spentTotal()).toBeCloseTo(0.4)
   })
 
+  test("a provider error without usage is recorded but not charged", () => {
+    const ledger = new Ledger({ total: 1, classes: { eu: 1 } })
+    ledger.reserve("eu", 0.4)({ model: "m", upstream: "h", cost: 0, status: "failed", httpStatus: 429 })
+    expect(ledger.spentTotal()).toBe(0)
+    expect(ledger.entries[0].httpStatus).toBe(429)
+  })
+
+  test("spend persists: a new run under the same budget starts from what was already spent", async () => {
+    const file = `${require("os").tmpdir()}/ledger-${Math.random().toString(36).slice(2)}/new-dir/ledger.jsonl`
+    const first = new Ledger({ total: 1, classes: { eu: 1 } }, file)
+    first.reserve("eu", 0.7)({ model: "m", upstream: "h", cost: 0.6, status: "settled" })
+    const second = new Ledger({ total: 1, classes: { eu: 1 } }, file)
+    expect(second.spentTotal()).toBeCloseTo(0.6)
+    expect(() => second.reserve("eu", 0.5)).toThrow(BudgetExceeded)
+    expect(second.canAfford("eu", 0.3)).toBe(true)
+  })
+
   test("settling twice counts once", () => {
     const ledger = new Ledger({ total: 1, classes: { eu: 1 } })
     const settle = ledger.reserve("eu", 0.4)

@@ -19,8 +19,12 @@ export type ModelConfig = {
 }
 
 export type EvalConfig = {
-  budget: { total: number; classes: Record<string, number> }
-  /** Stated here, with its date, so every € figure in the report can be re-derived. */
+  /**
+   * `name` identifies the budget across runs: spend is kept in runs/ledger-<name>.jsonl, and the
+   * caps apply to everything spent under that name. All amounts are in €.
+   */
+  budget: { name: string; total: number; classes: Record<string, number> }
+  /** For converting USD list prices into the € prices below by hand; recorded in the report. */
   usdToEur: { rate: number; date: string }
   /** Assumed per-task usage, for the estimate shown before anything runs. */
   estimate: { inputTokensPerTask: number; outputTokensPerTask: number }
@@ -29,6 +33,7 @@ export type EvalConfig = {
   datasets: { name: string; harbor: string; tasks?: string[] }[]
   /** The Lunos release under test (`lunos-ai@<version>` in each container). */
   lunosVersion: string
+  /** Recorded in the report so a run can be identified; Harbor fixes its own task order. */
   seed: number
 }
 
@@ -46,6 +51,8 @@ export function validate(config: EvalConfig) {
       problems.push(`${model.model}: price needs a source URL and the date it was checked`)
   }
   if (!(config.usdToEur.rate > 0)) problems.push("usdToEur.rate must be set")
+  if (!/^[a-z0-9-]+$/.test(config.budget.name ?? ""))
+    problems.push("budget.name must be set (lowercase, digits, dashes)")
   if (problems.length) throw new Error(`eval config:\n- ${problems.join("\n- ")}`)
   return config
 }

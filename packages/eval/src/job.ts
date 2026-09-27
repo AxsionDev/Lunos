@@ -31,23 +31,30 @@ export function harborJob(input: {
   proxyURL: string
   jobsDir: string
   concurrency: number
+  /** A built-in Harbor agent instead of Lunos, e.g. "oracle" to check the pipeline for free. */
+  agent?: string
 }) {
   const { config, model } = input
   return {
     job_name: `${model.id}-t${input.trial}`,
     jobs_dir: input.jobsDir,
     n_attempts: 1,
-    orchestrator: { type: "local", n_concurrent_trials: input.concurrency, quiet: true },
+    n_concurrent_trials: input.concurrency,
+    quiet: true,
+    // A retried trial spends twice; a failure is a result.
+    retry: { max_retries: 0 },
     environment: { type: "docker", delete: true },
     agents: [
-      {
-        import_path: "lunos_agent:Lunos",
-        model_name: model.model,
-        kwargs: {
-          version: config.lunosVersion,
-          opencode_config: lunosConfig(model, input.proxyURL, "/logs/agent/lunos-audit.log"),
-        },
-      },
+      input.agent
+        ? { name: input.agent, model_name: model.model }
+        : {
+            import_path: "lunos_agent:Lunos",
+            model_name: model.model,
+            kwargs: {
+              version: config.lunosVersion,
+              opencode_config: lunosConfig(model, input.proxyURL, "/logs/agent/lunos-audit.log"),
+            },
+          },
     ],
     datasets: config.datasets.map((dataset) =>
       dataset.harbor.startsWith(".") || dataset.harbor.startsWith("/")
