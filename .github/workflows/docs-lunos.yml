@@ -43,3 +43,12 @@ jobs:
       - name: No upstream branding in the built site
         working-directory: packages/web
         run: bun lunos/check-built.ts
+
+      - name: Upload the built site
+        # Deployed by hand to Axsion's own EU servers; see packages/web/lunos/DEPLOY.md.
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lunos-docs
+          path: packages/web/dist/docs
+          retention-days: 30
