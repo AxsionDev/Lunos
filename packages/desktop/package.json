@@ -7,7 +7,7 @@
   "homepage": "https://lunos.tech",
   "author": {
     "name": "Axsion",
-    "email": "security@lunos.tech"
+    "email": "admin@axsion.net"
   },
   "scripts": {
     "typecheck": "tsgo -b",
