@@ -191,7 +191,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode uninstall --help 1`] = `
 "lunos uninstall
 
-uninstall opencode and remove all related files
+uninstall Lunos and remove all related files
 
 Options:
   -h, --help         show help                                                             [boolean]
