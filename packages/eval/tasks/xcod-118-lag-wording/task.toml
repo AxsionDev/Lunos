@@ -1,0 +1,21 @@
+schema_version = "1.1"
+
+[task]
+name = "lunos/xcod-118-lag-wording"
+description = "When Lunos is one day behind upstream opencode, the README badge and the upstream-sync workflow say \"1 days behind upstr"
+keywords = ["lunos"]
+
+[metadata]
+category = "bugfix"
+source = "Lunos XCOD-118"
+
+[verifier]
+timeout_sec = 120.0
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+build_timeout_sec = 600.0
+cpus = 1
+memory_mb = 2048

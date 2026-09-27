@@ -20,6 +20,9 @@
     "@opencode-ai/desktop#test": {
       "outputs": []
     },
+    "@lunos/eval#test": {
+      "outputs": []
+    },
     "@opencode-ai/function#test": {
       "outputs": []
     },
