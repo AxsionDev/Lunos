@@ -25,7 +25,10 @@ export function lunosStarlight(options) {
     favicon: "/lunos/favicon.svg",
     // Upstream's head only adds opencode's favicons.
     head: [],
-    components: { ...options.components, Head: "./lunos/Head.astro" },
+    // Upstream's PageFrame adds an "OpenCode v2 is now available" banner linking to opencode.ai;
+    // Starlight's own PageFrame has no banner. lunos.css removes the space reserved for it.
+    components: (({ PageFrame, ...rest }) => ({ ...rest, Head: "./lunos/Head.astro" }))(options.components ?? {}),
+    customCss: [...(options.customCss ?? []), "./lunos/lunos.css"],
     editLink: { baseUrl: `${config.github}/edit/dev/packages/web/` },
     sidebar: [
       ...filterSidebar(options.sidebar),
