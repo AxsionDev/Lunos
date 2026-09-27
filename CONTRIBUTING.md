@@ -40,7 +40,9 @@ data-residency policy refuses it. Run `bun ./script/jurisdictions.ts` afterwards
 
 Lunos merges upstream opencode's `dev` branch every week, as a pull request opened by the
 `upstream-sync` workflow. **We merge, never rebase** (XCOD-16), so upstream history stays intact
-and each sync is reviewable. The README badge shows how far behind upstream Lunos is.
+and each sync is reviewable. The workflow resolves exactly one kind of conflict by itself: a
+`package.json` whose only conflict is the `"version"` line keeps Lunos's version. Anything else
+opens a draft PR labelled `upstream-conflict` for a person to resolve. The README badge shows how far behind upstream Lunos is.
 
 That shapes how to change code:
 

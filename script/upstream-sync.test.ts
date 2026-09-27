@@ -12,6 +12,7 @@ import {
   redFlags,
   upstreamPRs,
   withTests,
+  resolveVersionLines,
   type Body,
 } from "./upstream-sync"
 
@@ -125,5 +126,58 @@ describe("upstream sync", () => {
     const body = withTests(prBody(base), "- ✅ No new failures")
     expect(body).toContain("<!-- upstream-sync:tests -->\n- ✅ No new failures\n<!-- /upstream-sync:tests -->")
     expect(body).not.toContain("Waiting for")
+  })
+
+  test("keeps Lunos's version where the version line is the only conflict", () => {
+    const text = [
+      "{",
+      "<<<<<<< HEAD",
+      '  "version": "1.18.40",',
+      "=======",
+      '  "version": "1.18.33",',
+      ">>>>>>> upstream/dev",
+      '  "name": "@opencode-ai/core",',
+      "}",
+    ].join("\n")
+    expect(resolveVersionLines(text)).toEqual({
+      text: ["{", '  "version": "1.18.40",', '  "name": "@opencode-ai/core",', "}"].join("\n"),
+      resolved: 1,
+      remaining: 0,
+    })
+  })
+
+  test("leaves any other conflict for a person, including a version hunk with more in it", () => {
+    const other = ["<<<<<<< HEAD", '  "open": "10.1.2",', "=======", '  "open": "11.0.4",', ">>>>>>> upstream/dev"]
+    const mixed = [
+      "<<<<<<< HEAD",
+      '  "version": "1.18.40",',
+      '  "name": "lunos",',
+      "=======",
+      '  "version": "1.18.33",',
+      '  "name": "opencode",',
+      ">>>>>>> upstream/dev",
+    ]
+    const version = [
+      "<<<<<<< HEAD",
+      '  "version": "1.18.40",',
+      "=======",
+      '  "version": "1.18.33",',
+      ">>>>>>> upstream/dev",
+    ]
+    const result = resolveVersionLines(["{", ...version, ...other, ...mixed, "}"].join("\n"))
+    expect(result.resolved).toBe(1)
+    expect(result.remaining).toBe(2)
+    expect(result.text).toContain('"open": "10.1.2"')
+    expect(result.text).toContain("<<<<<<< HEAD")
+    // The version-only hunk is settled; the mixed hunk keeps both sides for a person.
+    expect(result.text.split('"version": "1.18.33"').length - 1).toBe(1)
+    expect(result.text).toContain('"name": "opencode"')
+  })
+
+  test("the PR body says which files kept Lunos's version", () => {
+    expect(prBody({ ...base, versionsKept: ["packages/core/package.json"] })).toContain(
+      "## Version lines kept automatically",
+    )
+    expect(prBody(base)).not.toContain("Version lines kept")
   })
 })
