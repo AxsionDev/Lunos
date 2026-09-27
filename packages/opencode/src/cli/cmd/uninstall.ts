@@ -22,9 +22,24 @@ interface RemovalTargets {
   binary: string | null
 }
 
+/**
+ * How each package manager removes Lunos. Lunos is published to npm as `lunos-ai` and nowhere else:
+ * there is no Homebrew, Chocolatey or Scoop package, so for those the uninstall removes nothing
+ * rather than removing upstream opencode's package of the same name.
+ */
+export const PACKAGE_UNINSTALL: Partial<Record<Installation.Method, string[]>> = {
+  npm: ["npm", "uninstall", "-g", "lunos-ai"],
+  pnpm: ["pnpm", "uninstall", "-g", "lunos-ai"],
+  bun: ["bun", "remove", "-g", "lunos-ai"],
+  yarn: ["yarn", "global", "remove", "lunos-ai"],
+}
+
+const NOT_PUBLISHED = (method: string) =>
+  `Lunos isn't published to ${method}; remove it with the tool that installed it`
+
 export const UninstallCommand = {
   command: "uninstall",
-  describe: "uninstall opencode and remove all related files",
+  describe: "uninstall Lunos and remove all related files",
   builder: (yargs: Argv) =>
     yargs
       .option("keep-config", {
@@ -128,16 +143,8 @@ async function showRemovalSummary(targets: RemovalTargets, method: Installation.
   }
 
   if (method !== "curl" && method !== "unknown") {
-    const cmds: Record<string, string> = {
-      npm: "npm uninstall -g opencode-ai",
-      pnpm: "pnpm uninstall -g opencode-ai",
-      bun: "bun remove -g opencode-ai",
-      yarn: "yarn global remove opencode-ai",
-      brew: "brew uninstall opencode",
-      choco: "choco uninstall opencode",
-      scoop: "scoop uninstall opencode",
-    }
-    prompts.log.info(`  ✓ Package: ${cmds[method] || method}`)
+    const cmd = PACKAGE_UNINSTALL[method]
+    prompts.log.info(cmd ? `  ✓ Package: ${cmd.join(" ")}` : `  ○ Package: not removed (${NOT_PUBLISHED(method)})`)
   }
 }
 
@@ -179,30 +186,18 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
   }
 
   if (method !== "curl" && method !== "unknown") {
-    const cmds: Record<string, string[]> = {
-      npm: ["npm", "uninstall", "-g", "lunos-ai"],
-      pnpm: ["pnpm", "uninstall", "-g", "lunos-ai"],
-      bun: ["bun", "remove", "-g", "lunos-ai"],
-      yarn: ["yarn", "global", "remove", "lunos-ai"],
-      brew: ["brew", "uninstall", "opencode"],
-      choco: ["choco", "uninstall", "opencode"],
-      scoop: ["scoop", "uninstall", "opencode"],
-    }
-
-    const cmd = cmds[method]
+    const cmd = PACKAGE_UNINSTALL[method]
+    if (!cmd) prompts.log.warn(`Not removing a ${method} package: ${NOT_PUBLISHED(method)}`)
     if (cmd) {
       spinner.start(`Running ${cmd.join(" ")}...`)
-      const result = await Process.run(method === "choco" ? ["choco", "uninstall", "opencode", "-y", "-r"] : cmd, {
+      const result = await Process.run(cmd, {
         nothrow: true,
       })
       if (result.code !== 0) {
         spinner.stop(`Package manager uninstall failed: exit code ${result.code}`, 1)
         const text = `${result.stdout.toString("utf8")}\n${result.stderr.toString("utf8")}`
-        if (method === "choco" && text.includes("not running from an elevated command shell")) {
-          prompts.log.warn(`You may need to run '${cmd.join(" ")}' from an elevated command shell`)
-        } else {
-          prompts.log.warn(`You may need to run manually: ${cmd.join(" ")}`)
-        }
+        prompts.log.warn(`You may need to run manually: ${cmd.join(" ")}`)
+        if (text.trim()) prompts.log.message(text.trim())
       } else {
         spinner.stop("Package removed")
       }
@@ -215,7 +210,7 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
     prompts.log.info(`  rm "${targets.binary}"`)
 
     const binDir = path.dirname(targets.binary)
-    if (binDir.includes(".opencode")) {
+    if (binDir.includes(".lunos")) {
       prompts.log.info(`  rmdir "${binDir}" 2>/dev/null`)
     }
   }
@@ -229,7 +224,7 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
   }
 
   UI.empty()
-  prompts.log.success("Thank you for using OpenCode!")
+  prompts.log.success("Thank you for using Lunos!")
 }
 
 async function getShellConfigFile(): Promise<string | null> {
@@ -266,7 +261,7 @@ async function getShellConfigFile(): Promise<string | null> {
     if (!exists) continue
 
     const content = await Filesystem.readText(file).catch(() => "")
-    if (content.includes("# opencode") || content.includes(".opencode/bin")) {
+    if (content.includes("# lunos") || content.includes(".lunos/bin")) {
       return file
     }
   }
@@ -275,31 +270,33 @@ async function getShellConfigFile(): Promise<string | null> {
 }
 
 async function cleanShellConfig(file: string) {
-  const content = await Filesystem.readText(file)
-  const lines = content.split("\n")
+  await Filesystem.write(file, removeLunosPath(await Filesystem.readText(file)))
+}
 
+/**
+ * Removes the PATH lines Lunos's install script adds (`# lunos` followed by an export or
+ * fish_add_path for ~/.lunos/bin). Leaves every other line alone, including upstream opencode's
+ * `# opencode` / ~/.opencode/bin lines: someone may have both installed.
+ */
+export function removeLunosPath(content: string) {
+  const lines = content.split("\n")
   const filtered: string[] = []
   let skip = false
 
   for (const line of lines) {
     const trimmed = line.trim()
 
-    if (trimmed === "# opencode") {
+    if (trimmed === "# lunos") {
       skip = true
       continue
     }
 
     if (skip) {
       skip = false
-      if (trimmed.includes(".opencode/bin") || trimmed.includes("fish_add_path")) {
-        continue
-      }
+      if (trimmed.includes(".lunos/bin")) continue
     }
 
-    if (
-      (trimmed.startsWith("export PATH=") && trimmed.includes(".opencode/bin")) ||
-      (trimmed.startsWith("fish_add_path") && trimmed.includes(".opencode"))
-    ) {
+    if ((trimmed.startsWith("export PATH=") || trimmed.startsWith("fish_add_path")) && trimmed.includes(".lunos/bin")) {
       continue
     }
 
@@ -310,8 +307,7 @@ async function cleanShellConfig(file: string) {
     filtered.pop()
   }
 
-  const output = filtered.join("\n") + "\n"
-  await Filesystem.write(file, output)
+  return filtered.join("\n") + "\n"
 }
 
 async function getDirectorySize(dir: string): Promise<number> {
