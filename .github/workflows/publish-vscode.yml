@@ -30,7 +30,9 @@ jobs:
       id-token: write
       attestations: write
     env:
-      DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
+      # Anything that isn't a push of a vscode-v* tag is a dry run: a dispatch on a branch can't
+      # publish, whatever its dry_run input says.
+      DRY_RUN: ${{ (github.ref_type != 'tag' || inputs.dry_run) && '1' || '' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:

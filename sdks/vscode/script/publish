@@ -13,14 +13,15 @@ if [ "$publisher" != "$expected_publisher" ]; then
     exit 1
 fi
 
-# Get the latest Git tag
-latest_tag=$(git tag --sort=committerdate | grep -E '^vscode-v[0-9]+\.[0-9]+\.[0-9]+$' | tail -1 || true)
-if [ -z "$latest_tag" ]; then
-    if [ "${DRY_RUN:-}" != "1" ]; then
-        echo "No tags found"
-        exit 1
-    fi
+# The version comes from the tag being published. Only a dry run may run without one; it never
+# picks "the latest tag", because a clone can hold upstream opencode's vscode-v* tags too.
+if [[ "${GITHUB_REF_NAME:-}" =~ ^vscode-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    latest_tag="$GITHUB_REF_NAME"
+elif [ "${DRY_RUN:-}" = "1" ]; then
     latest_tag="vscode-v$(node -p 'require("./package.json").version')"
+else
+    echo "Refusing to publish: not running on a vscode-vX.Y.Z tag (ref: ${GITHUB_REF_NAME:-none})" >&2
+    exit 1
 fi
 echo "Latest tag: $latest_tag"
 version=$(echo "$latest_tag" | sed 's/^vscode-v//')
