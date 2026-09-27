@@ -32,7 +32,10 @@ export function lunosStarlight(options) {
     editLink: { baseUrl: `${config.github}/edit/dev/packages/web/` },
     sidebar: [
       ...filterSidebar(options.sidebar),
-      { label: "Lunos", items: ["lunos-fork", "data-residency", "offline-mode", "marketplace", "memory", "trust"] },
+      {
+        label: "Lunos",
+        items: ["lunos-fork", "data-residency", "offline-mode", "marketplace", "memory", "artifacts", "trust"],
+      },
     ],
   }
 }
