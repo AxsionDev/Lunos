@@ -36,6 +36,7 @@ import { MarketplaceCommand } from "./cli/cmd/marketplace"
 import { AuditCommand } from "./cli/cmd/audit"
 import { MemoryCommand } from "./cli/cmd/memory"
 import { Heap } from "./cli/heap"
+import { brandHelp } from "./cli/brand"
 
 const args = hideBin(process.argv)
 
@@ -67,6 +68,7 @@ const NOTICE_COMMANDS = new Set([
 ])
 
 function show(out: string) {
+  out = brandHelp(out)
   const text = out.trimStart()
   if (!text.startsWith("lunos ")) {
     process.stderr.write(UI.logo() + EOL + EOL)

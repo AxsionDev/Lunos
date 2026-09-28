@@ -45,7 +45,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode attach --help 1`] = `
 "lunos attach <url>
 
-attach to a running opencode server
+attach to a running Lunos server
 
 Positionals:
   url  http://localhost:4096                                                     [string] [required]
@@ -71,7 +71,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode run --help 1`] = `
 "lunos run [message..]
 
-run opencode with a message
+run Lunos with a message
 
 Positionals:
   message  message to send                                                     [array] [default: []]
@@ -93,7 +93,7 @@ Options:
                                           [string] [choices: "default", "json"] [default: "default"]
   -f, --file         file(s) to attach to message                                            [array]
       --title        title for the session (uses truncated prompt if no value provided)     [string]
-      --attach       attach to a running opencode server (e.g., http://localhost:4096)      [string]
+      --attach       attach to a running Lunos server (e.g., http://localhost:4096)         [string]
   -p, --password     basic auth password (defaults to OPENCODE_SERVER_PASSWORD)             [string]
   -u, --username     basic auth username (defaults to OPENCODE_SERVER_USERNAME or 'opencode')
                                                                                             [string]
@@ -208,7 +208,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode serve --help 1`] = `
 "lunos serve
 
-starts a headless opencode server
+starts a headless Lunos server
 
 Options:
   -h, --help         show help                                                             [boolean]
@@ -228,7 +228,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode web --help 1`] = `
 "lunos web
 
-start opencode server and open web interface
+start Lunos server and open web interface
 
 Options:
   -h, --help         show help                                                             [boolean]
@@ -334,7 +334,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode pr --help 1`] = `
 "lunos pr <number>
 
-fetch and checkout a GitHub PR branch, then run opencode
+fetch and checkout a GitHub PR branch, then run Lunos
 
 Positionals:
   number  PR number to checkout                                                  [number] [required]
@@ -499,7 +499,7 @@ exports[`opencode CLI help-text snapshots every documented command emits stable 
 log in to a provider
 
 Positionals:
-  url  opencode auth provider                                                               [string]
+  url  Lunos auth provider                                                                  [string]
 
 Options:
   -h, --help        show help                                                              [boolean]

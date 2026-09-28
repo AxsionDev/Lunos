@@ -29,6 +29,12 @@ describe("rebrand", () => {
     for (const text of kept) expect(rebrand(text)).toBe(text)
   })
 
+  test("keeps the server-ready line the SDK waits for", () => {
+    expect(rebrand("prints `opencode server listening on http://…` when ready")).toBe(
+      "prints `opencode server listening on http://…` when ready",
+    )
+  })
+
   test("keeps third-party names", () => {
     for (const text of ["opencode-wakatime", "opencode.nvim", "https://github.com/HShami/opencode-helicone-session"])
       expect(rebrand(text)).toBe(text)

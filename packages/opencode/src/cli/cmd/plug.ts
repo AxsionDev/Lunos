@@ -181,7 +181,7 @@ function printPlugins(plugins: PluginListEntry[]) {
   for (const plugin of plugins) {
     log.info(`${plugin.name} ${UI.Style.TEXT_DIM}(${plugin.marketplace})`)
     if (plugin.description) log.info(`  ${plugin.description}`)
-    log.info(`  ${UI.Style.TEXT_DIM}opencode plugin ${plugin.spec}`)
+    log.info(`  ${UI.Style.TEXT_DIM}lunos plugin ${plugin.spec}`)
   }
 }
 
