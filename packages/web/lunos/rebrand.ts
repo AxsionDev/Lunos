@@ -19,6 +19,8 @@ const KEEP: RegExp[] = [
   /@opencode-ai\/[\w-]+/g,
   /\bai\.opencode\.[\w.]+/g,
   /\bcreateOpencode(?:Client|Server)?\b/g,
+  // The server-ready line `lunos serve` still prints, because the SDK waits for it (XCOD-127).
+  /\bopencode server listening\b/g,
   /\bx-opencode-[\w-]+/g,
   // Third-party plugins and repos that happen to have "opencode" in their name.
   /\bopencode-(?!ai\b)[\w-]+/g,

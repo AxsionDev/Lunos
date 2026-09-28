@@ -55,3 +55,5 @@ packages/tui/src/component/logo.tsx
 
 # Docs and deployment.
 docs/**
+packages/opencode/src/cli/brand.ts
+packages/opencode/test/cli/brand.test.ts

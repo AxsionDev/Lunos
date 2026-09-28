@@ -11,14 +11,16 @@ Lunos adds EU data-residency controls, provider jurisdiction metadata, an audit 
 
 The command is `lunos` and the npm package is `lunos-ai`. Some names still say `opencode`, because the Lunos binary reads them and renaming them would break existing setups. They work exactly as the rest of these docs describe:
 
-| Name                                              | What it is                                                    |
-| ------------------------------------------------- | ------------------------------------------------------------- |
-| `opencode.json`, `opencode.jsonc`                 | Config files, in your project or global config directory      |
-| `.opencode/`                                      | The project directory for agents, commands, plugins and plans |
-| `~/.config/opencode/`, `~/.local/share/opencode/` | Global config and data directories                            |
-| `OPENCODE_*`                                      | Environment variables, such as `OPENCODE_CONFIG`              |
-| `@opencode-ai/plugin`, `@opencode-ai/sdk`         | The plugin and SDK packages                                   |
-| `https://opencode.ai/config.json`                 | The `$schema` URL in config files. Lunos doesn't fetch it     |
+| Name                                              | What it is                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------- |
+| `opencode.json`, `opencode.jsonc`                 | Config files, in your project or global config directory       |
+| `.opencode/`                                      | The project directory for agents, commands, plugins and plans  |
+| `~/.config/opencode/`, `~/.local/share/opencode/` | Global config and data directories                             |
+| `OPENCODE_*`                                      | Environment variables, such as `OPENCODE_CONFIG`               |
+| `@opencode-ai/plugin`, `@opencode-ai/sdk`         | The plugin and SDK packages                                    |
+| `https://opencode.ai/config.json`                 | The `$schema` URL in config files. Lunos doesn't fetch it      |
+| `opencode.local`                                  | The default mDNS name `lunos serve --mdns` advertises          |
+| `opencode server listening on …`                  | The line `lunos serve` prints when ready; the SDK waits for it |
 
 Lunos-only settings use `lunos` or `LUNOS_` names, for example `LUNOS_OFFLINE` and `LUNOS_DISABLE_AUTOUPDATE`.
 
