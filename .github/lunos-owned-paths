@@ -28,6 +28,9 @@ packages/core/src/offline.ts
 packages/core/src/npm.ts
 script/offline-calls.ts
 script/offline-egress.ts
+packages/opencode/script/offline-bundles.ts
+packages/opencode/script/offline/**
+packages/opencode/script/release-checksums.ts
 packages/opencode/src/provider/provider.ts
 packages/opencode/src/share/**
 packages/core/src/jurisdiction.ts

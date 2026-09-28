@@ -255,7 +255,13 @@ if (Script.release) {
       await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
     }
   }
-  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber --repo ${process.env.GH_REPO}`
+  // XCOD-121: the model catalogue this build embeds, and the offline install instructions. Uploaded
+  // before release-checksums.ts runs, so SHA256SUMS and its signature cover them and they can go
+  // into the offline bundles (offline-bundles.ts) verifiably.
+  await Bun.write("./dist/lunos-models-snapshot.json", generated.modelsData)
+  const install = await Bun.file("./script/offline/INSTALL-OFFLINE.md").text()
+  await Bun.write("./dist/INSTALL-OFFLINE.md", install.replaceAll("__VERSION__", Script.version))
+  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz ./dist/lunos-models-snapshot.json ./dist/INSTALL-OFFLINE.md --clobber --repo ${process.env.GH_REPO}`
 }
 
 export { binaries }

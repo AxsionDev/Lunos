@@ -93,5 +93,7 @@ if (Script.release) {
   // XCOD-106: every asset is on the draft by now (CLI archives, desktop builds, latest*.yml, SBOM).
   // Checksum and sign them before the release becomes public, so it is never visible unsigned.
   await $`bun ./packages/opencode/script/release-checksums.ts ${tag}`
+  // XCOD-121: offline install bundles, built from the files SHA256SUMS just signed.
+  await $`bun ./packages/opencode/script/offline-bundles.ts ${tag}`
   await $`gh release edit ${tag} --draft=false --repo ${process.env.GH_REPO}`
 }

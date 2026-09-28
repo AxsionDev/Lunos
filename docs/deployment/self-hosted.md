@@ -197,6 +197,23 @@ Download the archive for your platform from the [releases page](https://github.c
 
 For reviewers who require building from audited source. See [`CONTRIBUTING.md`](../../CONTRIBUTING.md) in the repository.
 
+### Installing without internet access
+
+From the next release, every release carries an **offline bundle** per platform, `lunos-offline-<os>-<arch>.tar.gz`. It contains:
+
+- the CLI archive
+- the model catalogue built into that release
+- the SBOM
+- the release's signed `SHA256SUMS`, with Sigstore signatures
+- Sigstore's trusted root
+- `INSTALL-OFFLINE.md`
+
+Every file but the trusted root is covered by the signed `SHA256SUMS`, so the whole bundle can be verified without a network.
+
+1. **On a machine with internet access,** verify the bundle against `SHA256SUMS-offline`, which is signed the same way. Then transfer it. A trust root shipped inside the bundle can't vouch for the bundle itself, so this is the step that establishes trust.
+2. **On the offline machine,** unpack it and follow `INSTALL-OFFLINE.md`. With cosign installed there, the signature and checksums can be re-checked offline. Then install the binary.
+3. **Set `LUNOS_OFFLINE=1`** and install `rg` from your OS packages, because Lunos can't download ripgrep offline.
+
 ### Verify your download
 
 Releases can be checked without trusting the download location. None of this needs a certificate from us.
@@ -340,11 +357,12 @@ Lunos requires no database, no message broker and no inbound network access. Ser
 - **The agent is not sandboxed.** Lunos can execute shell commands and modify files. Its permission system is a UX safeguard that prompts before acting — it is _not_ a security boundary. For true isolation, run it in a container or VM. This is inherited from upstream and documented in [`SECURITY.md`](../../SECURITY.md).
 - **Model provider data handling is governed by your agreement with that provider,** not by Lunos. Residency controls determine _which_ provider may be used; they do not alter what that provider does with what it receives.
 - **Allowing a self-hosted share server is coarse.** `enterprise.url` counts as `unknown`, so allowing it with `"unknown"` also allows other endpoints whose region can't be determined, such as gateways and generic OpenAI-compatible endpoints. There is no per-host allow list yet. Leave sharing off (the default) if that's too broad.
+- **A residency policy can't yet allow a self-hosted model endpoint.** Its provider ID has no recorded jurisdiction, and untagged providers are always denied; there is no configuration setting to record one. Being designed (XCOD-121, XCOD-138).
 - **Feature parity with upstream opencode is not claimed or measured.**
 
 ## 8. Questions a reviewer usually asks next
 
-**Can it run fully air-gapped?** Not with a hosted model provider: model inference needs egress. Against a self-hosted, OpenAI-compatible model endpoint on your own network, set `LUNOS_OFFLINE=1` ([offline mode](#every-outbound-call-and-offline-mode)) and Lunos contacts only that endpoint and anything else you configured. The endpoint is untagged by default, and a residency policy denies it until you record its jurisdiction. Installing still needs a download today (npm or a release archive); an offline install bundle and a tested vLLM/Ollama recipe are in progress (XCOD-121).
+**Can it run fully air-gapped?** Not with a hosted model provider: model inference needs egress. Against a self-hosted, OpenAI-compatible model endpoint on your own network, set `LUNOS_OFFLINE=1` ([offline mode](#every-outbound-call-and-offline-mode)) and Lunos contacts only that endpoint and anything else you configured. **But a residency policy denies a self-hosted endpoint today, and there is no configuration setting to allow it:** its provider ID has no recorded jurisdiction, and untagged providers are always refused. So on an air-gapped machine you currently run without a `residency` policy, or not at all. A way to declare a self-hosted endpoint's jurisdiction is being designed (XCOD-121, XCOD-138). To install without internet access, use the offline bundle (see [Installing without internet access](#installing-without-internet-access)).
 
 **Does the vendor receive telemetry?** No. There is no Lunos-operated endpoint receiving data from your deployment.
 

@@ -100,8 +100,9 @@ allowed and refused call ([data residency](../data-residency.md); enforced for s
 **v1.18.39**). Session sharing is **off by default** and governed by the same policy.
 
 **Not mitigated:** what a permitted provider does with the data is governed by your agreement with
-it. Self-hosted, OpenAI-compatible endpoints are untagged and denied until you record their
-jurisdiction.
+it. Self-hosted, OpenAI-compatible endpoints are untagged, so a residency policy denies them, and
+there is no configuration setting yet to record their jurisdiction (being designed: XCOD-121,
+XCOD-138).
 
 ### Secrets
 
