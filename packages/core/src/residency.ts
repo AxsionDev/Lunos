@@ -19,6 +19,8 @@ import { Audit } from "./audit"
 export interface Policy {
   /** Regions a deployment is permitted to send data to, e.g. `["eu"]`. */
   readonly allow: readonly Jurisdiction.Region[]
+  /** Jurisdictions this deployment declares for endpoints Lunos can't assess (XCOD-121). */
+  readonly endpoints?: Readonly<Record<string, Jurisdiction.Declaration>>
 }
 
 export interface Decision {
@@ -43,16 +45,16 @@ export interface Decision {
  *    US-region Azure resource through is worse than no policy, because it reports success.
  *    The deployer can still use it by widening `allow` — an explicit, auditable choice.
  */
-export function evaluate(providerID: string, policy: Policy): Decision {
-  const claim = Jurisdiction.lookup(providerID)
+export function evaluate(providerID: string, policy: Policy, baseURL?: string): Decision {
+  const { claim, tagged } = Jurisdiction.resolve(providerID, baseURL, policy.endpoints)
   const base = { providerID, region: claim.region }
   const allowed = policy.allow.join(", ")
 
-  if (!Jurisdiction.isTagged(providerID)) {
+  if (!tagged) {
     return {
       ...base,
       allowed: false,
-      reason: `Provider "${providerID}" has no recorded data-processing jurisdiction, and the active residency policy allows only: ${allowed}. Untagged providers are denied rather than assumed compliant. Add an entry in packages/core/src/jurisdiction.ts if this provider should be usable.`,
+      reason: `Provider "${providerID}" has no recorded data-processing jurisdiction, and the active residency policy allows only: ${allowed}. Untagged providers are denied rather than assumed compliant. If it's an endpoint you run, declare its region in residency.endpoints, e.g. "residency": { "endpoints": { "${providerID}": { "region": "eu" } } }.`,
     }
   }
 
@@ -60,7 +62,10 @@ export function evaluate(providerID: string, policy: Policy): Decision {
     return {
       ...base,
       allowed: true,
-      reason: `Provider "${providerID}" processes in "${claim.region}", which the residency policy allows.`,
+      reason:
+        claim.basis === "declared"
+          ? `Provider "${providerID}" is declared "${claim.region}" in residency.endpoints, which the residency policy allows.`
+          : `Provider "${providerID}" processes in "${claim.region}", which the residency policy allows.`,
     }
   }
 
@@ -109,13 +114,19 @@ export interface EgressRecord {
 }
 
 /**
- * Build an audit record for one outbound call.
+ * Build an audit record for one outbound call. Pass the claim that decided the call, so a
+ * declared endpoint is recorded as `declared` rather than as its provider's built-in claim.
  *
  * Records the destination host but never the request body — an audit trail of what left and
  * where it went must not itself become a copy of the data that left.
  */
-export function record(providerID: string, url: string, allowed: boolean, now = new Date()): EgressRecord {
-  const claim = Jurisdiction.lookup(providerID)
+export function record(
+  providerID: string,
+  url: string,
+  allowed: boolean,
+  now = new Date(),
+  claim: Jurisdiction.Claim = Jurisdiction.lookup(providerID),
+): EgressRecord {
   return {
     timestamp: now.toISOString(),
     providerID,
@@ -144,6 +155,7 @@ export interface ConfigBlock {
   readonly allow: readonly Jurisdiction.Region[]
   readonly audit?: boolean
   readonly auditPath?: string
+  readonly endpoints?: Readonly<Record<string, Jurisdiction.Declaration>>
 }
 
 export interface Resolved {
@@ -164,7 +176,11 @@ export function resolve(block: ConfigBlock | undefined): Resolved | undefined {
   if (!block) return undefined
   // Audit is on by default once a policy exists, so enabling residency does not silently skip
   // the record of what actually left.
-  return { policy: { allow: block.allow }, audit: block.audit ?? true, auditPath: block.auditPath }
+  return {
+    policy: { allow: block.allow, endpoints: block.endpoints },
+    audit: block.audit ?? true,
+    auditPath: block.auditPath,
+  }
 }
 
 // XCOD-103: egress records go into the one audit stream (core/audit.ts). The v0 fields keep their
@@ -207,16 +223,19 @@ export function enforce(input: {
 }): Fetch | undefined {
   const { providerID, resolved } = input
   const file = resolved.auditPath ?? input.defaultAuditPath
-  const decision = evaluate(providerID, resolved.policy)
+  // The endpoint decides the claim, not just the provider id: a built-in provider pointed at
+  // another host doesn't inherit its claim (XCOD-138), and a declared endpoint is logged as such.
+  const decision = evaluate(providerID, resolved.policy, input.baseURL)
+  const { claim } = Jurisdiction.resolve(providerID, input.baseURL, resolved.policy.endpoints)
   if (!decision.allowed && resolved.enforce !== false) {
-    if (resolved.audit) append(file, record(providerID, input.baseURL, false))
+    if (resolved.audit) append(file, record(providerID, input.baseURL, false, new Date(), claim))
     throw new DeniedError(decision)
   }
   if (!resolved.audit) return input.fetch
   const inner = input.fetch
   return async (request, init) => {
     const url = typeof request === "string" ? request : request instanceof URL ? request.href : (request as Request).url
-    append(file, record(providerID, url, true))
+    append(file, record(providerID, url, true, new Date(), claim))
     return (inner ?? fetch)(request, init)
   }
 }

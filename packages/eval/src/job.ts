@@ -18,7 +18,20 @@ export function lunosConfig(model: ModelConfig, proxyURL: string, auditPath: str
         models: { [id]: { name: id, tool_call: true } },
       },
     },
-    residency: { allow: model.residency, audit: true, auditPath },
+    residency: {
+      allow: model.residency,
+      audit: true,
+      auditPath,
+      // The provider points at the metering proxy, not its own API, so its built-in claim doesn't
+      // apply (XCOD-138). Declare it: the proxy forwards to model.upstream, whose region the eval
+      // config states. The proxy's upstream log is the evidence of where traffic went.
+      endpoints: {
+        [provider]: {
+          region: model.residency.find((region) => region === "eu" || region === "us" || region === "other") ?? "other",
+          note: `Lunos eval metering proxy, forwarding to ${new URL(model.upstream).host}`,
+        },
+      },
+    },
     share: "disabled",
     autoupdate: false,
   }

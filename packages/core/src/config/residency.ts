@@ -18,4 +18,20 @@ export class Info extends Schema.Class<Info>("ConfigV2.Residency")({
   auditPath: Schema.String.pipe(Schema.optional).annotate({
     description: "Path of the audit log. Defaults to residency-egress.log in the Lunos data directory.",
   }),
+  endpoints: Schema.Record(
+    Schema.String,
+    Schema.Struct({
+      region: Schema.Literals(["eu", "us", "other"]).annotate({
+        description: "Where this endpoint processes data. Your declaration: Lunos can't verify it.",
+      }),
+      note: Schema.String.pipe(Schema.optional).annotate({
+        description: 'What the declaration rests on, recorded for reviewers, e.g. "vLLM on our Frankfurt servers"',
+      }),
+    }),
+  )
+    .pipe(Schema.optional)
+    .annotate({
+      description:
+        'Jurisdictions this deployment declares for endpoints Lunos can\'t assess, keyed by provider id: self-hosted models (vLLM, Ollama) or a built-in provider pointed at another host. A declaration never changes a built-in provider\'s claim for its own API. Recorded in the audit log with basis "declared". Lock it with managed config ($locked: ["residency"]).',
+    }),
 }) {}
