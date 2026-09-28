@@ -134,8 +134,9 @@ describe("subagent model selection in a real run", () => {
         const audit = path.join(fixture.home, "egress.log")
         yield* Effect.promise(() =>
           configure(fixture.home, {
-            residency: { allow: ["eu"], auditPath: audit },
-            // An EU-tagged provider id pointed at the scripted LLM, so the main agent is allowed.
+            // The scripted LLM runs on localhost, which isn't Mistral's API, so it's declared EU
+            // (XCOD-138): the main agent is allowed, the per-type Anthropic model isn't.
+            residency: { allow: ["eu"], auditPath: audit, endpoints: { mistral: { region: "eu" } } },
             provider: {
               test: { models: { "small-model": smallModel } },
               mistral: {
