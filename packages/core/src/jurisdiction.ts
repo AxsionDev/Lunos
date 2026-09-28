@@ -44,6 +44,8 @@ export type Basis =
   | "user-configured"
   /** Determined by whatever endpoint the user pointed at. We cannot know. */
   | "user-endpoint"
+  /** Declared by the deployment in `residency.endpoints` for an endpoint Lunos can't assess (XCOD-121). */
+  | "declared"
   /** A gateway: the real jurisdiction is that of whatever it routes to. */
   | "gateway"
   /** No EU claim is made. */
@@ -56,6 +58,12 @@ export interface Claim {
   readonly note: string
   /** Present when an EU option exists but is not the default. */
   readonly euOption?: string
+  /**
+   * The provider's own API hosts (a leading "." matches any subdomain). When set, the claim holds
+   * only for these: the same provider pointed at another host (a changed baseURL) is somebody
+   * else's endpoint, and is assessed like one (XCOD-138).
+   */
+  readonly hosts?: readonly string[]
 }
 
 const UNKNOWN: Claim = {
@@ -78,21 +86,25 @@ const CLAIMS: Record<string, Claim> = {
   mistral: {
     region: "eu",
     basis: "both",
+    hosts: ["api.mistral.ai", "codestral.mistral.ai"],
     note: "Mistral AI is a French company and its own API serves EU-hosted inference. Note this is the direct Mistral API only — Mistral models served via Azure or Bedrock inherit that platform's region instead, and are covered by the `azure` / `amazon-bedrock` rows.",
   },
   scaleway: {
     region: "eu",
     basis: "both",
+    hosts: ["api.scaleway.ai"],
     note: "Scaleway is a French company (Iliad group); its Generative APIs run in French data centres. Reached through the generic openai-compatible plugin, not a dedicated one.",
   },
   ovhcloud: {
     region: "eu",
     basis: "both",
+    hosts: [".endpoints.kepler.ai.cloud.ovh.net"],
     note: "OVHcloud is a French company; AI Endpoints run in its EU data centres. Reached through the generic openai-compatible plugin.",
   },
   hetzner: {
     region: "eu",
     basis: "both",
+    hosts: ["inference.hetzner.com"],
     note: "Hetzner Online GmbH is a German company; its inference offering runs on its own German infrastructure. Reached through the generic openai-compatible plugin.",
   },
   "sap-ai-core": {
@@ -275,6 +287,74 @@ const SHARE_HOSTS: Record<string, Claim> = {
 /** Look up a provider's jurisdiction claim. Unknown providers are `unknown`/`none`, never assumed safe. */
 export function lookup(providerID: string): Claim {
   return CLAIMS[providerID] ?? SHARE_HOSTS[providerID] ?? UNKNOWN
+}
+
+/** Regions a deployment may declare for an endpoint in `residency.endpoints`. */
+export type DeclaredRegion = "eu" | "us" | "other"
+
+export interface Declaration {
+  readonly region: DeclaredRegion
+  readonly note?: string
+}
+
+export function hostOf(url: string | undefined) {
+  if (!url) return undefined
+  try {
+    return new URL(url).host.toLowerCase()
+  } catch {
+    return undefined
+  }
+}
+
+function hostMatches(host: string, hosts: readonly string[]) {
+  const name = host.replace(/:\d+$/, "")
+  return hosts.some((entry) => (entry.startsWith(".") ? name.endsWith(entry) : name === entry))
+}
+
+/**
+ * The claim that applies to one provider at one endpoint (XCOD-121, XCOD-138), and whether it
+ * counts as recorded. In order:
+ *
+ * 1. A built-in claim, when the provider is at one of its own API hosts, or has no host list, or
+ *    no baseURL is known (the SDK's default is the provider's own API).
+ * 2. The deployment's declaration in `residency.endpoints`, for any other endpoint. A declaration
+ *    can't change a built-in claim: it only applies where rule 1 doesn't.
+ * 3. A built-in provider pointed somewhere else, undeclared: `unknown`, so an EU-only policy
+ *    denies it.
+ * 4. Otherwise untagged, and always denied.
+ */
+export function resolve(
+  providerID: string,
+  baseURL: string | undefined,
+  declared: Readonly<Record<string, Declaration>> | undefined,
+): { claim: Claim; tagged: boolean } {
+  const builtIn = CLAIMS[providerID] ?? SHARE_HOSTS[providerID]
+  const host = hostOf(baseURL)
+  if (builtIn && (!builtIn.hosts || !host || hostMatches(host, builtIn.hosts))) return { claim: builtIn, tagged: true }
+  const declaration = declared?.[providerID]
+  if (declaration) {
+    return {
+      claim: {
+        region: declaration.region,
+        basis: "declared",
+        note:
+          declaration.note ??
+          `Declared "${declaration.region}" by this deployment's residency.endpoints for ${host ?? "its endpoint"}. Lunos can't verify it.`,
+      },
+      tagged: true,
+    }
+  }
+  if (builtIn) {
+    return {
+      claim: {
+        region: "unknown",
+        basis: "user-endpoint",
+        note: `"${providerID}" is configured with ${host}, not one of its own API hosts, so its built-in "${builtIn.region}" claim doesn't apply. Declare this endpoint in residency.endpoints to use it under a policy.`,
+      },
+      tagged: true,
+    }
+  }
+  return { claim: UNKNOWN, tagged: false }
 }
 
 /** Whether a claim is recorded for this provider at all. */

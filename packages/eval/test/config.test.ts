@@ -75,7 +75,12 @@ describe("harbor job", () => {
       baseURL: "http://host.docker.internal:9000/mistral/v1",
       apiKey: "via-lunos-eval-proxy",
     })
-    expect(lunos.residency).toEqual({ allow: ["eu"], audit: true, auditPath: "/logs/audit.log" })
+    expect(lunos.residency).toEqual({
+      allow: ["eu"],
+      audit: true,
+      auditPath: "/logs/audit.log",
+      endpoints: { mistral: { region: "eu", note: "Lunos eval metering proxy, forwarding to api.mistral.ai" } },
+    })
     expect(lunos.enabled_providers).toEqual(["mistral"])
     expect(JSON.stringify(lunos)).not.toContain("sk-")
   })

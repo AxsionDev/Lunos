@@ -28022,6 +28022,24 @@
           },
           "auditPath": {
             "type": "string"
+          },
+          "endpoints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "region": {
+                  "type": "string",
+                  "enum": ["eu", "us", "other"],
+                  "description": "Where this endpoint processes data. Your declaration: Lunos can't verify it."
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "required": ["region"],
+              "additionalProperties": false
+            }
           }
         },
         "required": ["allow"],

@@ -3976,6 +3976,15 @@ export type ConfigV2Residency = {
   allow: Array<"eu" | "us" | "other" | "configurable" | "unknown">
   audit?: boolean
   auditPath?: string
+  endpoints?: {
+    [key: string]: {
+      /**
+       * Where this endpoint processes data. Your declaration: Lunos can't verify it.
+       */
+      region: "eu" | "us" | "other"
+      note?: string
+    }
+  }
 }
 
 export type ConfigV2ReferenceGit = {

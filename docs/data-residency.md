@@ -35,6 +35,8 @@ Enforcement happens when a model is resolved, before any connection to the provi
 | Provider's region depends on configuration (Azure, AWS Bedrock, Google Vertex, SAP AI Core) | **Blocked**             | See below                                                                  |
 | Provider is a gateway (OpenRouter, Vercel AI Gateway…)                                      | **Blocked**             | Routes onward to other providers; no single jurisdiction can be guaranteed |
 | Provider has no recorded jurisdiction                                                       | **Blocked**             | Never assessed, so never assumed safe                                      |
+| An EU provider with a changed `baseURL` (not its own API host)                              | **Blocked**             | The EU claim is for the provider's own API, not wherever it's pointed      |
+| An endpoint you declared in `residency.endpoints` as `"eu"`                                 | **Allowed**             | Your declaration, recorded in the audit log as `declared`                  |
 
 ### Why configurable providers are blocked by default
 
@@ -51,6 +53,35 @@ Allowing them automatically would mean a US-region Azure resource passes a polic
 ```
 
 Opting in is a statement that **you** have verified the region. [Model provider jurisdictions](provider-jurisdictions.md) lists, per provider, exactly what to set — for example `AWS_REGION=eu-central-1` for Bedrock, or a `europe-*` location for Vertex.
+
+## Self-hosted models and other endpoints you run
+
+A self-hosted model (vLLM, Ollama, LM Studio) has no recorded jurisdiction, so a policy blocks it. The same applies to a built-in provider whose `baseURL` points somewhere other than its own API, for example a company proxy in front of Mistral. Lunos can't know where such an endpoint runs, so you declare it, from v1.18.41:
+
+```json
+{
+  "residency": {
+    "allow": ["eu"],
+    "endpoints": {
+      "vllm": { "region": "eu", "note": "vLLM on our servers in Frankfurt" }
+    }
+  },
+  "provider": {
+    "vllm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "http://gpu01.internal:8000/v1" },
+      "models": { "qwen3-coder": { "name": "Qwen3 Coder", "tool_call": true } }
+    }
+  }
+}
+```
+
+- The key is the provider id. `region` is `eu`, `us` or `other`, and `note` records what the declaration rests on.
+- **A declaration never changes a built-in provider's claim for its own API.** Declaring `anthropic` as `eu` has no effect on `api.anthropic.com`. It only covers the endpoints Lunos can't assess itself.
+- The audit log records these calls with basis `declared` and the real host, so a reviewer can tell your declaration from a recorded fact.
+- In managed config, lock it with `"$locked": ["residency"]`, so developers can't add their own declarations.
+
+The built-in EU claims hold only for these hosts: `api.mistral.ai` and `codestral.mistral.ai` (Mistral), `api.scaleway.ai` (Scaleway), `*.endpoints.kepler.ai.cloud.ovh.net` (OVHcloud) and `inference.hetzner.com` (Hetzner).
 
 ## Allowed values
 
@@ -121,6 +152,8 @@ A deployment permitting EU providers plus a verified EU-region Azure resource:
 ```
 
 ## Limits worth stating plainly
+
+- **A declared endpoint is only as good as the declaration.** Lunos can't verify where a declared endpoint actually runs; it records the host it called and your declaration. Treat `residency.endpoints` as a deployment decision, and lock it in managed config.
 
 - This controls **where model requests go**. It is not a data-protection assessment and does not by itself discharge GDPR obligations — you still need the appropriate agreement with the provider.
 - Jurisdiction entries reflect the project's best current understanding, not the provider's contractual commitments. The source of truth is `packages/core/src/jurisdiction.ts`; corrections there flow into the published table.
