@@ -3,6 +3,20 @@
 The Lunos docs are a static site. Axsion hosts them on its own servers in the EU; no Cloudflare
 account or other third-party host is involved.
 
+## With the lunos-web scripts (recommended)
+
+The docs ship in the same artifact as lunos.tech and its API. In the lunos-web repo:
+
+```powershell
+./build.ps1 -LunosRepo <path to this repo>   # builds web, api and docs (needs bun)
+./deploy.ps1 -ArtifactZip <zip>              # on the IIS box, as Administrator
+```
+
+`build.ps1` runs the same branding check as CI. `deploy.ps1` mirrors the docs to the docs IIS site
+and checks the version and search afterwards. The IIS config (`docs-site/web.config`) and the
+one-time site setup (technical spec §9) live in lunos-web. The rest of this page is for serving the
+docs some other way.
+
 ## Get a build
 
 - **From CI:** every push to `dev` runs the `docs-lunos` workflow, which uploads the built site as
