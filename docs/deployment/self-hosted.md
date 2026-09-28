@@ -207,12 +207,13 @@ From the next release, every release carries an **offline bundle** per platform,
 - the release's signed `SHA256SUMS`, with Sigstore signatures
 - Sigstore's trusted root
 - `INSTALL-OFFLINE.md`
+- ripgrep and cosign builds for that platform, with `TOOLS.txt` recording each one's source URL and pinned checksum
 
-Every file but the trusted root is covered by the signed `SHA256SUMS`, so the whole bundle can be verified without a network.
+Every Lunos file in the bundle except the trusted root is covered by the signed `SHA256SUMS`, so it can be verified without a network. The two tools are third-party builds: the release checks them against checksums pinned in Lunos's release script, and the signed `SHA256SUMS-offline` covers them as part of the bundle.
 
 1. **On a machine with internet access,** verify the bundle against `SHA256SUMS-offline`, which is signed the same way. Then transfer it. A trust root shipped inside the bundle can't vouch for the bundle itself, so this is the step that establishes trust.
-2. **On the offline machine,** unpack it and follow `INSTALL-OFFLINE.md`. With cosign installed there, the signature and checksums can be re-checked offline. Then install the binary.
-3. **Set `LUNOS_OFFLINE=1`** and install `rg` from your OS packages, because Lunos can't download ripgrep offline.
+2. **On the offline machine,** unpack it and follow `INSTALL-OFFLINE.md`. The bundled cosign re-checks the signature and checksums there, offline. Then install the binary and the bundled `rg`.
+3. **Set `LUNOS_OFFLINE=1`.** The `linux-arm64-musl` bundle has no `rg`, because ripgrep has no build for that platform: install it from your OS packages.
 
 ### Verify your download
 

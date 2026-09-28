@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import path from "path"
 import { bundleFiles, bundleName, cliArchives, unsigned } from "../../script/offline-bundles"
+import { RIPGREP_VERSION, toolsFor } from "../../script/offline/tools"
 
 const release = [
   "lunos-linux-x64.tar.gz",
@@ -58,5 +60,23 @@ describe("offline bundles", () => {
       ]),
     ).toEqual([])
     expect(unsigned(sums, ["lunos-linux-x64.tar.gz", "INSTALL-OFFLINE.md"])).toEqual(["INSTALL-OFFLINE.md"])
+  })
+
+  test("bundles the tools for each archive's platform", () => {
+    const linux = toolsFor("lunos-linux-x64-baseline-musl.tar.gz")
+    expect(linux.rg?.url).toEndWith("ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz")
+    expect(linux.cosign.url).toEndWith("cosign-linux-amd64")
+    const windows = toolsFor("lunos-windows-arm64.zip")
+    expect(windows.rg?.name).toBe("rg.exe")
+    expect(windows.cosign.url).toEndWith("cosign-windows-amd64.exe")
+    expect(toolsFor("lunos-darwin-arm64.zip").cosign.url).toEndWith("cosign-darwin-arm64")
+    // No ripgrep build runs on arm64 musl.
+    expect(toolsFor("lunos-linux-arm64-musl.tar.gz").rg).toBeUndefined()
+    for (const archive of cliArchives(release)) expect(toolsFor(archive).cosign.sha256).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  test("bundles the ripgrep version Lunos would otherwise download", async () => {
+    const source = await Bun.file(path.join(import.meta.dir, "../../../core/src/ripgrep/binary.ts")).text()
+    expect(source).toContain(`const VERSION = "${RIPGREP_VERSION}"`)
   })
 })

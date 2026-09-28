@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 // XCOD-121: offline install bundles. One per CLI archive: lunos-offline-<os>-<arch>.tar.gz holds
 // the archive, the model catalogue snapshot the binary was built with, the SBOM, INSTALL-OFFLINE.md,
-// the release's signed SHA256SUMS and signatures, and Sigstore's trusted root, so an administrator
-// can verify and install Lunos on a machine with no network.
+// the release's signed SHA256SUMS and signatures, Sigstore's trusted root, and pinned ripgrep and
+// cosign binaries (offline/tools.ts), so an administrator can verify and install Lunos on a machine
+// with no network.
 //
 // Runs in publish.yml after release-checksums.ts has written and signed SHA256SUMS: every file in a
-// bundle except trusted_root.json is covered by that signature. The bundles themselves are listed
+// bundle except trusted_root.json and the tools is covered by that signature. The bundles themselves are listed
 // in SHA256SUMS-offline, signed the same way, for checking a bundle before it is transferred.
 //
 //   GH_REPO=<owner/repo> bun offline-bundles.ts <tag>
@@ -15,6 +16,7 @@ import { $ } from "bun"
 import { mkdtemp, mkdir, readdir, copyFile } from "fs/promises"
 import os from "os"
 import path from "path"
+import { addTools } from "./offline/tools"
 import { BUNDLE_SUFFIX, IDENTITY_REGEXP, OIDC_ISSUER, SUMS, formatSums, isSbom, sha256 } from "./release-checksums"
 
 export const OFFLINE_SUMS = "SHA256SUMS-offline"
@@ -63,7 +65,7 @@ async function trustedRoot(dir: string) {
   await Bun.write(path.join(dir, TRUSTED_ROOT), JSON.stringify(root))
 }
 
-export async function buildBundles(dir: string, out: string) {
+export async function buildBundles(dir: string, out: string, cache = path.join(dir, "tools-cache")) {
   const names = await readdir(dir)
   const files = bundleFiles(names)
   const archives = cliArchives(names)
@@ -73,6 +75,7 @@ export async function buildBundles(dir: string, out: string) {
   if (!names.includes(TRUSTED_ROOT)) await trustedRoot(dir)
 
   await mkdir(out, { recursive: true })
+  await mkdir(cache, { recursive: true })
   const built: string[] = []
   for (const archive of archives) {
     const stage = await mkdtemp(path.join(os.tmpdir(), "lunos-offline-"))
@@ -80,6 +83,7 @@ export async function buildBundles(dir: string, out: string) {
     const root = path.join(stage, name.replace(/\.tar\.gz$/, ""))
     await mkdir(root)
     for (const file of [archive, ...files, TRUSTED_ROOT]) await copyFile(path.join(dir, file), path.join(root, file))
+    await addTools(archive, root, cache)
     await $`tar --no-xattrs -czf ${path.join(out, name)} -C ${stage} ${path.basename(root)}`
     built.push(name)
   }
