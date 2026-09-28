@@ -215,6 +215,48 @@ Every Lunos file in the bundle except the trusted root is covered by the signed 
 2. **On the offline machine,** unpack it and follow `INSTALL-OFFLINE.md`. The bundled cosign re-checks the signature and checksums there, offline. Then install the binary and the bundled `rg`.
 3. **Set `LUNOS_OFFLINE=1`.** The `linux-arm64-musl` bundle has no `rg`, because ripgrep has no build for that platform: install it from your OS packages.
 
+### Air-gapped deployment
+
+With the offline bundle, a model server on your own network, and `LUNOS_OFFLINE=1`, Lunos runs with no route to the internet. Any OpenAI-compatible server works; vLLM and Ollama are the common ones.
+
+**1. Run the model server** on a host the developer machines can reach. Load or pull the model while that host still has a network, or copy the weights in.
+
+```bash
+# vLLM
+vllm serve Qwen/Qwen3-Coder-30B-A3B-Instruct --port 8000 \
+  --enable-auto-tool-choice --tool-call-parser qwen3_coder
+# Ollama (pull first, then move it into the isolated network)
+ollama pull qwen3:4b && ollama serve
+```
+
+Lunos's agent works through tool calls, so choose a model that supports them and enable tool calling on the server (vLLM needs the two flags above). Give Ollama a context window of at least 16k tokens with `OLLAMA_CONTEXT_LENGTH=16384`; its default is too small for the agent's instructions.
+
+**2. Point Lunos at it and declare its region,** so the residency policy allows it. In `opencode.json`, or in [managed config](#organisation-policy-settings-developers-cant-change) so developers can't change it:
+
+```json
+{
+  "model": "ollama/qwen3:4b",
+  "residency": {
+    "allow": ["eu"],
+    "endpoints": { "ollama": { "region": "eu", "note": "Ollama on gpu01, Sofia data centre" } }
+  },
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama",
+      "options": { "baseURL": "http://gpu01.internal:11434/v1" },
+      "models": { "qwen3:4b": { "name": "Qwen3 4B", "tool_call": true } }
+    }
+  }
+}
+```
+
+For vLLM, use `"baseURL": "http://<host>:8000/v1"` and the model name you served. The declaration is yours: Lunos can't check where the server is, and the audit log records these calls with basis `declared` ([data residency](../data-residency.md#self-hosted-models-and-other-endpoints-you-run)).
+
+**3. Set `LUNOS_OFFLINE=1`** for every user, and check with `lunos run "say hello"`.
+
+**What we tested (2026-09-28):** a Docker `--internal` network with no route out, holding an Ollama server (`qwen3:4b`, CPU only) and an Ubuntu 24.04 client. Lunos was installed on the client from an offline bundle as described above, with the configuration above and `LUNOS_OFFLINE=1`. It completed a task that wrote a Python file and ran it. Under `strace` and `tcpdump`, its only connections were to the Ollama server and the container's DNS resolver, and every DNS lookup was for the Ollama server's name. The audit log recorded each model call as `region: eu`, `basis: declared`, `allowed: true`. Run again without `LUNOS_OFFLINE`, Lunos also tried to resolve `models.opencode.ai` and `registry.npmjs.org`, the model catalogue and npm registry calls listed in [Every outbound call, and offline mode](#every-outbound-call-and-offline-mode), and nothing else. We didn't test vLLM or GPU inference; the vLLM settings above follow vLLM's documentation. A small model on CPU is slow (about 25 minutes for that task). A 3B model we tried wrote its tool calls as text instead of making them, and an 8B one ran out of the test machine's 8 GB of memory.
+
 ### Verify your download
 
 Releases can be checked without trusting the download location. None of this needs a certificate from us.
@@ -358,12 +400,12 @@ Lunos requires no database, no message broker and no inbound network access. Ser
 - **The agent is not sandboxed.** Lunos can execute shell commands and modify files. Its permission system is a UX safeguard that prompts before acting — it is _not_ a security boundary. For true isolation, run it in a container or VM. This is inherited from upstream and documented in [`SECURITY.md`](../../SECURITY.md).
 - **Model provider data handling is governed by your agreement with that provider,** not by Lunos. Residency controls determine _which_ provider may be used; they do not alter what that provider does with what it receives.
 - **Allowing a self-hosted share server is coarse.** `enterprise.url` counts as `unknown`, so allowing it with `"unknown"` also allows other endpoints whose region can't be determined, such as gateways and generic OpenAI-compatible endpoints. There is no per-host allow list yet. Leave sharing off (the default) if that's too broad.
-- **A residency policy can't yet allow a self-hosted model endpoint.** Its provider ID has no recorded jurisdiction, and untagged providers are always denied; there is no configuration setting to record one. Being designed (XCOD-121, XCOD-138).
+- **A self-hosted endpoint's region is your declaration, not something Lunos verifies.** From v1.18.41 you allow a self-hosted model under a residency policy by declaring its region in `residency.endpoints` ([data residency](../data-residency.md#self-hosted-models-and-other-endpoints-you-run)). The audit log records those calls with basis `declared`, so a reviewer can tell them from recorded facts. Lock the declaration in managed config.
 - **Feature parity with upstream opencode is not claimed or measured.**
 
 ## 8. Questions a reviewer usually asks next
 
-**Can it run fully air-gapped?** Not with a hosted model provider: model inference needs egress. Against a self-hosted, OpenAI-compatible model endpoint on your own network, set `LUNOS_OFFLINE=1` ([offline mode](#every-outbound-call-and-offline-mode)) and Lunos contacts only that endpoint and anything else you configured. **But a residency policy denies a self-hosted endpoint today, and there is no configuration setting to allow it:** its provider ID has no recorded jurisdiction, and untagged providers are always refused. So on an air-gapped machine you currently run without a `residency` policy, or not at all. A way to declare a self-hosted endpoint's jurisdiction is being designed (XCOD-121, XCOD-138). To install without internet access, use the offline bundle (see [Installing without internet access](#installing-without-internet-access)).
+**Can it run fully air-gapped?** Not with a hosted model provider: model inference needs egress. Against a self-hosted, OpenAI-compatible model endpoint on your own network, set `LUNOS_OFFLINE=1` ([offline mode](#every-outbound-call-and-offline-mode)) and Lunos contacts only that endpoint and anything else you configured. To keep a residency policy on, declare the endpoint's region in `residency.endpoints` (from v1.18.41); otherwise the policy refuses it, because Lunos can't know where it runs. See [Air-gapped deployment](#air-gapped-deployment). To install without internet access, use the offline bundle (see [Installing without internet access](#installing-without-internet-access)).
 
 **Does the vendor receive telemetry?** No. There is no Lunos-operated endpoint receiving data from your deployment.
 
