@@ -30,7 +30,7 @@ export const dict = {
   "command.project.previous": "Previous project",
   "command.project.next": "Next project",
   "command.project.index": "Switch to project {{index}}",
-  "command.provider.connect": "Connect provider",
+  "command.provider.connect": "Add provider",
   "command.server.switch": "Switch server",
   "command.settings.open": "Open settings",
   "command.session.previous": "Previous session",

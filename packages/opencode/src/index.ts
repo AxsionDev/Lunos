@@ -48,7 +48,7 @@ if (args.length === 2 && args.includes("--verbose") && (args.includes("--version
 }
 
 // Plain one-shot commands get the once-a-day "new version" stderr line. The TUI has its own
-// reminder, and long-running servers or the upgrade flow itself shouldn't print it.
+// reminder, and long-running servers or the update flow itself shouldn't print it.
 const NOTICE_COMMANDS = new Set([
   "run",
   "mcp",
@@ -66,6 +66,15 @@ const NOTICE_COMMANDS = new Set([
   "db",
   "debug",
 ])
+
+// XCOD-147: the check starts with the command, not after it, so a finished command rarely waits
+// for the registry. Set in the middleware, after the log/env flags are applied.
+let pendingNotice: Promise<void> | undefined
+// A finished command gives a still-running check this long before it falls back to the cache, so
+// a slow or unreachable registry never holds up a command by the full 3 s timeout.
+const NOTICE_GRACE = 300
+let commandDone: () => void = () => {}
+const commandFinished = new Promise<void>((resolve) => (commandDone = resolve)).then(() => Bun.sleep(NOTICE_GRACE))
 
 function show(out: string) {
   out = brandHelp(out)
@@ -111,6 +120,10 @@ const cli = yargs(args)
     process.env.AGENT = "1"
     process.env.OPENCODE = "1"
     process.env.OPENCODE_PID = String(process.pid)
+
+    if (!pendingNotice && NOTICE_COMMANDS.has(String(opts._[0] ?? ""))) {
+      pendingNotice = import("./cli/upgrade").then(({ notice }) => notice({ until: commandFinished })).catch(() => {})
+    }
   })
   .usage("")
   .completion("completion", "generate shell completion script")
@@ -167,11 +180,10 @@ try {
     })
   } else {
     await cli.parse()
-    if (NOTICE_COMMANDS.has(args[0] ?? "")) {
-      // Bounded, so a slow registry never holds up a finished command by more than a moment.
-      const { notice } = await import("./cli/upgrade")
-      await Promise.race([notice().catch(() => {}), Bun.sleep(2000)])
-    }
+    // The check had the whole command to finish; past the grace period it uses the cached result.
+    // The outer bound only guards against a stuck config load.
+    commandDone()
+    if (pendingNotice) await Promise.race([pendingNotice, Bun.sleep(4000)])
   }
 } catch (e) {
   const formatted = FormatError(e)

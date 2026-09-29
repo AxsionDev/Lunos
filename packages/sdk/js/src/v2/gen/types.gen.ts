@@ -2729,6 +2729,18 @@ export type PermissionNotFoundError = {
   message: string
 }
 
+export type ConfiguredProvider = {
+  id: string
+  name: string
+  method: "api" | "oauth" | "wellknown" | "env" | "config" | "custom"
+  status: "connected" | "expired" | "error"
+  stored: boolean
+  jurisdiction: {
+    region: "eu" | "us" | "other" | "configurable" | "unknown"
+    basis: string
+  }
+}
+
 export type ProviderAuthMethod = {
   type: "oauth" | "api"
   label: string
@@ -9967,6 +9979,34 @@ export type ProviderListResponses = {
 }
 
 export type ProviderListResponse = ProviderListResponses[keyof ProviderListResponses]
+
+export type ProviderConfiguredData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/provider/configured"
+}
+
+export type ProviderConfiguredErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProviderConfiguredError = ProviderConfiguredErrors[keyof ProviderConfiguredErrors]
+
+export type ProviderConfiguredResponses = {
+  /**
+   * Configured providers
+   */
+  200: Array<ConfiguredProvider>
+}
+
+export type ProviderConfiguredResponse = ProviderConfiguredResponses[keyof ProviderConfiguredResponses]
 
 export type ProviderAuthData = {
   body?: never
