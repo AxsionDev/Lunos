@@ -665,7 +665,9 @@ function App(props: {
     // Attached to a server this client doesn't own: the turn and its jobs run there and carry on.
     if (!host.attach) {
       const jobs = await runningJobs()
-      const message = restartBusyMessage({ busySessions: busySessionIDs().length, runningJobs: jobs.map((j) => j.id) })
+      // A background job's own session is busy too; count it as the job, not as a turn.
+      const turns = () => busySessionIDs().filter((id) => !jobs.some((job) => job.sessionID === id))
+      const message = restartBusyMessage({ busySessions: turns().length, runningJobs: jobs.map((j) => j.id) })
       if (message) {
         const choice = await new Promise<RestartChoice>((resolve) => {
           dialog.replace(
@@ -702,7 +704,7 @@ function App(props: {
           if (!done) return
         }
         if (choice === "stop") {
-          const busy = busySessionIDs()
+          const busy = turns()
           if (busy.length) cancelled.push(busy.length === 1 ? "the current turn" : `${busy.length} running turns`)
           for (const job of jobs) cancelled.push(`background job ${job.title ?? job.id}`)
           await Promise.all([
