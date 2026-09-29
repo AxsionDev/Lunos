@@ -30,7 +30,7 @@ import {
 } from "solid-js"
 import { TuiPathsProvider, TuiStartupProvider, TuiTerminalEnvironmentProvider, useTuiStartup } from "./context/runtime"
 import { DialogProvider, useDialog } from "./ui/dialog"
-import { DialogProvider as DialogProviderList } from "./component/dialog-provider"
+import { DialogProvider as DialogProviderConnect, DialogProviders } from "./component/dialog-provider"
 import { ErrorComponent } from "./component/error-component"
 import { PluginRouteMissing } from "./component/plugin-route-missing"
 import { ProjectProvider, useProject } from "./context/project"
@@ -120,7 +120,7 @@ const appBindingCommands = [
   "mode.cycle.reverse",
   "variant.cycle",
   "variant.list",
-  "provider.connect",
+  "provider.list",
   "console.org.switch",
   "opencode.status",
   "opencode.debug",
@@ -539,7 +539,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       (isEmpty, wasEmpty) => {
         // only trigger when we transition into an empty-provider state
         if (!isEmpty || wasEmpty) return
-        dialog.replace(() => <DialogProviderList />)
+        dialog.replace(() => <DialogProviderConnect />)
       },
     ),
   )
@@ -758,14 +758,27 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         },
       },
       {
-        name: "provider.connect",
-        title: "Connect provider",
+        name: "provider.list",
+        title: "Providers",
         suggested: !connected(),
-        slashName: "connect",
+        slashName: "providers",
+        // XCOD-130: the old slash name still resolves here, with a rename hint. Remove in 1.21.0.
+        slashAliases: ["connect"],
+        slashAliasHints: { connect: "/connect is now /providers" },
         run: () => {
-          dialog.replace(() => <DialogProviderList />)
+          dialog.replace(() => <DialogProviders />)
         },
         category: "Provider",
+      },
+      {
+        // XCOD-130: pre-rename command id, kept for plugins and /tui/execute-command callers.
+        name: "provider.connect",
+        title: "Providers",
+        category: "Provider",
+        hidden: true,
+        run: () => {
+          dialog.replace(() => <DialogProviders />)
+        },
       },
       ...(sync.data.console_state.switchableOrgCount > 1
         ? [
