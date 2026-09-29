@@ -967,7 +967,7 @@ it.instance("decodes the checked-in reference deployment config on the live path
       Bun.file(path.resolve(import.meta.dir, "../../../../docs/deployment/self-hosted.md")).text(),
     )
     const section = guide.slice(guide.indexOf("examples/reference-deployment/opencode.json"))
-    const shown = section.match(/```json\n([\s\S]*?)```/)?.[1]
+    const shown = section.match(/```json\r?\n([\s\S]*?)```/)?.[1]
     expect(shown && JSON.parse(shown)).toEqual(reference)
   }),
 )
