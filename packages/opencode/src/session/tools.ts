@@ -223,9 +223,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               if (params.expires !== undefined) {
                 const date = new Date(String(params.expires))
                 if (Number.isNaN(date.getTime()))
-                  return finish("Not remembered", `Not remembered: expires must be an ISO date, got "${params.expires}".`, {
-                    refused: true,
-                  })
+                  return finish(
+                    "Not remembered",
+                    `Not remembered: expires must be an ISO date, got "${params.expires}".`,
+                    {
+                      refused: true,
+                    },
+                  )
                 expires = date.toISOString()
               }
               // XCOD-136: a fact this one contradicts (same subject, different value), or the one the
@@ -234,7 +238,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               const { retention } = yield* memory.policy()
               const candidate = proposed
                 ? existing.find(
-                    (item) => item.id === proposed && MemoryLifecycle.recallable(item, retention, MemoryLifecycle.now()),
+                    (item) =>
+                      item.id === proposed && MemoryLifecycle.recallable(item, retention, MemoryLifecycle.now()),
                   )
                 : MemoryLifecycle.contradicted(fact, existing, retention)
               if (proposed && !candidate)
@@ -255,7 +260,9 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                   scope,
                   kind,
                   ...(expires ? { expires } : {}),
-                  ...(candidate ? { contradicts: { id: candidate.id, text: candidate.text }, proposed: !!proposed } : {}),
+                  ...(candidate
+                    ? { contradicts: { id: candidate.id, text: candidate.text }, proposed: !!proposed }
+                    : {}),
                 },
               })
               let replaces: string | undefined
@@ -294,7 +301,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 })
                 .pipe(Effect.result)
               if (result._tag === "Failure") return finish("Not remembered", result.failure.message, { refused: true })
-              const replaced = replaces ? ` It replaces ${replaces}, which is now outdated.` : candidate ? ` ${candidate.id} was kept.` : ""
+              const replaced = replaces
+                ? ` It replaces ${replaces}, which is now outdated.`
+                : candidate
+                  ? ` ${candidate.id} was kept.`
+                  : ""
               return finish("Remembered", `Remembered in ${scope} memory as ${result.success.id}.${replaced}`, {
                 id: result.success.id,
                 scope,

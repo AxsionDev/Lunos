@@ -36,11 +36,7 @@ export interface Backend {
    * Active facts closest to the query. With `history`, outdated facts whose words match are added
    * after them (they are not in the engine, so they are matched from the ledger).
    */
-  recall(
-    query: string,
-    limit: number,
-    options?: { history?: boolean },
-  ): Promise<{ facts: Recalled[]; graph: string }>
+  recall(query: string, limit: number, options?: { history?: boolean }): Promise<{ facts: Recalled[]; graph: string }>
   forget(id: string): Promise<boolean>
   /**
    * Mark a fact outdated (XCOD-136): kept in the ledger with `invalid_at` and, with `by`, a link to
@@ -229,7 +225,10 @@ export function cognee(input: {
       const off = new Set(expired.map((fact) => fact.id))
       await MemoryStore.rewrite(
         root,
-        (items) => items.filter((item) => !gone.has(item.id)).map((item) => (off.has(item.id) ? { ...item, detached: true } : item)),
+        (items) =>
+          items
+            .filter((item) => !gone.has(item.id))
+            .map((item) => (off.has(item.id) ? { ...item, detached: true } : item)),
         mode,
         { drop: gone },
       )

@@ -213,6 +213,7 @@ export const Definitions = {
   "dialog.move_session.delete": keybind("ctrl+d", "Delete project copy"),
   "dialog.move_session.refresh": keybind("ctrl+r", "Refresh project copies"),
   "dialog.memory.forget": keybind("ctrl+d", "Forget a fact in the memory browser"),
+  "dialog.memory.outdate": keybind("ctrl+u", "Mark a fact outdated in the memory browser"),
   "dialog.memory.export": keybind("ctrl+s", "Export memory from the memory browser"),
   "dialog.memory.import": keybind("ctrl+o", "Import memory from the memory browser"),
   "dialog.memory.import.all": keybind("ctrl+a", "Approve or reject every importable row in the import preview"),

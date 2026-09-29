@@ -76,7 +76,9 @@ async function timed<T>(what: string, promise: Promise<T>): Promise<T> {
     return await Promise.race([promise, timeout])
   } catch (error) {
     if (error instanceof KeyError) throw error
-    throw new KeyError(`The OS keychain refused while ${what}: ${error instanceof Error ? error.message : String(error)}`)
+    throw new KeyError(
+      `The OS keychain refused while ${what}: ${error instanceof Error ? error.message : String(error)}`,
+    )
   } finally {
     clearTimeout(timer)
   }
@@ -90,7 +92,8 @@ export async function get(): Promise<Buffer | undefined> {
   const value = await timed("reading the memory key", system().get({ service: SERVICE, name: account() }))
   if (!value) return undefined
   const key = Buffer.from(value, "base64")
-  if (key.byteLength !== 32) throw new KeyError(`The memory key in the OS keychain (${describe()}) is not a 256-bit key`)
+  if (key.byteLength !== 32)
+    throw new KeyError(`The memory key in the OS keychain (${describe()}) is not a 256-bit key`)
   cached = key
   return key
 }
@@ -98,7 +101,10 @@ export async function get(): Promise<Buffer | undefined> {
 /** Create and store a new key. Only called when no encrypted ledger line exists. */
 export async function create(): Promise<Buffer> {
   const key = crypto.randomBytes(32)
-  await timed("storing a new memory key", system().set({ service: SERVICE, name: account(), value: key.toString("base64") }))
+  await timed(
+    "storing a new memory key",
+    system().set({ service: SERVICE, name: account(), value: key.toString("base64") }),
+  )
   cached = key
   return key
 }

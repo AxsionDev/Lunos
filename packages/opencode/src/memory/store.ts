@@ -291,8 +291,7 @@ export async function load(root: string): Promise<Ledger> {
       if (!hash) line.problem ??= "it has no integrity hash, but the rest of the ledger does"
       else if (hashOf(record) !== hash) line.problem ??= "its content doesn't match its integrity hash: it was edited"
       const ok = !!hash && !!storedChain && bases.some((base) => link(base, hash) === storedChain)
-      if (!ok)
-        line.problem ??= `${CHAIN_BREAK}: a line before it was removed or reordered, or this line was inserted`
+      if (!ok) line.problem ??= `${CHAIN_BREAK}: a line before it was removed or reordered, or this line was inserted`
       bases = ok
         ? [storedChain!]
         : [

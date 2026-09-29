@@ -16,12 +16,7 @@ import {
   MemoryPassphraseRequiredError,
   MemoryUnavailableError,
 } from "../errors"
-import type {
-  MemoryExportInput,
-  MemoryImportApplyInput,
-  MemoryImportInput,
-  MemoryOutdateInput,
-} from "../groups/memory"
+import type { MemoryExportInput, MemoryImportApplyInput, MemoryImportInput, MemoryOutdateInput } from "../groups/memory"
 
 const SCOPES = ["project", "user"] as const
 

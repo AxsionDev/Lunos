@@ -90,7 +90,9 @@ export function expiring(facts: MemoryStore.Fact[], policy: Retention, days: num
   const until = at.getTime() + days * DAY
   return facts
     .map((fact) => ({ fact, expires: expiresAt(fact, policy) }))
-    .filter((item): item is { fact: MemoryStore.Fact; expires: Date } => !!item.expires && item.expires.getTime() <= until)
+    .filter(
+      (item): item is { fact: MemoryStore.Fact; expires: Date } => !!item.expires && item.expires.getTime() <= until,
+    )
     .filter((item) => state(item.fact, policy, at) !== "purge")
     .toSorted((a, b) => a.expires.getTime() - b.expires.getTime())
 }

@@ -69,10 +69,14 @@ export const MemoryListCommand = effectCmd({
     for (const scope of scopesOf(args.scope)) {
       const facts = yield* factsOf(scope)
       if (expiring) {
-        const days = args.expiring !== undefined && Number.isFinite(args.expiring) ? args.expiring : DEFAULT_EXPIRING_DAYS
+        const days =
+          args.expiring !== undefined && Number.isFinite(args.expiring) ? args.expiring : DEFAULT_EXPIRING_DAYS
         for (const item of MemoryLifecycle.expiring(facts, retention, days, at)) {
           const state = MemoryLifecycle.state(item.fact, retention, at)
-          const when = state === "expired" ? `expired ${item.expires.toISOString().slice(0, 10)}` : `expires ${item.expires.toISOString().slice(0, 10)}`
+          const when =
+            state === "expired"
+              ? `expired ${item.expires.toISOString().slice(0, 10)}`
+              : `expires ${item.expires.toISOString().slice(0, 10)}`
           lines.push(`${item.fact.id}  ${scope.padEnd(7)}  ${when}  ${oneLine(item.fact.text)}`)
         }
         continue
@@ -81,7 +85,9 @@ export const MemoryListCommand = effectCmd({
         const state = MemoryLifecycle.state(fact, retention, at)
         const tag = state === "active" ? "" : `[${state === "purge" ? "expired" : state}] `
         const inferred = fact.kind === "inferred" ? "(inferred) " : ""
-        lines.push(`${fact.id}  ${scope.padEnd(7)}  ${fact.provenance.date.slice(0, 10)}  ${tag}${inferred}${oneLine(fact.text)}`)
+        lines.push(
+          `${fact.id}  ${scope.padEnd(7)}  ${fact.provenance.date.slice(0, 10)}  ${tag}${inferred}${oneLine(fact.text)}`,
+        )
       }
     }
     const empty = expiring ? "No facts are expiring." : "No facts in memory."
@@ -199,8 +205,14 @@ function healthLines(health: Memory.Health[], encryption: MemoryStore.Mode) {
       item.facts === 0 && !item.problems.length
         ? "empty"
         : [
-            item.unsealed ? `not sealed yet (written before integrity checks; sealed when memory next starts)` : "sealed",
-            item.encrypted ? `encrypted (${item.encrypted} line(s))` : encryption === "os-keychain" ? "not encrypted yet (encrypted when memory next starts)" : "not encrypted",
+            item.unsealed
+              ? `not sealed yet (written before integrity checks; sealed when memory next starts)`
+              : "sealed",
+            item.encrypted
+              ? `encrypted (${item.encrypted} line(s))`
+              : encryption === "os-keychain"
+                ? "not encrypted yet (encrypted when memory next starts)"
+                : "not encrypted",
           ].join(", ")
     lines.push(`  ledger: ${ledger}`)
     for (const problem of item.problems)

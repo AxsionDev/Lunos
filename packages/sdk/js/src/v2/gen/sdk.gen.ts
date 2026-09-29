@@ -130,6 +130,9 @@ import type {
   MemoryImportResponses,
   MemoryListErrors,
   MemoryListResponses,
+  MemoryOutdateErrors,
+  MemoryOutdateInput,
+  MemoryOutdateResponses,
   MemoryRelatedErrors,
   MemoryRelatedResponses,
   ModelRef,
@@ -3399,6 +3402,45 @@ export class Memory extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<MemoryImportResponses, MemoryImportErrors, ThrowOnError>({
       url: "/memory/import",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Mark a fact outdated
+   *
+   * Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.
+   */
+  public outdate<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+      memoryOutdateInput?: MemoryOutdateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryOutdateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryOutdateResponses, MemoryOutdateErrors, ThrowOnError>({
+      url: "/memory/{id}/outdate",
       ...options,
       ...params,
       headers: {

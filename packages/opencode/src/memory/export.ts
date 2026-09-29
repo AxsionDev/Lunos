@@ -136,8 +136,7 @@ export const run = Effect.fn("MemoryExport.run")(function* (options: Options) {
     quarantined += all.filter((item) => item.quarantined).length
     const kept = all.filter(
       (item) =>
-        !item.quarantined &&
-        (!options.since || new Date(item.provenance.date).getTime() >= options.since.getTime()),
+        !item.quarantined && (!options.since || new Date(item.provenance.date).getTime() >= options.since.getTime()),
     )
     known.set(scope, new Set(kept.map((item) => item.id)))
     facts.push(...kept.map((item) => MemoryBundle.fact(scope, item)))

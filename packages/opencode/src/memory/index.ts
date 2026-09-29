@@ -383,7 +383,9 @@ const layer = Layer.effect(
         const target = (yield* facts(input.scope)).find((item) => item.id === input.replaces)
         if (!target || target.quarantined || !MemoryStore.isActive(target))
           return yield* Effect.fail(
-            new Error(`Not remembered: ${input.replaces} is not an active fact in ${input.scope} memory, so it can't be replaced.`),
+            new Error(
+              `Not remembered: ${input.replaces} is not an active fact in ${input.scope} memory, so it can't be replaced.`,
+            ),
           )
       }
       const fact = yield* Effect.tryPromise({
@@ -719,7 +721,12 @@ const layer = Layer.effect(
           purge: 0,
           quarantined: 0,
         }
-        const ledger = yield* Effect.promise(() => MemoryStore.load(root).then((value) => value, (error: Error) => error))
+        const ledger = yield* Effect.promise(() =>
+          MemoryStore.load(root).then(
+            (value) => value,
+            (error: Error) => error,
+          ),
+        )
         if (ledger instanceof Error) {
           out.push({ scope, facts: 0, counts, problems: [], encrypted: 0, unsealed: 0, error: ledger.message })
           if (input.audit)
@@ -732,7 +739,9 @@ const layer = Layer.effect(
           continue
         }
         for (const fact of ledger.facts) counts[MemoryLifecycle.state(fact, retention, at)]++
-        counts.quarantined += ledger.problems.filter((problem) => !ledger.facts.some((fact) => fact.id === problem.id)).length
+        counts.quarantined += ledger.problems.filter(
+          (problem) => !ledger.facts.some((fact) => fact.id === problem.id),
+        ).length
         if (input.audit) {
           s.reported.delete(root)
           report(s, scope, ledger.problems, input.origin ?? "cli")

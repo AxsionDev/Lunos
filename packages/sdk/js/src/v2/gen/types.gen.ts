@@ -1667,6 +1667,11 @@ export type MemoryConfig = {
     max_facts?: number
     max_fact_chars?: number
   }
+  retention?: {
+    days?: number
+    grace_days?: number
+  }
+  encryption?: "off" | "os-keychain"
 }
 
 export type SubagentConfig = {
@@ -2564,6 +2569,17 @@ export type MemoryFact = {
   importedFrom?: string
   originSource?: string
   originDate?: string
+  /**
+   * XCOD-136: active (recalled), outdated, expired (not recalled; deleted after the grace period), purge (due for deletion) or quarantined (failed the ledger's integrity check)
+   */
+  state: "active" | "outdated" | "expired" | "purge" | "quarantined"
+  kind?: "observed" | "inferred"
+  validFrom?: string
+  invalidAt?: string
+  replacedBy?: string
+  replaces?: string
+  expires?: string
+  quarantined?: string
 }
 
 export type MemoryList = {
@@ -2575,14 +2591,14 @@ export type MemoryList = {
   facts: Array<MemoryFact>
 }
 
-export type MemoryNotFoundError = {
-  _tag: "MemoryNotFoundError"
-  id: string
+export type MemoryUnavailableError = {
+  _tag: "MemoryUnavailableError"
   message: string
 }
 
-export type MemoryUnavailableError = {
-  _tag: "MemoryUnavailableError"
+export type MemoryNotFoundError = {
+  _tag: "MemoryNotFoundError"
+  id: string
   message: string
 }
 
@@ -2686,6 +2702,10 @@ export type MemoryImportResult = {
     text: string
     reason: string
   }>
+}
+
+export type MemoryOutdateInput = {
+  by?: string
 }
 
 export type PermissionRequest = {
@@ -9614,6 +9634,10 @@ export type MemoryListErrors = {
    * Bad request
    */
   400: BadRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
 }
 
 export type MemoryListError = MemoryListErrors[keyof MemoryListErrors]
@@ -9768,6 +9792,44 @@ export type MemoryImportResponses = {
 }
 
 export type MemoryImportResponse = MemoryImportResponses[keyof MemoryImportResponses]
+
+export type MemoryOutdateData = {
+  body?: MemoryOutdateInput
+  path: {
+    id: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/{id}/outdate"
+}
+
+export type MemoryOutdateErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * MemoryNotFoundError
+   */
+  404: MemoryNotFoundError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryOutdateError = MemoryOutdateErrors[keyof MemoryOutdateErrors]
+
+export type MemoryOutdateResponses = {
+  /**
+   * Fact marked outdated
+   */
+  200: boolean
+}
+
+export type MemoryOutdateResponse = MemoryOutdateResponses[keyof MemoryOutdateResponses]
 
 export type MemoryForgetData = {
   body?: never
