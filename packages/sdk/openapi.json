@@ -5245,6 +5245,186 @@
         ]
       }
     },
+    "/memory/import/preview": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.importPreview",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What the import would do; nothing is written",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryImportPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "MemoryImportRefusedError | MemoryPassphraseRequiredError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MemoryImportRefusedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MemoryPassphraseRequiredError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Read and verify a bundle, Markdown or another agent's memory file, screen every fact with the write guard, and show each as new, duplicate, conflict or rejected. Writes nothing.",
+        "summary": "Preview a memory import",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryImportInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.importPreview({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/import": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.import",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What was imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "MemoryImportRefusedError | MemoryPassphraseRequiredError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MemoryImportRefusedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MemoryPassphraseRequiredError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Import the approved rows of a preview. The input is read, verified and screened again; only rows named in accept are written.",
+        "summary": "Import memory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryImportApplyInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.import({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/memory/{id}/forget": {
       "post": {
         "tags": ["memory"],
@@ -23776,6 +23956,15 @@
           },
           "date": {
             "type": "string"
+          },
+          "importedFrom": {
+            "type": "string"
+          },
+          "originSource": {
+            "type": "string"
+          },
+          "originDate": {
+            "type": "string"
           }
         },
         "required": ["id", "scope", "text", "sessionID", "agent", "source", "date"],
@@ -23977,6 +24166,402 @@
           }
         },
         "required": ["path", "format", "facts", "notes", "entities", "relations", "graph", "encrypted"],
+        "additionalProperties": false
+      },
+      "MemoryImportInput": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "user"]
+          },
+          "asFacts": {
+            "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string"
+          }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "MemoryImportRow": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["fact", "note"]
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "user"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["new", "duplicate", "conflict", "rejected"]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "near": {
+            "type": "boolean"
+          },
+          "otherID": {
+            "type": "string"
+          },
+          "otherText": {
+            "type": "string"
+          }
+        },
+        "required": ["key", "kind", "scope", "status", "reason", "text", "file"],
+        "additionalProperties": false
+      },
+      "MemoryImportPreview": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["bundle", "markdown"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "encrypted": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryImportRow"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "new": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              "duplicate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              "conflict": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              "rejected": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              }
+            },
+            "required": ["new", "duplicate", "conflict", "rejected"],
+            "additionalProperties": false
+          },
+          "limit": {
+            "type": "string"
+          },
+          "extractionModel": {
+            "type": "string"
+          },
+          "extractionCalls": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "embedding": {
+            "type": "string"
+          },
+          "remoteEmbeddingCalls": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "sha256",
+          "encrypted",
+          "warnings",
+          "rows",
+          "counts",
+          "extractionModel",
+          "extractionCalls",
+          "embedding",
+          "remoteEmbeddingCalls"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryImportRefusedError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["MemoryImportRefusedError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "MemoryPassphraseRequiredError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["MemoryPassphraseRequiredError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "MemoryImportApplyInput": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "user"]
+          },
+          "asFacts": {
+            "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string"
+          },
+          "accept": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Keys of the preview rows to write. Rejected rows and exact duplicates are never written"
+          }
+        },
+        "required": ["path", "accept"],
+        "additionalProperties": false
+      },
+      "MemoryImportResult": {
+        "type": "object",
+        "properties": {
+          "facts": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "noteParagraphs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": ["text", "reason"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["facts", "noteParagraphs", "notes", "failed"],
         "additionalProperties": false
       },
       "PermissionRequest": {

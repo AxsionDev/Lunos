@@ -122,6 +122,12 @@ import type {
   MemoryExportResponses,
   MemoryForgetErrors,
   MemoryForgetResponses,
+  MemoryImportApplyInput,
+  MemoryImportErrors,
+  MemoryImportInput,
+  MemoryImportPreviewErrors,
+  MemoryImportPreviewResponses,
+  MemoryImportResponses,
   MemoryListErrors,
   MemoryListResponses,
   MemoryRelatedErrors,
@@ -3317,6 +3323,82 @@ export class Memory extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<MemoryExportResponses, MemoryExportErrors, ThrowOnError>({
       url: "/memory/export",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview a memory import
+   *
+   * Read and verify a bundle, Markdown or another agent's memory file, screen every fact with the write guard, and show each as new, duplicate, conflict or rejected. Writes nothing.
+   */
+  public importPreview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryImportInput?: MemoryImportInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryImportInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryImportPreviewResponses, MemoryImportPreviewErrors, ThrowOnError>(
+      {
+        url: "/memory/import/preview",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  /**
+   * Import memory
+   *
+   * Import the approved rows of a preview. The input is read, verified and screened again; only rows named in accept are written.
+   */
+  public import<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryImportApplyInput?: MemoryImportApplyInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryImportApplyInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryImportResponses, MemoryImportErrors, ThrowOnError>({
+      url: "/memory/import",
       ...options,
       ...params,
       headers: {

@@ -1,6 +1,11 @@
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
-import { MemoryNotFoundError, MemoryUnavailableError } from "../errors"
+import {
+  MemoryImportRefusedError,
+  MemoryNotFoundError,
+  MemoryPassphraseRequiredError,
+  MemoryUnavailableError,
+} from "../errors"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery } from "../middleware/workspace-routing"
@@ -18,6 +23,13 @@ export const MemoryFact = Schema.Struct({
   agent: Schema.String,
   source: Schema.String,
   date: Schema.String,
+  importedFrom: Schema.optional(Schema.String).annotate({
+    description: "Imported facts only (XCOD-133): import:<file>#<sha256> it came in from",
+  }),
+  originSource: Schema.optional(Schema.String).annotate({
+    description: "Imported facts only: where it first came from",
+  }),
+  originDate: Schema.optional(Schema.String).annotate({ description: "Imported facts only: when it was first saved" }),
 }).annotate({ identifier: "MemoryFact" })
 
 export const MemoryList = Schema.Struct({
@@ -54,6 +66,74 @@ export const MemoryExportResult = Schema.Struct({
   encrypted: Schema.Boolean,
   decrypt: Schema.optional(Schema.String).annotate({ description: "The command that decrypts an encrypted bundle" }),
 }).annotate({ identifier: "MemoryExportResult" })
+
+// XCOD-133: the TUI's Import action. Preview first; apply re-reads and re-plans on the server, so
+// the client only ever names rows by key and never supplies fact text.
+export const MemoryImportInput = Schema.Struct({
+  path: Schema.String.annotate({
+    description: "A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file",
+  }),
+  scope: Schema.optional(Schema.Literals(["project", "user"])).annotate({
+    description: "Put everything in this memory (default: each bundle fact's own scope; project for Markdown)",
+  }),
+  asFacts: Schema.optional(Schema.Boolean).annotate({
+    description: "Import AGENTS.md, CLAUDE.md, Claude Code memory and bundle notes as facts instead of notes",
+  }),
+  passphrase: Schema.optional(Schema.String).annotate({
+    description: "For an encrypted bundle. Never stored or echoed back",
+  }),
+}).annotate({ identifier: "MemoryImportInput" })
+
+export const MemoryImportApplyInput = Schema.Struct({
+  ...MemoryImportInput.fields,
+  accept: Schema.Array(Schema.String).annotate({
+    description: "Keys of the preview rows to write. Rejected rows and exact duplicates are never written",
+  }),
+}).annotate({ identifier: "MemoryImportApplyInput" })
+
+export const MemoryImportRow = Schema.Struct({
+  key: Schema.String,
+  kind: Schema.Literals(["fact", "note"]),
+  scope: Schema.Literals(["project", "user"]),
+  status: Schema.Literals(["new", "duplicate", "conflict", "rejected"]),
+  reason: Schema.String,
+  text: Schema.String,
+  file: Schema.String,
+  note: Schema.optional(Schema.String),
+  near: Schema.optional(Schema.Boolean).annotate({ description: "A near-duplicate: written only if approved" }),
+  otherID: Schema.optional(Schema.String),
+  otherText: Schema.optional(Schema.String).annotate({ description: "What it duplicates or contradicts" }),
+}).annotate({ identifier: "MemoryImportRow" })
+
+export const MemoryImportPreview = Schema.Struct({
+  kind: Schema.Literals(["bundle", "markdown"]),
+  label: Schema.String,
+  sha256: Schema.String,
+  format: Schema.optional(Schema.String),
+  encrypted: Schema.Boolean,
+  warnings: Schema.Array(Schema.String),
+  rows: Schema.Array(MemoryImportRow),
+  counts: Schema.Struct({
+    new: Schema.Number,
+    duplicate: Schema.Number,
+    conflict: Schema.Number,
+    rejected: Schema.Number,
+  }),
+  limit: Schema.optional(Schema.String).annotate({
+    description: "Set when importing would pass memory.limits.max_facts: nothing can be imported",
+  }),
+  extractionModel: Schema.String,
+  extractionCalls: Schema.Number,
+  embedding: Schema.String,
+  remoteEmbeddingCalls: Schema.Number,
+}).annotate({ identifier: "MemoryImportPreview" })
+
+export const MemoryImportResult = Schema.Struct({
+  facts: Schema.Number,
+  noteParagraphs: Schema.Number,
+  notes: Schema.Array(Schema.String),
+  failed: Schema.Array(Schema.Struct({ text: Schema.String, reason: Schema.String })),
+}).annotate({ identifier: "MemoryImportResult" })
 
 export const MemoryApi = HttpApi.make("memory")
   .add(
@@ -92,6 +172,32 @@ export const MemoryApi = HttpApi.make("memory")
             summary: "Export memory",
             description:
               "Export long-term memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file per fact.",
+          }),
+        ),
+        HttpApiEndpoint.post("importPreview", `${root}/import/preview`, {
+          payload: MemoryImportInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemoryImportPreview, "What the import would do; nothing is written"),
+          error: [MemoryImportRefusedError, MemoryPassphraseRequiredError, MemoryUnavailableError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.importPreview",
+            summary: "Preview a memory import",
+            description:
+              "Read and verify a bundle, Markdown or another agent's memory file, screen every fact with the write guard, and show each as new, duplicate, conflict or rejected. Writes nothing.",
+          }),
+        ),
+        HttpApiEndpoint.post("importApply", `${root}/import`, {
+          payload: MemoryImportApplyInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemoryImportResult, "What was imported"),
+          error: [MemoryImportRefusedError, MemoryPassphraseRequiredError, MemoryUnavailableError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.import",
+            summary: "Import memory",
+            description:
+              "Import the approved rows of a preview. The input is read, verified and screened again; only rows named in accept are written.",
           }),
         ),
         HttpApiEndpoint.post("forget", `${root}/:id/forget`, {

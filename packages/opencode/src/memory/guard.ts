@@ -63,7 +63,7 @@ export function secret(text: string): string | undefined {
  */
 const INJECTION: readonly [RegExp, string][] = [
   [
-    /\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}?\b(previous|prior|above|earlier|preceding|all|any|your|the|system)\b[^.\n]{0,30}?\b(instructions?|prompts?|rules|guidelines|directives|guardrails)\b/i,
+    /\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}?\b(previous|prior|above|earlier|preceding|all|your|system)\b[^.\n]{0,30}?\b(instructions?|prompts?|rules|guidelines|directives|guardrails)\b/i,
     "it tells the model to ignore its instructions",
   ],
   [

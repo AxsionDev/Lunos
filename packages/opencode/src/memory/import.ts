@@ -776,6 +776,13 @@ const planned = Effect.fn("MemoryImport.planned")(function* (options: Options & 
     maxFactChars: cfg.memory?.limits?.max_fact_chars ?? MemoryBackend.DEFAULT_LIMITS.maxFactChars,
   }
   const result = plan(source, { existing, limits, target: options.target })
+  const recalled = cfg.memory?.scope ?? ["project"]
+  for (const scope of ["project", "user"] as const)
+    if (!recalled.includes(scope) && result.rows.some((row) => row.scope === scope && row.status !== "rejected"))
+      result.source.warnings = [
+        ...result.source.warnings,
+        `Rows go to ${scope} memory, which memory.scope doesn't include: they would be stored but not recalled until it does`,
+      ]
   const shown: Preview = {
     ...result,
     extraction: {
@@ -803,16 +810,17 @@ export interface Result {
   failed: { text: string; reason: string }[]
 }
 
-/** The note file's new text: the marker, then the original with only approved paragraphs left. */
-function noteText(note: NoteFile, keep: Set<string>, date: string) {
+/**
+ * The note file's new text: the marker, then only what was screened. Approved paragraphs, and
+ * single-line headings that pass the guard. Everything else is dropped: the notes sync trusts note
+ * files, so a block the preview never showed (a heading with poison under it, a second marker) must
+ * not get in.
+ */
+export function noteText(note: NoteFile, keep: Set<string>, date: string, limits: { maxFactChars: number }) {
   const blocks = note.text
     .split(/\n\s*\n/)
     .map((block) => block.trim())
-    .filter((block) => {
-      if (!block) return false
-      const paragraph = MemoryNotes.paragraphs(block)[0]
-      return paragraph === undefined || keep.has(paragraph)
-    })
+    .filter((block) => keep.has(block) || (/^#{1,6} [^\n]*$/.test(block) && !MemoryGuard.check(block, limits)))
   const marker = MemoryNotes.marker({
     imported: { from: note.from, date },
     ...(note.origin ? { origin: note.origin } : {}),
@@ -870,7 +878,7 @@ export const run = Effect.fn("MemoryImport.run")(function* (
     const keep = new Set(noteRows.filter((item) => item.row.note === note.name).map((item) => item.row.text))
     if (!keep.size) continue
     const name = yield* Effect.tryPromise({
-      try: () => writeNote(path.join(worktree, ".opencode", "memory"), note.name, noteText(note, keep, date)),
+      try: () => writeNote(path.join(worktree, ".opencode", "memory"), note.name, noteText(note, keep, date, limits)),
       catch: toError,
     })
     if (name) written.push(name)

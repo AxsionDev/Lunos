@@ -391,7 +391,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory --help 1`] = `
 "lunos memory
 
-review, search, export and forget long-term memory
+review, search, export, import and forget long-term memory
 
 Commands:
   lunos memory list            list remembered facts, with where each came from
@@ -402,6 +402,8 @@ Commands:
                                are kept)
   lunos memory export          export all memory as a versioned bundle (facts, graph, notes,
                                provenance), or as one Markdown file per fact with --format markdown
+  lunos memory import <path>   import memory from a Lunos bundle, Markdown, or AGENTS.md / CLAUDE.md
+                               / Claude Code memory notes; previews first
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -670,6 +672,32 @@ Options:
       --include-index  bundle: also copy the engine's database files, for a same-version,
                        same-engine restore                                [boolean] [default: false]
       --dir            markdown: where to write the files (default: .opencode/memory/export)[string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory import --help 1`] = `
+"lunos memory import <path>
+
+import memory from a Lunos bundle, Markdown, or AGENTS.md / CLAUDE.md / Claude Code memory notes;
+previews first
+
+Positionals:
+  path  a bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file
+                                                                                 [string] [required]
+
+Options:
+  -h, --help               show help                                                       [boolean]
+  -v, --version            show version number                                             [boolean]
+      --print-logs         print logs to stderr                                            [boolean]
+      --log-level          log level            [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure               run without external plugins                                    [boolean]
+      --scope              put everything in this memory (default: a bundle fact's own scope;
+                           project for Markdown)                        [choices: "project", "user"]
+      --yes                write the new rows (without it, only preview)  [boolean] [default: false]
+      --dry-run            only preview, even with --yes                  [boolean] [default: false]
+      --as-facts           import AGENTS.md, CLAUDE.md, Claude Code memory and bundle notes as facts
+                           instead of notes                               [boolean] [default: false]
+      --include-conflicts  with --yes, also write rows marked conflict or near-duplicate
+                                                                          [boolean] [default: false]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode db path --help 1`] = `

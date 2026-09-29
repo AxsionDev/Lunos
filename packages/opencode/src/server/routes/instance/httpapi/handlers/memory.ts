@@ -5,11 +5,17 @@ import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "@/memory"
 import { MemoryBundle } from "@/memory/bundle"
 import { MemoryExport } from "@/memory/export"
+import { MemoryImport } from "@/memory/import"
 import { MemoryStore } from "@/memory/store"
 import { Provider } from "@/provider/provider"
 import { InstanceHttpApi } from "../api"
-import { MemoryNotFoundError, MemoryUnavailableError } from "../errors"
-import type { MemoryExportInput } from "../groups/memory"
+import {
+  MemoryImportRefusedError,
+  MemoryNotFoundError,
+  MemoryPassphraseRequiredError,
+  MemoryUnavailableError,
+} from "../errors"
+import type { MemoryExportInput, MemoryImportApplyInput, MemoryImportInput } from "../groups/memory"
 
 const SCOPES = ["project", "user"] as const
 
@@ -46,7 +52,14 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       const facts = []
       for (const scope of SCOPES)
         for (const fact of yield* memory.facts(scope))
-          facts.push({ id: fact.id, scope, text: fact.text, ...fact.provenance })
+          facts.push({
+            id: fact.id,
+            scope,
+            text: fact.text,
+            ...fact.provenance,
+            ...(fact.imported ? { importedFrom: fact.imported.from } : {}),
+            ...(fact.origin ? { originSource: fact.origin.source, originDate: fact.origin.date } : {}),
+          })
       return { on: verdict.on, reason: verdict.on ? undefined : verdict.reason, facts }
     })
 
@@ -127,8 +140,77 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       }
     })
 
+    const importError = (error: Error) => {
+      if (error instanceof MemoryImport.PassphraseError)
+        return new MemoryPassphraseRequiredError({ message: error.message })
+      if (
+        error instanceof MemoryImport.RefusedError ||
+        error.name === "MemoryModelRefused" ||
+        error.name === "MemoryImportRefused"
+      )
+        return new MemoryImportRefusedError({ message: error.message })
+      return unavailable(error.message)
+    }
+
+    const importOptions = (input: typeof MemoryImportInput.Type) => ({
+      path: input.path,
+      target: input.scope,
+      asFacts: input.asFacts,
+      passphrase: async () => input.passphrase,
+    })
+
+    const importPreview = Effect.fn("MemoryHttpApi.importPreview")(function* (ctx: {
+      payload: typeof MemoryImportInput.Type
+    }) {
+      const preview = yield* MemoryImport.preview({ ...importOptions(ctx.payload), parent: yield* parent() }).pipe(
+        Effect.mapError(importError),
+      )
+      const source = preview.source
+      return {
+        kind: source.kind,
+        label: source.label,
+        sha256: source.sha256,
+        format: source.bundle?.format,
+        encrypted: source.bundle?.encrypted ?? false,
+        warnings: source.warnings,
+        rows: preview.rows.map((row) => ({
+          key: row.key,
+          kind: row.kind,
+          scope: row.scope,
+          status: row.status,
+          reason: row.reason,
+          text: row.text,
+          file: row.file,
+          note: row.note,
+          near: row.near,
+          otherID: row.other?.id,
+          otherText: row.other?.text,
+        })),
+        counts: preview.counts,
+        limit: preview.limit,
+        extractionModel: preview.extraction.model,
+        extractionCalls: preview.extraction.calls,
+        embedding: preview.embedding.model,
+        remoteEmbeddingCalls: preview.embedding.remoteCalls,
+      }
+    })
+
+    const importApply = Effect.fn("MemoryHttpApi.importApply")(function* (ctx: {
+      payload: typeof MemoryImportApplyInput.Type
+    }) {
+      yield* on()
+      const result = yield* MemoryImport.run({
+        ...importOptions(ctx.payload),
+        parent: yield* parent(),
+        accept: ctx.payload.accept,
+      }).pipe(Effect.mapError(importError))
+      return { facts: result.facts, noteParagraphs: result.noteParagraphs, notes: result.notes, failed: result.failed }
+    })
+
     return handlers
       .handle("list", list)
+      .handle("importPreview", importPreview)
+      .handle("importApply", importApply)
       .handle("related", related)
       .handle("export", exportMemory)
       .handle("forget", forget)
