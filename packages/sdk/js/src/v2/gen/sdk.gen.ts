@@ -131,7 +131,6 @@ import type {
   MemoryListErrors,
   MemoryListResponses,
   MemoryOutdateErrors,
-  MemoryOutdateInput,
   MemoryOutdateResponses,
   MemoryRelatedErrors,
   MemoryRelatedResponses,
@@ -3424,7 +3423,7 @@ export class Memory extends HeyApiClient {
       id: string
       directory?: string
       workspace?: string
-      memoryOutdateInput?: MemoryOutdateInput
+      by?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3436,7 +3435,7 @@ export class Memory extends HeyApiClient {
             { in: "path", key: "id" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
-            { key: "memoryOutdateInput", map: "body" },
+            { in: "query", key: "by" },
           ],
         },
       ],
@@ -3445,11 +3444,6 @@ export class Memory extends HeyApiClient {
       url: "/memory/{id}/outdate",
       ...options,
       ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
     })
   }
 

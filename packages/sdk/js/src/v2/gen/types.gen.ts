@@ -2704,10 +2704,6 @@ export type MemoryImportResult = {
   }>
 }
 
-export type MemoryOutdateInput = {
-  by?: string
-}
-
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -9806,13 +9802,14 @@ export type MemoryImportResponses = {
 export type MemoryImportResponse = MemoryImportResponses[keyof MemoryImportResponses]
 
 export type MemoryOutdateData = {
-  body?: MemoryOutdateInput
+  body?: never
   path: {
     id: string
   }
   query?: {
     directory?: string
     workspace?: string
+    by?: string
   }
   url: "/memory/{id}/outdate"
 }

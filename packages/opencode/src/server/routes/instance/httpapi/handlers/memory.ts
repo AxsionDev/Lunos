@@ -16,7 +16,7 @@ import {
   MemoryPassphraseRequiredError,
   MemoryUnavailableError,
 } from "../errors"
-import type { MemoryExportInput, MemoryImportApplyInput, MemoryImportInput, MemoryOutdateInput } from "../groups/memory"
+import type { MemoryExportInput, MemoryImportApplyInput, MemoryImportInput } from "../groups/memory"
 
 const SCOPES = ["project", "user"] as const
 
@@ -105,12 +105,12 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
 
     const outdate = Effect.fn("MemoryHttpApi.outdate")(function* (ctx: {
       params: { id: string }
-      payload: typeof MemoryOutdateInput.Type
+      query: { by?: string }
     }) {
       yield* find(ctx.params.id)
       yield* on()
       yield* memory
-        .outdate({ id: ctx.params.id, by: ctx.payload.by, parent: yield* parent(), origin: "tui" })
+        .outdate({ id: ctx.params.id, by: ctx.query.by, parent: yield* parent(), origin: "tui" })
         .pipe(Effect.mapError((error) => unavailable(error.message)))
       return true
     })

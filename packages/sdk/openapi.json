@@ -5463,6 +5463,14 @@
               "type": "string"
             },
             "required": false
+          },
+          {
+            "name": "by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
           }
         ],
         "responses": {
@@ -5517,15 +5525,6 @@
         },
         "description": "Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.",
         "summary": "Mark a fact outdated",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MemoryOutdateInput"
-              }
-            }
-          }
-        },
         "x-codeSamples": [
           {
             "lang": "js",
@@ -24774,15 +24773,6 @@
           }
         },
         "required": ["facts", "noteParagraphs", "notes", "failed"],
-        "additionalProperties": false
-      },
-      "MemoryOutdateInput": {
-        "type": "object",
-        "properties": {
-          "by": {
-            "type": "string"
-          }
-        },
         "additionalProperties": false
       },
       "PermissionRequest": {

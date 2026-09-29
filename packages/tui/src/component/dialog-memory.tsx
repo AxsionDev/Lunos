@@ -173,9 +173,7 @@ export function DialogMemory() {
             setToForget(undefined)
             if (toOutdate() !== option.value) return setToOutdate(option.value)
             setToOutdate(undefined)
-            const result = await sdk.client.memory
-              .outdate({ id: option.value, memoryOutdateInput: {} })
-              .catch((error) => ({ error }))
+            const result = await sdk.client.memory.outdate({ id: option.value }).catch((error) => ({ error }))
             if (result.error) {
               toast.show({ variant: "error", title: "Could not mark it outdated", message: errorMessage(result.error) })
               return

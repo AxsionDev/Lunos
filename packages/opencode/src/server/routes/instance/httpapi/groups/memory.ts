@@ -8,7 +8,11 @@ import {
 } from "../errors"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
-import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery } from "../middleware/workspace-routing"
+import {
+  WorkspaceRoutingMiddleware,
+  WorkspaceRoutingQuery,
+  WorkspaceRoutingQueryFields,
+} from "../middleware/workspace-routing"
 import { described } from "./metadata"
 
 // XCOD-94: what the TUI memory browser reads. `list` reads the provenance ledger only and never
@@ -43,9 +47,10 @@ export const MemoryFact = Schema.Struct({
   quarantined: Schema.optional(Schema.String).annotate({ description: "Why the integrity check quarantined it" }),
 }).annotate({ identifier: "MemoryFact" })
 
-export const MemoryOutdateInput = Schema.Struct({
+export const MemoryOutdateQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
   by: Schema.optional(Schema.String).annotate({ description: "The id of the active fact that replaces it" }),
-}).annotate({ identifier: "MemoryOutdateInput" })
+})
 
 export const MemoryList = Schema.Struct({
   on: Schema.Boolean.annotate({ description: "Whether memory is on" }),
@@ -218,8 +223,7 @@ export const MemoryApi = HttpApi.make("memory")
         ),
         HttpApiEndpoint.post("outdate", `${root}/:id/outdate`, {
           params: { id: Schema.String },
-          payload: MemoryOutdateInput,
-          query: WorkspaceRoutingQuery,
+          query: MemoryOutdateQuery,
           success: described(Schema.Boolean, "Fact marked outdated"),
           error: [HttpApiError.BadRequest, MemoryNotFoundError, MemoryUnavailableError],
         }).annotateMerge(
