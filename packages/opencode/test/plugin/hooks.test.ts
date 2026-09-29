@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import os from "os"
+import path from "path"
 import { ConfigHooksPlugin, filePathFrom, matches, runEntry } from "../../src/plugin/hooks"
 
 // Config-driven hooks run user-supplied commands on events Lunos already
@@ -87,7 +89,10 @@ describe("runEntry", () => {
   })
 
   test("context is exported to the command's environment", async () => {
-    const out = "/tmp/lunos-hook-env-" + Bun.hash(Math.random().toString()).toString(16)
+    // Under os.tmpdir(), with `/`: on Windows Git's `sh` maps `/tmp` elsewhere than Bun does (XCOD-137).
+    const out = path
+      .join(os.tmpdir(), "lunos-hook-env-" + Bun.hash(Math.random().toString()).toString(16))
+      .replaceAll("\\", "/")
     const e = entry({
       command: ["sh", "-c", `printf '%s %s %s' "$LUNOS_HOOK_EVENT" "$LUNOS_TOOL" "$LUNOS_FILE" > ${out}`],
     })

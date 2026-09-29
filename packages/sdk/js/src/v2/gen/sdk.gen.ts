@@ -117,6 +117,9 @@ import type {
   McpRemoteConfig,
   McpStatusErrors,
   McpStatusResponses,
+  MemoryExportErrors,
+  MemoryExportInput,
+  MemoryExportResponses,
   MemoryForgetErrors,
   MemoryForgetResponses,
   MemoryListErrors,
@@ -3286,6 +3289,43 @@ export class Memory extends HeyApiClient {
       url: "/memory/{id}/related",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Export memory
+   *
+   * Export long-term memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file per fact.
+   */
+  public export<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryExportInput?: MemoryExportInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryExportInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryExportResponses, MemoryExportErrors, ThrowOnError>({
+      url: "/memory/export",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

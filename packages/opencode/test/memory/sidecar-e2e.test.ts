@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import path from "node:path"
 import { MemoryBackend } from "../../src/memory/backend"
+import { MemoryBundle } from "../../src/memory/bundle"
 import { MemorySidecar } from "../../src/memory/sidecar"
 import { MemoryStore } from "../../src/memory/store"
 import { tmpdir } from "../fixture/fixture"
@@ -55,6 +56,21 @@ describe("memory sidecar, end to end", () => {
         expect(before.facts[0].fact.text).toContain("billing service")
         expect(before.facts[0].fact.provenance).toEqual(provenance)
         expect(before.graph).toContain("billing service")
+
+        // Export (XCOD-132): the engine's graph maps onto the ledger's fact ids.
+        const ledger = new Set((await backend.list()).map((fact) => fact.id))
+        const exported = MemoryBundle.graph("project", await backend.graph(), ledger)
+        const billingService = exported.entities.find((entity) => entity.name === "billing service")!
+        expect(billingService).toMatchObject({ id: expect.stringMatching(/^project:/), facts: [billing.id] })
+        expect(exported.relations).toContainEqual({
+          scope: "project",
+          source: billingService.id,
+          target: exported.entities.find((entity) => entity.name === "invoices table")!.id,
+          relationship: "owns",
+          facts: [billing.id],
+        })
+        for (const item of [...exported.entities, ...exported.relations])
+          for (const id of item.facts) expect(ledger.has(id)).toBe(true)
 
         expect(await backend.forget(billing.id)).toBe(true)
         const after = await backend.recall("who owns the invoices table?", 5)

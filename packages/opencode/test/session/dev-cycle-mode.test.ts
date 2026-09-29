@@ -1,4 +1,5 @@
 import { describe, expect } from "bun:test"
+import path from "path"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { Effect, Layer } from "effect"
@@ -55,8 +56,12 @@ describe("dev-cycle output path", () => {
       const ctx = instance({ vcs: true, worktree: "/tmp/wt" })
       const session = { slug: "my-feature", time: { created: 1700000000000 } }
 
-      expect(SessionNs.devcycle(session, ctx)).toBe(SessionNs.plan(session, ctx).replace("/plans/", "/dev-cycle/"))
-      expect(SessionNs.devcycle(session, ctx)).toBe("/tmp/wt/.opencode/dev-cycle/1700000000000-my-feature.md")
+      expect(SessionNs.devcycle(session, ctx)).toBe(
+        SessionNs.plan(session, ctx).replace(`${path.sep}plans${path.sep}`, `${path.sep}dev-cycle${path.sep}`),
+      )
+      expect(SessionNs.devcycle(session, ctx)).toBe(
+        path.join("/tmp/wt", ".opencode", "dev-cycle", "1700000000000-my-feature.md"),
+      )
     }),
   )
 
@@ -65,8 +70,10 @@ describe("dev-cycle output path", () => {
       const ctx = instance({ vcs: false, worktree: "/tmp/wt" })
       const session = { slug: "my-feature", time: { created: 1700000000000 } }
 
-      expect(SessionNs.devcycle(session, ctx)).toBe(SessionNs.plan(session, ctx).replace("/plans/", "/dev-cycle/"))
-      expect(SessionNs.devcycle(session, ctx)).not.toContain("/tmp/wt")
+      expect(SessionNs.devcycle(session, ctx)).toBe(
+        SessionNs.plan(session, ctx).replace(`${path.sep}plans${path.sep}`, `${path.sep}dev-cycle${path.sep}`),
+      )
+      expect(SessionNs.devcycle(session, ctx)).not.toContain(path.join("/tmp/wt"))
     }),
   )
 })

@@ -39,6 +39,15 @@ export function exportDir(worktree: string) {
   return path.join(worktree, ".opencode", "memory", "export")
 }
 
+/**
+ * Where the TUI writes memory bundles (XCOD-132): the data directory, not the worktree, so a bundle
+ * (which can hold user memory and forgotten-later facts) is never where the agent can read it or
+ * where `git add` picks it up.
+ */
+export function bundles() {
+  return path.join(Global.Path.data, "memory", "exports")
+}
+
 export function models() {
   return path.join(Global.Path.data, "memory", "models")
 }
