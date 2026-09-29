@@ -660,7 +660,6 @@ function App(props: {
       toast.show({ variant: "info", message: "Restart cancelled." })
       return
     }
-    const draft = restartDraft(promptRef.current?.current)
     const cancelled: string[] = []
 
     // Attached to a server this client doesn't own: the turn and its jobs run there and carry on.
@@ -725,6 +724,8 @@ function App(props: {
     }
 
     const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
+    // Read last: while waiting, the user may have typed more, or sent what was there.
+    const draft = restartDraft(promptRef.current?.current)
     host.request({ sessionID: fresh ? undefined : sessionID, fresh, draft, cancelled, upgraded: upgradedTo() })
     if (host.attach)
       toast.show({
