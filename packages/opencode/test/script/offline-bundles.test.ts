@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import fs from "fs/promises"
+import os from "os"
 import path from "path"
 import { bundleFiles, bundleName, cliArchives, unsigned } from "../../script/offline-bundles"
-import { RIPGREP_VERSION, toolsFor } from "../../script/offline/tools"
+import { RIPGREP_VERSION, download, toolsFor } from "../../script/offline/tools"
 
 const release = [
   "lunos-linux-x64.tar.gz",
@@ -78,5 +80,25 @@ describe("offline bundles", () => {
   test("bundles the ripgrep version Lunos would otherwise download", async () => {
     const source = await Bun.file(path.join(import.meta.dir, "../../../core/src/ripgrep/binary.ts")).text()
     expect(source).toContain(`const VERSION = "${RIPGREP_VERSION}"`)
+  })
+
+  test("abandons a stalled download and retries it, instead of hanging the release", async () => {
+    let requests = 0
+    const body = "tool bytes"
+    const server = Bun.serve({
+      port: 0,
+      // The first request never answers, as the stalled connection that hung v1.18.41 didn't.
+      fetch: () => (++requests === 1 ? new Promise<Response>(() => {}) : new Response(body)),
+    })
+    const cache = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-tools-"))
+    const sha256 = new Bun.CryptoHasher("sha256").update(body).digest("hex")
+    try {
+      const file = await download({ url: `${server.url}tool`, sha256 }, cache, 200)
+      expect(await Bun.file(file).text()).toBe(body)
+      expect(requests).toBe(2)
+      expect(await fs.readdir(cache)).toEqual(["tool"])
+    } finally {
+      server.stop(true)
+    }
   })
 })

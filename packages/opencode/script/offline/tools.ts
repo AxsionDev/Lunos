@@ -9,7 +9,7 @@
 // checks this).
 
 import { $ } from "bun"
-import { mkdir, mkdtemp, copyFile, chmod } from "fs/promises"
+import { mkdir, mkdtemp, copyFile, chmod, rename } from "fs/promises"
 import os from "os"
 import path from "path"
 import { sha256 } from "../release-checksums"
@@ -98,12 +98,29 @@ export function toolsFor(archive: string) {
   }
 }
 
-async function download(item: Download, cache: string) {
+/** Per attempt. The largest tool is ~150 MB, which takes seconds on a runner. */
+const DOWNLOAD_TIMEOUT_MS = 5 * 60_000
+const DOWNLOAD_ATTEMPTS = 3
+
+export async function download(item: Download, cache: string, timeoutMs = DOWNLOAD_TIMEOUT_MS) {
   const file = path.join(cache, path.basename(item.url))
   if (!(await Bun.file(file).exists())) {
-    const response = await fetch(item.url)
-    if (!response.ok) throw new Error(`offline bundles: ${item.url} returned ${response.status}`)
-    await Bun.write(file, response)
+    // A stalled connection once hung a release for six hours (v1.18.41): fetch has no timeout of
+    // its own. Each attempt is bounded and writes to a temporary name, so a cut-off download is
+    // never mistaken for a cached one.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const response = await fetch(item.url, { signal: AbortSignal.timeout(timeoutMs) })
+        if (!response.ok) throw new Error(`${item.url} returned ${response.status}`)
+        await Bun.write(file + ".part", await response.arrayBuffer())
+        await rename(file + ".part", file)
+        break
+      } catch (error) {
+        if (attempt === DOWNLOAD_ATTEMPTS)
+          throw new Error(`offline bundles: downloading ${item.url} failed ${attempt} times: ${error}`)
+        console.warn(`offline bundles: ${item.url} attempt ${attempt} failed (${error}), retrying`)
+      }
+    }
   }
   const hash = await sha256(file)
   if (hash !== item.sha256) throw new Error(`offline bundles: ${item.url} has SHA-256 ${hash}, pinned ${item.sha256}`)
