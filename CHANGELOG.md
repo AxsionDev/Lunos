@@ -30,6 +30,18 @@ reasoning behind a change are published separately as **Lunos Notes**.
   error and the command to run by hand, and is never retried. Also in the palette as **Restart
   Lunos**, with an unbound `app_restart` keybind (XCOD-129).
 
+- **`/settings`: every configuration option in one place,** after Claude Code's `/config`. One
+  dialog with **Status | Settings | Usage** tabs; `/config` is an alias, `/status` opens the Status
+  tab and `lunos settings` starts the TUI on it. Settings lists every option, generated from the
+  config schema, by category, with its value and a source badge (default, user, project, env,
+  managed 🔒); typing filters, and Enter or Space change a value by its type (toggle, pick list,
+  the model and theme pickers, an inline prompt, the MCP/providers dialogs, or `$EDITOR` for
+  structured settings). Changes are validated against the schema, go to the user config (Ctrl+S
+  switches to the project's `.opencode/opencode.json`) with comments kept, are refused for keys
+  locked by organisation policy, and offer `/restart` when they need one. `/settings key=value`
+  changes one value from the prompt, and `lunos settings list [--json] | get <key> | set <key>
+<value> [--project]` does the same for scripts (XCOD-128).
+
 ### Changed
 
 - **`/connect` is now `/providers`,** the same word as the `lunos providers` CLI command. It opens
