@@ -315,7 +315,10 @@ export const MemoryImportCommand = effectCmd({
       const next = writable && !args["dry-run"] ? ` Run again with --yes to import ${writable} row(s).` : ""
       return yield* writeStdoutEffect(why + next + EOL)
     }
-    if (!writable) return yield* writeStdoutEffect(`Nothing new to import; nothing was written.${EOL}`)
+    if (!writable) {
+      MemoryImport.audit(preview)
+      return yield* writeStdoutEffect(`Nothing new to import; nothing was written.${EOL}`)
+    }
     const result = yield* MemoryImport.run({
       ...options,
       passphrase,

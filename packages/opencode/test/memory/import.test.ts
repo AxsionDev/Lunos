@@ -196,6 +196,10 @@ describe("verifying a bundle", () => {
     await expect(MemoryImport.read(a)).rejects.toThrow(/graph\.json is missing/)
 
     const b = await writeBundle(path.join(tmp.path, "b"))
+    // What Finder leaves behind is tolerated (never read); anything else unlisted is not.
+    await fs.writeFile(path.join(b, ".DS_Store"), "junk")
+    await fs.writeFile(path.join(b, "notes", ".DS_Store"), "junk")
+    await MemoryImport.read(b)
     await fs.writeFile(path.join(b, "notes", "extra.md"), "Smuggled in.\n")
     await expect(MemoryImport.read(b)).rejects.toThrow(/notes\/extra\.md is not in the manifest/)
 

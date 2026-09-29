@@ -230,6 +230,12 @@ export async function read(input: string, options: ReadOptions = {}): Promise<So
 
 const FORMAT = /^lunos-memory\/(\d+)$/
 
+/**
+ * Files a file manager drops into any folder it opens. Never read, so tolerated when unlisted:
+ * otherwise opening a bundle folder in Finder would make it unimportable.
+ */
+const OS_JUNK = new Set([".DS_Store", "Thumbs.db", "desktop.ini"])
+
 function isProvenance(value: unknown): value is MemoryStore.Provenance {
   const p = value as Record<string, unknown> | null
   return (
@@ -299,7 +305,8 @@ function bundle(
       problems.push(`${entry.path} does not match its checksum`)
   }
   for (const file of files.keys())
-    if (file !== "manifest.json" && !listed.has(file)) problems.push(`${file} is not in the manifest`)
+    if (file !== "manifest.json" && !listed.has(file) && !OS_JUNK.has(path.posix.basename(file)))
+      problems.push(`${file} is not in the manifest`)
   if (problems.length)
     throw new RefusedError(
       `Nothing was imported: ${input.label} failed verification, so none of it can be trusted:\n${problems.map((item) => `  ${item}`).join("\n")}`,
@@ -842,6 +849,37 @@ async function writeNote(dir: string, name: string, text: string) {
 }
 
 /**
+ * Record an approved import in the audit log: the counts and the SHA-256 of what was read, never
+ * text or paths. Also called when an approved import had nothing to write (all duplicates or all
+ * rejected), so a bundle that was entirely poison still leaves a trace. Previews are not recorded.
+ */
+export function audit(
+  shown: Preview,
+  written: { facts: number; notes: number; noteParagraphs: number; failed: number; scopes: MemoryStore.Scope[] } = {
+    facts: 0,
+    notes: 0,
+    noteParagraphs: 0,
+    failed: 0,
+    scopes: [],
+  },
+) {
+  AuditLog.emit("memory.import", {
+    kind: shown.source.kind,
+    sha256: shown.source.sha256,
+    encrypted: shown.source.bundle?.encrypted ?? false,
+    facts: written.facts,
+    notes: written.notes,
+    note_paragraphs: written.noteParagraphs,
+    new: shown.counts.new,
+    duplicate: shown.counts.duplicate,
+    conflict: shown.counts.conflict,
+    rejected: shown.counts.rejected,
+    failed: written.failed,
+    scopes: written.scopes,
+  })
+}
+
+/**
  * Import for real. Re-reads and re-plans (never trusting a preview a client holds), then writes the
  * rows that are `new`, plus `conflict` and near-duplicate rows when `includeConflicts`. With `accept`
  * given, only the rows it names are written. Rejected rows and exact duplicates never are. Refused
@@ -904,17 +942,10 @@ export const run = Effect.fn("MemoryImport.run")(function* (
     const skipped = yield* memory.syncNotes(options.parent)
     for (const item of skipped) failed.push({ text: item, reason: "the note paragraph could not be stored" })
   }
-  AuditLog.emit("memory.import", {
-    kind: source.kind,
-    sha256: source.sha256,
-    encrypted: source.bundle?.encrypted ?? false,
+  audit(shown, {
     facts,
     notes: written.length,
-    note_paragraphs: noteRows.length,
-    new: shown.counts.new,
-    duplicate: shown.counts.duplicate,
-    conflict: shown.counts.conflict,
-    rejected: shown.counts.rejected,
+    noteParagraphs: noteRows.length,
     failed: failed.length,
     scopes: [...new Set(chosen.map((item) => item.row.scope))],
   })
