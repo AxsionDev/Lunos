@@ -7,10 +7,12 @@ import { useSDK } from "../context/sdk"
 import { useTheme } from "../context/theme"
 import { useCommandShortcut } from "../keymap"
 import { errorMessage } from "../util/error"
+import { exportMemory } from "./dialog-memory-export"
 
 // XCOD-94: the memory browser. Lists every remembered fact with where it came from (read from
 // the provenance ledger, so opening it never starts memory), shows the entities and relationships
-// around the highlighted fact, and forgets a fact on a double press of the forget key.
+// around the highlighted fact, and forgets a fact on a double press of the forget key. Export
+// (XCOD-132) writes all of memory out as a bundle or Markdown, with the CLI's options.
 export function DialogMemory() {
   const dialog = useDialog()
   const sdk = useSDK()
@@ -110,6 +112,12 @@ export function DialogMemory() {
       }}
       onSelect={(option) => setHighlighted(option.value)}
       actions={[
+        {
+          command: "dialog.memory.export",
+          title: "export",
+          disabled: () => !memory()?.facts.length,
+          onTrigger: () => exportMemory({ dialog, sdk, toast }),
+        },
         {
           command: "dialog.memory.forget",
           title: "forget",

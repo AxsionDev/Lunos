@@ -153,6 +153,43 @@ def _relations(context: str) -> list:
 
 
 @server.tool()
+async def graph(dataset: str) -> dict:
+    """Every node and edge in the dataset's graph, for `lunos memory export` (XCOD-132). No LLM call.
+
+    Nodes keep only what an export needs (id, type, name, description); Lunos maps them onto the
+    facts they came from. Chunk text and embeddings are left out: they are derived from the facts.
+    """
+    from cognee.context_global_variables import set_database_global_context_variables
+    from cognee.infrastructure.databases.graph import get_graph_engine
+    from cognee.modules.data.methods import get_datasets_by_name
+    from cognee.modules.users.methods import get_default_user
+
+    with _quiet():
+        await _data_ids(dataset)  # runs setup on a fresh store
+        user = await get_default_user()
+        found = await get_datasets_by_name([dataset], user.id)
+        if not found:
+            return {"nodes": [], "edges": []}
+        async with set_database_global_context_variables(found[0].id, user.id):
+            engine = await get_graph_engine()
+            raw_nodes, raw_edges = await engine.get_graph_data()
+    nodes = [
+        {
+            "id": str(node_id),
+            "type": str(props.get("type") or ""),
+            "name": str(props.get("name") or ""),
+            "description": str(props.get("description") or ""),
+        }
+        for node_id, props in raw_nodes
+    ]
+    edges = [
+        {"source": str(source), "target": str(target), "relationship": str(rel)}
+        for source, target, rel, *_ in raw_edges
+    ]
+    return {"nodes": nodes, "edges": edges}
+
+
+@server.tool()
 async def forget(id: str, dataset_id: str) -> dict:
     """Remove one fact, and the graph nodes and edges derived only from it."""
     from uuid import UUID

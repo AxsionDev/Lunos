@@ -1,5 +1,6 @@
 import { describe, expect } from "bun:test"
 import fs from "node:fs/promises"
+import path from "node:path"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Effect, Layer } from "effect"
@@ -78,6 +79,48 @@ describe("memory routes", () => {
       expect(missing.status).toBe(404)
       const related = yield* requestInDirectory("/memory/nope/related", directory)
       expect(related.status).toBe(404)
+    }),
+  )
+
+  // XCOD-132: the TUI's Export action.
+  it.instance(
+    "export writes a bundle with the CLI's options, and with memory off asks for --no-graph instead of starting it",
+    Effect.gen(function* () {
+      const directory = yield* seed
+      const post = (body: object) =>
+        requestInDirectory("/memory/export", directory, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        })
+      const off = yield* post({ out: "with-graph" })
+      expect(off.status).toBe(409)
+      expect(((yield* off.json) as { message: string }).message).toContain("--no-graph")
+
+      const ok = yield* post({ graph: false, zip: true, passphrase: "a long passphrase", out: "memory.zip.enc" })
+      expect(ok.status).toBe(200)
+      const result = (yield* ok.json) as Record<string, unknown>
+      expect(result).toMatchObject({
+        path: path.join(directory, "memory.zip.enc"),
+        format: "bundle",
+        facts: 1,
+        graph: false,
+        encrypted: true,
+      })
+      expect(result.decrypt).toContain("openssl enc -d -aes-256-cbc")
+      expect(JSON.stringify(result)).not.toContain("a long passphrase")
+      const bytes = yield* Effect.promise(() => fs.readFile(path.join(directory, "memory.zip.enc")))
+      expect(bytes.subarray(0, 8).toString()).toBe("Salted__")
+
+      expect((yield* post({ graph: false, passphrase: "short" })).status).toBe(400)
+      expect((yield* post({ graph: false, since: "not a date" })).status).toBe(400)
+      const sidecar = yield* Effect.promise(() =>
+        fs.stat(MemoryStore.sidecarDir()).then(
+          () => true,
+          () => false,
+        ),
+      )
+      expect(sidecar).toBe(false)
     }),
   )
 })

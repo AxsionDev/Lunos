@@ -26,6 +26,34 @@ export const MemoryList = Schema.Struct({
   facts: Schema.Array(MemoryFact),
 }).annotate({ identifier: "MemoryList" })
 
+// XCOD-132: the TUI's Export action. The same options as `lunos memory export`.
+export const MemoryExportInput = Schema.Struct({
+  format: Schema.optional(Schema.Literals(["bundle", "markdown"])),
+  scope: Schema.optional(Schema.Literals(["project", "user", "both"])),
+  since: Schema.optional(Schema.String).annotate({ description: "Only facts saved on or after this date" }),
+  zip: Schema.optional(Schema.Boolean),
+  passphrase: Schema.optional(Schema.String).annotate({
+    description: "Encrypt the bundle with this passphrase (implies zip). Never stored or echoed back",
+  }),
+  graph: Schema.optional(Schema.Boolean).annotate({ description: "Include the entity graph (default true)" }),
+  includeIndex: Schema.optional(Schema.Boolean),
+  out: Schema.optional(Schema.String).annotate({
+    description: "Where to write: the bundle path, or the directory for markdown",
+  }),
+}).annotate({ identifier: "MemoryExportInput" })
+
+export const MemoryExportResult = Schema.Struct({
+  path: Schema.String,
+  format: Schema.Literals(["bundle", "markdown"]),
+  facts: Schema.Number,
+  notes: Schema.Number,
+  entities: Schema.Number,
+  relations: Schema.Number,
+  graph: Schema.Boolean,
+  encrypted: Schema.Boolean,
+  decrypt: Schema.optional(Schema.String).annotate({ description: "The command that decrypts an encrypted bundle" }),
+}).annotate({ identifier: "MemoryExportResult" })
+
 export const MemoryApi = HttpApi.make("memory")
   .add(
     HttpApiGroup.make("memory")
@@ -50,6 +78,19 @@ export const MemoryApi = HttpApi.make("memory")
             identifier: "memory.related",
             summary: "Fact connections",
             description: "Entities and relationships in the memory graph around one fact.",
+          }),
+        ),
+        HttpApiEndpoint.post("export", `${root}/export`, {
+          payload: MemoryExportInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemoryExportResult, "Where the export was written, and what it holds"),
+          error: [HttpApiError.BadRequest, MemoryUnavailableError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.export",
+            summary: "Export memory",
+            description:
+              "Export long-term memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file per fact.",
           }),
         ),
         HttpApiEndpoint.post("forget", `${root}/:id/forget`, {

@@ -100,7 +100,7 @@ async function install() {
 }
 
 export interface Handle {
-  call<T>(tool: "remember" | "recall" | "forget", args: Record<string, unknown>): Promise<T>
+  call<T>(tool: "remember" | "recall" | "forget" | "graph", args: Record<string, unknown>): Promise<T>
   close(): Promise<void>
 }
 

@@ -1,12 +1,14 @@
-import fs from "node:fs/promises"
 import path from "node:path"
 import { EOL } from "os"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import { cmd } from "./cmd"
 import { effectCmd, fail } from "../effect-cmd"
 import { writeStdoutEffect } from "../stdout"
+import * as Prompt from "../effect/prompt"
 import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "@/memory"
+import { MemoryBundle } from "@/memory/bundle"
+import { MemoryExport } from "@/memory/export"
 import { MemoryNotes } from "@/memory/notes"
 import { MemoryRecall } from "@/memory/recall"
 import { MemoryStore } from "@/memory/store"
@@ -40,23 +42,6 @@ function oneLine(text: string, max = 100) {
   return flat.length > max ? flat.slice(0, max - 1) + "…" : flat
 }
 
-function markdown(scope: MemoryStore.Scope, fact: MemoryStore.Fact) {
-  const p = fact.provenance
-  return [
-    "---",
-    `id: ${fact.id}`,
-    `scope: ${scope}`,
-    `date: ${p.date}`,
-    `source: ${JSON.stringify(p.source)}`,
-    `session: ${p.sessionID}`,
-    `agent: ${p.agent}`,
-    "---",
-    "",
-    fact.text,
-    "",
-  ].join("\n")
-}
-
 export const MemoryListCommand = effectCmd({
   command: "list",
   describe: "list remembered facts, with where each came from",
@@ -79,7 +64,7 @@ export const MemoryShowCommand = effectCmd({
     const memory = yield* Memory.Service
     for (const scope of SCOPES) {
       const fact = (yield* memory.facts(scope)).find((item) => item.id === args.id)
-      if (fact) return yield* writeStdoutEffect(markdown(scope, fact))
+      if (fact) return yield* writeStdoutEffect(MemoryExport.markdownFile(scope, fact))
     }
     return yield* fail(`No fact with id ${args.id}`)
   }),
@@ -138,33 +123,104 @@ export const MemoryPurgeCommand = effectCmd({
   }),
 })
 
+/** Where the passphrase for `--encrypt` comes from when there is no terminal to ask on. */
+export const PASSPHRASE_ENV = "LUNOS_MEMORY_PASSPHRASE"
+
+const passphrase = Effect.fn("Cli.memory.passphrase")(function* () {
+  const fromEnv = process.env[PASSPHRASE_ENV]
+  if (fromEnv) return fromEnv
+  if (!process.stdin.isTTY)
+    return yield* fail(`--encrypt needs a passphrase: run it in a terminal, or set ${PASSPHRASE_ENV}`)
+  const first = yield* Prompt.password({
+    message: "Passphrase for the export (it is not stored anywhere)",
+    validate: (value) => (value && value.length >= 8 ? undefined : "At least 8 characters"),
+  })
+  if (Option.isNone(first)) return yield* fail("Cancelled; nothing was exported")
+  const again = yield* Prompt.password({ message: "The same passphrase again" })
+  if (Option.isNone(again)) return yield* fail("Cancelled; nothing was exported")
+  if (again.value !== first.value) return yield* fail("The passphrases don't match; nothing was exported")
+  return first.value
+})
+
+export function parseSince(value: unknown) {
+  if (value === undefined) return undefined
+  const date = new Date(String(value))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 export const MemoryExportCommand = effectCmd({
   command: "export",
   describe:
-    "write every fact as a Markdown file with its provenance, for review in git (forget removes a fact's file from the default directory)",
+    "export all memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file per fact with --format markdown",
   builder: (yargs) =>
-    yargs.option("scope", scopeOption).option("dir", {
-      type: "string",
-      describe: "where to write them (default: .opencode/memory/export)",
-    }),
+    yargs
+      .option("format", {
+        choices: ["bundle", "markdown"] as const,
+        default: "bundle" as const,
+        describe: "bundle: everything, machine-readable (lunos-memory/1). markdown: one file per fact, for git review",
+      })
+      .option("scope", {
+        choices: [...SCOPES, "both"] as const,
+        default: "both" as const,
+        describe: "which memory to export",
+      })
+      .option("since", { type: "string", describe: "bundle: only facts saved on or after this date (ISO 8601)" })
+      .option("out", {
+        type: "string",
+        describe: "bundle: where to write it (default: ./lunos-memory-<time>, plus .zip or .zip.enc)",
+      })
+      .option("zip", {
+        type: "boolean",
+        default: false,
+        describe: "bundle: write one .zip file instead of a directory",
+      })
+      .option("encrypt", {
+        type: "boolean",
+        default: false,
+        describe: `bundle: encrypt the .zip with a passphrase (asked for, or ${PASSPHRASE_ENV}); never stored`,
+      })
+      .option("graph", {
+        type: "boolean",
+        default: true,
+        describe: "bundle: include the entity graph (reading it starts memory; --no-graph exports without)",
+      })
+      .option("include-index", {
+        type: "boolean",
+        default: false,
+        describe: "bundle: also copy the engine's database files, for a same-version, same-engine restore",
+      })
+      .option("dir", {
+        type: "string",
+        describe: "markdown: where to write the files (default: .opencode/memory/export)",
+      }),
   handler: Effect.fn("Cli.memory.export")(function* (args) {
-    const memory = yield* Memory.Service
     const ctx = yield* InstanceState.context
-    const dir = path.resolve(ctx.directory, args.dir ?? MemoryStore.exportDir(MemoryStore.projectRoot(ctx)))
-    let written = 0
-    for (const scope of scopesOf(args.scope)) {
-      const facts = yield* memory.facts(scope)
-      if (!facts.length) continue
-      const target = path.join(dir, scope)
-      yield* Effect.promise(() => fs.mkdir(target, { recursive: true }))
-      for (const fact of facts) {
-        yield* Effect.promise(() => fs.writeFile(path.join(target, `${fact.id}.md`), markdown(scope, fact)))
-        written++
-      }
+    if (args.format === "markdown") {
+      const dir = path.resolve(ctx.directory, args.dir ?? MemoryStore.exportDir(MemoryStore.projectRoot(ctx)))
+      const written = yield* MemoryExport.markdown({ dir, scopes: scopesOf(args.scope) })
+      return yield* writeStdoutEffect(
+        written ? `Wrote ${written} fact(s) to ${dir}${EOL}` : `No facts in memory; nothing written.${EOL}`,
+      )
     }
-    yield* writeStdoutEffect(
-      written ? `Wrote ${written} fact(s) to ${dir}${EOL}` : `No facts in memory; nothing written.${EOL}`,
-    )
+    const since = parseSince(args.since)
+    if (since === null) return yield* fail(`--since must be a date, such as 2026-09-01; got "${args.since}"`)
+    const result = yield* MemoryExport.run({
+      scopes: scopesOf(args.scope),
+      since,
+      graph: args.graph,
+      includeIndex: args["include-index"],
+      zip: args.zip,
+      passphrase: args.encrypt ? yield* passphrase() : undefined,
+      out: args.out,
+      directory: ctx.directory,
+    }).pipe(Effect.catch((error) => fail(error.message)))
+    const counts = result.manifest.counts
+    const lines = [
+      `Exported ${counts.facts.total} fact(s) (${counts.facts.project} project, ${counts.facts.user} user), ${counts.notes} note file(s), ${counts.entities} entities and ${counts.relations} relationships to ${result.path}`,
+    ]
+    if (!result.manifest.graph.included) lines.push(`The graph was not included: ${result.manifest.graph.reason}.`)
+    if (result.encrypted) lines.push(`Decrypt with: ${MemoryBundle.decryptCommand(path.basename(result.path))}`)
+    yield* writeStdoutEffect(lines.join(EOL) + EOL)
   }),
 })
 

@@ -2583,6 +2583,29 @@ export type MemoryUnavailableError = {
   message: string
 }
 
+export type MemoryExportInput = {
+  format?: "bundle" | "markdown"
+  scope?: "project" | "user" | "both"
+  since?: string
+  zip?: boolean
+  passphrase?: string
+  graph?: boolean
+  includeIndex?: boolean
+  out?: string
+}
+
+export type MemoryExportResult = {
+  path: string
+  format: "bundle" | "markdown"
+  facts: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  notes: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  entities: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  relations: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  graph: boolean
+  encrypted: boolean
+  decrypt?: string
+}
+
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -9559,6 +9582,38 @@ export type MemoryRelatedResponses = {
 }
 
 export type MemoryRelatedResponse = MemoryRelatedResponses[keyof MemoryRelatedResponses]
+
+export type MemoryExportData = {
+  body?: MemoryExportInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/export"
+}
+
+export type MemoryExportErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryExportError = MemoryExportErrors[keyof MemoryExportErrors]
+
+export type MemoryExportResponses = {
+  /**
+   * Where the export was written, and what it holds
+   */
+  200: MemoryExportResult
+}
+
+export type MemoryExportResponse = MemoryExportResponses[keyof MemoryExportResponses]
 
 export type MemoryForgetData = {
   body?: never

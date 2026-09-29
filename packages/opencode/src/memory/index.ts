@@ -13,6 +13,7 @@ import { LLM } from "@/session/llm"
 import { MessageID, SessionID } from "@/session/schema"
 import type { SessionV1 } from "@opencode-ai/core/v1/session"
 import { MemoryBackend } from "./backend"
+import type { MemoryBundle } from "./bundle"
 import { MemoryGuard } from "./guard"
 import { MemoryNotes } from "./notes"
 import { MemoryRecall } from "./recall"
@@ -87,6 +88,15 @@ export interface Interface {
   }) => Effect.Effect<{ scope: MemoryStore.Scope; fact: MemoryStore.Fact } | undefined, Error>
   /** Delete a scope's memory directory, and nothing else. Hand-written notes are kept. */
   readonly purge: (scope: MemoryStore.Scope) => Effect.Effect<number, Error>
+  /**
+   * The engine's graph for a scope, for export (XCOD-132). Uses the running sidecar if there is one;
+   * otherwise starts one for this read only, with no model (the read makes no model call, and hand-
+   * written notes are not synced, so exporting never changes memory), and stops it again. Fails
+   * when memory is off: off means no memory process starts.
+   */
+  readonly graph: (scope: MemoryStore.Scope) => Effect.Effect<MemoryBundle.RawGraph, Error>
+  /** Stop a scope's sidecar if it is running, so its database files can be copied. */
+  readonly release: (scope: MemoryStore.Scope) => Effect.Effect<void>
   readonly recallFor: (input: {
     sessionID: string
     userMessageID: string
@@ -336,11 +346,42 @@ const layer = Layer.effect(
       return undefined
     })
 
-    const purge = Effect.fn("Memory.purge")(function* (scope: MemoryStore.Scope) {
+    const release = Effect.fn("Memory.release")(function* (scope: MemoryStore.Scope) {
       const s = yield* InstanceState.get(state)
       const running = s.running.get(scope)
       s.running.delete(scope)
       if (running) yield* Effect.promise(() => running.then((item) => item.close()).catch(() => {}))
+    })
+
+    const graph = Effect.fn("Memory.graph")(function* (scope: MemoryStore.Scope) {
+      const verdict = yield* decision()
+      if (!verdict.on) return yield* Effect.fail(new OffError(`Memory is off: ${verdict.reason}`))
+      const s = yield* InstanceState.get(state)
+      const running = s.running.get(scope)
+      if (running)
+        return yield* Effect.tryPromise({ try: () => running.then((backend) => backend.graph()), catch: toError })
+      const root = MemoryStore.dir(scope, s.worktree)
+      return yield* Effect.tryPromise({
+        try: async () => {
+          const handle = await MemorySidecar.start({
+            root,
+            sample: async () => {
+              throw new Error("Reading the memory graph makes no model calls")
+            },
+          })
+          try {
+            return await MemoryBackend.cognee({ root, handle, limits: MemoryBackend.DEFAULT_LIMITS }).graph()
+          } finally {
+            await handle.close()
+          }
+        },
+        catch: toError,
+      })
+    })
+
+    const purge = Effect.fn("Memory.purge")(function* (scope: MemoryStore.Scope) {
+      const s = yield* InstanceState.get(state)
+      yield* release(scope)
       const root = MemoryStore.dir(scope, s.worktree)
       const count = (yield* Effect.promise(() => MemoryStore.facts(root))).length
       yield* Effect.tryPromise({ try: () => fs.rm(root, { recursive: true, force: true }), catch: toError })
@@ -359,6 +400,8 @@ const layer = Layer.effect(
       facts,
       forget,
       purge,
+      graph,
+      release,
       recallFor,
     })
   }),

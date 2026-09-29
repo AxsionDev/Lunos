@@ -18,6 +18,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **`lunos memory export` writes a full, versioned bundle** (`lunos-memory/1`): facts with provenance,
+  the entity graph tied to the facts it came from, hand-written notes, and a manifest with a SHA-256
+  per file, documented by a JSON Schema in the bundle's `SCHEMA.md`. `--zip`, `--encrypt`
+  (OpenSSL-compatible), `--scope`, `--since` and `--include-index`; also `ctrl+s` in the TUI memory
+  browser. `--format markdown` keeps the old one-file-per-fact export (XCOD-132).
+
 ## [1.18.41] - 2026-09-29
 
 ### Security

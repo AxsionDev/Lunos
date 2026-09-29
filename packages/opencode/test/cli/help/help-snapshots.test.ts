@@ -62,6 +62,7 @@ const TOP_LEVEL = [
   "pr",
   "session",
   "plugin",
+  "memory",
   "db",
 ] as const
 
@@ -82,6 +83,7 @@ const SUBCOMMANDS = [
   ["session", "delete"],
   ["github", "install"],
   ["github", "run"],
+  ["memory", "export"],
   ["db", "path"],
 ] as const
 

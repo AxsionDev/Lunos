@@ -58,6 +58,7 @@ The tool also fetches its model catalogue (a list of available models and their 
 - **After that, no network of its own.** Every remember and recall ran with all outbound connections blocked.
 - **Fact extraction** uses the model you set as `memory.model`, through your normal provider and residency policy, so it is one more model request like any other.
 - **Avoiding the downloads.** You can pre-seed the uv cache and the model directory. Details are in [`specs/memory-layer.md` §7](../../packages/opencode/specs/memory-layer.md).
+- **Exports stay where you put them** (from the next release). `lunos memory export` writes a bundle to a local path you choose: facts with provenance, the extracted graph, copies of `.opencode/memory/*.md`, and a manifest. It makes no network call and no model call. Reading the graph starts the local memory process. The bundle leaves the machine only if you move it. Embeddings and engine database files are included only with `--include-index`. `--encrypt` locks it with a passphrase that is never stored.
 
 **The marketplace** (`lunos marketplace …` commands and the TUI's Discover view) fetches `https://lunos.tech/marketplace.json`, the built-in `lunos-community` catalogue: names, descriptions and install sources of community plugins and MCP servers. It sends no project data, runs only when you use those commands, never at startup, and is cached for a day. Installing an entry then fetches that entry's package (for example from npm). Turn off the built-in catalogue with `"marketplace_default": false`. Marketplaces you add yourself are fetched the same way.
 
@@ -91,7 +92,7 @@ Everything else:
 - Your source code, except the portions sent to your chosen model provider as context
 - Conversation history and session state, stored in local files
 - Configuration and credentials, stored locally
-- Long-term memory, when on (from v1.18.40): the knowledge graph and its provenance ledger, in local files
+- Long-term memory, when on (from v1.18.40): the knowledge graph and its provenance ledger, in local files. `lunos memory export` bundles are written only where you tell them to go
 - The audit log: model calls and share uploads (v1.18.39); tool runs, permission decisions, installs and policy refusals from v1.18.40. No prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
 
 ### Touches Lunos-operated infrastructure
