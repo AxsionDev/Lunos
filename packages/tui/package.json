@@ -13,6 +13,7 @@
     ".": "./src/index.tsx",
     "./builtins": "./src/feature-plugins/builtins.ts",
     "./config": "./src/config/index.tsx",
+    "./config/schema": "./src/config/schema.ts",
     "./context/args": "./src/context/args.tsx",
     "./context/epilogue": "./src/context/epilogue.tsx",
     "./context/exit": "./src/context/exit.tsx",

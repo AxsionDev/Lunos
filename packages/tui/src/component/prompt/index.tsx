@@ -60,6 +60,7 @@ import { usePromptMove } from "./move"
 import { readLocalAttachment } from "./local-attachment"
 import { useLocation } from "../../context/location"
 import { parseRestartSlash } from "../../util/restart"
+import { parseSettingsSlash } from "../../util/settings"
 
 registerOpencodeSpinner()
 
@@ -172,7 +173,8 @@ export function Prompt(props: PromptProps) {
   const renderer = useRenderer()
   const exit = useExit()
   const dimensions = useTerminalDimensions()
-  const { theme, syntax } = useTheme()
+  const themeState = useTheme()
+  const { theme, syntax } = themeState
   const kv = useKV()
   const animationsEnabled = useAnimationsEnabled()
   const list = createMemo(() => props.placeholders?.normal ?? [])
@@ -976,6 +978,37 @@ export function Prompt(props: PromptProps) {
       input.clear()
       setStore("prompt", { input: "", parts: [] })
       keymap.dispatchCommand(restartSlash.fresh ? "app.restart.fresh" : "app.restart")
+      return false
+    }
+    // XCOD-128: `/settings key=value` (or `/config key=value`) changes one setting in the user
+    // config, with the same validation and organisation locks as the settings screen.
+    const settingsSlash = parseSettingsSlash(store.prompt.input)
+    if (settingsSlash) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      if ("error" in settingsSlash) {
+        toast.show({ variant: "warning", message: settingsSlash.error })
+        return false
+      }
+      void sdk.client.config
+        .settingsSet({ settingsSetInput: { key: settingsSlash.key, value: settingsSlash.value, scope: "user" } })
+        .then((result) => {
+          const data = result.data
+          if (!data || !data.ok) {
+            toast.show({
+              variant: "error",
+              message: data && !data.ok ? data.error : "Settings didn't save",
+              duration: 8000,
+            })
+            return
+          }
+          if (data.key === "tui.theme" && typeof data.value === "string") themeState.set(data.value)
+          toast.show({
+            variant: "success",
+            message: `${data.key} = ${JSON.stringify(data.value)} (saved to ${data.file})${data.restart ? ". /restart to apply it" : ""}`,
+            duration: 6000,
+          })
+        })
       return false
     }
     const agent = local.mode.current()
