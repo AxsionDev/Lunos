@@ -469,6 +469,29 @@ it.instance("ignores unknown keybind names without dropping valid overrides from
   ),
 )
 
+// XCOD-130 / XCOD-40: a legacy keybind name in a user's tui.json must survive the loader
+// (unknown-key drop + schema decode) so the TUI can resolve it onto the renamed command.
+it.instance("keeps a legacy provider_connect keybind working as provider.list, and reports it deprecated", () =>
+  withCleanState(
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const test = yield* TestInstance
+      yield* fs.writeJson(path.join(Global.Path.config, "tui.json"), {
+        keybinds: { provider_connect: "ctrl+k", agent_list: "ctrl+y", not_a_real_keybind: "ctrl+q" },
+      })
+
+      const config = yield* getTuiConfig(test.directory)
+      expect(config.keybinds.get("provider.list")?.[0]?.key).toBe("ctrl+k")
+      expect(config.keybinds.get("mode.list")?.[0]?.key).toBe("ctrl+y")
+      expect(config.keybinds.get("not_a_real_keybind")).toEqual([])
+      expect(config.deprecatedKeybinds).toEqual([
+        { legacy: "agent_list", canonical: "mode_list" },
+        { legacy: "provider_connect", canonical: "provider_list" },
+      ])
+    }),
+  ),
+)
+
 it.instance("resolves keybind lookup from canonical keybinds", () =>
   withCleanState(
     Effect.gen(function* () {
