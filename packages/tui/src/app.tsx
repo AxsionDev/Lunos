@@ -53,6 +53,7 @@ import { DialogModel } from "./component/dialog-model"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogStatus } from "./component/dialog-status"
+import { DialogSettings } from "./component/dialog-settings"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
@@ -548,6 +549,8 @@ function App(props: {
         route.navigate({ type: "home", prompt: props.restarted.draft })
       }
     })
+    // XCOD-128: `lunos settings` starts on the settings screen.
+    if (args.settings) dialog.replace(() => <DialogSettings tab={args.settings} />)
     if (props.restarted)
       toast.show({
         variant: "success",
@@ -978,6 +981,17 @@ function App(props: {
             },
           ]
         : []),
+      {
+        // XCOD-128: every configuration option in one place; /config is Claude Code's name for it.
+        name: "settings.open",
+        title: "Settings",
+        slashName: "settings",
+        slashAliases: ["config"],
+        run: () => {
+          dialog.replace(() => <DialogSettings tab="settings" />)
+        },
+        category: "System",
+      },
       {
         name: "opencode.status",
         title: "View status",

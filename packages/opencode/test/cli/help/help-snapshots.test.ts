@@ -63,6 +63,7 @@ const TOP_LEVEL = [
   "pr",
   "session",
   "plugin",
+  "settings", // XCOD-128
   "db",
 ] as const
 
@@ -70,6 +71,8 @@ const TOP_LEVEL = [
 // distinct argv shape, not every leaf. Add new entries when a subcommand
 // gains user-visible flags that we want to lock in.
 const SUBCOMMANDS = [
+  ["settings", "list"],
+  ["settings", "set"],
   ["mcp", "list"],
   ["mcp", "add"],
   ["mcp", "auth"],

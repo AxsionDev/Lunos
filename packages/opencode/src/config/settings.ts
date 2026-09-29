@@ -754,17 +754,17 @@ export const RowSchema = Schema.Struct({
 }).annotate({ identifier: "SettingRow" })
 
 const Tokens = Schema.Struct({
-  input: Schema.Number,
-  output: Schema.Number,
-  reasoning: Schema.Number,
-  cache_read: Schema.Number,
-  cache_write: Schema.Number,
+  input: Schema.Finite,
+  output: Schema.Finite,
+  reasoning: Schema.Finite,
+  cache_read: Schema.Finite,
+  cache_write: Schema.Finite,
 })
 
 export const Usage = Schema.Struct({
-  days: Schema.Number,
-  sessions: Schema.Number,
-  cost: Schema.Number,
+  days: Schema.Finite,
+  sessions: Schema.Finite,
+  cost: Schema.Finite,
   tokens: Tokens,
 }).annotate({ identifier: "SettingsUsage" })
 export type Usage = Schema.Schema.Type<typeof Usage>

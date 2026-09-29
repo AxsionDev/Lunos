@@ -71,7 +71,7 @@ export const Prompt = Schema.Struct({
 
 export const Info = Schema.Struct({
   $schema: Schema.optional(Schema.String),
-  theme: Schema.optional(Schema.String),
+  theme: Schema.optional(Schema.String).annotate({ description: "Colour theme, by name (see /themes)" }),
   keybinds: Schema.optional(TuiKeybind.KeybindOverrides),
   plugin: Schema.optional(Schema.Array(PluginSpec)),
   plugin_enabled: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
