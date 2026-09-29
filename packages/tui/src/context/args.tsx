@@ -8,6 +8,8 @@ export interface Args {
   sessionID?: string
   fork?: boolean
   auto?: boolean
+  /** XCOD-128: open straight on the settings dialog (`lunos settings`). */
+  settings?: "settings" | "status"
 }
 
 export const { use: useArgs, provider: ArgsProvider } = createSimpleContext({

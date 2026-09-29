@@ -2,6 +2,8 @@ import { DialogSelect, type DialogSelectRef } from "../ui/dialog-select"
 import { useTheme, resolveTheme, type Theme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { onCleanup } from "solid-js"
+import { useTuiConfig } from "../config"
+import { useSDK } from "../context/sdk"
 
 function ThemeSwatch(props: { current: boolean; resolved?: Theme }) {
   return (
@@ -14,8 +16,11 @@ function ThemeSwatch(props: { current: boolean; resolved?: Theme }) {
   )
 }
 
-export function DialogThemeList() {
+/** `onPick` (XCOD-128, /settings) is called with the confirmed theme, which then saves it to tui.json. */
+export function DialogThemeList(props: { onPick?: (theme: string) => void } = {}) {
   const theme = useTheme()
+  const tuiConfig = useTuiConfig()
+  const sdk = useSDK()
   const initial = theme.selected
   const all = theme.all()
   const mode = theme.mode()
@@ -56,6 +61,13 @@ export function DialogThemeList() {
       onSelect={(opt) => {
         theme.set(opt.value)
         confirmed = true
+        if (props.onPick) return props.onPick(opt.value)
+        // A theme in tui.json wins over this pick on the next start; keep the file in step, or the
+        // pick would silently revert (XCOD-128 writes the theme there).
+        if (tuiConfig.theme !== undefined && tuiConfig.theme !== opt.value)
+          void sdk.client.config
+            .settingsSet({ settingsSetInput: { key: "tui.theme", value: opt.value, scope: "user" } })
+            .catch(() => {})
         dialog.clear()
       }}
       ref={(r) => {

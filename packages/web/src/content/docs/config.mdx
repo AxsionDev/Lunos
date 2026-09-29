@@ -251,6 +251,28 @@ All managed preference keys appear in the resolved config and cannot be overridd
 
 ---
 
+### Settings
+
+You don't have to edit these files by hand. In the TUI, [`/settings`](/docs/tui#settings-1) lists
+every option with its current value and the layer it comes from, and changes it for you. From a
+shell or a script, `lunos settings` does the same:
+
+```bash
+lunos settings list [--json]                      # every setting, value and source
+lunos settings get share                          # one value
+lunos settings set share disabled                 # write it to your user config
+lunos settings set compaction.auto false --project  # or to .opencode/opencode.json
+lunos settings set theme tokyonight               # TUI settings go to tui.json
+```
+
+Keys are the config keys, with dots for nested ones (`compaction.auto`, `memory.enabled`,
+`residency.allow`). `set` checks the value against the config schema first: an invalid value (for
+example `lunos settings set autoupdate sometimes`) is refused with the allowed values listed, exits
+non-zero, and writes nothing. Keys your organisation locks in [managed config](#managed-settings)
+are refused with the same message the TUI shows. Edits keep the file's comments and formatting.
+
+---
+
 ### Applying changes
 
 Lunos reads its config when it starts. To apply a change without quitting, run

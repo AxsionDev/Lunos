@@ -486,6 +486,24 @@ opencode memory import <path> [--scope project|user] [--yes] [--dry-run] [--as-f
 
 ---
 
+### settings
+
+View and change settings. With no subcommand it opens the TUI on the [settings screen](/docs/tui#settings-1).
+
+```bash
+opencode settings
+opencode settings list [--json]
+opencode settings get <key>
+opencode settings set <key> <value> [--project]
+```
+
+- `set` writes your user config, or `.opencode/opencode.json` with `--project`, keeping comments. It
+  validates the value against the config schema and refuses keys locked by your organisation, exiting
+  non-zero with the reason. Lists take comma-separated values or JSON; structured settings take JSON.
+- See [Config: Settings](/docs/config#settings).
+
+---
+
 ### export
 
 Export session data as JSON.

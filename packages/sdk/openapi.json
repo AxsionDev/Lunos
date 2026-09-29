@@ -739,6 +739,121 @@
         ]
       }
     },
+    "/config/settings": {
+      "get": {
+        "tags": ["config"],
+        "operationId": "config.settings",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every setting, with value, source and lock",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Every configuration option generated from the config schema, with its current value (secrets masked), the layer it came from, whether organisation policy locks it, the loaded config files and 30-day usage.",
+        "summary": "List settings",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.config.settings({\n  ...\n})"
+          }
+        ]
+      },
+      "patch": {
+        "tags": ["config"],
+        "operationId": "config.settingsSet",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result of the change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsSetResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Validate one setting against the config schema and write it to the user or project config, keeping comments. Refuses keys locked by organisation policy.",
+        "summary": "Change one setting",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsSetInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.config.settingsSet({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/config/providers": {
       "get": {
         "tags": ["config"],
@@ -22666,6 +22781,276 @@
           }
         },
         "additionalProperties": false
+      },
+      "SettingRow": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string",
+            "enum": ["config", "tui"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["boolean", "enum", "string", "number", "list", "object"]
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            }
+          },
+          "dialog": {
+            "type": "string",
+            "enum": ["models", "themes", "mcps", "providers", "modes"]
+          },
+          "restart": {
+            "type": "boolean"
+          },
+          "deprecated": {
+            "type": "boolean"
+          },
+          "top": {
+            "type": "boolean"
+          },
+          "readonly": {
+            "type": "boolean"
+          },
+          "value": {},
+          "display": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["default", "user", "project", "env", "managed", "remote"]
+          },
+          "from": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "override": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "target",
+          "label",
+          "category",
+          "description",
+          "kind",
+          "restart",
+          "deprecated",
+          "top",
+          "readonly",
+          "display",
+          "source",
+          "locked",
+          "secret"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsUsage": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number"
+          },
+          "sessions": {
+            "type": "number"
+          },
+          "cost": {
+            "type": "number"
+          },
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "number"
+              },
+              "output": {
+                "type": "number"
+              },
+              "reasoning": {
+                "type": "number"
+              },
+              "cache_read": {
+                "type": "number"
+              },
+              "cache_write": {
+                "type": "number"
+              }
+            },
+            "required": ["input", "output", "reasoning", "cache_read", "cache_write"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["days", "sessions", "cost", "tokens"],
+        "additionalProperties": false
+      },
+      "SettingsSnapshot": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingRow"
+            }
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "layer": {
+                  "type": "string",
+                  "enum": ["default", "user", "project", "env", "managed", "remote", "cli"]
+                },
+                "path": {
+                  "type": "string"
+                },
+                "loaded": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["layer", "path", "loaded"],
+              "additionalProperties": false
+            }
+          },
+          "locked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "files": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "type": "object",
+                "properties": {
+                  "config": {
+                    "type": "string"
+                  },
+                  "tui": {
+                    "type": "string"
+                  }
+                },
+                "required": ["config", "tui"],
+                "additionalProperties": false
+              },
+              "project": {
+                "type": "object",
+                "properties": {
+                  "config": {
+                    "type": "string"
+                  },
+                  "tui": {
+                    "type": "string"
+                  }
+                },
+                "required": ["config", "tui"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["user", "project"],
+            "additionalProperties": false
+          },
+          "usage": {
+            "$ref": "#/components/schemas/SettingsUsage"
+          }
+        },
+        "required": ["rows", "layers", "locked", "files", "usage"],
+        "additionalProperties": false
+      },
+      "SettingsSetInput": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["user", "project"]
+          }
+        },
+        "required": ["key", "value", "scope"],
+        "additionalProperties": false
+      },
+      "SettingsSetResult": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "enum": [true]
+              },
+              "key": {
+                "type": "string"
+              },
+              "value": {},
+              "file": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string",
+                "enum": ["user", "project"]
+              },
+              "restart": {
+                "type": "boolean"
+              },
+              "changed": {
+                "type": "boolean"
+              }
+            },
+            "required": ["ok", "key", "file", "scope", "restart", "changed"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "enum": [false]
+              },
+              "error": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": ["ok", "error", "code"],
+            "additionalProperties": false
+          }
+        ]
       },
       "Model": {
         "type": "object",
