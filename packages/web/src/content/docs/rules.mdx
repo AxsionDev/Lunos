@@ -169,6 +169,7 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
 - **Remembering.** The agent saves facts with a `memory_remember` tool. You approve each one: the tool asks by default. It refuses:
   - anything in a turn that used `webfetch`, `websearch`, an MCP resource, or read a file outside the project
   - anything that looks like a key, token or password
+  - anything shaped like instructions to the model: "ignore all previous instructions", chat role markers, tool-call syntax
 - **Recalling.** Relevant facts are added to your message in a `<memory>` block, each with where and when it was learned, capped at `retrieval.max_tokens`. The agent can also look things up with `memory_search`.
 - **Your notes.** Paragraphs in `.opencode/memory/*.md` are part of project memory, with no approval needed. When you edit or delete one, memory follows.
   - The agent's file edits in `.opencode/memory/` ask first, and edits to the stored graph are refused by default. This stops the agent from writing memory through a file instead of the tool.
@@ -179,9 +180,10 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
   - Project memory: `.opencode/memory/graph/`, which is never committed. Lunos writes a `.gitignore` there.
   - `"user"` scope: in the Lunos data directory.
 - **Reviewing it.**
-  - In the TUI, `/memory` opens a browser: every fact with where it came from, the entities and relationships around the highlighted fact, `ctrl+d` twice to forget it, and `ctrl+s` to export.
+  - In the TUI, `/memory` opens a browser: every fact with where it came from, the entities and relationships around the highlighted fact, `ctrl+d` twice to forget it, `ctrl+s` to export and `ctrl+o` to import.
   - `lunos memory list`, `show <id>` and `search <query>` show what is stored and where each fact came from.
   - `lunos memory export` writes all of memory as one bundle (see [Exporting memory](#exporting-memory)). `--format markdown` writes one Markdown file per fact instead, for review in git.
+  - `lunos memory import <path>` brings memory in (see [Importing memory](#importing-memory)).
   - `lunos memory forget <id>` removes a fact. `lunos memory purge --scope project --yes` deletes the whole memory.
 - **Turning it off:**
   - `"memory": { "enabled": false }`, or remove the key
@@ -227,6 +229,44 @@ What to know:
 
 - **A bundle is a snapshot.** Forgetting a fact later doesn't remove it from bundles you have already written. A bundle can hold user memory too, so keep it out of git.
 - In the TUI, `ctrl+s` in the `/memory` browser offers the same choices. The passphrase is typed into a plain prompt, as API keys are.
+
+#### Importing memory
+
+`lunos memory import <path>` brings memory in: to restore a backup, to move memory between machines or teammates, or to bring in what you already wrote for other coding agents.
+
+```bash
+lunos memory import lunos-memory-20260929-101500.zip.enc    # preview only: nothing is written
+lunos memory import lunos-memory-20260929-101500.zip.enc --yes
+lunos memory import AGENTS.md --yes                         # becomes a note in .opencode/memory/
+lunos memory import ~/.claude/projects/<project>/memory --yes
+lunos memory import notes/ --as-facts --scope user --yes
+```
+
+It reads:
+
+- **A Lunos bundle**, as a folder, `.zip` or `.zip.enc` (the passphrase is asked for, or read from `LUNOS_MEMORY_PASSPHRASE`). Facts keep their original provenance, and notes come back as notes.
+- **Markdown**: a file or a folder. One fact per top-level `- ` bullet, or one per file. The `--format markdown` export reads back with its provenance.
+- **Other agents' files**: `AGENTS.md`, `CLAUDE.md` and Claude Code's auto-memory notes come in as notes in `.opencode/memory/` (as `agents-md.md`, `claude-md.md`, and so on, never under their own names, which other tools load as instructions). `--as-facts` imports them as facts instead.
+
+**Imported memory is untrusted.** A checksum or a passphrase proves where a bundle came from, not that what it says is safe. So an import:
+
+1. **Checks the format.** A bundle from a newer major version is refused.
+2. **Verifies the bundle.** Every file's SHA-256 is checked, after decrypting. One changed byte, a missing file or a file the manifest doesn't list refuses the whole bundle.
+3. **Screens every fact and note paragraph** with the checks agent writes pass: the size limit, the secret check, and the check for instruction-shaped text.
+4. **Dedupes** against what memory holds, and flags near-duplicates.
+5. **Finds conflicts**: the same subject with a different value is shown next to the fact it contradicts.
+6. **Previews.** A table shows every row as new, duplicate, conflict or rejected, with the reason. Nothing is written without `--yes`, or approval in the TUI. `--dry-run` previews even with `--yes`.
+7. **Stores** the new rows. `--include-conflicts` also writes conflicts and near-duplicates. Each imported fact's source becomes `import:<file>#<sha256>`, its original provenance is kept as its origin, and it is marked imported.
+
+What to know:
+
+- **The graph and the index are never imported.** Memory re-extracts entities and relationships from the facts, and re-embeds them with your configured, local embedding model. `graph.json` and `index/` files in a bundle are ignored.
+- **Recall labels imported facts** "imported", with where they came from, inside the `<memory>` block that is always reference, never instructions.
+- **Where facts go.** A bundle's facts go back to their own scope. Markdown goes to project memory. `--scope project|user` puts everything in one memory. Notes are always project memory.
+- **Limits.** If the import would pass `memory.limits.max_facts`, it stops at the preview.
+- **Models.** Extracting each fact's graph is one call to your `memory.model`, and the preview says how many. Both `memory.model` and `memory.embedding` are checked against your data-residency policy before anything is read. A denied model stops the import, and the error names the setting.
+- **The audit log** records each import: the counts and the SHA-256 of what was read, never the text.
+- In the TUI, `ctrl+o` in the `/memory` browser asks for the path and shows the preview. New rows start approved; `enter` approves or rejects one row, `ctrl+a` all of them, and `ctrl+s` imports.
 
 ---
 

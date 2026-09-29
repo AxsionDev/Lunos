@@ -25,6 +25,18 @@ reasoning behind a change are published separately as **Lunos Notes**.
   per file, documented by a JSON Schema in the bundle's `SCHEMA.md`. `--zip`, `--encrypt`
   (OpenSSL-compatible), `--scope`, `--since` and `--include-index`; also `ctrl+s` in the TUI memory
   browser. `--format markdown` keeps the old one-file-per-fact export (XCOD-132).
+- **`lunos memory import`** brings memory in from a Lunos bundle (folder, `.zip` or `.zip.enc`),
+  Markdown, or `AGENTS.md` / `CLAUDE.md` / Claude Code auto-memory notes. Imported memory is treated
+  as untrusted. Bundles are checksum-verified, every fact passes the write guard, and duplicates and
+  conflicts are found. A preview of new / duplicate / conflict / rejected rows comes first, and
+  nothing is written without `--yes` or approval in the TUI (`ctrl+o` in the memory browser).
+  Imported facts keep their original provenance as `origin` and are labelled "imported" when
+  recalled. The audit log records each import without its text (XCOD-133).
+
+### Security
+
+- **Memory now refuses instruction-shaped text** ("ignore all previous instructions", chat role
+  markers, tool-call syntax), for the agent's `memory_remember` as well as imports (XCOD-133).
 
 ## [1.18.41] - 2026-09-29
 
