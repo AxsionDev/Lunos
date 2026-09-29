@@ -492,6 +492,21 @@ it.instance("keeps a legacy provider_connect keybind working as provider.list, a
   ),
 )
 
+// XCOD-129: /restart has an optional keybind, unbound until tui.json sets app_restart.
+it.instance("app_restart is unbound by default and binds app.restart from tui.json", () =>
+  withCleanState(
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const test = yield* TestInstance
+      const before = yield* getTuiConfig(test.directory)
+      expect(before.keybinds.get("app.restart")).toEqual([])
+      yield* fs.writeJson(path.join(Global.Path.config, "tui.json"), { keybinds: { app_restart: "<leader>r" } })
+      const config = yield* getTuiConfig(test.directory)
+      expect(config.keybinds.get("app.restart").length).toBe(1)
+    }),
+  ),
+)
+
 it.instance("resolves keybind lookup from canonical keybinds", () =>
   withCleanState(
     Effect.gen(function* () {

@@ -68,17 +68,21 @@ describe("skill allowed-tools in a real run", () => {
       Effect.gen(function* () {
         yield* Effect.promise(() => installSkill(home))
         const log = path.join(home, "hook-env.log")
-        const script = path.join(home, "record-env.sh")
+        // A Bun script rather than a `#!/bin/sh` file: Windows can't spawn a shebang script
+        // directly, so a `.sh` hook command never ran there (XCOD-137).
+        const script = path.join(home, "record-env.js")
         yield* Effect.promise(async () => {
-          await fs.writeFile(script, `#!/bin/sh\necho "$LUNOS_TOOL agent=$LUNOS_AGENT skill=$LUNOS_SKILL" >> ${log}\n`)
-          await fs.chmod(script, 0o755)
+          await fs.writeFile(
+            script,
+            `const e = process.env\nrequire("fs").appendFileSync(${JSON.stringify(log)}, \`\${e.LUNOS_TOOL} agent=\${e.LUNOS_AGENT} skill=\${e.LUNOS_SKILL ?? ""}\\n\`)\n`,
+          )
           // Real config file through the live config path (the XCOD-68 lesson), merged with the
           // harness's inline provider config.
           const dir = path.join(home, ".config", "opencode")
           await fs.mkdir(dir, { recursive: true })
           await fs.writeFile(
             path.join(dir, "opencode.json"),
-            JSON.stringify({ hooks: { "tool.execute.before": [{ command: [script] }] } }),
+            JSON.stringify({ hooks: { "tool.execute.before": [{ command: [process.execPath, script] }] } }),
           )
         })
         yield* llm.push(reply().tool("glob", { pattern: "*.nothing" }))

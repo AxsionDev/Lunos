@@ -55,10 +55,12 @@ export function newVersionNotice(version: string, width: number) {
 }
 
 /**
- * What the "Update Complete" alert tells people to do next. XCOD-129's `/restart` hasn't shipped;
- * once it has, this is the one string to change ("Run /restart, or restart Lunos, to use it.").
+ * What the "Update Complete" alert tells people to do next (XCOD-129): `/restart` relaunches the
+ * newly installed version and reopens the session.
  */
-export const UPDATE_RESTART_HINT = "Restart Lunos to use it."
+export function updateRestartHint(version: string) {
+  return `Run /restart to use ${version}.`
+}
 
 /** `versionLabel()` plus the upstream base when known, for bug reports and debug surfaces. */
 export function versionDetail(version = InstallationVersion, upstream = InstallationUpstreamVersion) {
