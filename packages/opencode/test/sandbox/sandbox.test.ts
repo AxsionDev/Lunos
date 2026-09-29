@@ -134,10 +134,35 @@ describe("sandbox container", () => {
   })
 })
 
+describe("docker workspace adapter", () => {
+  test("list reads host metadata only, so a workspace sync never waits on Docker", async () => {
+    const { DockerAdapter } = await import("../../src/control-plane/adapters/docker")
+    const started = Date.now()
+    const listed = await DockerAdapter.list!({
+      instance: { directory: "/nowhere", worktree: "/nowhere", project: { id: "prj_test" } } as never,
+    })
+    expect(listed).toEqual([])
+    expect(Date.now() - started).toBeLessThan(1000)
+  })
+})
+
 describe("copy mode and the result handoff", () => {
   test("the seed holds HEAD plus uncommitted changes, and the branch gets exactly the agent's edits", async () => {
     await using tmp = await tmpdir({ git: true })
     const root = tmp.path
+    // core.autocrlf=true is Windows' default, and a fresh repo (the seed) picks it up from global
+    // config. The seed must still check files out with LF, for the Linux container.
+    const globalConfig = path.join(root, "..", path.basename(root) + ".gitconfig")
+    await Bun.write(globalConfig, "[core]\n\tautocrlf = true\n")
+    const previousGlobal = process.env.GIT_CONFIG_GLOBAL
+    process.env.GIT_CONFIG_GLOBAL = globalConfig
+    await using _restore = {
+      [Symbol.asyncDispose]: async () => {
+        if (previousGlobal === undefined) delete process.env.GIT_CONFIG_GLOBAL
+        else process.env.GIT_CONFIG_GLOBAL = previousGlobal
+        await fs.rm(globalConfig, { force: true })
+      },
+    }
     await Bun.write(path.join(root, "a.txt"), "a\n")
     await Bun.write(path.join(root, "gone.txt"), "gone\n")
     await Bun.write(path.join(root, ".gitignore"), "ignored/\n")

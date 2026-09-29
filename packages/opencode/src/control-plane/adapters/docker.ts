@@ -42,18 +42,20 @@ export const DockerAdapter: WorkspaceAdapter = {
     })
     await Sandbox.start(sandbox)
   },
+  // Called on every workspace syncList, for every project, so it must not shell out to Docker
+  // (which can be absent, or slow to answer): it reads the host-side sandbox metadata only.
   async list(context) {
     const { Sandbox } = await load()
     const project = context?.instance?.project.id
     if (!project) return []
-    return (await Sandbox.list())
-      .filter((row) => row.meta && row.meta.root === context?.instance?.worktree)
-      .map((row) => ({
+    return (await Sandbox.known())
+      .filter((meta) => meta.root === context?.instance?.worktree)
+      .map((meta) => ({
         type: "docker",
-        name: row.id,
-        branch: row.meta?.branch ?? null,
-        directory: row.meta?.directory ?? null,
-        extra: { sandbox: row.id },
+        name: meta.id,
+        branch: meta.branch,
+        directory: meta.directory,
+        extra: { sandbox: meta.id },
         projectID: project,
       }))
   },

@@ -43,6 +43,10 @@ export async function repo(directory: string): Promise<Repo> {
  */
 export async function seed(input: Repo & { into: string; branch: string }) {
   await git(["init", "--quiet", input.into])
+  // The workspace goes into a Linux container: check files out exactly as committed, whatever the
+  // host's core.autocrlf says (it defaults to true on Windows, which would write CRLF).
+  await git(["-C", input.into, "config", "core.autocrlf", "false"])
+  await git(["-C", input.into, "config", "core.eol", "lf"])
   await git(["-C", input.into, "fetch", "--quiet", "--depth=1", `file://${input.root}`, input.base])
   await git(["-C", input.into, "checkout", "--quiet", "-b", input.branch, "FETCH_HEAD"])
   await git(["-C", input.into, "config", "user.name", "Lunos sandbox"])

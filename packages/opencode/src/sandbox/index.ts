@@ -274,6 +274,17 @@ export async function destroy(id: string) {
   await fs.rm(metaFile(id), { force: true })
 }
 
+/** Sandboxes this machine created, from the host metadata alone: no Docker call. */
+export async function known(): Promise<Meta[]> {
+  const names = await fs.readdir(metaDir()).catch(() => [] as string[])
+  const all = await Promise.all(
+    names
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => meta(name.slice(0, -".json".length)).catch(() => undefined)),
+  )
+  return all.filter((item): item is Meta => item !== undefined)
+}
+
 export async function list() {
   const rows = await SandboxDocker.list()
   return Promise.all(rows.map(async (row) => ({ ...row, meta: await meta(row.id).catch(() => undefined) })))
