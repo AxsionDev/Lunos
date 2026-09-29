@@ -476,6 +476,8 @@ opencode memory purge --scope project|user --yes
 opencode memory export [--format bundle|markdown] [--scope project|user|both] [--since <date>]
                        [--out <path>] [--zip] [--encrypt] [--no-graph] [--include-index] [--dir <path>]
 opencode memory import <path> [--scope project|user] [--yes] [--dry-run] [--as-facts] [--include-conflicts]
+opencode memory migrate --to neo4j [--scope project|user] [--yes] [--include-conflicts]
+opencode memory status
 ```
 
 - `export` writes all of memory as a versioned bundle (facts, graph, notes and provenance) to `./lunos-memory-<time>/`, or a `.zip` with `--zip`, or an encrypted `.zip.enc` with `--encrypt`. See [Rules: exporting memory](/docs/rules#exporting-memory).
@@ -483,6 +485,8 @@ opencode memory import <path> [--scope project|user] [--yes] [--dry-run] [--as-f
 - `forget` removes the fact from memory and from that Markdown export folder. Bundles already written are snapshots and keep it.
 - `import` reads a bundle, Markdown, or `AGENTS.md` / `CLAUDE.md` / Claude Code memory, verifies and screens every fact, and shows a preview of new, duplicate, conflict and rejected rows. It writes only with `--yes`. See [Rules: importing memory](/docs/rules#importing-memory).
 - `purge` deletes a memory's stored facts and graph. Your notes in `.opencode/memory/*.md` are kept.
+- `migrate --to neo4j` moves this machine's embedded memory into the external database set in `memory.backend`: it exports a bundle and imports it with the same preview, keeping each fact's id and provenance. It writes only with `--yes`. See [Rules: an external memory database](/docs/rules#an-external-memory-database).
+- `status` shows whether memory is on, the backend and whether it can be reached, and each scope's fact count and last write.
 
 ---
 

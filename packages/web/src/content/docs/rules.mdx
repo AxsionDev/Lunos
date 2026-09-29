@@ -215,6 +215,32 @@ A fact can be marked **outdated**, optionally with the fact that replaces it. It
   - Turning it on encrypts the existing ledger the next time memory starts; turning it off decrypts it (the key must still be there).
 - **Audit.** With the [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md) on, every memory operation is recorded (`memory.remember`, `recall`, `forget`, `outdate`, `import`, `export`, `purge`, `verify_failed`), with its time, scope, fact ids, counts and where it came from, never a fact's text or a search query, and forwarded to your SIEM like every other event.
 
+#### An external memory database
+
+Memory can live in a Neo4j database your team runs instead of on each machine, so a team shares project memory and keeps it on infrastructure it controls:
+
+```jsonc
+"memory": {
+  "enabled": true,
+  "backend": {
+    "type": "neo4j",
+    "url": "bolt+s://graph.internal:7687",
+    "username": "{env:LUNOS_MEMORY_DB_USER}",
+    "password": "{env:LUNOS_MEMORY_DB_PASSWORD}",
+    "jurisdiction": "EU-DE"
+  }
+}
+```
+
+- **Before connecting,** Lunos checks that a `jurisdiction` is declared and that your [data-residency policy](https://github.com/AxsionDev/Lunos/blob/dev/docs/data-residency.md) allows it, that the connection uses TLS (plain `bolt://` only to localhost, unless `allow_insecure: true`), and that the username and password are `{env:}` or `{file:}` references. A literal password fails config loading. A residency refusal names `memory.backend` and is written to the audit log.
+- **Scopes stay apart.** Project memory is keyed by a hash of the repository's git remote, so everyone on the same repository shares it and no other project sees it. User memory is keyed by `backend.user` (hashed) or a random id kept on your machine.
+- **Facts only.** The database holds each fact with its provenance and an integrity hash. There are no embeddings and no entity graph: recall uses the database's full-text index, so a second machine needs no re-index, and remembering makes no model call. Your notes in `.opencode/memory/*.md` stay in the repository and aren't copied into the database.
+- **`read_only: true`** allows recall only: the remember tool isn't offered.
+- **Off still means off:** with memory off, no connection is opened.
+- `lunos memory migrate --to neo4j` moves embedded memory into the database, with a preview first. `lunos memory status` shows the backend, whether it is reachable, and each scope's fact count and last write.
+
+The [self-hosted deployment guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md#external-memory-database) has a Docker Compose example, what lives where, and what Neo4j needs.
+
 #### Exporting memory
 
 `lunos memory export` writes everything in memory to a versioned bundle, format `lunos-memory/1`. Use it for backups, to move memory to another machine or engine, to hand it to someone to review, or for a GDPR data-portability request.

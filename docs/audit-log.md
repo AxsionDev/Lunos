@@ -80,6 +80,7 @@ One JSON object per line. Every line carries:
 | `memory.verify_failed`          | `scope`, `source`, `count`, `ids`, `lines`, or `reason` (`key`, `unreadable`)                                                      | Ledger lines that failed the integrity check (quarantined): at memory start and on `lunos memory verify`, once per distinct finding per process; or a ledger that couldn't be read |
 | `memory.export`                 | `scopes`, `facts`, `format`, `zip`, `encrypted`, `index`, `graph`, `quarantined`                                                   | A memory bundle written by `lunos memory export`. Never the content, the path or the passphrase                                                                                    |
 | `memory.import`                 | `kind`, `sha256`, `encrypted`, `facts`, `notes`, `note_paragraphs`, `new`, `duplicate`, `conflict`, `rejected`, `failed`, `scopes` | An approved `lunos memory import`, including one that wrote nothing: what it found and wrote, and the SHA-256 of what it read. Never the text, the path or the passphrase          |
+| `memory.denied`                 | `setting` (`memory.backend`), `host`, `jurisdiction`, `region`, `reason`                                                           | An external memory database refused by the residency policy before any connection (XCOD-134). Never credentials                                                                    |
 
 ### What is never recorded
 

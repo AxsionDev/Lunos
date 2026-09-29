@@ -41,6 +41,9 @@ export const EVENTS = [
   "memory.export",
   // XCOD-133: an import that wrote something. Counts and the input's SHA-256, never text or paths.
   "memory.import",
+  // XCOD-134: an external memory database refused before connecting (residency). Setting, host,
+  // declared jurisdiction and region; never credentials.
+  "memory.denied",
   "upgrade",
   "audit.forward_refused",
 ] as const

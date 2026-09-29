@@ -21444,6 +21444,40 @@
         "additionalProperties": false,
         "description": "Server configuration for opencode serve and web commands"
       },
+      "MemoryBackendConfig": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["embedded", "neo4j", "memgraph"]
+          },
+          "url": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "jurisdiction": {
+            "type": "string"
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "allow_insecure": {
+            "type": "boolean"
+          },
+          "user": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "MemoryConfig": {
         "type": "object",
         "properties": {
@@ -21504,6 +21538,9 @@
           "encryption": {
             "type": "string",
             "enum": ["off", "os-keychain"]
+          },
+          "backend": {
+            "$ref": "#/components/schemas/MemoryBackendConfig"
           }
         },
         "additionalProperties": false

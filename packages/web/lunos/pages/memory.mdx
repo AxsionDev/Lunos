@@ -52,6 +52,10 @@ In the TUI, `/memory` opens the same list, `ctrl+s` exports it and `ctrl+o` impo
 
 `lunos memory import` brings a bundle back on another machine, or your `AGENTS.md`, `CLAUDE.md` and Claude Code memory notes. Imported memory is treated as untrusted: the bundle's checksums are verified, every fact goes through the same checks as the agent's own writes (secrets, instruction-shaped text, size), and you see a preview of what is new, duplicate, conflicting or rejected before anything is written. Imported facts keep their original provenance and are labelled "imported" when recalled.
 
+## Share it with your team
+
+Memory can live in a Neo4j database your team runs, instead of on each machine. Set `memory.backend` with the database's URL, credentials as `{env:}` or `{file:}` references, and the jurisdiction it runs in. Lunos checks that jurisdiction against your residency policy and requires TLS to any other host before it connects. Everyone on the same repository shares its project memory; your user memory stays yours. `lunos memory migrate --to neo4j` moves what you have, with a preview first. The [self-hosted guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md#external-memory-database) has the details.
+
 ## Network
 
 - **The first time memory starts,** it downloads its Python packages (pinned by hash) and a small embedding model.
