@@ -5571,6 +5571,64 @@
         ]
       }
     },
+    "/provider/configured": {
+      "get": {
+        "tags": ["provider"],
+        "operationId": "provider.configured",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configured providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConfiguredProvider"
+                  },
+                  "description": "Configured providers"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "List the providers with a stored credential or loaded from the environment or config, with auth method, status and jurisdiction. Never includes secrets.",
+        "summary": "List configured providers",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.provider.configured({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/provider/auth": {
       "get": {
         "tags": ["provider"],
@@ -24040,6 +24098,44 @@
           }
         },
         "required": ["_tag", "requestID", "message"],
+        "additionalProperties": false
+      },
+      "ConfiguredProvider": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": ["api", "oauth", "wellknown", "env", "config", "custom"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["connected", "expired", "error"]
+          },
+          "stored": {
+            "type": "boolean"
+          },
+          "jurisdiction": {
+            "type": "object",
+            "properties": {
+              "region": {
+                "type": "string",
+                "enum": ["eu", "us", "other", "configurable", "unknown"]
+              },
+              "basis": {
+                "type": "string"
+              }
+            },
+            "required": ["region", "basis"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "name", "method", "status", "stored", "jurisdiction"],
         "additionalProperties": false
       },
       "ProviderAuthMethod": {

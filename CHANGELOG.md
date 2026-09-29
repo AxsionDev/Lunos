@@ -26,6 +26,20 @@ reasoning behind a change are published separately as **Lunos Notes**.
   (OpenSSL-compatible), `--scope`, `--since` and `--include-index`; also `ctrl+s` in the TUI memory
   browser. `--format markdown` keeps the old one-file-per-fact export (XCOD-132).
 
+### Changed
+
+- **`/connect` is now `/providers`,** the same word as the `lunos providers` CLI command. It opens
+  on your configured providers, each with its status (connected, expired or error), auth method and
+  jurisdiction, with **Add provider** (the old connect flow), **Log out** and **Set as default for
+  model picker**. `/connect` remains a hidden alias that shows "/connect is now /providers", and the
+  `provider_connect` keybind still works as an alias of the new `provider_list`; both aliases will
+  be removed in 1.21.0, after the next two minor releases (XCOD-130).
+
+### Fixed
+
+- A legacy keybind name in `tui.json` (such as `agent_list`, renamed in XCOD-40) was silently
+  dropped when the config loaded, instead of resolving to its new name (XCOD-130).
+
 ## [1.18.41] - 2026-09-29
 
 ### Security

@@ -160,7 +160,7 @@ export function DialogModel(props: { providerID?: string }) {
       actions={[
         {
           command: "model.dialog.provider",
-          title: connected() ? "Connect provider" : "View all providers",
+          title: connected() ? "Add provider" : "View all providers",
           onTrigger() {
             dialog.replace(() => <DialogProvider />)
           },

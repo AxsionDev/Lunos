@@ -125,7 +125,7 @@ export const Definitions = {
   model_cycle_favorite: keybind("none", "Next favorite model"),
   model_cycle_favorite_reverse: keybind("none", "Previous favorite model"),
   mcp_list: keybind("none", "List MCP servers"),
-  provider_connect: keybind("none", "Connect provider"),
+  provider_list: keybind("none", "Manage providers"),
   console_org_switch: keybind("none", "Switch console organization"),
   mode_list: keybind("<leader>a", "List modes"),
   mode_cycle: keybind("tab", "Next mode"),
@@ -257,14 +257,18 @@ export const KeybindAliases: Record<string, KeybindName> = {
   agent_list: "mode_list",
   agent_cycle: "mode_cycle",
   agent_cycle_reverse: "mode_cycle_reverse",
+  // XCOD-130: the provider command was renamed to /providers.
+  provider_connect: "provider_list",
 }
 
 export const KeybindOverrides = Schema.Struct(
   Object.fromEntries(
-    Object.entries(Definitions).map(([name, item]) => [
-      name,
-      Schema.optional(BindingValueSchema).annotate({ description: item.description }),
-    ]),
+    [
+      ...Object.entries(Definitions).map(([name, item]) => [name, item.description]),
+      // Legacy names stay in the schema so a config decode keeps them for resolveKeybindAliases,
+      // which maps them onto their canonical names and reports them as deprecated.
+      ...Object.entries(KeybindAliases).map(([legacy, canonical]) => [legacy, `Deprecated: use ${canonical}`]),
+    ].map(([name, description]) => [name, Schema.optional(BindingValueSchema).annotate({ description })]),
   ),
 ).annotate({ description: "TUI keybinding overrides" })
 export const Descriptions = Object.fromEntries(
@@ -348,7 +352,7 @@ export const CommandMap = {
   model_cycle_favorite: "model.cycle_favorite",
   model_cycle_favorite_reverse: "model.cycle_favorite_reverse",
   mcp_list: "mcp.list",
-  provider_connect: "provider.connect",
+  provider_list: "provider.list",
   console_org_switch: "console.org.switch",
   mode_list: "mode.list",
   mode_cycle: "mode.cycle",
@@ -503,7 +507,7 @@ export function parse(keybinds: KeybindOverrides): Keybinds {
 export const Keybinds = { parse }
 
 export function unknownKeys(input: object) {
-  return Object.keys(input).filter((key) => !KeybindNames.has(key))
+  return Object.keys(input).filter((key) => !KeybindNames.has(key) && !(key in KeybindAliases))
 }
 
 export function bindingDefaults(): BindingDefaults<Renderable, KeyEvent> {

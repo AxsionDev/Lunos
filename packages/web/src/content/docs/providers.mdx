@@ -10,14 +10,14 @@ Lunos uses the [AI SDK](https://ai-sdk.dev/) and [Models.dev](https://models.dev
 
 To add a provider you need to:
 
-1. Add the API keys for the provider using the `/connect` command.
+1. Add the API keys for the provider using the `/providers` command.
 2. Configure the provider in your Lunos config.
 
 ---
 
 ### Credentials
 
-When you add a provider's API keys with the `/connect` command, they are stored
+When you add a provider's API keys with the `/providers` command, they are stored
 in `~/.local/share/opencode/auth.json`.
 
 ---
@@ -93,10 +93,10 @@ tested and verified to work well with Lunos. [Learn more](/docs/zen).
 If you are new, we recommend starting with OpenCode Zen.
 :::
 
-1. Run the `/connect` command in the TUI, select `OpenCode Zen`, and head to [opencode.ai/auth](https://opencode.ai/zen).
+1. Run the `/providers` command in the TUI, choose **Add provider**, select `OpenCode Zen`, and head to [opencode.ai/auth](https://opencode.ai/zen).
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Sign in, add your billing details, and copy your API key.
@@ -125,10 +125,10 @@ It works like any other provider in Lunos and is completely optional to use.
 OpenCode Go is a low cost subscription plan that provides reliable access to popular open coding models provided by the OpenCode team that have been
 tested and verified to work well with Lunos.
 
-1. Run the `/connect` command in the TUI, select `OpenCode Go`, and head to [opencode.ai/auth](https://opencode.ai/zen).
+1. Run the `/providers` command in the TUI, choose **Add provider**, select `OpenCode Go`, and head to [opencode.ai/auth](https://opencode.ai/zen).
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Sign in, add your billing details, and copy your API key.
@@ -167,10 +167,10 @@ Don't see a provider here? Submit a PR.
 
 1. Head over to the [302.AI console](https://302.ai/), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **302.AI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **302.AI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your 302.AI API key.
@@ -294,11 +294,11 @@ To use Amazon Bedrock with Lunos:
    #### Authentication Precedence
 
    Amazon Bedrock uses the following authentication priority:
-   1. **Bearer Token** - `AWS_BEARER_TOKEN_BEDROCK` environment variable or token from `/connect` command
+   1. **Bearer Token** - `AWS_BEARER_TOKEN_BEDROCK` environment variable or token from `/providers` command
    2. **AWS Credential Chain** - Profile, access keys, shared credentials, IAM roles, Web Identity Tokens (EKS IRSA), instance metadata
 
    :::note
-   When a bearer token is set (via `/connect` or `AWS_BEARER_TOKEN_BEDROCK`), it takes precedence over all AWS credential methods including configured profiles.
+   When a bearer token is set (via `/providers` or `AWS_BEARER_TOKEN_BEDROCK`), it takes precedence over all AWS credential methods including configured profiles.
    :::
 
 3. Run the `/models` command to select the model you want.
@@ -331,10 +331,10 @@ For custom inference profiles, use the model and provider name in the key and se
 
 ### Anthropic
 
-1. Once you've signed up, run the `/connect` command and select Anthropic.
+1. Once you've signed up, run the `/providers` command, choose **Add provider**, and select Anthropic.
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Here you can select the **Claude Pro/Max** option and it'll open your browser
@@ -424,10 +424,10 @@ If you encounter "I'm sorry, but I cannot assist with that request" errors, try 
    The deployment name must match the model name for opencode to work properly.
    :::
 
-3. Run the `/connect` command and search for **Azure**.
+3. Run the `/providers` command, choose **Add provider**, and search for **Azure**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 4. Enter your API key.
@@ -459,7 +459,7 @@ If you encounter "I'm sorry, but I cannot assist with that request" errors, try 
 
 #### Microsoft Entra ID (Azure CLI)
 
-You can use your Azure CLI session instead of an API key. [Install the Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli), run `az login`, then run `/connect`, select **Azure**, and choose **Microsoft Entra ID (Azure CLI)**. Enter the Azure Resource name when prompted. Use `az login --tenant TENANT_ID` if the Resource belongs to a different tenant.
+You can use your Azure CLI session instead of an API key. [Install the Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli), run `az login`, then run `/providers`, select **Azure**, and choose **Microsoft Entra ID (Azure CLI)**. Enter the Azure Resource name when prompted. Use `az login --tenant TENANT_ID` if the Resource belongs to a different tenant.
 
 Find the Resource name by opening your Azure OpenAI or Foundry Resource in the [Azure portal](https://portal.azure.com/) or [Microsoft Foundry](https://ai.azure.com/). It is also the first part of the endpoint: `my-models` in `https://my-models.openai.azure.com/` or `https://my-models.services.ai.azure.com/`. If your identity can list Resources, you can also find their names and Resource groups with:
 
@@ -502,10 +502,10 @@ Assign your identity the inference role required by the deployment: **Cognitive 
    The deployment name must match the model name for opencode to work properly.
    :::
 
-3. Run the `/connect` command and search for **Azure Cognitive Services**.
+3. Run the `/providers` command, choose **Add provider**, and search for **Azure Cognitive Services**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 4. Enter your API key.
@@ -541,10 +541,10 @@ Assign your identity the inference role required by the deployment: **Cognitive 
 
 1. Head over to the [Baseten](https://app.baseten.co/), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **Baseten**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Baseten**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Baseten API key.
@@ -568,10 +568,10 @@ Assign your identity the inference role required by the deployment: **Cognitive 
 
 1. Head over to the [Cerebras console](https://inference.cerebras.ai/), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **Cerebras**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Cerebras**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Cerebras API key.
@@ -597,10 +597,10 @@ Cloudflare AI Gateway lets you access models from OpenAI, Anthropic, Workers AI,
 
 1. Head over to the [Cloudflare dashboard](https://dash.cloudflare.com/), navigate to **AI** > **AI Gateway**, and create a new gateway. Note your **Account ID** and **Gateway ID**.
 
-2. Run the `/connect` command and search for **Cloudflare AI Gateway**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Cloudflare AI Gateway**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your **Account ID** when prompted.
@@ -652,7 +652,7 @@ Cloudflare AI Gateway lets you access models from OpenAI, Anthropic, Workers AI,
    }
    ```
 
-   Alternatively, you can set environment variables instead of using `/connect`.
+   Alternatively, you can set environment variables instead of using `/providers`.
 
    ```bash title="~/.bash_profile"
    export CLOUDFLARE_ACCOUNT_ID=your-32-character-account-id
@@ -668,10 +668,10 @@ Cloudflare Workers AI lets you run AI models on Cloudflare's global network dire
 
 1. Head over to the [Cloudflare dashboard](https://dash.cloudflare.com/), navigate to **Workers AI**, and select **Use REST API** to get your **Account ID** and create an API token.
 
-2. Run the `/connect` command and search for **Cloudflare Workers AI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Cloudflare Workers AI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your **Account ID** when prompted.
@@ -698,7 +698,7 @@ Cloudflare Workers AI lets you run AI models on Cloudflare's global network dire
    /models
    ```
 
-   Alternatively, you can set environment variables instead of using `/connect`.
+   Alternatively, you can set environment variables instead of using `/providers`.
 
    ```bash title="~/.bash_profile"
    export CLOUDFLARE_ACCOUNT_ID=your-32-character-account-id
@@ -711,10 +711,10 @@ Cloudflare Workers AI lets you run AI models on Cloudflare's global network dire
 
 1. Head over to the [Cortecs console](https://cortecs.ai/), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **Cortecs**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Cortecs**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Cortecs API key.
@@ -738,10 +738,10 @@ Cloudflare Workers AI lets you run AI models on Cloudflare's global network dire
 
 1. Head over to the [DeepSeek console](https://platform.deepseek.com/), create an account, and click **Create new API key**.
 
-2. Run the `/connect` command and search for **DeepSeek**.
+2. Run the `/providers` command, choose **Add provider**, and search for **DeepSeek**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your DeepSeek API key.
@@ -765,10 +765,10 @@ Cloudflare Workers AI lets you run AI models on Cloudflare's global network dire
 
 1. Head over to the [Deep Infra dashboard](https://deepinfra.com/dash), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **Deep Infra**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Deep Infra**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Deep Infra API key.
@@ -799,10 +799,10 @@ Lunos supports two authentication methods:
 
 #### OAuth (Recommended)
 
-1. Run the `/connect` command and search for **DigitalOcean**.
+1. Run the `/providers` command, choose **Add provider**, and search for **DigitalOcean**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Select **Login with DigitalOcean**.
@@ -831,7 +831,7 @@ Lunos supports two authentication methods:
    /models
    ```
 
-5. To pick up newly created Inference Routers, re-run `/connect` and select **DigitalOcean** again.
+5. To pick up newly created Inference Routers, re-run `/providers` and select **DigitalOcean** again.
 
 #### Using a Model Access Key
 
@@ -839,7 +839,7 @@ If you'd rather paste a key directly:
 
 1. Head over to the **Manage** page in the Inference section of the [DigitalOcean console](https://cloud.digitalocean.com/) and create a new key.
 
-2. Run the `/connect` command and select **DigitalOcean**, then **Paste Model Access Key**.
+2. Run the `/providers` command, choose **Add provider**, and select **DigitalOcean**, then **Paste Model Access Key**.
 
    ```txt
    ┌ Enter your DigitalOcean Model Access Key
@@ -880,10 +880,10 @@ Selecting a router model is a drop-in replacement for any other model — Lunos 
 
 1. Head over to the [Eden AI platform](https://app.edenai.run/user/register) to create an account and generate an API key.
 
-2. Run the `/connect` command and search for **Eden AI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Eden AI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Eden AI API key.
@@ -926,10 +926,10 @@ Selecting a router model is a drop-in replacement for any other model — Lunos 
 
 1. Head over to the [FrogBot dashboard](https://app.frogbot.ai/signup), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **FrogBot**.
+2. Run the `/providers` command, choose **Add provider**, and search for **FrogBot**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your FrogBot API key.
@@ -953,10 +953,10 @@ Selecting a router model is a drop-in replacement for any other model — Lunos 
 
 1. Head over to the [Fireworks AI console](https://app.fireworks.ai/), create an account, and click **Create API Key**.
 
-2. Run the `/connect` command and search for **Fireworks AI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Fireworks AI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Fireworks AI API key.
@@ -993,10 +993,10 @@ See [GitLab Duo Agent Platform prerequisites](https://docs.gitlab.com/user/duo_a
 for full requirements.
 :::
 
-1. Run the `/connect` command and select GitLab.
+1. Run the `/providers` command, choose **Add provider**, and select GitLab.
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Choose your authentication method:
@@ -1159,10 +1159,10 @@ Some models might need a [Pro+
 subscription](https://github.com/features/copilot/plans) to use.
 :::
 
-1. Run the `/connect` command and search for GitHub Copilot.
+1. Run the `/providers` command, choose **Add provider**, and search for GitHub Copilot.
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Navigate to [github.com/login/device](https://github.com/login/device) and enter the code.
@@ -1191,10 +1191,10 @@ To use GMI Cloud with Lunos:
 
 1. Head over to the [GMI Cloud console](https://console.gmicloud.ai/) to create an API key. You can also review the [API reference](https://docs.gmicloud.ai/inference-engine/api-reference/llm-api-reference) for the endpoint details.
 
-2. Run the `/connect` command and search for **GMI Cloud**.
+2. Run the `/providers` command, choose **Add provider**, and search for **GMI Cloud**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your GMI Cloud API key.
@@ -1262,10 +1262,10 @@ The `global` region improves availability and reduces errors at no extra cost. U
 
 1. Head over to the [Groq console](https://console.groq.com/), click **Create API Key**, and copy the key.
 
-2. Run the `/connect` command and search for Groq.
+2. Run the `/providers` command, choose **Add provider**, and search for Groq.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter the API key for the provider.
@@ -1291,10 +1291,10 @@ The `global` region improves availability and reduces errors at no extra cost. U
 
 1. Head over to [Hugging Face settings](https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained) to create a token with permission to make calls to Inference Providers.
 
-2. Run the `/connect` command and search for **Hugging Face**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Hugging Face**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Hugging Face token.
@@ -1320,10 +1320,10 @@ The `global` region improves availability and reduces errors at no extra cost. U
 
 1. Head over to [Helicone](https://helicone.ai), create an account, and generate an API key from your dashboard.
 
-2. Run the `/connect` command and search for **Helicone**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Helicone**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Helicone API key.
@@ -1471,10 +1471,10 @@ IO.NET offers 17 models optimized for various use cases:
 
 1. Head over to the [IO.NET console](https://ai.io.net/), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **IO.NET**.
+2. Run the `/providers` command, choose **Add provider**, and search for **IO.NET**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your IO.NET API key.
@@ -1534,10 +1534,10 @@ To use Kimi K2 from Moonshot AI:
 
 1. Head over to the [Moonshot AI console](https://platform.moonshot.ai/console), create an account, and click **Create API key**.
 
-2. Run the `/connect` command and search for **Moonshot AI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Moonshot AI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Moonshot API key.
@@ -1561,10 +1561,10 @@ To use Kimi K2 from Moonshot AI:
 
 1. Head over to the [MiniMax API Console](https://platform.minimax.io/login), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **MiniMax**.
+2. Run the `/providers` command, choose **Add provider**, and search for **MiniMax**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your MiniMax API key.
@@ -1594,10 +1594,10 @@ To use Kimi K2 from Moonshot AI:
    wk-<id>.ws-<secret>
    ```
 
-3. Run the `/connect` command, search for **Modal**, and enter the combined proxy token.
+3. Run the `/providers` command, choose **Add provider**, search for **Modal**, and enter the combined proxy token.
 
    ```txt
-   /connect
+   /providers
    ```
 
 4. Run the `/models` command to select one of the endpoints in your Modal workspace.
@@ -1614,10 +1614,10 @@ NVIDIA provides access to Nemotron models and many other open models through [bu
 
 1. Head over to [build.nvidia.com](https://build.nvidia.com), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **NVIDIA**.
+2. Run the `/providers` command, choose **Add provider**, and search for **NVIDIA**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your NVIDIA API key.
@@ -1666,10 +1666,10 @@ export NVIDIA_API_KEY=nvapi-your-key-here
 
 1. Head over to the [Nebius Token Factory console](https://tokenfactory.nebius.com/), create an account, and click **Add Key**.
 
-2. Run the `/connect` command and search for **Nebius Token Factory**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Nebius Token Factory**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Nebius Token Factory API key.
@@ -1741,10 +1741,10 @@ To use Ollama Cloud with Lunos:
 
 3. Copy the API key for use in Lunos.
 
-4. Run the `/connect` command and search for **Ollama Cloud**.
+4. Run the `/providers` command, choose **Add provider**, and search for **Ollama Cloud**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 5. Enter your Ollama Cloud API key.
@@ -1774,10 +1774,10 @@ To use Ollama Cloud with Lunos:
 
 We recommend signing up for [ChatGPT Plus or Pro](https://chatgpt.com/pricing).
 
-1. Once you've signed up, run the `/connect` command and select OpenAI.
+1. Once you've signed up, run the `/providers` command, choose **Add provider**, and select OpenAI.
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Here you can select the **ChatGPT Plus/Pro** option and it'll open your browser
@@ -1813,10 +1813,10 @@ OpenCode Zen is a list of tested and verified models provided by the OpenCode te
 
 1. Sign in to **<a href={console}>OpenCode Zen</a>** and click **Create API Key**.
 
-2. Run the `/connect` command and search for **OpenCode Zen**.
+2. Run the `/providers` command, choose **Add provider**, and search for **OpenCode Zen**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Lunos API key.
@@ -1840,10 +1840,10 @@ OpenCode Zen is a list of tested and verified models provided by the OpenCode te
 
 1. Head over to the [OpenRouter dashboard](https://openrouter.ai/settings/keys), click **Create API Key**, and copy the key.
 
-2. Run the `/connect` command and search for OpenRouter.
+2. Run the `/providers` command, choose **Add provider**, and search for OpenRouter.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter the API key for the provider.
@@ -1904,10 +1904,10 @@ OpenCode Zen is a list of tested and verified models provided by the OpenCode te
 
 1. Head over to the [LLM Gateway dashboard](https://llmgateway.io/dashboard), click **Create API Key**, and copy the key.
 
-2. Run the `/connect` command and search for LLM Gateway.
+2. Run the `/providers` command, choose **Add provider**, and search for LLM Gateway.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter the API key for the provider.
@@ -1974,10 +1974,10 @@ OpenCode Zen is a list of tested and verified models provided by the OpenCode te
 
 1. Head over to [platform.poolside.ai](https://platform.poolside.ai), sign in, open the **API Keys** tab, and click **New key** to generate an API key.
 
-2. Run the `/connect` command and search for **Poolside**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Poolside**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Poolside API key.
@@ -2042,10 +2042,10 @@ SAP AI Core provides access to 40+ models from OpenAI, Anthropic, Google, Amazon
    The service key is a JSON object containing `clientid`, `clientsecret`, `url`, and `serviceurls.AI_API_URL`. You can find your AI Core instance under **Services** > **Instances and Subscriptions** in the BTP Cockpit.
    :::
 
-2. Run the `/connect` command and search for **SAP AI Core**.
+2. Run the `/providers` command, choose **Add provider**, and search for **SAP AI Core**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your service key JSON.
@@ -2097,10 +2097,10 @@ STACKIT AI Model Serving provides fully managed sovereign hosting environment fo
    You need a STACKIT customer account, user account, and project before creating auth tokens.
    :::
 
-2. Run the `/connect` command and search for **STACKIT**.
+2. Run the `/providers` command, choose **Add provider**, and search for **STACKIT**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your STACKIT AI Model Serving auth token.
@@ -2124,10 +2124,10 @@ STACKIT AI Model Serving provides fully managed sovereign hosting environment fo
 
 1. Head over to the [OVHcloud panel](https://ovh.com/manager). Navigate to the `Public Cloud` section, `AI & Machine Learning` > `AI Endpoints` and in `API Keys` tab, click **Create a new API key**.
 
-2. Run the `/connect` command and search for **OVHcloud AI Endpoints**.
+2. Run the `/providers` command, choose **Add provider**, and search for **OVHcloud AI Endpoints**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your OVHcloud AI Endpoints API key.
@@ -2153,10 +2153,10 @@ To use [Scaleway Generative APIs](https://www.scaleway.com/en/docs/generative-ap
 
 1. Head over to the [Scaleway Console IAM settings](https://console.scaleway.com/iam/api-keys) to generate a new API key.
 
-2. Run the `/connect` command and search for **Scaleway**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Scaleway**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Scaleway API key.
@@ -2182,10 +2182,10 @@ To use [Scaleway Generative APIs](https://www.scaleway.com/en/docs/generative-ap
 
 1. Head over to the [SCX.ai platform](https://platform.scx.ai) to create an account and generate an API key.
 
-2. Run the `/connect` command and search for **SCX.ai**.
+2. Run the `/providers` command, choose **Add provider**, and search for **SCX.ai**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your SCX.ai API key.
@@ -2220,10 +2220,10 @@ Lunos supports two authentication methods:
 
 #### Browser OAuth (Recommended)
 
-1. Run the `/connect` command and search for **Snowflake Cortex**.
+1. Run the `/providers` command, choose **Add provider**, and search for **Snowflake Cortex**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Select **Login with Snowflake (External Browser)**.
@@ -2271,7 +2271,7 @@ If you prefer to paste a token directly, or if `SNOWFLAKE$LOCAL_APPLICATION` is 
 
 1. Generate a [Programmatic Access Token (PAT)](https://docs.snowflake.com/en/user-guide/programmatic-access-tokens) in your Snowflake account.
 
-2. Run the `/connect` command, search for **Snowflake Cortex**, and select **Paste PAT or bearer token manually**.
+2. Run the `/providers` command, choose **Add provider**, search for **Snowflake Cortex**, and select **Paste PAT or bearer token manually**.
 
 3. Enter your [account identifier](https://docs.snowflake.com/en/user-guide/admin-account-identifier) when prompted.
 
@@ -2293,7 +2293,7 @@ export SNOWFLAKE_CORTEX_TOKEN=your-pat-or-jwt
 ```
 
 :::note
-`SNOWFLAKE_CORTEX_TOKEN` accepts a PAT or JWT only — the browser OAuth flow is available via `/connect` only and cannot be configured through an environment variable. `SNOWFLAKE_CORTEX_PAT` is still supported for backward compatibility.
+`SNOWFLAKE_CORTEX_TOKEN` accepts a PAT or JWT only — the browser OAuth flow is available via `/providers` only and cannot be configured through an environment variable. `SNOWFLAKE_CORTEX_PAT` is still supported for backward compatibility.
 :::
 
 The model catalog is provided automatically. A minimal `opencode.json` is all that's needed:
@@ -2312,10 +2312,10 @@ The model catalog is provided automatically. A minimal `opencode.json` is all th
 
 1. Head over to the [Together AI console](https://api.together.ai), create an account, and click **Add Key**.
 
-2. Run the `/connect` command and search for **Together AI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Together AI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Together AI API key.
@@ -2339,10 +2339,10 @@ The model catalog is provided automatically. A minimal `opencode.json` is all th
 
 1. Head over to the [Venice AI console](https://venice.ai), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **Venice AI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Venice AI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Venice AI API key.
@@ -2368,10 +2368,10 @@ Vercel AI Gateway lets you access models from OpenAI, Anthropic, Google, xAI, an
 
 1. Head over to the [Vercel dashboard](https://vercel.com/), navigate to the **AI Gateway** tab, and click **API keys** to create a new API key.
 
-2. Run the `/connect` command and search for **Vercel AI Gateway**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Vercel AI Gateway**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter your Vercel AI Gateway API key.
@@ -2424,10 +2424,10 @@ Two ways to authenticate: a SuperGrok subscription via device-code OAuth or a pa
 
 #### Option A — SuperGrok subscription
 
-1. Run the `/connect` command and search for **xAI**.
+1. Run the `/providers` command, choose **Add provider**, and search for **xAI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 2. Select **SuperGrok Subscription**. Lunos opens xAI's verification link with the user code pre-populated when supported.
@@ -2446,10 +2446,10 @@ Lunos refreshes the OAuth access token automatically. Any Grok or X Premium plan
 
 1. Head over to the [xAI console](https://console.x.ai/), create an account, and generate an API key.
 
-2. Run the `/connect` command and search for **xAI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **xAI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Select **Manually enter API Key** and paste your xAI API key.
@@ -2473,10 +2473,10 @@ Lunos refreshes the OAuth access token automatically. Any Grok or X Premium plan
 
 1. Head over to the [Z.AI API console](https://z.ai/manage-apikey/apikey-list), create an account, and click **Create a new API key**.
 
-2. Run the `/connect` command and search for **Z.AI**.
+2. Run the `/providers` command, choose **Add provider**, and search for **Z.AI**.
 
    ```txt
-   /connect
+   /providers
    ```
 
    If you are subscribed to the **GLM Coding Plan**, select **Z.AI Coding Plan**.
@@ -2502,10 +2502,10 @@ Lunos refreshes the OAuth access token automatically. Any Grok or X Premium plan
 
 1. Head over to the [ZenMux dashboard](https://zenmux.ai/settings/keys), click **Create API Key**, and copy the key.
 
-2. Run the `/connect` command and search for ZenMux.
+2. Run the `/providers` command, choose **Add provider**, and search for ZenMux.
 
    ```txt
-   /connect
+   /providers
    ```
 
 3. Enter the API key for the provider.
@@ -2542,16 +2542,16 @@ Lunos refreshes the OAuth access token automatically. Any Grok or X Premium plan
 
 ## Custom provider
 
-To add any **OpenAI-compatible** provider that's not listed in the `/connect` command:
+To add any **OpenAI-compatible** provider that's not listed in the `/providers` command:
 
 :::tip
 You can use any OpenAI-compatible provider with opencode. Most modern AI providers offer OpenAI-compatible APIs.
 :::
 
-1. Run the `/connect` command and scroll down to **Other**.
+1. Run the `/providers` command, choose **Add provider**, and scroll down to **Other**.
 
    ```bash
-   $ /connect
+   $ /providers
 
    ┌  Add credential
    │
@@ -2564,7 +2564,7 @@ You can use any OpenAI-compatible provider with opencode. Most modern AI provide
 2. Enter a unique ID for the provider.
 
    ```bash
-   $ /connect
+   $ /providers
 
    ┌  Add credential
    │
@@ -2580,7 +2580,7 @@ You can use any OpenAI-compatible provider with opencode. Most modern AI provide
 3. Enter your API key for the provider.
 
    ```bash
-   $ /connect
+   $ /providers
 
    ┌  Add credential
    │
@@ -2680,6 +2680,6 @@ If you are having trouble with configuring a provider, check the following:
    This doesn't apply to providers like Amazon Bedrock, that rely on environment variables for their auth.
 
 2. For custom providers, check the opencode config and:
-   - Make sure the provider ID used in the `/connect` command matches the ID in your opencode config.
+   - Make sure the provider ID used in the `/providers` command matches the ID in your opencode config.
    - The right npm package is used for the provider. For example, use `@ai-sdk/cerebras` for Cerebras. And for all other OpenAI-compatible providers, use `@ai-sdk/openai-compatible` (for `/v1/chat/completions`); if a model uses `/v1/responses`, use `@ai-sdk/openai`. For mixed setups under one provider, you can override per model via `provider.npm`.
    - Check correct API endpoint is used in the `options.baseURL` field.
