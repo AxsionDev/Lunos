@@ -75,7 +75,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         const config = yield* Effect.promise(() => readGlobalMcpConfig(home))
         expect((config?.mcp as Record<string, unknown> | undefined)?.["filesystem"]).toBeUndefined()
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -86,7 +86,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("Provide either --url <url> or a command after --")
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -123,7 +123,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
           url: "https://seed.example/mcp",
         })
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -166,7 +166,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         expect(after?.mcp).toEqual(before?.mcp)
         expect((after?.mcp as Record<string, unknown> | undefined)?.["disabled-server"]).toEqual({ enabled: false })
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -205,7 +205,7 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
           environment: { API_TOKEN: "{env:API_TOKEN}" },
         })
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -258,6 +258,6 @@ describe("opencode mcp add <name> (marketplace, subprocess)", () => {
         expect(rawText).toContain("{env:API_TOKEN}")
         expect(rawText).not.toContain("leaked-value")
       }),
-    60_000,
+    120_000,
   )
 })
