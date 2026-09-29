@@ -11,7 +11,7 @@ import {
   InstallationVersion,
   manualInstallCommand,
   newVersionMessage,
-  UPDATE_RESTART_HINT,
+  updateRestartHint,
 } from "@opencode-ai/core/installation/version"
 import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
@@ -96,6 +96,15 @@ import * as TuiAudio from "./audio"
 import { win32DisableProcessedInput, win32FlushInputBuffer } from "./terminal-win32"
 import { destroyRenderer } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
+import {
+  restartBanner,
+  restartBusyMessage,
+  restartDraft,
+  type RestartChoice,
+  type RestartHost,
+  type Restarted,
+} from "./util/restart"
+import { DialogSelect } from "./ui/dialog-select"
 
 registerOpencodeSpinner()
 
@@ -140,6 +149,7 @@ const appBindingCommands = [
   "app.debug",
   "app.console",
   "app.heap_snapshot",
+  "app.restart",
   "terminal.suspend",
   "terminal.title.toggle",
   "app.toggle.animations",
@@ -161,6 +171,12 @@ export type TuiInput = {
   headers?: RequestInit["headers"]
   events?: EventSource
   pluginHost: TuiPluginHost
+  /** XCOD-129: offers `/restart`, and receives the request once the user confirms it. */
+  restart?: RestartHost
+  /** XCOD-129: set when this process is the relaunch of a `/restart`. */
+  restarted?: Restarted & { sessionID?: string }
+  /** Called once the TUI has loaded its data: a relaunch counts as started from here. */
+  onStarted?: () => void
 }
 
 function errorMessage(error: unknown) {
@@ -180,7 +196,15 @@ function errorMessage(error: unknown) {
 
 export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
   const global = yield* Global.Service
-  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown }
+  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown, restarting: false }
+  // XCOD-129: a restart replaces this process, so the "continue with lunos -s" epilogue is noise.
+  const restartHost: RestartHost | undefined = input.restart && {
+    ...input.restart,
+    request: (request) => {
+      exit.restarting = true
+      input.restart?.request(request)
+    },
+  }
   const result = yield* Effect.scoped(
     Effect.gen(function* () {
       const renderer = yield* Effect.acquireRelease(
@@ -314,6 +338,9 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                       onSnapshot={input.onSnapshot}
                                                                       onListening={input.onListening}
                                                                       pluginHost={input.pluginHost}
+                                                                      restart={restartHost}
+                                                                      restarted={input.restarted}
+                                                                      onStarted={input.onStarted}
                                                                     />
                                                                   </LocationProvider>
                                                                 </EditorContextProvider>
@@ -356,11 +383,18 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       process.stderr.write((cliErrorMessage(result.reason) ?? errorFormat(result.reason)) + "\n")
       process.exitCode = 1
     }
-    if (result.epilogue) process.stdout.write(result.epilogue + "\n")
+    if (result.epilogue && !exit.restarting) process.stdout.write(result.epilogue + "\n")
   })
 })
 
-function App(props: { onSnapshot?: () => Promise<string[]>; onListening?: () => void; pluginHost: TuiPluginHost }) {
+function App(props: {
+  onSnapshot?: () => Promise<string[]>
+  onListening?: () => void
+  pluginHost: TuiPluginHost
+  restart?: RestartHost
+  restarted?: Restarted & { sessionID?: string }
+  onStarted?: () => void
+}) {
   const startup = useTuiStartup()
   const tuiConfig = useTuiConfig()
   const route = useRoute()
@@ -507,9 +541,27 @@ function App(props: { onSnapshot?: () => Promise<string[]>; onListening?: () => 
         route.navigate({
           type: "session",
           sessionID: args.sessionID,
+          // XCOD-129: after /restart, the unsent prompt comes back with the session.
+          prompt: props.restarted?.draft,
         })
+      } else if (props.restarted?.draft) {
+        route.navigate({ type: "home", prompt: props.restarted.draft })
       }
     })
+    if (props.restarted)
+      toast.show({
+        variant: "success",
+        message: restartBanner(props.restarted, InstallationVersion),
+        duration: 8000,
+      })
+  })
+
+  // XCOD-129: a relaunch has started once its data is loaded; a later error is an ordinary one.
+  let started = false
+  createEffect(() => {
+    if (started || sync.status !== "complete") return
+    started = true
+    props.onStarted?.()
   })
 
   let continued = false
@@ -570,6 +622,118 @@ function App(props: { onSnapshot?: () => Promise<string[]>; onListening?: () => 
     if (workspace?.type !== "worktree" || !workspace.directory) return
     return workspace
   })
+  // XCOD-129: /restart. Set by /update, so the restart runs the newly installed version.
+  const [upgradedTo, setUpgradedTo] = createSignal<string | undefined>()
+  // While "wait for the current turn" is pending; running /restart again cancels it.
+  const [restartPending, setRestartPending] = createSignal<{ cancel: () => void } | undefined>()
+
+  const busySessionIDs = () =>
+    Object.entries(sync.data.session_status)
+      .filter(([, status]) => status && status.type !== "idle")
+      .map(([id]) => id)
+
+  // Every job, not only this session's: shutting the worker down stops all of them.
+  async function runningJobs() {
+    const result = await sdk.client.experimental.background.list().catch(() => undefined)
+    return (result?.data ?? []).filter((job) => job.status === "running")
+  }
+
+  async function settled(timeout: number | undefined, cancelled: () => boolean) {
+    const deadline = timeout === undefined ? undefined : Date.now() + timeout
+    while (!cancelled()) {
+      if (busySessionIDs().length === 0 && (await runningJobs()).length === 0) return true
+      if (deadline !== undefined && Date.now() > deadline) return false
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+    return false
+  }
+
+  async function restart(fresh: boolean) {
+    const host = props.restart
+    if (!host) {
+      toast.show({ variant: "warning", message: "Restart isn't available in this client." })
+      return
+    }
+    const pending = restartPending()
+    if (pending) {
+      pending.cancel()
+      toast.show({ variant: "info", message: "Restart cancelled." })
+      return
+    }
+    const draft = restartDraft(promptRef.current?.current)
+    const cancelled: string[] = []
+
+    // Attached to a server this client doesn't own: the turn and its jobs run there and carry on.
+    if (!host.attach) {
+      const jobs = await runningJobs()
+      const message = restartBusyMessage({ busySessions: busySessionIDs().length, runningJobs: jobs.map((j) => j.id) })
+      if (message) {
+        const choice = await new Promise<RestartChoice>((resolve) => {
+          dialog.replace(
+            () => (
+              <DialogSelect<RestartChoice>
+                title="Restart Lunos?"
+                placeholder={message}
+                skipFilter
+                options={[
+                  { title: "Wait for the current turn, then restart", value: "wait" },
+                  { title: "Stop and restart (cancels running work)", value: "stop" },
+                  { title: "Cancel", value: "cancel" },
+                ]}
+                onSelect={(option) => {
+                  resolve(option.value)
+                  dialog.clear()
+                }}
+              />
+            ),
+            () => resolve("cancel"),
+          )
+        })
+        if (choice === "cancel") return
+        if (choice === "wait") {
+          let stop = false
+          setRestartPending({ cancel: () => (stop = true) })
+          toast.show({
+            variant: "info",
+            message: "Lunos will restart when the current work finishes. Run /restart again to cancel.",
+            duration: 8000,
+          })
+          const done = await settled(undefined, () => stop)
+          setRestartPending(undefined)
+          if (!done) return
+        }
+        if (choice === "stop") {
+          const busy = busySessionIDs()
+          if (busy.length) cancelled.push(busy.length === 1 ? "the current turn" : `${busy.length} running turns`)
+          for (const job of jobs) cancelled.push(`background job ${job.title ?? job.id}`)
+          await Promise.all([
+            ...busy.map((sessionID) => sdk.client.session.abort({ sessionID }).catch(() => {})),
+            ...jobs.map((job) => sdk.client.experimental.background.cancel({ jobID: job.id }).catch(() => {})),
+          ])
+          // Never restart while a tool may still be writing: wait until the aborted work has
+          // actually stopped, and give up (without restarting) if it doesn't.
+          if (!(await settled(15_000, () => false))) {
+            toast.show({
+              variant: "error",
+              message: "The running work didn't stop within 15s, so Lunos didn't restart. Try /restart again.",
+              duration: 8000,
+            })
+            return
+          }
+        }
+      }
+    }
+
+    const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
+    host.request({ sessionID: fresh ? undefined : sessionID, fresh, draft, cancelled, upgraded: upgradedTo() })
+    if (host.attach)
+      toast.show({
+        variant: "info",
+        message: `Restarting this client only; the server at ${host.attach} keeps running.`,
+      })
+    exit()
+  }
+
   const appCommands = createMemo(() =>
     [
       {
@@ -889,6 +1053,30 @@ function App(props: { onSnapshot?: () => Promise<string[]>; onListening?: () => 
         },
         category: "System",
       },
+      ...(props.restart
+        ? [
+            {
+              name: "app.restart",
+              title: "Restart Lunos",
+              desc: props.restart.attach ? "Restart this client (the server keeps running)" : undefined,
+              slashName: "restart",
+              run: () => {
+                dialog.clear()
+                void restart(false)
+              },
+              category: "System",
+            },
+            {
+              name: "app.restart.fresh",
+              title: "Restart Lunos in a new session",
+              run: () => {
+                dialog.clear()
+                void restart(true)
+              },
+              category: "System",
+            },
+          ]
+        : []),
       {
         name: "app.exit",
         title: "Exit the app",
@@ -1127,13 +1315,13 @@ function App(props: { onSnapshot?: () => Promise<string[]>; onListening?: () => 
     }
 
     setAvailableVersion(undefined)
+    setUpgradedTo(result.data.version)
+    // XCOD-129: the app stays open; /restart relaunches the new version back in this session.
     await DialogAlert.show(
       dialog,
       "Update Complete",
-      `Updated to Lunos v${result.data.version}. ${UPDATE_RESTART_HINT}`,
+      `Updated to Lunos v${result.data.version}. ${updateRestartHint(result.data.version)}`,
     )
-
-    void exit()
   }
 
   event.on("installation.update-available", async (evt) => {

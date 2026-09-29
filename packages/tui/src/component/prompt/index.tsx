@@ -59,6 +59,7 @@ import { usePromptWorkspace } from "./workspace"
 import { usePromptMove } from "./move"
 import { readLocalAttachment } from "./local-attachment"
 import { useLocation } from "../../context/location"
+import { parseRestartSlash } from "../../util/restart"
 
 registerOpencodeSpinner()
 
@@ -966,6 +967,15 @@ export function Prompt(props: PromptProps) {
       input.clear()
       setStore("prompt", { input: "", parts: [] })
       dialog.replace(() => <DialogMemory />)
+      return false
+    }
+    // XCOD-129: `/restart --fresh` has an argument, so the slash list can't run it; neither goes
+    // to the server as a prompt.
+    const restartSlash = parseRestartSlash(store.prompt.input)
+    if (restartSlash) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      keymap.dispatchCommand(restartSlash.fresh ? "app.restart.fresh" : "app.restart")
       return false
     }
     const agent = local.mode.current()

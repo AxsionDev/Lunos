@@ -18,6 +18,18 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **`/restart`** stops Lunos and starts it again, back in the same session with your unsent prompt
+  kept; `/restart --fresh` starts a new session. It stops MCP servers, LSP servers, the memory
+  sidecar and the local server first, and relaunches with the same arguments, directory and
+  environment. After `/update` it runs the newly installed version (the banner shows old → new), and
+  the "Update Complete" alert now says `Run /restart to use X.Y.Z.` instead of closing Lunos. If the
+  agent is mid-turn or background jobs are running it asks first (wait, stop and restart, or
+  cancel). In `lunos attach` only the client restarts. A relaunch that fails to start prints the
+  error and the command to run by hand, and is never retried. Also in the palette as **Restart
+  Lunos**, with an unbound `app_restart` keybind (XCOD-129).
+
 ### Changed
 
 - **`/connect` is now `/providers`,** the same word as the `lunos providers` CLI command. It opens

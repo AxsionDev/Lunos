@@ -37,6 +37,7 @@ import { AuditCommand } from "./cli/cmd/audit"
 import { MemoryCommand } from "./cli/cmd/memory"
 import { Heap } from "./cli/heap"
 import { brandHelp } from "./cli/brand"
+import { Restart } from "./cli/restart"
 
 const args = hideBin(process.argv)
 
@@ -194,6 +195,8 @@ try {
   }
   process.exitCode = 1
 } finally {
+  // XCOD-129: a relaunch after /restart that failed to start says how to start Lunos by hand.
+  if (process.exitCode) Restart.reportFailedStart()
   // Some subprocesses don't react properly to SIGTERM and similar signals.
   // Most notably, some docker-container-based MCP servers don't handle such signals unless
   // run using `docker run --init`.

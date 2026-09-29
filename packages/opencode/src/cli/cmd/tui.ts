@@ -14,6 +14,8 @@ import { writeHeapSnapshot } from "v8"
 import { ServerAuth } from "@/server/auth"
 import { validateSession } from "../tui/validate-session"
 import { win32InstallCtrlCGuard } from "@opencode-ai/tui/terminal-win32"
+import type { RestartRequest } from "@opencode-ai/tui/util/restart"
+import { Restart } from "../restart"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -147,6 +149,8 @@ export const TuiThreadCommand = cmd({
         hidden: true,
       }),
   handler: async (args) => {
+    // XCOD-129: taken before anything else, so the worker and its children never inherit it.
+    const restarted = Restart.takeHandoff()
     if (args.replay === true) {
       UI.error("--replay is not supported; replay is enabled by default")
       process.exitCode = 1
@@ -198,6 +202,18 @@ export const TuiThreadCommand = cmd({
     }
 
     const unguard = win32InstallCtrlCGuard()
+    let restartRequest: RestartRequest | undefined
+    // A relaunch that hasn't loaded its session within the timeout gives up, once, with the manual
+    // command, rather than hanging on a blank screen.
+    const watchdog = restarted
+      ? setTimeout(() => {
+          Restart.write(Restart.TERMINAL_RESET + "\x1b[?1049l")
+          process.stderr.write(`Lunos didn't finish starting within ${Restart.START_TIMEOUT / 1000}s.\n`)
+          Restart.reportFailedStart()
+          process.exit(1)
+        }, Restart.START_TIMEOUT)
+      : undefined
+    watchdog?.unref?.()
     try {
       const { TuiConfig } = await import("@/config/tui")
       if (args.fork && !args.continue && !args.session) {
@@ -295,6 +311,12 @@ export const TuiThreadCommand = cmd({
             },
             config,
             pluginHost: createLegacyTuiPluginHost(),
+            restart: { request: (request) => (restartRequest = request) },
+            restarted: restarted && { ...restarted },
+            onStarted() {
+              clearTimeout(watchdog)
+              Restart.markStarted()
+            },
             directory: cwd,
             fetch: transport.fetch,
             headers: transport.headers,
@@ -314,10 +336,15 @@ export const TuiThreadCommand = cmd({
         await stop()
       }
     } finally {
+      clearTimeout(watchdog)
       try {
         unguard?.()
       } catch {}
     }
+    if (process.exitCode) Restart.reportFailedStart()
+    // XCOD-129: the TUI has exited and the worker (MCP, LSP, memory sidecar, local server) is shut
+    // down; start Lunos again in its place.
+    else if (restartRequest) await Restart.relaunch(restartRequest)
     process.exit()
   },
 })

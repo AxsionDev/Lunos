@@ -68,14 +68,12 @@ export function restartDraft(prompt: PromptInfo | undefined): PromptInfo | undef
 
 export type RestartChoice = "wait" | "stop" | "cancel"
 
-/** Why the restart has to ask first, or undefined when nothing is running. */
+/** Why the restart has to ask first, or undefined when nothing is running. Kept short: dialog width. */
 export function restartBusyMessage(input: { busySessions: number; runningJobs: string[] }) {
   const parts: string[] = []
   if (input.busySessions > 0) parts.push(input.busySessions === 1 ? "The agent is mid-turn" : "Agents are mid-turn")
-  if (input.runningJobs.length)
-    parts.push(
-      `${input.runningJobs.length} background ${input.runningJobs.length === 1 ? "job is" : "jobs are"} running`,
-    )
+  const jobs = input.runningJobs.length
+  if (jobs) parts.push(`${jobs} background ${jobs === 1 ? "job" : "jobs"} running`)
   if (!parts.length) return
-  return `${parts.join(", and ")}. Restarting now would cut ${parts.length > 1 || input.runningJobs.length > 1 ? "them" : "it"} off.`
+  return parts.join("; ") + "."
 }

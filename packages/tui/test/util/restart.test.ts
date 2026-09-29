@@ -59,11 +59,10 @@ describe("restartBusyMessage (XCOD-129)", () => {
   })
 
   test("names the turn and the jobs", () => {
-    expect(restartBusyMessage({ busySessions: 1, runningJobs: [] })).toBe(
-      "The agent is mid-turn. Restarting now would cut it off.",
-    )
+    expect(restartBusyMessage({ busySessions: 1, runningJobs: [] })).toBe("The agent is mid-turn.")
     expect(restartBusyMessage({ busySessions: 1, runningJobs: ["a", "b"] })).toBe(
-      "The agent is mid-turn, and 2 background jobs are running. Restarting now would cut them off.",
+      "The agent is mid-turn; 2 background jobs running.",
     )
+    expect(restartBusyMessage({ busySessions: 0, runningJobs: ["a"] })).toBe("1 background job running.")
   })
 })

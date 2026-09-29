@@ -3,6 +3,7 @@ export * as Restart from "./restart"
 import fs from "node:fs"
 import path from "node:path"
 import { Global } from "@opencode-ai/core/global"
+import { AuditLog } from "@/audit/log"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import type { Restarted, RestartRequest } from "@opencode-ai/tui/util/restart"
 
@@ -205,6 +206,13 @@ export function reportFailedStart(write: (text: string) => void = (text) => proc
  */
 export const TERMINAL_RESET = "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[?25h"
 
+/** Write straight to the terminal, bypassing buffered streams. */
+export function write(text: string) {
+  try {
+    fs.writeSync(1, text)
+  } catch {}
+}
+
 export type RelaunchDeps = {
   platform: NodeJS.Platform
   execve: (file: string, argv: string[], env: Record<string, string | undefined>) => never | void
@@ -221,6 +229,8 @@ export type RelaunchDeps = {
   /** Error output. */
   error: (text: string) => void
   exit: (code: number) => never | void
+  /** Flush what must not be lost to exec (the audit trail). */
+  flush?: () => Promise<void>
 }
 
 /**
@@ -283,6 +293,7 @@ export async function relaunch(
     return fail(`couldn't save the session handoff (${error instanceof Error ? error.message : String(error)})`)
   }
   env[HANDOFF_ENV] = file
+  await deps.flush?.()
   deps.write(TERMINAL_RESET)
 
   if (deps.platform !== "win32") {
@@ -355,5 +366,8 @@ export function defaultDeps(): RelaunchDeps {
       } catch {}
     },
     exit: (code) => process.exit(code),
+    flush: async () => {
+      await Promise.race([AuditLog.flush(), Bun.sleep(3000)])
+    },
   }
 }

@@ -46,6 +46,7 @@ export const Definitions = {
   leader: keybind(LeaderDefault, "Leader key for keybind combinations"),
 
   app_exit: keybind("ctrl+c,ctrl+d,<leader>q", "Exit the application"),
+  app_restart: keybind("none", "Restart Lunos"),
   app_debug: keybind("none", "Toggle debug panel"),
   app_console: keybind("none", "Toggle console"),
   app_heap_snapshot: keybind("none", "Write heap snapshot"),
@@ -275,6 +276,7 @@ export const Descriptions = Object.fromEntries(
 ) as Record<KeybindName, string>
 export const CommandMap = {
   app_exit: "app.exit",
+  app_restart: "app.restart",
   app_debug: "app.debug",
   app_console: "app.console",
   app_heap_snapshot: "app.heap_snapshot",
