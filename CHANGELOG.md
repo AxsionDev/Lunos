@@ -41,6 +41,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
   nothing is written without `--yes` or approval in the TUI (`ctrl+o` in the memory browser).
   Imported facts keep their original provenance as `origin` and are labelled "imported" when
   recalled. The audit log records each import without its text (XCOD-133).
+- **External memory sources** (`memory.sources`): recall from a Neo4j knowledge graph or an MCP
+  memory server (Graphiti, Cognee, Mem0, the reference `server-memory`…) alongside Lunos's own
+  memory. Sources are read-only and untrusted: each needs a `jurisdiction` the residency policy
+  allows before it is first contacted; results are screened like imports, cut to the source's
+  `max_tokens`, shown in a labelled `<memory-source>` section, and never stored locally. A slow or
+  failing source is skipped after `timeout_ms` (2 s) with a notice. `/memory sources` lists them and
+  turns one off for the session. New audit events `memory.source_query` and `memory.source_denied`
+  (XCOD-135).
 
 ### Security
 

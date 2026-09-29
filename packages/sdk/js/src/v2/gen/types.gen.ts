@@ -1655,6 +1655,31 @@ export type ServerConfig = {
   cors?: Array<string>
 }
 
+export type MemorySourceConfig = {
+  /**
+   * A unique name for the source, e.g. "platform-kg". Shown as the label on everything it returns
+   */
+  name: string
+  /**
+   * "graph": a read-only query against a Neo4j knowledge graph. "mcp": a search tool on an MCP server configured under "mcp"
+   */
+  type: "graph" | "mcp"
+  jurisdiction?: string
+  enabled?: boolean
+  max_tokens?: number
+  timeout_ms?: number
+  trusted?: boolean
+  url?: string
+  database?: string
+  query?: "fulltext" | "contains"
+  index?: string
+  username?: string
+  password?: string
+  server?: string
+  tool?: string
+  argument?: string
+}
+
 export type MemoryConfig = {
   enabled?: boolean
   scope?: Array<"project" | "user">
@@ -1667,6 +1692,7 @@ export type MemoryConfig = {
     max_facts?: number
     max_fact_chars?: number
   }
+  sources?: Array<MemorySourceConfig>
   retention?: {
     days?: number
     grace_days?: number

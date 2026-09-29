@@ -21,6 +21,7 @@ import { MemoryNotes } from "./notes"
 import { MemoryRecall } from "./recall"
 import { MemoryModel } from "./model"
 import { MemorySidecar } from "./sidecar"
+import { MemorySources } from "./sources"
 import { MemoryStore } from "./store"
 import { MemorySwitch } from "./switch"
 
@@ -191,6 +192,7 @@ const layer = Layer.effect(
     const config = yield* Config.Service
     const provider = yield* Provider.Service
     const llm = yield* LLM.Service
+    const sources = yield* MemorySources.Service
     const state = yield* InstanceState.make<State>(
       Effect.fn("Memory.state")(function* (ctx) {
         const state: State = {
@@ -546,23 +548,30 @@ const layer = Layer.effect(
       if (s.recalled.has(input.userMessageID)) return s.recalled.get(input.userMessageID)
       if (!(yield* decision(input.sessionID)).on) return undefined
       const cfg = yield* config.get()
-      const text = yield* search({
-        query: input.query,
-        sessionID: input.sessionID,
-        parent: input.parent,
-        origin: "turn",
-      }).pipe(
-        Effect.tap((results) =>
-          Effect.logInfo("memory recalled", {
-            session: input.sessionID,
-            facts: results.flatMap((result) => result.facts.map((item) => `${result.scope}:${item.fact.id}`)),
-          }),
-        ),
-        Effect.map((results) => MemoryRecall.block(results, cfg.memory?.retrieval?.max_tokens)),
-        Effect.catch((error) =>
-          Effect.logWarning("memory recall failed", { error: error.message }).pipe(Effect.as(undefined)),
-        ),
+      // XCOD-135: local memory and external sources are recalled side by side; either failing
+      // leaves the other's results in the block.
+      const [local, external] = yield* Effect.all(
+        [
+          search({
+            query: input.query,
+            sessionID: input.sessionID,
+            parent: input.parent,
+            origin: "turn",
+          }).pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("memory recall failed", { error: error.message }).pipe(Effect.as([])),
+            ),
+          ),
+          sources.recall({ sessionID: input.sessionID, query: input.query }),
+        ],
+        { concurrency: 2 },
       )
+      yield* Effect.logInfo("memory recalled", {
+        session: input.sessionID,
+        facts: local.flatMap((result) => result.facts.map((item) => `${result.scope}:${item.fact.id}`)),
+        sources: external.labels,
+      })
+      const text = MemoryRecall.block(local, cfg.memory?.retrieval?.max_tokens, external)
       s.recalled.set(input.userMessageID, text)
       return text
     })
@@ -800,6 +809,10 @@ function toError(error: unknown) {
   return error instanceof Error ? error : new Error(String(error))
 }
 
-export const node = LayerNode.make({ service: Service, layer, deps: [Config.node, Provider.node, LLM.node] })
+export const node = LayerNode.make({
+  service: Service,
+  layer,
+  deps: [Config.node, Provider.node, LLM.node, MemorySources.node],
+})
 
 export * as Memory from "."

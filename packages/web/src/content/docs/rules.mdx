@@ -291,6 +291,51 @@ What to know:
 - **The audit log** records each import: the counts and the SHA-256 of what was read, never the text.
 - In the TUI, `ctrl+o` in the `/memory` browser asks for the path and shows the preview. New rows start approved; `enter` approves or rejects one row, `ctrl+a` all of them, and `ctrl+s` imports.
 
+#### External memory sources
+
+Lunos can also recall from knowledge your organisation already keeps: a Neo4j knowledge graph, or an MCP memory server such as Graphiti, Cognee or Mem0. Sources are **read-only**: Lunos never writes to them, and nothing they return is stored in Lunos's memory.
+
+```jsonc title="opencode.json"
+{
+  "memory": {
+    "enabled": true,
+    "sources": [
+      {
+        "name": "platform-kg",
+        "type": "graph",
+        "url": "bolt+s://kg.internal:7687",
+        "query": "fulltext",
+        "username": "{env:KG_USER}",
+        "password": "{env:KG_PASS}",
+        "jurisdiction": "EU-DE",
+        "max_tokens": 500,
+      },
+      {
+        "name": "team-memory",
+        "type": "mcp",
+        "server": "graphiti",
+        "tool": "search_memory_facts",
+        "jurisdiction": "EU-FI",
+        "max_tokens": 500,
+      },
+    ],
+  },
+  "mcp": {
+    "graphiti": { "type": "remote", "url": "https://graphiti.internal/mcp", "enabled": false },
+  },
+}
+```
+
+- **`type: "graph"`** runs two fixed, read-only Cypher queries in read transactions: a full-text search (`query: "fulltext"`, the default; `index` picks the full-text index, otherwise the first one the database has), or `query: "contains"`, which matches node names. Each matching node comes back with its labels, its `description` and its relationships. Use `bolt+s://` or `neo4j+s://`; plain `bolt://` is only allowed to this machine. Give the account read-only rights.
+- **`type: "mcp"`** calls one `tool` on a server configured under `mcp`, with the question as its `argument` (default `query`). Memory opens its own connection to that server, only after the residency check. Set the server's `enabled` to `false` so the agent isn't also given its tools, some of which may write. A tool whose name looks like a write (`add_…`, `delete_…`) or that the server marks as not read-only is refused. A remote server that needs OAuth can't be a source yet; give it `headers` instead.
+- **Recall.** Each turn, every enabled source is asked the same question as local memory. Results appear in the `<memory>` block in a `<memory-source name="…">` section, labelled as untrusted reference, never instructions. Each source gets its own `max_tokens` (default 500), inside `retrieval.max_tokens` overall; sources get at most half of it.
+- **Untrusted by default.** Every result goes through the same secret and instruction-pattern screens as an import. A result that fails is withheld, and the block only says how many were. `trusted: true` is honoured only when [managed config](/docs/config#managed-settings) declares the same source (same type and url, or same server and tool); it then skips the instruction-pattern screen, never the secret screen or the size caps.
+- **Residency.** Each source must declare a `jurisdiction`, like `"EU-DE"`, `"EU"` or `"US"`. Before a source is first contacted, it is checked against your [residency policy](/docs/data-residency). A source without one, or with one the policy doesn't allow, is never contacted, and the denial is written to the audit log.
+- **Failures don't block you.** A source that is slow or failing is skipped after `timeout_ms` (default 2000) with a notice, and tried again on the next turn.
+- **Turning sources off.** `/memory sources` lists every source with how its last query went. `/memory sources off <name>` turns one off for this session, and `/memory sources on <name>` turns it back on. `"enabled": false` turns a source off in config. When memory is off, no source is queried.
+- **Keeping a fact.** To keep something a source said, ask the agent to remember it. It calls `memory_remember` with the source as provenance (`memory source <name>`), and you approve it like any other fact.
+- **The audit log** records each query (source, latency, result and withheld counts) as `memory.source_query`, and each refusal as `memory.source_denied`, never the question or the results.
+
 ---
 
 ## Referencing External Files

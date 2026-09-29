@@ -37,6 +37,10 @@ export const EVENTS = [
   "memory.outdate",
   "memory.purge",
   "memory.verify_failed",
+  // XCOD-135: one query to an external memory source (name, type, host, status, latency, counts),
+  // and a source refused by the residency policy before it was contacted. Never content or queries.
+  "memory.source_query",
+  "memory.source_denied",
   // XCOD-132: a bundle export. Counts and options only, never content or the passphrase.
   "memory.export",
   // XCOD-133: an import that wrote something. Counts and the input's SHA-256, never text or paths.

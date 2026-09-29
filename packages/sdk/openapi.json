@@ -21444,6 +21444,67 @@
         "additionalProperties": false,
         "description": "Server configuration for opencode serve and web commands"
       },
+      "MemorySourceConfig": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A unique name for the source, e.g. \"platform-kg\". Shown as the label on everything it returns"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["graph", "mcp"],
+            "description": "\"graph\": a read-only query against a Neo4j knowledge graph. \"mcp\": a search tool on an MCP server configured under \"mcp\""
+          },
+          "jurisdiction": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "trusted": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string",
+            "enum": ["fulltext", "contains"]
+          },
+          "index": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "server": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "argument": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "type"],
+        "additionalProperties": false
+      },
       "MemoryConfig": {
         "type": "object",
         "properties": {
@@ -21486,6 +21547,12 @@
               }
             },
             "additionalProperties": false
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemorySourceConfig"
+            }
           },
           "retention": {
             "type": "object",
