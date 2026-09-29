@@ -428,7 +428,12 @@ export async function neo4j(input: {
           `A fact can be at most ${limits.maxFactChars} characters (memory.limits.max_fact_chars); this one is ${trimmed.length}`,
         )
       const existing = await facts()
-      const same = existing.find((fact) => fact.text === trimmed && !fact.quarantined)
+      // Only a fact that is still recalled counts as the same: re-remembering the text of an
+      // outdated or expired fact stores it again, active.
+      const at = MemoryLifecycle.now()
+      const same = existing.find(
+        (fact) => fact.text === trimmed && !fact.quarantined && MemoryLifecycle.recallable(fact, policy, at),
+      )
       if (same) return same
       if (existing.length >= limits.maxFacts)
         throw new Error(

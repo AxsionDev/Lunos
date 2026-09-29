@@ -7,7 +7,8 @@ export * as ConfigMemoryBackend from "./memory-backend"
  * OPENCODE_CONFIG_CONTENT, managed and remote config.
  */
 
-export const DOCS = "https://lunos.tech/docs/deployment/self-hosted#external-memory-database"
+export const DOCS =
+  "https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md#external-memory-database"
 
 const REFERENCE = /^\{(env|file):[^}]+\}$/
 

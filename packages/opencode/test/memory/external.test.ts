@@ -234,6 +234,12 @@ describe.skipIf(!url)("neo4j (live)", () => {
     expect((await store.recall("invoices table", 5, { history: true })).facts.map((item) => item.fact.id)).toContain(
       billing.id,
     )
+    // Remembering an outdated fact's text again stores a new, active fact that is recalled.
+    const again = await store.remember("The billing service owns the invoices table.", provenance)
+    expect(again.id).not.toBe(billing.id)
+    expect(again.status ?? "active").toBe("active")
+    expect((await store.recall("invoices table", 5)).facts.map((item) => item.fact.id)).toContain(again.id)
+    expect(await store.forget(again.id)).toBe(true)
     expect(await store.forget(billing.id)).toBe(true)
     expect((await store.list()).map((fact) => fact.text)).toEqual(["The search team owns the index repo."])
   })

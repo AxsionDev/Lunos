@@ -54,7 +54,7 @@ In the TUI, `/memory` opens the same list, `ctrl+s` exports it and `ctrl+o` impo
 
 ## Share it with your team
 
-Memory can live in a Neo4j database your team runs, instead of on each machine. Set `memory.backend` with the database's URL, credentials as `{env:}` or `{file:}` references, and the jurisdiction it runs in. Lunos checks that jurisdiction against your residency policy and requires TLS to any other host before it connects. Everyone on the same repository shares its project memory; your user memory stays yours. `lunos memory migrate --to neo4j` moves what you have, with a preview first. The [self-hosted guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md#external-memory-database) has the details.
+Memory can live in a Neo4j database your team runs, instead of on each machine. Set `memory.backend` with the database's URL, credentials as `{env:}` or `{file:}` references, and the jurisdiction it runs in. Lunos checks that jurisdiction against your residency policy and requires TLS to any other host before it connects. Everyone on the same repository shares its project memory. Lunos doesn't recall your user memory for anyone else, but anyone with the database's credentials can read it there. `lunos memory migrate --to neo4j` moves what you have, with a preview first. The [self-hosted guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md#external-memory-database) has the details.
 
 ## Network
 
