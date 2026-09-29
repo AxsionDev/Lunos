@@ -16,6 +16,13 @@ import type { SessionV1 } from "@opencode-ai/core/v1/session"
  *   writes all of a step's calls before it sees any of their results.
  * - **Secrets:** anything the audit log would mask as key-shaped, or a `{env:` / `{file:`
  *   substitution that config loading would expand.
+ * - **Instructions to the model** (XCOD-133, OWASP ASI06): text shaped like a prompt injection
+ *   ("ignore all previous instructions", role markers, tool-call syntax). Ordinary imperative
+ *   guidance ("run the tests before pushing") is not: project notes are full of it.
+ * - **Size:** longer than `memory.limits.max_fact_chars`.
+ *
+ * `check` runs the content screens (everything but taint) and is shared by `memory_remember` and
+ * `lunos memory import`, so an imported fact passes exactly what an agent's write passes.
  */
 
 export class RefusedError extends Error {
@@ -48,4 +55,46 @@ function outside(file: string, worktree: string) {
 export function secret(text: string): string | undefined {
   if (/\{(env|file):/.test(text)) return "it contains a {env:} or {file:} substitution"
   if (Audit.redact(text) !== text) return "it contains something shaped like a key, token or password"
+}
+
+/**
+ * Prompt-injection shapes. Deliberately narrow: a note saying "never push to main" is guidance a
+ * person wrote, but "ignore all previous instructions" or a forged tool call is never a fact.
+ */
+const INJECTION: readonly [RegExp, string][] = [
+  [
+    /\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}?\b(previous|prior|above|earlier|preceding|all|any|your|the|system)\b[^.\n]{0,30}?\b(instructions?|prompts?|rules|guidelines|directives|guardrails)\b/i,
+    "it tells the model to ignore its instructions",
+  ],
+  [
+    /\byou are now\b|\bfrom now on,? you (?:are|must|will)\b|\bact as (?:an? )?(?:unrestricted|jailbroken|dan)\b/i,
+    "it tries to redefine who the model is",
+  ],
+  [/\b(?:new|updated|real|hidden) (?:system )?instructions?\s*:/i, "it announces new instructions"],
+  [/^\s*(?:system|assistant|developer)\s*:/im, "it contains a chat role marker"],
+  [
+    /<\|(?:im_start|im_end|system|assistant|user|endoftext)\|>|\[\/?INST\]|<<\/?SYS>>/i,
+    "it contains chat-template tokens",
+  ],
+  [
+    /<\/?(?:system|assistant|tool_call|tool_use|function_calls?|invoke|antml:[a-z_]+|memory)\b[^>]*>/i,
+    "it contains tool-call or prompt markup",
+  ],
+  [/"(?:tool_calls|function_call|tool_use)"\s*:/, "it contains tool-call syntax"],
+]
+
+export function instructions(text: string): string | undefined {
+  for (const [pattern, reason] of INJECTION) if (pattern.test(text)) return reason
+}
+
+export function size(text: string, maxChars: number): string | undefined {
+  const length = text.trim().length
+  if (!length) return "it is empty"
+  if (length > maxChars)
+    return `it is ${length} characters, over the ${maxChars} allowed (memory.limits.max_fact_chars)`
+}
+
+/** Every content screen a write must pass: size, secrets, then instruction-shaped content. */
+export function check(text: string, limits: { maxFactChars: number }): string | undefined {
+  return size(text, limits.maxFactChars) ?? secret(text) ?? instructions(text)
 }
