@@ -203,40 +203,86 @@ describe("relaunch (XCOD-129)", () => {
   }
   const dir = () => fs.mkdtempSync(path.join(os.tmpdir(), "restart-"))
 
-  test("execs the same binary in place with the same env, plus the handoff", async () => {
-    const { calls, deps } = harness()
-    const handoff = path.join(dir(), "h.json")
-    await Restart.relaunch(
-      {
+  // One relaunch, per platform: POSIX replaces the process in place; Windows has no exec, so it
+  // spawns the same binary with the same arguments, cwd, env and handoff, waits, and exits with its
+  // code. The platform is injected, so both branches run on every CI OS.
+  const cases = [
+    {
+      platform: "darwin" as const,
+      execPath: "/opt/lunos",
+      argv: compiled,
+      cwd: "/work",
+      manual: "/opt/lunos --model fake/m --session ses_1",
+    },
+    {
+      platform: "win32" as const,
+      execPath: "C:\\lunos\\lunos.exe",
+      argv: windowsCompiled,
+      cwd: "C:\\work",
+      manual: "C:\\lunos\\lunos.exe --model fake/m --session ses_1",
+    },
+  ]
+  for (const item of cases) {
+    test(`${item.platform}: relaunches the same binary with the same args, env and cwd, plus the handoff`, async () => {
+      const spawned: { argv: string[]; cwd: string; env: Record<string, string | undefined>; verbatim: boolean }[] = []
+      const { calls, deps } = harness({
+        platform: item.platform,
+        spawn: async (argv, options) => {
+          spawned.push({ argv, ...options })
+          return 3
+        },
+      })
+      const handoff = path.join(dir(), "h.json")
+      await Restart.relaunch(
+        { sessionID: "ses_1", fresh: false, cancelled: ["job A"], draft: { input: "half-typed", parts: [] } },
+        deps,
+        {
+          execPath: item.execPath,
+          argv: [...item.argv, "--model", "fake/m", "-s", "old"],
+          execArgv: [],
+          env: { PATH: "", KEEP: "1" },
+          cwd: item.cwd,
+          handoff,
+        },
+      )
+      const argv = [item.execPath, "--model", "fake/m", "--session", "ses_1"]
+      if (item.platform === "win32") {
+        expect(calls.execve).toBeUndefined()
+        expect(spawned).toHaveLength(1)
+        expect(spawned[0]).toMatchObject({ argv, cwd: item.cwd, verbatim: false })
+        expect(spawned[0].env.KEEP).toBe("1")
+        expect(spawned[0].env[Restart.HANDOFF_ENV]).toBe(handoff)
+        expect(calls.exits).toEqual([3])
+      } else {
+        expect(spawned).toHaveLength(0)
+        expect(calls.execve?.file).toBe(item.execPath)
+        expect(calls.execve?.argv).toEqual(argv)
+        expect(calls.execve?.env.KEEP).toBe("1")
+        expect(calls.execve?.env[Restart.HANDOFF_ENV]).toBe(handoff)
+        expect(calls.exits).toEqual([])
+      }
+      expect(calls.writes).toEqual([Restart.TERMINAL_RESET])
+      expect(JSON.parse(fs.readFileSync(handoff, "utf8"))).toMatchObject({
+        v: 1,
         sessionID: "ses_1",
         fresh: false,
         cancelled: ["job A"],
         draft: { input: "half-typed", parts: [] },
-      },
-      deps,
-      {
-        execPath: "/opt/lunos",
-        argv: [...compiled, "--model", "fake/m", "-s", "old"],
-        execArgv: [],
-        env: { PATH: "/usr/bin", KEEP: "1" },
-        cwd: "/work",
-        handoff,
-      },
-    )
-    expect(calls.execve?.argv).toEqual(["/opt/lunos", "--model", "fake/m", "--session", "ses_1"])
-    expect(calls.execve?.env.KEEP).toBe("1")
-    expect(calls.execve?.env[Restart.HANDOFF_ENV]).toBe(handoff)
-    expect(calls.writes).toEqual([Restart.TERMINAL_RESET])
-    const saved = JSON.parse(fs.readFileSync(handoff, "utf8"))
-    expect(saved).toMatchObject({
-      v: 1,
-      sessionID: "ses_1",
-      fresh: false,
-      cancelled: ["job A"],
-      draft: { input: "half-typed", parts: [] },
-      manual: "/opt/lunos --model fake/m --session ses_1",
+        manual: item.manual,
+      })
     })
-    expect(fs.statSync(handoff).mode & 0o777).toBe(0o600)
+  }
+
+  // A file permission of the host running the test, not of the simulated platform: NTFS has no
+  // POSIX mode bits (Windows reports 0o666), and the handoff there lives in the per-user profile.
+  test.skipIf(process.platform === "win32")("the handoff file is readable by its owner only", () => {
+    const file = path.join(dir(), "h.json")
+    Restart.writeHandoff(file, { v: 1, from: "1.0.0", fresh: true, cancelled: [], manual: "lunos" })
+    expect(fs.statSync(file).mode & 0o777).toBe(0o600)
+  })
+
+  test("the real dependencies use this machine's platform", () => {
+    expect(Restart.defaultDeps().platform).toBe(process.platform)
   })
 
   test("a new binary that won't start prints the error and the manual command, once", async () => {

@@ -32,6 +32,8 @@ export const EVENTS = [
   // Long-term memory (XCOD-94). `memory.forget` is emitted by the review surface (part 3).
   "memory.write",
   "memory.forget",
+  // XCOD-132: a bundle export. Counts and options only, never content or the passphrase.
+  "memory.export",
   "upgrade",
   "audit.forward_refused",
 ] as const

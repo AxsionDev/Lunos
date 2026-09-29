@@ -1,5 +1,6 @@
 export * as MemoryBackend from "./backend"
 
+import type { MemoryBundle } from "./bundle"
 import { MemorySidecar } from "./sidecar"
 import { MemoryStore } from "./store"
 
@@ -19,6 +20,8 @@ export interface Backend {
   recall(query: string, limit: number): Promise<{ facts: Recalled[]; graph: string }>
   forget(id: string): Promise<boolean>
   list(): Promise<MemoryStore.Fact[]>
+  /** Every node and edge in the engine's graph, for export (XCOD-132). No model call. */
+  graph(): Promise<MemoryBundle.RawGraph>
   close(): Promise<void>
 }
 
@@ -92,6 +95,9 @@ export function cognee(input: { root: string; handle: MemorySidecar.Handle; limi
     },
     list() {
       return MemoryStore.facts(root)
+    },
+    graph() {
+      return handle.call<MemoryBundle.RawGraph>("graph", { dataset: MemoryStore.DATASET })
     },
     close() {
       return handle.close()

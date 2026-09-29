@@ -29,6 +29,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
   cancel). In `lunos attach` only the client restarts. A relaunch that fails to start prints the
   error and the command to run by hand, and is never retried. Also in the palette as **Restart
   Lunos**, with an unbound `app_restart` keybind (XCOD-129).
+- **`lunos memory export` writes a full, versioned bundle** (`lunos-memory/1`): facts with provenance,
+  the entity graph tied to the facts it came from, hand-written notes, and a manifest with a SHA-256
+  per file, documented by a JSON Schema in the bundle's `SCHEMA.md`. `--zip`, `--encrypt`
+  (OpenSSL-compatible), `--scope`, `--since` and `--include-index`; also `ctrl+s` in the TUI memory
+  browser. `--format markdown` keeps the old one-file-per-fact export (XCOD-132).
 
 - **`/settings`: every configuration option in one place,** after Claude Code's `/config`. One
   dialog with **Status | Settings | Usage** tabs; `/config` is an alias, `/status` opens the Status
