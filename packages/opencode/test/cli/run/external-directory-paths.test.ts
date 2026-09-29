@@ -10,7 +10,10 @@ import path from "path"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
 
-// Outside the run's project (the fixture's home), so reads here are external.
+// Outside the run's project (the fixture's home), so reads here are external. The project must be
+// pinned with PWD: `lunos run` takes its project from $PWD, which the harness otherwise inherits
+// from the test process (the repo checkout, on D: on the GitHub Windows runner). A driveless path
+// takes the project's drive, so the project has to be on the same drive as this directory.
 const given = mkdtempSync(path.join(os.tmpdir(), "lunos-ext-"))
 const real = realpathSync.native(given)
 writeFileSync(path.join(real, "secret.txt"), "external-content")
@@ -39,12 +42,13 @@ const readParts = (stdout: string, parse: (s: string) => Array<Record<string, un
 describe("external_directory rules in a real run", () => {
   cliIt.live(
     "an allow rule on the real spelling allows every spelling of the path",
-    ({ llm, opencode }) =>
+    ({ llm, opencode, home }) =>
       Effect.gen(function* () {
         for (const filePath of variants) yield* llm.push(reply().tool("read", { filePath }))
         yield* llm.text("done")
         const result = yield* opencode.run("read it", {
           format: "json",
+          env: { PWD: home },
           permission: { "*": "allow", external_directory: { "*": "deny", [path.join(real, "*")]: "allow" } },
         })
         opencode.expectExit(result, 0)
@@ -61,12 +65,13 @@ describe("external_directory rules in a real run", () => {
 
   cliIt.live(
     "a deny rule on the real spelling denies every spelling of the path",
-    ({ llm, opencode }) =>
+    ({ llm, opencode, home }) =>
       Effect.gen(function* () {
         for (const filePath of variants) yield* llm.push(reply().tool("read", { filePath }))
         yield* llm.text("done")
         const result = yield* opencode.run("read it", {
           format: "json",
+          env: { PWD: home },
           permission: { "*": "allow", external_directory: { "*": "allow", [path.join(real, "*")]: "deny" } },
         })
         opencode.expectExit(result, 0)
@@ -76,6 +81,9 @@ describe("external_directory rules in a real run", () => {
         for (const part of parts) {
           expect(part.state.status).not.toBe("completed")
           expect(JSON.stringify(part.state)).not.toContain("external-content")
+          // Denied by the rule, not failing some other way (e.g. a path resolved onto the wrong
+          // drive, which "*": "allow" would let through to a "File not found").
+          expect(JSON.stringify(part.state)).toContain("prevents you from using this specific tool call")
         }
       }),
     90_000,
