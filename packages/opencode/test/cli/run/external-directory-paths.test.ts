@@ -50,7 +50,10 @@ describe("external_directory rules in a real run", () => {
         opencode.expectExit(result, 0)
 
         const parts = readParts(result.stdout, opencode.parseJsonEvents)
-        expect(parts.map((part) => part.state.status)).toEqual(variants.map(() => "completed"))
+        // A failed read shows its whole state, so a CI failure says why.
+        expect(parts.map((part) => (part.state.status === "completed" ? "completed" : part.state))).toEqual(
+          variants.map(() => "completed"),
+        )
         for (const part of parts) expect(part.state.output).toContain("external-content")
       }),
     90_000,
