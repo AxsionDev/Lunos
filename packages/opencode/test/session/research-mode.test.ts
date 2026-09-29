@@ -1,4 +1,5 @@
 import { describe, expect } from "bun:test"
+import path from "path"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { Effect, Layer } from "effect"
@@ -64,8 +65,12 @@ describe("research output path", () => {
       const ctx = instance({ vcs: true, worktree: "/tmp/wt" })
       const session = { slug: "my-topic", time: { created: 1700000000000 } }
 
-      expect(SessionNs.research(session, ctx)).toBe(SessionNs.plan(session, ctx).replace("/plans/", "/research/"))
-      expect(SessionNs.research(session, ctx)).toBe("/tmp/wt/.opencode/research/1700000000000-my-topic.md")
+      expect(SessionNs.research(session, ctx)).toBe(
+        SessionNs.plan(session, ctx).replace(`${path.sep}plans${path.sep}`, `${path.sep}research${path.sep}`),
+      )
+      expect(SessionNs.research(session, ctx)).toBe(
+        path.join("/tmp/wt", ".opencode", "research", "1700000000000-my-topic.md"),
+      )
     }),
   )
 
@@ -74,8 +79,10 @@ describe("research output path", () => {
       const ctx = instance({ vcs: false, worktree: "/tmp/wt" })
       const session = { slug: "my-topic", time: { created: 1700000000000 } }
 
-      expect(SessionNs.research(session, ctx)).toBe(SessionNs.plan(session, ctx).replace("/plans/", "/research/"))
-      expect(SessionNs.research(session, ctx)).not.toContain("/tmp/wt")
+      expect(SessionNs.research(session, ctx)).toBe(
+        SessionNs.plan(session, ctx).replace(`${path.sep}plans${path.sep}`, `${path.sep}research${path.sep}`),
+      )
+      expect(SessionNs.research(session, ctx)).not.toContain(path.join("/tmp/wt"))
     }),
   )
 })

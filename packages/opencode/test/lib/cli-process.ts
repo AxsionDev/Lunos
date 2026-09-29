@@ -117,13 +117,15 @@ export type SpawnOpts = { readonly timeoutMs?: number; readonly env?: Record<str
 
 // Typed equivalent of constructing argv for `opencode run`. New flags should
 // land here so tests stay grep-able and refactor-safe.
+type PermissionAction = "ask" | "allow" | "deny"
+
 export type RunOpts = SpawnOpts & {
   readonly model?: string
   readonly agent?: string
   readonly format?: "default" | "json"
   readonly command?: string
   readonly printLogs?: boolean
-  readonly permission?: Record<string, "ask" | "allow" | "deny">
+  readonly permission?: Record<string, PermissionAction | Record<string, PermissionAction>>
   readonly extraArgs?: string[]
 }
 

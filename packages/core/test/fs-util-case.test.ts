@@ -45,3 +45,36 @@ describe.skipIf(process.platform === "win32")("FSUtil.onDiskCase", () => {
     expect(FSUtil.onDiskCase(path.join(root, "alias", "src"))).toBe(path.join(root, "Alias", "Src"))
   })
 })
+
+// XCOD-137: a model-supplied path is resolved against the instance directory, never the cwd.
+describe("FSUtil.resolveOnDisk", () => {
+  const project = path.join(root, "Project")
+
+  test("resolves a relative path against the base, not the cwd", () => {
+    expect(FSUtil.resolveOnDisk(project, path.join("Src", "Main.ts"))).toBe(
+      FSUtil.onDiskCase(path.join(project, "Src", "Main.ts")),
+    )
+  })
+
+  test("keeps an absolute path absolute", () => {
+    const file = path.join(root, "Project", "Src", "Main.ts")
+    expect(FSUtil.resolveOnDisk(os.homedir(), file)).toBe(FSUtil.onDiskCase(file))
+  })
+
+  // On the GitHub Windows runner the cwd (the checkout) is on D: while TEMP is on C:, so this
+  // catches a driveless path picking up the cwd's drive.
+  test.skipIf(process.platform !== "win32")("gives a driveless Windows path the base's drive", () => {
+    const file = path.join(project, "Src", "Main.ts")
+    const driveless = file
+      .replace(/^[A-Za-z]:/, "")
+      .replaceAll("\\", "/")
+      .toLowerCase()
+    expect(FSUtil.resolveOnDisk(project, driveless)).toBe(FSUtil.normalizePath(file))
+  })
+
+  test.skipIf(process.platform !== "win32")("converts a git-bash drive path before resolving", () => {
+    const file = path.join(project, "Src", "Main.ts")
+    const bash = "/" + file[0].toLowerCase() + file.slice(2).replaceAll("\\", "/")
+    expect(FSUtil.resolveOnDisk(os.homedir(), bash)).toBe(FSUtil.normalizePath(file))
+  })
+})

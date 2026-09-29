@@ -208,6 +208,38 @@ be a Git repository**.
 
 ---
 
+### restart
+
+Restart Lunos and come back to the same session, with whatever you had typed but not sent still in
+the prompt. Use it after `/update` to run the new version, to pick up config changes, or to recover
+from a stuck MCP server or LSP. Also in the command palette as **Restart Lunos**.
+
+```bash frame="none"
+/restart
+```
+
+`/restart --fresh` starts a new session instead (palette: **Restart Lunos in a new session**).
+
+Lunos stops its MCP servers, LSP servers, memory sidecar and local server, restores the terminal,
+and starts again with the same executable, arguments, working directory and environment, plus
+`--session <id>`. The new process shows `Restarted — Lunos X.Y.Z` (`X.Y.Z → A.B.C` after an
+update).
+
+- **While the agent is working** (mid-turn, or background jobs running) Lunos asks first: **wait
+  for the current turn**, then restart; **stop and restart**, cancelling the running work (listed in
+  the banner afterwards; `/undo` reverts file changes it made); or **cancel**. It never restarts
+  silently while a tool may be writing files. While it waits, `/restart` again cancels the restart.
+- **With `lunos attach`** only the TUI client restarts. The server keeps running, along with any
+  turn it was working on.
+- **On Windows** the new Lunos starts in the same console window, and the old process stays behind,
+  idle, until it exits (Windows can't replace a running process the way Linux and macOS do).
+- **If the new process fails to start** (for example because of a broken config file), Lunos prints
+  the error and the exact command to start it by hand. It never retries.
+
+**Keybind:** none by default; set `app_restart` in [`tui.json`](/docs/keybinds).
+
+---
+
 ### sessions
 
 List and switch between sessions. _Aliases_: `/resume`, `/continue`
@@ -295,8 +327,9 @@ Update Lunos to the latest version. Also available as `/upgrade`, its old name.
 
 When a new version is published, the bottom-right corner of every screen shows
 `There is a new version: X.Y.Z — please run lunos update` (`New version: X.Y.Z · lunos update` in
-terminals narrower than 100 columns) until you update. After updating, restart Lunos to use the new
-version. See [`lunos update`](/docs/cli#update) for when the check runs and how to turn it off.
+terminals narrower than 100 columns) until you update. After updating, run [`/restart`](#restart) to
+use the new version: it starts the newly installed Lunos, not the old binary, back in the same
+session. See [`lunos update`](/docs/cli#update) for when the check runs and how to turn it off.
 
 ---
 
