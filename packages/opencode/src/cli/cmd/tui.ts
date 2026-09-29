@@ -145,8 +145,35 @@ export const TuiThreadCommand = cmd({
       .option("demo", {
         type: "boolean",
         hidden: true,
+      })
+      .option("sandbox", {
+        type: "boolean",
+        describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
       }),
   handler: async (args) => {
+    // XCOD-144: the server and everything it spawns run in a container; only the TUI stays here.
+    const { wanted, runSandboxedTui } = await import("./sandbox")
+    if (wanted(args, resolveThreadDirectory(args.project))) {
+      const unsupported = [
+        ["--mini", args.mini],
+        ["--prompt", args.prompt !== undefined],
+        ["--model", args.model !== undefined],
+        ["--mode", args.mode !== undefined || args.agent !== undefined],
+        ["--port", hasArg("--port")],
+        ["--hostname", hasArg("--hostname")],
+      ].find((entry) => entry[1])?.[0]
+      if (unsupported) {
+        UI.error(`${unsupported} cannot be used with --sandbox yet`)
+        process.exitCode = 1
+        return
+      }
+      await runSandboxedTui(resolveThreadDirectory(args.project), {
+        continue: args.continue,
+        session: args.session,
+        fork: args.fork,
+      })
+      return
+    }
     if (args.replay === true) {
       UI.error("--replay is not supported; replay is enabled by default")
       process.exitCode = 1

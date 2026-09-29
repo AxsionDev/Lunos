@@ -1953,6 +1953,21 @@ export type Config = {
     }
   }
   memory?: MemoryConfig
+  sandbox?: {
+    enabled?: boolean
+    image?: string
+    workspace?: "copy"
+    on_finish?: "destroy" | "retain"
+    resources?: {
+      /**
+       * CPUs the sandbox may use (docker --cpus). Default 2
+       */
+      cpus?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      memory?: string
+      pids?: number
+      tmp?: string
+    }
+  }
   residency?: ConfigV2Residency
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal

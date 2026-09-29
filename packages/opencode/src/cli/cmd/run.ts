@@ -19,7 +19,8 @@ import { pathToFileURL } from "url"
 import { open } from "node:fs/promises"
 import { Effect } from "effect"
 import { UI } from "../ui"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, fail } from "../effect-cmd"
+import { wanted as sandboxWanted } from "./sandbox"
 import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
@@ -128,7 +129,8 @@ export const RunCommand = effectCmd({
   describe: "run opencode with a message",
   // --attach connects to a remote server (no local instance needed); the
   // default path runs an in-process server and needs the project instance.
-  instance: (args) => !args.attach,
+  // --sandbox (XCOD-144) doesn't either: it must not initialise the project's plugins on the host.
+  instance: (args) => !args.attach && !sandboxWanted(args),
   // For --dir without --attach, load instance for the resolved target dir.
   // The handler also chdirs (preserving the legacy order: chdir → file resolution).
   directory: (args) => (args.dir && !args.attach ? path.resolve(process.cwd(), args.dir) : process.cwd()),
@@ -264,8 +266,33 @@ export const RunCommand = effectCmd({
         default: false,
         hidden: true,
         describe: "enable direct interactive demo slash commands; pass one as the message to run it immediately",
+      })
+      .option("sandbox", {
+        type: "boolean",
+        describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
+    if (sandboxWanted(args)) {
+      if (args.attach) return yield* fail("--sandbox cannot be used with --attach")
+      if (args.mini) return yield* fail("--sandbox cannot be used with --mini yet")
+      const { runSandboxed } = yield* Effect.promise(() => import("./sandbox"))
+      const here = Filesystem.resolve(process.env.PWD ?? process.cwd())
+      const directory = args.dir ? path.resolve(here, args.dir) : here
+      return yield* Effect.tryPromise({
+        try: () =>
+          runSandboxed(directory, async (conn) => {
+            await RunCommand.handler!({
+              ...args,
+              sandbox: false,
+              attach: conn.url,
+              dir: conn.directory,
+              password: conn.password,
+              username: "opencode",
+            } as never)
+          }),
+        catch: (error) => error,
+      }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
+    }
     const { Agent } = yield* Effect.promise(() => import("@/agent/agent"))
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
     const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))
@@ -1028,5 +1055,6 @@ export async function runMini(input: MiniCommandInput) {
     "dangerously-skip-permissions": false,
     dangerouslySkipPermissions: false,
     demo: input.demo ?? false,
+    sandbox: undefined,
   })
 }
