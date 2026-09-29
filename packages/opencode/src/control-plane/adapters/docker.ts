@@ -57,9 +57,17 @@ export const DockerAdapter: WorkspaceAdapter = {
         projectID: project,
       }))
   },
+  // Nothing is destroyed until the results are back on the host: hand them back first (branch plus
+  // transcript), and if that fails, throw and keep the container.
   async remove(info) {
     const { Sandbox } = await load()
-    await Sandbox.destroy(decodeExtra(info.extra).sandbox)
+    const id = decodeExtra(info.extra).sandbox
+    const meta = await Sandbox.meta(id).catch(() => undefined)
+    if (meta && (await Sandbox.SandboxDocker.exists(id))) {
+      const conn = await Sandbox.start(meta)
+      await Sandbox.handoff(meta, conn, { outcome: "workspace removed" })
+    }
+    await Sandbox.destroy(id)
   },
   async target(info) {
     const { Sandbox } = await load()

@@ -19,12 +19,12 @@ Or turn it on for every run in a project or for yourself:
 }
 ```
 
-`--no-sandbox` overrides `sandbox.enabled` for one run. Sandboxing needs Docker (Docker Desktop, or Docker Engine on Linux); if the `docker` command or daemon isn't available, Lunos says so and stops rather than running on the host.
+`--no-sandbox` overrides `sandbox.enabled` for one run. If any config layer (global, project, `OPENCODE_CONFIG_CONTENT`) turns it on, it is on: a repository's own config can't switch off a sandbox you asked for. `sandbox.enabled` applies to `lunos` and `lunos run` only; `lunos serve`, `lunos web`, `lunos acp` and the other commands still run on the host. Sandboxing needs Docker (Docker Desktop, or Docker Engine on Linux); if the `docker` command or daemon isn't available, Lunos says so and stops rather than running on the host.
 
 ## What happens
 
 1. **Copy.** Your repository is copied into a new Docker volume: the current commit (depth 1), with your uncommitted changes applied — staged, unstaged, and untracked files that aren't gitignored. Ignored files (`.env`, `node_modules`, build output) are **not** copied. Your working tree is never mounted into the container, read-write or read-only. The copy has to be a git repository with at least one commit.
-2. **Run.** A container starts from the sandbox image, running `lunos serve`. Every session, subagent, background job, tool call, `bash` command, MCP server and LSP server started by that server runs inside the container. The client on your machine talks to it over a port bound to `127.0.0.1`, protected by a random password.
+2. **Run.** A container starts from the sandbox image, running `lunos serve`. Sessions, subagents, background jobs, tool calls, `bash` commands, and the MCP and LSP servers are all started by that server, so they run inside the container; no Lunos server runs on your machine. The client on your machine talks to it over a port bound to `127.0.0.1`, protected by a random password.
 3. **Hand back.** When the work is done — `lunos run` has finished, or you quit the TUI — Lunos:
    - writes every session's transcript (`transcript.json`) and a run summary (`summary.json`: image digest, resource limits, base commit, changed files) to `.opencode/sandbox/<id>/` in your repository (ignored by git by default);
    - stops the container and copies its workspace out;
@@ -101,13 +101,13 @@ Also not built yet: `destroy_on_success`, `retain_for` and `prune`, the `--keep`
 
 ## Configuration reference
 
-| Key                        | Default                             | Meaning                                                 |
-| -------------------------- | ----------------------------------- | ------------------------------------------------------- |
-| `sandbox.enabled`          | `false`                             | Sandbox every run, as if `--sandbox` were passed        |
-| `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                   |
-| `sandbox.workspace`        | `"copy"`                            | How the project gets in; `copy` is the only mode so far |
-| `sandbox.on_finish`        | `"destroy"`                         | `destroy` or `retain`, after a successful hand-back     |
-| `sandbox.resources.cpus`   | `2`                                 | `docker --cpus`                                         |
-| `sandbox.resources.memory` | `"4g"`                              | `docker --memory`                                       |
-| `sandbox.resources.pids`   | `512`                               | `docker --pids-limit`                                   |
-| `sandbox.resources.tmp`    | `"1g"`                              | Size of the in-memory `/tmp`                            |
+| Key                        | Default                             | Meaning                                                          |
+| -------------------------- | ----------------------------------- | ---------------------------------------------------------------- |
+| `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed |
+| `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                            |
+| `sandbox.workspace`        | `"copy"`                            | How the project gets in; `copy` is the only mode so far          |
+| `sandbox.on_finish`        | `"destroy"`                         | `destroy` or `retain`, after a successful hand-back              |
+| `sandbox.resources.cpus`   | `2`                                 | `docker --cpus`                                                  |
+| `sandbox.resources.memory` | `"4g"`                              | `docker --memory`                                                |
+| `sandbox.resources.pids`   | `512`                               | `docker --pids-limit`                                            |
+| `sandbox.resources.tmp`    | `"1g"`                              | Size of the in-memory `/tmp`                                     |

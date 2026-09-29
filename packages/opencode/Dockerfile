@@ -14,8 +14,9 @@ RUN apk add libgcc libstdc++ ripgrep git && adduser -D -u 1000 -h /home/lunos lu
 # build was never reached.
 #
 # The build artifact is still named `bin/opencode` upstream; it is installed as `lunos` here so
-# the first published image carries the product's own name. Safe to rename because no image has
-# ever been pushed to ghcr.io/axsiondev/lunos — there is nothing depending on the old entrypoint.
+# the first published image carries the product's own name. (XCOD-144: images have since been
+# pushed — v1.18.42 is ghcr.io/axsiondev/lunos@sha256:d4f5c3e3… — but the package isn't public, so
+# anonymous pulls fail.)
 FROM base AS build-amd64
 COPY dist/lunos-linux-x64-baseline-musl/bin/opencode /usr/local/bin/lunos
 

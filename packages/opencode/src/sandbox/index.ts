@@ -228,6 +228,10 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
     await fs.mkdir(results, { recursive: true })
     await fs.writeFile(path.join(path.dirname(results), ".gitignore"), "*\n")
     await fs.writeFile(path.join(results, "transcript.json"), JSON.stringify(sessions, null, 2))
+    await SandboxGit.setBranch({ gitDir: info.gitDir, branch: info.branch, commit, expected: previous })
+    info.handedOff = commit
+    await saveMeta(info)
+    // Last, so a summary only ever describes a branch that exists.
     const files = await SandboxGit.changedFiles(info.gitDir, info.base, commit)
     await fs.writeFile(
       path.join(results, "summary.json"),
@@ -253,10 +257,6 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
         2,
       ),
     )
-    // Last, so the branch only appears once everything else is on disk.
-    await SandboxGit.setBranch({ gitDir: info.gitDir, branch: info.branch, commit, expected: previous })
-    info.handedOff = commit
-    await saveMeta(info)
     return { branch: info.branch, commit, files, results }
   } finally {
     await fs.rm(out, { recursive: true, force: true })

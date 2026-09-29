@@ -87,14 +87,17 @@ export function worktreeOf(directory: string) {
 }
 
 export function load(directory: string, worktree = worktreeOf(directory)): Resolved {
-  let info: ConfigSandbox.Info = {}
-  for (const file of files(directory, worktree)) info = merge(info, read(file))
+  const layers = files(directory, worktree).map(read)
   const content = Flag.OPENCODE_CONFIG_CONTENT
   if (content) {
     const data = parse(content, [], { allowTrailingComma: true }) as { sandbox?: unknown } | undefined
-    if (data?.sandbox) info = merge(info, decode(data.sandbox))
+    if (data?.sandbox) layers.push(decode(data.sandbox))
   }
-  return resolve(info)
+  const info = layers.reduce<ConfigSandbox.Info>(merge, {})
+  // `enabled` is the one key that isn't last-wins: a repository's own config must not be able to
+  // switch off a sandbox the user asked for, and so run itself (and its plugins) on the host.
+  // Only --no-sandbox turns it off for a run.
+  return resolve({ ...info, enabled: layers.some((layer) => layer?.enabled === true) })
 }
 
 export * as SandboxConfig from "./config"

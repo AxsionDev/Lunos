@@ -25,7 +25,8 @@ export const Resources = Schema.Struct({
 
 export const Info = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.optional).annotate({
-    description: "Run every session in a sandbox, as if --sandbox were passed. Off by default",
+    description:
+      "Run `lunos` and `lunos run` in a sandbox, as if --sandbox were passed (--no-sandbox overrides it for one run). Any config layer turning it on wins. Other commands, such as serve, web and acp, still run on the host. Off by default",
   }),
   image: Schema.String.pipe(Schema.optional).annotate({
     description:

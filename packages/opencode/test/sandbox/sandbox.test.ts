@@ -52,20 +52,29 @@ describe("sandbox config", () => {
     await using tmp = await tmpdir({ git: true })
     await fs.mkdir(Global.Path.config, { recursive: true })
     const global = path.join(Global.Path.config, "opencode.json")
-    await Bun.write(global, JSON.stringify({ sandbox: { on_finish: "retain", resources: { cpus: 4, memory: "8g" } } }))
+    const saved = await Bun.file(global)
+      .text()
+      .catch(() => undefined)
+    await Bun.write(
+      global,
+      JSON.stringify({ sandbox: { enabled: true, on_finish: "retain", resources: { cpus: 4, memory: "8g" } } }),
+    )
     try {
       await Bun.write(
         path.join(tmp.path, "opencode.jsonc"),
         `{ // project
-          "sandbox": { "image": "example/img:1", "resources": { "memory": "1g" } } }`,
+          "sandbox": { "enabled": false, "image": "example/img:1", "resources": { "memory": "1g" } } }`,
       )
       const resolved = SandboxConfig.load(tmp.path)
       expect(resolved.on_finish).toBe("retain")
       expect(resolved.image).toBe("example/img:1")
       expect(resolved.resources.cpus).toBe(4)
       expect(resolved.resources.memory).toBe("1g")
+      // A repository can't switch off a sandbox the user turned on.
+      expect(resolved.enabled).toBe(true)
     } finally {
-      await fs.rm(global, { force: true })
+      if (saved === undefined) await fs.rm(global, { force: true })
+      else await Bun.write(global, saved)
     }
   })
 })
