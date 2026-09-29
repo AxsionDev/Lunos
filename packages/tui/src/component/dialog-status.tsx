@@ -5,6 +5,7 @@ import { useDialog } from "../ui/dialog"
 import { useSync } from "../context/sync"
 import { For, Match, Switch, Show, createMemo } from "solid-js"
 import { versionDetail } from "@opencode-ai/core/installation/version"
+import { statusGlyph } from "../util/status-glyph"
 
 export type DialogStatusProps = {}
 
@@ -72,7 +73,7 @@ export function DialogStatus() {
                     )[item.status],
                   }}
                 >
-                  •
+                  {statusGlyph(item.status)}
                 </text>
                 <text fg={theme.text} wrapMode="word">
                   <b>{key}</b>{" "}
@@ -110,7 +111,7 @@ export function DialogStatus() {
                     }[item.status],
                   }}
                 >
-                  •
+                  {statusGlyph(item.status)}
                 </text>
                 <text fg={theme.text} wrapMode="word">
                   <b>{item.id}</b> <span style={{ fg: theme.textMuted }}>{item.root}</span>

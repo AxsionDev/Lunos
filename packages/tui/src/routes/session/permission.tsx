@@ -16,6 +16,7 @@ import { getScrollAcceleration } from "../../util/scroll"
 import { useTuiConfig } from "../../config"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
+import { selectionMarker } from "../../util/status-glyph"
 
 type PermissionStage = "permission" | "always" | "reject"
 
@@ -688,6 +689,8 @@ function Prompt<const T extends Record<string, string>>(props: {
                 }}
               >
                 <text fg={option === store.selected ? selectedForeground(theme, theme.warning) : theme.textMuted}>
+                  {/* XCOD-141: a marker as well as the highlight, so the choice doesn't rely on colour alone. */}
+                  {selectionMarker(option === store.selected)}
                   {props.options[option]}
                 </text>
               </box>
