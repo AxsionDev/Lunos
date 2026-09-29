@@ -3,7 +3,7 @@ export * as ConfigSettings from "./settings"
 import path from "path"
 import { existsSync } from "fs"
 import fs from "fs/promises"
-import { SchemaAST } from "effect"
+import { Schema, SchemaAST } from "effect"
 import { applyEdits, modify, parse as parseJsonc } from "jsonc-parser"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { Flag } from "@opencode-ai/core/flag/flag"
@@ -726,4 +726,111 @@ export async function set(input: {
     await fs.writeFile(file, updated)
   }
   return { key: item.key, value, file, scope: input.scope, restart: item.restart, changed }
+}
+
+// ---------------------------------------------------------------------------------------------
+// HTTP shapes (GET/PATCH /config/settings, SDK: config.settings / config.settingsSet)
+
+export const RowSchema = Schema.Struct({
+  key: Schema.String,
+  target: Schema.Literals(["config", "tui"]),
+  label: Schema.String,
+  category: Schema.String,
+  description: Schema.String,
+  kind: Schema.Literals(["boolean", "enum", "string", "number", "list", "object"]),
+  values: Schema.optional(Schema.Array(Schema.Union([Schema.String, Schema.Boolean]))),
+  dialog: Schema.optional(Schema.Literals(["models", "themes", "mcps", "providers", "modes"])),
+  restart: Schema.Boolean,
+  deprecated: Schema.Boolean,
+  top: Schema.Boolean,
+  readonly: Schema.Boolean,
+  value: Schema.optional(Schema.Json),
+  display: Schema.String,
+  source: Schema.Literals(["default", "user", "project", "env", "managed", "remote"]),
+  from: Schema.optional(Schema.String),
+  locked: Schema.Boolean,
+  override: Schema.optional(Schema.String),
+  secret: Schema.Boolean,
+}).annotate({ identifier: "SettingRow" })
+
+const Tokens = Schema.Struct({
+  input: Schema.Number,
+  output: Schema.Number,
+  reasoning: Schema.Number,
+  cache_read: Schema.Number,
+  cache_write: Schema.Number,
+})
+
+export const Usage = Schema.Struct({
+  days: Schema.Number,
+  sessions: Schema.Number,
+  cost: Schema.Number,
+  tokens: Tokens,
+}).annotate({ identifier: "SettingsUsage" })
+export type Usage = Schema.Schema.Type<typeof Usage>
+
+export const SnapshotSchema = Schema.Struct({
+  rows: Schema.Array(RowSchema),
+  layers: Schema.Array(
+    Schema.Struct({
+      layer: Schema.Literals(["default", "user", "project", "env", "managed", "remote", "cli"]),
+      path: Schema.String,
+      loaded: Schema.Boolean,
+    }),
+  ),
+  locked: Schema.Array(Schema.String),
+  files: Schema.Struct({
+    user: Schema.Struct({ config: Schema.String, tui: Schema.String }),
+    project: Schema.Struct({ config: Schema.String, tui: Schema.String }),
+  }),
+  usage: Usage,
+}).annotate({ identifier: "SettingsSnapshot" })
+
+export const SetInput = Schema.Struct({
+  key: Schema.String,
+  /** As typed: `true`, `notify`, `eu,us`, or JSON for objects. */
+  value: Schema.String,
+  scope: Schema.Literals(["user", "project"]),
+}).annotate({ identifier: "SettingsSetInput" })
+
+export const SetOutput = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    key: Schema.String,
+    value: Schema.optional(Schema.Json),
+    file: Schema.String,
+    scope: Schema.Literals(["user", "project"]),
+    restart: Schema.Boolean,
+    changed: Schema.Boolean,
+  }),
+  Schema.Struct({
+    ok: Schema.Literal(false),
+    error: Schema.String,
+    code: Schema.String,
+  }),
+]).annotate({ identifier: "SettingsSetResult" })
+
+/** Totals over session rows, the same columns `lunos stats` sums. */
+export function usage(
+  sessions: ReadonlyArray<{
+    cost: number
+    tokens_input: number
+    tokens_output: number
+    tokens_reasoning: number
+    tokens_cache_read: number
+    tokens_cache_write: number
+  }>,
+  days: number,
+): Usage {
+  const tokens = { input: 0, output: 0, reasoning: 0, cache_read: 0, cache_write: 0 }
+  let cost = 0
+  for (const row of sessions) {
+    cost += row.cost
+    tokens.input += row.tokens_input
+    tokens.output += row.tokens_output
+    tokens.reasoning += row.tokens_reasoning
+    tokens.cache_read += row.tokens_cache_read
+    tokens.cache_write += row.tokens_cache_write
+  }
+  return { days, sessions: sessions.length, cost, tokens }
 }

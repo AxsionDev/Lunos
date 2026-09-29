@@ -2,6 +2,7 @@
 // decode the config loader uses, with organisation locks and JSONC comments respected.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import fs from "fs/promises"
+import { existsSync } from "fs"
 import os from "os"
 import path from "path"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
@@ -103,7 +104,7 @@ describe("settings set", () => {
     await expect(
       ConfigSettings.set({ key: "subagent_depth", value: "-1", scope: "user", ctx: ctx(), locked: [] }),
     ).rejects.toThrow("Invalid value for subagent_depth")
-    expect(await fs.exists(userFile())).toBe(false)
+    expect(existsSync(userFile())).toBe(false)
   })
 
   test("unknown keys are refused", async () => {
@@ -120,7 +121,7 @@ describe("settings set", () => {
     ).rejects.toThrow(ConfigPolicy.message("share"))
     off()
     expect(seen).toEqual(["share"])
-    expect(await fs.exists(userFile())).toBe(false)
+    expect(existsSync(userFile())).toBe(false)
   })
 
   test("a parent whose subtree is locked is refused too", async () => {
