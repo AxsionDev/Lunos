@@ -6,6 +6,7 @@ import { Memory } from "@/memory"
 import { MemoryBundle } from "@/memory/bundle"
 import { MemoryExport } from "@/memory/export"
 import { MemoryImport } from "@/memory/import"
+import { MemoryLifecycle } from "@/memory/lifecycle"
 import { MemoryStore } from "@/memory/store"
 import { Provider } from "@/provider/provider"
 import { InstanceHttpApi } from "../api"
@@ -18,6 +19,10 @@ import {
 import type { MemoryExportInput, MemoryImportApplyInput, MemoryImportInput } from "../groups/memory"
 
 const SCOPES = ["project", "user"] as const
+
+function defined<T extends Record<string, unknown>>(value: T) {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as Partial<T>
+}
 
 export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (handlers) =>
   Effect.gen(function* () {
@@ -41,7 +46,9 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
 
     const find = Effect.fn("MemoryHttpApi.find")(function* (id: string) {
       for (const scope of SCOPES) {
-        const fact = (yield* memory.facts(scope)).find((item) => item.id === id)
+        const fact = (yield* memory.facts(scope).pipe(Effect.mapError((error) => unavailable(error.message)))).find(
+          (item) => item.id === id,
+        )
         if (fact) return { scope, fact }
       }
       return yield* Effect.fail(new MemoryNotFoundError({ id, message: `No fact with id ${id}` }))
@@ -49,9 +56,12 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
 
     const list = Effect.fn("MemoryHttpApi.list")(function* () {
       const verdict = yield* memory.decision()
+      const { retention } = yield* memory.policy()
+      const at = MemoryLifecycle.now()
       const facts = []
       for (const scope of SCOPES)
-        for (const fact of yield* memory.facts(scope))
+        for (const fact of yield* memory.facts(scope).pipe(Effect.mapError((error) => unavailable(error.message)))) {
+          const expires = MemoryLifecycle.expiresAt(fact, retention)
           facts.push({
             id: fact.id,
             scope,
@@ -59,7 +69,18 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
             ...fact.provenance,
             ...(fact.imported ? { importedFrom: fact.imported.from } : {}),
             ...(fact.origin ? { originSource: fact.origin.source, originDate: fact.origin.date } : {}),
+            state: MemoryLifecycle.state(fact, retention, at),
+            ...defined({
+              kind: fact.kind,
+              validFrom: fact.valid_from,
+              invalidAt: fact.invalid_at,
+              replacedBy: fact.replaced_by,
+              replaces: fact.replaces,
+              expires: expires?.toISOString(),
+              quarantined: fact.quarantined,
+            }),
           })
+        }
       return { on: verdict.on, reason: verdict.on ? undefined : verdict.reason, facts }
     })
 
@@ -67,7 +88,7 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       const found = yield* find(ctx.params.id)
       yield* on()
       const results = yield* memory
-        .search({ query: found.fact.text, parent: yield* parent(), limit: 5 })
+        .search({ query: found.fact.text, parent: yield* parent(), limit: 5, origin: "tui" })
         .pipe(Effect.mapError((error) => unavailable(error.message)))
       const graph = results.find((result) => result.scope === found.scope)?.graph ?? ""
       return graph.split("\n").filter((line) => line.trim())
@@ -77,7 +98,19 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       yield* find(ctx.params.id)
       yield* on()
       yield* memory
-        .forget({ id: ctx.params.id, parent: yield* parent() })
+        .forget({ id: ctx.params.id, parent: yield* parent(), origin: "tui" })
+        .pipe(Effect.mapError((error) => unavailable(error.message)))
+      return true
+    })
+
+    const outdate = Effect.fn("MemoryHttpApi.outdate")(function* (ctx: {
+      params: { id: string }
+      query: { by?: string }
+    }) {
+      yield* find(ctx.params.id)
+      yield* on()
+      yield* memory
+        .outdate({ id: ctx.params.id, by: ctx.query.by, parent: yield* parent(), origin: "tui" })
         .pipe(Effect.mapError((error) => unavailable(error.message)))
       return true
     })
@@ -92,7 +125,9 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
           instance.directory,
           input.out ?? MemoryStore.exportDir(MemoryStore.projectRoot(instance)),
         )
-        const facts = yield* MemoryExport.markdown({ dir, scopes })
+        const facts = yield* MemoryExport.markdown({ dir, scopes }).pipe(
+          Effect.mapError((error) => unavailable(error.message)),
+        )
         return {
           path: dir,
           format: "markdown" as const,
@@ -213,6 +248,7 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       .handle("importApply", importApply)
       .handle("related", related)
       .handle("export", exportMemory)
+      .handle("outdate", outdate)
       .handle("forget", forget)
   }),
 )

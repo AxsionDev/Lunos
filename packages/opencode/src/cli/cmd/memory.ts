@@ -8,15 +8,18 @@ import * as Prompt from "../effect/prompt"
 import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "@/memory"
 import { MemoryBundle } from "@/memory/bundle"
+import { MemoryKey } from "@/memory/key"
 import { MemoryExport } from "@/memory/export"
 import { MemoryImport } from "@/memory/import"
+import { MemoryLifecycle } from "@/memory/lifecycle"
 import { MemoryNotes } from "@/memory/notes"
 import { MemoryRecall } from "@/memory/recall"
 import { MemoryStore } from "@/memory/store"
 
-// XCOD-94: the review surface for long-term memory. `list`, `show` and `export` read the provenance
-// ledger only, so reviewing memory never starts the engine or needs a model. `search` and `forget`
-// start it. Everything works when memory is turned off, except `search` and `forget`, which say so.
+// XCOD-94: the review surface for long-term memory. `list`, `show`, `status`, `verify` and `export`
+// read the provenance ledger only, so reviewing memory never starts the engine or needs a model.
+// `search`, `forget` and `outdate` start it. Everything works when memory is turned off, except
+// those three, which say so.
 
 const SCOPES = ["project", "user"] as const
 
@@ -43,17 +46,52 @@ function oneLine(text: string, max = 100) {
   return flat.length > max ? flat.slice(0, max - 1) + "…" : flat
 }
 
+/** The ledger for a scope, or a CLI error saying why it can't be read (a missing key, say). */
+const factsOf = (scope: MemoryStore.Scope) =>
+  Memory.Service.use((memory) => memory.facts(scope)).pipe(Effect.catch((error) => fail(error.message)))
+
+export const DEFAULT_EXPIRING_DAYS = 7
+
 export const MemoryListCommand = effectCmd({
   command: "list",
-  describe: "list remembered facts, with where each came from",
-  builder: (yargs) => yargs.option("scope", scopeOption),
+  describe: "list remembered facts, with where each came from and their state",
+  builder: (yargs) =>
+    yargs.option("scope", scopeOption).option("expiring", {
+      type: "number",
+      describe: `only facts that expire within this many days (default ${DEFAULT_EXPIRING_DAYS}), and expired ones not yet deleted`,
+    }),
   handler: Effect.fn("Cli.memory.list")(function* (args) {
     const memory = yield* Memory.Service
+    const { retention } = yield* memory.policy()
+    const at = MemoryLifecycle.now()
     const lines: string[] = []
-    for (const scope of scopesOf(args.scope))
-      for (const fact of yield* memory.facts(scope))
-        lines.push(`${fact.id}  ${scope.padEnd(7)}  ${fact.provenance.date.slice(0, 10)}  ${oneLine(fact.text)}`)
-    yield* writeStdoutEffect(lines.length ? lines.join(EOL) + EOL : `No facts in memory.${EOL}`)
+    const expiring = process.argv.includes("--expiring") || args.expiring !== undefined
+    for (const scope of scopesOf(args.scope)) {
+      const facts = yield* factsOf(scope)
+      if (expiring) {
+        const days =
+          args.expiring !== undefined && Number.isFinite(args.expiring) ? args.expiring : DEFAULT_EXPIRING_DAYS
+        for (const item of MemoryLifecycle.expiring(facts, retention, days, at)) {
+          const state = MemoryLifecycle.state(item.fact, retention, at)
+          const when =
+            state === "expired"
+              ? `expired ${item.expires.toISOString().slice(0, 10)}`
+              : `expires ${item.expires.toISOString().slice(0, 10)}`
+          lines.push(`${item.fact.id}  ${scope.padEnd(7)}  ${when}  ${oneLine(item.fact.text)}`)
+        }
+        continue
+      }
+      for (const fact of facts) {
+        const state = MemoryLifecycle.state(fact, retention, at)
+        const tag = state === "active" ? "" : `[${state === "purge" ? "expired" : state}] `
+        const inferred = fact.kind === "inferred" ? "(inferred) " : ""
+        lines.push(
+          `${fact.id}  ${scope.padEnd(7)}  ${fact.provenance.date.slice(0, 10)}  ${tag}${inferred}${oneLine(fact.text)}`,
+        )
+      }
+    }
+    const empty = expiring ? "No facts are expiring." : "No facts in memory."
+    yield* writeStdoutEffect(lines.length ? lines.join(EOL) + EOL : `${empty}${EOL}`)
   }),
 })
 
@@ -63,9 +101,13 @@ export const MemoryShowCommand = effectCmd({
   builder: (yargs) => yargs.positional("id", { type: "string", demandOption: true }),
   handler: Effect.fn("Cli.memory.show")(function* (args) {
     const memory = yield* Memory.Service
+    const { retention } = yield* memory.policy()
     for (const scope of SCOPES) {
-      const fact = (yield* memory.facts(scope)).find((item) => item.id === args.id)
-      if (fact) return yield* writeStdoutEffect(MemoryExport.markdownFile(scope, fact))
+      const fact = (yield* factsOf(scope)).find((item) => item.id === args.id)
+      if (fact)
+        return yield* writeStdoutEffect(
+          MemoryExport.markdownFile(scope, fact, MemoryLifecycle.expiresAt(fact, retention)),
+        )
     }
     return yield* fail(`No fact with id ${args.id}`)
   }),
@@ -74,13 +116,16 @@ export const MemoryShowCommand = effectCmd({
 export const MemorySearchCommand = effectCmd({
   command: "search <query>",
   describe: "search memory the way the agent does",
-  builder: (yargs) => yargs.positional("query", { type: "string", demandOption: true }),
+  builder: (yargs) =>
+    yargs
+      .positional("query", { type: "string", demandOption: true })
+      .option("history", { type: "boolean", default: false, describe: "also show outdated facts, marked as such" }),
   handler: Effect.fn("Cli.memory.search")(function* (args) {
     const memory = yield* Memory.Service
     const verdict = yield* memory.decision()
     if (!verdict.on) return yield* fail(`Memory is off: ${verdict.reason}`)
     const results = yield* memory
-      .search({ query: args.query, parent: yield* parent() })
+      .search({ query: args.query, parent: yield* parent(), history: args.history, origin: "cli" })
       .pipe(Effect.catch((error) => fail(error.message)))
     yield* writeStdoutEffect((MemoryRecall.block(results) ?? "Nothing in memory matches.") + EOL)
   }),
@@ -95,7 +140,7 @@ export const MemoryForgetCommand = effectCmd({
     const verdict = yield* memory.decision()
     if (!verdict.on) return yield* fail(`Memory is off: ${verdict.reason}. Turn it on to forget a fact, or use purge`)
     const removed = yield* memory
-      .forget({ id: args.id, parent: yield* parent() })
+      .forget({ id: args.id, parent: yield* parent(), origin: "cli" })
       .pipe(Effect.catch((error) => fail(error.message)))
     if (!removed) return yield* fail(`No fact with id ${args.id}`)
     const note =
@@ -116,11 +161,115 @@ export const MemoryPurgeCommand = effectCmd({
   handler: Effect.fn("Cli.memory.purge")(function* (args) {
     const memory = yield* Memory.Service
     const scope = args.scope as MemoryStore.Scope
-    const count = (yield* memory.facts(scope)).length
+    const count = (yield* memory.facts(scope).pipe(Effect.orElseSucceed(() => []))).length
     if (!args.yes)
       return yield* fail(`This deletes ${count} fact(s) in ${scope} memory. Run again with --yes to confirm.`)
     yield* memory.purge(scope).pipe(Effect.catch((error) => fail(error.message)))
     yield* writeStdoutEffect(`Deleted ${scope} memory (${count} fact(s)).${EOL}`)
+  }),
+})
+
+export const MemoryOutdateCommand = effectCmd({
+  command: "outdate <id>",
+  describe: "mark a fact as no longer true: kept for history, but no longer recalled",
+  builder: (yargs) =>
+    yargs
+      .positional("id", { type: "string", demandOption: true })
+      .option("by", { type: "string", describe: "the id of the fact that replaces it" }),
+  handler: Effect.fn("Cli.memory.outdate")(function* (args) {
+    const memory = yield* Memory.Service
+    const verdict = yield* memory.decision()
+    if (!verdict.on) return yield* fail(`Memory is off: ${verdict.reason}. Turn it on to mark a fact outdated`)
+    const result = yield* memory
+      .outdate({ id: args.id, by: args.by, parent: yield* parent(), origin: "cli" })
+      .pipe(Effect.catch((error) => fail(error.message)))
+    const by = result.fact.replaced_by ? `, replaced by ${result.fact.replaced_by}` : ""
+    yield* writeStdoutEffect(
+      `Marked ${result.fact.id} in ${result.scope} memory outdated as of ${result.fact.invalid_at}${by}. It is kept, and no longer recalled.${EOL}`,
+    )
+  }),
+})
+
+function healthLines(health: Memory.Health[], encryption: MemoryStore.Mode) {
+  const lines: string[] = []
+  for (const item of health) {
+    if (item.error) {
+      lines.push(`${item.scope} memory: can't be read: ${item.error}`)
+      continue
+    }
+    const c = item.counts
+    lines.push(
+      `${item.scope} memory: ${item.facts} fact(s): ${c.active} active, ${c.outdated} outdated, ${c.expired + c.purge} expired, ${c.quarantined} quarantined`,
+    )
+    const ledger =
+      item.facts === 0 && !item.problems.length
+        ? "empty"
+        : [
+            item.unsealed
+              ? `not sealed yet (written before integrity checks; sealed when memory next starts)`
+              : "sealed",
+            item.encrypted
+              ? `encrypted (${item.encrypted} line(s))`
+              : encryption === "os-keychain"
+                ? "not encrypted yet (encrypted when memory next starts)"
+                : "not encrypted",
+          ].join(", ")
+    lines.push(`  ledger: ${ledger}`)
+    for (const problem of item.problems)
+      lines.push(`  QUARANTINED ${problem.id ?? "(unknown id)"} (facts.jsonl line ${problem.line}): ${problem.reason}`)
+  }
+  return lines
+}
+
+export const MemoryStatusCommand = effectCmd({
+  command: "status",
+  describe: "show whether memory is on, how many facts are in each state, and any quarantined facts",
+  handler: Effect.fn("Cli.memory.status")(function* () {
+    const memory = yield* Memory.Service
+    const verdict = yield* memory.decision()
+    const { retention, encryption } = yield* memory.policy()
+    const health = yield* memory.verify({ origin: "cli" })
+    const lines = [
+      verdict.on ? "Memory is on." : `Memory is off: ${verdict.reason}.`,
+      `Retention: ${retention.days ? `${retention.days} day(s), then ${retention.graceDays} day(s) before deletion` : "none (facts don't expire unless they have their own date)"}.`,
+      `Encryption: ${encryption === "os-keychain" ? `the ledger is encrypted with a key in the OS keychain (${MemoryKey.describe()}); the engine's database files are not` : "off"}.`,
+      ...healthLines(health, encryption),
+    ]
+    yield* writeStdoutEffect(lines.join(EOL) + EOL)
+  }),
+})
+
+export const MemoryVerifyCommand = effectCmd({
+  command: "verify",
+  describe: "re-check every ledger entry's integrity hash and the hash chain; quarantined facts are listed",
+  builder: (yargs) =>
+    yargs
+      .option("reseal", {
+        type: "boolean",
+        default: false,
+        describe: "accept the ledger as it is now (after you reviewed it): recompute every hash",
+      })
+      .option("scope", { ...scopeOption, describe: "with --reseal: which memory" }),
+  handler: Effect.fn("Cli.memory.verify")(function* (args) {
+    const memory = yield* Memory.Service
+    const { encryption } = yield* memory.policy()
+    if (args.reseal) {
+      if (!args.scope) return yield* fail("--reseal needs --scope project or --scope user")
+      const count = yield* memory
+        .reseal(args.scope as MemoryStore.Scope)
+        .pipe(Effect.catch((error) => fail(error.message)))
+      return yield* writeStdoutEffect(
+        `Resealed ${args.scope} memory: ${count} quarantined line(s) accepted as they are now.${EOL}`,
+      )
+    }
+    const health = yield* memory.verify({ origin: "cli", audit: true })
+    yield* writeStdoutEffect(healthLines(health, encryption).join(EOL) + EOL)
+    const bad = health.filter((item) => item.error || item.problems.length)
+    if (bad.length)
+      return yield* fail(
+        `Integrity check failed. Quarantined facts are not recalled. Forget them with lunos memory forget <id>, or, once you have checked them, accept them with lunos memory verify --reseal --scope <scope>.`,
+      )
+    yield* writeStdoutEffect(`Every ledger entry matches its hash, and the chain is unbroken.${EOL}`)
   }),
 })
 
@@ -198,7 +347,9 @@ export const MemoryExportCommand = effectCmd({
     const ctx = yield* InstanceState.context
     if (args.format === "markdown") {
       const dir = path.resolve(ctx.directory, args.dir ?? MemoryStore.exportDir(MemoryStore.projectRoot(ctx)))
-      const written = yield* MemoryExport.markdown({ dir, scopes: scopesOf(args.scope) })
+      const written = yield* MemoryExport.markdown({ dir, scopes: scopesOf(args.scope) }).pipe(
+        Effect.catch((error) => fail(error.message)),
+      )
       return yield* writeStdoutEffect(
         written ? `Wrote ${written} fact(s) to ${dir}${EOL}` : `No facts in memory; nothing written.${EOL}`,
       )
@@ -339,13 +490,16 @@ function nearCount(preview: MemoryImport.Preview) {
 
 export const MemoryCommand = cmd({
   command: "memory",
-  describe: "review, search, export, import and forget long-term memory",
+  describe: "review, search, export, import, outdate, verify and forget long-term memory",
   builder: (yargs) =>
     yargs
       .command(MemoryListCommand)
       .command(MemoryShowCommand)
       .command(MemorySearchCommand)
       .command(MemoryForgetCommand)
+      .command(MemoryOutdateCommand)
+      .command(MemoryStatusCommand)
+      .command(MemoryVerifyCommand)
       .command(MemoryPurgeCommand)
       .command(MemoryExportCommand)
       .command(MemoryImportCommand)

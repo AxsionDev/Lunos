@@ -5067,6 +5067,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
           }
         },
         "description": "List facts in long-term memory with where each came from. Does not start memory.",
@@ -5421,6 +5431,104 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.import({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/{id}/outdate": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.outdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fact marked outdated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "description": "Fact marked outdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/effect_HttpApiError_BadRequest"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MemoryNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryNotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.",
+        "summary": "Mark a fact outdated",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.outdate({\n  ...\n})"
           }
         ]
       }
@@ -21378,6 +21486,24 @@
               }
             },
             "additionalProperties": false
+          },
+          "retention": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "grace_days": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "encryption": {
+            "type": "string",
+            "enum": ["off", "os-keychain"]
           }
         },
         "additionalProperties": false
@@ -24023,9 +24149,36 @@
           },
           "originDate": {
             "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["active", "outdated", "expired", "purge", "quarantined"],
+            "description": "XCOD-136: active (recalled), outdated, expired (not recalled; deleted after the grace period), purge (due for deletion) or quarantined (failed the ledger's integrity check)"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["observed", "inferred"]
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "invalidAt": {
+            "type": "string"
+          },
+          "replacedBy": {
+            "type": "string"
+          },
+          "replaces": {
+            "type": "string"
+          },
+          "expires": {
+            "type": "string"
+          },
+          "quarantined": {
+            "type": "string"
           }
         },
-        "required": ["id", "scope", "text", "sessionID", "agent", "source", "date"],
+        "required": ["id", "scope", "text", "sessionID", "agent", "source", "date", "state"],
         "additionalProperties": false
       },
       "MemoryList": {
@@ -24048,6 +24201,20 @@
         "required": ["on", "facts"],
         "additionalProperties": false
       },
+      "MemoryUnavailableError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["MemoryUnavailableError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
       "MemoryNotFoundError": {
         "type": "object",
         "properties": {
@@ -24063,20 +24230,6 @@
           }
         },
         "required": ["_tag", "id", "message"],
-        "additionalProperties": false
-      },
-      "MemoryUnavailableError": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": ["MemoryUnavailableError"]
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": ["_tag", "message"],
         "additionalProperties": false
       },
       "MemoryExportInput": {

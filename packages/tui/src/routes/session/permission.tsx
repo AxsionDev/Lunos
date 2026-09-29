@@ -357,6 +357,41 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
               }
             }
 
+            // XCOD-94 / XCOD-136: what would be remembered, and the fact it contradicts, if any.
+            if (permission === "memory") {
+              const meta = props.request.metadata ?? {}
+              const fact = typeof meta["fact"] === "string" ? meta["fact"] : ""
+              const source = typeof meta["source"] === "string" ? meta["source"] : ""
+              const scope = typeof meta["scope"] === "string" ? meta["scope"] : ""
+              const kind = typeof meta["kind"] === "string" ? meta["kind"] : ""
+              const raw = meta["contradicts"]
+              const contradicts =
+                raw && typeof raw === "object" && typeof (raw as { text?: unknown }).text === "string"
+                  ? (raw as { id?: string; text: string })
+                  : undefined
+              return {
+                icon: "◆",
+                title: `Remember in ${scope || "project"} memory`,
+                body: (
+                  <box paddingLeft={1} gap={1}>
+                    <text fg={theme.text}>{fact}</text>
+                    <text fg={theme.textMuted}>{`From ${source}${kind ? ` · ${kind}` : ""}`}</text>
+                    <Show when={contradicts}>
+                      {(item) => (
+                        <box>
+                          <text fg={theme.warning}>{`Contradicts ${item().id ?? "a remembered fact"}:`}</text>
+                          <text fg={theme.text}>{item().text}</text>
+                          <text fg={theme.textMuted}>
+                            If you allow it, you'll be asked whether to replace the old fact or keep both.
+                          </text>
+                        </box>
+                      )}
+                    </Show>
+                  </box>
+                ),
+              }
+            }
+
             if (permission === "doom_loop") {
               return {
                 icon: "⟳",

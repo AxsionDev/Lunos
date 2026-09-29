@@ -68,8 +68,9 @@ async function indexFiles(scope: MemoryStore.Scope, root: string) {
 }
 
 /** One fact as Markdown with its provenance: XCOD-94's `--format markdown` and `lunos memory show`. */
-export function markdownFile(scope: MemoryStore.Scope, fact: MemoryStore.Fact) {
+export function markdownFile(scope: MemoryStore.Scope, fact: MemoryStore.Fact, expires?: Date) {
   const p = fact.provenance
+  const optional = (key: string, value: string | undefined) => (value ? [`${key}: ${value}`] : [])
   return [
     "---",
     `id: ${fact.id}`,
@@ -78,6 +79,16 @@ export function markdownFile(scope: MemoryStore.Scope, fact: MemoryStore.Fact) {
     `source: ${JSON.stringify(p.source)}`,
     `session: ${p.sessionID}`,
     `agent: ${p.agent}`,
+    // XCOD-136: the fact's lifecycle.
+    // Only what differs from a plain active fact, so an active fact's file is what XCOD-94 wrote.
+    ...optional("status", fact.status === "outdated" ? "outdated" : undefined),
+    ...optional("kind", fact.kind),
+    ...optional("valid_from", fact.valid_from),
+    ...optional("invalid_at", fact.invalid_at),
+    ...optional("replaced_by", fact.replaced_by),
+    ...optional("replaces", fact.replaces),
+    ...optional("expires", expires?.toISOString() ?? fact.expires),
+    ...optional("quarantined", fact.quarantined && JSON.stringify(fact.quarantined)),
     "---",
     "",
     fact.text,
@@ -93,7 +104,9 @@ export const markdown = Effect.fn("MemoryExport.markdown")(function* (input: {
   const memory = yield* Memory.Service
   let written = 0
   for (const scope of input.scopes) {
-    const facts = yield* memory.facts(scope)
+    // Quarantined facts failed the ledger's integrity check: Lunos can't vouch for them, so they are
+    // left out of every export (XCOD-136). `lunos memory verify` lists them.
+    const facts = (yield* memory.facts(scope)).filter((fact) => !fact.quarantined)
     if (!facts.length) continue
     const target = path.join(input.dir, scope)
     yield* Effect.promise(() => fs.mkdir(target, { recursive: true }))
@@ -117,9 +130,13 @@ export const run = Effect.fn("MemoryExport.run")(function* (options: Options) {
 
   const facts: MemoryBundle.Fact[] = []
   const known = new Map<MemoryStore.Scope, Set<string>>()
+  let quarantined = 0
   for (const scope of options.scopes) {
-    const kept = (yield* memory.facts(scope)).filter(
-      (item) => !options.since || new Date(item.provenance.date).getTime() >= options.since.getTime(),
+    const all = yield* memory.facts(scope)
+    quarantined += all.filter((item) => item.quarantined).length
+    const kept = all.filter(
+      (item) =>
+        !item.quarantined && (!options.since || new Date(item.provenance.date).getTime() >= options.since.getTime()),
     )
     known.set(scope, new Set(kept.map((item) => item.id)))
     facts.push(...kept.map((item) => MemoryBundle.fact(scope, item)))
@@ -183,6 +200,7 @@ export const run = Effect.fn("MemoryExport.run")(function* (options: Options) {
       graphOmitted,
       notes: noteFiles,
       index,
+      quarantined,
     }),
   )
   yield* Effect.tryPromise({
@@ -197,6 +215,7 @@ export const run = Effect.fn("MemoryExport.run")(function* (options: Options) {
     encrypted: encrypt,
     index: options.includeIndex,
     graph: !graphOmitted,
+    quarantined,
   })
   return { path: out, manifest: bundle.manifest, encrypted: encrypt }
 })

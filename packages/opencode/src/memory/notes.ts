@@ -108,7 +108,7 @@ export async function sync(input: { backend: MemoryBackend.Backend; worktree: st
           source,
           date: new Date().toISOString(),
         },
-        imported && { imported: imported.imported, origin: imported.origin },
+        imported ? { imported: imported.imported, origin: imported.origin, kind: "observed" } : { kind: "observed" },
       )
       .catch((error: Error) => skipped.push(`${source}: ${error.message}`))
   }

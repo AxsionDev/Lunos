@@ -55,7 +55,15 @@ export interface Candidate {
   from: string
   /** Notes only: the file in `.opencode/memory/` it goes into. */
   note?: string
+  /** XCOD-136: lifecycle fields the input carried, kept on import. */
+  lifecycle?: Lifecycle
+  /** The fact's id in the input (bundles), so `replaced_by` links can be carried over to the new ids. */
+  inputID?: string
+  /** Outdated facts: the input id of the fact that replaced it. */
+  replacedBy?: string
 }
+
+export type Lifecycle = Pick<MemoryStore.Fact, "status" | "kind" | "expires" | "valid_from" | "invalid_at">
 
 /** A note file to restore: its original text (so headings survive) and its marker. */
 export interface NoteFile {
@@ -266,6 +274,12 @@ function bundleFact(line: string, index: number): MemoryBundle.Fact {
   if (value.scope !== "project" && value.scope !== "user") throw bad("scope must be project or user")
   if (!isProvenance(value.provenance)) throw bad("provenance needs sessionID, agent, source and date")
   if (value.origin !== undefined && !isProvenance(value.origin)) throw bad("origin is not a provenance")
+  if (value.status !== undefined && value.status !== "active" && value.status !== "outdated")
+    throw bad("status must be active or outdated")
+  if (value.kind !== undefined && value.kind !== null && value.kind !== "observed" && value.kind !== "inferred")
+    throw bad("kind must be observed, inferred or null")
+  for (const key of ["valid_from", "invalid_at", "replaced_by", "expires"] as const)
+    if (value[key] !== undefined && typeof value[key] !== "string") throw bad(`${key} must be a string`)
   return value as unknown as MemoryBundle.Fact
 }
 
@@ -363,6 +377,9 @@ function bundle(
       origin: provenanceOf(item.origin ?? item.provenance),
       file: `facts.jsonl:${index + 1}`,
       from,
+      lifecycle: lifecycleOf(item),
+      inputID: typeof item.id === "string" ? item.id : undefined,
+      replacedBy: item.status === "outdated" && item.replaced_by ? item.replaced_by : undefined,
     })
   })
   if (!input.asFacts)
@@ -390,6 +407,25 @@ function bundle(
     bundle: { format, created: String(manifest.created ?? ""), counts, encrypted: input.encrypted },
     warnings,
   }
+}
+
+/** The lifecycle fields worth keeping from a bundle fact (XCOD-136). All optional in `lunos-memory/1`. */
+function lifecycleOf(item: {
+  status?: string
+  kind?: string | null
+  expires?: string
+  valid_from?: string
+  invalid_at?: string
+}): Lifecycle | undefined {
+  const out: Lifecycle = {}
+  if (item.status === "outdated") {
+    out.status = "outdated"
+    out.invalid_at = item.invalid_at ?? new Date().toISOString()
+  }
+  if (item.kind === "observed" || item.kind === "inferred") out.kind = item.kind
+  if (item.expires && !Number.isNaN(new Date(item.expires).getTime())) out.expires = item.expires
+  if (item.valid_from) out.valid_from = item.valid_from
+  return Object.keys(out).length ? out : undefined
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -489,6 +525,7 @@ export function markdown(input: { file: string; path: string; text: string; from
           source: unquote(fields.source),
           date: fields.date,
         },
+        lifecycle: lifecycleOf(fields),
       })
     return { candidates, notes }
   }
@@ -621,7 +658,7 @@ function rowKey(item: Candidate, scope: MemoryStore.Scope) {
 
 export function plan(
   source: Source,
-  input: { existing: Existing; limits: MemoryBackend.Limits; target?: MemoryStore.Scope },
+  input: { existing: Existing; limits: MemoryBackend.Limits; target?: MemoryStore.Scope; now?: Date },
 ): Plan {
   type Known = { id?: string; text: string; words: string[]; set: Set<string> }
   const known = (id: string | undefined, text: string): Known => {
@@ -666,6 +703,11 @@ export function plan(
       rows.push(row("rejected", refusal))
       continue
     }
+    const expires = item.lifecycle?.expires
+    if (expires && new Date(expires).getTime() <= (input.now ?? new Date()).getTime()) {
+      rows.push(row("rejected", `it expired on ${expires.slice(0, 10)}`))
+      continue
+    }
     const id = exact[scope].get(item.text)
     if (id) {
       rows.push(row("duplicate", `already in ${scope} memory`, { other: { id, text: item.text } }))
@@ -682,6 +724,11 @@ export function plan(
     }
     seen.add(dedupe)
     const mine = known(undefined, item.text)
+    // An outdated fact is history: it can't contradict or nearly duplicate what is true now.
+    if (item.lifecycle?.status === "outdated") {
+      rows.push(row("new", `outdated ${scope} fact, kept as history (not recalled)`))
+      continue
+    }
     const near = pool[scope].find((other) => jaccard(mine.set, other.set) >= NEAR)
     if (near) {
       rows.push(
@@ -909,6 +956,13 @@ export const run = Effect.fn("MemoryImport.run")(function* (
 
   const date = new Date().toISOString()
   const failed: Result["failed"] = []
+  /** Input id → the id the fact has here: new, or the existing fact it duplicates. */
+  const ids = new Map<string, { scope: MemoryStore.Scope; id: string }>()
+  shown.rows.forEach((row, index) => {
+    const candidate = source.candidates[index]
+    if (candidate.inputID && row.status === "duplicate" && row.other?.id)
+      ids.set(candidate.inputID, { scope: row.scope, id: row.other.id })
+  })
   // Notes first: the notes sync stores their paragraphs when project memory starts.
   const written: string[] = []
   const noteRows = chosen.filter((item) => item.row.kind === "note")
@@ -931,12 +985,26 @@ export const run = Effect.fn("MemoryImport.run")(function* (
         origin: candidate.origin,
         imported: { from: candidate.from, date },
         parent: options.parent,
+        lifecycle: candidate.lifecycle,
       })
       .pipe(
-        Effect.as(true),
+        Effect.map((fact) => {
+          if (candidate.inputID) ids.set(candidate.inputID, { scope: row.scope, id: fact.id })
+          return true
+        }),
         Effect.catch((error) => Effect.sync(() => (failed.push({ text: row.text, reason: error.message }), false))),
       )
     if (stored) facts++
+  }
+  // Outdated facts point at their replacement by its new id, when it is here in the same scope.
+  for (const { row, candidate } of chosen) {
+    if (row.kind !== "fact" || !candidate.replacedBy || !candidate.inputID) continue
+    const self = ids.get(candidate.inputID)
+    const by = ids.get(candidate.replacedBy)
+    if (!self || !by || by.scope !== self.scope) continue
+    yield* memory
+      .link({ scope: self.scope, id: self.id, by: by.id })
+      .pipe(Effect.catch((error) => Effect.sync(() => failed.push({ text: row.text, reason: error.message }))))
   }
   if (written.length) {
     const skipped = yield* memory.syncNotes(options.parent)

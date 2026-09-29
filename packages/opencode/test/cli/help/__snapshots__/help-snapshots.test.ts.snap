@@ -408,13 +408,19 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory --help 1`] = `
 "lunos memory
 
-review, search, export, import and forget long-term memory
+review, search, export, import, outdate, verify and forget long-term memory
 
 Commands:
-  lunos memory list            list remembered facts, with where each came from
+  lunos memory list            list remembered facts, with where each came from and their state
   lunos memory show <id>       show one fact and its provenance
   lunos memory search <query>  search memory the way the agent does
   lunos memory forget <id>     remove one fact from memory
+  lunos memory outdate <id>    mark a fact as no longer true: kept for history, but no longer
+                               recalled
+  lunos memory status          show whether memory is on, how many facts are in each state, and any
+                               quarantined facts
+  lunos memory verify          re-check every ledger entry's integrity hash and the hash chain;
+                               quarantined facts are listed
   lunos memory purge           delete all of a memory's stored facts and graph (hand-written notes
                                are kept)
   lunos memory export          export all memory as a versioned bundle (facts, graph, notes,
