@@ -154,6 +154,8 @@ export type TuiInput = {
   args: Args
   config: TuiConfig.Resolved
   onSnapshot?: () => Promise<string[]>
+  /** Called once the app listens for server events, so one-off events sent after it aren't lost. */
+  onListening?: () => void
   directory?: string
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
@@ -310,6 +312,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                   <LocationProvider>
                                                                     <App
                                                                       onSnapshot={input.onSnapshot}
+                                                                      onListening={input.onListening}
                                                                       pluginHost={input.pluginHost}
                                                                     />
                                                                   </LocationProvider>
@@ -357,7 +360,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
   })
 })
 
-function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPluginHost }) {
+function App(props: { onSnapshot?: () => Promise<string[]>; onListening?: () => void; pluginHost: TuiPluginHost }) {
   const startup = useTuiStartup()
   const tuiConfig = useTuiConfig()
   const route = useRoute()
@@ -1157,6 +1160,9 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (choice !== true) return
     await runUpgrade(version)
   })
+  // The update check (XCOD-147) starts only once mounted, when the SDK's event subscription (set up
+  // in its provider's onMount, which runs first) and the handler above both exist.
+  onMount(() => props.onListening?.())
 
   const plugin = createMemo(() => {
     if (!ready()) return
