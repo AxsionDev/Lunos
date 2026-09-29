@@ -162,6 +162,38 @@ const scenarios: Scenario[] = [
     .at((ctx) => ({ path: "/config", headers: ctx.headers(), body: { username: 1 } }))
     .status(400),
   http.protected.get("/config/providers", "config.providers").json(),
+  http.protected.get("/config/settings", "config.settings").json(200, (body) => {
+    object(body)
+    array(body.rows)
+    check(
+      (body.rows as { key: string }[]).some((row) => row.key === "share"),
+      "settings should list the share key",
+    )
+  }),
+  http.protected
+    .patch("/config/settings", "config.settingsSet.invalid")
+    .at((ctx) => ({
+      path: "/config/settings",
+      headers: ctx.headers(),
+      body: { key: "autoupdate", value: "sometimes", scope: "project" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === false, "an invalid value should be refused")
+      check(String(body.error).includes("Allowed values"), "the refusal should list the allowed values")
+    }),
+  http.protected
+    .patch("/config/settings", "config.settingsSet")
+    .mutating()
+    .at((ctx) => ({
+      path: "/config/settings",
+      headers: ctx.headers(),
+      body: { key: "snapshot", value: "false", scope: "project" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === true, "a valid project setting should be written")
+    }),
   http.protected.get("/project", "project.list").json(200, array, "status"),
   http.protected.get("/project/current", "project.current").json(
     200,
@@ -263,6 +295,20 @@ const scenarios: Scenario[] = [
     .status(204, undefined, "status"),
   http.protected.get("/provider", "provider.list").json(),
   http.protected.get("/provider/auth", "provider.auth").json(),
+  http.protected
+    .get("/provider/configured", "provider.configured")
+    .seeded(() =>
+      Effect.promise(() =>
+        Bun.write(
+          path.join(exerciseDataDirectory, "auth.json"),
+          JSON.stringify({ "httpapi-configured": { type: "api", key: "must-not-leak" } }),
+        ),
+      ),
+    )
+    .json(200, (body) => {
+      array(body)
+      check(!JSON.stringify(body).includes("must-not-leak"), "configured providers must not expose credential secrets")
+    }),
   http.protected
     .post("/provider/{providerID}/oauth/authorize", "provider.oauth.authorize")
     .at((ctx) => ({

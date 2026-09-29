@@ -42,5 +42,20 @@ export const Info = Schema.Struct({
   })
     .pipe(Schema.optional)
     .annotate({ description: "Size caps" }),
+  retention: Schema.Struct({
+    days: Schema.Int.check(Schema.isGreaterThan(0)).pipe(Schema.optional).annotate({
+      description:
+        "Facts expire this many days after they were saved (default: never). Hand-written notes never expire. Expired facts are not recalled, and are deleted after grace_days",
+    }),
+    grace_days: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.optional).annotate({
+      description: "Days an expired fact is kept, not recalled, before it is deleted (default 7)",
+    }),
+  })
+    .pipe(Schema.optional)
+    .annotate({ description: "How long facts are kept" }),
+  encryption: Schema.Literals(["off", "os-keychain"]).pipe(Schema.optional).annotate({
+    description:
+      'Encrypt the provenance ledger (facts.jsonl) with a key kept in the OS keychain: "os-keychain", or "off" (the default). The memory engine\'s own database files are not encrypted; use full-disk encryption for those',
+  }),
 }).annotate({ identifier: "MemoryConfig" })
 export type Info = Schema.Schema.Type<typeof Info>

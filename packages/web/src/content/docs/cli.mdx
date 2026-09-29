@@ -465,7 +465,7 @@ opencode stats
 
 ### memory
 
-Review long-term memory (see [Rules: long-term memory](/docs/rules#long-term-memory)). `list`, `show` and `export` read what is stored without starting memory.
+Review long-term memory (see [Rules: long-term memory](/docs/rules#long-term-memory)). `list`, `show` and `export --format markdown` read what is stored without starting memory. A bundle export starts memory to read the graph, unless you pass `--no-graph`.
 
 ```bash
 opencode memory list [--scope project|user]
@@ -473,12 +473,34 @@ opencode memory show <id>
 opencode memory search <query>
 opencode memory forget <id>
 opencode memory purge --scope project|user --yes
-opencode memory export [--scope project|user] [--dir <path>]
+opencode memory export [--format bundle|markdown] [--scope project|user|both] [--since <date>]
+                       [--out <path>] [--zip] [--encrypt] [--no-graph] [--include-index] [--dir <path>]
+opencode memory import <path> [--scope project|user] [--yes] [--dry-run] [--as-facts] [--include-conflicts]
 ```
 
-- `export` writes one Markdown file per fact, with its provenance, to `.opencode/memory/export/` so you can review memory in git.
-- `forget` removes the fact from memory and from that export folder.
+- `export` writes all of memory as a versioned bundle (facts, graph, notes and provenance) to `./lunos-memory-<time>/`, or a `.zip` with `--zip`, or an encrypted `.zip.enc` with `--encrypt`. See [Rules: exporting memory](/docs/rules#exporting-memory).
+- `export --format markdown` writes one Markdown file per fact, with its provenance, to `.opencode/memory/export/` (or `--dir`) so you can review memory in git.
+- `forget` removes the fact from memory and from that Markdown export folder. Bundles already written are snapshots and keep it.
+- `import` reads a bundle, Markdown, or `AGENTS.md` / `CLAUDE.md` / Claude Code memory, verifies and screens every fact, and shows a preview of new, duplicate, conflict and rejected rows. It writes only with `--yes`. See [Rules: importing memory](/docs/rules#importing-memory).
 - `purge` deletes a memory's stored facts and graph. Your notes in `.opencode/memory/*.md` are kept.
+
+---
+
+### settings
+
+View and change settings. With no subcommand it opens the TUI on the [settings screen](/docs/tui#settings-1).
+
+```bash
+opencode settings
+opencode settings list [--json]
+opencode settings get <key>
+opencode settings set <key> <value> [--project]
+```
+
+- `set` writes your user config, or `.opencode/opencode.json` with `--project`, keeping comments. It
+  validates the value against the config schema and refuses keys locked by your organisation, exiting
+  non-zero with the reason. Lists take comma-separated values or JSON; structured settings take JSON.
+- See [Config: Settings](/docs/config#settings).
 
 ---
 
@@ -650,25 +672,48 @@ opencode uninstall
 
 ---
 
-### upgrade
+### update
 
-Updates opencode to the latest version or a specific version.
-
-```bash
-opencode upgrade [target]
-```
-
-To upgrade to the latest version.
+Updates Lunos to the latest version or a specific version. `lunos upgrade` is an alias and still works.
 
 ```bash
-opencode upgrade
+lunos update [target]
 ```
 
-To upgrade to a specific version.
+To update to the latest version.
 
 ```bash
-opencode upgrade v0.1.48
+lunos update
 ```
+
+When you're already on the latest version, this prints `Lunos is up to date (X.Y.Z).` and exits 0.
+
+To update to a specific version.
+
+```bash
+lunos update v0.1.48
+```
+
+If the update fails, Lunos prints the command to run by hand. For npm installs that's
+`npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`.
+
+A running TUI keeps using the old version until it restarts. After `/update` in the TUI, run
+`/restart`: it starts the newly installed version back in the same session. See
+[`/restart`](/docs/tui#restart).
+
+#### New version notice
+
+Every time Lunos starts it asks the npm registry (`lunos-ai`, or the registry in your `.npmrc`) for
+the latest version. The check runs in the background, never delays startup, and gives up after 3
+seconds; if it fails, the last known result is used.
+
+- In the TUI, the bottom-right corner shows `There is a new version: X.Y.Z — please run lunos update`
+  on every screen until you update (`New version: X.Y.Z · lunos update` below 100 columns).
+- Plain commands such as `lunos models` print `There is a new version: X.Y.Z — please run "lunos update"`
+  to stderr, at most once a day. It never goes to stdout, so piped output stays clean.
+
+No check is made, and no notice shown, with `"autoupdate": false`, `LUNOS_DISABLE_AUTOUPDATE=1`,
+`LUNOS_OFFLINE=1`, or when an organisation policy sets `"autoupdate": false`.
 
 #### Flags
 

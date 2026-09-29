@@ -46,6 +46,7 @@ export const Definitions = {
   leader: keybind(LeaderDefault, "Leader key for keybind combinations"),
 
   app_exit: keybind("ctrl+c,ctrl+d,<leader>q", "Exit the application"),
+  app_restart: keybind("none", "Restart Lunos"),
   app_debug: keybind("none", "Toggle debug panel"),
   app_console: keybind("none", "Toggle console"),
   app_heap_snapshot: keybind("none", "Write heap snapshot"),
@@ -125,7 +126,7 @@ export const Definitions = {
   model_cycle_favorite: keybind("none", "Next favorite model"),
   model_cycle_favorite_reverse: keybind("none", "Previous favorite model"),
   mcp_list: keybind("none", "List MCP servers"),
-  provider_connect: keybind("none", "Connect provider"),
+  provider_list: keybind("none", "Manage providers"),
   console_org_switch: keybind("none", "Switch console organization"),
   mode_list: keybind("<leader>a", "List modes"),
   mode_cycle: keybind("tab", "Next mode"),
@@ -213,6 +214,11 @@ export const Definitions = {
   "dialog.move_session.delete": keybind("ctrl+d", "Delete project copy"),
   "dialog.move_session.refresh": keybind("ctrl+r", "Refresh project copies"),
   "dialog.memory.forget": keybind("ctrl+d", "Forget a fact in the memory browser"),
+  "dialog.memory.outdate": keybind("ctrl+u", "Mark a fact outdated in the memory browser"),
+  "dialog.memory.export": keybind("ctrl+s", "Export memory from the memory browser"),
+  "dialog.memory.import": keybind("ctrl+o", "Import memory from the memory browser"),
+  "dialog.memory.import.all": keybind("ctrl+a", "Approve or reject every importable row in the import preview"),
+  "dialog.memory.import.apply": keybind("ctrl+s", "Write the approved rows of the import preview"),
   "prompt.autocomplete.prev": keybind("up,ctrl+p", "Move to previous autocomplete item"),
   "prompt.autocomplete.next": keybind("down,ctrl+n", "Move to next autocomplete item"),
   "prompt.autocomplete.hide": keybind("escape", "Hide autocomplete"),
@@ -256,14 +262,18 @@ export const KeybindAliases: Record<string, KeybindName> = {
   agent_list: "mode_list",
   agent_cycle: "mode_cycle",
   agent_cycle_reverse: "mode_cycle_reverse",
+  // XCOD-130: the provider command was renamed to /providers.
+  provider_connect: "provider_list",
 }
 
 export const KeybindOverrides = Schema.Struct(
   Object.fromEntries(
-    Object.entries(Definitions).map(([name, item]) => [
-      name,
-      Schema.optional(BindingValueSchema).annotate({ description: item.description }),
-    ]),
+    [
+      ...Object.entries(Definitions).map(([name, item]) => [name, item.description]),
+      // Legacy names stay in the schema so a config decode keeps them for resolveKeybindAliases,
+      // which maps them onto their canonical names and reports them as deprecated.
+      ...Object.entries(KeybindAliases).map(([legacy, canonical]) => [legacy, `Deprecated: use ${canonical}`]),
+    ].map(([name, description]) => [name, Schema.optional(BindingValueSchema).annotate({ description })]),
   ),
 ).annotate({ description: "TUI keybinding overrides" })
 export const Descriptions = Object.fromEntries(
@@ -271,6 +281,7 @@ export const Descriptions = Object.fromEntries(
 ) as Record<KeybindName, string>
 export const CommandMap = {
   app_exit: "app.exit",
+  app_restart: "app.restart",
   app_debug: "app.debug",
   app_console: "app.console",
   app_heap_snapshot: "app.heap_snapshot",
@@ -347,7 +358,7 @@ export const CommandMap = {
   model_cycle_favorite: "model.cycle_favorite",
   model_cycle_favorite_reverse: "model.cycle_favorite_reverse",
   mcp_list: "mcp.list",
-  provider_connect: "provider.connect",
+  provider_list: "provider.list",
   console_org_switch: "console.org.switch",
   mode_list: "mode.list",
   mode_cycle: "mode.cycle",
@@ -502,7 +513,7 @@ export function parse(keybinds: KeybindOverrides): Keybinds {
 export const Keybinds = { parse }
 
 export function unknownKeys(input: object) {
-  return Object.keys(input).filter((key) => !KeybindNames.has(key))
+  return Object.keys(input).filter((key) => !KeybindNames.has(key) && !(key in KeybindAliases))
 }
 
 export function bindingDefaults(): BindingDefaults<Renderable, KeyEvent> {

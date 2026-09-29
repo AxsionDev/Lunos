@@ -38,11 +38,19 @@ lunos memory list              # every fact, with where it came from
 lunos memory show <id>
 lunos memory search <query>    # what the agent would recall
 lunos memory forget <id>       # removes the fact and the graph data only it produced
-lunos memory export            # one Markdown file per fact, for review
+lunos memory export            # everything, as a versioned bundle you can back up or move
+lunos memory export --format markdown   # one Markdown file per fact, for review
+lunos memory import <path>     # a bundle, Markdown or AGENTS.md; previews first
 lunos memory purge             # delete a memory's facts and graph
 ```
 
-In the TUI, `/memory` opens the same list.
+In the TUI, `/memory` opens the same list, `ctrl+s` exports it and `ctrl+o` imports.
+
+## Take it with you
+
+`lunos memory export` writes all of memory, both scopes, to one bundle: every fact with its provenance, the graph of entities and relationships (each tied to the facts it came from), your notes, and a manifest with a SHA-256 for every file. `SCHEMA.md` inside the bundle documents the format, so other tools can read it without Lunos. Add `--zip`, or `--encrypt` for a passphrase-locked archive that decrypts with a standard `openssl` command. Embeddings are left out: they are rebuilt from the facts.
+
+`lunos memory import` brings a bundle back on another machine, or your `AGENTS.md`, `CLAUDE.md` and Claude Code memory notes. Imported memory is treated as untrusted: the bundle's checksums are verified, every fact goes through the same checks as the agent's own writes (secrets, instruction-shaped text, size), and you see a preview of what is new, duplicate, conflicting or rejected before anything is written. Imported facts keep their original provenance and are labelled "imported" when recalled.
 
 ## Network
 

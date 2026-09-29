@@ -274,6 +274,16 @@ export namespace FSUtil {
     return current
   }
 
+  /**
+   * A model-supplied path made absolute against `base` (the instance directory) and spelled
+   * as on disk. On Windows a rooted path without a drive (`/Users/me/x`, `\Users\me\x`) takes
+   * its drive from `base`, not from the process's cwd, which can be on another drive (XCOD-137).
+   * Git-bash/WSL spellings (`/c/…`, `/mnt/c/…`) are converted first.
+   */
+  export function resolveOnDisk(base: string, p: string): string {
+    return onDiskCase(pathResolve(base, windowsPath(p)))
+  }
+
   export function normalizePathPattern(p: string): string {
     if (process.platform !== "win32") return p
     if (p === "*") return p

@@ -109,11 +109,16 @@ export function onRefused(listener: (refusal: Refusal) => void) {
  */
 export const refused = (key: string, via: string) =>
   Effect.gen(function* () {
-    const refusal = { key, via, at: new Date().toISOString() }
     yield* Effect.logWarning(message(key), { via })
-    for (const listener of listeners) listener(refusal)
-    return refusal
+    return notifyRefused(key, via)
   })
+
+/** `refused` for callers outside Effect (the settings writer, XCOD-128). */
+export function notifyRefused(key: string, via: string) {
+  const refusal = { key, via, at: new Date().toISOString() }
+  for (const listener of listeners) listener(refusal)
+  return refusal
+}
 
 /** `$locked` means nothing outside managed config, and must never be written back to it. */
 export function strip<T>(doc: T): T {

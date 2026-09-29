@@ -1,6 +1,7 @@
 import { Config } from "@/config/config"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { Provider } from "@/provider/provider"
+import { ConfigSettings } from "@/config/settings"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
@@ -33,6 +34,29 @@ export const ConfigApi = HttpApi.make("config")
             identifier: "config.update",
             summary: "Update configuration",
             description: "Update OpenCode configuration settings and preferences.",
+          }),
+        ),
+        HttpApiEndpoint.get("settings", `${root}/settings`, {
+          query: WorkspaceRoutingQuery,
+          success: described(ConfigSettings.SnapshotSchema, "Every setting, with value, source and lock"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.settings",
+            summary: "List settings",
+            description:
+              "Every configuration option generated from the config schema, with its current value (secrets masked), the layer it came from, whether organisation policy locks it, the loaded config files and 30-day usage.",
+          }),
+        ),
+        HttpApiEndpoint.patch("settingsSet", `${root}/settings`, {
+          query: WorkspaceRoutingQuery,
+          payload: ConfigSettings.SetInput,
+          success: described(ConfigSettings.SetOutput, "Result of the change"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.settingsSet",
+            summary: "Change one setting",
+            description:
+              "Validate one setting against the config schema and write it to the user or project config, keeping comments. Refuses keys locked by organisation policy.",
           }),
         ),
         HttpApiEndpoint.get("providers", `${root}/providers`, {

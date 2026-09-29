@@ -1,5 +1,6 @@
 import { ProviderAuth } from "@/provider/auth"
 import { Provider } from "@/provider/provider"
+import { ProviderConfigured } from "@/provider/configured"
 
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
@@ -43,6 +44,17 @@ export const ProviderApi = HttpApi.make("provider")
             identifier: "provider.list",
             summary: "List providers",
             description: "Get a list of all available AI providers, including both available and connected ones.",
+          }),
+        ),
+        HttpApiEndpoint.get("configured", `${root}/configured`, {
+          query: WorkspaceRoutingQuery,
+          success: described(ProviderConfigured.List, "Configured providers"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "provider.configured",
+            summary: "List configured providers",
+            description:
+              "List the providers with a stored credential or loaded from the environment or config, with auth method, status and jurisdiction. Never includes secrets.",
           }),
         ),
         HttpApiEndpoint.get("auth", `${root}/auth`, {

@@ -29,9 +29,18 @@ export const EVENTS = [
   "marketplace.install",
   "marketplace.refused",
   "policy.override_refused",
-  // Long-term memory (XCOD-94). `memory.forget` is emitted by the review surface (part 3).
-  "memory.write",
+  // Long-term memory (XCOD-94, XCOD-136). Ids, counts, hashes and where the operation came from;
+  // never a fact's text or a recall query. `memory.remember` was `memory.write` before XCOD-136.
+  "memory.remember",
+  "memory.recall",
   "memory.forget",
+  "memory.outdate",
+  "memory.purge",
+  "memory.verify_failed",
+  // XCOD-132: a bundle export. Counts and options only, never content or the passphrase.
+  "memory.export",
+  // XCOD-133: an import that wrote something. Counts and the input's SHA-256, never text or paths.
+  "memory.import",
   "upgrade",
   "audit.forward_refused",
 ] as const

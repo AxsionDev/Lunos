@@ -7,16 +7,25 @@ import { useSDK } from "../context/sdk"
 import { useTheme } from "../context/theme"
 import { useCommandShortcut } from "../keymap"
 import { errorMessage } from "../util/error"
+import { exportMemory } from "./dialog-memory-export"
+import { importMemory } from "./dialog-memory-import"
 
 // XCOD-94: the memory browser. Lists every remembered fact with where it came from (read from
 // the provenance ledger, so opening it never starts memory), shows the entities and relationships
-// around the highlighted fact, and forgets a fact on a double press of the forget key.
+// around the highlighted fact, and forgets a fact on a double press of the forget key. Export
+// (XCOD-132) writes all of memory out as a bundle or Markdown, with the CLI's options. Import
+// (XCOD-133) previews an import, with approve/reject per row, before anything is written. Outdate
+// (XCOD-136) marks a fact as no longer true on a double press: it is kept, but not recalled. Each
+// fact shows its state: outdated, expired, quarantined (failed the ledger's integrity check), and
+// whether the agent inferred it.
 export function DialogMemory() {
   const dialog = useDialog()
   const sdk = useSDK()
   const toast = useToast()
   const { theme } = useTheme()
   const forgetHint = useCommandShortcut("dialog.memory.forget")
+  const outdateHint = useCommandShortcut("dialog.memory.outdate")
+  const [toOutdate, setToOutdate] = createSignal<string>()
   dialog.setSize("large")
 
   const [loadError, setLoadError] = createSignal<unknown>()
@@ -55,10 +64,23 @@ export function DialogMemory() {
     const connections = related()
     return facts.map((fact) => {
       const isForgetting = toForget() === fact.id
+      const isOutdating = toOutdate() === fact.id
+      const state =
+        fact.state === "active"
+          ? ""
+          : fact.state === "outdated"
+            ? `outdated ${fact.invalidAt?.slice(0, 10) ?? ""}${fact.replacedBy ? ` → ${fact.replacedBy}` : ""}`
+            : fact.state === "quarantined"
+              ? `QUARANTINED: ${fact.quarantined ?? ""}`
+              : `expired ${fact.expires?.slice(0, 10) ?? ""}`
       const details =
         highlighted() === fact.id
           ? [
-              `${fact.scope} memory · ${fact.date.slice(0, 10)} · from ${fact.source} · ${fact.agent} · ${fact.sessionID}`,
+              ...(state ? [state] : []),
+              ...(fact.kind === "inferred" ? ["inferred by the agent"] : []),
+              fact.importedFrom
+                ? `imported · ${fact.scope} memory · ${fact.date.slice(0, 10)} · from ${fact.importedFrom}${fact.originSource ? ` · originally ${fact.originSource}, ${fact.originDate?.slice(0, 10)}` : ""}`
+                : `${fact.scope} memory · ${fact.date.slice(0, 10)} · from ${fact.source} · ${fact.agent} · ${fact.sessionID}`,
               ...(connections?.id === fact.id
                 ? connections.lines.length
                   ? connections.lines.map((line) => `  ${line}`)
@@ -69,8 +91,12 @@ export function DialogMemory() {
             ]
           : undefined
       return {
-        title: isForgetting ? `Press ${forgetHint()} again to forget` : fact.text.replace(/\s+/g, " "),
-        bg: isForgetting ? theme.error : undefined,
+        title: isForgetting
+          ? `Press ${forgetHint()} again to forget`
+          : isOutdating
+            ? `Press ${outdateHint()} again to mark outdated`
+            : `${fact.state === "active" ? "" : `[${fact.state === "purge" ? "expired" : fact.state}] `}${fact.text.replace(/\s+/g, " ")}`,
+        bg: isForgetting ? theme.error : isOutdating ? theme.warning : undefined,
         value: fact.id,
         category: fact.scope === "project" ? "Project memory" : "User memory",
         details,
@@ -106,10 +132,60 @@ export function DialogMemory() {
       emptyView={emptyView()}
       onMove={(option) => {
         setToForget(undefined)
+        setToOutdate(undefined)
         setHighlighted(option.value)
       }}
       onSelect={(option) => setHighlighted(option.value)}
       actions={[
+        {
+          command: "dialog.memory.export",
+          title: "export",
+          disabled: () => !memory()?.facts.length,
+          onTrigger: () => exportMemory({ dialog, sdk, toast }),
+        },
+        {
+          command: "dialog.memory.import",
+          title: "import",
+          withoutSelection: true,
+          disabled: () => memory()?.on !== true,
+          onTrigger: () =>
+            importMemory({
+              dialog,
+              sdk,
+              toast,
+              onDone: () => dialog.replace(() => <DialogMemory />),
+            }),
+        },
+        {
+          command: "dialog.memory.outdate",
+          title: "outdate",
+          disabled: () => memory()?.on !== true,
+          onTrigger: async (option) => {
+            const fact = memory()?.facts.find((item) => item.id === option.value)
+            if (fact?.state !== "active") {
+              toast.show({
+                variant: "error",
+                title: "Not active",
+                message: "Only an active fact can be marked outdated.",
+              })
+              return
+            }
+            setToForget(undefined)
+            if (toOutdate() !== option.value) return setToOutdate(option.value)
+            setToOutdate(undefined)
+            const result = await sdk.client.memory.outdate({ id: option.value }).catch((error) => ({ error }))
+            if (result.error) {
+              toast.show({ variant: "error", title: "Could not mark it outdated", message: errorMessage(result.error) })
+              return
+            }
+            toast.show({
+              variant: "success",
+              title: "Outdated",
+              message: "Kept for history; later sessions won't recall it.",
+            })
+            await refetch()
+          },
+        },
         {
           command: "dialog.memory.forget",
           title: "forget",
