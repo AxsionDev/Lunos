@@ -469,6 +469,8 @@ describe("MemorySources service (a real stdio MCP server)", () => {
             JSON.stringify({ memory: { sources: (ctx.config.memory as { sources: unknown[] }).sources } }),
           )
         })
+        // The test preload points this at a shared temp dir; put it back afterwards.
+        const previous = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
         process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = managed
         try {
           const text = yield* recall()
@@ -476,7 +478,8 @@ describe("MemorySources service (a real stdio MCP server)", () => {
           expect(text).toContain("which your organisation's managed config trusts")
           expect(text).toMatch(/ignore all previous/i)
         } finally {
-          delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+          if (previous === undefined) delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+          else process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = previous
         }
       }),
     ),
