@@ -60,10 +60,20 @@ export interface Fact {
   id: string
   scope: MemoryStore.Scope
   text: string
-  /** "active" for every fact until the lifecycle story adds "outdated". */
+  /** "outdated": no longer true (XCOD-136); kept for history, never recalled. */
   status: "active" | "outdated"
-  /** "observed" for a person's own words (hand-written notes); null where Lunos can't tell. */
+  /** "observed": a person said it or it was read from a file; "inferred": the agent concluded it; null where Lunos can't tell (facts saved before XCOD-136). */
   kind: Kind | null
+  /** XCOD-136, optional: when the fact became true. Absent means `provenance.date`. */
+  valid_from?: string
+  /** Outdated facts: when it stopped being true. */
+  invalid_at?: string
+  /** Outdated facts: the id (in this bundle, if it was exported too) of the fact that replaced it. */
+  replaced_by?: string
+  /** The id of the fact this one replaced. */
+  replaces?: string
+  /** A per-fact expiry date. Retention set with `memory.retention.days` is the reader's own policy and is not exported. */
+  expires?: string
   provenance: MemoryStore.Provenance
   /** The engine's own ids, for a same-engine restore. Importers into anything else ignore them. */
   engine: { name: string; datasetID: string }
@@ -117,6 +127,11 @@ export interface Manifest {
     relations: number
   }
   graph: { included: boolean; engine: string; reason?: string }
+  /**
+   * XCOD-136, optional: the ledger's integrity check at export time. Quarantined facts (edited or
+   * damaged ledger lines) are never exported; this says how many were left out.
+   */
+  integrity?: { checked: boolean; quarantined: number }
   index: {
     included: boolean
     engine?: string
@@ -132,8 +147,8 @@ export function fact(scope: MemoryStore.Scope, input: MemoryStore.Fact): Fact {
     id: input.id,
     scope,
     text: input.text,
-    status: "active",
-    kind: input.provenance.sessionID === MemoryNotes.SESSION ? "observed" : null,
+    status: input.status ?? "active",
+    kind: input.kind ?? (input.provenance.sessionID === MemoryNotes.SESSION ? "observed" : null),
     provenance: {
       sessionID: input.provenance.sessionID,
       agent: input.provenance.agent,
@@ -141,6 +156,11 @@ export function fact(scope: MemoryStore.Scope, input: MemoryStore.Fact): Fact {
       date: input.provenance.date,
     },
     engine: { name: ENGINE, datasetID: input.datasetID },
+    ...(input.valid_from ? { valid_from: input.valid_from } : {}),
+    ...(input.invalid_at ? { invalid_at: input.invalid_at } : {}),
+    ...(input.replaced_by ? { replaced_by: input.replaced_by } : {}),
+    ...(input.replaces ? { replaces: input.replaces } : {}),
+    ...(input.expires ? { expires: input.expires } : {}),
     ...(input.origin ? { origin: { ...input.origin } } : {}),
     ...(input.imported ? { imported: { from: input.imported.from, date: input.imported.date } } : {}),
   }
@@ -276,6 +296,8 @@ export interface Content {
   /** Set when the graph was left out, with why. */
   graphOmitted?: string
   notes: { name: string; text: string }[]
+  /** Facts left out because they failed the ledger's integrity check (XCOD-136). */
+  quarantined?: number
   /** Engine database files, with their path inside the bundle (under `index/<scope>/`). */
   index?: {
     scopes: MemoryStore.Scope[]
@@ -326,6 +348,7 @@ export async function entries(content: Content): Promise<{ entries: Entry[]; man
           scopes: content.index.scopes,
         }
       : { included: false },
+    integrity: { checked: true, quarantined: content.quarantined ?? 0 },
     files,
   }
   return { entries: [...body, text("manifest.json", JSON.stringify(manifest, null, 2) + "\n")], manifest }
@@ -450,7 +473,6 @@ export const JSON_SCHEMA = {
   $defs: {
     manifest: {
       type: "object",
-      additionalProperties: false,
       required: ["format", "lunos", "created", "scopes", "filters", "counts", "graph", "index", "files"],
       properties: {
         format: { const: FORMAT },
@@ -492,6 +514,12 @@ export const JSON_SCHEMA = {
           required: ["included", "engine"],
           properties: { included: { type: "boolean" }, engine: { type: "string" }, reason: { type: "string" } },
         },
+        integrity: {
+          type: "object",
+          required: ["checked", "quarantined"],
+          description: "Optional. Facts that failed the ledger's integrity check are left out; this counts them",
+          properties: { checked: { type: "boolean" }, quarantined: { type: "integer", minimum: 0 } },
+        },
         index: {
           type: "object",
           required: ["included"],
@@ -524,7 +552,6 @@ export const JSON_SCHEMA = {
     },
     fact: {
       type: "object",
-      additionalProperties: false,
       required: ["id", "scope", "text", "status", "kind", "provenance", "engine"],
       properties: {
         id: { type: "string", minLength: 1 },
@@ -532,6 +559,11 @@ export const JSON_SCHEMA = {
         text: { type: "string", minLength: 1 },
         status: { enum: ["active", "outdated"] },
         kind: { enum: ["observed", "inferred", null] },
+        valid_from: { type: "string", description: "When the fact became true; absent means provenance.date" },
+        invalid_at: { type: "string", description: "Outdated facts: when it stopped being true" },
+        replaced_by: { type: "string", description: "Outdated facts: the id of the fact that replaced it" },
+        replaces: { type: "string", description: "The id of the fact this one replaced" },
+        expires: { type: "string", description: "A per-fact expiry date" },
         provenance,
         engine: {
           type: "object",
@@ -623,13 +655,21 @@ format so any tool can read a bundle without Lunos.
   listed in itself.
 - **Treat an imported bundle as untrusted.** It asserts where facts came from; it doesn't make them safe instructions.
   Run every fact through your write guard (Lunos refuses secrets, \`{env:}\`/\`{file:}\` substitutions and outside content).
-- \`status\` is \`active\` for every fact until Lunos tracks outdated facts. \`kind\` is \`observed\` for a person's own
-  words (hand-written notes) and \`null\` where Lunos can't tell observed from inferred.
+- \`status\` is \`active\` or \`outdated\`. An outdated fact is no longer true: it is kept for history, with
+  \`invalid_at\` and, if something replaced it, \`replaced_by\`. Importers keep it outdated and never recall it.
+- \`kind\` is \`observed\` (a person said it, or it was read from a file), \`inferred\` (the agent concluded it) or
+  \`null\` (saved before Lunos recorded the difference).
+- \`expires\` is a per-fact expiry date. An importer doesn't import a fact that has already expired. Retention
+  (\`memory.retention.days\`) is each machine's own policy and isn't exported.
+- Facts whose ledger line failed Lunos's integrity check (quarantined) are never exported;
+  \`manifest.integrity.quarantined\` counts them.
 - \`engine.datasetID\` is Cognee's id. Importers into another engine ignore it.
 - Embeddings and vector indexes are not exported by default: they are model-specific and rebuilt on import.
 - A bundle is a snapshot. Forgetting a fact later doesn't remove it from bundles already written.
-- Unknown fields may be added in later \`lunos-memory/1\` bundles; readers ignore them. A breaking change gets a new
-  format version.
+- Unknown fields may be added in later \`lunos-memory/1\` bundles, so the schema allows them on the manifest and on
+  facts, and readers ignore them. \`valid_from\`, \`invalid_at\`, \`replaced_by\`, \`replaces\`, \`expires\` and
+  \`manifest.integrity\` are such additions: optional, so a bundle without them is still valid. A breaking change gets a
+  new format version.
 
 ## Encryption (\`--encrypt\`)
 

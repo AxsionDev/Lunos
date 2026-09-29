@@ -55,6 +55,7 @@ describe("memory routes", () => {
             agent: "build",
             source: "user message",
             date: "2026-09-26T10:00:00Z",
+            state: "active",
           },
         ],
       })

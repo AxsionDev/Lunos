@@ -30,7 +30,22 @@ export const MemoryFact = Schema.Struct({
     description: "Imported facts only: where it first came from",
   }),
   originDate: Schema.optional(Schema.String).annotate({ description: "Imported facts only: when it was first saved" }),
+  state: Schema.Literals(["active", "outdated", "expired", "purge", "quarantined"]).annotate({
+    description:
+      "XCOD-136: active (recalled), outdated, expired (not recalled; deleted after the grace period), purge (due for deletion) or quarantined (failed the ledger's integrity check)",
+  }),
+  kind: Schema.optional(Schema.Literals(["observed", "inferred"])),
+  validFrom: Schema.optional(Schema.String),
+  invalidAt: Schema.optional(Schema.String).annotate({ description: "Outdated facts: when it stopped being true" }),
+  replacedBy: Schema.optional(Schema.String).annotate({ description: "Outdated facts: the fact that replaced it" }),
+  replaces: Schema.optional(Schema.String),
+  expires: Schema.optional(Schema.String).annotate({ description: "When it expires, if it does" }),
+  quarantined: Schema.optional(Schema.String).annotate({ description: "Why the integrity check quarantined it" }),
 }).annotate({ identifier: "MemoryFact" })
+
+export const MemoryOutdateInput = Schema.Struct({
+  by: Schema.optional(Schema.String).annotate({ description: "The id of the active fact that replaces it" }),
+}).annotate({ identifier: "MemoryOutdateInput" })
 
 export const MemoryList = Schema.Struct({
   on: Schema.Boolean.annotate({ description: "Whether memory is on" }),
@@ -142,6 +157,7 @@ export const MemoryApi = HttpApi.make("memory")
         HttpApiEndpoint.get("list", root, {
           query: WorkspaceRoutingQuery,
           success: described(MemoryList, "Stored facts, with provenance"),
+          error: [MemoryUnavailableError],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "memory.list",
@@ -198,6 +214,20 @@ export const MemoryApi = HttpApi.make("memory")
             summary: "Import memory",
             description:
               "Import the approved rows of a preview. The input is read, verified and screened again; only rows named in accept are written.",
+          }),
+        ),
+        HttpApiEndpoint.post("outdate", `${root}/:id/outdate`, {
+          params: { id: Schema.String },
+          payload: MemoryOutdateInput,
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Fact marked outdated"),
+          error: [HttpApiError.BadRequest, MemoryNotFoundError, MemoryUnavailableError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.outdate",
+            summary: "Mark a fact outdated",
+            description:
+              "Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.",
           }),
         ),
         HttpApiEndpoint.post("forget", `${root}/:id/forget`, {

@@ -18,6 +18,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Effect, Layer, Schema } from "effect"
 import { testEffect } from "../lib/effect"
 import { Memory } from "../../src/memory"
+import { Question } from "../../src/question"
 
 const callID = "call-test"
 const sessionID = SessionID.make("ses_test")
@@ -69,6 +70,7 @@ const fakeMemory = Memory.Service.of({
 
 const layer = Layer.mergeAll(
   Layer.succeed(Memory.Service, fakeMemory),
+  Layer.succeed(Question.Service, {} as Question.Interface),
   Layer.succeed(Plugin.Service, fakePlugin),
   Layer.succeed(Permission.Service, fakePermission),
   Layer.succeed(MCP.Service, fakeMcp()),

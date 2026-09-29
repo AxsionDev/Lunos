@@ -28,6 +28,8 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "@/memory"
 import { MemoryGuard } from "@/memory/guard"
+import { MemoryLifecycle } from "@/memory/lifecycle"
+import { Question } from "@/question"
 import { MemoryRecall } from "@/memory/recall"
 import { MemoryStore } from "@/memory/store"
 import MEMORY_REMEMBER from "@/memory/remember.txt"
@@ -65,6 +67,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
   const memory = yield* Memory.Service
+  const question = yield* Question.Service
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -179,6 +182,21 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 description:
                   'Where it came from: "user message", or the worktree-relative path of the file it was read from',
               },
+              kind: {
+                type: "string",
+                enum: ["observed", "inferred"],
+                description:
+                  'observed: the user said it, or you read it in a file. inferred: you concluded it yourself. Default "inferred"',
+              },
+              replaces: {
+                type: "string",
+                description:
+                  "The id of a recalled fact this one makes untrue. A person confirms the replacement; the old fact is kept as outdated",
+              },
+              expires: {
+                type: "string",
+                description: "An ISO date after which the fact should no longer be recalled, if it is temporary",
+              },
               ...(scopes.length > 1
                 ? { scope: { type: "string", enum: scopes, description: "Which memory to store it in" } }
                 : {}),
@@ -194,17 +212,73 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               const fact = String(params.fact ?? "").trim()
               const source = String(params.source ?? "user message")
               const scope = (scopes.includes(params.scope as never) ? params.scope : scopes[0]) as "project" | "user"
+              const kind = params.kind === "observed" ? "observed" : "inferred"
+              const proposed = typeof params.replaces === "string" && params.replaces ? params.replaces : undefined
               const ctx = context(params, opts)
               AuditLog.toolRun({ tool: "memory_remember", agent: ctx.agent, session: ctx.sessionID, args: {} })
               // Check first, so a person is never asked to approve something that would be refused.
               const refusal = MemoryGuard.taint(input.messages, worktree) ?? MemoryGuard.secret(fact)
               if (refusal) return finish("Not remembered", `Not remembered: ${refusal}.`, { refused: true })
+              let expires: string | undefined
+              if (params.expires !== undefined) {
+                const date = new Date(String(params.expires))
+                if (Number.isNaN(date.getTime()))
+                  return finish("Not remembered", `Not remembered: expires must be an ISO date, got "${params.expires}".`, {
+                    refused: true,
+                  })
+                expires = date.toISOString()
+              }
+              // XCOD-136: a fact this one contradicts (same subject, different value), or the one the
+              // agent proposes to replace. Replacing is offered to the person, never done silently.
+              const existing = yield* memory.facts(scope).pipe(Effect.orElseSucceed(() => []))
+              const { retention } = yield* memory.policy()
+              const candidate = proposed
+                ? existing.find(
+                    (item) => item.id === proposed && MemoryLifecycle.recallable(item, retention, MemoryLifecycle.now()),
+                  )
+                : MemoryLifecycle.contradicted(fact, existing, retention)
+              if (proposed && !candidate)
+                return finish(
+                  "Not remembered",
+                  `Not remembered: ${proposed} is not an active fact in ${scope} memory, so it can't be replaced.`,
+                  { refused: true },
+                )
+              // The pattern is the scope, never the fact: permission decisions are audited, and the
+              // audit log never holds a fact's text. The prompt shows the fact from the metadata.
               yield* ctx.ask({
                 permission: "memory",
-                patterns: [fact],
+                patterns: [scope],
                 always: ["*"],
-                metadata: { fact, source, scope },
+                metadata: {
+                  fact,
+                  source,
+                  scope,
+                  kind,
+                  ...(expires ? { expires } : {}),
+                  ...(candidate ? { contradicts: { id: candidate.id, text: candidate.text }, proposed: !!proposed } : {}),
+                },
               })
+              let replaces: string | undefined
+              if (candidate) {
+                const answer = yield* question
+                  .ask({
+                    sessionID: ctx.sessionID,
+                    questions: [
+                      {
+                        header: "Replace a remembered fact?",
+                        question: `The new fact:\n  ${fact}\ncontradicts this one in ${scope} memory (${candidate.id}):\n  ${candidate.text}\nReplace it? The old fact is kept as outdated, and no longer recalled.`,
+                        options: [
+                          { label: "Replace", description: "Mark the old fact outdated, replaced by the new one" },
+                          { label: "Keep both", description: "Remember the new fact and keep the old one active" },
+                        ],
+                        custom: false,
+                      },
+                    ],
+                    tool: { messageID: input.processor.message.id, callID: opts.toolCallId },
+                  })
+                  .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<ReadonlyArray<string>>))
+                if (answer[0]?.includes("Replace")) replaces = candidate.id
+              }
               const result = yield* memory
                 .remember({
                   fact,
@@ -214,12 +288,17 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                   agent: ctx.agent,
                   parent,
                   messages: input.messages,
+                  kind,
+                  expires,
+                  replaces,
                 })
                 .pipe(Effect.result)
               if (result._tag === "Failure") return finish("Not remembered", result.failure.message, { refused: true })
-              return finish("Remembered", `Remembered in ${scope} memory as ${result.success.id}.`, {
+              const replaced = replaces ? ` It replaces ${replaces}, which is now outdated.` : candidate ? ` ${candidate.id} was kept.` : ""
+              return finish("Remembered", `Remembered in ${scope} memory as ${result.success.id}.${replaced}`, {
                 id: result.success.id,
                 scope,
+                ...(replaces ? { replaces } : {}),
               })
             }),
           )
@@ -231,7 +310,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         inputSchema: jsonSchema(
           ProviderTransform.schema(input.model, {
             type: "object",
-            properties: { query: { type: "string", description: "What to look up" } },
+            properties: {
+              query: { type: "string", description: "What to look up" },
+              history: {
+                type: "boolean",
+                description: "Also show outdated facts (what used to be true), marked as such. Default false",
+              },
+            },
             required: ["query"],
             additionalProperties: false,
           }),
@@ -243,7 +328,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               const ctx = context(params, opts)
               AuditLog.toolRun({ tool: "memory_search", agent: ctx.agent, session: ctx.sessionID, args: {} })
               const result = yield* memory
-                .search({ query: String(params.query ?? ""), sessionID: ctx.sessionID, parent })
+                .search({
+                  query: String(params.query ?? ""),
+                  sessionID: ctx.sessionID,
+                  parent,
+                  history: params.history === true,
+                  origin: "tool",
+                })
                 .pipe(Effect.result)
               if (result._tag === "Failure") return finish("Memory search failed", result.failure.message)
               return finish("Memory", MemoryRecall.block(result.success) ?? "Nothing in memory matches.")
