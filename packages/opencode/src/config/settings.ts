@@ -137,6 +137,12 @@ const ENV_OVERRIDES: { key: string; active: (env: Record<string, string | undefi
   },
   { key: "memory.enabled", active: (env) => (MemorySwitch.envDisables(env) ? MemorySwitch.ENV : undefined) },
   { key: "memory", active: (env) => (MemorySwitch.envDisables(env) ? MemorySwitch.ENV : undefined) },
+  {
+    key: "share",
+    active: (env) =>
+      ["OPENCODE_DISABLE_SHARE", "LUNOS_OFFLINE"].find((name) => truthy(env[name])) ??
+      (truthy(env.OPENCODE_AUTO_SHARE) ? "OPENCODE_AUTO_SHARE" : undefined),
+  },
   { key: "permission", active: (env) => (env.OPENCODE_PERMISSION ? "OPENCODE_PERMISSION" : undefined) },
 ]
 
