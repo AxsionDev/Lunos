@@ -2117,6 +2117,84 @@ export type Config = {
   }
 }
 
+export type SettingRow = {
+  key: string
+  target: "config" | "tui"
+  label: string
+  category: string
+  description: string
+  kind: "boolean" | "enum" | "string" | "number" | "list" | "object"
+  values?: Array<string | boolean>
+  dialog?: "models" | "themes" | "mcps" | "providers" | "modes"
+  restart: boolean
+  deprecated: boolean
+  top: boolean
+  readonly: boolean
+  value?: unknown
+  display: string
+  source: "default" | "user" | "project" | "env" | "managed" | "remote"
+  from?: string
+  locked: boolean
+  override?: string
+  secret: boolean
+}
+
+export type SettingsUsage = {
+  days: number
+  sessions: number
+  cost: number
+  tokens: {
+    input: number
+    output: number
+    reasoning: number
+    cache_read: number
+    cache_write: number
+  }
+}
+
+export type SettingsSnapshot = {
+  rows: Array<SettingRow>
+  layers: Array<{
+    layer: "default" | "user" | "project" | "env" | "managed" | "remote" | "cli"
+    path: string
+    loaded: boolean
+  }>
+  locked: Array<string>
+  files: {
+    user: {
+      config: string
+      tui: string
+    }
+    project: {
+      config: string
+      tui: string
+    }
+  }
+  usage: SettingsUsage
+}
+
+export type SettingsSetInput = {
+  key: string
+  value: string
+  scope: "user" | "project"
+}
+
+export type SettingsSetResult =
+  | {
+      ok: true
+      key: string
+      value?: unknown
+      file: string
+      scope: "user" | "project"
+      restart: boolean
+      changed: boolean
+    }
+  | {
+      ok: false
+      error: string
+      code: string
+    }
+
 export type Model = {
   id: string
   providerID: string
@@ -7785,6 +7863,62 @@ export type ConfigUpdateResponses = {
 }
 
 export type ConfigUpdateResponse = ConfigUpdateResponses[keyof ConfigUpdateResponses]
+
+export type ConfigSettingsData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/settings"
+}
+
+export type ConfigSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigSettingsError = ConfigSettingsErrors[keyof ConfigSettingsErrors]
+
+export type ConfigSettingsResponses = {
+  /**
+   * Every setting, with value, source and lock
+   */
+  200: SettingsSnapshot
+}
+
+export type ConfigSettingsResponse = ConfigSettingsResponses[keyof ConfigSettingsResponses]
+
+export type ConfigSettingsSetData = {
+  body?: SettingsSetInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/settings"
+}
+
+export type ConfigSettingsSetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigSettingsSetError = ConfigSettingsSetErrors[keyof ConfigSettingsSetErrors]
+
+export type ConfigSettingsSetResponses = {
+  /**
+   * Result of the change
+   */
+  200: SettingsSetResult
+}
+
+export type ConfigSettingsSetResponse = ConfigSettingsSetResponses[keyof ConfigSettingsSetResponses]
 
 export type ConfigProvidersData = {
   body?: never

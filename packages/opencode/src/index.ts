@@ -35,6 +35,7 @@ import { PluginCommand } from "./cli/cmd/plug"
 import { MarketplaceCommand } from "./cli/cmd/marketplace"
 import { AuditCommand } from "./cli/cmd/audit"
 import { MemoryCommand } from "./cli/cmd/memory"
+import { SettingsCommand } from "./cli/cmd/settings"
 import { Heap } from "./cli/heap"
 import { brandHelp } from "./cli/brand"
 import { Restart } from "./cli/restart"
@@ -153,6 +154,7 @@ const cli = yargs(args)
   .command(MarketplaceCommand)
   .command(AuditCommand)
   .command(MemoryCommand)
+  .command(SettingsCommand)
   .command(DbCommand)
   .fail((msg, err) => {
     if (

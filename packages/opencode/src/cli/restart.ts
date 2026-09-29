@@ -59,6 +59,9 @@ const FLAG_OPTIONS = new Set(["--continue", "-c", "--fork", "--no-continue", "--
  */
 export function relaunchArgs(args: readonly string[], input: { sessionID?: string; fresh: boolean }) {
   const out: string[] = []
+  // XCOD-128: `lunos settings` is the TUI opened on the settings screen; a restart from there
+  // comes back to the session, not to the screen.
+  if (args[0] === "settings") args = args.slice(1)
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
     if (arg === "--") {

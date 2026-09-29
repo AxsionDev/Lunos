@@ -436,6 +436,25 @@ Options:
       --pure        run without external plugins                                           [boolean]"
 `;
 
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings --help 1`] = `
+"lunos settings
+
+view and change settings (opens the settings screen)
+
+Commands:
+  lunos settings list               list every setting with its value and where it comes from
+  lunos settings get <key>          print one setting's current value
+  lunos settings set <key> <value>  change one setting in your user config (or the project's, with
+                                    --project)
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]"
+`;
+
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode db --help 1`] = `
 "lunos db
 
@@ -455,6 +474,39 @@ Options:
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
       --format      Output format                 [string] [choices: "json", "tsv"] [default: "tsv"]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings list --help 1`] = `
+"lunos settings list
+
+list every setting with its value and where it comes from
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --json        print JSON                                            [boolean] [default: false]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings set --help 1`] = `
+"lunos settings set <key> <value>
+
+change one setting in your user config (or the project's, with --project)
+
+Positionals:
+  key    setting key, e.g. share or compaction.auto                              [string] [required]
+  value  new value (JSON for lists and objects)                                  [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --project     write to .opencode/opencode.json in this project instead of your user config
+                                                                          [boolean] [default: false]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp list --help 1`] = `

@@ -329,6 +329,8 @@ export const TuiThreadCommand = cmd({
               prompt,
               fork: args.fork,
               auto: args.auto || args.yolo || args["dangerously-skip-permissions"],
+              // XCOD-128: `lunos settings` starts here, on the settings screen.
+              settings: (args as { settings?: "settings" }).settings,
             },
           }),
         )
