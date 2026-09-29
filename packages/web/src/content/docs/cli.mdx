@@ -652,25 +652,44 @@ opencode uninstall
 
 ---
 
-### upgrade
+### update
 
-Updates opencode to the latest version or a specific version.
-
-```bash
-opencode upgrade [target]
-```
-
-To upgrade to the latest version.
+Updates Lunos to the latest version or a specific version. `lunos upgrade` is an alias and still works.
 
 ```bash
-opencode upgrade
+lunos update [target]
 ```
 
-To upgrade to a specific version.
+To update to the latest version.
 
 ```bash
-opencode upgrade v0.1.48
+lunos update
 ```
+
+When you're already on the latest version, this prints `Lunos is up to date (X.Y.Z).` and exits 0.
+
+To update to a specific version.
+
+```bash
+lunos update v0.1.48
+```
+
+If the update fails, Lunos prints the command to run by hand. For npm installs that's
+`npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`.
+
+#### New version notice
+
+Every time Lunos starts it asks the npm registry (`lunos-ai`, or the registry in your `.npmrc`) for
+the latest version. The check runs in the background, never delays startup, and gives up after 3
+seconds; if it fails, the last known result is used.
+
+- In the TUI, the bottom-right corner shows `There is a new version: X.Y.Z — please run lunos update`
+  on every screen until you update (`New version: X.Y.Z · lunos update` below 100 columns).
+- Plain commands such as `lunos models` print `There is a new version: X.Y.Z — please run "lunos update"`
+  to stderr, at most once a day. It never goes to stdout, so piped output stays clean.
+
+No check is made, and no notice shown, with `"autoupdate": false`, `LUNOS_DISABLE_AUTOUPDATE=1`,
+`LUNOS_OFFLINE=1`, or when an organisation policy sets `"autoupdate": false`.
 
 #### Flags
 

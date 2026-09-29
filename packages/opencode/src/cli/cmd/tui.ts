@@ -273,9 +273,12 @@ export const TuiThreadCommand = cmd({
         return
       }
 
-      setTimeout(() => {
-        client.call("checkUpgrade", { directory: cwd }).catch(() => {})
-      }, 1000).unref?.()
+      // XCOD-147: the update check announces its result with a one-off event. Sent before the TUI
+      // listens, it was silently lost, so a fast (or cached) answer never reached the screen. With
+      // the in-process worker the check starts once the TUI is listening; an external server keeps
+      // the old delay.
+      const checkUpgrade = () => void client.call("checkUpgrade", { directory: cwd }).catch(() => {})
+      if (external) setTimeout(checkUpgrade, 1000).unref?.()
 
       try {
         const { Effect } = await import("effect")
@@ -284,6 +287,7 @@ export const TuiThreadCommand = cmd({
         await Effect.runPromise(
           run({
             url: transport.url,
+            onListening: external ? undefined : checkUpgrade,
             async onSnapshot() {
               const tui = writeHeapSnapshot("tui.heapsnapshot")
               const server = await client.call("snapshot", undefined)
