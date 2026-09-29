@@ -15,19 +15,19 @@ You can switch between agents during a session or invoke them with the `@` menti
 
 ## Types
 
-There are two types of agents in OpenCode; primary agents and subagents.
+There are two types of agents in Lunos; primary agents and subagents.
 
 ---
 
 ### Primary agents
 
-Primary agents are the main assistants you interact with directly. You can cycle through them using the **Tab** key, or your configured `switch_agent` keybind. These agents handle your main conversation. Tool access is configured via permissions — for example, Build has all tools enabled while Plan is restricted.
+Primary agents are the main assistants you interact with directly. You can cycle through them using the **Tab** key, or your configured `mode_cycle` keybind. These agents handle your main conversation. Tool access is configured via permissions — for example, Build has all tools enabled while Plan is restricted.
 
 :::tip
 You can use the **Tab** key to switch between primary agents during a session.
 :::
 
-OpenCode comes with two built-in primary agents, **Build** and **Plan**. We'll
+Lunos comes with two built-in primary agents, **Build** and **Plan**. We'll
 look at these below.
 
 ---
@@ -36,13 +36,13 @@ look at these below.
 
 Subagents are specialized assistants that primary agents can invoke for specific tasks. You can also manually invoke them by **@ mentioning** them in your messages.
 
-OpenCode comes with three built-in subagents, **General**, **Explore**, and **Scout**. We'll look at this below.
+Lunos comes with three built-in subagents, **General**, **Explore**, and **Scout**. We'll look at this below.
 
 ---
 
 ## Built-in
 
-OpenCode comes with two built-in primary agents and three built-in subagents.
+Lunos comes with three built-in primary agents and three built-in subagents.
 
 ---
 
@@ -68,6 +68,35 @@ This agent is useful when you want the LLM to analyze code, suggest changes, or 
 
 ---
 
+### Use research
+
+_Mode_: `primary`
+
+A read-only agent for deep investigation of a topic or codebase. All file edits are denied except Markdown under the research output path — `.opencode/research/` in a Git project, or the global data directory otherwise. Unlike `plan`, it can delegate legwork to the `general` and `explore` subagents.
+
+Research mode is expected to gather evidence with real tool calls and write its findings to a Markdown file, citing the file paths and sources it drew on. A request phrased as an implementation task ("add X", "create Y") still produces a how-to document describing how the change should be made rather than the change itself — switch to `build` when you want it applied.
+
+---
+
+### Use dev-cycle
+
+An agent that runs one feature through a full development cycle — discover, architect, plan, then build and verify — pausing for your approval at three gates. Every phase but the build itself delegates to a dedicated subagent: `explore` for discovery, then `architect`, `planner`, and finally `qa` to review code it did not write.
+
+The cycle's working document lives at `.opencode/dev-cycle/` in a Git project, or the global data directory otherwise. Its frontmatter carries the position:
+
+```markdown
+---
+phase: architect
+gate: pending
+---
+```
+
+That position is read from the file at the start of every turn, so editing those two lines is how you approve a gate, rewind to an earlier phase, or redirect a cycle mid-flight. Rewinding changes only that file, not the conversation record — each turn's reminder is persisted, so earlier phases stay visible in the history, and only the newest reminder block is authoritative.
+
+The gates are advisory. Unlike `plan` and `research`, this agent holds full write permissions for the whole run — it is _instructed_ to stop at each gate rather than prevented from continuing, so a cycle that ignores a gate is possible. Review the diff at gate 3 rather than assuming nothing was written before gate 2 opened.
+
+---
+
 ### Use general
 
 _Mode_: `subagent`
@@ -88,7 +117,7 @@ A fast, read-only agent for exploring codebases. Cannot modify files. Use this w
 
 _Mode_: `subagent`
 
-A read-only agent for external docs and dependency research. Use this when you need to clone a dependency repository into OpenCode's managed cache, inspect library source, or cross-reference local code against upstream implementations without modifying your workspace.
+A read-only agent for external docs and dependency research. Use this when you need to clone a dependency repository into Lunos's managed cache, inspect library source, or cross-reference local code against upstream implementations without modifying your workspace.
 
 ---
 
@@ -118,7 +147,7 @@ Hidden system agent that creates session summaries. It runs automatically and is
 
 ## Usage
 
-1. For primary agents, use the **Tab** key to cycle through them during a session. You can also use your configured `switch_agent` keybind.
+1. For primary agents, use the **Tab** key to cycle through them during a session. You can also use your configured `mode_cycle` keybind.
 
 2. Subagents can be invoked:
    - **Automatically** by primary agents for specialized tasks based on their descriptions.
@@ -284,7 +313,7 @@ Temperature values typically range from 0.0 to 1.0:
 }
 ```
 
-If no temperature is specified, OpenCode uses model-specific defaults; typically 0 for most models, 0.55 for Qwen models.
+If no temperature is specified, Lunos uses model-specific defaults; typically 0 for most models, 0.55 for Qwen models.
 
 ---
 
@@ -344,7 +373,7 @@ Specify a custom system prompt file for this agent with the `prompt` config. The
 }
 ```
 
-This path is relative to where the config file is located. So this works for both the global OpenCode config and the project specific config.
+This path is relative to where the config file is located. So this works for both the global Lunos config and the project specific config.
 
 ---
 
@@ -366,7 +395,70 @@ If you don’t specify a model, primary agents use the [model globally configure
 }
 ```
 
-The model ID in your OpenCode config uses the format `provider/model-id`. For example, if you're using [OpenCode Zen](/docs/zen), you would use `opencode/gpt-5.1-codex` for GPT 5.1 Codex.
+The model ID in your Lunos config uses the format `provider/model-id`. For example, if you're using [OpenCode Zen](/docs/zen), you would use `opencode/gpt-5.1-codex` for GPT 5.1 Codex.
+
+---
+
+### Background subagents
+
+Subagents can run in the background while the main agent keeps working. This is off by default; turn it on with:
+
+```json title="opencode.json"
+{ "subagent": { "background": true } }
+```
+
+Then the main agent can launch a task in the background, and its result arrives in the conversation when it finishes. Run `/tasks` to see every background job with its agent, model, status and elapsed time. Press Enter to open a job's session, or `ctrl+d` to cancel a running one.
+
+Aborting or deleting the parent session cancels its background jobs. Compaction doesn't affect them. If Lunos exits, running jobs stop; the job's session keeps what it did so far and can be continued. Details: `packages/opencode/specs/background-subagents.md`.
+
+---
+
+### Choosing models for subagents
+
+Every subagent gets a model from the first of these rules that applies:
+
+1. **Per task call:** the main agent picks a model for one task, but only when `subagent.dynamic.enabled` is `true`, and only from `subagent.dynamic.allow`. A model that isn't on the list is refused with an error the main agent can see. It is never silently swapped for another.
+2. **Per type of work:** `agent.<subagent-type>.model`, for example `agent.explore.model`.
+3. **Global default:** `subagent.model`.
+4. **Inherit:** the main agent's current model. This is the default.
+
+Each value can be `"inherit"` (the main agent's model), `"small"` (your `small_model`, or inherit if that isn't set), or `"provider/model"`. The task tool's metadata records which model was chosen and which rule chose it.
+
+**Based on the main agent.** This is the default and needs no config: subagents use whatever model, and reasoning variant, the main agent is running.
+
+**Based on the type of work.** For example, a cheap model for broad search and a strong one for review:
+
+```json title="opencode.json"
+{
+  "model": "mistral/mistral-large-latest",
+  "small_model": "mistral/mistral-small-latest",
+  "agent": {
+    "explore": { "model": "small" },
+    "qa": { "model": "mistral/mistral-large-latest", "variant": "high" }
+  }
+}
+```
+
+**Chosen per task by the main agent,** from a list you allow:
+
+```json title="opencode.json"
+{
+  "subagent": {
+    "dynamic": {
+      "enabled": true,
+      "allow": ["mistral/codestral-latest", "scaleway/llama-3.3-70b-instruct"]
+    }
+  }
+}
+```
+
+The task tool only offers a `model` argument when this is enabled, and only as a choice from `allow`.
+
+**Reasoning effort.** An inherited model keeps the main agent's variant. An overridden model uses the configured `variant` (per agent, or `subagent.variant`), or the model's default.
+
+**Data residency.** The chosen model is checked against your [residency policy](/docs/data-residency) before the subagent starts. A denial names the rule that chose the model (for example `agent.qa.model → anthropic/… denied by residency policy`) and is written to the audit log. Models on `subagent.dynamic.allow` that the policy would deny are never offered to the main agent.
+
+**Resuming a task.** Resuming with `task_id` keeps the model of the original run unless the call explicitly picks another allowed model.
 
 ---
 
@@ -712,6 +804,11 @@ This interactive command will:
 3. Generate an appropriate system prompt and identifier.
 4. Let you select which permissions the agent should be allowed (anything you don't select is denied).
 5. Finally, create a markdown file with the agent configuration.
+
+The permissions in step 4 start with the read-only set selected — `bash`, `edit`, and `task` are
+off unless you turn them on. The agent's generated system prompt has no effect on what it is
+actually allowed to do, so an agent described as research-only still needs `edit` left unselected
+to be unable to write files.
 
 ---
 

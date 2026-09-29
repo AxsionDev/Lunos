@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, spyOn } from "bun:test"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Logger, References } from "effect"
 import fs from "fs/promises"
 import path from "path"
 import { pathToFileURL } from "url"
@@ -69,6 +69,89 @@ function load(dir: string, flags?: Parameters<typeof RuntimeFlags.layer>[0]) {
 }
 
 describe("plugin.loader.shared", () => {
+  it.live("skips v2 plugin defaults on the server loader path", () =>
+    withTmp(
+      async (dir) => {
+        const file = path.join(dir, "plugin.ts")
+        await Bun.write(file, ["export default {", '  id: "demo.v2",', "  setup: async () => {},", "}", ""].join("\n"))
+
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({ plugin: [pathToFileURL(file).href] }, null, 2),
+        )
+
+        return {}
+      },
+      (tmp) =>
+        Effect.gen(function* () {
+          const logs: Array<{ message: unknown; level: unknown }> = []
+          const spec = pathToFileURL(path.join(tmp.path, "plugin.ts")).href
+          yield* load(tmp.path).pipe(
+            Effect.provideService(References.MinimumLogLevel, "Debug"),
+            Effect.provide(
+              Logger.layer([
+                Logger.make<unknown, void>((options) => {
+                  logs.push({ message: options.message, level: options.logLevel })
+                }),
+              ]),
+            ),
+          )
+
+          expect(logs).toContainEqual({
+            message: [
+              "skipping v2 plugin module in v1 loader",
+              expect.objectContaining({ spec, path: expect.stringContaining("plugin.ts") }),
+            ],
+            level: "Debug",
+          })
+          expect(logs).not.toContainEqual(expect.objectContaining({ level: "Error" }))
+          expect(JSON.stringify(logs)).not.toContain("failed to load plugin")
+          expect(JSON.stringify(logs)).not.toContain("Plugin export is not a function")
+        }),
+    ),
+  )
+
+  it.live("still logs malformed v1-looking defaults on the server loader path", () =>
+    withTmp(
+      async (dir) => {
+        const file = path.join(dir, "plugin.ts")
+        await Bun.write(file, ["export default {", '  id: "broken",', "}", ""].join("\n"))
+
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({ plugin: [pathToFileURL(file).href] }, null, 2),
+        )
+
+        return {}
+      },
+      (tmp) =>
+        Effect.gen(function* () {
+          const logs: Array<{ message: unknown; level: unknown }> = []
+          const spec = pathToFileURL(path.join(tmp.path, "plugin.ts")).href
+          yield* load(tmp.path).pipe(
+            Effect.provide(
+              Logger.layer([
+                Logger.make<unknown, void>((options) => {
+                  logs.push({ message: options.message, level: options.logLevel })
+                }),
+              ]),
+            ),
+          )
+
+          expect(logs).toContainEqual({
+            message: [
+              "failed to load plugin",
+              expect.objectContaining({
+                path: spec,
+                error: expect.stringContaining("must default export an object with server()"),
+              }),
+            ],
+            level: "Error",
+          })
+        }),
+    ),
+  )
+
   it.live("loads a file:// plugin function export", () =>
     withTmp(
       async (dir) => {

@@ -1,0 +1,32 @@
+name: offline-egress
+
+# XCOD-121: with LUNOS_OFFLINE=1, `lunos run` may connect to the configured model endpoint and
+# nothing else. script/offline-egress.ts traces every connect() (strace -f, so npm/uv/git
+# subprocesses count too) against a local mock endpoint. A new ungated outbound call fails this.
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-egress:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Install strace
+        run: sudo apt-get install -y -qq strace ripgrep
+
+      - name: Offline run contacts only the model endpoint
+        run: bun script/offline-egress.ts --online

@@ -1,0 +1,33 @@
+---
+title: Lunos and opencode
+description: Lunos is a fork of opencode. What that means, and which names still say opencode.
+---
+
+Lunos is a fork of [opencode](https://github.com/anomalyco/opencode), maintained by ITService EOOD (Axsion), a Bulgarian company. It is not built by, maintained by, or affiliated with the opencode team.
+
+Lunos adds EU data-residency controls, provider jurisdiction metadata, an audit log, organisation policy, offline mode and a curated marketplace, and it merges upstream opencode's changes every week. Both projects are MIT-licensed; see [LICENSE](https://github.com/AxsionDev/Lunos/blob/dev/LICENSE).
+
+## Naming
+
+The command is `lunos` and the npm package is `lunos-ai`. Some names still say `opencode`, because the Lunos binary reads them and renaming them would break existing setups. They work exactly as the rest of these docs describe:
+
+| Name                                              | What it is                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------- |
+| `opencode.json`, `opencode.jsonc`                 | Config files, in your project or global config directory       |
+| `.opencode/`                                      | The project directory for agents, commands, plugins and plans  |
+| `~/.config/opencode/`, `~/.local/share/opencode/` | Global config and data directories                             |
+| `OPENCODE_*`                                      | Environment variables, such as `OPENCODE_CONFIG`               |
+| `@opencode-ai/plugin`, `@opencode-ai/sdk`         | The plugin and SDK packages                                    |
+| `https://opencode.ai/config.json`                 | The `$schema` URL in config files. Lunos doesn't fetch it      |
+| `opencode.local`                                  | The default mDNS name `lunos serve --mdns` advertises          |
+| `opencode server listening on …`                  | The line `lunos serve` prints when ready; the SDK waits for it |
+
+Lunos-only settings use `lunos` or `LUNOS_` names, for example `LUNOS_OFFLINE` and `LUNOS_DISABLE_AUTOUPDATE`.
+
+## What these docs leave out
+
+Upstream's hosted products aren't part of Lunos, so their pages aren't here: OpenCode Zen, OpenCode Go, session sharing on opncd.ai (Lunos turns sharing off by default), and the GitHub and GitLab apps.
+
+## Support
+
+Report issues at [github.com/AxsionDev/Lunos/issues](https://github.com/AxsionDev/Lunos/issues). Don't report Lunos issues to the opencode project.

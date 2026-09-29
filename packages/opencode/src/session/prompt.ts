@@ -54,6 +54,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { eq } from "drizzle-orm"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
+import { Memory } from "@/memory"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
 
@@ -138,6 +139,7 @@ const layer = Layer.effect(
     const sys = yield* SystemPrompt.Service
     const llm = yield* LLM.Service
     const events = yield* EventV2Bridge.Service
+    const memory = yield* Memory.Service
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
     const { db } = database
@@ -306,7 +308,7 @@ const layer = Layer.effect(
       }
       yield* plugin.trigger(
         "tool.execute.before",
-        { tool: TaskTool.id, sessionID, callID: part.id },
+        { tool: TaskTool.id, sessionID, agent: lastUser.agent, callID: part.id },
         { args: taskArgs },
       )
 
@@ -388,7 +390,7 @@ const layer = Layer.effect(
 
       yield* plugin.trigger(
         "tool.execute.after",
-        { tool: TaskTool.id, sessionID, callID: part.id, args: taskArgs },
+        { tool: TaskTool.id, sessionID, agent: lastUser.agent, callID: part.id, args: taskArgs },
         result,
       )
 
@@ -1182,6 +1184,32 @@ const layer = Layer.effect(
             Effect.provideService(FSUtil.Service, fsys),
             Effect.provideService(Session.Service, sessions),
           )
+          // XCOD-94: recalled memory, computed once per user message and never saved, like the
+          // reminders above. Skipped for an agent whose permission denies memory.
+          const memoryUser = msgs.findLast((m) => m.info.role === "user")
+          if (memoryUser && !Permission.disabled(["memory_search"], agent.permission).size) {
+            const query = memoryUser.parts
+              .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+              .join("\n")
+              .trim()
+            const recalled = query
+              ? yield* memory.recallFor({
+                  sessionID,
+                  userMessageID: memoryUser.info.id,
+                  query,
+                  parent: { providerID: model.providerID, modelID: model.id },
+                })
+              : undefined
+            if (recalled)
+              memoryUser.parts.push({
+                id: PartID.ascending(),
+                messageID: memoryUser.info.id,
+                sessionID,
+                type: "text",
+                text: recalled,
+                synthetic: true,
+              })
+          }
 
           const msg: SessionV1.Assistant = {
             id: MessageID.ascending(),
@@ -1238,6 +1266,7 @@ const layer = Layer.effect(
               Effect.provideService(MCP.Service, mcp),
               Effect.provideService(Truncate.Service, truncate),
               Effect.provideService(RuntimeFlags.Service, flags),
+              Effect.provideService(Memory.Service, memory),
             )
 
             if (lastUser.format?.type === "json_schema") {
@@ -1369,6 +1398,23 @@ const layer = Layer.effect(
       }
       const agentName = cmd.agent ?? input.agent
 
+      // XCOD-94: /memory off | on switches memory for this session and records that in the
+      // transcript without calling a model.
+      if (input.command === Command.Default.MEMORY) {
+        const arg = input.arguments.trim().toLowerCase()
+        if (arg === "off" || arg === "on") yield* memory.setSessionOff(input.sessionID, arg === "off")
+        const verdict = yield* memory.decision(input.sessionID)
+        const status = verdict.on ? "Memory is on for this session." : `Memory is off: ${verdict.reason}.`
+        return yield* prompt({
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          model: input.model ? Provider.parseModel(input.model) : yield* currentModel(input.sessionID),
+          agent: input.agent,
+          parts: [{ type: "text", text: `/memory${arg ? " " + arg : ""}\n\n${status}` }],
+          noReply: true,
+        })
+      }
+
       const raw = input.arguments.match(argsRegex) ?? []
       const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
       const templateCommand = yield* Effect.promise(async () => cmd.template)
@@ -1425,6 +1471,19 @@ const layer = Layer.effect(
         const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
         const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
         const error = new NamedError.Unknown({ message: `Agent not found: "${agentName}".${hint}` })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw error
+      }
+
+      // Every skill is promoted to a slash command (Command.state), but that table is
+      // built once per instance with no agent in scope, while skill permissions are
+      // per-agent. The model-facing list already filters via Skill.available(agent);
+      // without this check the same denied skill stays typeable as a command. Listing
+      // is not enforcement, so enforce here, at invocation.
+      if (cmd.source === "skill" && Permission.evaluate("skill", cmd.name, agent.permission).action === "deny") {
+        const error = new NamedError.Unknown({
+          message: `Skill "${cmd.name}" is not permitted for agent "${agent.name}".`,
+        })
         yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
         throw error
       }
@@ -1625,6 +1684,7 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     RuntimeFlags.node,
     Database.node,
+    Memory.node,
   ],
 })
 

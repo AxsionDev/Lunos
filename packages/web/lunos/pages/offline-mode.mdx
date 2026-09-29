@@ -1,0 +1,25 @@
+---
+title: Offline mode
+description: One switch that stops every call Lunos makes on its own behalf, for restricted networks.
+---
+
+Set `LUNOS_OFFLINE=1` (from v1.18.41) and Lunos only talks to what you configured: your model provider, MCP servers, remote config and skills, and audit forwarding. Everything it would contact on its own behalf is turned off:
+
+- the model catalogue refresh (the snapshot built into the binary is used instead)
+- update checks
+- downloads of LSP servers, formatters, ripgrep and npm packages
+- syntax-highlighting grammars in the TUI
+- session sharing and the marketplace
+- the `webfetch` and `websearch` tools
+
+```bash
+LUNOS_OFFLINE=1 lunos
+```
+
+Offline mode means "only talk to what I set up", not "no network at all". Pair it with a model endpoint on your own network, such as vLLM or Ollama, to keep all traffic inside your perimeter.
+
+With offline mode on, LSP servers and formatters work only if they're already installed, and ripgrep must be installed as `rg`. A refused call always names `LUNOS_OFFLINE` in its message; it never hangs or retries.
+
+`lunos --version --verbose` shows whether offline mode is on and which calls it turned off.
+
+The full list of outbound calls, and the narrower switch for each, is in the [self-hosted deployment guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md#every-outbound-call-and-offline-mode).

@@ -50,6 +50,20 @@ export const Attention = Schema.Struct({
   sounds: Schema.optional(AttentionSounds),
 }).annotate({ description: "Attention notification and sound settings" })
 
+export const QuestionDismissWindowDefault = 2000
+export const QuestionUndoWindowDefault = 5000
+const Millis = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+export const QuestionPrompt = Schema.Struct({
+  dismiss_window: Schema.optional(Millis).annotate({
+    description:
+      "Milliseconds in which a second Esc dismisses an agent question; the first only warns. 0 dismisses on the first Esc (default 2000)",
+  }),
+  undo_window: Schema.optional(Millis).annotate({
+    description:
+      "Milliseconds after dismissing a question during which ctrl+z brings it back before the agent is told. 0 tells the agent at once (default 5000)",
+  }),
+}).annotate({ description: "Guards against dismissing an agent's question by accident" })
+
 const PromptSize = Schema.Int.check(Schema.isGreaterThan(0))
 export const Prompt = Schema.Struct({
   max_height: Schema.optional(PromptSize).annotate({ description: "Prompt textarea max height" }),
@@ -72,10 +86,15 @@ export const Info = Schema.Struct({
   diff_style: Schema.optional(DiffStyle),
   cursor: Schema.optional(Cursor),
   mouse: Schema.optional(Schema.Boolean).annotate({ description: "Enable or disable mouse capture (default: true)" }),
+  reduced_motion: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "true turns off every animation (the home screen's moon reflection, spinners, placeholder cycling) and the in-app toggle can't turn them back on. Unset: off by default when NO_COLOR is set or TERM=dumb",
+  }),
+  question: Schema.optional(QuestionPrompt),
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
-export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | "mouse" | "cursor"> & {
+export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | "mouse" | "cursor" | "question"> & {
   attention: {
     enabled: boolean
     notifications: boolean
@@ -87,10 +106,13 @@ export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | 
   keybinds: TuiKeybind.BindingLookupView
   leader_timeout: number
   mouse: boolean
+  question: { dismiss_window: number; undo_window: number }
   cursor?: {
     style: "block" | "underline" | "line" | "default"
     blinking: boolean
   }
+  /** Legacy keybind override names found in config, resolved onto their current names (XCOD-40). */
+  deprecatedKeybinds: { legacy: string; canonical: string }[]
 }
 
 export const ResolveOptions = Schema.Struct({
@@ -110,6 +132,8 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
     }
   }
 
+  const { deprecated } = TuiKeybind.resolveKeybindAliases(keybinds)
+
   return {
     ...input,
     attention: {
@@ -124,8 +148,13 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
       commandMap: TuiKeybind.CommandMap,
       bindingDefaults: TuiKeybind.bindingDefaults(),
     }),
+    deprecatedKeybinds: deprecated.map((item) => ({ legacy: item.legacy, canonical: item.canonical })),
     leader_timeout: input.leader_timeout ?? LeaderTimeoutDefault,
     mouse: input.mouse ?? true,
+    question: {
+      dismiss_window: input.question?.dismiss_window ?? QuestionDismissWindowDefault,
+      undo_window: input.question?.undo_window ?? QuestionUndoWindowDefault,
+    },
     cursor: input.cursor
       ? {
           style: input.cursor.style ?? "block",

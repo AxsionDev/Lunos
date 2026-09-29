@@ -1,0 +1,51 @@
+---
+title: Memory
+description: Opt-in long-term memory that stays on your machine, with every remembered fact reviewable.
+---
+
+Lunos can remember facts across sessions, such as "the billing service owns the invoices table", and recall the relevant ones in later turns. **Memory is off by default.** Everything it stores stays on your machine.
+
+## Turn it on
+
+```json title="opencode.json"
+{
+  "memory": {
+    "enabled": true,
+    "scope": ["project"],
+    "model": "small"
+  }
+}
+```
+
+| Key                    | Default       | What it does                                                                                                                                                                              |
+| ---------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`              | `false`       | Turns memory on. `LUNOS_DISABLE_MEMORY=1` turns it off regardless                                                                                                                         |
+| `scope`                | `["project"]` | `"project"` keeps memory in `.opencode/memory/graph/` in the project. `"user"` keeps it in the Lunos data directory                                                                       |
+| `model`                | `"small"`     | The model that extracts facts when something is remembered: `"small"` (your `small_model`), `"inherit"`, or `"provider/model"`. It goes through your normal provider and residency policy |
+| `retrieval.max_tokens` | `1500`        | The most recalled memory added to one turn                                                                                                                                                |
+| `limits.max_facts`     | `5000`        | The most facts kept per scope                                                                                                                                                             |
+
+Memory needs [uv](https://docs.astral.sh/uv/) and Python 3.10–3.13. It runs [Cognee](https://github.com/topoteretes/cognee) in a local sidecar, with embeddings computed on your machine.
+
+## What gets remembered
+
+The agent **asks before remembering** anything, unless you allow it. Recalled facts are added to a turn as reference context, each with where and when it was learned, and marked as not instructions: they may be outdated, and none overrides you or the system prompt. You can also write notes yourself as Markdown files in `.opencode/memory/`. The agent needs your permission to edit them, and it can't edit the stored graph at all.
+
+## Review what's stored
+
+```bash
+lunos memory list              # every fact, with where it came from
+lunos memory show <id>
+lunos memory search <query>    # what the agent would recall
+lunos memory forget <id>       # removes the fact and the graph data only it produced
+lunos memory export            # one Markdown file per fact, for review
+lunos memory purge             # delete a memory's facts and graph
+```
+
+In the TUI, `/memory` opens the same list.
+
+## Network
+
+- **The first time memory starts,** it downloads its Python packages (pinned by hash) and a small embedding model.
+- **After that, memory makes no network calls of its own.** Extracting facts is one more request to your model provider, under your residency policy, and it appears in the audit log.
+- **With `LUNOS_OFFLINE=1`,** memory uses only what's already cached.

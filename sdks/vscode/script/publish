@@ -1,10 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Get the latest Git tag
-latest_tag=$(git tag --sort=committerdate | grep -E '^vscode-v[0-9]+\.[0-9]+\.[0-9]+$' | tail -1)
-if [ -z "$latest_tag" ]; then
-    echo "No tags found"
+# XCOD-122: package and publish the Lunos extension. With DRY_RUN=1 it only checks the publisher
+# and packages, and publishes nothing.
+
+# Axsion's publisher on the VS Code Marketplace and its namespace on Open VSX. The extension must
+# never be published under upstream's publisher (sst-dev) or anyone else's.
+expected_publisher="axsion"
+publisher=$(node -p 'require("./package.json").publisher')
+if [ "$publisher" != "$expected_publisher" ]; then
+    echo "Refusing to publish: package.json publisher is \"$publisher\", expected \"$expected_publisher\"" >&2
+    exit 1
+fi
+
+# The version comes from the tag being published. Only a dry run may run without one; it never
+# picks "the latest tag", because a clone can hold upstream opencode's vscode-v* tags too.
+if [[ "${GITHUB_REF_NAME:-}" =~ ^vscode-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    latest_tag="$GITHUB_REF_NAME"
+elif [ "${DRY_RUN:-}" = "1" ]; then
+    latest_tag="vscode-v$(node -p 'require("./package.json").version')"
+else
+    echo "Refusing to publish: not running on a vscode-vX.Y.Z tag (ref: ${GITHUB_REF_NAME:-none})" >&2
     exit 1
 fi
 echo "Latest tag: $latest_tag"
@@ -12,10 +28,17 @@ version=$(echo "$latest_tag" | sed 's/^vscode-v//')
 echo "Latest version: $version"
 
 # package-marketplace
-vsce package --no-git-tag-version --no-update-package-json --no-dependencies --skip-license -o dist/opencode.vsix "$version"
+vsce package --no-git-tag-version --no-update-package-json --no-dependencies --skip-license -o dist/lunos.vsix "$version"
+(cd dist && sha256sum lunos.vsix > lunos.vsix.sha256 2>/dev/null || shasum -a 256 lunos.vsix > lunos.vsix.sha256)
+cat dist/lunos.vsix.sha256
+
+if [ "${DRY_RUN:-}" = "1" ]; then
+    echo "Dry run: packaged dist/lunos.vsix, published nothing"
+    exit 0
+fi
 
 # publish-marketplace
-vsce publish --packagePath dist/opencode.vsix
+vsce publish --packagePath dist/lunos.vsix
 
 # publish-openvsx
-npx ovsx publish dist/opencode.vsix -p "$OPENVSX_TOKEN"
+npx ovsx publish dist/lunos.vsix -p "$OVSX_PAT"

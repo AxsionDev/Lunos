@@ -29,6 +29,9 @@ const PluginModule = Schema.Struct({
   ]),
 })
 
+/** Plugin id that becomes active once every external v2 plugin has been loaded (or failed to). */
+export const LOADED = "core/config-plugin-loaded"
+
 export const Plugin = define({
   id: "config-plugin",
   effect: Effect.fn(function* (ctx) {
@@ -86,6 +89,12 @@ export const Plugin = define({
           })
         }).pipe(Effect.ignoreCause)
       }
-    }).pipe(Effect.forkScoped({ startImmediately: true }))
+    }).pipe(
+      // Loading is forked so boot doesn't wait on npm. The marker below is what "every external
+      // plugin has finished loading" looks like to the rest of the system: live tool calls wait
+      // on it (XCOD-75), so a guard hook can't miss the first tool call of a run.
+      Effect.ensuring(ctx.plugin.add({ id: LOADED, effect: () => Effect.void })),
+      Effect.forkScoped({ startImmediately: true }),
+    )
   }),
 })

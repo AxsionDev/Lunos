@@ -1,0 +1,54 @@
+name: docs-lunos
+
+# XCOD-124: builds the Lunos docs (packages/web) and fails if a published page shows upstream
+# opencode branding outside the allow-list, links to a page the Lunos build leaves out, or names
+# something that doesn't exist ("Lunos Zen", lunos.ai). Upstream-sync PRs run this too: when an
+# upstream merge adds such a reference, or rewrites text a lunos/patches.ts entry matches, this
+# fails and the patch list gets updated in that PR.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "packages/web/**"
+      - ".github/workflows/docs-lunos.yml"
+  push:
+    branches: [dev]
+    paths:
+      - "packages/web/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Rebrand tests
+        working-directory: packages/web
+        run: bun test ./lunos
+
+      - name: Build docs
+        working-directory: packages/web
+        run: bun run build
+
+      - name: No upstream branding in the built site
+        working-directory: packages/web
+        run: bun lunos/check-built.ts
+
+      - name: Upload the built site
+        # Deployed by hand to Axsion's own EU servers; see packages/web/lunos/DEPLOY.md.
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lunos-docs
+          path: packages/web/dist/docs
+          retention-days: 30

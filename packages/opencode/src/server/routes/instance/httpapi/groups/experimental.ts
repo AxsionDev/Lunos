@@ -29,6 +29,30 @@ const CapabilitiesResponse = Schema.Struct({
   backgroundSubagents: Schema.Boolean,
 }).annotate({ identifier: "ExperimentalCapabilities" })
 
+// XCOD-82: one background subagent job, as the monitoring surfaces show it.
+export const BackgroundJobItem = Schema.Struct({
+  id: Schema.String,
+  title: Schema.optional(Schema.String),
+  status: Schema.Literals(["running", "completed", "error", "cancelled"]),
+  startedAt: Schema.Number,
+  completedAt: Schema.optional(Schema.Number),
+  elapsedMs: Schema.Number,
+  agent: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  modelRule: Schema.optional(Schema.String),
+  parentSessionID: Schema.optional(Schema.String),
+  sessionID: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "BackgroundJobItem" })
+
+// XCOD-84: a plan, research note or dev-cycle record an agent wrote. The file is the source of truth.
+export const ArtifactItem = Schema.Struct({
+  kind: Schema.Literals(["plan", "research", "dev-cycle"]),
+  title: Schema.String,
+  path: Schema.String,
+  created: Schema.Number,
+}).annotate({ identifier: "ArtifactItem" })
+
 const ConsoleOrgOption = Schema.Struct({
   accountID: Schema.String,
   accountEmail: Schema.String,
@@ -98,6 +122,9 @@ export const ExperimentalPaths = {
   worktreeReset: "/experimental/worktree/reset",
   session: "/experimental/session",
   sessionBackground: "/experimental/session/:sessionID/background",
+  backgroundJobs: "/experimental/background",
+  artifacts: "/experimental/artifact",
+  backgroundJobCancel: "/experimental/background/:jobID/cancel",
   resource: "/experimental/resource",
 } as const
 
@@ -243,6 +270,42 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Background subagents",
             description:
               "Detach any synchronous subagents currently blocking the session and continue them in the background.",
+          }),
+        ),
+        HttpApiEndpoint.get("artifacts", ExperimentalPaths.artifacts, {
+          query: Schema.Struct({
+            ...WorkspaceRoutingQueryFields,
+            kind: Schema.optional(Schema.Literals(["plan", "research", "dev-cycle"])),
+          }),
+          success: described(Schema.Array(ArtifactItem), "Plans, research notes and dev-cycle records"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.artifact.list",
+            summary: "List artifacts",
+            description:
+              "List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.",
+          }),
+        ),
+        HttpApiEndpoint.get("backgroundJobs", ExperimentalPaths.backgroundJobs, {
+          query: Schema.Struct({ ...WorkspaceRoutingQueryFields, sessionID: Schema.optional(Schema.String) }),
+          success: described(Schema.Array(BackgroundJobItem), "Background subagent jobs"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.background.list",
+            summary: "List background subagents",
+            description:
+              "List subagent jobs with status, elapsed time, agent and resolved model. Pass sessionID to list only that session's jobs.",
+          }),
+        ),
+        HttpApiEndpoint.post("backgroundJobCancel", ExperimentalPaths.backgroundJobCancel, {
+          params: { jobID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Whether a running job was cancelled"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.background.cancel",
+            summary: "Cancel a background subagent",
+            description: "Cancel a running background subagent job and its child session.",
           }),
         ),
         HttpApiEndpoint.get("resource", ExperimentalPaths.resource, {

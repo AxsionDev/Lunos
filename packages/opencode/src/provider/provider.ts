@@ -16,6 +16,8 @@ import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
+import { Residency } from "@opencode-ai/core/residency"
+import { AuditLog } from "@/audit/log"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -841,7 +843,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       if (!apiToken) {
         throw new Error(
           "CLOUDFLARE_API_TOKEN (or CF_AIG_TOKEN) is required for Cloudflare AI Gateway. " +
-            "Set it via environment variable or run `opencode auth cloudflare-ai-gateway`.",
+            "Set it via environment variable or run `lunos auth cloudflare-ai-gateway`.",
         )
       }
 
@@ -975,7 +977,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           autoload: false,
           async getModel() {
             throw new Error(
-              `Snowflake Cortex: missing credentials (${missing}). Provide a bearer token (OAuth, JWT, or PAT) via env var, opencode auth, or provider options.`,
+              `Snowflake Cortex: missing credentials (${missing}). Provide a bearer token (OAuth, JWT, or PAT) via env var, lunos auth, or provider options.`,
             )
           },
         }
@@ -1210,6 +1212,8 @@ export class InitError extends Schema.TaggedErrorClass<InitError>()("ProviderIni
   cause: Schema.optional(Schema.Defect()),
 }) {
   override get message() {
+    // A residency denial is a policy decision, not a broken provider: say so, and why.
+    if (this.cause instanceof Residency.DeniedError) return this.cause.message
     return `Failed to initialize provider: ${this.providerID}`
   }
 
@@ -1263,6 +1267,7 @@ interface State {
   sdk: Map<string, BundledSDK>
   modelLoaders: Record<string, CustomModelLoader>
   varsLoaders: Record<string, CustomVarsLoader>
+  residency: Residency.Resolved | undefined
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Provider") {}
@@ -1776,6 +1781,7 @@ const layer = Layer.effect(
           sdk,
           modelLoaders,
           varsLoaders,
+          residency: AuditLog.residency(cfg),
         }
       }),
     )
@@ -1843,6 +1849,16 @@ const layer = Layer.effect(
             options,
           }),
         )
+        // Before the SDK cache: a cached SDK only ever exists for a provider that was allowed.
+        // This is the enforcement point for live sessions; the v2 `aisdk.sdk` hook is not on this path.
+        if (s.residency)
+          options["fetch"] = Residency.enforce({
+            providerID: model.providerID,
+            baseURL: typeof options["baseURL"] === "string" ? options["baseURL"] : "",
+            resolved: s.residency,
+            defaultAuditPath: path.join(Global.Path.log, "residency-egress.log"),
+            fetch: options["fetch"],
+          })
         const existing = s.sdk.get(key)
         if (existing) return existing
 

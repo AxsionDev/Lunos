@@ -1,5 +1,6 @@
 interface ImportMetaEnv {
   readonly OPENCODE_CHANNEL: string
+  readonly LUNOS_UPSTREAM_VERSION: string
 }
 
 interface ImportMeta {

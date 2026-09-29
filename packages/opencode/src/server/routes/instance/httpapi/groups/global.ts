@@ -49,8 +49,11 @@ const GlobalEventSchema = Schema.Struct({
 }).annotate({ identifier: "GlobalEvent" })
 
 export const GlobalUpgradeInput = Schema.Struct({
-  target: Schema.String.check(
-    Schema.makeFilter((value) => (semver.valid(value) === null ? "Expected a semantic version" : undefined)),
+  // Omitted means "the latest published Lunos release", which is what the TUI's /upgrade asks for.
+  target: Schema.optional(
+    Schema.String.check(
+      Schema.makeFilter((value) => (semver.valid(value) === null ? "Expected a semantic version" : undefined)),
+    ),
   ),
 })
 
@@ -130,8 +133,8 @@ export const GlobalApi = HttpApi.make("global").add(
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.upgrade",
-          summary: "Upgrade opencode",
-          description: "Upgrade opencode to the specified version.",
+          summary: "Upgrade Lunos",
+          description: "Upgrade Lunos to the specified version, or to the latest release when no target is given.",
         }),
       ),
     )

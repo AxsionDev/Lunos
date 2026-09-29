@@ -6,6 +6,7 @@ import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath, RelativePath } from "@opencode-ai/core/schema"
 import { effectCmd } from "../../effect-cmd"
 import { cmd } from "../cmd"
+import { writeStdoutEffect } from "../../stdout"
 
 const filesystem = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
@@ -24,7 +25,7 @@ const FileSearchCommand = effectCmd({
     }),
   handler: Effect.fn("Cli.debug.file.search")(function* (args) {
     const results = yield* Effect.orDie(filesystem(FileSystem.Service.use((svc) => svc.find({ query: args.query }))))
-    process.stdout.write(results.map((item) => item.path).join(EOL) + EOL)
+    yield* writeStdoutEffect(results.map((item) => item.path).join(EOL) + EOL)
   }),
 })
 
@@ -39,7 +40,7 @@ const FileReadCommand = effectCmd({
     }),
   handler: Effect.fn("Cli.debug.file.read")(function* (args) {
     const file = yield* filesystem(FileSystem.Service.use((svc) => svc.read({ path: RelativePath.make(args.path) })))
-    process.stdout.write(
+    yield* writeStdoutEffect(
       JSON.stringify(
         { content: Buffer.from(file.content).toString("base64"), encoding: "base64", mime: file.mime },
         null,
@@ -60,7 +61,7 @@ const FileListCommand = effectCmd({
     }),
   handler: Effect.fn("Cli.debug.file.list")(function* (args) {
     const files = yield* filesystem(FileSystem.Service.use((svc) => svc.list({ path: RelativePath.make(args.path) })))
-    process.stdout.write(JSON.stringify(files, null, 2) + EOL)
+    yield* writeStdoutEffect(JSON.stringify(files, null, 2) + EOL)
   }),
 })
 

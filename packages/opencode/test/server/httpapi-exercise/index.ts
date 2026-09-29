@@ -593,6 +593,23 @@ const scenarios: Scenario[] = [
     .json(200, (body) => {
       check(body === false, "background route should be a no-op without running subagents")
     }),
+  http.protected.get("/experimental/background", "experimental.background.list").json(200, (body) => {
+    array(body)
+    check(body.length === 0, "no background jobs should exist in a fresh instance")
+  }),
+  http.protected
+    .post("/experimental/background/{jobID}/cancel", "experimental.background.cancel")
+    .mutating()
+    .at((ctx) => ({
+      path: route("/experimental/background/{jobID}/cancel", { jobID: "ses_missing" }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      check(body === false, "cancelling an unknown job should be a no-op")
+    }),
+  http.protected.get("/experimental/artifact", "experimental.artifact.list").json(200, (body) => {
+    array(body)
+  }),
   http.protected.get("/experimental/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")
@@ -1657,10 +1674,15 @@ const scenarios: Scenario[] = [
     .seeded((ctx) => ctx.session({ title: "Share session" }))
     .at((ctx) => ({ path: route("/session/{sessionID}/share", { sessionID: ctx.state.id }), headers: ctx.headers() }))
     .json(
-      200,
-      (body, ctx) => {
+      403,
+      (body) => {
+        // Lunos defaults `share` to "disabled": the route refuses plainly instead of uploading.
         object(body)
-        check(body.id === ctx.state.id, "share should return the session")
+        check(body._tag === "ShareDisabledError", "share should be refused while sharing is disabled")
+        check(
+          typeof body.message === "string" && body.message.includes('"share": "manual"'),
+          "refusal should say how to enable sharing",
+        )
       },
       "status",
     ),

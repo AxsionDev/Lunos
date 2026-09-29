@@ -42,6 +42,9 @@ export interface DialogSelectProps<T> {
     side?: "left" | "right"
     hidden?: boolean
     disabled?: boolean | ((option: DialogSelectOption<T> | undefined) => boolean)
+    // Fire even when no row is selected (e.g. switching tabs away from an empty list). Such an
+    // action receives no option.
+    withoutSelection?: boolean
     onTrigger: (option: DialogSelectOption<T>) => void
   }[]
   footerHints?: {
@@ -442,8 +445,8 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
             if (isActionDisabled(item)) return
             setStore("input", "keyboard")
             const option = selected()
-            if (!option) return
-            item.onTrigger(option)
+            if (!option && !item.withoutSelection) return
+            item.onTrigger(option!)
           },
         })),
       ],
@@ -505,8 +508,8 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     if (!item || !isActionItem(item) || isActionDisabled(item)) return
     setStore("input", "keyboard")
     const option = selected()
-    if (!option) return
-    item.onTrigger(option)
+    if (!option && !item.withoutSelection) return
+    item.onTrigger(option!)
   }
 
   function isActionItem(item: VisibleAction): item is Action & { label: string } {
