@@ -8,6 +8,7 @@ import { AuditLog } from "@/audit/log"
 import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "."
 import { MemoryBundle } from "./bundle"
+import { MemoryNotes } from "./notes"
 import { MemorySidecar } from "./sidecar"
 import { MemoryStore } from "./store"
 
@@ -50,18 +51,6 @@ export function defaultName(now: Date, input: { zip: boolean; encrypt: boolean }
     .replace(/[-:]/g, "")
     .replace("T", "-")
   return `lunos-memory-${stamp}${input.encrypt ? ".zip.enc" : input.zip ? ".zip" : ""}`
-}
-
-/** Hand-written notes, `.opencode/memory/*.md`: the files the notes sync reads. */
-async function notes(worktree: string) {
-  const dir = path.join(worktree, ".opencode", "memory")
-  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
-  const out: { name: string; text: string }[] = []
-  for (const entry of entries
-    .filter((item) => item.isFile() && item.name.endsWith(".md"))
-    .toSorted((a, b) => a.name.localeCompare(b.name)))
-    out.push({ name: entry.name, text: await fs.readFile(path.join(dir, entry.name), "utf8") })
-  return out
 }
 
 /** The engine's files for a scope, minus its logs and the ledger (the bundle's facts.jsonl is the ledger). */
@@ -158,7 +147,7 @@ export const run = Effect.fn("MemoryExport.run")(function* (options: Options) {
       graph.relations.push(...part.relations)
     }
 
-  const noteFiles = options.scopes.includes("project") ? yield* Effect.promise(() => notes(worktree)) : []
+  const noteFiles = options.scopes.includes("project") ? yield* Effect.promise(() => MemoryNotes.read(worktree)) : []
 
   const found = MemoryBundle.secrets({ facts, graph, notes: noteFiles })
   if (found.length) return yield* Effect.fail(new MemoryBundle.SecretsError(found))

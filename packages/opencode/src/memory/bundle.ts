@@ -67,6 +67,10 @@ export interface Fact {
   provenance: MemoryStore.Provenance
   /** The engine's own ids, for a same-engine restore. Importers into anything else ignore them. */
   engine: { name: string; datasetID: string }
+  /** Only on a fact that was itself imported (XCOD-133): its provenance where it came from. */
+  origin?: MemoryStore.Provenance
+  /** Only on an imported fact: what it was imported from, and when. */
+  imported?: MemoryStore.Imported
 }
 
 export interface Entity {
@@ -137,6 +141,8 @@ export function fact(scope: MemoryStore.Scope, input: MemoryStore.Fact): Fact {
       date: input.provenance.date,
     },
     engine: { name: ENGINE, datasetID: input.datasetID },
+    ...(input.origin ? { origin: { ...input.origin } } : {}),
+    ...(input.imported ? { imported: { from: input.imported.from, date: input.imported.date } } : {}),
   }
 }
 
@@ -531,6 +537,17 @@ export const JSON_SCHEMA = {
           type: "object",
           required: ["name", "datasetID"],
           properties: { name: { type: "string" }, datasetID: { type: "string" } },
+        },
+        origin: { ...provenance, description: "Imported facts only: the provenance the fact had where it came from" },
+        imported: {
+          type: "object",
+          additionalProperties: false,
+          required: ["from", "date"],
+          description: "Imported facts only: what it was imported from and when",
+          properties: {
+            from: { type: "string", description: "import:<file>#<sha256 of that file>" },
+            date: { type: "string" },
+          },
         },
       },
     },

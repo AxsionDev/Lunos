@@ -95,6 +95,24 @@ export interface Interface {
    * when memory is off: off means no memory process starts.
    */
   readonly graph: (scope: MemoryStore.Scope) => Effect.Effect<MemoryBundle.RawGraph, Error>
+  /**
+   * Store one imported fact (XCOD-133), keeping its original provenance as `origin` and marking it
+   * imported. Runs the same content screens as `remember` (size, secrets, instruction-shaped text)
+   * again at write time; there is no turn to taint-check. The caller has shown a preview and had it
+   * approved.
+   */
+  readonly storeImported: (input: {
+    scope: MemoryStore.Scope
+    text: string
+    origin?: MemoryStore.Provenance
+    imported: MemoryStore.Imported
+    parent: MemoryModel.Model
+  }) => Effect.Effect<MemoryStore.Fact, Error>
+  /**
+   * Re-read the hand-written notes into project memory now (an import just wrote some), starting
+   * project memory if it isn't running. Returns paragraphs that couldn't be stored.
+   */
+  readonly syncNotes: (parent: MemoryModel.Model) => Effect.Effect<string[], Error>
   /** Stop a scope's sidecar if it is running, so its database files can be copied. */
   readonly release: (scope: MemoryStore.Scope) => Effect.Effect<void>
   readonly recallFor: (input: {
@@ -197,6 +215,14 @@ const layer = Layer.effect(
       return sample
     })
 
+    const limitsOf = Effect.fn("Memory.limits")(function* () {
+      const cfg = yield* config.get()
+      return {
+        maxFacts: cfg.memory?.limits?.max_facts ?? MemoryBackend.DEFAULT_LIMITS.maxFacts,
+        maxFactChars: cfg.memory?.limits?.max_fact_chars ?? MemoryBackend.DEFAULT_LIMITS.maxFactChars,
+      }
+    })
+
     const backend = Effect.fn("Memory.backend")(function* (input: {
       scope: MemoryStore.Scope
       sessionID?: string
@@ -211,7 +237,7 @@ const layer = Layer.effect(
       const cfg = yield* config.get()
       const chosen = yield* Effect.try({
         try: () => {
-          MemoryModel.checkEmbedding(cfg.memory)
+          MemoryModel.checkEmbedding(cfg.memory, AuditLog.residency(cfg))
           const out = MemoryModel.resolve({ memory: cfg.memory, small_model: cfg.small_model, parent: input.parent })
           MemoryModel.checkResidency(out, AuditLog.residency(cfg))
           return out
@@ -219,10 +245,7 @@ const layer = Layer.effect(
         catch: toError,
       })
       const sample = yield* sampler(chosen.model)
-      const limits = {
-        maxFacts: cfg.memory?.limits?.max_facts ?? MemoryBackend.DEFAULT_LIMITS.maxFacts,
-        maxFactChars: cfg.memory?.limits?.max_fact_chars ?? MemoryBackend.DEFAULT_LIMITS.maxFactChars,
-      }
+      const limits = yield* limitsOf()
       const starting = (async () => {
         const root = await MemoryStore.ensure(input.scope, s.worktree)
         const handle = await MemorySidecar.start({ root, sample })
@@ -245,7 +268,10 @@ const layer = Layer.effect(
       messages: readonly SessionV1.WithParts[]
     }) {
       const s = yield* InstanceState.get(state)
-      const refusal = MemoryGuard.taint(input.messages, s.worktree) ?? MemoryGuard.secret(input.fact)
+      const refusal =
+        MemoryGuard.taint(input.messages, s.worktree) ??
+        MemoryGuard.secret(input.fact) ??
+        MemoryGuard.instructions(input.fact)
       if (refusal) return yield* Effect.fail(new MemoryGuard.RefusedError(`Not remembered: ${refusal}.`))
       const store = yield* backend({ scope: input.scope, sessionID: input.sessionID, parent: input.parent })
       const fact = yield* Effect.tryPromise({
@@ -268,6 +294,47 @@ const layer = Layer.effect(
       })
       s.recalled.clear()
       return fact
+    })
+
+    const storeImported = Effect.fn("Memory.storeImported")(function* (input: {
+      scope: MemoryStore.Scope
+      text: string
+      origin?: MemoryStore.Provenance
+      imported: MemoryStore.Imported
+      parent: MemoryModel.Model
+    }) {
+      const s = yield* InstanceState.get(state)
+      const refusal = MemoryGuard.check(input.text, yield* limitsOf())
+      if (refusal) return yield* Effect.fail(new MemoryGuard.RefusedError(`Not imported: ${refusal}.`))
+      const store = yield* backend({ scope: input.scope, parent: input.parent })
+      const fact = yield* Effect.tryPromise({
+        try: () =>
+          store.remember(
+            input.text,
+            {
+              // Never "notes": the notes sync forgets any notes fact whose paragraph it can't find.
+              sessionID: "import",
+              agent: "import",
+              source: input.imported.from,
+              date: input.imported.date,
+            },
+            { origin: input.origin, imported: input.imported },
+          ),
+        catch: toError,
+      })
+      s.recalled.clear()
+      return fact
+    })
+
+    const syncNotes = Effect.fn("Memory.syncNotes")(function* (parent: MemoryModel.Model) {
+      const s = yield* InstanceState.get(state)
+      const store = yield* backend({ scope: "project", parent })
+      const result = yield* Effect.tryPromise({
+        try: () => MemoryNotes.sync({ backend: store, worktree: s.worktree }),
+        catch: toError,
+      })
+      s.recalled.clear()
+      return result.skipped
     })
 
     const search = Effect.fn("Memory.search")(function* (input: {
@@ -403,6 +470,8 @@ const layer = Layer.effect(
       graph,
       release,
       recallFor,
+      storeImported,
+      syncNotes,
     })
   }),
 )

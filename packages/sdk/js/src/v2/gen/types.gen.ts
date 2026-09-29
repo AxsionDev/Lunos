@@ -2561,6 +2561,9 @@ export type MemoryFact = {
   agent: string
   source: string
   date: string
+  importedFrom?: string
+  originSource?: string
+  originDate?: string
 }
 
 export type MemoryList = {
@@ -2604,6 +2607,85 @@ export type MemoryExportResult = {
   graph: boolean
   encrypted: boolean
   decrypt?: string
+}
+
+export type MemoryImportInput = {
+  /**
+   * A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file
+   */
+  path: string
+  scope?: "project" | "user"
+  asFacts?: boolean
+  passphrase?: string
+}
+
+export type MemoryImportRow = {
+  key: string
+  kind: "fact" | "note"
+  scope: "project" | "user"
+  status: "new" | "duplicate" | "conflict" | "rejected"
+  reason: string
+  text: string
+  file: string
+  note?: string
+  near?: boolean
+  otherID?: string
+  otherText?: string
+}
+
+export type MemoryImportPreview = {
+  kind: "bundle" | "markdown"
+  label: string
+  sha256: string
+  format?: string
+  encrypted: boolean
+  warnings: Array<string>
+  rows: Array<MemoryImportRow>
+  counts: {
+    new: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    duplicate: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    conflict: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    rejected: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  }
+  limit?: string
+  extractionModel: string
+  extractionCalls: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  embedding: string
+  remoteEmbeddingCalls: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
+export type MemoryImportRefusedError = {
+  _tag: "MemoryImportRefusedError"
+  message: string
+}
+
+export type MemoryPassphraseRequiredError = {
+  _tag: "MemoryPassphraseRequiredError"
+  message: string
+}
+
+export type MemoryImportApplyInput = {
+  /**
+   * A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file
+   */
+  path: string
+  scope?: "project" | "user"
+  asFacts?: boolean
+  passphrase?: string
+  /**
+   * Keys of the preview rows to write. Rejected rows and exact duplicates are never written
+   */
+  accept: Array<string>
+}
+
+export type MemoryImportResult = {
+  facts: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  noteParagraphs: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  notes: Array<string>
+  failed: Array<{
+    text: string
+    reason: string
+  }>
 }
 
 export type PermissionRequest = {
@@ -9626,6 +9708,78 @@ export type MemoryExportResponses = {
 }
 
 export type MemoryExportResponse = MemoryExportResponses[keyof MemoryExportResponses]
+
+export type MemoryImportPreviewData = {
+  body?: MemoryImportInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/import/preview"
+}
+
+export type MemoryImportPreviewErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+  /**
+   * MemoryImportRefusedError | MemoryPassphraseRequiredError
+   */
+  422: MemoryImportRefusedError | MemoryPassphraseRequiredError
+}
+
+export type MemoryImportPreviewError = MemoryImportPreviewErrors[keyof MemoryImportPreviewErrors]
+
+export type MemoryImportPreviewResponses = {
+  /**
+   * What the import would do; nothing is written
+   */
+  200: MemoryImportPreview
+}
+
+export type MemoryImportPreviewResponse = MemoryImportPreviewResponses[keyof MemoryImportPreviewResponses]
+
+export type MemoryImportData = {
+  body?: MemoryImportApplyInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/import"
+}
+
+export type MemoryImportErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+  /**
+   * MemoryImportRefusedError | MemoryPassphraseRequiredError
+   */
+  422: MemoryImportRefusedError | MemoryPassphraseRequiredError
+}
+
+export type MemoryImportError = MemoryImportErrors[keyof MemoryImportErrors]
+
+export type MemoryImportResponses = {
+  /**
+   * What was imported
+   */
+  200: MemoryImportResult
+}
+
+export type MemoryImportResponse = MemoryImportResponses[keyof MemoryImportResponses]
 
 export type MemoryForgetData = {
   body?: never

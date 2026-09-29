@@ -72,11 +72,23 @@ export interface Provenance {
   date: string
 }
 
+/**
+ * Set on a fact that came in through `lunos memory import` (XCOD-133): what it was imported from
+ * (`import:<file>#<sha256>`) and when. Imported memory is untrusted: recall labels it.
+ */
+export interface Imported {
+  from: string
+  date: string
+}
+
 export interface Fact {
   id: string
   datasetID: string
   text: string
   provenance: Provenance
+  /** Imported facts only: the provenance the fact had where it came from. */
+  origin?: Provenance
+  imported?: Imported
 }
 
 function ledgerFile(root: string) {

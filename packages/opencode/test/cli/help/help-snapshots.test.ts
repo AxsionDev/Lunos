@@ -85,6 +85,7 @@ const SUBCOMMANDS = [
   ["github", "install"],
   ["github", "run"],
   ["memory", "export"],
+  ["memory", "import"],
   ["db", "path"],
 ] as const
 

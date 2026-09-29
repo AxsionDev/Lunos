@@ -39,13 +39,19 @@ export function resolve(input: {
   return { model: parse(value), source }
 }
 
-/** Only "local" embeddings exist so far. Anything else is refused rather than silently ignored. */
-export function checkEmbedding(memory: ConfigMemory.Info | undefined) {
+/**
+ * Only "local" embeddings exist so far. A provider embedding model ("provider/model") is checked
+ * against the residency policy first, so a denied one is named as denied (XCOD-133: an import would
+ * re-embed every fact with it), and then refused as not supported rather than silently ignored.
+ * Runs before anything starts, so either refusal happens before any call.
+ */
+export function checkEmbedding(memory: ConfigMemory.Info | undefined, residency?: Residency.Resolved) {
   const value = memory?.embedding ?? "local"
-  if (value !== "local")
-    throw new RefusedError(
-      `memory.embedding "${value}" is not supported yet. Only "local" embeddings are available, which compute on this machine`,
-    )
+  if (value === "local") return
+  if (value.includes("/")) checkResidency({ model: parse(value), source: "memory.embedding" }, residency)
+  throw new RefusedError(
+    `memory.embedding "${value}" is not supported yet. Only "local" embeddings are available, which compute on this machine`,
+  )
 }
 
 /**

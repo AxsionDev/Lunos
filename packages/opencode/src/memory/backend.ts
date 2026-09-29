@@ -16,7 +16,12 @@ export interface Recalled {
 }
 
 export interface Backend {
-  remember(text: string, provenance: MemoryStore.Provenance): Promise<MemoryStore.Fact>
+  /** `extra` marks an imported fact (XCOD-133): its original provenance, and where it came from. */
+  remember(
+    text: string,
+    provenance: MemoryStore.Provenance,
+    extra?: Pick<MemoryStore.Fact, "origin" | "imported">,
+  ): Promise<MemoryStore.Fact>
   recall(query: string, limit: number): Promise<{ facts: Recalled[]; graph: string }>
   forget(id: string): Promise<boolean>
   list(): Promise<MemoryStore.Fact[]>
@@ -45,7 +50,7 @@ export const DEFAULT_LIMITS: Limits = { maxFacts: 5000, maxFactChars: 2000 }
 export function cognee(input: { root: string; handle: MemorySidecar.Handle; limits: Limits }): Backend {
   const { root, handle, limits } = input
   return {
-    async remember(text, provenance) {
+    async remember(text, provenance, extra) {
       const trimmed = text.trim()
       if (!trimmed) throw new LimitError("Nothing to remember")
       if (trimmed.length > limits.maxFactChars)
@@ -64,7 +69,9 @@ export function cognee(input: { root: string; handle: MemorySidecar.Handle; limi
         text: trimmed,
         dataset: MemoryStore.DATASET,
       })
-      const fact = { id: stored.id, datasetID: stored.dataset_id, text: trimmed, provenance }
+      const fact: MemoryStore.Fact = { id: stored.id, datasetID: stored.dataset_id, text: trimmed, provenance }
+      if (extra?.origin) fact.origin = extra.origin
+      if (extra?.imported) fact.imported = extra.imported
       await MemoryStore.add(root, fact)
       return fact
     },

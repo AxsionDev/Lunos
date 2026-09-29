@@ -8,11 +8,13 @@ import { useTheme } from "../context/theme"
 import { useCommandShortcut } from "../keymap"
 import { errorMessage } from "../util/error"
 import { exportMemory } from "./dialog-memory-export"
+import { importMemory } from "./dialog-memory-import"
 
 // XCOD-94: the memory browser. Lists every remembered fact with where it came from (read from
 // the provenance ledger, so opening it never starts memory), shows the entities and relationships
 // around the highlighted fact, and forgets a fact on a double press of the forget key. Export
-// (XCOD-132) writes all of memory out as a bundle or Markdown, with the CLI's options.
+// (XCOD-132) writes all of memory out as a bundle or Markdown, with the CLI's options. Import
+// (XCOD-133) previews an import, with approve/reject per row, before anything is written.
 export function DialogMemory() {
   const dialog = useDialog()
   const sdk = useSDK()
@@ -60,7 +62,9 @@ export function DialogMemory() {
       const details =
         highlighted() === fact.id
           ? [
-              `${fact.scope} memory · ${fact.date.slice(0, 10)} · from ${fact.source} · ${fact.agent} · ${fact.sessionID}`,
+              fact.importedFrom
+                ? `imported · ${fact.scope} memory · ${fact.date.slice(0, 10)} · from ${fact.importedFrom}${fact.originSource ? ` · originally ${fact.originSource}, ${fact.originDate?.slice(0, 10)}` : ""}`
+                : `${fact.scope} memory · ${fact.date.slice(0, 10)} · from ${fact.source} · ${fact.agent} · ${fact.sessionID}`,
               ...(connections?.id === fact.id
                 ? connections.lines.length
                   ? connections.lines.map((line) => `  ${line}`)
@@ -117,6 +121,19 @@ export function DialogMemory() {
           title: "export",
           disabled: () => !memory()?.facts.length,
           onTrigger: () => exportMemory({ dialog, sdk, toast }),
+        },
+        {
+          command: "dialog.memory.import",
+          title: "import",
+          withoutSelection: true,
+          disabled: () => memory()?.on !== true,
+          onTrigger: () =>
+            importMemory({
+              dialog,
+              sdk,
+              toast,
+              onDone: () => dialog.replace(() => <DialogMemory />),
+            }),
         },
         {
           command: "dialog.memory.forget",

@@ -34,6 +34,8 @@ export const EVENTS = [
   "memory.forget",
   // XCOD-132: a bundle export. Counts and options only, never content or the passphrase.
   "memory.export",
+  // XCOD-133: an import that wrote something. Counts and the input's SHA-256, never text or paths.
+  "memory.import",
   "upgrade",
   "audit.forward_refused",
 ] as const

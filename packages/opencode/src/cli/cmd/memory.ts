@@ -9,6 +9,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "@/memory"
 import { MemoryBundle } from "@/memory/bundle"
 import { MemoryExport } from "@/memory/export"
+import { MemoryImport } from "@/memory/import"
 import { MemoryNotes } from "@/memory/notes"
 import { MemoryRecall } from "@/memory/recall"
 import { MemoryStore } from "@/memory/store"
@@ -226,9 +227,119 @@ export const MemoryExportCommand = effectCmd({
   }),
 })
 
+const importPassphrase = Effect.fn("Cli.memory.importPassphrase")(function* () {
+  const fromEnv = process.env[PASSPHRASE_ENV]
+  if (fromEnv) return fromEnv
+  if (!process.stdin.isTTY) return undefined
+  const value = yield* Prompt.password({ message: "Passphrase for the encrypted bundle" })
+  return Option.isNone(value) ? undefined : value.value
+})
+
+const STATUS_ORDER: MemoryImport.Status[] = ["new", "conflict", "duplicate", "rejected"]
+
+/** The preview table: one row per fact or note paragraph, grouped by status, each with its reason. */
+export function previewText(preview: MemoryImport.Preview) {
+  const source = preview.source
+  const what =
+    source.kind === "bundle"
+      ? `bundle ${source.bundle?.format}${source.bundle?.encrypted ? ", encrypted" : ""}, created ${source.bundle?.created}`
+      : "Markdown"
+  const lines = [`Import from ${source.label} (${what}, sha256 ${source.sha256.slice(0, 12)}…)`]
+  for (const warning of source.warnings) lines.push(`  ${warning}.`)
+  lines.push("")
+  if (!preview.rows.length) lines.push("Nothing to import.")
+  else {
+    lines.push(`${"STATUS".padEnd(10)} ${"SCOPE".padEnd(7)} ${"KIND".padEnd(4)}  ${"TEXT".padEnd(60)}  REASON`)
+    for (const status of STATUS_ORDER)
+      for (const row of preview.rows.filter((item) => item.status === status)) {
+        lines.push(
+          `${row.status.padEnd(10)} ${row.scope.padEnd(7)} ${row.kind.padEnd(4)}  ${oneLine(row.text, 60).padEnd(60)}  ${row.reason} [${row.file}${row.note ? ` → ${row.note}` : ""}]`,
+        )
+        if (row.other && row.status === "conflict") lines.push(`${"".padEnd(25)}  vs ${oneLine(row.other.text, 60)}`)
+      }
+  }
+  const c = preview.counts
+  lines.push("", `${c.new} new, ${c.duplicate} duplicate, ${c.conflict} conflict, ${c.rejected} rejected`)
+  lines.push(
+    `Graph extraction: up to ${preview.extraction.calls} call(s) to ${preview.extraction.model} (${preview.extraction.source}). Embeddings: ${preview.embedding.model}, ${preview.embedding.remoteCalls} remote call(s).`,
+  )
+  return lines.join(EOL)
+}
+
+export const MemoryImportCommand = effectCmd({
+  command: "import <path>",
+  describe:
+    "import memory from a Lunos bundle, Markdown, or AGENTS.md / CLAUDE.md / Claude Code memory notes; previews first",
+  builder: (yargs) =>
+    yargs
+      .positional("path", {
+        type: "string",
+        demandOption: true,
+        describe: "a bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file",
+      })
+      .option("scope", {
+        choices: SCOPES,
+        describe: "put everything in this memory (default: a bundle fact's own scope; project for Markdown)",
+      })
+      .option("yes", { type: "boolean", default: false, describe: "write the new rows (without it, only preview)" })
+      .option("dry-run", { type: "boolean", default: false, describe: "only preview, even with --yes" })
+      .option("as-facts", {
+        type: "boolean",
+        default: false,
+        describe: "import AGENTS.md, CLAUDE.md, Claude Code memory and bundle notes as facts instead of notes",
+      })
+      .option("include-conflicts", {
+        type: "boolean",
+        default: false,
+        describe: "with --yes, also write rows marked conflict or near-duplicate",
+      }),
+  handler: Effect.fn("Cli.memory.import")(function* (args) {
+    const options = {
+      path: args.path,
+      target: args.scope as MemoryStore.Scope | undefined,
+      asFacts: args["as-facts"],
+      parent: yield* parent(),
+    }
+    // Asked for at most once: the preview's read and the import's re-read use the same answer.
+    let asked: Promise<string | undefined> | undefined
+    const passphrase = () =>
+      (asked ??= Effect.runPromise(importPassphrase().pipe(Effect.orElseSucceed(() => undefined))))
+    const preview = yield* MemoryImport.preview({ ...options, passphrase }).pipe(
+      Effect.catch((error) => fail(error.message)),
+    )
+    yield* writeStdoutEffect(previewText(preview) + EOL)
+    if (preview.limit) return yield* fail(preview.limit)
+    const writable = preview.counts.new + (args["include-conflicts"] ? preview.counts.conflict + nearCount(preview) : 0)
+    if (args["dry-run"] || !args.yes) {
+      const why = args["dry-run"] ? "Dry run: nothing was written." : "Preview only: nothing was written."
+      const next = writable && !args["dry-run"] ? ` Run again with --yes to import ${writable} row(s).` : ""
+      return yield* writeStdoutEffect(why + next + EOL)
+    }
+    if (!writable) {
+      MemoryImport.audit(preview)
+      return yield* writeStdoutEffect(`Nothing new to import; nothing was written.${EOL}`)
+    }
+    const result = yield* MemoryImport.run({
+      ...options,
+      passphrase,
+      includeConflicts: args["include-conflicts"],
+    }).pipe(Effect.catch((error) => fail(error.message)))
+    const lines = [
+      `Imported ${result.facts} fact(s)${result.noteParagraphs ? ` and ${result.noteParagraphs} note paragraph(s)` : ""}${result.notes.length ? ` (notes written: ${result.notes.map((name) => `.opencode/memory/${name}`).join(", ")})` : ""}.`,
+    ]
+    for (const item of result.failed) lines.push(`Not imported: ${oneLine(item.text, 60)}: ${item.reason}`)
+    yield* writeStdoutEffect(lines.join(EOL) + EOL)
+    if (result.failed.length) return yield* fail(`${result.failed.length} row(s) could not be imported`)
+  }),
+})
+
+function nearCount(preview: MemoryImport.Preview) {
+  return preview.rows.filter((row) => row.near).length
+}
+
 export const MemoryCommand = cmd({
   command: "memory",
-  describe: "review, search, export and forget long-term memory",
+  describe: "review, search, export, import and forget long-term memory",
   builder: (yargs) =>
     yargs
       .command(MemoryListCommand)
@@ -237,6 +348,7 @@ export const MemoryCommand = cmd({
       .command(MemoryForgetCommand)
       .command(MemoryPurgeCommand)
       .command(MemoryExportCommand)
+      .command(MemoryImportCommand)
       .demandCommand(),
   handler: () => {},
 })

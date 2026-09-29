@@ -475,11 +475,13 @@ opencode memory forget <id>
 opencode memory purge --scope project|user --yes
 opencode memory export [--format bundle|markdown] [--scope project|user|both] [--since <date>]
                        [--out <path>] [--zip] [--encrypt] [--no-graph] [--include-index] [--dir <path>]
+opencode memory import <path> [--scope project|user] [--yes] [--dry-run] [--as-facts] [--include-conflicts]
 ```
 
 - `export` writes all of memory as a versioned bundle (facts, graph, notes and provenance) to `./lunos-memory-<time>/`, or a `.zip` with `--zip`, or an encrypted `.zip.enc` with `--encrypt`. See [Rules: exporting memory](/docs/rules#exporting-memory).
 - `export --format markdown` writes one Markdown file per fact, with its provenance, to `.opencode/memory/export/` (or `--dir`) so you can review memory in git.
 - `forget` removes the fact from memory and from that Markdown export folder. Bundles already written are snapshots and keep it.
+- `import` reads a bundle, Markdown, or `AGENTS.md` / `CLAUDE.md` / Claude Code memory, verifies and screens every fact, and shows a preview of new, duplicate, conflict and rejected rows. It writes only with `--yes`. See [Rules: importing memory](/docs/rules#importing-memory).
 - `purge` deletes a memory's stored facts and graph. Your notes in `.opencode/memory/*.md` are kept.
 
 ---
