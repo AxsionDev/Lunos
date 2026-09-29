@@ -341,13 +341,19 @@ const layer = Layer.effect(
         result.reserve += maxTokens
         const started = Date.now()
         const at = new Date().toISOString()
+        let connected = false
         jobs.push(
           race(
-            open(data, source, mcp).then((connection) =>
-              connection.kind === "graph"
-                ? connection.client.search(input.query, LIMIT, timeout)
-                : connection.client.search(input.query, timeout),
-            ),
+            open(data, source, mcp)
+              .then((connection) => {
+                connected = true
+                return connection
+              })
+              .then((connection) =>
+                connection.kind === "graph"
+                  ? connection.client.search(input.query, LIMIT, timeout)
+                  : connection.client.search(input.query, timeout),
+              ),
             timeout,
           ).then(
             (found) => {
@@ -391,7 +397,10 @@ const layer = Layer.effect(
             (error) => {
               const latency = Date.now() - started
               const timedOut = error instanceof Timeout
-              drop(data, source.name)
+              // A query that failed or hung drops its connection, so the next turn reconnects. A
+              // connection still being set up is kept: a server slower to start than the timeout
+              // then answers on a later turn instead of being restarted and killed every turn.
+              if (connected) drop(data, source.name)
               const detail = timedOut ? `timed out after ${timeout} ms` : message(error)
               data.last.set(source.name, { state: "unavailable", detail, latencyMs: latency, at })
               result.notices.push(

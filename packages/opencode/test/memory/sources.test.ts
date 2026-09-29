@@ -8,6 +8,7 @@ import { Audit } from "@opencode-ai/core/audit"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { Effect, Schema } from "effect"
 import { Memory } from "../../src/memory"
+import { MemoryGuard } from "../../src/memory/guard"
 import { MemoryRecall } from "../../src/memory/recall"
 import { MemorySources } from "../../src/memory/sources"
 import { MemorySourceGraph } from "../../src/memory/sources/graph"
@@ -50,7 +51,13 @@ async function events(file: string, event: string) {
 
 function setup(
   dir: string,
-  input: { mode?: string; source?: Record<string, unknown>; memory?: Record<string, unknown>; residency?: unknown },
+  input: {
+    mode?: string
+    delay?: number
+    source?: Record<string, unknown>
+    memory?: Record<string, unknown>
+    residency?: unknown
+  },
 ) {
   const marker = path.join(dir, "stub-marker.txt")
   const audit = path.join(dir, "audit.log")
@@ -77,7 +84,11 @@ function setup(
         memstub: {
           type: "local",
           command: [process.execPath, STUB],
-          environment: { STUB_MODE: input.mode ?? "ok", STUB_MARKER: marker },
+          environment: {
+            STUB_MODE: input.mode ?? "ok",
+            STUB_MARKER: marker,
+            ...(input.delay ? { STUB_START_DELAY_MS: String(input.delay) } : {}),
+          },
           enabled: false,
         },
       },
@@ -225,6 +236,56 @@ describe("MemorySources checks", () => {
   })
 })
 
+describe("promoting a source's fact", () => {
+  const block = MemoryRecall.block([], 1500, {
+    sections: [
+      {
+        name: "platform-kg",
+        type: "graph",
+        trusted: false,
+        items: ["payments-service OWNED_BY Team Orion"],
+        maxTokens: 500,
+      },
+    ],
+    notices: [],
+    reserve: 500,
+  })!
+  const messages = [
+    {
+      info: { id: "msg_u", role: "user", sessionID: "ses" },
+      parts: [
+        { type: "text", text: "remember who owns payments-service" },
+        { type: "text", text: block, synthetic: true },
+      ],
+    },
+  ] as never
+
+  test("reads what each source returned back out of the turn's block", () => {
+    expect(MemoryGuard.recalledFromSources(messages).get("platform-kg")).toEqual([
+      "payments-service OWNED_BY Team Orion",
+    ])
+  })
+
+  test("a source's fact under another provenance is refused", () => {
+    expect(MemoryGuard.provenance(messages, "payments-service OWNED_BY Team Orion", "user message")).toContain(
+      "memory source platform-kg",
+    )
+  })
+
+  test("with the source as provenance it passes, but only for a source recalled in this turn", () => {
+    expect(
+      MemoryGuard.provenance(messages, "payments-service OWNED_BY Team Orion", "memory source platform-kg"),
+    ).toBeUndefined()
+    expect(MemoryGuard.provenance(messages, "anything", "memory source other-kg")).toContain(
+      'no memory source named "other-kg"',
+    )
+  })
+
+  test("an unrelated fact in the same turn is unaffected", () => {
+    expect(MemoryGuard.provenance(messages, "We deploy on Tuesdays after the standup", "user message")).toBeUndefined()
+  })
+})
+
 describe("MemoryRecall.block with sources", () => {
   const section = (name: string, items: string[], maxTokens = 500): MemoryRecall.Section => ({
     name,
@@ -319,6 +380,20 @@ describe("MemorySources service (a real stdio MCP server)", () => {
         expect(text).toContain('Source "team-memory" is unavailable (timed out after 400 ms)')
         const queries = yield* Effect.promise(() => events(ctx.audit, "memory.source_query"))
         expect(queries.some((line) => line.status === "timeout")).toBe(true)
+      }),
+    ),
+  )
+
+  it.live("a server slower to start than the timeout is kept starting, and answers on a later turn", () =>
+    withSources({ delay: 1000, source: { timeout_ms: 400 } }, (ctx) =>
+      Effect.gen(function* () {
+        const first = yield* recall("ses_1", "first")
+        expect(first).toContain("timed out after 400 ms")
+        yield* Effect.promise(() => Bun.sleep(1500))
+        const second = yield* recall("ses_1", "second")
+        expect(second).toContain("payments-service is owned by Team Orion")
+        // Started once: the slow start wasn't killed and restarted.
+        expect((yield* Effect.promise(() => read(ctx.marker))).match(/spawned/g)).toHaveLength(1)
       }),
     ),
   )

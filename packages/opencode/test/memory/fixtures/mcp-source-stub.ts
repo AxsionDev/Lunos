@@ -2,7 +2,7 @@
 // the server appends "spawned" to when it starts (so a test can prove it was never started),
 // "called" on each search, and "WRITE" if anything ever calls its write tool. STUB_MODE picks what
 // the search tool does: "ok" (default), "poison" (one poisoned fact among good ones), "hang" (never
-// answers) or "error". STUB_FACTS, if set, is a JSON array of fact strings to return instead.
+// answers) or "error". STUB_START_DELAY_MS delays startup. STUB_FACTS, if set, is a JSON array of fact strings to return instead.
 import fs from "node:fs"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
@@ -51,4 +51,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   return { content: [{ type: "text", text: JSON.stringify({ facts }) }] }
 })
 
+// STUB_START_DELAY_MS: a server slow to start (npx fetching a package, say).
+const delay = Number(process.env.STUB_START_DELAY_MS ?? 0)
+if (delay) await Bun.sleep(delay)
 await server.connect(new StdioServerTransport())

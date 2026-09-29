@@ -156,7 +156,8 @@ verify` (`packages/opencode/src/memory/store.ts`).
   graph or MCP memory server in `memory.sources` is residency-checked by its declared `jurisdiction`
   before it is first contacted, and never contacted if denied. Its results go through the same
   secret and instruction-pattern screens as imports, are size-capped per source, appear in a
-  labelled `<memory-source>` section, and are never written to the local ledger. Only the configured
+  labelled `<memory-source>` section, and are never written to the local ledger. Keeping one takes a
+  `memory_remember` with the source as provenance; the same text under another provenance is refused. Only the configured
   search tool (MCP) or two fixed read-only Cypher queries (graph) are ever run, and a slow source is
   skipped after its timeout (`packages/opencode/src/memory/sources/`).
 - **Audit.** Every memory operation is an audit event (`memory.remember`, `recall`, `forget`,

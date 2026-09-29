@@ -377,6 +377,7 @@ const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       const refusal =
         MemoryGuard.taint(input.messages, s.worktree) ??
+        MemoryGuard.provenance(input.messages, input.fact, input.source) ??
         MemoryGuard.secret(input.fact) ??
         MemoryGuard.instructions(input.fact)
       if (refusal) return yield* Effect.fail(new MemoryGuard.RefusedError(`Not remembered: ${refusal}.`))

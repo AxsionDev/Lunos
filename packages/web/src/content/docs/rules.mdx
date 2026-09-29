@@ -333,7 +333,7 @@ Lunos can also recall from knowledge your organisation already keeps: a Neo4j kn
 - **Residency.** Each source must declare a `jurisdiction`, like `"EU-DE"`, `"EU"` or `"US"`. Before a source is first contacted, it is checked against your [residency policy](/docs/data-residency). A source without one, or with one the policy doesn't allow, is never contacted, and the denial is written to the audit log.
 - **Failures don't block you.** A source that is slow or failing is skipped after `timeout_ms` (default 2000) with a notice, and tried again on the next turn.
 - **Turning sources off.** `/memory sources` lists every source with how its last query went. `/memory sources off <name>` turns one off for this session, and `/memory sources on <name>` turns it back on. `"enabled": false` turns a source off in config. When memory is off, no source is queried.
-- **Keeping a fact.** To keep something a source said, ask the agent to remember it. It calls `memory_remember` with the source as provenance (`memory source <name>`), and you approve it like any other fact.
+- **Keeping a fact.** To keep something a source said, ask the agent to remember it. It calls `memory_remember` with the source as provenance (`memory source <name>`), and you approve it like any other fact. A fact that repeats a source's result under any other provenance (such as "user message") is refused, and so is one attributed to a source that wasn't recalled in that turn.
 - **The audit log** records each query (source, latency, result and withheld counts) as `memory.source_query`, and each refusal as `memory.source_denied`, never the question or the results.
 
 ---
