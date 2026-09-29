@@ -55,7 +55,6 @@ import { eq } from "drizzle-orm"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { Memory } from "@/memory"
-import { Question } from "@/question"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
 
@@ -141,7 +140,6 @@ const layer = Layer.effect(
     const llm = yield* LLM.Service
     const events = yield* EventV2Bridge.Service
     const memory = yield* Memory.Service
-    const question = yield* Question.Service
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
     const { db } = database
@@ -1269,7 +1267,6 @@ const layer = Layer.effect(
               Effect.provideService(Truncate.Service, truncate),
               Effect.provideService(RuntimeFlags.Service, flags),
               Effect.provideService(Memory.Service, memory),
-              Effect.provideService(Question.Service, question),
             )
 
             if (lastUser.format?.type === "json_schema") {
@@ -1688,7 +1685,6 @@ export const node = LayerNode.make({
     RuntimeFlags.node,
     Database.node,
     Memory.node,
-    Question.node,
   ],
 })
 

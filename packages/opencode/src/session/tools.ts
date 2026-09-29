@@ -29,7 +29,6 @@ import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "@/memory"
 import { MemoryGuard } from "@/memory/guard"
 import { MemoryLifecycle } from "@/memory/lifecycle"
-import { Question } from "@/question"
 import { MemoryRecall } from "@/memory/recall"
 import { MemoryStore } from "@/memory/store"
 import MEMORY_REMEMBER from "@/memory/remember.txt"
@@ -67,7 +66,6 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
   const memory = yield* Memory.Service
-  const question = yield* Question.Service
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -109,12 +107,16 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         .pipe(Effect.orDie),
   })
 
+  // XCOD-136: memory_remember asks "replace or keep both?" through the question tool, and only
+  // when this agent may ask questions (never in `lunos run`, which denies "question").
+  let questionTool: Tool.Def | undefined
   for (const item of yield* registry.tools({
     modelID: ModelV2.ID.make(input.model.api.id),
     providerID: input.model.providerID,
     agent: input.agent,
     permission: input.session.permission,
   })) {
+    if (item.id === "question") questionTool = item
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
       description: item.description,
@@ -266,25 +268,36 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 },
               })
               let replaces: string | undefined
-              if (candidate) {
-                const answer = yield* question
-                  .ask({
-                    sessionID: ctx.sessionID,
-                    questions: [
-                      {
-                        header: "Replace a remembered fact?",
-                        question: `The new fact:\n  ${fact}\ncontradicts this one in ${scope} memory (${candidate.id}):\n  ${candidate.text}\nReplace it? The old fact is kept as outdated, and no longer recalled.`,
-                        options: [
-                          { label: "Replace", description: "Mark the old fact outdated, replaced by the new one" },
-                          { label: "Keep both", description: "Remember the new fact and keep the old one active" },
-                        ],
-                        custom: false,
-                      },
-                    ],
-                    tool: { messageID: input.processor.message.id, callID: opts.toolCallId },
-                  })
-                  .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<ReadonlyArray<string>>))
-                if (answer[0]?.includes("Replace")) replaces = candidate.id
+              // Where no one can answer a question (`lunos run`, or an agent denied "question"), the
+              // fact is kept alongside the old one, and the output says how to replace it later.
+              const canAsk =
+                !!questionTool &&
+                !Permission.disabled(
+                  ["question"],
+                  Permission.merge(input.agent.permission, input.session.permission ?? []),
+                ).has("question")
+              if (candidate && questionTool && canAsk) {
+                const asked = yield* questionTool
+                  .execute(
+                    {
+                      questions: [
+                        {
+                          header: "Replace a remembered fact?",
+                          question: `The new fact:\n  ${fact}\ncontradicts this one in ${scope} memory (${candidate.id}):\n  ${candidate.text}\nReplace it? The old fact is kept as outdated, and no longer recalled.`,
+                          options: [
+                            { label: "Replace", description: "Mark the old fact outdated, replaced by the new one" },
+                            { label: "Keep both", description: "Remember the new fact and keep the old one active" },
+                          ],
+                        },
+                      ],
+                    },
+                    ctx,
+                  )
+                  .pipe(
+                    Effect.map((out) => (out.metadata as { answers?: ReadonlyArray<ReadonlyArray<string>> }).answers),
+                    Effect.catchCause(() => Effect.succeed(undefined)),
+                  )
+                if (asked?.[0]?.includes("Replace")) replaces = candidate.id
               }
               const result = yield* memory
                 .remember({
@@ -304,7 +317,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               const replaced = replaces
                 ? ` It replaces ${replaces}, which is now outdated.`
                 : candidate
-                  ? ` ${candidate.id} was kept.`
+                  ? ` It contradicts ${candidate.id}, which was kept${canAsk ? "" : ` (no one could be asked; mark it outdated with: lunos memory outdate ${candidate.id} --by ${result.success.id})`}.`
                   : ""
               return finish("Remembered", `Remembered in ${scope} memory as ${result.success.id}.${replaced}`, {
                 id: result.success.id,
