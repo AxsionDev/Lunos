@@ -20,6 +20,15 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **`/restart`** stops Lunos and starts it again, back in the same session with your unsent prompt
+  kept; `/restart --fresh` starts a new session. It stops MCP servers, LSP servers, the memory
+  sidecar and the local server first, and relaunches with the same arguments, directory and
+  environment. After `/update` it runs the newly installed version (the banner shows old → new), and
+  the "Update Complete" alert now says `Run /restart to use X.Y.Z.` instead of closing Lunos. If the
+  agent is mid-turn or background jobs are running it asks first (wait, stop and restart, or
+  cancel). In `lunos attach` only the client restarts. A relaunch that fails to start prints the
+  error and the command to run by hand, and is never retried. Also in the palette as **Restart
+  Lunos**, with an unbound `app_restart` keybind (XCOD-129).
 - **`lunos memory export` writes a full, versioned bundle** (`lunos-memory/1`): facts with provenance,
   the entity graph tied to the facts it came from, hand-written notes, and a manifest with a SHA-256
   per file, documented by a JSON Schema in the bundle's `SCHEMA.md`. `--zip`, `--encrypt`

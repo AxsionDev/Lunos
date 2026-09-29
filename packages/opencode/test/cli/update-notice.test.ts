@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
-import { newVersionMessage, newVersionNotice, UPDATE_RESTART_HINT } from "@opencode-ai/core/installation/version"
+import { newVersionMessage, newVersionNotice, updateRestartHint } from "@opencode-ai/core/installation/version"
 import { Installation } from "../../src/installation"
 import { checkLatest, notice } from "../../src/cli/upgrade"
 import { isUpToDate, manualUpdateCommand, UpgradeCommand, upToDateMessage } from "../../src/cli/cmd/upgrade"
@@ -106,8 +106,8 @@ describe("copy", () => {
     expect(newVersionNotice("10.123.4567", 80)).toContain("10.123.4567")
   })
 
-  test("the restart hint names restarting Lunos", () => {
-    expect(UPDATE_RESTART_HINT).toContain("Restart Lunos")
+  test("the update-complete hint points at /restart with the new version (XCOD-129)", () => {
+    expect(updateRestartHint("1.18.44")).toBe("Run /restart to use 1.18.44.")
   })
 })
 

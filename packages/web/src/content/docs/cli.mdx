@@ -677,6 +677,10 @@ lunos update v0.1.48
 If the update fails, Lunos prints the command to run by hand. For npm installs that's
 `npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`.
 
+A running TUI keeps using the old version until it restarts. After `/update` in the TUI, run
+`/restart`: it starts the newly installed version back in the same session. See
+[`/restart`](/docs/tui#restart).
+
 #### New version notice
 
 Every time Lunos starts it asks the npm registry (`lunos-ai`, or the registry in your `.npmrc`) for
