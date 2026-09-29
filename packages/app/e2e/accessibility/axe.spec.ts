@@ -28,6 +28,19 @@ for (const scheme of ["light", "dark"] as const) {
         project: fixture.project,
         pageMessages,
         vcsDiff: [diff("src/app.ts"), diff("README.md")],
+        fileList: (path) =>
+          path
+            ? []
+            : [
+                {
+                  name: "README.md",
+                  path: "README.md",
+                  absolute: `${fixture.directory}/README.md`,
+                  type: "file",
+                  ignored: false,
+                },
+              ],
+        fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
       })
       // The shared mock answers unknown paths with `{}`; the General settings tab needs a list here,
       // otherwise the app crashes behind the dialog and axe audits the error page instead.
@@ -70,6 +83,28 @@ for (const scheme of ["light", "dark"] as const) {
       await openSession(page)
       await expectAppVisible(page.locator("#review-panel"))
       await audit(page, info, "review")
+    })
+
+    test("review panel with context and file tabs open", async ({ page }, info) => {
+      await page.addInitScript(() => {
+        localStorage.setItem(
+          "opencode.global.dat:layout",
+          JSON.stringify({ review: { diffStyle: "split", panelOpened: true } }),
+        )
+      })
+      await openSession(page)
+      const panel = page.locator("#review-panel")
+      await expectAppVisible(panel)
+      await page.getByRole("button", { name: "View context usage" }).click()
+      await expect(panel.getByRole("tab", { name: "Context" })).toHaveAttribute("aria-selected", "true")
+      await panel.getByRole("button", { name: "Open file" }).click()
+      await panel.getByRole("button", { name: "README.md" }).click()
+      await expect(panel.getByRole("tab", { name: "README.md" })).toHaveAttribute("aria-selected", "true")
+      await expect(panel.getByText("contents:README.md", { exact: true })).toBeVisible()
+      await audit(page, info, "review-file-tabs")
+      // Close buttons are hidden from assistive tech inside the tablist, so Delete closes the focused tab.
+      await panel.getByRole("tab", { name: "README.md" }).press("Delete")
+      await expect(panel.getByRole("tab", { name: "README.md" })).toHaveCount(0)
     })
 
     for (const tab of ["General", "Shortcuts", "Servers", "Providers", "Models"]) {

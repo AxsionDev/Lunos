@@ -1,5 +1,5 @@
 import { Tabs as Kobalte } from "@kobalte/core/tabs"
-import { Show, splitProps, type JSX } from "solid-js"
+import { onMount, Show, splitProps, type JSX } from "solid-js"
 import type { ComponentProps, ParentProps, Component } from "solid-js"
 
 export interface TabsProps extends ComponentProps<typeof Kobalte> {
@@ -77,6 +77,13 @@ function TabsTrigger(props: ParentProps<TabsTriggerProps>) {
           split.onMiddleClick()
         }
       }}
+      onKeyDown={(e) => {
+        // Keyboard close for closable tabs: the close button itself is hidden from the tab order below.
+        if (e.key !== "Delete" || !split.onMiddleClick || e.defaultPrevented) return
+        if (!(e.target instanceof Element) || e.target.getAttribute("role") !== "tab") return
+        e.preventDefault()
+        split.onMiddleClick()
+      }}
     >
       <Kobalte.Trigger
         {...rest}
@@ -89,7 +96,20 @@ function TabsTrigger(props: ParentProps<TabsTriggerProps>) {
       </Kobalte.Trigger>
       <Show when={split.closeButton}>
         {(closeButton) => (
-          <div data-slot="tabs-trigger-close-button" data-hidden={split.hideCloseButton}>
+          <div
+            data-slot="tabs-trigger-close-button"
+            data-hidden={split.hideCloseButton}
+            // A tablist may only own tabs (XCOD-141, axe aria-required-children), so the close button
+            // is a pointer affordance only: hidden from assistive tech and the tab order. Keyboard users
+            // close the focused tab with Delete (above) or the close-tab shortcut.
+            aria-hidden="true"
+            ref={(el) =>
+              onMount(() => {
+                for (const node of el.querySelectorAll<HTMLElement>("button, a[href], input, [tabindex]"))
+                  node.tabIndex = -1
+              })
+            }
+          >
             {closeButton()}
           </div>
         )}
