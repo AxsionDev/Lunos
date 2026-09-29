@@ -240,7 +240,7 @@ const TIPS: Tip[] = [
   "Use {highlight}--format json{/highlight} for machine-readable output in scripts",
   "Run {highlight}lunos serve{/highlight} for headless API access to Lunos",
   "Use {highlight}lunos run --attach{/highlight} to connect to a running server",
-  "Run {highlight}lunos upgrade{/highlight} to update to the latest version",
+  "Run {highlight}lunos update{/highlight} (or {highlight}/update{/highlight}) to update to the latest version",
   "Run {highlight}lunos auth list{/highlight} to see all configured providers",
   "Run {highlight}lunos agent create{/highlight} for guided agent creation",
   "Use {highlight}/opencode{/highlight} in GitHub issues/PRs to trigger AI actions",

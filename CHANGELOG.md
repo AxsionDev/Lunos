@@ -26,6 +26,17 @@ reasoning behind a change are published separately as **Lunos Notes**.
   model picker**. `/connect` remains a hidden alias that shows "/connect is now /providers", and the
   `provider_connect` keybind still works as an alias of the new `provider_list`; both aliases will
   be removed in 1.21.0, after the next two minor releases (XCOD-130).
+- **`lunos update` is now the name of the update command,** and `/update` in the TUI. `lunos upgrade`
+  and `/upgrade` remain working aliases, so no script breaks. When you're already current it prints
+  `Lunos is up to date (X.Y.Z).` and exits 0. Lunos now checks the npm registry on every start (in
+  the background, never delaying startup, 3 s timeout, falling back to the last known result)
+  instead of once a day, and the TUI shows `There is a new version: X.Y.Z — please run lunos update`
+  in the bottom-right corner of every screen, home and session alike, until you update (`New
+version: X.Y.Z · lunos update` below 100 columns). This replaces the home-screen footer's `·
+update available (/upgrade)`. Plain commands print `There is a new version: X.Y.Z — please run
+"lunos update"` to stderr at most once a day. Nothing is checked or shown with `"autoupdate":
+false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `autoupdate: false`
+  (XCOD-147).
 
 ### Fixed
 

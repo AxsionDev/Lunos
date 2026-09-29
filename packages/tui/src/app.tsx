@@ -7,7 +7,12 @@ import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { InstallationVersion, manualInstallCommand } from "@opencode-ai/core/installation/version"
+import {
+  InstallationVersion,
+  manualInstallCommand,
+  newVersionMessage,
+  UPDATE_RESTART_HINT,
+} from "@opencode-ai/core/installation/version"
 import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
@@ -33,6 +38,7 @@ import { DialogProvider, useDialog } from "./ui/dialog"
 import { DialogProvider as DialogProviderConnect, DialogProviders } from "./component/dialog-provider"
 import { ErrorComponent } from "./component/error-component"
 import { PluginRouteMissing } from "./component/plugin-route-missing"
+import { UpdateNotice } from "./component/update-notice"
 import { ProjectProvider, useProject } from "./context/project"
 import { EditorContextProvider } from "./context/editor"
 import { useEvent } from "./context/event"
@@ -148,6 +154,8 @@ export type TuiInput = {
   args: Args
   config: TuiConfig.Resolved
   onSnapshot?: () => Promise<string[]>
+  /** Called once the app listens for server events, so one-off events sent after it aren't lost. */
+  onListening?: () => void
   directory?: string
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
@@ -304,6 +312,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                   <LocationProvider>
                                                                     <App
                                                                       onSnapshot={input.onSnapshot}
+                                                                      onListening={input.onListening}
                                                                       pluginHost={input.pluginHost}
                                                                     />
                                                                   </LocationProvider>
@@ -351,7 +360,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
   })
 })
 
-function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPluginHost }) {
+function App(props: { onSnapshot?: () => Promise<string[]>; onListening?: () => void; pluginHost: TuiPluginHost }) {
   const startup = useTuiStartup()
   const tuiConfig = useTuiConfig()
   const route = useRoute()
@@ -394,6 +403,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     }),
   )
   const [ready, setReady] = createSignal(false)
+  // XCOD-147: set only by this session's update check, never from persisted state, so the notice
+  // can't outlive a switch that turned checks off.
+  const [availableVersion, setAvailableVersion] = createSignal<string | undefined>()
+  const updateNotice = createMemo(() => {
+    const version = availableVersion()
+    return version && InstallationVersion !== "local" && isVersionGreater(version, InstallationVersion)
+      ? version
+      : undefined
+  })
   props.pluginHost
     .start({
       api,
@@ -861,8 +879,10 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       },
       {
         name: "app.upgrade",
-        title: "Upgrade Lunos",
-        slashName: "upgrade",
+        title: "Update Lunos",
+        slashName: "update",
+        // `/upgrade` was the name until XCOD-147; it keeps working.
+        slashAliases: ["upgrade"],
         run: () => {
           dialog.clear()
           void runUpgrade(undefined)
@@ -1079,7 +1099,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     })
   })
 
-  // One flow for the reminder dialog and /upgrade. `target` undefined means "latest";
+  // One flow for the reminder dialog and /update. `target` undefined means "latest";
   // the server resolves it from the lunos-ai registry entry.
   async function runUpgrade(target: string | undefined) {
     toast.show({
@@ -1098,17 +1118,19 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       toast.show({
         variant: "error",
         title: "Update Failed",
-        message: `${reason}\nTo upgrade manually, run: ${manualInstallCommand(target)}`,
+        // XCOD-111: always the full `npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`, using
+        // the version the update check found when /update didn't name one.
+        message: `${reason}\nTo update manually, run: ${manualInstallCommand(target ?? updateNotice())}`,
         duration: 15000,
       })
       return
     }
 
-    kv.set("available_version", undefined)
+    setAvailableVersion(undefined)
     await DialogAlert.show(
       dialog,
       "Update Complete",
-      `Updated to Lunos v${result.data.version}. Restart Lunos to use it.`,
+      `Updated to Lunos v${result.data.version}. ${UPDATE_RESTART_HINT}`,
     )
 
     void exit()
@@ -1116,8 +1138,9 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
 
   event.on("installation.update-available", async (evt) => {
     const version = evt.properties.version
-    // Kept after the dialog is dismissed, so the footer can keep saying an update exists.
-    kv.set("available_version", version)
+    // Kept after the dialog is dismissed or skipped: the bottom-right notice stays until the
+    // update is installed.
+    setAvailableVersion(version)
 
     const skipped = kv.get("skipped_version")
     if (skipped && !isVersionGreater(version, skipped)) return
@@ -1125,18 +1148,22 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     const choice = await DialogConfirm.show(
       dialog,
       `Update Available`,
-      `Lunos v${version} is available (you have v${InstallationVersion}).\nRelease notes: https://github.com/AxsionDev/Lunos/releases/tag/v${version}\n\nUpdate now?`,
+      `${newVersionMessage(version)} (you have ${InstallationVersion}), or /update here.\nRelease notes: https://github.com/AxsionDev/Lunos/releases/tag/v${version}\n\nUpdate now?`,
       "skip",
     )
 
-    if (choice === false) {
+    // Once per new version: "skip" and Esc both mean "not now", and the bottom-right notice keeps
+    // saying the update exists. Without this the dialog blocked every start (XCOD-147).
+    if (choice !== true) {
       kv.set("skipped_version", version)
       return
     }
 
-    if (choice !== true) return
     await runUpgrade(version)
   })
+  // The update check (XCOD-147) starts only once mounted, when the SDK's event subscription (set up
+  // in its provider's onMount, which runs first) and the handler above both exist.
+  onMount(() => props.onListening?.())
 
   const plugin = createMemo(() => {
     if (!ready()) return
@@ -1183,6 +1210,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           </Switch>
           {plugin()}
         </box>
+        <UpdateNotice version={updateNotice()} />
         <box flexShrink={0}>
           <pluginRuntime.Slot name="app_bottom" />
         </box>
