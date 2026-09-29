@@ -480,7 +480,7 @@ Amazon Bedrock supports AWS-specific configuration:
 - `endpoint` - Custom endpoint URL for VPC endpoints. This is an alias for the generic `baseURL` option using AWS-specific terminology. If both are specified, `endpoint` takes precedence.
 
 :::note
-Bearer tokens (`AWS_BEARER_TOKEN_BEDROCK` or `/connect`) take precedence over profile-based authentication. See [authentication precedence](/docs/providers#authentication-precedence) for details.
+Bearer tokens (`AWS_BEARER_TOKEN_BEDROCK` or `/providers`) take precedence over profile-based authentication. See [authentication precedence](/docs/providers#authentication-precedence) for details.
 :::
 
 [Learn more about Amazon Bedrock configuration](/docs/providers#amazon-bedrock).
@@ -846,7 +846,7 @@ The `disabled_providers` takes priority over `enabled_providers`.
 The `disabled_providers` option accepts an array of provider IDs. When a provider is disabled:
 
 - It won't be loaded even if environment variables are set.
-- It won't be loaded even if API keys are configured through the `/connect` command.
+- It won't be loaded even if API keys are configured through the `/providers` command.
 - The provider's models won't appear in the model selection list.
 
 ---

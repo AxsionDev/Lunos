@@ -50,7 +50,8 @@ const TOP_LEVEL = [
   "debug",
   "providers", // aliased to `auth`
   "agent",
-  "upgrade",
+  "update",
+  "upgrade", // alias of `update` (XCOD-147)
   "uninstall",
   "serve",
   "web",

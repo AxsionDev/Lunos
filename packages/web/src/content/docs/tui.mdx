@@ -75,12 +75,14 @@ Here are all available slash commands:
 
 ---
 
-### connect
+### providers
 
-Add a provider to Lunos. Allows you to select from available providers and add their API keys.
+Manage providers. Lists your configured providers with their status, auth method and jurisdiction.
+From there you can **Add provider** (log in with an API key or OAuth), **Log out**, or **Set as default
+for model picker**. The old name still works for now and shows a rename hint.
 
 ```bash frame="none"
-/connect
+/providers
 ```
 
 ---
@@ -280,6 +282,21 @@ Unshare current session. [Learn more](/docs/share#un-sharing).
 ```bash frame="none"
 /unshare
 ```
+
+---
+
+### update
+
+Update Lunos to the latest version. Also available as `/upgrade`, its old name.
+
+```bash frame="none"
+/update
+```
+
+When a new version is published, the bottom-right corner of every screen shows
+`There is a new version: X.Y.Z — please run lunos update` (`New version: X.Y.Z · lunos update` in
+terminals narrower than 100 columns) until you update. After updating, restart Lunos to use the new
+version. See [`lunos update`](/docs/cli#update) for when the check runs and how to turn it off.
 
 ---
 

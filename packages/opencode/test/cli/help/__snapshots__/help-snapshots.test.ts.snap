@@ -142,9 +142,9 @@ exports[`opencode CLI help-text snapshots every documented command emits stable 
 manage AI providers and credentials
 
 Commands:
-  lunos providers list               list providers and credentials                    [aliases: ls]
-  lunos providers login [url]        log in to a provider
-  lunos providers logout [provider]  log out from a configured provider
+  lunos providers list               list configured providers                         [aliases: ls]
+  lunos providers login [url]        add provider (API key or OAuth login)
+  lunos providers logout [provider]  log out of a configured provider
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -171,13 +171,30 @@ Options:
       --pure        run without external plugins                                           [boolean]"
 `;
 
-exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode upgrade --help 1`] = `
-"lunos upgrade [target]
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode update --help 1`] = `
+"lunos update [target]
 
-upgrade Lunos to the latest or a specific version
+update Lunos to the latest or a specific version
 
 Positionals:
-  target  version to upgrade to, for ex '0.1.48' or 'v0.1.48'                               [string]
+  target  version to update to, for ex '0.1.48' or 'v0.1.48'                                [string]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+  -m, --method      installation method to use              [string] [choices: "npm", "pnpm", "bun"]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode upgrade --help 1`] = `
+"lunos update [target]
+
+update Lunos to the latest or a specific version
+
+Positionals:
+  target  version to update to, for ex '0.1.48' or 'v0.1.48'                                [string]
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -508,7 +525,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers list --help 1`] = `
 "lunos providers list
 
-list providers and credentials
+list configured providers
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -521,7 +538,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers login --help 1`] = `
 "lunos providers login [url]
 
-log in to a provider
+add provider (API key or OAuth login)
 
 Positionals:
   url  Lunos auth provider                                                                  [string]
@@ -539,7 +556,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers logout --help 1`] = `
 "lunos providers logout [provider]
 
-log out from a configured provider
+log out of a configured provider
 
 Positionals:
   provider  provider id or name to log out from                                             [string]

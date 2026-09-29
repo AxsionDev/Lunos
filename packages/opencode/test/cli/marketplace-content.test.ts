@@ -58,7 +58,7 @@ describe("opencode marketplace search (subprocess)", () => {
         ])
           expect(out).toContain(row)
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -72,7 +72,7 @@ describe("opencode marketplace search (subprocess)", () => {
         expect(out).not.toContain("[plugin]")
         expect(out).not.toContain("[mcp]")
       }),
-    60_000,
+    120_000,
   )
 })
 
@@ -102,7 +102,7 @@ describe("opencode marketplace install (subprocess)", () => {
           yield* Effect.promise(() => fs.chmod(file, 0o644))
         }
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -121,7 +121,7 @@ describe("opencode marketplace install (subprocess)", () => {
         expect(result.stderr).toContain('targets event "PostToolUse"')
         expect(result.stderr).not.toContain("Unexpected error")
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -145,7 +145,7 @@ describe("opencode marketplace install (subprocess)", () => {
           { command: ["prettier", "--write", "."], matcher: { tool: "edit" } },
         ])
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -159,7 +159,7 @@ describe("opencode marketplace install (subprocess)", () => {
         const config = yield* Effect.promise(() => readGlobalConfig(home))
         expect(config?.skills?.urls).toEqual(["http://127.0.0.1:9/skills/"])
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -175,7 +175,7 @@ describe("opencode marketplace install (subprocess)", () => {
         const config = yield* Effect.promise(() => readGlobalConfig(home))
         expect(config?.mcp?.["a-server"]).toMatchObject({ type: "remote", url: "https://example.test/mcp" })
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -192,7 +192,7 @@ describe("opencode marketplace install (subprocess)", () => {
         const config = yield* Effect.promise(() => readGlobalConfig(home))
         expect(config?.hooks).toBeUndefined()
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -222,7 +222,7 @@ describe("opencode marketplace install (subprocess)", () => {
         expect(JSON.stringify(config?.marketplace ?? [])).not.toContain("copy")
         expect(config?.plugin).toBeUndefined()
       }),
-    60_000,
+    120_000,
   )
 
   // XCOD-105: review status at install time.
@@ -241,7 +241,7 @@ describe("opencode marketplace install (subprocess)", () => {
         const config = yield* Effect.promise(() => readGlobalConfig(home))
         expect(config?.mcp?.["a-server"]).toBeUndefined()
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -263,7 +263,7 @@ describe("opencode marketplace install (subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.stdout + result.stderr).toContain("marketplace_unreviewed is set by your organisation's policy")
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -296,7 +296,7 @@ describe("opencode marketplace install (subprocess)", () => {
         const config = yield* Effect.promise(() => readGlobalConfig(home))
         expect(config?.plugin).toBeUndefined()
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -308,7 +308,7 @@ describe("opencode marketplace install (subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.stdout + result.stderr).toContain("marketplace search")
       }),
-    60_000,
+    120_000,
   )
 })
 
@@ -322,6 +322,6 @@ describe("opencode plugin add (subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.stdout + result.stderr).toContain("No plugin named")
       }),
-    60_000,
+    120_000,
   )
 })

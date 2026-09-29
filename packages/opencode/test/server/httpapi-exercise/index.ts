@@ -264,6 +264,20 @@ const scenarios: Scenario[] = [
   http.protected.get("/provider", "provider.list").json(),
   http.protected.get("/provider/auth", "provider.auth").json(),
   http.protected
+    .get("/provider/configured", "provider.configured")
+    .seeded(() =>
+      Effect.promise(() =>
+        Bun.write(
+          path.join(exerciseDataDirectory, "auth.json"),
+          JSON.stringify({ "httpapi-configured": { type: "api", key: "must-not-leak" } }),
+        ),
+      ),
+    )
+    .json(200, (body) => {
+      array(body)
+      check(!JSON.stringify(body).includes("must-not-leak"), "configured providers must not expose credential secrets")
+    }),
+  http.protected
     .post("/provider/{providerID}/oauth/authorize", "provider.oauth.authorize")
     .at((ctx) => ({
       path: route("/provider/{providerID}/oauth/authorize", { providerID: "httpapi" }),
