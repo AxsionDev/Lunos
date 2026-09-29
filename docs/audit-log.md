@@ -70,7 +70,7 @@ One JSON object per line. Every line carries:
 | `marketplace.install`            | `kind`, `name`, `marketplace`, `path` or `package`                                                                     | Each marketplace entry installed                                        |
 | `marketplace.refused`            | `name` / `source`, `key`, `reason`                                                                                     | An install or marketplace add that was refused                          |
 | `policy.override_refused`        | `key`, `via`                                                                                                           | An attempt to change a key the organisation policy locks                |
-| `upgrade`                        | `method`, `from`, `version`, `allowed`                                                                                 | Each `lunos upgrade` attempt                                            |
+| `upgrade`                        | `method`, `from`, `version`, `allowed`                                                                                 | Each `lunos update` (or `upgrade`) attempt                              |
 | `audit.forward_refused`          | `via`, `host`, `region`, `allowed: false`, `reason`                                                                    | A forwarding destination the residency policy denies                    |
 | `memory.write` / `memory.forget` | `session`, `agent`, `scope`, `id`, `source`, `chars` (write); `scope`, `id` (forget)                                   | A fact saved to or removed from long-term memory. Never the fact's text |
 
