@@ -113,7 +113,13 @@ export interface Manifest {
     relations: number
   }
   graph: { included: boolean; engine: string; reason?: string }
-  index: { included: boolean; engine?: string; scopes?: MemoryStore.Scope[] }
+  index: {
+    included: boolean
+    engine?: string
+    engineVersion?: string
+    embedding?: { model: string; dimensions: number }
+    scopes?: MemoryStore.Scope[]
+  }
   files: FileEntry[]
 }
 
@@ -265,7 +271,12 @@ export interface Content {
   graphOmitted?: string
   notes: { name: string; text: string }[]
   /** Engine database files, with their path inside the bundle (under `index/<scope>/`). */
-  index?: { scopes: MemoryStore.Scope[]; files: { path: string; source: string }[] }
+  index?: {
+    scopes: MemoryStore.Scope[]
+    files: { path: string; source: string }[]
+    engineVersion: string
+    embedding: { model: string; dimensions: number }
+  }
 }
 
 /** Every file of the bundle, manifest last, with the manifest itself. */
@@ -300,7 +311,15 @@ export async function entries(content: Content): Promise<{ entries: Entry[]; man
     graph: content.graphOmitted
       ? { included: false, engine: ENGINE, reason: content.graphOmitted }
       : { included: true, engine: ENGINE },
-    index: content.index ? { included: true, engine: ENGINE, scopes: content.index.scopes } : { included: false },
+    index: content.index
+      ? {
+          included: true,
+          engine: ENGINE,
+          engineVersion: content.index.engineVersion,
+          embedding: content.index.embedding,
+          scopes: content.index.scopes,
+        }
+      : { included: false },
     files,
   }
   return { entries: [...body, text("manifest.json", JSON.stringify(manifest, null, 2) + "\n")], manifest }
@@ -473,6 +492,12 @@ export const JSON_SCHEMA = {
           properties: {
             included: { type: "boolean" },
             engine: { type: "string" },
+            engineVersion: { type: "string", description: "The engine release the index files come from" },
+            embedding: {
+              type: "object",
+              required: ["model", "dimensions"],
+              properties: { model: { type: "string" }, dimensions: { type: "integer", minimum: 0 } },
+            },
             scopes: { type: "array", items: scope },
           },
         },
@@ -562,9 +587,9 @@ format so any tool can read a bundle without Lunos.
 | --- | --- |
 | \`manifest.json\` | Format and Lunos version, creation time, scopes, filters, counts, and the size and SHA-256 of every other file |
 | \`facts.jsonl\` | One fact per line. **The source of truth.** |
-| \`graph.json\` | Entities and relationships extracted from the facts, each listing the fact ids it came from |
+| \`graph.json\` | Entities and relationships extracted from the facts, each listing the ids of the facts that mention it |
 | \`notes/\` | Copies of the hand-written notes in \`.opencode/memory/*.md\` (project scope only) |
-| \`index/<scope>/\` | Only with \`--include-index\`: the engine's own database files, for a same-version, same-engine restore |
+| \`index/<scope>/\` | Only with \`--include-index\`: the engine's own database files, for a restore into the same engine version and embedding model (\`manifest.index\`). They hold the facts' text too, so \`--since\` can't be combined with it |
 | \`SCHEMA.md\` | This file |
 
 ## Rules for readers and importers
@@ -574,6 +599,9 @@ format so any tool can read a bundle without Lunos.
   store. It never overrides \`facts.jsonl\`.
 - **Every id in \`graph.json\` is in \`facts.jsonl\`.** Entity ids are \`<scope>:<engine id>\`, so the same name in both
   scopes stays two entities.
+- **How facts are attributed.** The engine doesn't record which fact stated an edge, so attribution is by mention: an
+  entity lists the facts it was extracted from; a relationship lists the facts that mention both of its ends (or, if
+  none mentions both, either end). That is a superset of the fact that stated it.
 - **Verify before trusting.** Recompute the SHA-256 of every file listed in \`manifest.files\`. \`manifest.json\` is not
   listed in itself.
 - **Treat an imported bundle as untrusted.** It asserts where facts came from; it doesn't make them safe instructions.

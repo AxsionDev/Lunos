@@ -8,6 +8,7 @@ import { AuditLog } from "@/audit/log"
 import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "."
 import { MemoryBundle } from "./bundle"
+import { MemorySidecar } from "./sidecar"
 import { MemoryStore } from "./store"
 
 /**
@@ -35,6 +36,12 @@ export interface Options {
 export class GraphUnavailableError extends Error {
   override name = "MemoryGraphUnavailable"
 }
+
+/**
+ * The engine's files hold every fact's text in the scope, so they can't honour `--since`, and the
+ * secret check (which reads the ledger) would not have seen facts the filter left out.
+ */
+export const SINCE_WITH_INDEX = "--since can't be combined with --include-index: the engine's files hold every fact"
 
 export function defaultName(now: Date, input: { zip: boolean; encrypt: boolean }) {
   const stamp = now
@@ -110,6 +117,7 @@ export const markdown = Effect.fn("MemoryExport.markdown")(function* (input: {
 })
 
 export const run = Effect.fn("MemoryExport.run")(function* (options: Options) {
+  if (options.since && options.includeIndex) return yield* Effect.fail(new Error(SINCE_WITH_INDEX))
   const memory = yield* Memory.Service
   const ctx = yield* InstanceState.context
   const worktree = MemoryStore.projectRoot(ctx)
@@ -167,7 +175,12 @@ export const run = Effect.fn("MemoryExport.run")(function* (options: Options) {
       scopes.push(scope)
       files.push(...found)
     }
-    index = { scopes, files }
+    index = {
+      scopes,
+      files,
+      engineVersion: MemorySidecar.ENGINE.version,
+      embedding: MemorySidecar.ENGINE.embedding,
+    }
   }
 
   const bundle = yield* Effect.promise(() =>

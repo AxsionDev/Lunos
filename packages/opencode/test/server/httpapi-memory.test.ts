@@ -114,6 +114,11 @@ describe("memory routes", () => {
 
       expect((yield* post({ graph: false, passphrase: "short" })).status).toBe(400)
       expect((yield* post({ graph: false, since: "not a date" })).status).toBe(400)
+      expect((yield* post({ graph: false, since: "2026-09-01", includeIndex: true })).status).toBe(400)
+
+      // With no out, the bundle goes to the data directory, never the worktree.
+      const fallback = (yield* (yield* post({ graph: false })).json) as { path: string }
+      expect(path.dirname(fallback.path)).toBe(MemoryStore.bundles())
       const sidecar = yield* Effect.promise(() =>
         fs.stat(MemoryStore.sidecarDir()).then(
           () => true,

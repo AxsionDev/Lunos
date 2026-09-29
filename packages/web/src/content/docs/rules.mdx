@@ -213,7 +213,8 @@ A bundle holds:
 
 What to know:
 
-- **Embeddings and the engine's database files are left out.** They are specific to the model and engine, and are rebuilt when memory is imported. `--include-index` adds them, for a restore on the same Lunos version and engine.
+- **Embeddings and the engine's database files are left out.** They are specific to the model and engine, and are rebuilt when memory is imported. `--include-index` adds them, for a restore into the same engine version and embedding model, which the manifest records. Those files hold every fact's text, so `--include-index` can't be combined with `--since`.
+- **Where it goes.** The CLI writes to the folder you run it in unless you pass `--out`. The TUI writes to `memory/exports/` in the Lunos data directory, so a bundle never lands in your project.
 - **Reading the graph starts memory**, so memory must be on. With memory off, the export stops and says so; `--no-graph` exports the facts and notes without starting anything.
 - **Secrets are checked again.** The export runs the same check as writes do. If anything looks like a key, token or password, nothing is written and the offending ids are listed.
 - **Encryption** uses OpenSSL's format (AES-256-CBC, key from PBKDF2-SHA256 with 600,000 iterations). The passphrase is never stored; set `LUNOS_MEMORY_PASSPHRASE` to export without a prompt. Decrypt without Lunos with:
@@ -225,7 +226,7 @@ What to know:
   Then check the SHA-256s in `manifest.json`: this mode doesn't detect tampering by itself.
 
 - **A bundle is a snapshot.** Forgetting a fact later doesn't remove it from bundles you have already written. A bundle can hold user memory too, so keep it out of git.
-- In the TUI, `ctrl+s` in the `/memory` browser offers the same choices.
+- In the TUI, `ctrl+s` in the `/memory` browser offers the same choices. The passphrase is typed into a plain prompt, as API keys are.
 
 ---
 

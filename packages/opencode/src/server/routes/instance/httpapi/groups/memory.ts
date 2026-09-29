@@ -38,7 +38,8 @@ export const MemoryExportInput = Schema.Struct({
   graph: Schema.optional(Schema.Boolean).annotate({ description: "Include the entity graph (default true)" }),
   includeIndex: Schema.optional(Schema.Boolean),
   out: Schema.optional(Schema.String).annotate({
-    description: "Where to write: the bundle path, or the directory for markdown",
+    description:
+      "Where to write: the bundle path (default: memory/exports/ in the data directory), or the directory for markdown",
   }),
 }).annotate({ identifier: "MemoryExportInput" })
 

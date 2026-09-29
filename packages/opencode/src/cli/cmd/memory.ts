@@ -202,6 +202,8 @@ export const MemoryExportCommand = effectCmd({
         written ? `Wrote ${written} fact(s) to ${dir}${EOL}` : `No facts in memory; nothing written.${EOL}`,
       )
     }
+    if (args.dir !== undefined)
+      return yield* fail("--dir is for --format markdown. For a bundle, use --out <path> to choose where it goes")
     const since = parseSince(args.since)
     if (since === null) return yield* fail(`--since must be a date, such as 2026-09-01; got "${args.since}"`)
     const result = yield* MemoryExport.run({

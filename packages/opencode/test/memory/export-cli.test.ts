@@ -311,4 +311,48 @@ describe("lunos memory export (subprocess)", () => {
         ).toBe(false)
       }),
   )
+
+  cliIt.live(
+    "--include-index copies the engine's files and records its versions; it refuses --since",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => seed(home))
+        const graph = path.join(home, ".opencode", "memory", "graph")
+        yield* Effect.promise(async () => {
+          await fs.mkdir(path.join(graph, "system", "databases"), { recursive: true })
+          await fs.mkdir(path.join(graph, "logs"), { recursive: true })
+          await fs.writeFile(path.join(graph, "system", "databases", "graph.db"), "engine bytes")
+          await fs.writeFile(path.join(graph, "logs", "cognee.log"), "log line")
+        })
+        const out = path.join(home, "with-index")
+        const result = yield* opencode.spawn(["memory", "export", "--no-graph", "--include-index", "--out", out])
+        opencode.expectExit(result, 0, "export")
+        const files = yield* Effect.promise(() => tree(out))
+        expect(Object.keys(files).filter((file) => file.startsWith("index/"))).toEqual([
+          "index/project/system/databases/graph.db",
+        ])
+        expect(JSON.parse(files["manifest.json"]).index).toEqual({
+          included: true,
+          engine: "cognee",
+          engineVersion: "1.6.1",
+          embedding: { model: "sentence-transformers/all-MiniLM-L6-v2", dimensions: 384 },
+          scopes: ["project"],
+        })
+
+        const both = yield* opencode.spawn([
+          "memory",
+          "export",
+          "--no-graph",
+          "--include-index",
+          "--since",
+          "2026-09-01",
+        ])
+        expect(both.exitCode).not.toBe(0)
+        expect(both.stderr).toContain("--since can't be combined with --include-index")
+
+        const dir = yield* opencode.spawn(["memory", "export", "--no-graph", "--dir", path.join(home, "x")])
+        expect(dir.exitCode).not.toBe(0)
+        expect(dir.stderr).toContain("--dir is for --format markdown")
+      }),
+  )
 })

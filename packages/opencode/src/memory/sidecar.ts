@@ -26,6 +26,19 @@ import { Offline } from "@opencode-ai/core/offline"
  *   (`UV_PYTHON_DOWNLOADS=never`): a missing Python 3.10–3.13 is an error that says so.
  */
 
+/**
+ * The engine and embedding model the sidecar pins, read from `sidecar.py` itself so they can't drift.
+ * Recorded in an export's manifest (XCOD-132): engine database files only restore into the same.
+ */
+export const ENGINE = {
+  name: "cognee",
+  version: SCRIPT.match(/"cognee==([^"]+)"/)?.[1] ?? "unknown",
+  embedding: {
+    model: SCRIPT.match(/"EMBEDDING_MODEL": "([^"]+)"/)?.[1] ?? "unknown",
+    dimensions: Number(SCRIPT.match(/"EMBEDDING_DIMENSIONS": "(\d+)"/)?.[1] ?? 0),
+  },
+}
+
 export class UnavailableError extends Error {
   override name = "MemoryUnavailable"
 }

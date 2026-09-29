@@ -94,6 +94,15 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       const since = input.since === undefined ? undefined : new Date(input.since)
       if (since && Number.isNaN(since.getTime())) return yield* new HttpApiError.BadRequest({})
       if (input.passphrase !== undefined && input.passphrase.length < 8) return yield* new HttpApiError.BadRequest({})
+      if (since && input.includeIndex) return yield* new HttpApiError.BadRequest({})
+      const encrypt = input.passphrase !== undefined
+      // Not the worktree: see MemoryStore.bundles.
+      const out =
+        input.out ??
+        path.join(
+          MemoryStore.bundles(),
+          MemoryExport.defaultName(new Date(), { zip: (input.zip ?? false) || encrypt, encrypt }),
+        )
       const result = yield* MemoryExport.run({
         scopes,
         since,
@@ -101,7 +110,7 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
         includeIndex: input.includeIndex ?? false,
         zip: input.zip ?? false,
         passphrase: input.passphrase,
-        out: input.out,
+        out,
         directory: instance.directory,
       }).pipe(Effect.mapError((error) => unavailable(error.message)))
       const counts = result.manifest.counts
