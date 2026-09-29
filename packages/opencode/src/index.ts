@@ -70,6 +70,11 @@ const NOTICE_COMMANDS = new Set([
 // XCOD-147: the check starts with the command, not after it, so a finished command rarely waits
 // for the registry. Set in the middleware, after the log/env flags are applied.
 let pendingNotice: Promise<void> | undefined
+// A finished command gives a still-running check this long before it falls back to the cache, so
+// a slow or unreachable registry never holds up a command by the full 3 s timeout.
+const NOTICE_GRACE = 300
+let commandDone: () => void = () => {}
+const commandFinished = new Promise<void>((resolve) => (commandDone = resolve)).then(() => Bun.sleep(NOTICE_GRACE))
 
 function show(out: string) {
   out = brandHelp(out)
@@ -117,7 +122,7 @@ const cli = yargs(args)
     process.env.OPENCODE_PID = String(process.pid)
 
     if (!pendingNotice && NOTICE_COMMANDS.has(String(opts._[0] ?? ""))) {
-      pendingNotice = import("./cli/upgrade").then(({ notice }) => notice()).catch(() => {})
+      pendingNotice = import("./cli/upgrade").then(({ notice }) => notice({ until: commandFinished })).catch(() => {})
     }
   })
   .usage("")
@@ -175,8 +180,9 @@ try {
     })
   } else {
     await cli.parse()
-    // The check itself gives the registry 3 s from the start of the command; this outer bound
-    // only guards against a stuck config load.
+    // The check had the whole command to finish; past the grace period it uses the cached result.
+    // The outer bound only guards against a stuck config load.
+    commandDone()
     if (pendingNotice) await Promise.race([pendingNotice, Bun.sleep(4000)])
   }
 } catch (e) {

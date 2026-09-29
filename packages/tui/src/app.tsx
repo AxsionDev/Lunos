@@ -1152,12 +1152,13 @@ function App(props: { onSnapshot?: () => Promise<string[]>; onListening?: () => 
       "skip",
     )
 
-    if (choice === false) {
+    // Once per new version: "skip" and Esc both mean "not now", and the bottom-right notice keeps
+    // saying the update exists. Without this the dialog blocked every start (XCOD-147).
+    if (choice !== true) {
       kv.set("skipped_version", version)
       return
     }
 
-    if (choice !== true) return
     await runUpgrade(version)
   })
   // The update check (XCOD-147) starts only once mounted, when the SDK's event subscription (set up

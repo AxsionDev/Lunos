@@ -34,14 +34,21 @@ async function writeCache(cache: UpdateCache) {
  * Callers never wait on this for startup: the TUI runs it in its worker, and CLI commands start
  * it alongside the command.
  */
-export async function checkLatest(now = Date.now(), timeout = CHECK_TIMEOUT): Promise<string | undefined> {
+export async function checkLatest(
+  now = Date.now(),
+  timeout = CHECK_TIMEOUT,
+  /** Stop waiting early, e.g. once a plain CLI command has finished its own work. */
+  until?: Promise<unknown>,
+): Promise<string | undefined> {
   // Caught before the race, so a request that loses to the timeout can't reject unhandled later.
   const fetched = Installation.latest().catch(() => undefined)
   let timer: ReturnType<typeof setTimeout> | undefined
   const timedOut = new Promise<undefined>((resolve) => {
     timer = setTimeout(() => resolve(undefined), timeout)
   })
-  const latest = await Promise.race([fetched, timedOut]).finally(() => clearTimeout(timer))
+  const latest = await Promise.race([fetched, timedOut, ...(until ? [until.then(() => undefined)] : [])]).finally(() =>
+    clearTimeout(timer),
+  )
   const cache = await readCache()
   if (!latest) return cache.latest
   await writeCache({ ...cache, checkedAt: now, latest })
@@ -67,7 +74,14 @@ async function envDisables(config: { $locked?: ReadonlyArray<string> } | undefin
  * unattended.
  */
 export async function notice(
-  input: { now?: number; timeout?: number; current?: string; write?: (line: string) => void } = {},
+  input: {
+    now?: number
+    timeout?: number
+    current?: string
+    write?: (line: string) => void
+    /** Resolves when the command is done; the check stops waiting then and uses the cache. */
+    until?: Promise<unknown>
+  } = {},
 ) {
   const { now = Date.now(), timeout = CHECK_TIMEOUT, current = InstallationVersion } = input
   const write = input.write ?? ((line: string) => process.stderr.write(line))
@@ -76,7 +90,7 @@ export async function notice(
   const config = await AppRuntime.runPromise(Config.Service.use((cfg) => cfg.getGlobal())).catch(() => undefined)
   if (await envDisables(config)) return
   if (config?.autoupdate === false) return
-  const latest = await checkLatest(now, timeout)
+  const latest = await checkLatest(now, timeout, input.until)
   if (!latest || !semver.gt(latest, current)) return
   const cache = await readCache()
   if (cache.notifiedAt && now - cache.notifiedAt < DAY) return

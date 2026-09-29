@@ -49,6 +49,14 @@ describe("checkLatest (XCOD-147)", () => {
     expect(performance.now() - started).toBeLessThan(1000)
   })
 
+  test("stops waiting when told to (a finished CLI command) and uses the cache", async () => {
+    await checkLatest(t0)
+    latest.mockImplementation(() => new Promise(() => {}))
+    const started = performance.now()
+    expect(await checkLatest(t0 + 60_000, 60_000, Bun.sleep(20))).toBe("9.9.9")
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
   test("a failure with nothing cached is silent", async () => {
     latest.mockImplementation(async () => {
       throw new Error("offline")
