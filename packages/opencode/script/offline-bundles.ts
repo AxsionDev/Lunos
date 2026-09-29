@@ -107,7 +107,8 @@ async function main() {
   if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) throw new Error("no GitHub OIDC token: cannot sign keylessly")
 
   const dir = await mkdtemp(path.join(os.tmpdir(), "lunos-release-"))
-  await $`gh release download ${tag} --dir ${dir} --repo ${repo} --pattern ${"lunos-*"} --pattern ${"SHA256SUMS*"} --pattern ${MODELS_SNAPSHOT} --pattern ${INSTALL_DOC}`
+  // Only what the bundles use: the CLI archives and SBOM, not the ~2.4 GB of desktop installers.
+  await $`gh release download ${tag} --dir ${dir} --repo ${repo} --pattern ${"lunos-linux-*"} --pattern ${"lunos-darwin-*"} --pattern ${"lunos-windows-*"} --pattern ${"lunos-sbom-*"} --pattern ${"SHA256SUMS*"} --pattern ${MODELS_SNAPSHOT} --pattern ${INSTALL_DOC}`
   const out = path.join(dir, "offline")
   const built = await buildBundles(dir, out)
   await $`cosign sign-blob --yes --bundle ${OFFLINE_SUMS + BUNDLE_SUFFIX} ${OFFLINE_SUMS}`.cwd(out)

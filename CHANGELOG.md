@@ -18,7 +18,41 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
-On `dev`, not yet in a release.
+## [1.18.41] - 2026-09-29
+
+### Security
+
+- **A residency policy now checks the endpoint, not just the provider ID.** Up to v1.18.40, pointing
+  an EU-tagged provider (such as `mistral`) at another host with `baseURL` still passed
+  `"allow": ["eu"]`. Built-in EU claims now hold only for the provider's own API hosts; any other
+  endpoint is `unknown` and an EU-only policy refuses it (XCOD-138).
+
+### Added
+
+- **`residency.endpoints`** declares the region of an endpoint Lunos can't assess itself, such as a
+  self-hosted vLLM or Ollama server or a company proxy. Declared calls are allowed and recorded in the
+  audit log with basis `declared` (XCOD-121, XCOD-138).
+- **Offline mode:** `LUNOS_OFFLINE=1` turns off every outbound call Lunos makes on its own behalf;
+  `lunos --version --verbose` reports it, with the upstream base and lag (XCOD-121, XCOD-118).
+- **Air-gapped deployment** guide, with an Ollama/vLLM recipe tested on an isolated network
+  (XCOD-121).
+- **Desktop app** ships again, as Lunos (`lunos-desktop-*`, `tech.lunos.desktop`), updating only
+  from Lunos releases (XCOD-123).
+- **VS Code extension** "Lunos" (publisher `axsion`) on Open VSX and the VS Code Marketplace
+  (XCOD-122).
+- Weekly upstream merges, with a published "days behind upstream" metric (XCOD-118).
+
+### Fixed
+
+- The CLI no longer tells you to run `opencode …` in hints, errors or `--help` (XCOD-127).
+- `lunos uninstall` no longer removes upstream opencode's package or PATH line.
+
+### Known issues
+
+- The offline install bundles were not attached: the release job hung building them. They follow in
+  the next release (XCOD-121).
+
+## [1.18.40] - 2026-09-26
 
 ### Changed
 
