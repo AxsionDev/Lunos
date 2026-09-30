@@ -17,11 +17,23 @@ export interface Recalled {
   score: number
 }
 
-/** What a stored fact may carry besides its text and provenance. */
+/**
+ * What a stored fact may carry besides its text and provenance. `id` is honoured only by an
+ * external backend (XCOD-134: a migrated fact keeps its id); Cognee assigns its own.
+ */
 export type Extra = Partial<
   Pick<
     MemoryStore.Fact,
-    "origin" | "imported" | "kind" | "expires" | "valid_from" | "replaces" | "status" | "invalid_at" | "replaced_by"
+    | "id"
+    | "origin"
+    | "imported"
+    | "kind"
+    | "expires"
+    | "valid_from"
+    | "replaces"
+    | "status"
+    | "invalid_at"
+    | "replaced_by"
   >
 >
 

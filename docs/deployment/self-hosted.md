@@ -97,7 +97,7 @@ Everything else:
 - Your source code, except the portions sent to your chosen model provider as context
 - Conversation history and session state, stored in local files
 - Configuration and credentials, stored locally
-- Long-term memory, when on (from v1.18.40): the knowledge graph and its provenance ledger, in local files. `lunos memory export` bundles are written only where you tell them to go
+- Long-term memory, when on (from v1.18.40): the knowledge graph and its provenance ledger, in local files, or, if you configure one, in a Neo4j database you run ([External memory database](#external-memory-database)). `lunos memory export` bundles are written only where you tell them to go
 - The audit log: model calls and share uploads (v1.18.39); tool runs, permission decisions, installs and policy refusals from v1.18.40. No prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
 
 ### Touches Lunos-operated infrastructure
@@ -386,6 +386,82 @@ A sample policy with a macOS profile and Windows and Linux deployment notes is i
 [`examples/managed-policy/`](../../examples/managed-policy/). To check a machine, run
 `lunos debug config --sources`: it shows which layer set each key and which are locked.
 
+### External memory database
+
+From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your team runs, instead of on each developer's machine. A team then shares project memory, backs it up with its normal database tooling, and decides where the data sits.
+
+```jsonc
+"memory": {
+  "enabled": true,
+  "scope": ["project", "user"],
+  "backend": {
+    "type": "neo4j",                              // "embedded" (the default) | "neo4j" | "memgraph" (refused: not supported yet)
+    "url": "bolt+s://graph.internal:7687",        // TLS; plain bolt:// only to localhost
+    "username": "{env:LUNOS_MEMORY_DB_USER}",     // {env:} or {file:} only: a literal is refused at load
+    "password": "{file:~/.config/lunos/neo4j-password}",
+    "jurisdiction": "EU-DE",                      // required; checked against the residency policy
+    "database": "neo4j",                          // optional: the server's default database
+    "read_only": false                            // true: recall only, no remember tool
+    // "allow_insecure": true                     // plain bolt:// to another host, with a warning
+    // "user": "alice@example.com"                // who you are for user memory (hashed); default: a random per-machine id
+  }
+}
+```
+
+**Checked before anything connects.** When memory starts, Lunos refuses the backend, without opening a socket or loading the database driver, if:
+
+- no `jurisdiction` is declared;
+- a residency policy is set and doesn't allow the jurisdiction's region (`EU`, `EU-DE` or an EU country code count as `eu`, `US` or `US-…` as `us`, anything else as `other`). The refusal names `memory.backend` and is written to the audit log as `memory.denied`;
+- the URL is plain `bolt://` or `neo4j://` to a host that isn't this machine, unless `allow_insecure` is set. `lunos memory status` then shows a warning. `+ssc` is encrypted but doesn't verify the certificate, and says so;
+- the URL has credentials in it, or `memory.encryption` is `"os-keychain"`. That key is in one person's keychain, and the database is shared, so encrypt at rest on the server instead.
+
+`memory.enabled: false`, `LUNOS_DISABLE_MEMORY=1` or `/memory off` mean no connection is opened at all. That includes `lunos memory status` and `list`, which then say memory is off instead of reading the database.
+
+**Credentials** are accepted only as `{env:VAR}` or `{file:path}` references. A literal username or password in any config layer fails config loading with a pointer here. The message names the key, never the value.
+
+**Neo4j, and APOC.** Lunos talks to Neo4j 5 directly over Bolt, with the official JavaScript driver. It creates one uniqueness constraint, one index and one full-text index on its own label, `:LunosMemoryFact`, and doesn't use APOC. Cognee's own Neo4j adapter, which Lunos doesn't use here, requires the APOC plugin; you only need it if you run Cognee against the same server yourself. Neo4j Community Edition has one user database, so leave `database` unset there. Give Lunos a database user that can create constraints and indexes the first time; after that, a user with read and write access is enough, or read access with `read_only: true`.
+
+**What data lives where:**
+
+| Where              | What                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The Neo4j database | One `:LunosMemoryFact` node per fact: its text, its provenance (session id, agent, source, date), lifecycle (status, kind, expiry, replacement links), its scope, a namespace, and a SHA-256 of its record. This **is** the ledger in external mode. The namespace is `project:<SHA-256 of the repository's git remote>` or `user:<SHA-256 of the user id>`, never a local path |
+| Each machine       | Nothing memory-related but `memory/user.id` in the Lunos data directory (a random id, if you don't set `user`), and the hand-written notes in `.opencode/memory/*.md`, which stay in the repository and are **not** copied into the database                                                                                                                                    |
+| Nowhere            | Embeddings and an entity graph. External memory stores facts only, and recall uses the database's own full-text index. Nothing is computed on one machine that a second one would have to re-index, and remembering a fact makes no model call                                                                                                                                  |
+
+**Scopes in a shared database.** Project memory is keyed by the repository's `origin` remote (normalised, so `git@host:org/repo.git` and `https://host/org/repo` are the same project); a project with no remote can't use project memory in an external database. Everyone working on the same repository shares its project memory, and recall in one project never returns another project's facts. Every query filters on the namespace in the database. User memory is keyed by `user`, or a random id kept on the machine, so Lunos never recalls one person's user memory for another, nor on your own other machines unless you set `user` on each.
+
+**Namespaces keep recall apart; they are not access control.** Anyone with the database's credentials, which in a team setup is usually everyone, can query the database directly and read every project's memory and every user's user memory. A hashed `user` value that is guessable (an email address) can be linked back to its person. There is no mixed mode that keeps user memory on the machine while project memory is external: with `memory.backend` set, both scopes are in the database. If user memory must stay private, leave `"user"` out of `memory.scope`, or give each person separate database credentials and a database only they can read.
+
+**Moving existing memory:** `lunos memory migrate --to neo4j` exports this machine's embedded memory as a bundle, then imports it into the database with the same preview and write guard as `lunos memory import`. Facts keep their ids and provenance. Run it once without `--yes` to see the preview. The embedded memory is left as it is; delete it with `lunos memory purge` once you have checked the database. `lunos memory status` shows the backend, whether it can be reached, and each scope's fact count and last write.
+
+**Integrity.** Each node carries a SHA-256 of its record. A node whose record, text or namespace no longer matches is quarantined: listed by `lunos memory verify`, never recalled. Like the local ledger's hashes, these catch damage and naive edits, not someone with write access who recomputes them. Anyone with the database's credentials can write facts that every user of that project will recall. Treat database write access like commit access, and give readers `read_only: true`.
+
+A Docker Compose example for a single Neo4j server (put TLS in front of it, or use `bolt+s://` with Neo4j's own TLS, before other machines connect):
+
+```yaml
+# docker-compose.yml
+services:
+  neo4j:
+    image: neo4j:5
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7687:7687" # Bolt; expose it beyond this host only over TLS
+    environment:
+      NEO4J_AUTH_FILE: /run/secrets/neo4j_auth # contains: neo4j/<password>
+    secrets:
+      - neo4j_auth
+    volumes:
+      - neo4j-data:/data
+secrets:
+  neo4j_auth:
+    file: ./neo4j_auth.txt
+volumes:
+  neo4j-data:
+```
+
+Back up the `neo4j-data` volume, or run `neo4j-admin database dump`, like any other database. `lunos memory export` from any machine is also a full, portable copy of that project's facts.
+
 ## 6. What you need to provide
 
 | You provide                          | Notes                                                   |
@@ -396,7 +472,7 @@ A sample policy with a macOS profile and Windows and Linux deployment notes is i
 | Storage for local state              | Sessions, config and audit log are ordinary local files |
 | Your own backup and retention policy | Lunos does not manage retention of local state          |
 
-Lunos requires no database, no message broker and no inbound network access. Server mode exists and is **opt-in only**; leave it off unless you need it, and set a password if you enable it (see [`SECURITY.md`](../../SECURITY.md)).
+Lunos requires no database, no message broker and no inbound network access. An external memory database is optional (see [External memory database](#external-memory-database)). Server mode exists and is **opt-in only**; leave it off unless you need it, and set a password if you enable it (see [`SECURITY.md`](../../SECURITY.md)).
 
 ## 7. Known limitations — stated, not buried
 

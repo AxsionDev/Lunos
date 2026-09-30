@@ -1,3 +1,5 @@
+import fs from "node:fs/promises"
+import os from "node:os"
 import path from "node:path"
 import { EOL } from "os"
 import { Effect, Option } from "effect"
@@ -190,7 +192,7 @@ export const MemoryOutdateCommand = effectCmd({
   }),
 })
 
-function healthLines(health: Memory.Health[], encryption: MemoryStore.Mode) {
+function healthLines(health: Memory.Health[], encryption: MemoryStore.Mode, external = false) {
   const lines: string[] = []
   for (const item of health) {
     if (item.error) {
@@ -201,8 +203,10 @@ function healthLines(health: Memory.Health[], encryption: MemoryStore.Mode) {
     lines.push(
       `${item.scope} memory: ${item.facts} fact(s): ${c.active} active, ${c.outdated} outdated, ${c.expired + c.purge} expired, ${c.quarantined} quarantined`,
     )
-    const ledger =
-      item.facts === 0 && !item.problems.length
+    // XCOD-134: in an external database each fact node carries its record's SHA-256; there is no file.
+    const ledger = external
+      ? "in the external database, one integrity hash per fact"
+      : item.facts === 0 && !item.problems.length
         ? "empty"
         : [
             item.unsealed
@@ -216,7 +220,9 @@ function healthLines(health: Memory.Health[], encryption: MemoryStore.Mode) {
           ].join(", ")
     lines.push(`  ledger: ${ledger}`)
     for (const problem of item.problems)
-      lines.push(`  QUARANTINED ${problem.id ?? "(unknown id)"} (facts.jsonl line ${problem.line}): ${problem.reason}`)
+      lines.push(
+        `  QUARANTINED ${problem.id ?? "(unknown id)"} (${external ? "database" : `facts.jsonl line ${problem.line}`}): ${problem.reason}`,
+      )
   }
   return lines
 }
@@ -228,16 +234,50 @@ export const MemoryStatusCommand = effectCmd({
     const memory = yield* Memory.Service
     const verdict = yield* memory.decision()
     const { retention, encryption } = yield* memory.policy()
-    const health = yield* memory.verify({ origin: "cli" })
+    const where = yield* memory.where()
+    const external = where.type !== "embedded"
+    // Off means off: with an external database, nothing is opened to count facts (XCOD-134).
+    const health = external && !verdict.on ? [] : yield* memory.verify({ origin: "cli" })
     const lines = [
       verdict.on ? "Memory is on." : `Memory is off: ${verdict.reason}.`,
+      ...backendLines(where),
       `Retention: ${retention.days ? `${retention.days} day(s), then ${retention.graceDays} day(s) before deletion` : "none (facts don't expire unless they have their own date)"}.`,
       `Encryption: ${encryption === "os-keychain" ? `the ledger is encrypted with a key in the OS keychain (${MemoryKey.describe()}); the engine's database files are not` : "off"}.`,
-      ...healthLines(health, encryption),
+      ...healthLines(health, encryption, external),
     ]
     yield* writeStdoutEffect(lines.join(EOL) + EOL)
   }),
 })
+
+/** XCOD-134: where memory is kept, whether it can be reached, and each scope's count and last write. */
+function backendLines(where: Memory.Where) {
+  if (where.type === "embedded")
+    return [
+      `Backend: embedded (on this machine).`,
+      ...where.scopes.map(
+        (item) =>
+          `  ${item.scope}: ${item.error ? `can't be read: ${item.error}` : `${item.facts} fact(s), last write ${item.lastWrite ?? "never"}`}`,
+      ),
+    ]
+  const tls =
+    where.tls === "verified"
+      ? "TLS"
+      : where.tls === "unverified"
+        ? "TLS, certificate not verified"
+        : where.tls === "none"
+          ? "no TLS"
+          : undefined
+  const details = [`jurisdiction ${where.jurisdiction ?? "not set"}`, tls, where.readOnly ? "read-only" : undefined]
+  return [
+    `Backend: ${where.type}${where.host ? ` at ${where.host}` : ""} (${details.filter(Boolean).join(", ")}).`,
+    ...where.warnings.map((warning) => `  WARNING: ${warning}.`),
+    `  connection: ${where.connection ?? "not opened"}`,
+    ...where.scopes.map(
+      (item) =>
+        `  ${item.scope}: ${item.error ? `can't be read: ${item.error}` : `${item.facts} fact(s), last write ${item.lastWrite ?? "never"}`}`,
+    ),
+  ]
+}
 
 export const MemoryVerifyCommand = effectCmd({
   command: "verify",
@@ -262,14 +302,19 @@ export const MemoryVerifyCommand = effectCmd({
         `Resealed ${args.scope} memory: ${count} quarantined line(s) accepted as they are now.${EOL}`,
       )
     }
+    const external = (yield* memory.target()).type !== "embedded"
     const health = yield* memory.verify({ origin: "cli", audit: true })
-    yield* writeStdoutEffect(healthLines(health, encryption).join(EOL) + EOL)
+    yield* writeStdoutEffect(healthLines(health, encryption, external).join(EOL) + EOL)
     const bad = health.filter((item) => item.error || item.problems.length)
     if (bad.length)
       return yield* fail(
         `Integrity check failed. Quarantined facts are not recalled. Forget them with lunos memory forget <id>, or, once you have checked them, accept them with lunos memory verify --reseal --scope <scope>.`,
       )
-    yield* writeStdoutEffect(`Every ledger entry matches its hash, and the chain is unbroken.${EOL}`)
+    yield* writeStdoutEffect(
+      external
+        ? `Every fact in the database matches its hash.${EOL}`
+        : `Every ledger entry matches its hash, and the chain is unbroken.${EOL}`,
+    )
   }),
 })
 
@@ -411,8 +456,11 @@ export function previewText(preview: MemoryImport.Preview) {
   }
   const c = preview.counts
   lines.push("", `${c.new} new, ${c.duplicate} duplicate, ${c.conflict} conflict, ${c.rejected} rejected`)
+  const to = preview.destination
   lines.push(
-    `Graph extraction: up to ${preview.extraction.calls} call(s) to ${preview.extraction.model} (${preview.extraction.source}). Embeddings: ${preview.embedding.model}, ${preview.embedding.remoteCalls} remote call(s).`,
+    to
+      ? `Destination: ${to.type} database at ${to.host} (jurisdiction ${to.jurisdiction}). Facts are stored as they are: no extraction or embedding calls.`
+      : `Graph extraction: up to ${preview.extraction.calls} call(s) to ${preview.extraction.model} (${preview.extraction.source}). Embeddings: ${preview.embedding.model}, ${preview.embedding.remoteCalls} remote call(s).`,
   )
   return lines.join(EOL)
 }
@@ -484,13 +532,93 @@ export const MemoryImportCommand = effectCmd({
   }),
 })
 
+/**
+ * XCOD-134: move embedded memory into the external database set in memory.backend. Exports a bundle
+ * from embedded memory (facts and notes, no graph: the external database keeps facts only), then
+ * imports it into the database through the same preview and write guard as `lunos memory import`.
+ * Facts keep their ids and provenance. The embedded memory is left as it is.
+ */
+export const MemoryMigrateCommand = effectCmd({
+  command: "migrate",
+  describe: "move embedded memory into the external database set in memory.backend; previews first",
+  builder: (yargs) =>
+    yargs
+      .option("to", {
+        choices: ["neo4j", "memgraph"] as const,
+        demandOption: true,
+        describe: "the backend to move to; must match memory.backend.type",
+      })
+      .option("scope", scopeOption)
+      .option("yes", { type: "boolean", default: false, describe: "write the new rows (without it, only preview)" })
+      .option("include-conflicts", {
+        type: "boolean",
+        default: false,
+        describe: "with --yes, also write rows marked conflict or near-duplicate",
+      }),
+  handler: Effect.fn("Cli.memory.migrate")(function* (args) {
+    const memory = yield* Memory.Service
+    const target = yield* memory.target()
+    if (target.type !== args.to)
+      return yield* fail(
+        `memory.backend.type is "${target.type}", not "${args.to}". Set memory.backend (type, url, jurisdiction and credentials) for the database to move to first`,
+      )
+    if (target.readOnly) return yield* fail("memory.backend.read_only is set: nothing can be written to it")
+    const verdict = yield* memory.decision()
+    if (!verdict.on) return yield* fail(`Memory is off: ${verdict.reason}. Nothing was migrated`)
+    const scopes = scopesOf(args.scope)
+    const dir = yield* Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), "lunos-migrate-")))
+    const bundle = path.join(dir, "bundle")
+    const result = yield* Effect.gen(function* () {
+      yield* memory.pin("embedded")
+      const exported = yield* MemoryExport.run({
+        scopes,
+        graph: false,
+        includeIndex: false,
+        zip: false,
+        out: bundle,
+        directory: dir,
+      }).pipe(
+        Effect.ensuring(memory.pin(undefined)),
+        Effect.catch((error) => fail(`Could not read embedded memory: ${error.message}`)),
+      )
+      yield* writeStdoutEffect(
+        `Read ${exported.manifest.counts.facts.total} fact(s) and ${exported.manifest.counts.notes} note file(s) from embedded memory.${EOL}`,
+      )
+      const options = { path: bundle, migrate: true, parent: { providerID: "none", modelID: "" } }
+      const preview = yield* MemoryImport.preview(options).pipe(Effect.catch((error) => fail(error.message)))
+      yield* writeStdoutEffect(previewText(preview) + EOL)
+      if (preview.limit) return yield* fail(preview.limit)
+      const writable =
+        preview.counts.new + (args["include-conflicts"] ? preview.counts.conflict + nearCount(preview) : 0)
+      if (!args.yes)
+        return yield* writeStdoutEffect(
+          `Preview only: nothing was written.${writable ? ` Run again with --yes to migrate ${writable} row(s).` : ""}${EOL}`,
+        )
+      if (!writable) {
+        MemoryImport.audit(preview)
+        return yield* writeStdoutEffect(`Nothing new to migrate; nothing was written.${EOL}`)
+      }
+      return yield* MemoryImport.run({ ...options, includeConflicts: args["include-conflicts"] }).pipe(
+        Effect.catch((error) => fail(error.message)),
+      )
+    }).pipe(Effect.ensuring(Effect.promise(() => fs.rm(dir, { recursive: true, force: true }))))
+    if (!result) return
+    const lines = [
+      `Migrated ${result.facts} fact(s) to ${args.to}. Embedded memory is unchanged; delete it with lunos memory purge once you have checked the database.`,
+    ]
+    for (const item of result.failed) lines.push(`Not migrated: ${oneLine(item.text, 60)}: ${item.reason}`)
+    yield* writeStdoutEffect(lines.join(EOL) + EOL)
+    if (result.failed.length) return yield* fail(`${result.failed.length} row(s) could not be migrated`)
+  }),
+})
+
 function nearCount(preview: MemoryImport.Preview) {
   return preview.rows.filter((row) => row.near).length
 }
 
 export const MemoryCommand = cmd({
   command: "memory",
-  describe: "review, search, export, import, outdate, verify and forget long-term memory",
+  describe: "review, search, export, import, migrate, outdate, verify and forget long-term memory",
   builder: (yargs) =>
     yargs
       .command(MemoryListCommand)
@@ -503,6 +631,7 @@ export const MemoryCommand = cmd({
       .command(MemoryPurgeCommand)
       .command(MemoryExportCommand)
       .command(MemoryImportCommand)
+      .command(MemoryMigrateCommand)
       .demandCommand(),
   handler: () => {},
 })
