@@ -8,6 +8,8 @@ import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import { AuditLog } from "@/audit/log"
 import { SandboxConfig } from "./config"
 import { SandboxDocker } from "./docker"
+import { SandboxAllow } from "./allow"
+import type { SandboxEgress } from "./egress"
 import { SandboxGit } from "./git"
 
 // XCOD-144 slice 1: the lifecycle of one sandbox. `create` copies the repo into a container volume
@@ -38,6 +40,12 @@ export type Meta = {
   on_finish: SandboxConfig.Resolved["on_finish"]
   retain_for?: number
   resources: SandboxConfig.Resolved["resources"]
+  /** XCOD-157: absent on sandboxes made before network policy existed, which were "open". */
+  network?: SandboxConfig.Network
+  /** The egress proxy's allow list ("host:port"), fixed when the sandbox was created. */
+  allow?: string[]
+  /** The newest egress decision already written to the audit trail. */
+  egressUntil?: string
   password: string
   created: string
   /** The commit the branch was last set to; absent until the first successful handoff. */
@@ -79,6 +87,7 @@ function auditFields(info: Meta) {
     memory: info.resources.memory,
     pids: info.resources.pids,
     tmp: info.resources.tmp,
+    network: info.network ?? "open",
   }
 }
 
@@ -102,6 +111,8 @@ export async function create(input: {
   id?: string
   directory: string
   config: SandboxConfig.Resolved
+  /** Provider ids the host holds credentials for: their API hosts go on the egress allow list. */
+  providers?: readonly string[]
   log?: (line: string) => void
 }): Promise<Meta> {
   const log = input.log ?? (() => {})
@@ -114,6 +125,20 @@ export async function create(input: {
 
   log(`image ${input.config.image}`)
   const image = await SandboxDocker.image(input.config.image)
+  const managed = await SandboxConfig.managedDoc()
+  const network = input.config.network
+  const computed = SandboxAllow.compute({
+    doc: SandboxConfig.effectiveDoc(input.directory, managed),
+    providers: [...(input.providers ?? []), ...SandboxAllow.providersFromEnv(Object.keys(providerEnv()))],
+    network,
+    extra: input.config.allow,
+  })
+  // The proxy comes from the Lunos image, or from a sandbox.image your global or managed config set;
+  // never from one a repository chose, which would let it bring its own egress filter.
+  const egressImage = network === "open" ? undefined : await SandboxDocker.image(input.config.egressImage)
+  if (network === "open") log("network open: the sandbox can reach anything this machine can")
+  else log(`network ${network}: ${network === "none" ? "nothing" : computed.allow.join(", ")} allowed`)
+  for (const item of computed.denied) log(`not allowed by the residency policy: ${item.provider}`)
 
   const seed = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-seed-"))
   try {
@@ -139,6 +164,8 @@ export async function create(input: {
       on_finish: input.config.on_finish,
       retain_for: input.config.retain_for,
       resources: input.config.resources,
+      network,
+      allow: computed.allow,
       password,
       created: new Date().toISOString(),
     }
@@ -146,7 +173,7 @@ export async function create(input: {
 
     // Nothing has run yet, so a failure from here on can clean up after itself.
     try {
-      await populate(result, seed, await SandboxConfig.managedDoc())
+      await populate(result, seed, managed, egressImage)
     } catch (error) {
       await remove(id).catch(() => {})
       throw error
@@ -158,8 +185,20 @@ export async function create(input: {
   }
 }
 
-async function populate(info: Meta, seed: string, managed: Record<string, unknown> | undefined) {
+async function populate(
+  info: Meta,
+  seed: string,
+  managed: Record<string, unknown> | undefined,
+  egressImage: SandboxDocker.Image | undefined,
+) {
   await SandboxDocker.createVolume(info.id)
+  if (egressImage)
+    await SandboxDocker.createEgress({
+      id: info.id,
+      image: egressImage,
+      allow: info.allow ?? [],
+      network: info.network,
+    })
   await SandboxDocker.seed(info.id, info.image.id, SandboxGit.tar(seed), SandboxGit.TAR_ENV)
   const policy = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-policy-"))
   try {
@@ -182,8 +221,42 @@ async function populate(info: Meta, seed: string, managed: Record<string, unknow
         LUNOS_SANDBOX: info.id,
         OPENCODE_DISABLE_AUTOUPDATE: "1",
       },
+      network: info.network,
     }),
   )
+}
+
+/**
+ * Write the egress proxy's decisions since the last collection to the host's audit trail, as
+ * `sandbox.egress`, and return them. Its log survives a stop, so this works on a stopped sandbox.
+ */
+export async function collectEgress(info: Meta): Promise<SandboxEgress.Decision[]> {
+  if (!info.network || info.network === "open") return []
+  const text = await SandboxDocker.egressLog(info.id).catch(() => "")
+  const decisions = text
+    .split("\n")
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line) as SandboxEgress.Decision]
+      } catch {
+        return []
+      }
+    })
+    .filter((item) => typeof item.time === "string" && (!info.egressUntil || item.time > info.egressUntil))
+  for (const item of decisions)
+    AuditLog.emit("sandbox.egress", {
+      id: info.id,
+      kind: item.kind,
+      host: item.host,
+      port: item.port,
+      allowed: item.allowed,
+      network: info.network,
+    })
+  if (decisions.length) {
+    info.egressUntil = decisions.at(-1)!.time
+    await saveMeta(info).catch(() => {})
+  }
+  return decisions
 }
 
 /**
@@ -354,6 +427,7 @@ export async function finish(
 /** Stop and keep. Used by `finish` and whenever the results couldn't be handed back. */
 export async function retain(info: Meta, reason: string) {
   await SandboxDocker.stop(info.id).catch(() => {})
+  await collectEgress(info)
   if (info.retain_for) {
     info.expires = new Date(Date.now() + info.retain_for).toISOString()
     await saveMeta(info)
@@ -369,6 +443,7 @@ async function remove(id: string) {
 
 export async function destroy(id: string, reason = "requested") {
   const info = await meta(id).catch(() => undefined)
+  if (info) await collectEgress(info)
   await remove(id)
   AuditLog.emit("sandbox.destroy", info ? { ...auditFields(info), reason } : { id, reason })
 }
@@ -386,6 +461,7 @@ export async function prune(now = Date.now()) {
   const due = await expired(now)
   const removed: string[] = []
   for (const info of due) {
+    await collectEgress(info)
     await remove(info.id)
     AuditLog.emit("sandbox.prune", { ...auditFields(info), expires: info.expires })
     removed.push(info.id)

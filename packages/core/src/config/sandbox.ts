@@ -50,6 +50,14 @@ export const Info = Schema.Struct({
       description:
         'How long a retained sandbox is kept, e.g. "72h", "30m" or "7d". Once it has expired, `lunos sandbox prune` removes it, and so does the next sandboxed run or `lunos sandbox` command. Unset: kept until destroyed',
     }),
+  network: Schema.Literals(["policy", "none", "open"]).pipe(Schema.optional).annotate({
+    description:
+      'What the sandbox can reach. "policy" (default): only the model endpoints the residency policy allows, remote MCP servers, the npm registry and sandbox.allow, enforced by an egress proxy outside the container. "none": nothing. "open": anything this machine can reach (a warning is shown). A repository\'s config can only make it stricter',
+  }),
+  allow: Schema.mutable(Schema.Array(Schema.String)).pipe(Schema.optional).annotate({
+    description:
+      'Extra hosts the sandbox may reach under network "policy", as "host" (port 443) or "host:port". Read from your global and managed config only, never a repository\'s',
+  }),
   resources: Resources.pipe(Schema.optional).annotate({
     description: "CPU, memory, process and /tmp limits for the sandbox container",
   }),

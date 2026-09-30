@@ -2004,6 +2004,8 @@ export type Config = {
     workspace?: "copy"
     on_finish?: "destroy" | "retain" | "destroy_on_success"
     retain_for?: string
+    network?: "policy" | "none" | "open"
+    allow?: Array<string>
     resources?: {
       /**
        * CPUs the sandbox may use (docker --cpus). Default 2

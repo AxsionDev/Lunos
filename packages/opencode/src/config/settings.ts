@@ -133,6 +133,7 @@ const DEFAULTS: Record<string, unknown> = {
   "sandbox.required": false,
   "sandbox.workspace": "copy",
   "sandbox.on_finish": "destroy",
+  "sandbox.network": "policy",
   "sandbox.resources.cpus": 2,
   "sandbox.resources.memory": "4g",
   "sandbox.resources.pids": 512,

@@ -393,6 +393,15 @@ sandbox: `lunos` and `lunos run` start one automatically, `lunos serve`, `web`, 
 copied into each sandbox, read-only, so its other locked keys (a residency policy, for example) hold
 inside too. See [sandboxed runs](../sandboxed-runs.md#requiring-sandboxes-organisations).
 
+A sandbox's own network is limited by `sandbox.network` (default `"policy"`): only the model
+endpoints your residency policy allows, remote MCP servers, the npm registry and `sandbox.allow`,
+enforced by an egress proxy container outside the sandbox, with each connection in the audit log
+as `sandbox.egress`. Lock `sandbox` in managed config to fix the mode and allow list for everyone.
+Starting a sandbox pulls `ghcr.io/axsiondev/lunos:<version>` when it isn't already on the machine;
+mirror it to your registry and set `sandbox.image` in global or managed config for machines
+without access to ghcr.io (the egress proxy then runs from your mirror too). See
+[sandboxed runs](../sandboxed-runs.md#network).
+
 ### External memory database
 
 From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your team runs, instead of on each developer's machine. A team then shares project memory, backs it up with its normal database tooling, and decides where the data sits.
