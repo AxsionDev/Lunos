@@ -2,6 +2,7 @@ import { fileURLToPath } from "bun"
 import { useTheme } from "../context/theme"
 import { useSync } from "../context/sync"
 import { For, Match, Switch, Show, createMemo } from "solid-js"
+import { statusGlyph } from "../util/status-glyph"
 import { DialogSettings } from "./dialog-settings"
 
 export type DialogStatusProps = {}
@@ -66,7 +67,7 @@ export function StatusServers() {
                     )[item.status],
                   }}
                 >
-                  •
+                  {statusGlyph(item.status)}
                 </text>
                 <text fg={theme.text} wrapMode="word">
                   <b>{key}</b>{" "}
@@ -104,7 +105,7 @@ export function StatusServers() {
                     }[item.status],
                   }}
                 >
-                  •
+                  {statusGlyph(item.status)}
                 </text>
                 <text fg={theme.text} wrapMode="word">
                   <b>{item.id}</b> <span style={{ fg: theme.textMuted }}>{item.root}</span>
