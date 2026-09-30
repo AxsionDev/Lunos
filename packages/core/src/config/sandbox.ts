@@ -28,6 +28,10 @@ export const Info = Schema.Struct({
     description:
       "Run `lunos` and `lunos run` in a sandbox, as if --sandbox were passed (--no-sandbox overrides it for one run). Any config layer turning it on wins. Other commands, such as serve, web and acp, still run on the host. Off by default",
   }),
+  required: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      'Nothing runs on this machine except in a sandbox: `lunos` and `lunos run` always start one, --no-sandbox is refused, `lunos serve`, `web`, `acp`, `github` and `pr` refuse to start, and any agent tool call outside a sandbox is refused. Meant for managed config, locked with "$locked": ["sandbox.required"]. Off by default',
+  }),
   image: Schema.String.pipe(Schema.optional).annotate({
     description:
       "Container image with Lunos as its entry point. Default ghcr.io/axsiondev/lunos:<the CLI's version>. The image is pinned by digest when the sandbox is created",

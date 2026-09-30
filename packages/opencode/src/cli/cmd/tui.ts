@@ -164,7 +164,15 @@ export const TuiThreadCommand = cmd({
     // XCOD-129: taken before anything else, so the worker and its children never inherit it.
     const restarted = Restart.takeHandoff()
     // XCOD-144: the server and everything it spawns run in a container; only the TUI stays here.
-    const { wanted, runSandboxedTui } = await import("./sandbox")
+    const { wanted, runSandboxedTui, refuseHost } = await import("./sandbox")
+    if (args.sandbox === false) {
+      const refused = await refuseHost("`lunos --no-sandbox`", resolveThreadDirectory(args.project))
+      if (refused) {
+        UI.error(refused)
+        process.exitCode = 1
+        return
+      }
+    }
     if (wanted(args, resolveThreadDirectory(args.project))) {
       const unsupported = [
         ["--mini", args.mini],

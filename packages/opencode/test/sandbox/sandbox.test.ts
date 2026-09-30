@@ -367,3 +367,86 @@ describe("sandbox host config", () => {
     }
   })
 })
+
+// XCOD-157: sandbox.required, from managed config, and the guards that enforce it.
+describe("sandbox required", () => {
+  const withManaged = async (doc: unknown, fn: (dir: string) => Promise<void>) => {
+    await using managed = await tmpdir()
+    await Bun.write(path.join(managed.path, "managed.json"), JSON.stringify(doc))
+    const saved = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+    process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = managed.path
+    try {
+      await fn(managed.path)
+    } finally {
+      if (saved === undefined) delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+      else process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = saved
+    }
+  }
+
+  test("sandbox.required decodes through both schemas and is lockable", async () => {
+    expect(Schema.decodeUnknownSync(ConfigV1.Info)({ sandbox: { required: true } }).sandbox?.required).toBe(true)
+    expect(Schema.decodeUnknownSync(Config.Info)({ sandbox: { required: true } }).sandbox?.required).toBe(true)
+    const { ConfigPolicy } = await import("../../src/config/policy")
+    expect(ConfigPolicy.KNOWN).toContain("sandbox.required")
+  })
+
+  test("required in managed config: the host sandboxes, and a repository can't turn it off", async () => {
+    await using project = await tmpdir({ git: true })
+    await Bun.write(
+      path.join(project.path, "opencode.json"),
+      JSON.stringify({ sandbox: { required: false, enabled: false } }),
+    )
+    await withManaged({ $locked: ["sandbox.required"], sandbox: { required: true } }, async () => {
+      const config = SandboxConfig.load(project.path)
+      expect(config.required).toBe(true)
+      expect(config.requiredBy).toBe("managed")
+      expect(config.enabled).toBe(true)
+    })
+    expect(SandboxConfig.load(project.path).required).toBe(false)
+  })
+
+  test("the host may not run it, and says why; inside a sandbox it may", () => {
+    const message = SandboxConfig.refusal({ required: true, requiredBy: "managed" }, "`lunos serve`", false)
+    expect(message).toContain("sandbox.required is set by your organisation's managed config")
+    expect(message).toContain("`lunos serve`")
+    expect(SandboxConfig.refusal({ required: true, requiredBy: "managed" }, "`lunos serve`", true)).toBeUndefined()
+    expect(SandboxConfig.refusal({ required: false }, "`lunos serve`", false)).toBeUndefined()
+  })
+
+  test("inside needs the root-owned marker to match LUNOS_SANDBOX, not the variable alone", async () => {
+    await using tmp = await tmpdir()
+    const marker = path.join(tmp.path, "sandbox.json")
+    expect(SandboxConfig.inside("abcd1234", marker)).toBe(false)
+    await Bun.write(marker, JSON.stringify({ id: "abcd1234" }))
+    expect(SandboxConfig.inside("abcd1234", marker)).toBe(true)
+    expect(SandboxConfig.inside("other", marker)).toBe(false)
+    expect(SandboxConfig.inside(undefined, marker)).toBe(false)
+  })
+
+  test("--no-sandbox is overruled by a requirement; --attach runs nothing here", async () => {
+    await using project = await tmpdir({ git: true })
+    const { wanted } = await import("../../src/cli/cmd/sandbox")
+    await withManaged({ sandbox: { required: true } }, async () => {
+      expect(wanted({ sandbox: false }, project.path)).toBe(true)
+      expect(wanted({}, project.path)).toBe(true)
+      expect(wanted({ attach: "http://127.0.0.1:4096" }, project.path)).toBe(false)
+    })
+    expect(wanted({ sandbox: false }, project.path)).toBe(false)
+  })
+
+  test("the tool guard refuses every tool call outside a sandbox, with the reason", async () => {
+    const { SandboxGuard } = await import("../../src/sandbox/guard")
+    const ran: string[] = []
+    const tools = {
+      bash: { execute: async () => void ran.push("bash") },
+      mcp_thing: { execute: async () => void ran.push("mcp") },
+      schemaOnly: {},
+    }
+    expect(SandboxGuard.guard(tools, { required: false }, "ses_1", false)).toBe(false)
+    expect(SandboxGuard.guard(tools, { required: true }, "ses_1", true)).toBe(false)
+    expect(SandboxGuard.guard(tools, { required: true }, "ses_1", false)).toBe(true)
+    await expect(tools.bash.execute()).rejects.toThrow("sandbox.required is set")
+    await expect(tools.mcp_thing.execute()).rejects.toThrow("can't run on this machine")
+    expect(ran).toEqual([])
+  })
+})

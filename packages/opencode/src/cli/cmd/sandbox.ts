@@ -19,11 +19,30 @@ import { AuditLog } from "@/audit/log"
 
 const say = (text: string) => UI.println(UI.Style.TEXT_DIM + "sandbox " + UI.Style.TEXT_NORMAL + text)
 
-/** Whether this invocation runs sandboxed: --sandbox / --no-sandbox, else sandbox.enabled. */
+/**
+ * Whether this invocation runs sandboxed: --sandbox / --no-sandbox, else sandbox.enabled. With
+ * sandbox.required it always does (--attach excepted: that client runs nothing here); --no-sandbox
+ * is then refused by `refuseHost`, before anything starts.
+ */
 export function wanted(args: { sandbox?: boolean; attach?: string }, directory = process.env.PWD ?? process.cwd()) {
+  if (args.attach) return args.sandbox === true
+  const config = SandboxConfig.load(directory)
+  if (config.required) return true
   if (args.sandbox !== undefined) return args.sandbox
-  if (args.attach) return false
-  return SandboxConfig.load(directory).enabled
+  return config.enabled
+}
+
+/**
+ * The refusal for running `what` on the host under sandbox.required, recorded in the audit trail,
+ * or undefined when it may run. `--no-sandbox` under a requirement is refused the same way.
+ */
+export async function refuseHost(what: string, directory = process.env.PWD ?? process.cwd()) {
+  const config = SandboxConfig.load(directory)
+  const message = SandboxConfig.refusal(config, what)
+  if (!message) return undefined
+  await hostAudit()
+  AuditLog.emit("sandbox.refused", { what, reason: "sandbox.required", by: config.requiredBy })
+  return message
 }
 
 /** Per-run lifecycle overrides: --keep retains, --rm destroys, whatever sandbox.on_finish says. */

@@ -130,6 +130,7 @@ const DEFAULTS: Record<string, unknown> = {
   marketplace_default: true,
   "memory.enabled": false,
   "sandbox.enabled": false,
+  "sandbox.required": false,
   "sandbox.workspace": "copy",
   "sandbox.on_finish": "destroy",
   "sandbox.resources.cpus": 2,

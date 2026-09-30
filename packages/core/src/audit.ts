@@ -58,6 +58,8 @@ export const EVENTS = [
   "sandbox.retain",
   "sandbox.destroy",
   "sandbox.prune",
+  // XCOD-157: sandbox.required refused something on the host: a command, a tool call, --no-sandbox.
+  "sandbox.refused",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

@@ -57,6 +57,7 @@ import { SessionReminders } from "./reminders"
 import { Memory } from "@/memory"
 import { MemorySources } from "@/memory/sources"
 import { SessionTools } from "./tools"
+import { SandboxGuard } from "@/sandbox/guard"
 import { LLMEvent } from "@opencode-ai/llm"
 
 // @ts-ignore
@@ -1270,6 +1271,8 @@ const layer = Layer.effect(
               Effect.provideService(RuntimeFlags.Service, flags),
               Effect.provideService(Memory.Service, memory),
             )
+            // XCOD-157: with sandbox.required, no tool runs outside a sandbox, whatever started this session.
+            SandboxGuard.guard(tools, (yield* config.get()).sandbox, sessionID)
 
             if (lastUser.format?.type === "json_schema") {
               tools["StructuredOutput"] = createStructuredOutputTool({
