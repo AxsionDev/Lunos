@@ -8,6 +8,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { ConfigSandbox } from "@opencode-ai/core/config/sandbox"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { ConfigManaged } from "@/config/managed"
+import { SandboxDocker } from "./docker"
 
 // XCOD-144: the host reads only the `sandbox` key, straight from the config files. It deliberately
 // does not go through the Config service: loading that bootstraps an instance, which initialises the
@@ -25,6 +26,10 @@ export const LOCAL_IMAGE = "lunos-sandbox:local"
 
 export type Resolved = {
   enabled: boolean
+  /** sandbox.required: nothing may run on the host. Implies `enabled`. */
+  required: boolean
+  /** Where `required` came from, for the refusal message. */
+  requiredBy?: "managed" | "config"
   image: string
   workspace: "copy"
   on_finish: "destroy" | "retain" | "destroy_on_success"
@@ -98,6 +103,7 @@ export function defaultImage(version = InstallationVersion) {
 export function resolve(info: ConfigSandbox.Info): Resolved {
   return {
     enabled: info.enabled ?? false,
+    required: info.required ?? false,
     image: info.image ?? defaultImage(),
     workspace: info.workspace ?? "copy",
     on_finish: info.on_finish ?? "destroy",
@@ -126,11 +132,54 @@ export function load(directory: string, worktree = worktreeOf(directory)): Resol
     const data = parse(content, [], { allowTrailingComma: true }) as { sandbox?: unknown } | undefined
     if (data?.sandbox) layers.push(decode(data.sandbox))
   }
+  // XCOD-157: managed config last, so the organisation's settings win.
+  const managed = mergeDocs(ConfigManaged.readManagedDocsSync())
+  const managedLayer = isDoc(managed.sandbox) ? decode(managed.sandbox) : undefined
+  layers.push(managedLayer)
   const info = layers.reduce<ConfigSandbox.Info>(merge, {})
-  // `enabled` is the one key that isn't last-wins: a repository's own config must not be able to
-  // switch off a sandbox the user asked for, and so run itself (and its plugins) on the host.
-  // Only --no-sandbox turns it off for a run.
-  return resolve({ ...info, enabled: layers.some((layer) => layer?.enabled === true) })
+  // `enabled` and `required` aren't last-wins: a repository's own config must not be able to switch
+  // off a sandbox the user or the organisation asked for, and so run itself (and its plugins) on the
+  // host. Only --no-sandbox turns `enabled` off for a run, and nothing turns `required` off.
+  const requiredBy =
+    managedLayer?.required === true
+      ? "managed"
+      : layers.some((layer) => layer?.required === true)
+        ? "config"
+        : undefined
+  const enabled = !!requiredBy || layers.some((layer) => layer?.enabled === true)
+  return { ...resolve({ ...info, enabled, required: !!requiredBy }), requiredBy }
+}
+
+/**
+ * Whether this process is the server inside a sandbox. LUNOS_SANDBOX alone isn't proof: anyone can
+ * set it on the host. The marker is in the policy volume, root-owned at /etc/lunos, which a user
+ * can't create on the host without administrator rights.
+ */
+export function inside(
+  env = process.env.LUNOS_SANDBOX,
+  marker = path.join(SandboxDocker.POLICY_DIR, SandboxDocker.MARKER),
+) {
+  if (!env || !existsSync(marker)) return false
+  try {
+    return (JSON.parse(readFileSync(marker, "utf8")) as { id?: string }).id === env
+  } catch {
+    return false
+  }
+}
+
+/** Why the host must not run this, or undefined when it may. */
+export function refusal(config: Pick<Resolved, "required" | "requiredBy">, what: string, isInside = inside()) {
+  if (!config.required || isInside) return undefined
+  const by =
+    config.requiredBy === "managed"
+      ? " by your organisation's managed config"
+      : config.requiredBy === "config"
+        ? " in your config"
+        : ""
+  return (
+    `sandbox.required is set${by}, so ${what} can't run on this machine; nothing may run outside a sandbox. ` +
+    "Use `lunos --sandbox` or `lunos run --sandbox` (both are sandboxed automatically), or ask your administrator."
+  )
 }
 
 /**

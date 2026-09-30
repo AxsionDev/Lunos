@@ -1,6 +1,7 @@
 export * as ConfigManaged from "./managed"
 
-import { existsSync } from "fs"
+import { existsSync, readFileSync } from "fs"
+import { parse as parseJsonc } from "jsonc-parser"
 import os from "os"
 import path from "path"
 import { Process } from "@/util/process"
@@ -61,6 +62,47 @@ export async function readManagedDocs(): Promise<unknown[]> {
   const plist = await readManagedPreferences()
   if (plist) docs.push(JSON.parse(plist.text))
   return docs
+}
+
+/**
+ * XCOD-157: the same documents, read synchronously, for the few host-side decisions made before any
+ * async work can run (whether this run must be sandboxed). The MDM profile is converted with a
+ * synchronous plutil call, only when one is installed.
+ */
+export function readManagedDocsSync(): unknown[] {
+  const docs: unknown[] = []
+  const { dir } = managedConfigLocation()
+  for (const file of ["managed.json", "opencode.json", "opencode.jsonc"]) {
+    const target = path.join(dir, file)
+    if (existsSync(target)) docs.push(parseJsonc(readFileSync(target, "utf8"), [], { allowTrailingComma: true }))
+  }
+  for (const plist of plistCandidates()) {
+    const result = Bun.spawnSync(["plutil", "-convert", "json", "-o", "-", plist])
+    if (result.exitCode !== 0) continue
+    docs.push(JSON.parse(parseManagedPlist(result.stdout.toString())))
+    break
+  }
+  return docs
+}
+
+function plistUser() {
+  try {
+    return os.userInfo().username || "user"
+  } catch {
+    return "user"
+  }
+}
+
+/** Installed MDM profiles, Lunos's domain first, else the legacy one; empty off macOS. */
+function plistCandidates(): string[] {
+  if (process.platform !== "darwin") return []
+  const user = plistUser()
+  const paths = (domain: string) => [
+    path.join("/Library/Managed Preferences", user, `${domain}.plist`),
+    path.join("/Library/Managed Preferences", `${domain}.plist`),
+  ]
+  const existing = paths(MANAGED_PLIST_DOMAIN).filter(existsSync)
+  return existing.length ? existing : paths(LEGACY_PLIST_DOMAIN).filter(existsSync)
 }
 
 export function parseManagedPlist(json: string): string {

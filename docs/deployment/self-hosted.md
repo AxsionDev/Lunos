@@ -386,6 +386,13 @@ A sample policy with a macOS profile and Windows and Linux deployment notes is i
 [`examples/managed-policy/`](../../examples/managed-policy/). To check a machine, run
 `lunos debug config --sources`: it shows which layer set each key and which are locked.
 
+**Requiring sandboxed runs** (XCOD-157, unreleased). `"$locked": ["sandbox.required"]` with
+`"sandbox": { "required": true }` means nothing runs on developers' machines except in a Docker
+sandbox: `lunos` and `lunos run` start one automatically, `lunos serve`, `web`, `acp`, `github` and
+`pr` refuse to start, and any agent tool call outside a sandbox is refused. The policy itself is
+copied into each sandbox, read-only, so its other locked keys (a residency policy, for example) hold
+inside too. See [sandboxed runs](../sandboxed-runs.md#requiring-sandboxes-organisations).
+
 ### External memory database
 
 From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your team runs, instead of on each developer's machine. A team then shares project memory, backs it up with its normal database tooling, and decides where the data sits.

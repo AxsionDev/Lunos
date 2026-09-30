@@ -1999,6 +1999,7 @@ export type Config = {
   memory?: MemoryConfig
   sandbox?: {
     enabled?: boolean
+    required?: boolean
     image?: string
     workspace?: "copy"
     on_finish?: "destroy" | "retain" | "destroy_on_success"

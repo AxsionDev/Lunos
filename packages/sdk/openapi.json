@@ -22479,6 +22479,9 @@
               "enabled": {
                 "type": "boolean"
               },
+              "required": {
+                "type": "boolean"
+              },
               "image": {
                 "type": "string"
               },

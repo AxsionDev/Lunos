@@ -35,6 +35,28 @@ If you interrupt a run (Ctrl-C), there are no results to hand back, so the sandb
 
 A task counts as **failed** when `lunos run` exits with an error, or when any session's last reply ended in an error (a provider error, for example). That is what `destroy_on_success` looks at.
 
+## Requiring sandboxes (organisations)
+
+`sandbox.required: true` means nothing runs on the machine except in a sandbox. It belongs in [managed config](deployment/self-hosted.md#organisation-policy-settings-developers-cant-change), locked so users can't change it:
+
+```json
+{
+  "$locked": ["sandbox.required"],
+  "sandbox": { "required": true }
+}
+```
+
+With it set:
+
+- `lunos` and `lunos run` always start a sandbox, as if `--sandbox` were passed. `--no-sandbox` is refused.
+- `lunos serve`, `lunos web`, `lunos acp`, `lunos github` and `lunos pr` refuse to start: each would run a server, and so agents and tools, on the machine.
+- Any agent tool call made by a server outside a sandbox is refused, whatever started that server (the desktop app, an integration). This is the last line: it holds even for a server that was already running when the policy arrived.
+- Every refusal says why, and is recorded as a `sandbox.refused` audit event.
+- A repository's config can't turn it off. Nor can `sandbox.enabled: false` or `OPENCODE_CONFIG_CONTENT`.
+- `lunos run --attach <url>` still works: it runs nothing here, only a client for a server somewhere else.
+
+Inside the sandbox, the requirement is met, so tools run normally. Lunos knows it's inside from a marker in the root-owned, read-only `/etc/lunos` volume, not from an environment variable, which anyone could set on the machine.
+
 ## Keeping or throwing away the environment
 
 | `sandbox.on_finish`    | After a successful hand-back                                                                               |
@@ -133,13 +155,14 @@ These events go to the audit log your **global or managed** config names, never 
 - **The volume has no size limit** on Docker's default volume driver; `tmp` limits only `/tmp`.
 - **Anything the agent can reach through the model provider or the network is not contained**: a sandbox limits what the agent can do to your machine, not what it can send out.
 
-Also not built yet: an organisation-lockable `sandbox.required`, a `mount` workspace mode, devcontainer images, Podman, `/sandbox` in the TUI, and sandbox status in `/settings`. Verified on macOS with Docker Desktop only so far.
+Also not built yet: a `mount` workspace mode, devcontainer images, Podman, `/sandbox` in the TUI, and sandbox status in `/settings`. Verified on macOS with Docker Desktop only so far.
 
 ## Configuration reference
 
 | Key                        | Default                             | Meaning                                                          |
 | -------------------------- | ----------------------------------- | ---------------------------------------------------------------- |
 | `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed |
+| `sandbox.required`         | `false`                             | Nothing runs outside a sandbox; for locked managed config        |
 | `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                            |
 | `sandbox.workspace`        | `"copy"`                            | How the project gets in; `copy` is the only mode so far          |
 | `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back |

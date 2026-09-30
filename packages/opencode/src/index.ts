@@ -72,6 +72,10 @@ const NOTICE_COMMANDS = new Set([
   "debug",
 ])
 
+// Commands that start a Lunos server on this machine, other than `lunos` and `lunos run`, which
+// sandbox themselves when sandbox.required is set.
+const HOST_SERVER_COMMANDS = new Set(["serve", "web", "acp", "github", "pr"])
+
 // XCOD-147: the check starts with the command, not after it, so a finished command rarely waits
 // for the registry. Set in the middleware, after the log/env flags are applied.
 let pendingNotice: Promise<void> | undefined
@@ -125,6 +129,17 @@ const cli = yargs(args)
     process.env.AGENT = "1"
     process.env.OPENCODE = "1"
     process.env.OPENCODE_PID = String(process.pid)
+
+    // XCOD-157: with sandbox.required, these would run a server, and so agents and tools, on the host.
+    const command = String(opts._[0] ?? "")
+    if (HOST_SERVER_COMMANDS.has(command)) {
+      const [{ refuseHost }, { CliError }] = await Promise.all([
+        import("./cli/cmd/sandbox"),
+        import("./cli/effect-cmd"),
+      ])
+      const refused = await refuseHost(`\`lunos ${command}\``)
+      if (refused) throw new CliError({ message: refused, exitCode: 1 })
+    }
 
     if (!pendingNotice && NOTICE_COMMANDS.has(String(opts._[0] ?? ""))) {
       pendingNotice = import("./cli/upgrade").then(({ notice }) => notice({ until: commandFinished })).catch(() => {})

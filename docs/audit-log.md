@@ -89,6 +89,7 @@ One JSON object per line. Every line carries:
 | `sandbox.retain`                | same, plus `reason` (`on_finish`, `handoff failed`, `start failed`, `interrupted`, `stopped`), `expires`                           | A sandbox stopped and kept                                                                                                                                                                |
 | `sandbox.destroy`               | same, plus `reason` (`on_finish`, `requested`)                                                                                     | A sandbox's container and volumes removed                                                                                                                                                 |
 | `sandbox.prune`                 | same, plus `expires`                                                                                                               | A kept sandbox removed because its `retain_for` expired                                                                                                                                   |
+| `sandbox.refused`               | `what` (a command, `--no-sandbox`, or `tool`), `tool`, `session`, `reason` (`sandbox.required`), `by` (`managed`, `config`)        | `sandbox.required` refused something on the machine: a command that would run a server, `--no-sandbox`, or an agent tool call outside a sandbox                                           |
 
 ### What is never recorded
 
