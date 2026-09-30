@@ -301,6 +301,19 @@ describe("sandbox lifecycle", () => {
 })
 
 describe("sandbox host config", () => {
+  test("the server inside audits to a file the host collects, and doesn't forward", () => {
+    const inside = Sandbox.auditInside({
+      audit: { enabled: true, path: "/Users/me/audit.log", forward: { otlp: "https://siem.example.eu" }, redact: ["x"] },
+      residency: { allow: ["eu"], auditPath: "/var/log/egress.log" },
+      model: "a/b",
+    })
+    expect(inside.audit).toEqual({ enabled: true, path: "/sandbox/home/audit.log", redact: ["x"] })
+    expect(inside.residency).toEqual({ allow: ["eu"], auditPath: "/sandbox/home/audit.log" })
+    expect(inside.model).toBe("a/b")
+    // Untouched when there's nothing to rewrite.
+    expect(Sandbox.auditInside({ residency: { allow: ["eu"] } })).toEqual({ residency: { allow: ["eu"] } })
+  })
+
   test("managed documents merge without losing a lock, later documents winning", () => {
     const merged = SandboxConfig.mergeDocs([
       { $locked: ["residency"], residency: { allow: ["eu"] }, instructions: ["a.md"] },
