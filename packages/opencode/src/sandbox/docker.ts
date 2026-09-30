@@ -63,7 +63,9 @@ export async function image(ref: string): Promise<Image> {
       throw new Error(
         `Couldn't get the sandbox image ${ref}: ${pull.stderr.trim()}. ` +
           `Build one locally with \`bun run packages/opencode/script/sandbox-image.ts\` (tags lunos-sandbox:local) ` +
-          `and set "sandbox": { "image": "lunos-sandbox:local" }, or point sandbox.image at an image you can pull.`,
+          `and set "sandbox": { "image": "lunos-sandbox:local" }, or point sandbox.image at an image you can pull. ` +
+          `Set it in your global config (~/.config/opencode/opencode.json) or managed config: the network ` +
+          `policy's proxy runs from that image too, and ignores an image a repository's config chooses.`,
       )
     result = await inspect()
     if (result.code !== 0) throw new Error(`docker image inspect ${ref} failed: ${result.stderr.trim()}`)
