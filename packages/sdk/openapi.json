@@ -21620,6 +21620,40 @@
         "required": ["name", "type"],
         "additionalProperties": false
       },
+      "MemoryBackendConfig": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["embedded", "neo4j", "memgraph"]
+          },
+          "url": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "jurisdiction": {
+            "type": "string"
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "allow_insecure": {
+            "type": "boolean"
+          },
+          "user": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "MemoryConfig": {
         "type": "object",
         "properties": {
@@ -21686,6 +21720,9 @@
           "encryption": {
             "type": "string",
             "enum": ["off", "os-keychain"]
+          },
+          "backend": {
+            "$ref": "#/components/schemas/MemoryBackendConfig"
           }
         },
         "additionalProperties": false
@@ -22435,6 +22472,66 @@
           },
           "memory": {
             "$ref": "#/components/schemas/MemoryConfig"
+          },
+          "sandbox": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "image": {
+                "type": "string"
+              },
+              "workspace": {
+                "type": "string",
+                "enum": ["copy"]
+              },
+              "on_finish": {
+                "type": "string",
+                "enum": ["destroy", "retain"]
+              },
+              "resources": {
+                "type": "object",
+                "properties": {
+                  "cpus": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["NaN"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["Infinity"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["-Infinity"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["Infinity", "-Infinity", "NaN"]
+                      }
+                    ],
+                    "description": "CPUs the sandbox may use (docker --cpus). Default 2"
+                  },
+                  "memory": {
+                    "type": "string"
+                  },
+                  "pids": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "tmp": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
           },
           "residency": {
             "$ref": "#/components/schemas/ConfigV2Residency"

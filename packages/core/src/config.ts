@@ -25,6 +25,7 @@ import { ConfigReference } from "./config/reference"
 import { ConfigResidency } from "./config/residency"
 import { ConfigSubagent } from "./config/subagent"
 import { ConfigMemory } from "./config/memory"
+import { ConfigSandbox } from "./config/sandbox"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
 import { ConfigV1 } from "./v1/config/config"
@@ -116,6 +117,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   memory: ConfigMemory.Info.pipe(Schema.optional).annotate({
     description: "Graph-based long-term memory, off by default",
+  }),
+  sandbox: ConfigSandbox.Info.pipe(Schema.optional).annotate({
+    description: "Sandboxed runs: the Lunos server and everything it spawns run in a Docker container",
   }),
   residency: ConfigResidency.Info.pipe(Schema.optional).annotate({
     description:

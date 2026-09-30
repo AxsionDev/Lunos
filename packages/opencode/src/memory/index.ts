@@ -14,6 +14,7 @@ import { MessageID, SessionID } from "@/session/schema"
 import type { SessionV1 } from "@opencode-ai/core/v1/session"
 import { MemoryBackend } from "./backend"
 import type { MemoryBundle } from "./bundle"
+import { MemoryExternal } from "./external"
 import { MemoryGuard } from "./guard"
 import { MemoryKey } from "./key"
 import { MemoryLifecycle } from "./lifecycle"
@@ -58,6 +59,20 @@ export interface Health {
   unsealed: number
   /** Set when the ledger can't be read at all (the encryption key is missing, say). */
   error?: string
+}
+
+/** Where memory is kept and whether it can be reached, for `lunos memory status` (XCOD-134). */
+export interface Where {
+  type: "embedded" | MemoryExternal.Kind
+  /** External only. */
+  host?: string
+  jurisdiction?: string
+  tls?: MemoryExternal.Checked["tls"]
+  readOnly: boolean
+  warnings: string[]
+  /** "ok (server)", why it wasn't opened, or the connection error. External only. */
+  connection?: string
+  scopes: { scope: MemoryStore.Scope; facts?: number; lastWrite?: string; error?: string }[]
 }
 
 export interface Interface {
@@ -157,6 +172,11 @@ export interface Interface {
     parent: MemoryModel.Model
     /** XCOD-136: lifecycle fields the bundle carried (status, kind, expiry, validity). */
     lifecycle?: Pick<MemoryBackend.Extra, "status" | "kind" | "expires" | "valid_from" | "invalid_at">
+    /**
+     * XCOD-134 migration: store the fact as it was, with its own id, provenance and import record,
+     * instead of marking it imported. It is still screened like any import.
+     */
+    verbatim?: Pick<MemoryStore.Fact, "id" | "provenance" | "origin" | "imported">
   }) => Effect.Effect<MemoryStore.Fact, Error>
   /** Point an imported outdated fact at the imported fact that replaced it (ids are new on import). */
   readonly link: (input: { scope: MemoryStore.Scope; id: string; by: string }) => Effect.Effect<void, Error>
@@ -167,6 +187,23 @@ export interface Interface {
   readonly syncNotes: (parent: MemoryModel.Model) => Effect.Effect<string[], Error>
   /** Stop a scope's sidecar if it is running, so its database files can be copied. */
   readonly release: (scope: MemoryStore.Scope) => Effect.Effect<void>
+  /**
+   * XCOD-134: read and write embedded memory whatever `memory.backend` says, until unpinned. For
+   * `lunos memory migrate`, which exports from embedded memory and imports into the configured
+   * external database in one process.
+   */
+  readonly pin: (target: "embedded" | undefined) => Effect.Effect<void>
+  /**
+   * The configured backend type (ignoring a pin), whether it is recall-only, and, for an external
+   * database the pre-connection checks refuse (residency, TLS, jurisdiction), why.
+   */
+  readonly target: () => Effect.Effect<{
+    type: "embedded" | MemoryExternal.Kind
+    readOnly: boolean
+    refused?: string
+  }>
+  /** Where memory is kept, whether it can be reached, and each scope's fact count and last write. */
+  readonly where: () => Effect.Effect<Where>
   readonly recallFor: (input: {
     sessionID: string
     userMessageID: string
@@ -179,7 +216,9 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Me
 
 interface State {
   sessionOff: Set<string>
-  running: Map<MemoryStore.Scope, Promise<MemoryBackend.Backend>>
+  /** Keyed by `<backend type>:<scope>`, so a migration's embedded and external backends never mix. */
+  running: Map<string, Promise<MemoryBackend.Backend>>
+  pinned?: "embedded"
   recalled: Map<string, string | undefined>
   worktree: string
   /** The last integrity problems recorded per ledger, so `memory.verify_failed` isn't repeated. */
@@ -287,6 +326,26 @@ const layer = Layer.effect(
       }
     })
 
+    /** The external backend block in effect, or undefined for embedded memory (or while pinned). */
+    const external = Effect.fn("Memory.external")(function* () {
+      const cfg = yield* config.get()
+      const s = yield* InstanceState.get(state)
+      if (s.pinned) return undefined
+      return MemoryExternal.configured(cfg.memory) ? cfg.memory : undefined
+    })
+
+    const keyOf = Effect.fn("Memory.key")(function* (scope: MemoryStore.Scope) {
+      const cfg = yield* config.get()
+      const s = yield* InstanceState.get(state)
+      return `${s.pinned ?? MemoryExternal.type(cfg.memory)}:${scope}`
+    })
+
+    /** The running external backend for a scope (starting it), for the operations only it has. */
+    const externalOf = Effect.fn("Memory.externalOf")(function* (scope: MemoryStore.Scope, sessionID?: string) {
+      const store = yield* backend({ scope, sessionID })
+      return store as MemoryExternal.External
+    })
+
     /** Record a ledger's integrity problems once per distinct set, never with fact text. */
     const report = (s: State, scope: MemoryStore.Scope, problems: MemoryStore.Problem[], origin: Origin) => {
       const key = MemoryStore.dir(scope, s.worktree)
@@ -309,19 +368,57 @@ const layer = Layer.effect(
     const backend = Effect.fn("Memory.backend")(function* (input: {
       scope: MemoryStore.Scope
       sessionID?: string
-      parent: MemoryModel.Model
+      /** The main agent's model. Embedded memory needs it for extraction; an external database doesn't. */
+      parent?: MemoryModel.Model
     }) {
+      // Off means off: this is checked before anything else, so no sidecar starts and no database
+      // connection is opened (XCOD-134).
       const verdict = yield* decision(input.sessionID)
       if (!verdict.on) return yield* Effect.fail(new OffError(`Memory is off: ${verdict.reason}`))
       const s = yield* InstanceState.get(state)
-      const existing = s.running.get(input.scope)
+      const key = yield* keyOf(input.scope)
+      const existing = s.running.get(key)
       if (existing) return yield* Effect.tryPromise({ try: () => existing, catch: toError })
 
       const cfg = yield* config.get()
+      const outside = yield* external()
+      if (outside) {
+        // XCOD-134: jurisdiction, residency, URL and TLS are checked before the driver is loaded.
+        const checked = yield* Effect.try({
+          try: () => MemoryExternal.gate({ memory: outside, residency: AuditLog.residency(cfg) }),
+          catch: toError,
+        })
+        for (const warning of checked.warnings) yield* Effect.logWarning(warning)
+        const limits = yield* limitsOf()
+        const { retention } = yield* policy()
+        const scope = input.scope
+        const starting = (async () => {
+          const store = await MemoryExternal.neo4j({ checked, scope, worktree: s.worktree, limits, retention })
+          try {
+            const swept = await store.sweep(MemoryLifecycle.now())
+            if (swept.purged.length)
+              AuditLog.emit("memory.purge", {
+                scope,
+                source: "start",
+                reason: "expired",
+                count: swept.purged.length,
+                ids: swept.purged.map((fact) => fact.id),
+              })
+          } catch (error) {
+            await store.close()
+            throw error
+          }
+          return store as MemoryBackend.Backend
+        })()
+        s.running.set(key, starting)
+        starting.catch(() => s.running.delete(key))
+        return yield* Effect.tryPromise({ try: () => starting, catch: toError })
+      }
+      if (!input.parent) return yield* Effect.fail(new Error("Embedded memory needs a model to start"))
       const chosen = yield* Effect.try({
         try: () => {
           MemoryModel.checkEmbedding(cfg.memory, AuditLog.residency(cfg))
-          const out = MemoryModel.resolve({ memory: cfg.memory, small_model: cfg.small_model, parent: input.parent })
+          const out = MemoryModel.resolve({ memory: cfg.memory, small_model: cfg.small_model, parent: input.parent! })
           MemoryModel.checkResidency(out, AuditLog.residency(cfg))
           return out
         },
@@ -357,8 +454,8 @@ const layer = Layer.effect(
         }
         return backend
       })()
-      s.running.set(input.scope, starting)
-      starting.catch(() => s.running.delete(input.scope))
+      s.running.set(key, starting)
+      starting.catch(() => s.running.delete(key))
       return yield* Effect.tryPromise({ try: () => starting, catch: toError })
     })
 
@@ -445,24 +542,33 @@ const layer = Layer.effect(
       imported: MemoryStore.Imported
       parent: MemoryModel.Model
       lifecycle?: Pick<MemoryBackend.Extra, "status" | "kind" | "expires" | "valid_from" | "invalid_at">
+      verbatim?: Pick<MemoryStore.Fact, "id" | "provenance" | "origin" | "imported">
     }) {
       const s = yield* InstanceState.get(state)
       const refusal = MemoryGuard.check(input.text, yield* limitsOf())
       if (refusal) return yield* Effect.fail(new MemoryGuard.RefusedError(`Not imported: ${refusal}.`))
       const store = yield* backend({ scope: input.scope, parent: input.parent })
+      const verbatim = input.verbatim
       const fact = yield* Effect.tryPromise({
         try: () =>
-          store.remember(
-            input.text,
-            {
-              // Never "notes": the notes sync forgets any notes fact whose paragraph it can't find.
-              sessionID: "import",
-              agent: "import",
-              source: input.imported.from,
-              date: input.imported.date,
-            },
-            { origin: input.origin, imported: input.imported, ...input.lifecycle },
-          ),
+          verbatim
+            ? store.remember(input.text, verbatim.provenance, {
+                id: verbatim.id,
+                origin: verbatim.origin,
+                imported: verbatim.imported,
+                ...input.lifecycle,
+              })
+            : store.remember(
+                input.text,
+                {
+                  // Never "notes": the notes sync forgets any notes fact whose paragraph it can't find.
+                  sessionID: "import",
+                  agent: "import",
+                  source: input.imported.from,
+                  date: input.imported.date,
+                },
+                { origin: input.origin, imported: input.imported, ...input.lifecycle },
+              ),
         catch: toError,
       })
       s.recalled.clear()
@@ -470,6 +576,22 @@ const layer = Layer.effect(
     })
 
     const link = Effect.fn("Memory.link")(function* (input: { scope: MemoryStore.Scope; id: string; by: string }) {
+      if (yield* external()) {
+        const store = yield* externalOf(input.scope)
+        return yield* Effect.tryPromise({
+          try: () =>
+            store.rewrite((items) =>
+              items.map((item) =>
+                item.id === input.id
+                  ? { ...item, replaced_by: input.by }
+                  : item.id === input.by
+                    ? { ...item, replaces: input.id }
+                    : item,
+              ),
+            ),
+          catch: toError,
+        })
+      }
       const s = yield* InstanceState.get(state)
       const { encryption } = yield* policy()
       const root = MemoryStore.dir(input.scope, s.worktree)
@@ -492,6 +614,9 @@ const layer = Layer.effect(
     })
 
     const syncNotes = Effect.fn("Memory.syncNotes")(function* (parent: MemoryModel.Model) {
+      // XCOD-134: hand-written notes stay in the repository; they are not copied into a shared
+      // database, where each checkout's sync would forget the paragraphs the others don't have.
+      if (yield* external()) return [] as string[]
       const s = yield* InstanceState.get(state)
       const store = yield* backend({ scope: "project", parent })
       const result = yield* Effect.tryPromise({
@@ -515,12 +640,17 @@ const layer = Layer.effect(
       for (const scope of yield* scopes()) {
         // Don't start a sidecar just to learn that a scope is empty. A ledger that can't be read
         // (encrypted, key missing) fails here: memory must never look empty instead.
-        const stored = yield* Effect.tryPromise({
-          try: () => MemoryStore.facts(MemoryStore.dir(scope, s.worktree)),
-          catch: toError,
-        })
-        if (stored.length === 0 && !(scope === "project" && (yield* Effect.promise(() => MemoryNotes.any(s.worktree)))))
-          continue
+        if (!(yield* external())) {
+          const stored = yield* Effect.tryPromise({
+            try: () => MemoryStore.facts(MemoryStore.dir(scope, s.worktree)),
+            catch: toError,
+          })
+          if (
+            stored.length === 0 &&
+            !(scope === "project" && (yield* Effect.promise(() => MemoryNotes.any(s.worktree))))
+          )
+            continue
+        }
         const store = yield* backend({ scope, sessionID: input.sessionID, parent: input.parent })
         const found = yield* Effect.tryPromise({
           try: () => store.recall(input.query, input.limit ?? 10, { history: input.history }),
@@ -578,6 +708,11 @@ const layer = Layer.effect(
     })
 
     const facts = Effect.fn("Memory.facts")(function* (scope: MemoryStore.Scope) {
+      // XCOD-134: in an external database the facts are the ledger; reading them needs memory on.
+      if (yield* external()) {
+        const store = yield* backend({ scope })
+        return yield* Effect.tryPromise({ try: () => store.list(), catch: toError })
+      }
       const s = yield* InstanceState.get(state)
       return yield* Effect.tryPromise({
         try: () => MemoryStore.facts(MemoryStore.dir(scope, s.worktree)),
@@ -591,12 +726,15 @@ const layer = Layer.effect(
       sessionID?: string
       origin?: Origin
     }) {
-      for (const scope of ["project", "user"] as const) {
+      const outside = yield* external()
+      for (const scope of outside ? yield* scopes() : (["project", "user"] as const)) {
         const s0 = yield* InstanceState.get(state)
-        const ledger = yield* Effect.tryPromise({
-          try: () => MemoryStore.load(MemoryStore.dir(scope, s0.worktree)),
-          catch: toError,
-        })
+        const ledger: Pick<MemoryStore.Ledger, "facts" | "problems"> = outside
+          ? { facts: yield* facts(scope), problems: [] }
+          : yield* Effect.tryPromise({
+              try: () => MemoryStore.load(MemoryStore.dir(scope, s0.worktree)),
+              catch: toError,
+            })
         const fact =
           ledger.facts.find((item) => item.id === input.id) ??
           // An unreadable (quarantined) line can be forgotten by the id it claims.
@@ -626,16 +764,22 @@ const layer = Layer.effect(
 
     const release = Effect.fn("Memory.release")(function* (scope: MemoryStore.Scope) {
       const s = yield* InstanceState.get(state)
-      const running = s.running.get(scope)
-      s.running.delete(scope)
-      if (running) yield* Effect.promise(() => running.then((item) => item.close()).catch(() => {}))
+      for (const [key, running] of [...s.running]) {
+        if (!key.endsWith(`:${scope}`)) continue
+        s.running.delete(key)
+        yield* Effect.promise(() => running.then((item) => item.close()).catch(() => {}))
+      }
     })
 
     const graph = Effect.fn("Memory.graph")(function* (scope: MemoryStore.Scope) {
       const verdict = yield* decision()
       if (!verdict.on) return yield* Effect.fail(new OffError(`Memory is off: ${verdict.reason}`))
       const s = yield* InstanceState.get(state)
-      const running = s.running.get(scope)
+      if (yield* external()) {
+        const store = yield* backend({ scope })
+        return yield* Effect.tryPromise({ try: () => store.graph(), catch: toError })
+      }
+      const running = s.running.get(yield* keyOf(scope))
       if (running)
         return yield* Effect.tryPromise({ try: () => running.then((backend) => backend.graph()), catch: toError })
       const root = MemoryStore.dir(scope, s.worktree)
@@ -659,6 +803,13 @@ const layer = Layer.effect(
 
     const purge = Effect.fn("Memory.purge")(function* (scope: MemoryStore.Scope, origin: Origin = "cli") {
       const s = yield* InstanceState.get(state)
+      if (yield* external()) {
+        const store = yield* externalOf(scope)
+        const count = yield* Effect.tryPromise({ try: () => store.purge(), catch: toError })
+        AuditLog.emit("memory.purge", { scope, count, reason: "command", source: origin })
+        s.recalled.clear()
+        return count
+      }
       yield* release(scope)
       const root = MemoryStore.dir(scope, s.worktree)
       // Purging must work even when the ledger can't be read (its key is gone): count the lines.
@@ -722,6 +873,41 @@ const layer = Layer.effect(
       const { retention } = yield* policy()
       const at = MemoryLifecycle.now()
       const out: Health[] = []
+      if (yield* external()) {
+        for (const scope of yield* scopes()) {
+          const counts: Record<MemoryLifecycle.State, number> = {
+            active: 0,
+            outdated: 0,
+            expired: 0,
+            purge: 0,
+            quarantined: 0,
+          }
+          const got = yield* externalOf(scope).pipe(
+            Effect.flatMap((store) => Effect.tryPromise({ try: () => store.list(), catch: toError })),
+            Effect.result,
+          )
+          if (got._tag === "Failure") {
+            out.push({ scope, facts: 0, counts, problems: [], encrypted: 0, unsealed: 0, error: got.failure.message })
+            continue
+          }
+          const problems = got.success.flatMap((fact, index) =>
+            fact.quarantined ? [{ line: index + 1, id: fact.id, reason: fact.quarantined }] : [],
+          )
+          for (const fact of got.success) counts[MemoryLifecycle.state(fact, retention, at)]++
+          if (input.audit) {
+            s.reported.delete(`external:${scope}`)
+            if (problems.length)
+              AuditLog.emit("memory.verify_failed", {
+                scope,
+                source: input.origin ?? "cli",
+                count: problems.length,
+                ids: problems.map((problem) => problem.id),
+              })
+          }
+          out.push({ scope, facts: got.success.length, counts, problems, encrypted: 0, unsealed: 0 })
+        }
+        return out
+      }
       for (const scope of ["project", "user"] as const) {
         const root = MemoryStore.dir(scope, s.worktree)
         const counts: Record<MemoryLifecycle.State, number> = {
@@ -770,6 +956,15 @@ const layer = Layer.effect(
 
     const reseal = Effect.fn("Memory.reseal")(function* (scope: MemoryStore.Scope) {
       const s = yield* InstanceState.get(state)
+      if (yield* external()) {
+        const store = yield* externalOf(scope)
+        const before = (yield* Effect.tryPromise({ try: () => store.list(), catch: toError })).filter(
+          (fact) => fact.quarantined,
+        ).length
+        yield* Effect.tryPromise({ try: () => store.rewrite((items) => items), catch: toError })
+        s.recalled.clear()
+        return before
+      }
       const { encryption } = yield* policy()
       const root = MemoryStore.dir(scope, s.worktree)
       const before = yield* Effect.tryPromise({ try: () => MemoryStore.load(root), catch: toError })
@@ -782,7 +977,94 @@ const layer = Layer.effect(
       return before.problems.length
     })
 
+    const pin = Effect.fn("Memory.pin")(function* (target: "embedded" | undefined) {
+      const s = yield* InstanceState.get(state)
+      s.pinned = target
+      s.recalled.clear()
+    })
+
+    const target = Effect.fn("Memory.target")(function* () {
+      const cfg = yield* config.get()
+      const type = MemoryExternal.type(cfg.memory)
+      const readOnly = MemoryExternal.readOnly(cfg.memory)
+      if (type === "embedded") return { type, readOnly }
+      try {
+        MemoryExternal.gate({ memory: cfg.memory, residency: AuditLog.residency(cfg) })
+        return { type, readOnly }
+      } catch (error) {
+        return { type, readOnly, refused: error instanceof Error ? error.message : String(error) }
+      }
+    })
+
+    const where = Effect.fn("Memory.where")(function* () {
+      const cfg = yield* config.get()
+      const s = yield* InstanceState.get(state)
+      const configured = yield* scopes()
+      const kind = MemoryExternal.type(cfg.memory)
+      if (kind === "embedded") {
+        const out: Where = { type: "embedded", readOnly: false, warnings: [], scopes: [] }
+        for (const scope of configured) {
+          const got = yield* Effect.promise(() =>
+            MemoryStore.facts(MemoryStore.dir(scope, s.worktree)).then(
+              (items) => items,
+              (error: Error) => error,
+            ),
+          )
+          if (got instanceof Error) out.scopes.push({ scope, error: got.message })
+          else
+            out.scopes.push({
+              scope,
+              facts: got.length,
+              lastWrite: got
+                .map((fact) => fact.provenance.date)
+                .toSorted()
+                .at(-1),
+            })
+        }
+        return out
+      }
+      const block = MemoryExternal.configured(cfg.memory)!
+      const out: Where = {
+        type: kind,
+        jurisdiction: block.jurisdiction,
+        readOnly: block.read_only === true,
+        warnings: [],
+        scopes: [],
+      }
+      const checked = yield* Effect.try({
+        try: () => MemoryExternal.gate({ memory: cfg.memory, residency: AuditLog.residency(cfg) }),
+        catch: toError,
+      }).pipe(Effect.result)
+      if (checked._tag === "Failure") {
+        out.connection = `refused before connecting: ${checked.failure.message}`
+        return out
+      }
+      Object.assign(out, { host: checked.success.host, tls: checked.success.tls, warnings: checked.success.warnings })
+      const verdict = yield* decision()
+      if (!verdict.on) {
+        out.connection = `not opened: memory is off (${verdict.reason})`
+        return out
+      }
+      for (const scope of configured) {
+        const got = yield* externalOf(scope).pipe(
+          Effect.flatMap((store) => Effect.tryPromise({ try: () => store.health(), catch: toError })),
+          Effect.result,
+        )
+        if (got._tag === "Failure") {
+          out.scopes.push({ scope, error: got.failure.message })
+          continue
+        }
+        out.connection = `ok (${got.success.server})`
+        out.scopes.push({ scope, facts: got.success.facts, lastWrite: got.success.lastWrite })
+      }
+      out.connection ??= "failed"
+      return out
+    })
+
     return Service.of({
+      pin,
+      target,
+      where,
       decision,
       setSessionOff,
       scopes,

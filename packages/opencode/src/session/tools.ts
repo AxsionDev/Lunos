@@ -158,7 +158,9 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
 
   // XCOD-94: memory tools exist only while memory is on for this session, and not for an agent
   // whose permission denies "memory". memory_remember asks a person before anything is stored.
-  if ((yield* memory.decision(input.session.id)).on) {
+  // XCOD-134: nor while an external memory database is refused before connecting (residency, TLS).
+  const memoryTarget = (yield* memory.decision(input.session.id)).on ? yield* memory.target() : undefined
+  if (memoryTarget && !memoryTarget.refused) {
     const hidden = Permission.disabled(
       ["memory_remember", "memory_search"],
       Permission.merge(input.agent.permission, input.session.permission ?? []),
@@ -171,7 +173,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       output,
       metadata,
     })
-    if (!hidden.has("memory_remember"))
+    // XCOD-134: a recall-only external database (memory.backend.read_only) offers no remember tool.
+    if (!hidden.has("memory_remember") && !memoryTarget.readOnly)
       tools.memory_remember = tool({
         description: MEMORY_REMEMBER,
         inputSchema: jsonSchema(

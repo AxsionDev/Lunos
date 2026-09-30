@@ -1680,6 +1680,18 @@ export type MemorySourceConfig = {
   argument?: string
 }
 
+export type MemoryBackendConfig = {
+  type?: "embedded" | "neo4j" | "memgraph"
+  url?: string
+  database?: string
+  username?: string
+  password?: string
+  jurisdiction?: string
+  read_only?: boolean
+  allow_insecure?: boolean
+  user?: string
+}
+
 export type MemoryConfig = {
   enabled?: boolean
   scope?: Array<"project" | "user">
@@ -1698,6 +1710,7 @@ export type MemoryConfig = {
     grace_days?: number
   }
   encryption?: "off" | "os-keychain"
+  backend?: MemoryBackendConfig
 }
 
 export type SubagentConfig = {
@@ -1984,6 +1997,21 @@ export type Config = {
     }
   }
   memory?: MemoryConfig
+  sandbox?: {
+    enabled?: boolean
+    image?: string
+    workspace?: "copy"
+    on_finish?: "destroy" | "retain"
+    resources?: {
+      /**
+       * CPUs the sandbox may use (docker --cpus). Default 2
+       */
+      cpus?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      memory?: string
+      pids?: number
+      tmp?: string
+    }
+  }
   residency?: ConfigV2Residency
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal

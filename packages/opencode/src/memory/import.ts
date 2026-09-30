@@ -10,6 +10,7 @@ import { Config } from "@/config/config"
 import { InstanceState } from "@/effect/instance-state"
 import { Memory } from "."
 import { MemoryBackend } from "./backend"
+import { MemoryExternal } from "./external"
 import { MemoryBundle } from "./bundle"
 import { MemoryGuard } from "./guard"
 import { MemoryModel } from "./model"
@@ -61,6 +62,11 @@ export interface Candidate {
   inputID?: string
   /** Outdated facts: the input id of the fact that replaced it. */
   replacedBy?: string
+  /**
+   * Bundle facts: the fact exactly as the bundle has it, for `lunos memory migrate` (XCOD-134), which
+   * keeps id and provenance instead of marking the fact imported.
+   */
+  verbatim?: Pick<MemoryStore.Fact, "id" | "provenance" | "origin" | "imported">
 }
 
 export type Lifecycle = Pick<MemoryStore.Fact, "status" | "kind" | "expires" | "valid_from" | "invalid_at">
@@ -380,6 +386,18 @@ function bundle(
       lifecycle: lifecycleOf(item),
       inputID: typeof item.id === "string" ? item.id : undefined,
       replacedBy: item.status === "outdated" && item.replaced_by ? item.replaced_by : undefined,
+      ...(typeof item.id === "string"
+        ? {
+            verbatim: {
+              id: item.id,
+              provenance: provenanceOf(item.provenance),
+              ...(item.origin ? { origin: provenanceOf(item.origin) } : {}),
+              ...(item.imported && typeof item.imported.from === "string" && typeof item.imported.date === "string"
+                ? { imported: { from: item.imported.from, date: item.imported.date } }
+                : {}),
+            },
+          }
+        : {}),
     })
   })
   if (!input.asFacts)
@@ -782,9 +800,16 @@ export interface Options {
   target?: MemoryStore.Scope
   asFacts?: boolean
   passphrase?: () => Promise<string | undefined>
+  /**
+   * XCOD-134 `lunos memory migrate`: the bundle is this machine's own embedded memory, so facts keep
+   * their ids and provenance instead of being marked imported. Still screened and previewed.
+   */
+  migrate?: boolean
 }
 
 export interface Preview extends Plan {
+  /** XCOD-134: where the rows go, when that is an external database rather than this machine. */
+  destination?: { type: string; host?: string; jurisdiction?: string }
   /** The model that extracts each written fact's entities, and how many calls that is. */
   extraction: { model: string; source: string; calls: number }
   /** Embeddings are computed on this machine: no calls leave it. */
@@ -807,8 +832,15 @@ const planned = Effect.fn("MemoryImport.planned")(function* (options: Options & 
   const ctx = yield* InstanceState.context
   const worktree = MemoryStore.projectRoot(ctx)
   const residency = AuditLog.residency(cfg)
+  // XCOD-134: an external database stores facts as they are: no extraction model, no embeddings.
+  // Its own checks (jurisdiction, residency, TLS) run before anything is read.
+  const outside = MemoryExternal.configured(cfg.memory)
+  const checked = outside
+    ? yield* Effect.try({ try: () => MemoryExternal.gate({ memory: cfg.memory, residency }), catch: toError })
+    : undefined
   const chosen = yield* Effect.try({
     try: () => {
+      if (checked) return { model: { providerID: "none", modelID: "" }, source: "memory.backend" }
       MemoryModel.checkEmbedding(cfg.memory, residency)
       const out = MemoryModel.resolve({ memory: cfg.memory, small_model: cfg.small_model, parent: options.parent })
       MemoryModel.checkResidency(out, residency)
@@ -839,12 +871,25 @@ const planned = Effect.fn("MemoryImport.planned")(function* (options: Options & 
       ]
   const shown: Preview = {
     ...result,
-    extraction: {
-      model: `${chosen.model.providerID}/${chosen.model.modelID}`,
-      source: chosen.source,
-      calls: result.counts.new,
-    },
-    embedding: { model: cfg.memory?.embedding ?? "local", remoteCalls: 0 },
+    ...(checked
+      ? {
+          destination: {
+            type: checked.settings.type,
+            host: checked.host,
+            jurisdiction: checked.settings.jurisdiction,
+          },
+        }
+      : {}),
+    extraction: checked
+      ? { model: "none", source: "memory.backend", calls: 0 }
+      : {
+          model: `${chosen.model.providerID}/${chosen.model.modelID}`,
+          source: chosen.source,
+          calls: result.counts.new,
+        },
+    embedding: checked
+      ? { model: "none (full-text index in the database)", remoteCalls: 0 }
+      : { model: cfg.memory?.embedding ?? "local", remoteCalls: 0 },
   }
   return { preview: shown, source, existing, limits, worktree }
 })
@@ -986,6 +1031,7 @@ export const run = Effect.fn("MemoryImport.run")(function* (
         imported: { from: candidate.from, date },
         parent: options.parent,
         lifecycle: candidate.lifecycle,
+        ...(options.migrate && candidate.verbatim ? { verbatim: candidate.verbatim } : {}),
       })
       .pipe(
         Effect.map((fact) => {
