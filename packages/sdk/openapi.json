@@ -22497,6 +22497,16 @@
                 "type": "string",
                 "pattern": "^\\d+[mhd]$"
               },
+              "network": {
+                "type": "string",
+                "enum": ["policy", "none", "open"]
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "resources": {
                 "type": "object",
                 "properties": {

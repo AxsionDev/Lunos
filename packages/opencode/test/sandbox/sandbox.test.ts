@@ -450,3 +450,184 @@ describe("sandbox required", () => {
     expect(ran).toEqual([])
   })
 })
+
+// XCOD-157: network policy. The proxy is exercised over real sockets on loopback.
+describe("sandbox network", () => {
+  test("allow-list matching: exact host and port, subdomains for a leading dot", async () => {
+    const { SandboxEgress } = await import("../../src/sandbox/egress")
+    const list = ["api.anthropic.com:443", ".example.eu:443", "10.0.0.5:8000"]
+    expect(SandboxEgress.allowed(list, "api.anthropic.com", 443)).toBe(true)
+    expect(SandboxEgress.allowed(list, "API.Anthropic.com.", 443)).toBe(true)
+    expect(SandboxEgress.allowed(list, "api.anthropic.com", 80)).toBe(false)
+    expect(SandboxEgress.allowed(list, "eu.api.anthropic.com", 443)).toBe(false)
+    expect(SandboxEgress.allowed(list, "a.example.eu", 443)).toBe(true)
+    expect(SandboxEgress.allowed(list, "example.eu.attacker.com", 443)).toBe(false)
+    expect(SandboxEgress.allowed(list, "10.0.0.5", 8000)).toBe(true)
+    expect(SandboxEgress.allowed(list, "10.0.0.6", 8000)).toBe(false)
+  })
+
+  test("the proxy forwards what's allowed, refuses the rest with 403, and logs both", async () => {
+    const net = await import("node:net")
+    const { SandboxEgress } = await import("../../src/sandbox/egress")
+    // An upstream that echoes the first line it receives, and a server standing in for the sandbox.
+    const upstream = net.createServer((socket) =>
+      socket.once("data", (data) => socket.end(`upstream saw: ${data.toString().split("\r\n")[0]}`)),
+    )
+    const sandboxServer = net.createServer((socket) => socket.end("hello from the sandbox server"))
+    await Promise.all(
+      [upstream, sandboxServer].map((server) => new Promise<void>((done) => server.listen(0, "127.0.0.1", done))),
+    )
+    const upPort = (upstream.address() as { port: number }).port
+    const serverPort = (sandboxServer.address() as { port: number }).port
+    const decisions: { host: string; port: number; allowed: boolean; kind: string }[] = []
+    const egress = SandboxEgress.serve({
+      allow: [`127.0.0.1:${upPort}`],
+      upstream: { host: "127.0.0.1", port: serverPort },
+      proxyPort: 0,
+      relayPort: 0,
+      log: (decision) => decisions.push(decision),
+    })
+    await Promise.all(
+      [egress.proxy, egress.relay].map((server) => new Promise((done) => server.once("listening", done))),
+    )
+    const proxyPort = (egress.proxy.address() as { port: number }).port
+    const relayPort = (egress.relay.address() as { port: number }).port
+    const exchange = (port: number, text: string) =>
+      new Promise<string>((resolve) => {
+        const socket = net.connect(port, "127.0.0.1", () => socket.write(text))
+        let out = ""
+        socket.on("data", (data) => (out += data.toString()))
+        socket.on("close", () => resolve(out))
+        socket.on("error", () => resolve(out))
+      })
+    try {
+      const tunnel = await exchange(proxyPort, `CONNECT 127.0.0.1:${upPort} HTTP/1.1\r\nHost: x\r\n\r\nPING\r\n`)
+      expect(tunnel).toContain("200 Connection Established")
+      expect(tunnel).toContain("upstream saw: PING")
+
+      const plain = await exchange(
+        proxyPort,
+        `GET http://127.0.0.1:${upPort}/v1/models?x=1 HTTP/1.1\r\nHost: x\r\n\r\n`,
+      )
+      // Rewritten to origin form for the upstream.
+      expect(plain).toContain("upstream saw: GET /v1/models?x=1 HTTP/1.1")
+
+      const refused = await exchange(proxyPort, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+      expect(refused).toStartWith("HTTP/1.1 403 Forbidden")
+      expect(refused).toContain("example.com:443 is not allowed")
+
+      expect(await exchange(relayPort, "hi")).toBe("hello from the sandbox server")
+      expect(decisions.map((item) => [item.kind, item.host, item.port, item.allowed])).toEqual([
+        ["connect", "127.0.0.1", upPort, true],
+        ["http", "127.0.0.1", upPort, true],
+        ["connect", "example.com", 443, false],
+      ])
+    } finally {
+      await egress.close()
+      upstream.close()
+      sandboxServer.close()
+    }
+  })
+
+  test("allow list: providers the residency policy allows, remote MCP, npm, sandbox.allow", async () => {
+    const { SandboxAllow } = await import("../../src/sandbox/allow")
+    const doc = {
+      provider: {
+        local: { options: { baseURL: "http://10.0.0.5:8000/v1" } },
+        anthropic: {},
+      },
+      mcp: {
+        docs: { type: "remote", url: "https://mcp.example.eu/sse" },
+        off: { type: "remote", url: "https://off.example.com", enabled: false },
+        tool: { type: "local", command: ["x"] },
+      },
+    }
+    const open = SandboxAllow.compute({
+      doc,
+      providers: ["mistral"],
+      network: "policy",
+      extra: ["files.example.eu", "cache:8080"],
+    })
+    expect(open.allow).toEqual(
+      [
+        "10.0.0.5:8000",
+        "api.anthropic.com:443",
+        "api.mistral.ai:443",
+        "codestral.mistral.ai:443",
+        "mcp.example.eu:443",
+        "registry.npmjs.org:443",
+        "files.example.eu:443",
+        "cache:8080",
+      ].sort(),
+    )
+    // An EU-only policy drops the US provider and the undeclared self-hosted endpoint.
+    const eu = SandboxAllow.compute({
+      doc: { ...doc, residency: { allow: ["eu"] } },
+      providers: ["mistral"],
+      network: "policy",
+      extra: [],
+    })
+    expect(eu.allow).toContain("api.mistral.ai:443")
+    expect(eu.allow).not.toContain("api.anthropic.com:443")
+    expect(eu.allow).not.toContain("10.0.0.5:8000")
+    expect(eu.denied.map((item) => item.provider).sort()).toEqual(["anthropic", "local"])
+    expect(SandboxAllow.compute({ doc, providers: [], network: "none", extra: ["x"] }).allow).toEqual([])
+    expect(SandboxAllow.providersFromEnv(["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "FIREWORKS_API_KEY"])).toEqual([
+      "anthropic",
+      "google",
+      "fireworks-ai",
+    ])
+  })
+
+  test("a repository can make the network stricter, never looser, and can't add hosts", async () => {
+    expect(SandboxConfig.strictest("open", "policy")).toBe("policy")
+    expect(SandboxConfig.strictest("none", "open")).toBe("none")
+    expect(SandboxConfig.strictest(undefined, "open")).toBe("open")
+    await using project = await tmpdir({ git: true })
+    await Bun.write(
+      path.join(project.path, "opencode.json"),
+      JSON.stringify({ sandbox: { network: "open", allow: ["evil.example.com"] } }),
+    )
+    await Bun.write(
+      path.join(project.path, "opencode.json"),
+      JSON.stringify({ sandbox: { network: "open", allow: ["evil.example.com"], image: "evil/proxy:latest" } }),
+    )
+    const loaded = SandboxConfig.load(project.path)
+    expect(loaded.network).toBe("policy")
+    expect(loaded.allow).toEqual([])
+    // The repository chose the sandbox's image, but not the egress proxy's.
+    expect(loaded.image).toBe("evil/proxy:latest")
+    expect(loaded.egressImage).toBe(SandboxConfig.defaultImage())
+    await Bun.write(path.join(project.path, "opencode.json"), JSON.stringify({ sandbox: { network: "none" } }))
+    expect(SandboxConfig.load(project.path).network).toBe("none")
+  })
+
+  test("under a network policy the sandbox has no route out and no published port; the proxy is its way out", () => {
+    const args = SandboxDocker.createArgs({
+      id: "abcd1234",
+      project: "/repo",
+      image: { ref: "lunos-sandbox:local", id: "sha256:feed" },
+      resources: SandboxConfig.resolve({}).resources,
+      workdir: "/sandbox/workspace",
+      env: {},
+      network: "policy",
+    })
+    expect(args).not.toContain("--publish")
+    expect(args.join(" ")).toContain("--network lunos-sandbox-abcd1234-net --network-alias sandbox")
+    expect(args).toContain("HTTPS_PROXY=http://egress:3128")
+    expect(args).toContain("OPENCODE_DISABLE_MODELS_FETCH=1")
+
+    const egress = SandboxDocker.egressArgs({
+      id: "abcd1234",
+      image: { ref: "ghcr.io/axsiondev/lunos:1.18.43", id: "sha256:trusted" },
+      allow: ["api.mistral.ai:443"],
+    })
+    expect(egress.slice(-3)).toEqual(["sha256:trusted", "sandbox", "egress"])
+    for (const flag of ["--read-only", "no-new-privileges", "ALL", "1000:1000", "127.0.0.1::4096"])
+      expect(egress).toContain(flag)
+    expect(egress).toContain('LUNOS_EGRESS_ALLOW=["api.mistral.ai:443"]')
+    // It carries the relay's port; the sandbox's own label is left off, so `sandbox list` shows one row.
+    expect(egress).toContain("lunos.sandbox.egress=abcd1234")
+    expect(egress).not.toContain("lunos.sandbox=abcd1234")
+  })
+})
