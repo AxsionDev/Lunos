@@ -303,7 +303,12 @@ describe("sandbox lifecycle", () => {
 describe("sandbox host config", () => {
   test("the server inside audits to a file the host collects, and doesn't forward", () => {
     const inside = Sandbox.auditInside({
-      audit: { enabled: true, path: "/Users/me/audit.log", forward: { otlp: "https://siem.example.eu" }, redact: ["x"] },
+      audit: {
+        enabled: true,
+        path: "/Users/me/audit.log",
+        forward: { otlp: "https://siem.example.eu" },
+        redact: ["x"],
+      },
       residency: { allow: ["eu"], auditPath: "/var/log/egress.log" },
       model: "a/b",
     })

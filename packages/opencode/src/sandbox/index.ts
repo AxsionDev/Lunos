@@ -205,8 +205,7 @@ async function populate(
   await SandboxDocker.seed(info.id, info.image.id, SandboxGit.tar(seed), SandboxGit.TAR_ENV)
   const policy = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-policy-"))
   try {
-    if (managed)
-      await fs.writeFile(path.join(policy, "managed.json"), JSON.stringify(auditInside(managed), null, 2))
+    if (managed) await fs.writeFile(path.join(policy, "managed.json"), JSON.stringify(auditInside(managed), null, 2))
     await fs.writeFile(path.join(policy, SandboxDocker.MARKER), JSON.stringify({ id: info.id }) + "\n")
     await SandboxDocker.seedPolicy(info.id, info.image.id, policy, SandboxGit.TAR_ENV)
   } finally {
@@ -278,7 +277,10 @@ function runtime(info: Meta, secrets: Record<string, string>) {
     ...secrets,
     OPENCODE_SERVER_PASSWORD: info.password,
     OPENCODE_CONFIG_CONTENT: JSON.stringify(
-      SandboxConfig.mergeDocs([auditInside(isDoc(content) ? content : {}), { audit: { path: SandboxDocker.AUDIT_FILE } }]),
+      SandboxConfig.mergeDocs([
+        auditInside(isDoc(content) ? content : {}),
+        { audit: { path: SandboxDocker.AUDIT_FILE } },
+      ]),
     ),
   }
   return JSON.stringify({ env, config: auditInside(SandboxConfig.globalDoc()) })
