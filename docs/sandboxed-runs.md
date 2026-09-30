@@ -130,6 +130,7 @@ Your provider credentials (the ones `lunos auth` stores, and any `*_API_KEY` env
 - Lunos writes them through `docker exec`, on stdin, into a file on the container's in-memory `/run/lunos`. The server reads the file into its own environment as it starts, and deletes it.
 - So they are never in the container's configuration (`docker inspect`), never in the image or on the sandbox volume, and never in your machine's process list.
 - When the sandbox stops, they are gone with the in-memory filesystem. **A kept sandbox holds no credentials.** `lunos sandbox attach` hands them over again.
+- Credentials Lunos writes inside the sandbox, such as a refreshed OAuth token, go to the same in-memory filesystem, not to the volume.
 
 Inside a running sandbox, the server's environment does hold them, and processes the agent starts inherit it. A sandbox limits what the agent can do to your machine; it doesn't hide your provider key from the agent.
 
@@ -183,7 +184,14 @@ So a residency policy set in your global config, or locked by your organisation,
 
 With the audit trail on (`audit.enabled`, or a residency policy), the host records each sandbox's lifecycle as `sandbox.create`, `sandbox.attach`, `sandbox.finish`, `sandbox.retain`, `sandbox.destroy` and `sandbox.prune` events, with the image and its digest, the resource limits, the lifecycle policy and the outcome. Never file contents. See [the audit log](audit-log.md).
 
-These events go to the audit log your **global or managed** config names, never one the repository's config names: the repository is the code being sandboxed. Model calls made inside the sandbox are recorded by the server inside it, in the container's own audit log.
+These events go to the audit log your **global or managed** config names, never one the repository's config names: the repository is the code being sandboxed.
+
+What happens inside the sandbox (model calls, tool runs, permission decisions) is recorded by the server there, whenever your config turns auditing on. Its log is written in the sandbox, since your audit path doesn't exist there, and at every hand-back:
+
+- it's copied to `.opencode/sandbox/<id>/audit.log`;
+- each new event is added to your own audit log, tagged `sandbox: <id>`, with its original time as `sandbox_time`. So there's one trail, and `audit.forward` sends the sandbox's events to your SIEM from your machine. The server inside doesn't forward anything itself.
+
+The agent runs as the same user as that server, so it could alter the log inside before it's collected. The records it can't reach are the host's own `sandbox.*` events.
 
 ## What a sandbox does NOT isolate (yet)
 

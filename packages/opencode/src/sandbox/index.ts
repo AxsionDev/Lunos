@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto"
 import { setTimeout as sleep } from "node:timers/promises"
 import { Global } from "@opencode-ai/core/global"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { parse } from "jsonc-parser"
 import { AuditLog } from "@/audit/log"
 import { SandboxConfig } from "./config"
 import { SandboxDocker } from "./docker"
@@ -52,6 +53,8 @@ export type Meta = {
   handedOff?: string
   /** When a retained sandbox expires (sandbox.retain_for); `prune` removes it after that. */
   expires?: string
+  /** Lines of the audit log inside already copied into the host's audit trail. */
+  auditLines?: number
 }
 
 export type Connection = { url: string; password: string; headers: Record<string, string>; directory: string }
@@ -202,7 +205,8 @@ async function populate(
   await SandboxDocker.seed(info.id, info.image.id, SandboxGit.tar(seed), SandboxGit.TAR_ENV)
   const policy = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-policy-"))
   try {
-    if (managed) await fs.writeFile(path.join(policy, "managed.json"), JSON.stringify(managed, null, 2))
+    if (managed)
+      await fs.writeFile(path.join(policy, "managed.json"), JSON.stringify(auditInside(managed), null, 2))
     await fs.writeFile(path.join(policy, SandboxDocker.MARKER), JSON.stringify({ id: info.id }) + "\n")
     await SandboxDocker.seedPolicy(info.id, info.image.id, policy, SandboxGit.TAR_ENV)
   } finally {
@@ -264,9 +268,61 @@ export async function collectEgress(info: Meta): Promise<SandboxEgress.Decision[
  * password, the host's OPENCODE_CONFIG_CONTENT, and the user's global config.
  */
 function runtime(info: Meta, secrets: Record<string, string>) {
-  const env: Record<string, string> = { ...providerEnv(), ...secrets, OPENCODE_SERVER_PASSWORD: info.password }
-  if (process.env.OPENCODE_CONFIG_CONTENT) env.OPENCODE_CONFIG_CONTENT = process.env.OPENCODE_CONFIG_CONTENT
-  return JSON.stringify({ env, config: SandboxConfig.globalDoc() })
+  // The audit path goes in OPENCODE_CONFIG_CONTENT, which outranks global and project config, so
+  // whichever of them turns auditing on, the server inside writes where the host can collect it.
+  const content = process.env.OPENCODE_CONFIG_CONTENT
+    ? (parse(process.env.OPENCODE_CONFIG_CONTENT, [], { allowTrailingComma: true }) as unknown)
+    : {}
+  const env: Record<string, string> = {
+    ...providerEnv(),
+    ...secrets,
+    OPENCODE_SERVER_PASSWORD: info.password,
+    OPENCODE_CONFIG_CONTENT: JSON.stringify(
+      SandboxConfig.mergeDocs([auditInside(isDoc(content) ? content : {}), { audit: { path: SandboxDocker.AUDIT_FILE } }]),
+    ),
+  }
+  return JSON.stringify({ env, config: auditInside(SandboxConfig.globalDoc()) })
+}
+
+const isDoc = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value)
+
+/**
+ * A config document as the server inside should see it: its audit log at AUDIT_FILE, and no audit
+ * forwarding (the host forwards the sandbox's events once it has collected them, see `handoff`).
+ */
+export function auditInside(doc: Record<string, unknown>) {
+  const out = { ...doc }
+  if (isDoc(out.audit)) {
+    const { forward: _forward, ...audit } = out.audit
+    out.audit = { ...audit, path: SandboxDocker.AUDIT_FILE }
+  }
+  if (isDoc(out.residency) && out.residency.auditPath !== undefined)
+    out.residency = { ...out.residency, auditPath: SandboxDocker.AUDIT_FILE }
+  return out
+}
+
+/**
+ * The audit log written inside, since the last collection: copied whole to the results directory,
+ * and each new event written to the host's audit trail tagged with the sandbox id, so there is one
+ * trail (and one forwarder). The original time is kept as `sandbox_time`.
+ */
+async function collectAudit(info: Meta, results: string) {
+  const text = await SandboxDocker.readFile(info.id, SandboxDocker.AUDIT_FILE)
+  if (!text) return 0
+  await fs.writeFile(path.join(results, "audit.log"), text)
+  const lines = text.split("\n").filter(Boolean)
+  for (const line of lines.slice(info.auditLines ?? 0)) {
+    try {
+      const { v: _v, seq: _seq, prev: _prev, event, timestamp, ...fields } = JSON.parse(line) as Record<string, never>
+      AuditLog.emit(event, { ...fields, sandbox: info.id, sandbox_time: timestamp })
+    } catch {
+      // A line the agent mangled is still in the copy; it just isn't re-emitted.
+    }
+  }
+  const added = lines.length - (info.auditLines ?? 0)
+  info.auditLines = lines.length
+  return added
 }
 
 export function connection(info: Meta, port: number): Connection {
@@ -360,6 +416,7 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
     await fs.mkdir(results, { recursive: true })
     await fs.writeFile(path.join(path.dirname(results), ".gitignore"), "*\n")
     await fs.writeFile(path.join(results, "transcript.json"), JSON.stringify(sessions, null, 2))
+    await collectAudit(info, results)
     await SandboxGit.setBranch({ gitDir: info.gitDir, branch: info.branch, commit, expected: previous })
     info.handedOff = commit
     await saveMeta(info)

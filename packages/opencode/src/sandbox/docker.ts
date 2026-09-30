@@ -20,6 +20,11 @@ export const RUNTIME_FILE = `${RUNTIME_DIR}/runtime.json`
  * neither can be changed from inside.
  */
 export const POLICY_DIR = "/etc/lunos"
+/**
+ * XCOD-157: the audit log of the server inside. Config pointing elsewhere (the host's audit.path)
+ * is rewritten to this, since the host path doesn't exist in the container and the root is read-only.
+ */
+export const AUDIT_FILE = `${HOME}/audit.log`
 export const MARKER = "sandbox.json"
 
 export const containerName = (id: string) => `lunos-sandbox-${id}`
@@ -370,6 +375,13 @@ export async function streamLogs(id: string, options: { tail?: number; follow?: 
     { stdout: "inherit", stderr: "inherit", stdin: "ignore" },
   )
   return proc.exited
+}
+
+/** One file's contents from the container (running or stopped), or undefined when it's absent. */
+export async function readFile(id: string, file: string) {
+  return SandboxExec.pipe(["docker", "cp", `${containerName(id)}:${file}`, "-"], ["tar", "-x", "-O", "-f", "-"]).catch(
+    () => undefined,
+  )
 }
 
 /** Stream the workspace out of the container (running or stopped) and extract it into `into`. */
