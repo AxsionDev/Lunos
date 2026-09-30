@@ -58,6 +58,11 @@ export const EVENTS = [
   "sandbox.retain",
   "sandbox.destroy",
   "sandbox.prune",
+  // XCOD-157: sandbox.required refused something on the host: a command, a tool call, --no-sandbox.
+  "sandbox.refused",
+  // XCOD-157: one decision of a sandbox's egress proxy (network "policy" or "none"): destination
+  // host and port, and whether it was allowed. Never a URL path, a header or a body.
+  "sandbox.egress",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

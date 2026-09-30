@@ -8,6 +8,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { ConfigSandbox } from "@opencode-ai/core/config/sandbox"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { ConfigManaged } from "@/config/managed"
+import { SandboxDocker } from "./docker"
 
 // XCOD-144: the host reads only the `sandbox` key, straight from the config files. It deliberately
 // does not go through the Config service: loading that bootstraps an instance, which initialises the
@@ -25,13 +26,36 @@ export const LOCAL_IMAGE = "lunos-sandbox:local"
 
 export type Resolved = {
   enabled: boolean
+  /** sandbox.required: nothing may run on the host. Implies `enabled`. */
+  required: boolean
+  /** Where `required` came from, for the refusal message. */
+  requiredBy?: "managed" | "config"
   image: string
   workspace: "copy"
   on_finish: "destroy" | "retain" | "destroy_on_success"
   /** How long a retained sandbox is kept, in milliseconds; undefined keeps it until destroyed. */
   retain_for?: number
+  network: Network
+  /** sandbox.allow, from user and managed config only: extra "host:port" entries for the egress proxy. */
+  allow: string[]
+  /**
+   * The image the egress proxy runs: sandbox.image when your global or managed config set it (a
+   * mirror, for machines without ghcr.io), else the default. Never a repository's choice.
+   */
+  egressImage: string
   resources: { cpus: number; memory: string; pids: number; tmp: string }
 }
+
+export type Network = "policy" | "none" | "open"
+
+/** Stricter modes win when a repository's config and yours disagree. */
+const STRICTNESS: Record<Network, number> = { open: 0, policy: 1, none: 2 }
+export const strictest = (...modes: (Network | undefined)[]) =>
+  modes
+    .filter((mode): mode is Network => !!mode)
+    .reduce<
+      Network | undefined
+    >((acc, mode) => (acc === undefined || STRICTNESS[mode] > STRICTNESS[acc] ? mode : acc), undefined)
 
 const UNIT = { m: 60_000, h: 3_600_000, d: 86_400_000 } as const
 
@@ -98,10 +122,14 @@ export function defaultImage(version = InstallationVersion) {
 export function resolve(info: ConfigSandbox.Info): Resolved {
   return {
     enabled: info.enabled ?? false,
+    required: info.required ?? false,
     image: info.image ?? defaultImage(),
     workspace: info.workspace ?? "copy",
     on_finish: info.on_finish ?? "destroy",
     retain_for: info.retain_for ? duration(info.retain_for) : undefined,
+    network: info.network ?? "policy",
+    allow: info.allow ?? [],
+    egressImage: defaultImage(),
     resources: {
       cpus: info.resources?.cpus ?? 2,
       memory: info.resources?.memory ?? "4g",
@@ -120,17 +148,85 @@ export function worktreeOf(directory: string) {
 }
 
 export function load(directory: string, worktree = worktreeOf(directory)): Resolved {
-  const layers = files(directory, worktree).map(read)
+  const all = files(directory, worktree)
+  const user = all.slice(0, globalFiles().length).map(read)
+  const project = all.slice(globalFiles().length).map(read)
   const content = Flag.OPENCODE_CONFIG_CONTENT
   if (content) {
     const data = parse(content, [], { allowTrailingComma: true }) as { sandbox?: unknown } | undefined
-    if (data?.sandbox) layers.push(decode(data.sandbox))
+    if (data?.sandbox) user.push(decode(data.sandbox))
   }
+  // XCOD-157: managed config last, so the organisation's settings win.
+  const managed = mergeDocs(ConfigManaged.readManagedDocsSync())
+  const managedLayer = isDoc(managed.sandbox) ? decode(managed.sandbox) : undefined
+  const layers = [...user.slice(0, globalFiles().length), ...project, ...user.slice(globalFiles().length), managedLayer]
   const info = layers.reduce<ConfigSandbox.Info>(merge, {})
-  // `enabled` is the one key that isn't last-wins: a repository's own config must not be able to
-  // switch off a sandbox the user asked for, and so run itself (and its plugins) on the host.
-  // Only --no-sandbox turns it off for a run.
-  return resolve({ ...info, enabled: layers.some((layer) => layer?.enabled === true) })
+  // The network and its allow list are yours and your organisation's to open: a repository can make
+  // the network stricter, never looser, and can't add hosts to it.
+  const mine = [...user, managedLayer]
+  const network = strictest(
+    mine.reduce<Network | undefined>((acc, layer) => layer?.network ?? acc, undefined) ?? "policy",
+    strictest(...project.map((layer) => layer?.network)),
+  )
+  const allow = Array.from(new Set(mine.flatMap((layer) => layer?.allow ?? [])))
+  const egressImage = mine.reduce<string | undefined>((acc, layer) => layer?.image ?? acc, undefined) ?? defaultImage()
+  // `enabled` and `required` aren't last-wins: a repository's own config must not be able to switch
+  // off a sandbox the user or the organisation asked for, and so run itself (and its plugins) on the
+  // host. Only --no-sandbox turns `enabled` off for a run, and nothing turns `required` off.
+  const requiredBy =
+    managedLayer?.required === true
+      ? "managed"
+      : layers.some((layer) => layer?.required === true)
+        ? "config"
+        : undefined
+  const enabled = !!requiredBy || layers.some((layer) => layer?.enabled === true)
+  return { ...resolve({ ...info, enabled, required: !!requiredBy, network, allow }), egressImage, requiredBy }
+}
+
+/**
+ * Everything the egress allow list is derived from, merged the way the server inside will see it:
+ * global, then project, then OPENCODE_CONFIG_CONTENT, then managed, with managed `$locked` keys
+ * holding exactly the managed value.
+ */
+export function effectiveDoc(directory: string, managed: Doc | undefined, worktree = worktreeOf(directory)): Doc {
+  const docs: unknown[] = files(directory, worktree).map(readDoc)
+  if (Flag.OPENCODE_CONFIG_CONTENT) docs.push(parse(Flag.OPENCODE_CONFIG_CONTENT, [], { allowTrailingComma: true }))
+  const merged = mergeDocs([...docs, managed])
+  const locked = Array.isArray(managed?.$locked) ? (managed.$locked as unknown[]) : []
+  for (const key of locked) if (typeof key === "string" && !key.includes(".")) merged[key] = managed?.[key]
+  return merged
+}
+
+/**
+ * Whether this process is the server inside a sandbox. LUNOS_SANDBOX alone isn't proof: anyone can
+ * set it on the host. The marker is in the policy volume, root-owned at /etc/lunos, which a user
+ * can't create on the host without administrator rights.
+ */
+export function inside(
+  env = process.env.LUNOS_SANDBOX,
+  marker = path.join(SandboxDocker.POLICY_DIR, SandboxDocker.MARKER),
+) {
+  if (!env || !existsSync(marker)) return false
+  try {
+    return (JSON.parse(readFileSync(marker, "utf8")) as { id?: string }).id === env
+  } catch {
+    return false
+  }
+}
+
+/** Why the host must not run this, or undefined when it may. */
+export function refusal(config: Pick<Resolved, "required" | "requiredBy">, what: string, isInside = inside()) {
+  if (!config.required || isInside) return undefined
+  const by =
+    config.requiredBy === "managed"
+      ? " by your organisation's managed config"
+      : config.requiredBy === "config"
+        ? " in your config"
+        : ""
+  return (
+    `sandbox.required is set${by}, so ${what} can't run on this machine; nothing may run outside a sandbox. ` +
+    "Use `lunos --sandbox` or `lunos run --sandbox` (both are sandboxed automatically), or ask your administrator."
+  )
 }
 
 /**

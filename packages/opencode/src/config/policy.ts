@@ -26,6 +26,9 @@ export const KNOWN = [
   "audit.enabled",
   "audit.path",
   "audit.forward",
+  // XCOD-157: an organisation can require sandboxed runs.
+  "sandbox",
+  "sandbox.required",
 ] as const
 
 type Record_ = Record<string, unknown>

@@ -280,6 +280,11 @@ export const RunCommand = effectCmd({
         describe: "with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says",
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
+    if (args.sandbox === false && !args.attach) {
+      const { refuseHost } = yield* Effect.promise(() => import("./sandbox"))
+      const refused = yield* Effect.promise(() => refuseHost("`lunos run --no-sandbox`"))
+      if (refused) return yield* fail(refused)
+    }
     if (sandboxWanted(args)) {
       if (args.attach) return yield* fail("--sandbox cannot be used with --attach")
       if (args.mini) return yield* fail("--sandbox cannot be used with --mini yet")

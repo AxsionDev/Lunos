@@ -19,11 +19,30 @@ import { AuditLog } from "@/audit/log"
 
 const say = (text: string) => UI.println(UI.Style.TEXT_DIM + "sandbox " + UI.Style.TEXT_NORMAL + text)
 
-/** Whether this invocation runs sandboxed: --sandbox / --no-sandbox, else sandbox.enabled. */
+/**
+ * Whether this invocation runs sandboxed: --sandbox / --no-sandbox, else sandbox.enabled. With
+ * sandbox.required it always does (--attach excepted: that client runs nothing here); --no-sandbox
+ * is then refused by `refuseHost`, before anything starts.
+ */
 export function wanted(args: { sandbox?: boolean; attach?: string }, directory = process.env.PWD ?? process.cwd()) {
+  if (args.attach) return args.sandbox === true
+  const config = SandboxConfig.load(directory)
+  if (config.required) return true
   if (args.sandbox !== undefined) return args.sandbox
-  if (args.attach) return false
-  return SandboxConfig.load(directory).enabled
+  return config.enabled
+}
+
+/**
+ * The refusal for running `what` on the host under sandbox.required, recorded in the audit trail,
+ * or undefined when it may run. `--no-sandbox` under a requirement is refused the same way.
+ */
+export async function refuseHost(what: string, directory = process.env.PWD ?? process.cwd()) {
+  const config = SandboxConfig.load(directory)
+  const message = SandboxConfig.refusal(config, what)
+  if (!message) return undefined
+  await hostAudit()
+  AuditLog.emit("sandbox.refused", { what, reason: "sandbox.required", by: config.requiredBy })
+  return message
 }
 
 /** Per-run lifecycle overrides: --keep retains, --rm destroys, whatever sandbox.on_finish says. */
@@ -50,13 +69,15 @@ export async function hostAudit() {
   AuditLog.activate(settings)
 }
 
-/** The host's provider credentials, injected into the container at run time. */
-async function secrets(): Promise<Record<string, string>> {
+/** The host's stored provider credentials: injected into the container at run time. */
+async function credentials(): Promise<Record<string, unknown>> {
   const { AppRuntime } = await import("@/effect/app-runtime")
   const { Auth } = await import("@/auth")
-  const all = await AppRuntime.runPromise(Auth.Service.use((auth) => auth.all())).catch(() => ({}))
-  return Object.keys(all).length ? { OPENCODE_AUTH_CONTENT: JSON.stringify(all) } : {}
+  return AppRuntime.runPromise(Auth.Service.use((auth) => auth.all())).catch(() => ({}))
 }
+
+const secrets = (all: Record<string, unknown>): Record<string, string> =>
+  Object.keys(all).length ? { OPENCODE_AUTH_CONTENT: JSON.stringify(all) } : {}
 
 function reportHandoff(result: Sandbox.Handoff) {
   say(
@@ -91,6 +112,11 @@ async function conclude(
     return
   }
   reportHandoff(result)
+  const refused = (await Sandbox.collectEgress(info)).filter((item) => !item.allowed)
+  if (refused.length) {
+    const hosts = [...new Set(refused.map((item) => `${item.host}:${item.port}`))]
+    say(`network ${info.network}: refused ${refused.length} connection(s) to ${hosts.join(", ")}`)
+  }
   const failed = outcome.failed || result.failed
   const done = await Sandbox.finish(info, { failed, commit: result.commit, files: result.files.length }, policy)
   if (done === "destroyed") say(`destroyed ${info.id} (container and volumes)`)
@@ -114,12 +140,13 @@ export async function runSandboxed(
   await hostAudit()
   await pruneExpired()
   say("starting")
-  const info = await Sandbox.create({ directory, config, log: say })
+  const stored = await credentials()
+  const info = await Sandbox.create({ directory, config, providers: Object.keys(stored), log: say })
   const policy = info.on_finish
   say(`${info.id}: image ${info.image.digest ?? info.image.id}, on_finish ${policy}`)
   let conn: Sandbox.Connection
   try {
-    conn = await Sandbox.start(info, { secrets: await secrets() })
+    conn = await Sandbox.start(info, { secrets: secrets(stored) })
   } catch (error) {
     await Sandbox.retain(info, "start failed")
     say(`kept ${info.id} (stopped) for inspection; \`lunos sandbox destroy ${info.id}\` removes it`)
@@ -227,7 +254,7 @@ export const SandboxAttachCommand = effectCmd({
     yield* Effect.promise(async () => {
       // Reopened, it no longer expires on the old schedule; leaving it again sets a new one.
       info.expires = undefined
-      const conn = await Sandbox.start(info, { secrets: await secrets(), attach: true })
+      const conn = await Sandbox.start(info, { secrets: secrets(await credentials()), attach: true })
       say(`${info.id}: server ${conn.url}, workspace ${conn.directory}`)
       try {
         await attachTui(conn, { continue: true })
@@ -295,6 +322,26 @@ export const SandboxStopCommand = effectCmd({
   }),
 })
 
+/** Run by the egress container (see src/sandbox/egress.ts); not for people. */
+export const SandboxEgressCommand = cmd({
+  command: "egress",
+  describe: false,
+  async handler() {
+    const { SandboxEgress } = await import("@/sandbox/egress")
+    const [host, port] = (process.env.LUNOS_EGRESS_UPSTREAM ?? "sandbox:4096").split(":")
+    SandboxEgress.serve({
+      allow: JSON.parse(process.env.LUNOS_EGRESS_ALLOW ?? "[]") as string[],
+      mode: process.env.LUNOS_EGRESS_MODE,
+      upstream: { host, port: Number(port) },
+    })
+    // PID 1 in its container: without a handler, `docker stop` waits out its timeout.
+    await new Promise<void>((resolve) => {
+      process.once("SIGTERM", resolve)
+      process.once("SIGINT", resolve)
+    })
+  },
+})
+
 export const SandboxCommand = cmd({
   command: "sandbox",
   describe: "manage sandboxes (sandboxed runs: lunos --sandbox, lunos run --sandbox)",
@@ -306,6 +353,7 @@ export const SandboxCommand = cmd({
       .command(SandboxStopCommand)
       .command(SandboxDestroyCommand)
       .command(SandboxPruneCommand)
+      .command(SandboxEgressCommand)
       .demandCommand(),
   async handler() {},
 })

@@ -1,5 +1,6 @@
 import { SandboxExec } from "./exec"
 import type { SandboxConfig } from "./config"
+import { PROXY_PORT } from "./egress"
 
 // XCOD-144: everything that talks to the Docker CLI. The isolation flags live in `createArgs` and are
 // not configurable — config chooses the image, resources and lifecycle only.
@@ -29,6 +30,12 @@ export const MARKER = "sandbox.json"
 export const containerName = (id: string) => `lunos-sandbox-${id}`
 export const volumeName = (id: string) => `lunos-sandbox-${id}`
 export const policyVolumeName = (id: string) => `lunos-sandbox-${id}-policy`
+/** XCOD-157: the egress proxy and relay container, and the internal network it guards. */
+export const egressName = (id: string) => `lunos-sandbox-${id}-egress`
+export const networkName = (id: string) => `lunos-sandbox-${id}-net`
+/** The sandbox container's name on its network, and the proxy's. */
+export const SANDBOX_ALIAS = "sandbox"
+export const EGRESS_ALIAS = "egress"
 
 const docker = (args: string[], options?: SandboxExec.Options) => SandboxExec.check(["docker", ...args], options)
 
@@ -56,7 +63,9 @@ export async function image(ref: string): Promise<Image> {
       throw new Error(
         `Couldn't get the sandbox image ${ref}: ${pull.stderr.trim()}. ` +
           `Build one locally with \`bun run packages/opencode/script/sandbox-image.ts\` (tags lunos-sandbox:local) ` +
-          `and set "sandbox": { "image": "lunos-sandbox:local" }, or point sandbox.image at an image you can pull.`,
+          `and set "sandbox": { "image": "lunos-sandbox:local" }, or point sandbox.image at an image you can pull. ` +
+          `Set it in your global config (~/.config/opencode/opencode.json) or managed config: the network ` +
+          `policy's proxy runs from that image too, and ignores an image a repository's config chooses.`,
       )
     result = await inspect()
     if (result.code !== 0) throw new Error(`docker image inspect ${ref} failed: ${result.stderr.trim()}`)
@@ -78,7 +87,30 @@ export function createArgs(input: {
   resources: SandboxConfig.Resolved["resources"]
   workdir: string
   env: Record<string, string>
+  /** XCOD-157: "open" keeps Docker's default network; otherwise only the internal one, via the proxy. */
+  network?: SandboxConfig.Network
 }) {
+  const network = input.network ?? "open"
+  const proxy = `http://${EGRESS_ALIAS}:${PROXY_PORT}`
+  const networkArgs =
+    network === "open"
+      ? // The server is reachable from the host's loopback only, on a port Docker picks.
+        ["--publish", `127.0.0.1::${PORT}`]
+      : // No route out and no published port: the egress container is the only way in or out.
+        ["--network", networkName(input.id), "--network-alias", SANDBOX_ALIAS]
+  const proxyEnv =
+    network === "open"
+      ? {}
+      : {
+          HTTP_PROXY: proxy,
+          HTTPS_PROXY: proxy,
+          http_proxy: proxy,
+          https_proxy: proxy,
+          NO_PROXY: "localhost,127.0.0.1",
+          no_proxy: "localhost,127.0.0.1",
+          // models.dev isn't on the allow list; the bundled snapshot is used instead.
+          OPENCODE_DISABLE_MODELS_FETCH: "1",
+        }
   return [
     "create",
     "--name",
@@ -113,10 +145,8 @@ export function createArgs(input: {
     input.resources.memory,
     "--pids-limit",
     String(input.resources.pids),
-    // The server is reachable from the host's loopback only, on a port Docker picks.
-    "--publish",
-    `127.0.0.1::${PORT}`,
-    ...Object.entries({ ...input.env, LUNOS_SANDBOX_RUNTIME: RUNTIME_FILE }).flatMap(([key, value]) => [
+    ...networkArgs,
+    ...Object.entries({ ...input.env, ...proxyEnv, LUNOS_SANDBOX_RUNTIME: RUNTIME_FILE }).flatMap(([key, value]) => [
       "--env",
       `${key}=${value}`,
     ]),
@@ -212,6 +242,75 @@ export async function create(args: string[]) {
 }
 
 /**
+ * The egress side of a sandbox whose network isn't "open": an internal network, and a container
+ * from the trusted Lunos image on both it and Docker's default network, running `lunos sandbox
+ * egress` with the allow list. Locked down like the sandbox itself; it publishes the relay port.
+ */
+export function egressArgs(input: {
+  id: string
+  image: Image
+  allow: readonly string[]
+  network?: SandboxConfig.Network
+}) {
+  return [
+    "create",
+    "--name",
+    egressName(input.id),
+    "--label",
+    `${LABEL}.egress=${input.id}`,
+    "--user",
+    UID,
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--read-only",
+    "--tmpfs",
+    "/tmp:rw,noexec,nosuid,nodev,size=16m",
+    "--memory",
+    "256m",
+    "--pids-limit",
+    "64",
+    "--publish",
+    `127.0.0.1::${PORT}`,
+    "--env",
+    "HOME=/tmp",
+    "--env",
+    "OPENCODE_DISABLE_AUTOUPDATE=1",
+    "--env",
+    `LUNOS_EGRESS_ALLOW=${JSON.stringify(input.allow)}`,
+    "--env",
+    `LUNOS_EGRESS_UPSTREAM=${SANDBOX_ALIAS}:${PORT}`,
+    "--env",
+    `LUNOS_EGRESS_MODE=${input.network ?? "policy"}`,
+    input.image.id,
+    "sandbox",
+    "egress",
+  ]
+}
+
+export async function createEgress(input: {
+  id: string
+  image: Image
+  allow: readonly string[]
+  network?: SandboxConfig.Network
+}) {
+  await docker(["network", "create", "--internal", "--label", `${LABEL}.net=${input.id}`, networkName(input.id)])
+  await docker(egressArgs(input))
+  await docker(["network", "connect", "--alias", EGRESS_ALIAS, networkName(input.id), egressName(input.id)])
+}
+
+export async function hasEgress(id: string) {
+  return (await SandboxExec.run(["docker", "container", "inspect", egressName(id)])).code === 0
+}
+
+/** The egress proxy's decisions, one JSON line each, from its log. */
+export async function egressLog(id: string) {
+  const result = await SandboxExec.run(["docker", "logs", egressName(id)])
+  return result.stdout
+}
+
+/**
  * Write the runtime file into the running container's tmpfs, as the sandbox user, through stdin: the
  * values never appear in an argv, an environment or a file on the host.
  */
@@ -232,24 +331,29 @@ export async function inject(id: string, runtime: string) {
 }
 
 export async function start(id: string) {
+  if (await hasEgress(id)) await docker(["start", egressName(id)])
   await docker(["start", containerName(id)])
 }
 
 export async function stop(id: string) {
   await docker(["stop", "--time", "10", containerName(id)])
+  if (await hasEgress(id)) await docker(["stop", "--time", "5", egressName(id)])
 }
 
 /** Remove the container and its volume. Missing ones are not an error. */
 export async function remove(id: string) {
   await SandboxExec.run(["docker", "rm", "--force", "--volumes", containerName(id)])
+  await SandboxExec.run(["docker", "rm", "--force", egressName(id)])
+  await SandboxExec.run(["docker", "network", "rm", networkName(id)])
   for (const name of [volumeName(id), policyVolumeName(id)]) {
     const volume = await SandboxExec.run(["docker", "volume", "rm", "--force", name])
     if (volume.code !== 0) throw new Error(`docker volume rm ${name} failed: ${volume.stderr.trim()}`)
   }
 }
 
+/** The host port the sandbox server is reached on: the egress relay's, or with network "open" its own. */
 export async function hostPort(id: string) {
-  const out = await docker(["port", containerName(id), `${PORT}/tcp`])
+  const out = await docker(["port", (await hasEgress(id)) ? egressName(id) : containerName(id), `${PORT}/tcp`])
   const line = out.split("\n").find((item) => item.startsWith("127.0.0.1:"))
   if (!line) throw new Error(`the sandbox server port isn't published: ${out.trim()}`)
   return Number(line.split(":")[1])
