@@ -105,7 +105,9 @@ Options:
       --thinking     show thinking blocks                                                  [boolean]
   -i, --interactive  run in direct interactive split-footer mode          [boolean] [default: false]
       --auto         auto-approve permissions that are not explicitly denied (dangerous!)
-                                                                          [boolean] [default: false]"
+                                                                          [boolean] [default: false]
+      --sandbox      run in an isolated Docker sandbox; results come back as branch
+                     lunos/sandbox/<id>                                                    [boolean]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode debug --help 1`] = `
@@ -171,13 +173,30 @@ Options:
       --pure        run without external plugins                                           [boolean]"
 `;
 
-exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode upgrade --help 1`] = `
-"lunos upgrade [target]
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode update --help 1`] = `
+"lunos update [target]
 
-upgrade Lunos to the latest or a specific version
+update Lunos to the latest or a specific version
 
 Positionals:
-  target  version to upgrade to, for ex '0.1.48' or 'v0.1.48'                               [string]
+  target  version to update to, for ex '0.1.48' or 'v0.1.48'                                [string]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+  -m, --method      installation method to use              [string] [choices: "npm", "pnpm", "bun"]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode upgrade --help 1`] = `
+"lunos update [target]
+
+update Lunos to the latest or a specific version
+
+Positionals:
+  target  version to update to, for ex '0.1.48' or 'v0.1.48'                                [string]
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -388,6 +407,58 @@ Options:
   -f, --force       replace existing plugin version                       [boolean] [default: false]"
 `;
 
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory --help 1`] = `
+"lunos memory
+
+review, search, export, import, migrate, outdate, verify and forget long-term memory
+
+Commands:
+  lunos memory list            list remembered facts, with where each came from and their state
+  lunos memory show <id>       show one fact and its provenance
+  lunos memory search <query>  search memory the way the agent does
+  lunos memory forget <id>     remove one fact from memory
+  lunos memory outdate <id>    mark a fact as no longer true: kept for history, but no longer
+                               recalled
+  lunos memory status          show whether memory is on, how many facts are in each state, and any
+                               quarantined facts
+  lunos memory verify          re-check every ledger entry's integrity hash and the hash chain;
+                               quarantined facts are listed
+  lunos memory purge           delete all of a memory's stored facts and graph (hand-written notes
+                               are kept)
+  lunos memory export          export all memory as a versioned bundle (facts, graph, notes,
+                               provenance), or as one Markdown file per fact with --format markdown
+  lunos memory import <path>   import memory from a Lunos bundle, Markdown, or AGENTS.md / CLAUDE.md
+                               / Claude Code memory notes; previews first
+  lunos memory migrate         move embedded memory into the external database set in
+                               memory.backend; previews first
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings --help 1`] = `
+"lunos settings
+
+view and change settings (opens the settings screen)
+
+Commands:
+  lunos settings list               list every setting with its value and where it comes from
+  lunos settings get <key>          print one setting's current value
+  lunos settings set <key> <value>  change one setting in your user config (or the project's, with
+                                    --project)
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]"
+`;
+
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode db --help 1`] = `
 "lunos db
 
@@ -407,6 +478,39 @@ Options:
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
       --format      Output format                 [string] [choices: "json", "tsv"] [default: "tsv"]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings list --help 1`] = `
+"lunos settings list
+
+list every setting with its value and where it comes from
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --json        print JSON                                            [boolean] [default: false]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings set --help 1`] = `
+"lunos settings set <key> <value>
+
+change one setting in your user config (or the project's, with --project)
+
+Positionals:
+  key    setting key, e.g. share or compaction.auto                              [string] [required]
+  value  new value (JSON for lists and objects)                                  [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --project     write to .opencode/opencode.json in this project instead of your user config
+                                                                          [boolean] [default: false]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp list --help 1`] = `
@@ -619,6 +723,60 @@ Options:
       --pure        run without external plugins                                           [boolean]
       --event       GitHub mock event to run the agent for                                  [string]
       --token       GitHub personal access token (github_pat_********)                      [string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory export --help 1`] = `
+"lunos memory export
+
+export all memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file
+per fact with --format markdown
+
+Options:
+  -h, --help           show help                                                           [boolean]
+  -v, --version        show version number                                                 [boolean]
+      --print-logs     print logs to stderr                                                [boolean]
+      --log-level      log level                [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure           run without external plugins                                        [boolean]
+      --format         bundle: everything, machine-readable (lunos-memory/1). markdown: one file per
+                       fact, for git review      [choices: "bundle", "markdown"] [default: "bundle"]
+      --scope          which memory to export [choices: "project", "user", "both"] [default: "both"]
+      --since          bundle: only facts saved on or after this date (ISO 8601)            [string]
+      --out            bundle: where to write it (default: ./lunos-memory-<time>, plus .zip or
+                       .zip.enc)                                                            [string]
+      --zip            bundle: write one .zip file instead of a directory [boolean] [default: false]
+      --encrypt        bundle: encrypt the .zip with a passphrase (asked for, or
+                       LUNOS_MEMORY_PASSPHRASE); never stored             [boolean] [default: false]
+      --graph          bundle: include the entity graph (reading it starts memory; --no-graph
+                       exports without)                                    [boolean] [default: true]
+      --include-index  bundle: also copy the engine's database files, for a same-version,
+                       same-engine restore                                [boolean] [default: false]
+      --dir            markdown: where to write the files (default: .opencode/memory/export)[string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory import --help 1`] = `
+"lunos memory import <path>
+
+import memory from a Lunos bundle, Markdown, or AGENTS.md / CLAUDE.md / Claude Code memory notes;
+previews first
+
+Positionals:
+  path  a bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file
+                                                                                 [string] [required]
+
+Options:
+  -h, --help               show help                                                       [boolean]
+  -v, --version            show version number                                             [boolean]
+      --print-logs         print logs to stderr                                            [boolean]
+      --log-level          log level            [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure               run without external plugins                                    [boolean]
+      --scope              put everything in this memory (default: a bundle fact's own scope;
+                           project for Markdown)                        [choices: "project", "user"]
+      --yes                write the new rows (without it, only preview)  [boolean] [default: false]
+      --dry-run            only preview, even with --yes                  [boolean] [default: false]
+      --as-facts           import AGENTS.md, CLAUDE.md, Claude Code memory and bundle notes as facts
+                           instead of notes                               [boolean] [default: false]
+      --include-conflicts  with --yes, also write rows marked conflict or near-duplicate
+                                                                          [boolean] [default: false]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode db path --help 1`] = `

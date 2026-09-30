@@ -50,7 +50,7 @@ That provider is your choice and your contractual relationship. Lunos does not s
 
 The tool also fetches its model catalogue (a list of available models and their capabilities — no prompt data) over the network, and checks for updates unless disabled. None of these other calls carries project data. [Every outbound call](#every-outbound-call-and-offline-mode) lists all of them, and one switch turns them all off.
 
-**The update check** reads the `lunos-ai` package entry from your npm registry: `https://registry.npmjs.org/lunos-ai/latest` by default, or whatever registry your npm configuration points at, so a corporate or EU mirror is honoured. It sends no project data, and runs at most once a day; the result is cached in Lunos's state directory. Lunos only _announces_ new releases. It never installs one unless a person chooses to, or you set `"autoupdate": true`. To turn the check off entirely, set `"autoupdate": false` or the environment variable `LUNOS_DISABLE_AUTOUPDATE=1`.
+**The update check** reads the `lunos-ai` package entry from your npm registry: `https://registry.npmjs.org/lunos-ai/latest` by default, or whatever registry your npm configuration points at, so a corporate or EU mirror is honoured. It sends no project data. It runs on every start, in the background, and never delays startup: if the registry doesn't answer within 3 seconds, the last result (cached in Lunos's state directory) is used. Lunos only _announces_ new releases: `There is a new version: X.Y.Z — please run lunos update` in the bottom-right of the TUI, and at most once a day on stderr for plain commands. It never installs one unless a person runs `lunos update` (or `/update` in the TUI), or you set `"autoupdate": true`. To turn the check off entirely, set `"autoupdate": false` or the environment variable `LUNOS_DISABLE_AUTOUPDATE=1`.
 
 **Long-term memory, if you turn it on** (from v1.18.40; `"memory": { "enabled": true }`; off by default). Measured on 2026-09-26:
 
@@ -58,6 +58,12 @@ The tool also fetches its model catalogue (a list of available models and their 
 - **After that, no network of its own.** Every remember and recall ran with all outbound connections blocked.
 - **Fact extraction** uses the model you set as `memory.model`, through your normal provider and residency policy, so it is one more model request like any other.
 - **Avoiding the downloads.** You can pre-seed the uv cache and the model directory. Details are in [`specs/memory-layer.md` §7](../../packages/opencode/specs/memory-layer.md).
+- **Exports stay where you put them** (from the next release). `lunos memory export` writes a bundle to a local path you choose: facts with provenance, the extracted graph, copies of `.opencode/memory/*.md`, and a manifest. It makes no model call. Reading the graph starts the local memory process, which after its first start uses only what it has cached. The bundle leaves the machine only if you move it; the TUI writes it to the Lunos data directory, never into the project. Embeddings and engine database files are included only with `--include-index`. `--encrypt` locks it with a passphrase that is never stored.
+- **Retention, encryption and audit** (from the next release). None of these makes a network call.
+  - `memory.retention.days` expires facts that many days after they were saved (default: never); expired facts stop being recalled at once and are deleted `memory.retention.grace_days` later (default 7). Facts can also be marked outdated (`lunos memory outdate`): kept for history, never recalled.
+  - `"memory": { "encryption": "os-keychain" }` encrypts the provenance ledger (`facts.jsonl`) with AES-256-GCM, using a random key held only in the OS keychain (macOS Keychain, Windows Credential Manager, libsecret on Linux; a headless Linux host needs a running Secret Service). **It does not encrypt the memory engine's own database files** in the same directory (Cognee's SQLite, LanceDB and Kuzu stores, its plain-text copy of each fact under `data/`, and its logs under `logs/`; measured 2026-09-29, all hold fact text), nor the hand-written notes in `.opencode/memory/*.md`. Put the project and the Lunos data directory on full-disk-encrypted storage. If the keychain entry is lost, the ledger can't be read: Lunos refuses to use that memory rather than starting empty, and nothing else holds the key.
+  - Each ledger line carries a SHA-256 and a hash chain; lines that don't match are quarantined (not recalled, not exported) and reported by `lunos memory verify` and the audit log. The hashes are unkeyed: they catch damage and hand edits, not a deliberate rewrite by someone with write access.
+  - Every memory operation is an audit event (`memory.remember`, `recall`, `forget`, `outdate`, `import`, `export`, `purge`, `verify_failed`): time, scope, fact ids, counts and where it came from, never a fact's text or a search query. They are forwarded to your SIEM with everything else.
 
 **The marketplace** (`lunos marketplace …` commands and the TUI's Discover view) fetches `https://lunos.tech/marketplace.json`, the built-in `lunos-community` catalogue: names, descriptions and install sources of community plugins and MCP servers. It sends no project data, runs only when you use those commands, never at startup, and is cached for a day. Installing an entry then fetches that entry's package (for example from npm). Turn off the built-in catalogue with `"marketplace_default": false`. Marketplaces you add yourself are fetched the same way.
 
@@ -91,7 +97,7 @@ Everything else:
 - Your source code, except the portions sent to your chosen model provider as context
 - Conversation history and session state, stored in local files
 - Configuration and credentials, stored locally
-- Long-term memory, when on (from v1.18.40): the knowledge graph and its provenance ledger, in local files
+- Long-term memory, when on (from v1.18.40): the knowledge graph and its provenance ledger, in local files, or, if you configure one, in a Neo4j database you run ([External memory database](#external-memory-database)). `lunos memory export` bundles are written only where you tell them to go
 - The audit log: model calls and share uploads (v1.18.39); tool runs, permission decisions, installs and policy refusals from v1.18.40. No prompt or file contents (§5, and [The audit log](../audit-log.md)). It leaves the machine only if you configure forwarding to your own SIEM
 
 ### Touches Lunos-operated infrastructure
@@ -145,7 +151,7 @@ Every refused call names `LUNOS_OFFLINE` in its message. It doesn't hang or retr
 | Outbound call                                                                     | Host(s)                                                                                                   | When                                                                                              | With `LUNOS_OFFLINE=1`     | Other switch                                                                                  |
 | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
 | Models catalogue refresh                                                          | models.opencode.ai (or `OPENCODE_MODELS_URL`)                                                             | startup, then hourly                                                                              | **Off**                    | `OPENCODE_DISABLE_MODELS_FETCH`. The catalogue snapshot built into the binary is used instead |
-| Update check and automatic upgrade                                                | npm registry (or your `.npmrc` registry)                                                                  | startup, at most daily                                                                            | **Off**                    | `LUNOS_DISABLE_AUTOUPDATE`, or `"autoupdate": false`                                          |
+| Update check (`lunos update` notice) and automatic update                         | npm registry (or your `.npmrc` registry)                                                                  | every start, in the background (3 s timeout)                                                      | **Off**                    | `LUNOS_DISABLE_AUTOUPDATE`, or `"autoupdate": false`                                          |
 | npm installs: LSP servers, formatters, the plugin SDK, npm plugins, provider SDKs | npm registry (or your `.npmrc` registry)                                                                  | startup, and when a file type or provider is first used                                           | **Off**                    | `OPENCODE_DISABLE_LSP_DOWNLOAD` (LSP servers only)                                            |
 | LSP server downloads and toolchain installs (`go install`, `gem`, `dotnet tool`)  | github.com, download-cdn.jetbrains.com, releases.hashicorp.com, proxy.golang.org, rubygems.org, nuget.org | when a matching file is first opened                                                              | **Off**                    | `OPENCODE_DISABLE_LSP_DOWNLOAD`                                                               |
 | ripgrep download, when `rg` isn't installed                                       | github.com                                                                                                | first search                                                                                      | **Off**                    | none                                                                                          |
@@ -326,16 +332,16 @@ The repository ships a reference configuration for exactly this deployment: [`ex
 
 Key by key:
 
-| Key                               | Value                            | Why                                                                                                                                                                                                                                                                  |
-| --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `residency.allow`                 | `["eu"]`                         | The enforcement. Model requests may only go to providers that process data in the EU; anything else is refused before a connection is opened. Described in full below                                                                                                |
-| `residency.audit`                 | `true`                           | Records every outbound model call, and every refused one, to a local audit log. This is already the default once `residency` is set; it is written out so a reviewer doesn't have to know that                                                                       |
-| `enabled_providers`               | `["mistral"]`                    | Loads only this provider. Defence in depth: the residency policy would refuse the others anyway, but they don't appear in the model list at all, so nobody picks one and gets an error                                                                               |
-| `provider.mistral.options.apiKey` | `"{env:MISTRAL_API_KEY}"`        | Mistral AI (France) processes in the EU; see [Model provider jurisdictions](../provider-jurisdictions.md). The key is read from the environment, so the file itself holds no secret and can be committed. Scaleway, OVHcloud or Hetzner work the same way (§5 table) |
-| `model`                           | `"mistral/mistral-large-latest"` | The main agent's model, on the provider above                                                                                                                                                                                                                        |
-| `small_model`                     | `"mistral/mistral-small-latest"` | Used for titles and summaries. Set explicitly so it can't fall back to a model on another provider                                                                                                                                                                   |
-| `share`                           | `"disabled"`                     | Already the default. Set explicitly so a later config layer or a copy of this file can't turn sharing on without it showing in review. See [Session sharing](#session-sharing--off-by-default)                                                                       |
-| `autoupdate`                      | `"notify"`                       | Lunos tells you when a new release exists but never installs one without a person choosing it. A procurement reviewer should expect updates to be a decision, not a side effect. The check itself is a network call; set `false` to turn it off entirely             |
+| Key                               | Value                            | Why                                                                                                                                                                                                                                                                     |
+| --------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `residency.allow`                 | `["eu"]`                         | The enforcement. Model requests may only go to providers that process data in the EU; anything else is refused before a connection is opened. Described in full below                                                                                                   |
+| `residency.audit`                 | `true`                           | Records every outbound model call, and every refused one, to a local audit log. This is already the default once `residency` is set; it is written out so a reviewer doesn't have to know that                                                                          |
+| `enabled_providers`               | `["mistral"]`                    | Loads only this provider. Defence in depth: the residency policy would refuse the others anyway, but they don't appear in the model list at all, so nobody picks one and gets an error                                                                                  |
+| `provider.mistral.options.apiKey` | `"{env:MISTRAL_API_KEY}"`        | Mistral AI (France) processes in the EU; see [Model provider jurisdictions](../provider-jurisdictions.md). The key is read from the environment, so the file itself holds no secret and can be committed. Scaleway, OVHcloud or Hetzner work the same way (§5 table)    |
+| `model`                           | `"mistral/mistral-large-latest"` | The main agent's model, on the provider above                                                                                                                                                                                                                           |
+| `small_model`                     | `"mistral/mistral-small-latest"` | Used for titles and summaries. Set explicitly so it can't fall back to a model on another provider                                                                                                                                                                      |
+| `share`                           | `"disabled"`                     | Already the default. Set explicitly so a later config layer or a copy of this file can't turn sharing on without it showing in review. See [Session sharing](#session-sharing--off-by-default)                                                                          |
+| `autoupdate`                      | `"notify"`                       | Lunos tells you when a new release exists but never installs one without a person choosing it. A procurement reviewer should expect updates to be a decision, not a side effect. The check itself is a network call on every start; set `false` to turn it off entirely |
 
 To confirm the policy is active, run `lunos debug config` in that directory. The resolved config it prints includes `"residency": { "allow": ["eu"], "audit": true }`.
 
@@ -380,6 +386,82 @@ A sample policy with a macOS profile and Windows and Linux deployment notes is i
 [`examples/managed-policy/`](../../examples/managed-policy/). To check a machine, run
 `lunos debug config --sources`: it shows which layer set each key and which are locked.
 
+### External memory database
+
+From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your team runs, instead of on each developer's machine. A team then shares project memory, backs it up with its normal database tooling, and decides where the data sits.
+
+```jsonc
+"memory": {
+  "enabled": true,
+  "scope": ["project", "user"],
+  "backend": {
+    "type": "neo4j",                              // "embedded" (the default) | "neo4j" | "memgraph" (refused: not supported yet)
+    "url": "bolt+s://graph.internal:7687",        // TLS; plain bolt:// only to localhost
+    "username": "{env:LUNOS_MEMORY_DB_USER}",     // {env:} or {file:} only: a literal is refused at load
+    "password": "{file:~/.config/lunos/neo4j-password}",
+    "jurisdiction": "EU-DE",                      // required; checked against the residency policy
+    "database": "neo4j",                          // optional: the server's default database
+    "read_only": false                            // true: recall only, no remember tool
+    // "allow_insecure": true                     // plain bolt:// to another host, with a warning
+    // "user": "alice@example.com"                // who you are for user memory (hashed); default: a random per-machine id
+  }
+}
+```
+
+**Checked before anything connects.** When memory starts, Lunos refuses the backend, without opening a socket or loading the database driver, if:
+
+- no `jurisdiction` is declared;
+- a residency policy is set and doesn't allow the jurisdiction's region (`EU`, `EU-DE` or an EU country code count as `eu`, `US` or `US-…` as `us`, anything else as `other`). The refusal names `memory.backend` and is written to the audit log as `memory.denied`;
+- the URL is plain `bolt://` or `neo4j://` to a host that isn't this machine, unless `allow_insecure` is set. `lunos memory status` then shows a warning. `+ssc` is encrypted but doesn't verify the certificate, and says so;
+- the URL has credentials in it, or `memory.encryption` is `"os-keychain"`. That key is in one person's keychain, and the database is shared, so encrypt at rest on the server instead.
+
+`memory.enabled: false`, `LUNOS_DISABLE_MEMORY=1` or `/memory off` mean no connection is opened at all. That includes `lunos memory status` and `list`, which then say memory is off instead of reading the database.
+
+**Credentials** are accepted only as `{env:VAR}` or `{file:path}` references. A literal username or password in any config layer fails config loading with a pointer here. The message names the key, never the value.
+
+**Neo4j, and APOC.** Lunos talks to Neo4j 5 directly over Bolt, with the official JavaScript driver. It creates one uniqueness constraint, one index and one full-text index on its own label, `:LunosMemoryFact`, and doesn't use APOC. Cognee's own Neo4j adapter, which Lunos doesn't use here, requires the APOC plugin; you only need it if you run Cognee against the same server yourself. Neo4j Community Edition has one user database, so leave `database` unset there. Give Lunos a database user that can create constraints and indexes the first time; after that, a user with read and write access is enough, or read access with `read_only: true`.
+
+**What data lives where:**
+
+| Where              | What                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The Neo4j database | One `:LunosMemoryFact` node per fact: its text, its provenance (session id, agent, source, date), lifecycle (status, kind, expiry, replacement links), its scope, a namespace, and a SHA-256 of its record. This **is** the ledger in external mode. The namespace is `project:<SHA-256 of the repository's git remote>` or `user:<SHA-256 of the user id>`, never a local path |
+| Each machine       | Nothing memory-related but `memory/user.id` in the Lunos data directory (a random id, if you don't set `user`), and the hand-written notes in `.opencode/memory/*.md`, which stay in the repository and are **not** copied into the database                                                                                                                                    |
+| Nowhere            | Embeddings and an entity graph. External memory stores facts only, and recall uses the database's own full-text index. Nothing is computed on one machine that a second one would have to re-index, and remembering a fact makes no model call                                                                                                                                  |
+
+**Scopes in a shared database.** Project memory is keyed by the repository's `origin` remote (normalised, so `git@host:org/repo.git` and `https://host/org/repo` are the same project); a project with no remote can't use project memory in an external database. Everyone working on the same repository shares its project memory, and recall in one project never returns another project's facts. Every query filters on the namespace in the database. User memory is keyed by `user`, or a random id kept on the machine, so Lunos never recalls one person's user memory for another, nor on your own other machines unless you set `user` on each.
+
+**Namespaces keep recall apart; they are not access control.** Anyone with the database's credentials, which in a team setup is usually everyone, can query the database directly and read every project's memory and every user's user memory. A hashed `user` value that is guessable (an email address) can be linked back to its person. There is no mixed mode that keeps user memory on the machine while project memory is external: with `memory.backend` set, both scopes are in the database. If user memory must stay private, leave `"user"` out of `memory.scope`, or give each person separate database credentials and a database only they can read.
+
+**Moving existing memory:** `lunos memory migrate --to neo4j` exports this machine's embedded memory as a bundle, then imports it into the database with the same preview and write guard as `lunos memory import`. Facts keep their ids and provenance. Run it once without `--yes` to see the preview. The embedded memory is left as it is; delete it with `lunos memory purge` once you have checked the database. `lunos memory status` shows the backend, whether it can be reached, and each scope's fact count and last write.
+
+**Integrity.** Each node carries a SHA-256 of its record. A node whose record, text or namespace no longer matches is quarantined: listed by `lunos memory verify`, never recalled. Like the local ledger's hashes, these catch damage and naive edits, not someone with write access who recomputes them. Anyone with the database's credentials can write facts that every user of that project will recall. Treat database write access like commit access, and give readers `read_only: true`.
+
+A Docker Compose example for a single Neo4j server (put TLS in front of it, or use `bolt+s://` with Neo4j's own TLS, before other machines connect):
+
+```yaml
+# docker-compose.yml
+services:
+  neo4j:
+    image: neo4j:5
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7687:7687" # Bolt; expose it beyond this host only over TLS
+    environment:
+      NEO4J_AUTH_FILE: /run/secrets/neo4j_auth # contains: neo4j/<password>
+    secrets:
+      - neo4j_auth
+    volumes:
+      - neo4j-data:/data
+secrets:
+  neo4j_auth:
+    file: ./neo4j_auth.txt
+volumes:
+  neo4j-data:
+```
+
+Back up the `neo4j-data` volume, or run `neo4j-admin database dump`, like any other database. `lunos memory export` from any machine is also a full, portable copy of that project's facts.
+
 ## 6. What you need to provide
 
 | You provide                          | Notes                                                   |
@@ -390,14 +472,14 @@ A sample policy with a macOS profile and Windows and Linux deployment notes is i
 | Storage for local state              | Sessions, config and audit log are ordinary local files |
 | Your own backup and retention policy | Lunos does not manage retention of local state          |
 
-Lunos requires no database, no message broker and no inbound network access. Server mode exists and is **opt-in only**; leave it off unless you need it, and set a password if you enable it (see [`SECURITY.md`](../../SECURITY.md)).
+Lunos requires no database, no message broker and no inbound network access. An external memory database is optional (see [External memory database](#external-memory-database)). Server mode exists and is **opt-in only**; leave it off unless you need it, and set a password if you enable it (see [`SECURITY.md`](../../SECURITY.md)).
 
 ## 7. Known limitations — stated, not buried
 
 - **The residency policy is not enforced for sessions in v1.18.38 and earlier.** See the correction in §5. It is enforced from v1.18.39; on older versions the policy is advisory only.
 - **Binaries are not OS code-signed** on any platform: no Apple Developer ID or notarization, no Windows Authenticode. Gatekeeper and SmartScreen will warn. What you _can_ verify is that a download came from this repository's release workflow unchanged: npm provenance for the npm packages, and a Sigstore-signed `SHA256SUMS` for the release archives (see [Verify your download](#verify-your-download)). OS signing needs certificates that haven't been bought; it's deferred, not dropped.
 - **No security certification is held.** Lunos holds no CRA, EUCS, ISO or SOC certification and claims none. On the project's current assessment it falls outside the scope of the EU Cyber Resilience Act entirely, because it is free, MIT-licensed, self-hosted and unmonetised. A CycloneDX **software bill of materials is published with each release** as manufacturer-readiness groundwork, not as a compliance claim.
-- **The agent is not sandboxed.** Lunos can execute shell commands and modify files. Its permission system is a UX safeguard that prompts before acting — it is _not_ a security boundary. For true isolation, run it in a container or VM. This is inherited from upstream and documented in [`SECURITY.md`](../../SECURITY.md).
+- **The agent is not sandboxed by default.** Lunos can execute shell commands and modify files. Its permission system is a UX safeguard that prompts before acting — it is _not_ a security boundary. This is inherited from upstream and documented in [`SECURITY.md`](../../SECURITY.md). `lunos run --sandbox` / `lunos --sandbox` run the agent in a locked-down Docker container with the project copied in, and hand the results back as a branch ([Sandboxed runs](../sandboxed-runs.md)); that container shares the host kernel and does not yet restrict network egress, so for untrusted code where that matters, use a VM.
 - **Model provider data handling is governed by your agreement with that provider,** not by Lunos. Residency controls determine _which_ provider may be used; they do not alter what that provider does with what it receives.
 - **Allowing a self-hosted share server is coarse.** `enterprise.url` counts as `unknown`, so allowing it with `"unknown"` also allows other endpoints whose region can't be determined, such as gateways and generic OpenAI-compatible endpoints. There is no per-host allow list yet. Leave sharing off (the default) if that's too broad.
 - **A self-hosted endpoint's region is your declaration, not something Lunos verifies.** From v1.18.41 you allow a self-hosted model under a residency policy by declaring its region in `residency.endpoints` ([data residency](../data-residency.md#self-hosted-models-and-other-endpoints-you-run)). The audit log records those calls with basis `declared`, so a reviewer can tell them from recorded facts. Lock the declaration in managed config.

@@ -165,26 +165,30 @@ it.instance("research agent's global data-dir edit rule mirrors plan's (parity c
     // (path.relative(ctx.worktree, Global.Path.data/plans/*.md)); `research`
     // must have the structurally identical rule for its own output dir, or a
     // regression in either construction would silently drop file-write access.
+    // Patterns are built with path.join, so they use `\\` on Windows; compare with `/`.
+    const slash = (pattern: string) => pattern.replaceAll("\\", "/")
     const dataDirRule = (permission: PermissionV1.Ruleset, dir: string) =>
       permission.find(
-        (rule) => rule.permission === "edit" && rule.action === "allow" && rule.pattern.includes(`/${dir}/*.md`),
+        (rule) => rule.permission === "edit" && rule.action === "allow" && slash(rule.pattern).includes(`/${dir}/*.md`),
       )
     const planRule = dataDirRule(plan!.permission, "plans")
     const researchRule = dataDirRule(research!.permission, "research")
     expect(planRule).toBeDefined()
     expect(researchRule).toBeDefined()
-    expect(researchRule!.pattern).toBe(planRule!.pattern.replace("/plans/", "/research/"))
+    expect(slash(researchRule!.pattern)).toBe(slash(planRule!.pattern).replace("/plans/", "/research/"))
 
     const externalDirRule = (permission: PermissionV1.Ruleset, dir: string) =>
       permission.find(
         (rule) =>
-          rule.permission === "external_directory" && rule.action === "allow" && rule.pattern.endsWith(`/${dir}/*`),
+          rule.permission === "external_directory" &&
+          rule.action === "allow" &&
+          slash(rule.pattern).endsWith(`/${dir}/*`),
       )
     const planExternalRule = externalDirRule(plan!.permission, "plans")
     const researchExternalRule = externalDirRule(research!.permission, "research")
     expect(planExternalRule).toBeDefined()
     expect(researchExternalRule).toBeDefined()
-    expect(researchExternalRule!.pattern).toBe(planExternalRule!.pattern.replace("/plans/", "/research/"))
+    expect(slash(researchExternalRule!.pattern)).toBe(slash(planExternalRule!.pattern).replace("/plans/", "/research/"))
   }),
 )
 

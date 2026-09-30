@@ -18,6 +18,47 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **`/restart`** stops Lunos and starts it again, back in the same session with your unsent prompt
+  kept; `/restart --fresh` starts a new session. It stops MCP servers, LSP servers, the memory
+  sidecar and the local server first, and relaunches with the same arguments, directory and
+  environment. After `/update` it runs the newly installed version (the banner shows old → new), and
+  the "Update Complete" alert now says `Run /restart to use X.Y.Z.` instead of closing Lunos. If the
+  agent is mid-turn or background jobs are running it asks first (wait, stop and restart, or
+  cancel). In `lunos attach` only the client restarts. A relaunch that fails to start prints the
+  error and the command to run by hand, and is never retried. Also in the palette as **Restart
+  Lunos**, with an unbound `app_restart` keybind (XCOD-129).
+- **`lunos memory export` writes a full, versioned bundle** (`lunos-memory/1`): facts with provenance,
+  the entity graph tied to the facts it came from, hand-written notes, and a manifest with a SHA-256
+  per file, documented by a JSON Schema in the bundle's `SCHEMA.md`. `--zip`, `--encrypt`
+  (OpenSSL-compatible), `--scope`, `--since` and `--include-index`; also `ctrl+s` in the TUI memory
+  browser. `--format markdown` keeps the old one-file-per-fact export (XCOD-132).
+- **`lunos memory import`** brings memory in from a Lunos bundle (folder, `.zip` or `.zip.enc`),
+  Markdown, or `AGENTS.md` / `CLAUDE.md` / Claude Code auto-memory notes. Imported memory is treated
+  as untrusted. Bundles are checksum-verified, every fact passes the write guard, and duplicates and
+  conflicts are found. A preview of new / duplicate / conflict / rejected rows comes first, and
+  nothing is written without `--yes` or approval in the TUI (`ctrl+o` in the memory browser).
+  Imported facts keep their original provenance as `origin` and are labelled "imported" when
+  recalled. The audit log records each import without its text (XCOD-133).
+
+### Security
+
+- **Memory now refuses instruction-shaped text** ("ignore all previous instructions", chat role
+  markers, tool-call syntax), for the agent's `memory_remember` as well as imports (XCOD-133).
+
+- **`/settings`: every configuration option in one place,** after Claude Code's `/config`. One
+  dialog with **Status | Settings | Usage** tabs; `/config` is an alias, `/status` opens the Status
+  tab and `lunos settings` starts the TUI on it. Settings lists every option, generated from the
+  config schema, by category, with its value and a source badge (default, user, project, env,
+  managed 🔒); typing filters, and Enter or Space change a value by its type (toggle, pick list,
+  the model and theme pickers, an inline prompt, the MCP/providers dialogs, or `$EDITOR` for
+  structured settings). Changes are validated against the schema, go to the user config (Ctrl+S
+  switches to the project's `.opencode/opencode.json`) with comments kept, are refused for keys
+  locked by organisation policy, and offer `/restart` when they need one. `/settings key=value`
+  changes one value from the prompt, and `lunos settings list [--json] | get <key> | set <key>
+<value> [--project]` does the same for scripts (XCOD-128).
+
 ### Changed
 
 - **`/connect` is now `/providers`,** the same word as the `lunos providers` CLI command. It opens
@@ -26,6 +67,17 @@ reasoning behind a change are published separately as **Lunos Notes**.
   model picker**. `/connect` remains a hidden alias that shows "/connect is now /providers", and the
   `provider_connect` keybind still works as an alias of the new `provider_list`; both aliases will
   be removed in 1.21.0, after the next two minor releases (XCOD-130).
+- **`lunos update` is now the name of the update command,** and `/update` in the TUI. `lunos upgrade`
+  and `/upgrade` remain working aliases, so no script breaks. When you're already current it prints
+  `Lunos is up to date (X.Y.Z).` and exits 0. Lunos now checks the npm registry on every start (in
+  the background, never delaying startup, 3 s timeout, falling back to the last known result)
+  instead of once a day, and the TUI shows `There is a new version: X.Y.Z — please run lunos update`
+  in the bottom-right corner of every screen, home and session alike, until you update (`New
+version: X.Y.Z · lunos update` below 100 columns). This replaces the home-screen footer's `·
+update available (/upgrade)`. Plain commands print `There is a new version: X.Y.Z — please run
+"lunos update"` to stderr at most once a day. Nothing is checked or shown with `"autoupdate":
+false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `autoupdate: false`
+  (XCOD-147).
 
 ### Fixed
 

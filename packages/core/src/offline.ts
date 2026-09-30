@@ -58,9 +58,9 @@ export const CALLS: Call[] = [
   },
   {
     id: "update-check",
-    what: "Update check and automatic upgrade",
+    what: "Update check (`lunos update` notice) and automatic update",
     hosts: "npm registry (or your `.npmrc` registry)",
-    when: "startup, at most daily",
+    when: "every start, in the background (3 s timeout)",
     offline: "blocked",
     alsoOffBy: '`LUNOS_DISABLE_AUTOUPDATE`, or `"autoupdate": false`',
   },

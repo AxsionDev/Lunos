@@ -139,6 +139,24 @@ export class MemoryUnavailableError extends Schema.TaggedErrorClass<MemoryUnavai
   { httpApiStatus: 409 },
 ) {}
 
+// XCOD-133: an import refused before anything was written (verification, residency, the limit).
+export class MemoryImportRefusedError extends Schema.TaggedErrorClass<MemoryImportRefusedError>()(
+  "MemoryImportRefusedError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 422 },
+) {}
+
+// XCOD-133: the input is an encrypted bundle; ask for the passphrase and try again.
+export class MemoryPassphraseRequiredError extends Schema.TaggedErrorClass<MemoryPassphraseRequiredError>()(
+  "MemoryPassphraseRequiredError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 422 },
+) {}
+
 export class QuestionNotFoundError extends Schema.TaggedErrorClass<QuestionNotFoundError>()(
   "QuestionNotFoundError",
   {

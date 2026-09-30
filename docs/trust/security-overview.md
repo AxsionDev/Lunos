@@ -137,11 +137,34 @@ sessions. A stored fact is a standing prompt-injection candidate for every later
 - **Residency and egress.** Fact extraction uses the configured `memory.model` through Lunos's
   normal model path, so the residency policy applies and memory refuses to start if the policy
   denies that model. Embeddings are computed locally. The memory process gets no API keys, and its
-  Python packages are pinned by hash. Writes and forgets are recorded in the audit log, never with
-  the fact's text.
+  Python packages are pinned by hash.
+- **Facts that stop being true, and expiry** (from the next release). A fact can be marked outdated,
+  with the fact that replaces it: it is kept, with `valid_from` and `invalid_at`, but never recalled
+  unless history is asked for. When the agent saves a fact that contradicts one in memory, the person
+  approving it is shown both and asked whether to replace the old one. `memory.retention.days`
+  expires facts (none by default); expired facts are not recalled and are deleted after
+  `retention.grace_days`. Recall labels facts the agent inferred, as opposed to ones a person stated
+  (`packages/opencode/src/memory/lifecycle.ts`).
+- **Ledger integrity** (from the next release). Each line of the provenance ledger holds a SHA-256
+  of its content and provenance, and the lines form a hash chain. A line that doesn't match is
+  quarantined: not recalled or exported, and listed by `lunos memory status` and `lunos memory
+verify` (`packages/opencode/src/memory/store.ts`).
+- **Encryption at rest, opt-in** (from the next release). `memory.encryption: "os-keychain"`
+  encrypts the ledger line by line with AES-256-GCM, under a random key kept only in the OS keychain
+  (`packages/opencode/src/memory/key.ts`). No key is written to config or disk.
+- **Audit.** Every memory operation is an audit event (`memory.remember`, `recall`, `forget`,
+  `outdate`, `import`, `export`, `purge`, `verify_failed`) with ids, counts and where it came from,
+  never a fact's text or a recall query. The `memory` permission is asked about by scope, so
+  `permission.decision` events don't carry the fact either.
 
 **Not mitigated:** shell commands can still write files in `.opencode/memory/`, so review changes to
-that folder. Hand-written notes there are trusted by design. The first start downloads packages from
+that folder. The integrity hashes have no secret: they detect damage and naive edits, not someone
+with write access who rewrites the ledger and recomputes them (with encryption on, such an edit also
+needs the keychain key). Encryption covers only the ledger: the memory engine's own database files
+(which hold every fact's text) and the notes in `.opencode/memory/*.md` are not encrypted, so use
+full-disk encryption. Losing the keychain entry loses the encrypted ledger; Lunos then refuses to use
+that memory instead of starting empty. A Lunos rewrite of the ledger (forget, outdate, expiry)
+re-links a broken chain after reporting it; edited lines stay quarantined. Hand-written notes there are trusted by design. The first start downloads packages from
 PyPI and an embedding model from Hugging Face (pre-seedable). Memory needs uv and Python 3.10–3.13,
 which Lunos does not install.
 

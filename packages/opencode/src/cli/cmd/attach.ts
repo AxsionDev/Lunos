@@ -3,6 +3,8 @@ import { UI } from "@/cli/ui"
 import { errorMessage } from "@opencode-ai/tui/util/error"
 import { validateSession } from "../tui/validate-session"
 import { ServerAuth } from "@/server/auth"
+import type { RestartRequest } from "@opencode-ai/tui/util/restart"
+import { Restart } from "../restart"
 
 export const AttachCommand = cmd({
   command: "attach <url>",
@@ -60,6 +62,7 @@ export const AttachCommand = cmd({
         describe: "cap visible mini replay to the newest N messages",
       }),
   handler: async (args) => {
+    const restarted = Restart.takeHandoff()
     if (args.replay === true) {
       UI.error("--replay is not supported; replay is enabled by default")
       process.exitCode = 1
@@ -130,11 +133,16 @@ export const AttachCommand = cmd({
     const { Effect } = await import("effect")
     const { run } = await import("../tui/layer")
     const { createLegacyTuiPluginHost } = await import("@/plugin/tui/runtime")
+    let restartRequest: RestartRequest | undefined
     await Effect.runPromise(
       run({
         url: args.url,
         config,
         pluginHost: createLegacyTuiPluginHost(),
+        // XCOD-129: only this client restarts. The server isn't ours, so it's never stopped.
+        restart: { attach: args.url, request: (request) => (restartRequest = request) },
+        restarted: restarted && { ...restarted },
+        onStarted: () => Restart.markStarted(),
         args: {
           continue: args.continue,
           sessionID: args.session,
@@ -144,5 +152,7 @@ export const AttachCommand = cmd({
         headers,
       }),
     )
+    if (process.exitCode) Restart.reportFailedStart()
+    else if (restartRequest) await Restart.relaunch({ ...restartRequest, attach: args.url })
   },
 })

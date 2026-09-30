@@ -22,6 +22,10 @@ import type {
   ConfigGetResponses,
   ConfigProvidersErrors,
   ConfigProvidersResponses,
+  ConfigSettingsErrors,
+  ConfigSettingsResponses,
+  ConfigSettingsSetErrors,
+  ConfigSettingsSetResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
   EventSubscribeResponses,
@@ -117,10 +121,21 @@ import type {
   McpRemoteConfig,
   McpStatusErrors,
   McpStatusResponses,
+  MemoryExportErrors,
+  MemoryExportInput,
+  MemoryExportResponses,
   MemoryForgetErrors,
   MemoryForgetResponses,
+  MemoryImportApplyInput,
+  MemoryImportErrors,
+  MemoryImportInput,
+  MemoryImportPreviewErrors,
+  MemoryImportPreviewResponses,
+  MemoryImportResponses,
   MemoryListErrors,
   MemoryListResponses,
+  MemoryOutdateErrors,
+  MemoryOutdateResponses,
   MemoryRelatedErrors,
   MemoryRelatedResponses,
   ModelRef,
@@ -238,6 +253,7 @@ import type {
   SessionUnshareResponses,
   SessionUpdateErrors,
   SessionUpdateResponses,
+  SettingsSetInput,
   SubtaskPartInput,
   SyncHistoryListErrors,
   SyncHistoryListResponses,
@@ -1609,6 +1625,73 @@ export class Config2 extends HeyApiClient {
     )
     return (options?.client ?? this.client).patch<ConfigUpdateResponses, ConfigUpdateErrors, ThrowOnError>({
       url: "/config",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * List settings
+   *
+   * Every configuration option generated from the config schema, with its current value (secrets masked), the layer it came from, whether organisation policy locks it, the loaded config files and 30-day usage.
+   */
+  public settings<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ConfigSettingsResponses, ConfigSettingsErrors, ThrowOnError>({
+      url: "/config/settings",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Change one setting
+   *
+   * Validate one setting against the config schema and write it to the user or project config, keeping comments. Refuses keys locked by organisation policy.
+   */
+  public settingsSet<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      settingsSetInput?: SettingsSetInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "settingsSetInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<ConfigSettingsSetResponses, ConfigSettingsSetErrors, ThrowOnError>({
+      url: "/config/settings",
       ...options,
       ...params,
       headers: {
@@ -3284,6 +3367,153 @@ export class Memory extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<MemoryRelatedResponses, MemoryRelatedErrors, ThrowOnError>({
       url: "/memory/{id}/related",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Export memory
+   *
+   * Export long-term memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file per fact.
+   */
+  public export<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryExportInput?: MemoryExportInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryExportInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryExportResponses, MemoryExportErrors, ThrowOnError>({
+      url: "/memory/export",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview a memory import
+   *
+   * Read and verify a bundle, Markdown or another agent's memory file, screen every fact with the write guard, and show each as new, duplicate, conflict or rejected. Writes nothing.
+   */
+  public importPreview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryImportInput?: MemoryImportInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryImportInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryImportPreviewResponses, MemoryImportPreviewErrors, ThrowOnError>(
+      {
+        url: "/memory/import/preview",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  /**
+   * Import memory
+   *
+   * Import the approved rows of a preview. The input is read, verified and screened again; only rows named in accept are written.
+   */
+  public import<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryImportApplyInput?: MemoryImportApplyInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryImportApplyInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryImportResponses, MemoryImportErrors, ThrowOnError>({
+      url: "/memory/import",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Mark a fact outdated
+   *
+   * Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.
+   */
+  public outdate<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+      by?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "by" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryOutdateResponses, MemoryOutdateErrors, ThrowOnError>({
+      url: "/memory/{id}/outdate",
       ...options,
       ...params,
     })

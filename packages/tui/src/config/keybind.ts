@@ -46,6 +46,7 @@ export const Definitions = {
   leader: keybind(LeaderDefault, "Leader key for keybind combinations"),
 
   app_exit: keybind("ctrl+c,ctrl+d,<leader>q", "Exit the application"),
+  app_restart: keybind("none", "Restart Lunos"),
   app_debug: keybind("none", "Toggle debug panel"),
   app_console: keybind("none", "Toggle console"),
   app_heap_snapshot: keybind("none", "Write heap snapshot"),
@@ -213,6 +214,11 @@ export const Definitions = {
   "dialog.move_session.delete": keybind("ctrl+d", "Delete project copy"),
   "dialog.move_session.refresh": keybind("ctrl+r", "Refresh project copies"),
   "dialog.memory.forget": keybind("ctrl+d", "Forget a fact in the memory browser"),
+  "dialog.memory.outdate": keybind("ctrl+u", "Mark a fact outdated in the memory browser"),
+  "dialog.memory.export": keybind("ctrl+s", "Export memory from the memory browser"),
+  "dialog.memory.import": keybind("ctrl+o", "Import memory from the memory browser"),
+  "dialog.memory.import.all": keybind("ctrl+a", "Approve or reject every importable row in the import preview"),
+  "dialog.memory.import.apply": keybind("ctrl+s", "Write the approved rows of the import preview"),
   "prompt.autocomplete.prev": keybind("up,ctrl+p", "Move to previous autocomplete item"),
   "prompt.autocomplete.next": keybind("down,ctrl+n", "Move to next autocomplete item"),
   "prompt.autocomplete.hide": keybind("escape", "Hide autocomplete"),
@@ -275,6 +281,7 @@ export const Descriptions = Object.fromEntries(
 ) as Record<KeybindName, string>
 export const CommandMap = {
   app_exit: "app.exit",
+  app_restart: "app.restart",
   app_debug: "app.debug",
   app_console: "app.console",
   app_heap_snapshot: "app.heap_snapshot",

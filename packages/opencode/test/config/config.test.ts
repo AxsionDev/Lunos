@@ -823,6 +823,66 @@ it.instance("validates config schema and throws on invalid values", () =>
   }),
 )
 
+// XCOD-134: memory.backend credentials must be {env:} / {file:} references, checked before substitution.
+it.instance("rejects a literal memory.backend password at load, without echoing it", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    yield* writeConfigEffect(test.directory, {
+      $schema: "https://opencode.ai/config.json",
+      memory: {
+        backend: { type: "neo4j", url: "bolt://localhost:7687", jurisdiction: "EU-DE", password: "hunter2-literal" },
+      },
+    })
+    const exit = yield* Config.use.get().pipe(Effect.exit)
+    expect(Exit.isFailure(exit)).toBe(true)
+    if (Exit.isFailure(exit)) {
+      const error = Cause.squash(exit.cause) as { data?: unknown }
+      const text = JSON.stringify(error.data) + Cause.pretty(exit.cause)
+      expect(text).toContain("memory.backend.password must be an {env:VAR} or {file:path} reference")
+      expect(text).not.toContain("hunter2-literal")
+    }
+  }),
+)
+
+it.instance("accepts memory.backend credentials as {env:} and {file:} references and decodes every key", () =>
+  withProcessEnv(
+    "LUNOS_TEST_MEMORY_DB_USER",
+    "neo4j",
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      yield* FSUtil.use.writeWithDirs(path.join(test.directory, "db-password"), "from-a-file\n")
+      yield* writeConfigEffect(test.directory, {
+        $schema: "https://opencode.ai/config.json",
+        memory: {
+          backend: {
+            type: "neo4j",
+            url: "bolt+s://graph.internal:7687",
+            database: "lunos",
+            username: "{env:LUNOS_TEST_MEMORY_DB_USER}",
+            password: "{file:db-password}",
+            jurisdiction: "EU-DE",
+            read_only: true,
+            allow_insecure: false,
+            user: "alice@example.com",
+          },
+        },
+      })
+      const config = yield* Config.use.get()
+      expect(config.memory?.backend).toEqual({
+        type: "neo4j",
+        url: "bolt+s://graph.internal:7687",
+        database: "lunos",
+        username: "neo4j",
+        password: "from-a-file",
+        jurisdiction: "EU-DE",
+        read_only: true,
+        allow_insecure: false,
+        user: "alice@example.com",
+      })
+    }),
+  ),
+)
+
 it.instance("throws error for invalid JSON", () =>
   Effect.gen(function* () {
     const test = yield* TestInstance
@@ -967,7 +1027,7 @@ it.instance("decodes the checked-in reference deployment config on the live path
       Bun.file(path.resolve(import.meta.dir, "../../../../docs/deployment/self-hosted.md")).text(),
     )
     const section = guide.slice(guide.indexOf("examples/reference-deployment/opencode.json"))
-    const shown = section.match(/```json\n([\s\S]*?)```/)?.[1]
+    const shown = section.match(/```json\r?\n([\s\S]*?)```/)?.[1]
     expect(shown && JSON.parse(shown)).toEqual(reference)
   }),
 )

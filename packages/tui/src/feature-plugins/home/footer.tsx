@@ -1,6 +1,5 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
 import { versionLabel } from "@opencode-ai/core/installation/version"
-import { isVersionGreater } from "../../util/version"
 import type { BuiltinTuiPlugin } from "../builtins"
 import { createMemo, Match, Show, Switch } from "solid-js"
 import { abbreviateHome } from "../../runtime"
@@ -54,23 +53,14 @@ function Mcp(props: { api: TuiPluginApi }) {
   )
 }
 
+// XCOD-147: the "new version" notice moved out of this footer to the app-wide bottom-right line
+// (component/update-notice.tsx), so it shows on every screen with the version number.
 function Version(props: { api: TuiPluginApi }) {
   const theme = () => props.api.theme.current
-  // Set by the update reminder and kept after its dialog is dismissed (XCOD-91).
-  const available = createMemo(() => {
-    const version = props.api.kv.get<string | undefined>("available_version")
-    const current = props.api.app.version
-    return version && current !== "local" && isVersionGreater(version, current) ? version : undefined
-  })
 
   return (
     <box flexShrink={0}>
-      <text fg={theme().textMuted}>
-        {versionLabel(props.api.app.version)}
-        <Show when={available()}>
-          <span style={{ fg: theme().warning }}> · update available (/upgrade)</span>
-        </Show>
-      </text>
+      <text fg={theme().textMuted}>{versionLabel(props.api.app.version)}</text>
     </box>
   )
 }

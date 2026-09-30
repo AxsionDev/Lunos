@@ -1655,6 +1655,18 @@ export type ServerConfig = {
   cors?: Array<string>
 }
 
+export type MemoryBackendConfig = {
+  type?: "embedded" | "neo4j" | "memgraph"
+  url?: string
+  database?: string
+  username?: string
+  password?: string
+  jurisdiction?: string
+  read_only?: boolean
+  allow_insecure?: boolean
+  user?: string
+}
+
 export type MemoryConfig = {
   enabled?: boolean
   scope?: Array<"project" | "user">
@@ -1667,6 +1679,12 @@ export type MemoryConfig = {
     max_facts?: number
     max_fact_chars?: number
   }
+  retention?: {
+    days?: number
+    grace_days?: number
+  }
+  encryption?: "off" | "os-keychain"
+  backend?: MemoryBackendConfig
 }
 
 export type SubagentConfig = {
@@ -1953,6 +1971,21 @@ export type Config = {
     }
   }
   memory?: MemoryConfig
+  sandbox?: {
+    enabled?: boolean
+    image?: string
+    workspace?: "copy"
+    on_finish?: "destroy" | "retain"
+    resources?: {
+      /**
+       * CPUs the sandbox may use (docker --cpus). Default 2
+       */
+      cpus?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      memory?: string
+      pids?: number
+      tmp?: string
+    }
+  }
   residency?: ConfigV2Residency
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal
@@ -2085,6 +2118,84 @@ export type Config = {
     policies?: Array<ConfigV2ExperimentalPolicy>
   }
 }
+
+export type SettingRow = {
+  key: string
+  target: "config" | "tui"
+  label: string
+  category: string
+  description: string
+  kind: "boolean" | "enum" | "string" | "number" | "list" | "object"
+  values?: Array<string | boolean>
+  dialog?: "models" | "themes" | "mcps" | "providers" | "modes"
+  restart: boolean
+  deprecated: boolean
+  top: boolean
+  readonly: boolean
+  value?: unknown
+  display: string
+  source: "default" | "user" | "project" | "env" | "managed" | "remote"
+  from?: string
+  locked: boolean
+  override?: string
+  secret: boolean
+}
+
+export type SettingsUsage = {
+  days: number
+  sessions: number
+  cost: number
+  tokens: {
+    input: number
+    output: number
+    reasoning: number
+    cache_read: number
+    cache_write: number
+  }
+}
+
+export type SettingsSnapshot = {
+  rows: Array<SettingRow>
+  layers: Array<{
+    layer: "default" | "user" | "project" | "env" | "managed" | "remote" | "cli"
+    path: string
+    loaded: boolean
+  }>
+  locked: Array<string>
+  files: {
+    user: {
+      config: string
+      tui: string
+    }
+    project: {
+      config: string
+      tui: string
+    }
+  }
+  usage: SettingsUsage
+}
+
+export type SettingsSetInput = {
+  key: string
+  value: string
+  scope: "user" | "project"
+}
+
+export type SettingsSetResult =
+  | {
+      ok: true
+      key: string
+      value?: unknown
+      file: string
+      scope: "user" | "project"
+      restart: boolean
+      changed: boolean
+    }
+  | {
+      ok: false
+      error: string
+      code: string
+    }
 
 export type Model = {
   id: string
@@ -2561,6 +2672,20 @@ export type MemoryFact = {
   agent: string
   source: string
   date: string
+  importedFrom?: string
+  originSource?: string
+  originDate?: string
+  /**
+   * XCOD-136: active (recalled), outdated, expired (not recalled; deleted after the grace period), purge (due for deletion) or quarantined (failed the ledger's integrity check)
+   */
+  state: "active" | "outdated" | "expired" | "purge" | "quarantined"
+  kind?: "observed" | "inferred"
+  validFrom?: string
+  invalidAt?: string
+  replacedBy?: string
+  replaces?: string
+  expires?: string
+  quarantined?: string
 }
 
 export type MemoryList = {
@@ -2572,15 +2697,117 @@ export type MemoryList = {
   facts: Array<MemoryFact>
 }
 
+export type MemoryUnavailableError = {
+  _tag: "MemoryUnavailableError"
+  message: string
+}
+
 export type MemoryNotFoundError = {
   _tag: "MemoryNotFoundError"
   id: string
   message: string
 }
 
-export type MemoryUnavailableError = {
-  _tag: "MemoryUnavailableError"
+export type MemoryExportInput = {
+  format?: "bundle" | "markdown"
+  scope?: "project" | "user" | "both"
+  since?: string
+  zip?: boolean
+  passphrase?: string
+  graph?: boolean
+  includeIndex?: boolean
+  out?: string
+}
+
+export type MemoryExportResult = {
+  path: string
+  format: "bundle" | "markdown"
+  facts: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  notes: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  entities: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  relations: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  graph: boolean
+  encrypted: boolean
+  decrypt?: string
+}
+
+export type MemoryImportInput = {
+  /**
+   * A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file
+   */
+  path: string
+  scope?: "project" | "user"
+  asFacts?: boolean
+  passphrase?: string
+}
+
+export type MemoryImportRow = {
+  key: string
+  kind: "fact" | "note"
+  scope: "project" | "user"
+  status: "new" | "duplicate" | "conflict" | "rejected"
+  reason: string
+  text: string
+  file: string
+  note?: string
+  near?: boolean
+  otherID?: string
+  otherText?: string
+}
+
+export type MemoryImportPreview = {
+  kind: "bundle" | "markdown"
+  label: string
+  sha256: string
+  format?: string
+  encrypted: boolean
+  warnings: Array<string>
+  rows: Array<MemoryImportRow>
+  counts: {
+    new: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    duplicate: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    conflict: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    rejected: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  }
+  limit?: string
+  extractionModel: string
+  extractionCalls: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  embedding: string
+  remoteEmbeddingCalls: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
+export type MemoryImportRefusedError = {
+  _tag: "MemoryImportRefusedError"
   message: string
+}
+
+export type MemoryPassphraseRequiredError = {
+  _tag: "MemoryPassphraseRequiredError"
+  message: string
+}
+
+export type MemoryImportApplyInput = {
+  /**
+   * A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file
+   */
+  path: string
+  scope?: "project" | "user"
+  asFacts?: boolean
+  passphrase?: string
+  /**
+   * Keys of the preview rows to write. Rejected rows and exact duplicates are never written
+   */
+  accept: Array<string>
+}
+
+export type MemoryImportResult = {
+  facts: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  noteParagraphs: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  notes: Array<string>
+  failed: Array<{
+    text: string
+    reason: string
+  }>
 }
 
 export type PermissionRequest = {
@@ -7639,6 +7866,62 @@ export type ConfigUpdateResponses = {
 
 export type ConfigUpdateResponse = ConfigUpdateResponses[keyof ConfigUpdateResponses]
 
+export type ConfigSettingsData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/settings"
+}
+
+export type ConfigSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigSettingsError = ConfigSettingsErrors[keyof ConfigSettingsErrors]
+
+export type ConfigSettingsResponses = {
+  /**
+   * Every setting, with value, source and lock
+   */
+  200: SettingsSnapshot
+}
+
+export type ConfigSettingsResponse = ConfigSettingsResponses[keyof ConfigSettingsResponses]
+
+export type ConfigSettingsSetData = {
+  body?: SettingsSetInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/settings"
+}
+
+export type ConfigSettingsSetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigSettingsSetError = ConfigSettingsSetErrors[keyof ConfigSettingsSetErrors]
+
+export type ConfigSettingsSetResponses = {
+  /**
+   * Result of the change
+   */
+  200: SettingsSetResult
+}
+
+export type ConfigSettingsSetResponse = ConfigSettingsSetResponses[keyof ConfigSettingsSetResponses]
+
 export type ConfigProvidersData = {
   body?: never
   path?: never
@@ -9521,6 +9804,10 @@ export type MemoryListErrors = {
    * Bad request
    */
   400: BadRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
 }
 
 export type MemoryListError = MemoryListErrors[keyof MemoryListErrors]
@@ -9571,6 +9858,149 @@ export type MemoryRelatedResponses = {
 }
 
 export type MemoryRelatedResponse = MemoryRelatedResponses[keyof MemoryRelatedResponses]
+
+export type MemoryExportData = {
+  body?: MemoryExportInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/export"
+}
+
+export type MemoryExportErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryExportError = MemoryExportErrors[keyof MemoryExportErrors]
+
+export type MemoryExportResponses = {
+  /**
+   * Where the export was written, and what it holds
+   */
+  200: MemoryExportResult
+}
+
+export type MemoryExportResponse = MemoryExportResponses[keyof MemoryExportResponses]
+
+export type MemoryImportPreviewData = {
+  body?: MemoryImportInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/import/preview"
+}
+
+export type MemoryImportPreviewErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+  /**
+   * MemoryImportRefusedError | MemoryPassphraseRequiredError
+   */
+  422: MemoryImportRefusedError | MemoryPassphraseRequiredError
+}
+
+export type MemoryImportPreviewError = MemoryImportPreviewErrors[keyof MemoryImportPreviewErrors]
+
+export type MemoryImportPreviewResponses = {
+  /**
+   * What the import would do; nothing is written
+   */
+  200: MemoryImportPreview
+}
+
+export type MemoryImportPreviewResponse = MemoryImportPreviewResponses[keyof MemoryImportPreviewResponses]
+
+export type MemoryImportData = {
+  body?: MemoryImportApplyInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/import"
+}
+
+export type MemoryImportErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+  /**
+   * MemoryImportRefusedError | MemoryPassphraseRequiredError
+   */
+  422: MemoryImportRefusedError | MemoryPassphraseRequiredError
+}
+
+export type MemoryImportError = MemoryImportErrors[keyof MemoryImportErrors]
+
+export type MemoryImportResponses = {
+  /**
+   * What was imported
+   */
+  200: MemoryImportResult
+}
+
+export type MemoryImportResponse = MemoryImportResponses[keyof MemoryImportResponses]
+
+export type MemoryOutdateData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+    by?: string
+  }
+  url: "/memory/{id}/outdate"
+}
+
+export type MemoryOutdateErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * MemoryNotFoundError
+   */
+  404: MemoryNotFoundError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryOutdateError = MemoryOutdateErrors[keyof MemoryOutdateErrors]
+
+export type MemoryOutdateResponses = {
+  /**
+   * Fact marked outdated
+   */
+  200: boolean
+}
+
+export type MemoryOutdateResponse = MemoryOutdateResponses[keyof MemoryOutdateResponses]
 
 export type MemoryForgetData = {
   body?: never

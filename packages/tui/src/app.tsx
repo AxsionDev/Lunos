@@ -7,7 +7,12 @@ import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { InstallationVersion, manualInstallCommand } from "@opencode-ai/core/installation/version"
+import {
+  InstallationVersion,
+  manualInstallCommand,
+  newVersionMessage,
+  updateRestartHint,
+} from "@opencode-ai/core/installation/version"
 import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
@@ -33,6 +38,7 @@ import { DialogProvider, useDialog } from "./ui/dialog"
 import { DialogProvider as DialogProviderConnect, DialogProviders } from "./component/dialog-provider"
 import { ErrorComponent } from "./component/error-component"
 import { PluginRouteMissing } from "./component/plugin-route-missing"
+import { UpdateNotice } from "./component/update-notice"
 import { ProjectProvider, useProject } from "./context/project"
 import { EditorContextProvider } from "./context/editor"
 import { useEvent } from "./context/event"
@@ -47,6 +53,7 @@ import { DialogModel } from "./component/dialog-model"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogStatus } from "./component/dialog-status"
+import { DialogSettings } from "./component/dialog-settings"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
@@ -90,6 +97,15 @@ import * as TuiAudio from "./audio"
 import { win32DisableProcessedInput, win32FlushInputBuffer } from "./terminal-win32"
 import { destroyRenderer } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
+import {
+  restartBanner,
+  restartBusyMessage,
+  restartDraft,
+  type RestartChoice,
+  type RestartHost,
+  type Restarted,
+} from "./util/restart"
+import { DialogSelect } from "./ui/dialog-select"
 
 registerOpencodeSpinner()
 
@@ -134,6 +150,7 @@ const appBindingCommands = [
   "app.debug",
   "app.console",
   "app.heap_snapshot",
+  "app.restart",
   "terminal.suspend",
   "terminal.title.toggle",
   "app.toggle.animations",
@@ -148,11 +165,19 @@ export type TuiInput = {
   args: Args
   config: TuiConfig.Resolved
   onSnapshot?: () => Promise<string[]>
+  /** Called once the app listens for server events, so one-off events sent after it aren't lost. */
+  onListening?: () => void
   directory?: string
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
   events?: EventSource
   pluginHost: TuiPluginHost
+  /** XCOD-129: offers `/restart`, and receives the request once the user confirms it. */
+  restart?: RestartHost
+  /** XCOD-129: set when this process is the relaunch of a `/restart`. */
+  restarted?: Restarted & { sessionID?: string }
+  /** Called once the TUI has loaded its data: a relaunch counts as started from here. */
+  onStarted?: () => void
 }
 
 function errorMessage(error: unknown) {
@@ -172,7 +197,15 @@ function errorMessage(error: unknown) {
 
 export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
   const global = yield* Global.Service
-  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown }
+  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown, restarting: false }
+  // XCOD-129: a restart replaces this process, so the "continue with lunos -s" epilogue is noise.
+  const restartHost: RestartHost | undefined = input.restart && {
+    ...input.restart,
+    request: (request) => {
+      exit.restarting = true
+      input.restart?.request(request)
+    },
+  }
   const result = yield* Effect.scoped(
     Effect.gen(function* () {
       const renderer = yield* Effect.acquireRelease(
@@ -304,7 +337,11 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                   <LocationProvider>
                                                                     <App
                                                                       onSnapshot={input.onSnapshot}
+                                                                      onListening={input.onListening}
                                                                       pluginHost={input.pluginHost}
+                                                                      restart={restartHost}
+                                                                      restarted={input.restarted}
+                                                                      onStarted={input.onStarted}
                                                                     />
                                                                   </LocationProvider>
                                                                 </EditorContextProvider>
@@ -347,11 +384,18 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       process.stderr.write((cliErrorMessage(result.reason) ?? errorFormat(result.reason)) + "\n")
       process.exitCode = 1
     }
-    if (result.epilogue) process.stdout.write(result.epilogue + "\n")
+    if (result.epilogue && !exit.restarting) process.stdout.write(result.epilogue + "\n")
   })
 })
 
-function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPluginHost }) {
+function App(props: {
+  onSnapshot?: () => Promise<string[]>
+  onListening?: () => void
+  pluginHost: TuiPluginHost
+  restart?: RestartHost
+  restarted?: Restarted & { sessionID?: string }
+  onStarted?: () => void
+}) {
   const startup = useTuiStartup()
   const tuiConfig = useTuiConfig()
   const route = useRoute()
@@ -394,6 +438,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     }),
   )
   const [ready, setReady] = createSignal(false)
+  // XCOD-147: set only by this session's update check, never from persisted state, so the notice
+  // can't outlive a switch that turned checks off.
+  const [availableVersion, setAvailableVersion] = createSignal<string | undefined>()
+  const updateNotice = createMemo(() => {
+    const version = availableVersion()
+    return version && InstallationVersion !== "local" && isVersionGreater(version, InstallationVersion)
+      ? version
+      : undefined
+  })
   props.pluginHost
     .start({
       api,
@@ -489,9 +542,29 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         route.navigate({
           type: "session",
           sessionID: args.sessionID,
+          // XCOD-129: after /restart, the unsent prompt comes back with the session.
+          prompt: props.restarted?.draft,
         })
+      } else if (props.restarted?.draft) {
+        route.navigate({ type: "home", prompt: props.restarted.draft })
       }
     })
+    // XCOD-128: `lunos settings` starts on the settings screen.
+    if (args.settings) dialog.replace(() => <DialogSettings tab={args.settings} />)
+    if (props.restarted)
+      toast.show({
+        variant: "success",
+        message: restartBanner(props.restarted, InstallationVersion),
+        duration: 8000,
+      })
+  })
+
+  // XCOD-129: a relaunch has started once its data is loaded; a later error is an ordinary one.
+  let started = false
+  createEffect(() => {
+    if (started || sync.status !== "complete") return
+    started = true
+    props.onStarted?.()
   })
 
   let continued = false
@@ -552,6 +625,121 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (workspace?.type !== "worktree" || !workspace.directory) return
     return workspace
   })
+  // XCOD-129: /restart. Set by /update, so the restart runs the newly installed version.
+  const [upgradedTo, setUpgradedTo] = createSignal<string | undefined>()
+  // While "wait for the current turn" is pending; running /restart again cancels it.
+  const [restartPending, setRestartPending] = createSignal<{ cancel: () => void } | undefined>()
+
+  const busySessionIDs = () =>
+    Object.entries(sync.data.session_status)
+      .filter(([, status]) => status && status.type !== "idle")
+      .map(([id]) => id)
+
+  // Every job, not only this session's: shutting the worker down stops all of them.
+  async function runningJobs() {
+    const result = await sdk.client.experimental.background.list().catch(() => undefined)
+    return (result?.data ?? []).filter((job) => job.status === "running")
+  }
+
+  async function settled(timeout: number | undefined, cancelled: () => boolean) {
+    const deadline = timeout === undefined ? undefined : Date.now() + timeout
+    while (!cancelled()) {
+      if (busySessionIDs().length === 0 && (await runningJobs()).length === 0) return true
+      if (deadline !== undefined && Date.now() > deadline) return false
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+    return false
+  }
+
+  async function restart(fresh: boolean) {
+    const host = props.restart
+    if (!host) {
+      toast.show({ variant: "warning", message: "Restart isn't available in this client." })
+      return
+    }
+    const pending = restartPending()
+    if (pending) {
+      pending.cancel()
+      toast.show({ variant: "info", message: "Restart cancelled." })
+      return
+    }
+    const cancelled: string[] = []
+
+    // Attached to a server this client doesn't own: the turn and its jobs run there and carry on.
+    if (!host.attach) {
+      const jobs = await runningJobs()
+      // A background job's own session is busy too; count it as the job, not as a turn.
+      const turns = () => busySessionIDs().filter((id) => !jobs.some((job) => job.sessionID === id))
+      const message = restartBusyMessage({ busySessions: turns().length, runningJobs: jobs.map((j) => j.id) })
+      if (message) {
+        const choice = await new Promise<RestartChoice>((resolve) => {
+          dialog.replace(
+            () => (
+              <DialogSelect<RestartChoice>
+                title="Restart Lunos?"
+                placeholder={message}
+                skipFilter
+                options={[
+                  { title: "Wait for the current turn, then restart", value: "wait" },
+                  { title: "Stop and restart (cancels running work)", value: "stop" },
+                  { title: "Cancel", value: "cancel" },
+                ]}
+                onSelect={(option) => {
+                  resolve(option.value)
+                  dialog.clear()
+                }}
+              />
+            ),
+            () => resolve("cancel"),
+          )
+        })
+        if (choice === "cancel") return
+        if (choice === "wait") {
+          let stop = false
+          setRestartPending({ cancel: () => (stop = true) })
+          toast.show({
+            variant: "info",
+            message: "Lunos will restart when the current work finishes. Run /restart again to cancel.",
+            duration: 8000,
+          })
+          const done = await settled(undefined, () => stop)
+          setRestartPending(undefined)
+          if (!done) return
+        }
+        if (choice === "stop") {
+          const busy = turns()
+          if (busy.length) cancelled.push(busy.length === 1 ? "the current turn" : `${busy.length} running turns`)
+          for (const job of jobs) cancelled.push(`background job ${job.title ?? job.id}`)
+          await Promise.all([
+            ...busy.map((sessionID) => sdk.client.session.abort({ sessionID }).catch(() => {})),
+            ...jobs.map((job) => sdk.client.experimental.background.cancel({ jobID: job.id }).catch(() => {})),
+          ])
+          // Never restart while a tool may still be writing: wait until the aborted work has
+          // actually stopped, and give up (without restarting) if it doesn't.
+          if (!(await settled(15_000, () => false))) {
+            toast.show({
+              variant: "error",
+              message: "The running work didn't stop within 15s, so Lunos didn't restart. Try /restart again.",
+              duration: 8000,
+            })
+            return
+          }
+        }
+      }
+    }
+
+    const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
+    // Read last: while waiting, the user may have typed more, or sent what was there.
+    const draft = restartDraft(promptRef.current?.current)
+    host.request({ sessionID: fresh ? undefined : sessionID, fresh, draft, cancelled, upgraded: upgradedTo() })
+    if (host.attach)
+      toast.show({
+        variant: "info",
+        message: `Restarting this client only; the server at ${host.attach} keeps running.`,
+      })
+    exit()
+  }
+
   const appCommands = createMemo(() =>
     [
       {
@@ -796,6 +984,17 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           ]
         : []),
       {
+        // XCOD-128: every configuration option in one place; /config is Claude Code's name for it.
+        name: "settings.open",
+        title: "Settings",
+        slashName: "settings",
+        slashAliases: ["config"],
+        run: () => {
+          dialog.replace(() => <DialogSettings tab="settings" />)
+        },
+        category: "System",
+      },
+      {
         name: "opencode.status",
         title: "View status",
         slashName: "status",
@@ -861,14 +1060,40 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       },
       {
         name: "app.upgrade",
-        title: "Upgrade Lunos",
-        slashName: "upgrade",
+        title: "Update Lunos",
+        slashName: "update",
+        // `/upgrade` was the name until XCOD-147; it keeps working.
+        slashAliases: ["upgrade"],
         run: () => {
           dialog.clear()
           void runUpgrade(undefined)
         },
         category: "System",
       },
+      ...(props.restart
+        ? [
+            {
+              name: "app.restart",
+              title: "Restart Lunos",
+              desc: props.restart.attach ? "Restart this client (the server keeps running)" : undefined,
+              slashName: "restart",
+              run: () => {
+                dialog.clear()
+                void restart(false)
+              },
+              category: "System",
+            },
+            {
+              name: "app.restart.fresh",
+              title: "Restart Lunos in a new session",
+              run: () => {
+                dialog.clear()
+                void restart(true)
+              },
+              category: "System",
+            },
+          ]
+        : []),
       {
         name: "app.exit",
         title: "Exit the app",
@@ -1079,7 +1304,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     })
   })
 
-  // One flow for the reminder dialog and /upgrade. `target` undefined means "latest";
+  // One flow for the reminder dialog and /update. `target` undefined means "latest";
   // the server resolves it from the lunos-ai registry entry.
   async function runUpgrade(target: string | undefined) {
     toast.show({
@@ -1098,26 +1323,29 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       toast.show({
         variant: "error",
         title: "Update Failed",
-        message: `${reason}\nTo upgrade manually, run: ${manualInstallCommand(target)}`,
+        // XCOD-111: always the full `npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`, using
+        // the version the update check found when /update didn't name one.
+        message: `${reason}\nTo update manually, run: ${manualInstallCommand(target ?? updateNotice())}`,
         duration: 15000,
       })
       return
     }
 
-    kv.set("available_version", undefined)
+    setAvailableVersion(undefined)
+    setUpgradedTo(result.data.version)
+    // XCOD-129: the app stays open; /restart relaunches the new version back in this session.
     await DialogAlert.show(
       dialog,
       "Update Complete",
-      `Updated to Lunos v${result.data.version}. Restart Lunos to use it.`,
+      `Updated to Lunos v${result.data.version}. ${updateRestartHint(result.data.version)}`,
     )
-
-    void exit()
   }
 
   event.on("installation.update-available", async (evt) => {
     const version = evt.properties.version
-    // Kept after the dialog is dismissed, so the footer can keep saying an update exists.
-    kv.set("available_version", version)
+    // Kept after the dialog is dismissed or skipped: the bottom-right notice stays until the
+    // update is installed.
+    setAvailableVersion(version)
 
     const skipped = kv.get("skipped_version")
     if (skipped && !isVersionGreater(version, skipped)) return
@@ -1125,18 +1353,22 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     const choice = await DialogConfirm.show(
       dialog,
       `Update Available`,
-      `Lunos v${version} is available (you have v${InstallationVersion}).\nRelease notes: https://github.com/AxsionDev/Lunos/releases/tag/v${version}\n\nUpdate now?`,
+      `${newVersionMessage(version)} (you have ${InstallationVersion}), or /update here.\nRelease notes: https://github.com/AxsionDev/Lunos/releases/tag/v${version}\n\nUpdate now?`,
       "skip",
     )
 
-    if (choice === false) {
+    // Once per new version: "skip" and Esc both mean "not now", and the bottom-right notice keeps
+    // saying the update exists. Without this the dialog blocked every start (XCOD-147).
+    if (choice !== true) {
       kv.set("skipped_version", version)
       return
     }
 
-    if (choice !== true) return
     await runUpgrade(version)
   })
+  // The update check (XCOD-147) starts only once mounted, when the SDK's event subscription (set up
+  // in its provider's onMount, which runs first) and the handler above both exist.
+  onMount(() => props.onListening?.())
 
   const plugin = createMemo(() => {
     if (!ready()) return
@@ -1183,6 +1415,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           </Switch>
           {plugin()}
         </box>
+        <UpdateNotice version={updateNotice()} />
         <box flexShrink={0}>
           <pluginRuntime.Slot name="app_bottom" />
         </box>

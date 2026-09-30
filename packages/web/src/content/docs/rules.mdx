@@ -159,7 +159,9 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
     "model": "small",
     "embedding": "local",
     "retrieval": { "max_tokens": 1500 },
-    "limits": { "max_facts": 5000, "max_fact_chars": 2000 }
+    "limits": { "max_facts": 5000, "max_fact_chars": 2000 },
+    "retention": { "days": 180, "grace_days": 7 },
+    "encryption": "off"
   }
 }
 ```
@@ -169,6 +171,7 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
 - **Remembering.** The agent saves facts with a `memory_remember` tool. You approve each one: the tool asks by default. It refuses:
   - anything in a turn that used `webfetch`, `websearch`, an MCP resource, or read a file outside the project
   - anything that looks like a key, token or password
+  - anything shaped like instructions to the model: "ignore all previous instructions", chat role markers, tool-call syntax
 - **Recalling.** Relevant facts are added to your message in a `<memory>` block, each with where and when it was learned, capped at `retrieval.max_tokens`. The agent can also look things up with `memory_search`.
 - **Your notes.** Paragraphs in `.opencode/memory/*.md` are part of project memory, with no approval needed. When you edit or delete one, memory follows.
   - The agent's file edits in `.opencode/memory/` ask first, and edits to the stored graph are refused by default. This stops the agent from writing memory through a file instead of the tool.
@@ -179,10 +182,13 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
   - Project memory: `.opencode/memory/graph/`, which is never committed. Lunos writes a `.gitignore` there.
   - `"user"` scope: in the Lunos data directory.
 - **Reviewing it.**
-  - In the TUI, `/memory` opens a browser: every fact with where it came from, the entities and relationships around the highlighted fact, and `ctrl+d` twice to forget it.
+  - In the TUI, `/memory` opens a browser: every fact with where it came from, the entities and relationships around the highlighted fact, `ctrl+d` twice to forget it, `ctrl+s` to export and `ctrl+o` to import.
   - `lunos memory list`, `show <id>` and `search <query>` show what is stored and where each fact came from.
-  - `lunos memory export` writes one Markdown file per fact for review in git.
+  - `lunos memory export` writes all of memory as one bundle (see [Exporting memory](#exporting-memory)). `--format markdown` writes one Markdown file per fact instead, for review in git.
+  - `lunos memory import <path>` brings memory in (see [Importing memory](#importing-memory)).
   - `lunos memory forget <id>` removes a fact. `lunos memory purge --scope project --yes` deletes the whole memory.
+  - `lunos memory outdate <id> [--by <new id>]` marks a fact as no longer true (see [Facts that stop being true](#facts-that-stop-being-true)). `ctrl+u` twice does the same in the TUI browser.
+  - `lunos memory status` shows how many facts are active, outdated, expired and quarantined, and `lunos memory verify` re-checks the ledger (see [Integrity, expiry and encryption](#integrity-expiry-and-encryption)).
 - **Turning it off:**
   - `"memory": { "enabled": false }`, or remove the key
   - `LUNOS_DISABLE_MEMORY=1`, which overrides config
@@ -190,6 +196,126 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
   - `"permission": { "memory": "deny" }`, for all agents or one agent
 
   When memory is off, no memory process starts, no memory files are created and the memory tools aren't offered.
+
+#### Facts that stop being true
+
+A fact can be marked **outdated**, optionally with the fact that replaces it. It is kept, with when it became true (`valid_from`) and when it stopped (`invalid_at`), but it is no longer recalled. `lunos memory search --history`, or `memory_search` with `history: true`, shows outdated facts too, marked as such. `lunos memory show <id>` shows an outdated fact's `invalid_at` and `replaced_by`.
+
+- **When the agent remembers something that contradicts a fact** (the same subject with a different value, like "billing owns invoices" and then "ledger-service owns invoices"), the approval prompt shows both. If you allow it, you're asked whether to **replace** the old fact (it becomes outdated) or keep both. The agent can also propose a replacement itself (`replaces`), and you're asked the same way. Where no one can answer (`lunos run`), both are kept, and the tool's answer says how to outdate the old one.
+- **Observed or inferred.** Each fact the agent saves records whether you said it or it read it in a file (`observed`) or the agent concluded it (`inferred`). Recall labels inferred facts as such. Facts from your notes are observed.
+
+#### Integrity, expiry and encryption
+
+- **Expiry.** `memory.retention.days` makes facts expire that many days after they were saved (by default they never do). A fact can also have its own expiry date. An expired fact is no longer recalled, and is deleted `retention.grace_days` later (default 7), the next time memory starts; the audit log records the deletion. `lunos memory list --expiring [days]` shows what expires within that many days (default 7), and what has expired but not yet been deleted. Facts from your notes never expire: the note is their source.
+- **Integrity.** Every line of the ledger (`facts.jsonl`, the record of each fact and where it came from) carries a SHA-256 of its content and provenance, and the lines form a hash chain. If a line doesn't match (it was edited, damaged, removed or moved), that fact is **quarantined**: it is not recalled or exported, and `lunos memory status` and `lunos memory verify` list it with the reason. Forget it with `lunos memory forget <id>`, or, once you have checked it, accept the ledger as it is with `lunos memory verify --reseal --scope <scope>`. These are plain hashes with no secret: they catch damage and hand edits, not someone who rewrites the file and recomputes them.
+- **Encryption at rest.** `"encryption": "os-keychain"` encrypts the ledger, line by line (AES-256-GCM), with a random key kept in your OS keychain: macOS Keychain, Windows Credential Manager, or libsecret on Linux. The key is never written to config or to disk. What it covers, and what it doesn't:
+  - **Encrypted:** the ledger, in project and user memory.
+  - **Not encrypted:** the memory engine's own database files next to it (measured: Cognee's SQLite database, its Kuzu graph file, its LanceDB vector tables, its plain-text copy of each fact under `data/`, and its logs under `logs/` all hold fact text), and your notes in `.opencode/memory/*.md`, which are meant to be read and reviewed in git. Use full-disk encryption (FileVault, BitLocker, LUKS) for those.
+  - **If the key is lost**, the ledger can't be read, and nothing else holds it. Lunos refuses to read or write that memory, and says which keychain entry is missing, instead of starting empty; it never makes a new key while an encrypted ledger exists. Restore the keychain entry (from your keychain's backup), or delete that memory with `lunos memory purge`. Export a bundle if you need a copy that doesn't depend on the key.
+  - Turning it on encrypts the existing ledger the next time memory starts; turning it off decrypts it (the key must still be there).
+- **Audit.** With the [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md) on, every memory operation is recorded (`memory.remember`, `recall`, `forget`, `outdate`, `import`, `export`, `purge`, `verify_failed`), with its time, scope, fact ids, counts and where it came from, never a fact's text or a search query, and forwarded to your SIEM like every other event.
+
+#### An external memory database
+
+Memory can live in a Neo4j database your team runs instead of on each machine, so a team shares project memory and keeps it on infrastructure it controls:
+
+```jsonc
+"memory": {
+  "enabled": true,
+  "backend": {
+    "type": "neo4j",
+    "url": "bolt+s://graph.internal:7687",
+    "username": "{env:LUNOS_MEMORY_DB_USER}",
+    "password": "{env:LUNOS_MEMORY_DB_PASSWORD}",
+    "jurisdiction": "EU-DE"
+  }
+}
+```
+
+- **Before connecting,** Lunos checks that a `jurisdiction` is declared and that your [data-residency policy](https://github.com/AxsionDev/Lunos/blob/dev/docs/data-residency.md) allows it, that the connection uses TLS (plain `bolt://` only to localhost, unless `allow_insecure: true`), and that the username and password are `{env:}` or `{file:}` references. A literal password fails config loading. A residency refusal names `memory.backend` and is written to the audit log.
+- **Scopes stay apart.** Project memory is keyed by a hash of the repository's git remote, so everyone on the same repository shares it and no other project sees it. User memory is keyed by `backend.user` (hashed) or a random id kept on your machine. This keeps recall apart, but it isn't access control: anyone with the database's credentials can read every project's and every user's memory there.
+- **Facts only.** The database holds each fact with its provenance and an integrity hash. There are no embeddings and no entity graph: recall uses the database's full-text index, so a second machine needs no re-index, and remembering makes no model call. Your notes in `.opencode/memory/*.md` stay in the repository and aren't copied into the database.
+- **`read_only: true`** allows recall only: the remember tool isn't offered.
+- **Off still means off:** with memory off, no connection is opened.
+- `lunos memory migrate --to neo4j` moves embedded memory into the database, with a preview first. `lunos memory status` shows the backend, whether it is reachable, and each scope's fact count and last write.
+
+The [self-hosted deployment guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md#external-memory-database) has a Docker Compose example, what lives where, and what Neo4j needs.
+
+#### Exporting memory
+
+`lunos memory export` writes everything in memory to a versioned bundle, format `lunos-memory/1`. Use it for backups, to move memory to another machine or engine, to hand it to someone to review, or for a GDPR data-portability request.
+
+```bash
+lunos memory export                              # a folder: ./lunos-memory-<time>/
+lunos memory export --zip                        # one .zip file
+lunos memory export --encrypt                    # a .zip.enc, locked with a passphrase you're asked for
+lunos memory export --scope project --since 2026-09-01 --out backup/
+lunos memory export --format markdown            # one Markdown file per fact, as before
+```
+
+A bundle holds:
+
+- `facts.jsonl`: every fact, with its provenance (session, agent, source and date), scope, status (active or outdated, with `invalid_at` and `replaced_by`), expiry date if it has one and, where known, whether it was observed or inferred. **The facts are the source of truth.** Quarantined facts are left out, and the manifest counts them.
+- `graph.json`: the entities and relationships memory extracted, each listing the ids of the facts it came from.
+- `notes/`: copies of your notes in `.opencode/memory/*.md`.
+- `manifest.json`: the format and Lunos version, scopes, counts, creation time, and the SHA-256 of every file.
+- `SCHEMA.md`: the format, with its JSON Schema, so other tools can read a bundle without Lunos.
+
+What to know:
+
+- **Embeddings and the engine's database files are left out.** They are specific to the model and engine, and are rebuilt when memory is imported. `--include-index` adds them, for a restore into the same engine version and embedding model, which the manifest records. Those files hold every fact's text, so `--include-index` can't be combined with `--since`.
+- **Where it goes.** The CLI writes to the folder you run it in unless you pass `--out`. The TUI writes to `memory/exports/` in the Lunos data directory, so a bundle never lands in your project.
+- **Reading the graph starts memory**, so memory must be on. With memory off, the export stops and says so; `--no-graph` exports the facts and notes without starting anything.
+- **Secrets are checked again.** The export runs the same check as writes do. If anything looks like a key, token or password, nothing is written and the offending ids are listed.
+- **Encryption** uses OpenSSL's format (AES-256-CBC, key from PBKDF2-SHA256 with 600,000 iterations). The passphrase is never stored; set `LUNOS_MEMORY_PASSPHRASE` to export without a prompt. Decrypt without Lunos with:
+
+  ```bash
+  openssl enc -d -aes-256-cbc -md sha256 -pbkdf2 -iter 600000 -in lunos-memory.zip.enc -out lunos-memory.zip
+  ```
+
+  Then check the SHA-256s in `manifest.json`: this mode doesn't detect tampering by itself.
+
+- **A bundle is a snapshot.** Forgetting a fact later doesn't remove it from bundles you have already written. A bundle can hold user memory too, so keep it out of git.
+- In the TUI, `ctrl+s` in the `/memory` browser offers the same choices. The passphrase is typed into a plain prompt, as API keys are.
+
+#### Importing memory
+
+`lunos memory import <path>` brings memory in: to restore a backup, to move memory between machines or teammates, or to bring in what you already wrote for other coding agents.
+
+```bash
+lunos memory import lunos-memory-20260929-101500.zip.enc    # preview only: nothing is written
+lunos memory import lunos-memory-20260929-101500.zip.enc --yes
+lunos memory import AGENTS.md --yes                         # becomes a note in .opencode/memory/
+lunos memory import ~/.claude/projects/<project>/memory --yes
+lunos memory import notes/ --as-facts --scope user --yes
+```
+
+It reads:
+
+- **A Lunos bundle**, as a folder, `.zip` or `.zip.enc` (the passphrase is asked for, or read from `LUNOS_MEMORY_PASSPHRASE`). Facts keep their original provenance, and notes come back as notes.
+- **Markdown**: a file or a folder. One fact per top-level `- ` bullet, or one per file. The `--format markdown` export reads back with its provenance.
+- **Other agents' files**: `AGENTS.md`, `CLAUDE.md` and Claude Code's auto-memory notes come in as notes in `.opencode/memory/` (as `agents-md.md`, `claude-md.md`, and so on, never under their own names, which other tools load as instructions). `--as-facts` imports them as facts instead.
+
+**Imported memory is untrusted.** A checksum or a passphrase proves where a bundle came from, not that what it says is safe. So an import:
+
+1. **Checks the format.** A bundle from a newer major version is refused.
+2. **Verifies the bundle.** Every file's SHA-256 is checked, after decrypting. One changed byte, a missing file or a file the manifest doesn't list refuses the whole bundle.
+3. **Screens every fact and note paragraph** with the checks agent writes pass: the size limit, the secret check, and the check for instruction-shaped text.
+4. **Dedupes** against what memory holds, and flags near-duplicates.
+5. **Finds conflicts**: the same subject with a different value is shown next to the fact it contradicts.
+6. **Previews.** A table shows every row as new, duplicate, conflict or rejected, with the reason. Nothing is written without `--yes`, or approval in the TUI. `--dry-run` previews even with `--yes`.
+7. **Stores** the new rows. `--include-conflicts` also writes conflicts and near-duplicates. Each imported fact's source becomes `import:<file>#<sha256>`, its original provenance is kept as its origin, and it is marked imported.
+
+What to know:
+
+- **The graph and the index are never imported.** Memory re-extracts entities and relationships from the facts, and re-embeds them with your configured, local embedding model. `graph.json` and `index/` files in a bundle are ignored.
+- **Lifecycle is kept.** Outdated facts come in outdated (history, never recalled), linked to their replacement when it comes in too; expiry dates and observed/inferred are kept; a fact that has already expired is rejected.
+- **Recall labels imported facts** "imported", with where they came from, inside the `<memory>` block that is always reference, never instructions.
+- **Where facts go.** A bundle's facts go back to their own scope. Markdown goes to project memory. `--scope project|user` puts everything in one memory. Notes are always project memory.
+- **Limits.** If the import would pass `memory.limits.max_facts`, it stops at the preview.
+- **Models.** Extracting each fact's graph is one call to your `memory.model`, and the preview says how many. Both `memory.model` and `memory.embedding` are checked against your data-residency policy before anything is read. A denied model stops the import, and the error names the setting.
+- **The audit log** records each import: the counts and the SHA-256 of what was read, never the text.
+- In the TUI, `ctrl+o` in the `/memory` browser asks for the path and shows the preview. New rows start approved; `enter` approves or rejects one row, `ctrl+a` all of them, and `ctrl+s` imports.
 
 ---
 

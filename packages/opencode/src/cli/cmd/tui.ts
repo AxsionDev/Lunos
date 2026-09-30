@@ -14,6 +14,8 @@ import { writeHeapSnapshot } from "v8"
 import { ServerAuth } from "@/server/auth"
 import { validateSession } from "../tui/validate-session"
 import { win32InstallCtrlCGuard } from "@opencode-ai/tui/terminal-win32"
+import type { RestartRequest } from "@opencode-ai/tui/util/restart"
+import { Restart } from "../restart"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -145,8 +147,37 @@ export const TuiThreadCommand = cmd({
       .option("demo", {
         type: "boolean",
         hidden: true,
+      })
+      .option("sandbox", {
+        type: "boolean",
+        describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
       }),
   handler: async (args) => {
+    // XCOD-129: taken before anything else, so the worker and its children never inherit it.
+    const restarted = Restart.takeHandoff()
+    // XCOD-144: the server and everything it spawns run in a container; only the TUI stays here.
+    const { wanted, runSandboxedTui } = await import("./sandbox")
+    if (wanted(args, resolveThreadDirectory(args.project))) {
+      const unsupported = [
+        ["--mini", args.mini],
+        ["--prompt", args.prompt !== undefined],
+        ["--model", args.model !== undefined],
+        ["--mode", args.mode !== undefined || args.agent !== undefined],
+        ["--port", hasArg("--port")],
+        ["--hostname", hasArg("--hostname")],
+      ].find((entry) => entry[1])?.[0]
+      if (unsupported) {
+        UI.error(`${unsupported} cannot be used with --sandbox yet`)
+        process.exitCode = 1
+        return
+      }
+      await runSandboxedTui(resolveThreadDirectory(args.project), {
+        continue: args.continue,
+        session: args.session,
+        fork: args.fork,
+      })
+      return
+    }
     if (args.replay === true) {
       UI.error("--replay is not supported; replay is enabled by default")
       process.exitCode = 1
@@ -198,6 +229,18 @@ export const TuiThreadCommand = cmd({
     }
 
     const unguard = win32InstallCtrlCGuard()
+    let restartRequest: RestartRequest | undefined
+    // A relaunch that hasn't loaded its session within the timeout gives up, once, with the manual
+    // command, rather than hanging on a blank screen.
+    const watchdog = restarted
+      ? setTimeout(() => {
+          Restart.write(Restart.TERMINAL_RESET + "\x1b[?1049l")
+          process.stderr.write(`Lunos didn't finish starting within ${Restart.START_TIMEOUT / 1000}s.\n`)
+          Restart.reportFailedStart()
+          process.exit(1)
+        }, Restart.START_TIMEOUT)
+      : undefined
+    watchdog?.unref?.()
     try {
       const { TuiConfig } = await import("@/config/tui")
       if (args.fork && !args.continue && !args.session) {
@@ -273,9 +316,12 @@ export const TuiThreadCommand = cmd({
         return
       }
 
-      setTimeout(() => {
-        client.call("checkUpgrade", { directory: cwd }).catch(() => {})
-      }, 1000).unref?.()
+      // XCOD-147: the update check announces its result with a one-off event. Sent before the TUI
+      // listens, it was silently lost, so a fast (or cached) answer never reached the screen. With
+      // the in-process worker the check starts once the TUI is listening; an external server keeps
+      // the old delay.
+      const checkUpgrade = () => void client.call("checkUpgrade", { directory: cwd }).catch(() => {})
+      if (external) setTimeout(checkUpgrade, 1000).unref?.()
 
       try {
         const { Effect } = await import("effect")
@@ -284,6 +330,7 @@ export const TuiThreadCommand = cmd({
         await Effect.runPromise(
           run({
             url: transport.url,
+            onListening: external ? undefined : checkUpgrade,
             async onSnapshot() {
               const tui = writeHeapSnapshot("tui.heapsnapshot")
               const server = await client.call("snapshot", undefined)
@@ -291,6 +338,12 @@ export const TuiThreadCommand = cmd({
             },
             config,
             pluginHost: createLegacyTuiPluginHost(),
+            restart: { request: (request) => (restartRequest = request) },
+            restarted: restarted && { ...restarted },
+            onStarted() {
+              clearTimeout(watchdog)
+              Restart.markStarted()
+            },
             directory: cwd,
             fetch: transport.fetch,
             headers: transport.headers,
@@ -303,6 +356,8 @@ export const TuiThreadCommand = cmd({
               prompt,
               fork: args.fork,
               auto: args.auto || args.yolo || args["dangerously-skip-permissions"],
+              // XCOD-128: `lunos settings` starts here, on the settings screen.
+              settings: (args as { settings?: "settings" }).settings,
             },
           }),
         )
@@ -310,10 +365,15 @@ export const TuiThreadCommand = cmd({
         await stop()
       }
     } finally {
+      clearTimeout(watchdog)
       try {
         unguard?.()
       } catch {}
     }
+    if (process.exitCode) Restart.reportFailedStart()
+    // XCOD-129: the TUI has exited and the worker (MCP, LSP, memory sidecar, local server) is shut
+    // down; start Lunos again in its place.
+    else if (restartRequest) await Restart.relaunch(restartRequest)
     process.exit()
   },
 })

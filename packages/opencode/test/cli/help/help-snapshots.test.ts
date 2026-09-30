@@ -50,7 +50,8 @@ const TOP_LEVEL = [
   "debug",
   "providers", // aliased to `auth`
   "agent",
-  "upgrade",
+  "update",
+  "upgrade", // alias of `update` (XCOD-147)
   "uninstall",
   "serve",
   "web",
@@ -62,6 +63,8 @@ const TOP_LEVEL = [
   "pr",
   "session",
   "plugin",
+  "memory",
+  "settings", // XCOD-128
   "db",
 ] as const
 
@@ -69,6 +72,8 @@ const TOP_LEVEL = [
 // distinct argv shape, not every leaf. Add new entries when a subcommand
 // gains user-visible flags that we want to lock in.
 const SUBCOMMANDS = [
+  ["settings", "list"],
+  ["settings", "set"],
   ["mcp", "list"],
   ["mcp", "add"],
   ["mcp", "auth"],
@@ -82,6 +87,8 @@ const SUBCOMMANDS = [
   ["session", "delete"],
   ["github", "install"],
   ["github", "run"],
+  ["memory", "export"],
+  ["memory", "import"],
   ["db", "path"],
 ] as const
 
