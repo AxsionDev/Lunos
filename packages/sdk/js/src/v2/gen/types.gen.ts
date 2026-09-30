@@ -2001,7 +2001,8 @@ export type Config = {
     enabled?: boolean
     image?: string
     workspace?: "copy"
-    on_finish?: "destroy" | "retain"
+    on_finish?: "destroy" | "retain" | "destroy_on_success"
+    retain_for?: string
     resources?: {
       /**
        * CPUs the sandbox may use (docker --cpus). Default 2

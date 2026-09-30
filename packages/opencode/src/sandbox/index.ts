@@ -5,6 +5,8 @@ import { randomBytes } from "node:crypto"
 import { setTimeout as sleep } from "node:timers/promises"
 import { Global } from "@opencode-ai/core/global"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { parse } from "jsonc-parser"
+import { AuditLog } from "@/audit/log"
 import { SandboxConfig } from "./config"
 import { SandboxDocker } from "./docker"
 import { SandboxGit } from "./git"
@@ -13,6 +15,11 @@ import { SandboxGit } from "./git"
 // and creates (but doesn't start) the container; `start` runs the Lunos server in it; `handoff`
 // brings the results back to the host (transcript, then branch); `finish` applies on_finish, and
 // only after a successful handoff — a failed one always retains.
+//
+// XCOD-157: secrets are no longer part of the container's configuration. `start` writes them, with
+// the user's global config, into a tmpfs through `docker exec` (see boot.ts), every time it starts
+// the container. The organisation's managed config goes into a read-only volume at `create`.
+// Every step lands in the audit trail as a `sandbox.*` event.
 //
 // Host-side metadata (including the server password) is written to <state>/sandbox/<id>.json, mode
 // 0600, as soon as the sandbox exists, so an interrupted run still leaves something listable and
@@ -30,11 +37,16 @@ export type Meta = {
   branch: string
   image: SandboxDocker.Image
   on_finish: SandboxConfig.Resolved["on_finish"]
+  retain_for?: number
   resources: SandboxConfig.Resolved["resources"]
   password: string
   created: string
   /** The commit the branch was last set to; absent until the first successful handoff. */
   handedOff?: string
+  /** When a retained sandbox expires (sandbox.retain_for); `prune` removes it after that. */
+  expires?: string
+  /** Lines of the audit log inside already copied into the host's audit trail. */
+  auditLines?: number
 }
 
 export type Connection = { url: string; password: string; headers: Record<string, string>; directory: string }
@@ -44,6 +56,8 @@ export type Handoff = {
   commit: string
   files: { status: string; path: string }[]
   results: string
+  /** Whether a session's last reply ended in an error: what destroy_on_success keeps a sandbox for. */
+  failed: boolean
 }
 
 export const branchName = (id: string) => `lunos/sandbox/${id}`
@@ -55,6 +69,20 @@ export const resultsDir = (root: string, id: string) => path.join(root, ".openco
 async function saveMeta(meta: Meta) {
   await fs.mkdir(metaDir(), { recursive: true, mode: 0o700 })
   await fs.writeFile(metaFile(meta.id), JSON.stringify(meta, null, 2), { mode: 0o600 })
+}
+
+/** What every sandbox audit event says about the sandbox. Never file contents. */
+function auditFields(info: Meta) {
+  return {
+    id: info.id,
+    project: info.root,
+    image: info.image.ref,
+    digest: info.image.digest ?? info.image.id,
+    cpus: info.resources.cpus,
+    memory: info.resources.memory,
+    pids: info.resources.pids,
+    tmp: info.resources.tmp,
+  }
 }
 
 export async function meta(id: string): Promise<Meta> {
@@ -77,8 +105,6 @@ export async function create(input: {
   id?: string
   directory: string
   config: SandboxConfig.Resolved
-  /** Values injected at run time as environment, e.g. OPENCODE_AUTH_CONTENT. Never written to disk. */
-  secrets?: Record<string, string>
   log?: (line: string) => void
 }): Promise<Meta> {
   const log = input.log ?? (() => {})
@@ -114,6 +140,7 @@ export async function create(input: {
       branch,
       image,
       on_finish: input.config.on_finish,
+      retain_for: input.config.retain_for,
       resources: input.config.resources,
       password,
       created: new Date().toISOString(),
@@ -122,21 +149,30 @@ export async function create(input: {
 
     // Nothing has run yet, so a failure from here on can clean up after itself.
     try {
-      await populate(result, seed, input.secrets ?? {})
+      await populate(result, seed, await SandboxConfig.managedDoc())
     } catch (error) {
-      await destroy(id).catch(() => {})
+      await remove(id).catch(() => {})
       throw error
     }
+    AuditLog.emit("sandbox.create", { ...auditFields(result), on_finish: result.on_finish })
     return result
   } finally {
     await fs.rm(seed, { recursive: true, force: true })
   }
 }
 
-async function populate(info: Meta, seed: string, extraSecrets: Record<string, string>) {
+async function populate(info: Meta, seed: string, managed: Record<string, unknown> | undefined) {
   await SandboxDocker.createVolume(info.id)
   await SandboxDocker.seed(info.id, info.image.id, SandboxGit.tar(seed), SandboxGit.TAR_ENV)
-  const secrets = { ...providerEnv(), ...extraSecrets, OPENCODE_SERVER_PASSWORD: info.password }
+  const policy = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-policy-"))
+  try {
+    if (managed)
+      await fs.writeFile(path.join(policy, "managed.json"), JSON.stringify(auditInside(managed), null, 2))
+    await fs.writeFile(path.join(policy, SandboxDocker.MARKER), JSON.stringify({ id: info.id }) + "\n")
+    await SandboxDocker.seedPolicy(info.id, info.image.id, policy, SandboxGit.TAR_ENV)
+  } finally {
+    await fs.rm(policy, { recursive: true, force: true })
+  }
   await SandboxDocker.create(
     SandboxDocker.createArgs({
       id: info.id,
@@ -150,10 +186,70 @@ async function populate(info: Meta, seed: string, extraSecrets: Record<string, s
         LUNOS_SANDBOX: info.id,
         OPENCODE_DISABLE_AUTOUPDATE: "1",
       },
-      secretNames: Object.keys(secrets),
     }),
-    secrets,
   )
+}
+
+/**
+ * The runtime file's contents: provider keys, extra secrets (e.g. OPENCODE_AUTH_CONTENT), the server
+ * password, the host's OPENCODE_CONFIG_CONTENT, and the user's global config.
+ */
+function runtime(info: Meta, secrets: Record<string, string>) {
+  // The audit path goes in OPENCODE_CONFIG_CONTENT, which outranks global and project config, so
+  // whichever of them turns auditing on, the server inside writes where the host can collect it.
+  const content = process.env.OPENCODE_CONFIG_CONTENT
+    ? (parse(process.env.OPENCODE_CONFIG_CONTENT, [], { allowTrailingComma: true }) as unknown)
+    : {}
+  const env: Record<string, string> = {
+    ...providerEnv(),
+    ...secrets,
+    OPENCODE_SERVER_PASSWORD: info.password,
+    OPENCODE_CONFIG_CONTENT: JSON.stringify(
+      SandboxConfig.mergeDocs([auditInside(isDoc(content) ? content : {}), { audit: { path: SandboxDocker.AUDIT_FILE } }]),
+    ),
+  }
+  return JSON.stringify({ env, config: auditInside(SandboxConfig.globalDoc()) })
+}
+
+const isDoc = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value)
+
+/**
+ * A config document as the server inside should see it: its audit log at AUDIT_FILE, and no audit
+ * forwarding (the host forwards the sandbox's events once it has collected them, see `handoff`).
+ */
+export function auditInside(doc: Record<string, unknown>) {
+  const out = { ...doc }
+  if (isDoc(out.audit)) {
+    const { forward: _forward, ...audit } = out.audit
+    out.audit = { ...audit, path: SandboxDocker.AUDIT_FILE }
+  }
+  if (isDoc(out.residency) && out.residency.auditPath !== undefined)
+    out.residency = { ...out.residency, auditPath: SandboxDocker.AUDIT_FILE }
+  return out
+}
+
+/**
+ * The audit log written inside, since the last collection: copied whole to the results directory,
+ * and each new event written to the host's audit trail tagged with the sandbox id, so there is one
+ * trail (and one forwarder). The original time is kept as `sandbox_time`.
+ */
+async function collectAudit(info: Meta, results: string) {
+  const text = await SandboxDocker.readFile(info.id, SandboxDocker.AUDIT_FILE)
+  if (!text) return 0
+  await fs.writeFile(path.join(results, "audit.log"), text)
+  const lines = text.split("\n").filter(Boolean)
+  for (const line of lines.slice(info.auditLines ?? 0)) {
+    try {
+      const { v: _v, seq: _seq, prev: _prev, event, timestamp, ...fields } = JSON.parse(line) as Record<string, never>
+      AuditLog.emit(event, { ...fields, sandbox: info.id, sandbox_time: timestamp })
+    } catch {
+      // A line the agent mangled is still in the copy; it just isn't re-emitted.
+    }
+  }
+  const added = lines.length - (info.auditLines ?? 0)
+  info.auditLines = lines.length
+  return added
 }
 
 export function connection(info: Meta, port: number): Connection {
@@ -165,8 +261,14 @@ export function connection(info: Meta, port: number): Connection {
   }
 }
 
-export async function start(info: Meta, timeoutMs = 60_000): Promise<Connection> {
+export async function start(
+  info: Meta,
+  options: { secrets?: Record<string, string>; attach?: boolean; timeoutMs?: number } = {},
+): Promise<Connection> {
+  const timeoutMs = options.timeoutMs ?? 60_000
   await SandboxDocker.start(info.id)
+  await SandboxDocker.inject(info.id, runtime(info, options.secrets ?? {}))
+  if (options.attach) AuditLog.emit("sandbox.attach", auditFields(info))
   const conn = connection(info, await SandboxDocker.hostPort(info.id))
   const started = Date.now()
   while (Date.now() - started < timeoutMs) {
@@ -193,6 +295,19 @@ async function transcript(conn: Connection) {
       messages: (await client.session.messages({ sessionID: session.id }, { throwOnError: true })).data ?? [],
     })),
   )
+}
+
+/**
+ * A task failed when a session's last message is an assistant reply that didn't finish normally: it
+ * ended in an error, or it stopped mid-task (a rejected or failed tool call leaves `finish` at
+ * "tool-calls", and a truncated reply at "length").
+ */
+export function failed(sessions: { messages: { info: { role: string; error?: unknown; finish?: string } }[] }[]) {
+  return sessions.some((item) => {
+    const last = item.messages.at(-1)?.info
+    if (last?.role !== "assistant") return false
+    return !!last.error || (last.finish !== undefined && last.finish !== "stop")
+  })
 }
 
 /**
@@ -228,6 +343,7 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
     await fs.mkdir(results, { recursive: true })
     await fs.writeFile(path.join(path.dirname(results), ".gitignore"), "*\n")
     await fs.writeFile(path.join(results, "transcript.json"), JSON.stringify(sessions, null, 2))
+    await collectAudit(info, results)
     await SandboxGit.setBranch({ gitDir: info.gitDir, branch: info.branch, commit, expected: previous })
     info.handedOff = commit
     await saveMeta(info)
@@ -257,21 +373,81 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
         2,
       ),
     )
-    return { branch: info.branch, commit, files, results }
+    return { branch: info.branch, commit, files, results, failed: failed(sessions) }
   } finally {
     await fs.rm(out, { recursive: true, force: true })
   }
 }
 
-/** Apply the lifecycle policy. Only call after a successful handoff. */
-export async function finish(info: Meta, policy = info.on_finish) {
-  if (policy === "destroy") return destroy(info.id)
-  await SandboxDocker.stop(info.id).catch(() => {})
+/** Whether a policy destroys the sandbox, given how the task went. */
+export function destroys(policy: Meta["on_finish"], outcome: { failed: boolean }) {
+  return policy === "destroy" || (policy === "destroy_on_success" && !outcome.failed)
 }
 
-export async function destroy(id: string) {
+/**
+ * Apply the lifecycle policy. Only call after a successful handoff. Returns what happened; a kept
+ * sandbox gets its expiry (sandbox.retain_for) recorded, for `prune`.
+ */
+export async function finish(
+  info: Meta,
+  outcome: { failed: boolean; commit?: string; files?: number },
+  policy = info.on_finish,
+): Promise<"destroyed" | "retained"> {
+  AuditLog.emit("sandbox.finish", {
+    ...auditFields(info),
+    outcome: outcome.failed ? "failed" : "succeeded",
+    commit: outcome.commit,
+    files: outcome.files,
+    on_finish: policy,
+  })
+  if (destroys(policy, outcome)) {
+    await destroy(info.id, "on_finish")
+    return "destroyed"
+  }
+  await retain(info, "on_finish")
+  return "retained"
+}
+
+/** Stop and keep. Used by `finish` and whenever the results couldn't be handed back. */
+export async function retain(info: Meta, reason: string) {
+  await SandboxDocker.stop(info.id).catch(() => {})
+  if (info.retain_for) {
+    info.expires = new Date(Date.now() + info.retain_for).toISOString()
+    await saveMeta(info)
+  }
+  AuditLog.emit("sandbox.retain", { ...auditFields(info), reason, expires: info.expires })
+}
+
+/** Remove the container, its volumes and the host metadata, without an audit event. */
+async function remove(id: string) {
   await SandboxDocker.remove(id)
   await fs.rm(metaFile(id), { force: true })
+}
+
+export async function destroy(id: string, reason = "requested") {
+  const info = await meta(id).catch(() => undefined)
+  await remove(id)
+  AuditLog.emit("sandbox.destroy", info ? { ...auditFields(info), reason } : { id, reason })
+}
+
+/** Retained sandboxes whose sandbox.retain_for has run out, from the host metadata alone. */
+export async function expired(now = Date.now()) {
+  return (await known()).filter((info) => info.expires !== undefined && Date.parse(info.expires) <= now)
+}
+
+/**
+ * Remove every expired sandbox. Reads only the host metadata unless something has expired, so it's
+ * cheap enough to run at every start; Docker is only called for a sandbox that is due.
+ */
+export async function prune(now = Date.now()) {
+  const due = await expired(now)
+  const removed: string[] = []
+  for (const info of due) {
+    await remove(info.id)
+    AuditLog.emit("sandbox.prune", { ...auditFields(info), expires: info.expires })
+    removed.push(info.id)
+  }
+  return removed
 }
 
 /** Sandboxes this machine created, from the host metadata alone: no Docker call. */

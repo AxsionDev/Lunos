@@ -151,6 +151,14 @@ export const TuiThreadCommand = cmd({
       .option("sandbox", {
         type: "boolean",
         describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
+      })
+      .option("keep", {
+        type: "boolean",
+        describe: "with --sandbox: keep the sandbox when done, whatever sandbox.on_finish says",
+      })
+      .option("rm", {
+        type: "boolean",
+        describe: "with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says",
       }),
   handler: async (args) => {
     // XCOD-129: taken before anything else, so the worker and its children never inherit it.
@@ -175,6 +183,8 @@ export const TuiThreadCommand = cmd({
         continue: args.continue,
         session: args.session,
         fork: args.fork,
+        keep: args.keep,
+        rm: args.rm,
       })
       return
     }

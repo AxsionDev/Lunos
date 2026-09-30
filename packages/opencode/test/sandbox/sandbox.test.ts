@@ -87,7 +87,6 @@ describe("sandbox container", () => {
     resources: SandboxConfig.resolve({}).resources,
     workdir: "/sandbox/workspace",
     env: { HOME: "/sandbox/home" },
-    secretNames: ["OPENCODE_AUTH_CONTENT", "ANTHROPIC_API_KEY"],
   })
   const pairs = args.flatMap((arg, i) => (arg.startsWith("--") ? [[arg, args[i + 1]] as const] : []))
   const has = (flag: string, value: string) => pairs.some(([f, v]) => f === flag && v === value)
@@ -102,12 +101,20 @@ describe("sandbox container", () => {
     expect(args.some((arg) => arg.includes("--cap-add"))).toBe(false)
   })
 
-  test("the only writable mounts are the sandbox volume and /tmp; never the Docker socket or the host tree", () => {
+  test("the only writable mounts are the sandbox volume and two tmpfs; never the Docker socket or the host tree", () => {
     const volumes = pairs.filter(([flag]) => flag === "--volume").map(([, value]) => value)
-    expect(volumes).toEqual(["lunos-sandbox-abcd1234:/sandbox"])
+    // XCOD-157: the policy volume (managed config, sandbox marker) is mounted read-only.
+    expect(volumes).toEqual(["lunos-sandbox-abcd1234:/sandbox", "lunos-sandbox-abcd1234-policy:/etc/lunos:ro"])
     expect(args.some((arg) => arg.includes("docker.sock"))).toBe(false)
     expect(args).not.toContain("--mount")
-    expect(pairs.find(([flag]) => flag === "--tmpfs")?.[1]).toStartWith("/tmp:")
+    const tmpfs = pairs.filter(([flag]) => flag === "--tmpfs").map(([, value]) => value)
+    expect(tmpfs).toHaveLength(2)
+    expect(tmpfs[0]).toStartWith("/tmp:")
+    // The runtime tmpfs: private to the sandbox user, and nothing on it can be executed.
+    expect(tmpfs[1]).toStartWith("/run/lunos:")
+    expect(tmpfs[1]).toContain("mode=0700")
+    expect(tmpfs[1]).toContain("uid=1000")
+    expect(tmpfs[1]).toContain("noexec")
   })
 
   test("applies the resource limits and publishes the server on loopback only", () => {
@@ -117,12 +124,15 @@ describe("sandbox container", () => {
     expect(has("--publish", "127.0.0.1::4096")).toBe(true)
   })
 
-  test("pins the image by ID and passes secrets by name only", () => {
+  test("pins the image by ID and carries no secret, only where the runtime file will be", () => {
     expect(args).toContain("sha256:feed")
     expect(args).not.toContain("lunos-sandbox:local")
-    expect(has("--env", "OPENCODE_AUTH_CONTENT")).toBe(true)
-    expect(has("--env", "ANTHROPIC_API_KEY")).toBe(true)
     expect(has("--env", "HOME=/sandbox/home")).toBe(true)
+    expect(has("--env", "LUNOS_SANDBOX_RUNTIME=/run/lunos/runtime.json")).toBe(true)
+    const env = pairs.filter(([flag]) => flag === "--env").map(([, value]) => value)
+    // XCOD-157: secrets used to be passed by name (-e NAME); `docker inspect` then showed their values.
+    expect(env.every((value) => value.includes("="))).toBe(true)
+    expect(env.some((value) => /API_KEY|AUTH_CONTENT|PASSWORD/.test(value))).toBe(false)
   })
 
   test("provider keys are picked up by the *_API_KEY convention", () => {
@@ -220,5 +230,140 @@ describe("copy mode and the result handoff", () => {
   test("copy mode refuses a directory that isn't a git repository", async () => {
     await using tmp = await tmpdir()
     await expect(SandboxGit.repo(tmp.path)).rejects.toThrow("isn't in one")
+  })
+})
+
+// XCOD-157: lifecycle policies, the runtime channel and the host-side config the container gets.
+describe("sandbox lifecycle", () => {
+  test("destroy_on_success and retain_for decode through both schemas; a bad duration is rejected", () => {
+    const value = { on_finish: "destroy_on_success", retain_for: "72h" } as const
+    expect(Schema.decodeUnknownSync(ConfigV1.Info)({ sandbox: value }).sandbox).toEqual(value)
+    expect(Schema.decodeUnknownSync(Config.Info)({ sandbox: value }).sandbox?.retain_for).toBe("72h")
+    expect(() => Schema.decodeUnknownSync(ConfigV1.Info)({ sandbox: { retain_for: "3 days" } })).toThrow()
+  })
+
+  test("retain_for resolves to milliseconds", () => {
+    expect(SandboxConfig.duration("30m")).toBe(30 * 60_000)
+    expect(SandboxConfig.duration("72h")).toBe(72 * 3_600_000)
+    expect(SandboxConfig.duration("7d")).toBe(7 * 86_400_000)
+    expect(SandboxConfig.resolve({ retain_for: "2h" }).retain_for).toBe(7_200_000)
+    expect(SandboxConfig.resolve({}).retain_for).toBeUndefined()
+  })
+
+  test("destroy_on_success keeps the sandbox only when the task failed", () => {
+    expect(Sandbox.destroys("destroy_on_success", { failed: false })).toBe(true)
+    expect(Sandbox.destroys("destroy_on_success", { failed: true })).toBe(false)
+    expect(Sandbox.destroys("destroy", { failed: true })).toBe(true)
+    expect(Sandbox.destroys("retain", { failed: false })).toBe(false)
+  })
+
+  test("a task failed when a session's last reply ended in an error or stopped mid-task", () => {
+    const reply = (finish?: string, error?: unknown) => ({ info: { role: "assistant", finish, error } })
+    const user = { info: { role: "user" } }
+    expect(Sandbox.failed([{ messages: [user, reply("stop")] }])).toBe(false)
+    expect(Sandbox.failed([{ messages: [user, reply(undefined, { name: "APIError" })] }])).toBe(true)
+    // Seen in a real run: a rejected tool call ends the loop with no error, finish "tool-calls".
+    expect(Sandbox.failed([{ messages: [user, reply("tool-calls")] }])).toBe(true)
+    expect(Sandbox.failed([{ messages: [user, reply("length")] }])).toBe(true)
+    // An error earlier in the session that the agent recovered from isn't a failure.
+    expect(Sandbox.failed([{ messages: [user, reply(undefined, { name: "APIError" }), user, reply("stop")] }])).toBe(
+      false,
+    )
+    expect(Sandbox.failed([])).toBe(false)
+  })
+
+  test("--keep and --rm override on_finish for one run, and not together", async () => {
+    const { lifecycleOverride } = await import("../../src/cli/cmd/sandbox")
+    expect(lifecycleOverride({})).toBeUndefined()
+    expect(lifecycleOverride({ keep: true })).toBe("retain")
+    expect(lifecycleOverride({ rm: true })).toBe("destroy")
+    expect(() => lifecycleOverride({ keep: true, rm: true })).toThrow("contradict")
+  })
+
+  test("expired reads the host metadata: only kept sandboxes past their retain_for", async () => {
+    const dir = path.join(Global.Path.state, "sandbox")
+    await fs.mkdir(dir, { recursive: true })
+    const write = (id: string, expires?: string) =>
+      Bun.write(path.join(dir, `${id}.json`), JSON.stringify({ id, expires }))
+    const ids = ["x157past", "x157futu", "x157none"]
+    try {
+      await write(ids[0], "2026-01-01T00:00:00.000Z")
+      await write(ids[1], "2999-01-01T00:00:00.000Z")
+      await write(ids[2])
+      const due = (await Sandbox.expired(Date.parse("2026-09-30T00:00:00Z"))).map((info) => info.id)
+      expect(due).toContain(ids[0])
+      expect(due).not.toContain(ids[1])
+      expect(due).not.toContain(ids[2])
+    } finally {
+      for (const id of ids) await fs.rm(path.join(dir, `${id}.json`), { force: true })
+    }
+  })
+})
+
+describe("sandbox host config", () => {
+  test("the server inside audits to a file the host collects, and doesn't forward", () => {
+    const inside = Sandbox.auditInside({
+      audit: { enabled: true, path: "/Users/me/audit.log", forward: { otlp: "https://siem.example.eu" }, redact: ["x"] },
+      residency: { allow: ["eu"], auditPath: "/var/log/egress.log" },
+      model: "a/b",
+    })
+    expect(inside.audit).toEqual({ enabled: true, path: "/sandbox/home/audit.log", redact: ["x"] })
+    expect(inside.residency).toEqual({ allow: ["eu"], auditPath: "/sandbox/home/audit.log" })
+    expect(inside.model).toBe("a/b")
+    // Untouched when there's nothing to rewrite.
+    expect(Sandbox.auditInside({ residency: { allow: ["eu"] } })).toEqual({ residency: { allow: ["eu"] } })
+  })
+
+  test("managed documents merge without losing a lock, later documents winning", () => {
+    const merged = SandboxConfig.mergeDocs([
+      { $locked: ["residency"], residency: { allow: ["eu"] }, instructions: ["a.md"] },
+      { $locked: ["audit"], audit: { enabled: true }, instructions: ["b.md"] },
+      { residency: { allow: ["eu", "us"] } },
+    ])
+    expect(merged.$locked).toEqual(["residency", "audit"])
+    expect(merged.instructions).toEqual(["a.md", "b.md"])
+    expect(merged.residency).toEqual({ allow: ["eu", "us"] })
+    expect(merged.audit).toEqual({ enabled: true })
+  })
+
+  test("host audit settings come from global and managed config; a managed lock wins outright", () => {
+    const global = { audit: { enabled: true, path: "/home/u/audit.log" }, residency: { allow: ["eu", "us"] } }
+    expect(SandboxConfig.auditConfig(global, undefined).audit?.path).toBe("/home/u/audit.log")
+    const managed = { $locked: ["residency"], residency: { allow: ["eu"] }, audit: { path: "/var/log/lunos.log" } }
+    const both = SandboxConfig.auditConfig(global, managed)
+    expect(both.residency?.allow).toEqual(["eu"])
+    // Not locked: merged, managed on top.
+    expect(both.audit).toEqual({ enabled: true, path: "/var/log/lunos.log" })
+  })
+
+  test("the runtime file becomes the server's environment and global config, then disappears", async () => {
+    await using tmp = await tmpdir()
+    const { load, GLOBAL_CONFIG } = await import("../../src/sandbox/boot")
+    const file = path.join(tmp.path, "runtime.json")
+    await Bun.write(
+      file,
+      JSON.stringify({ env: { X157_SENTINEL_API_KEY: "sk-sentinel" }, config: { residency: { allow: ["eu"] } } }),
+    )
+    const saved = process.env.OPENCODE_CONFIG
+    delete process.env.OPENCODE_CONFIG
+    try {
+      load(file, 1000)
+      // Read through a widened view: TypeScript narrows process.env.OPENCODE_CONFIG after the delete.
+      const env: Record<string, string | undefined> = process.env
+      expect(env.X157_SENTINEL_API_KEY).toBe("sk-sentinel")
+      expect(env.OPENCODE_CONFIG).toBe(path.join(tmp.path, GLOBAL_CONFIG))
+      const written: unknown = JSON.parse(await Bun.file(env.OPENCODE_CONFIG!).text())
+      expect(written).toEqual({ residency: { allow: ["eu"] } })
+      expect(await Bun.file(file).exists()).toBe(false)
+      // Flag snapshots some keys at load; the compiled binary may have loaded it before boot ran.
+      const { Flag } = await import("@opencode-ai/core/flag/flag")
+      expect(Flag.OPENCODE_CONFIG).toBe(env.OPENCODE_CONFIG)
+    } finally {
+      delete process.env.X157_SENTINEL_API_KEY
+      if (saved === undefined) delete process.env.OPENCODE_CONFIG
+      else process.env.OPENCODE_CONFIG = saved
+      const { Flag } = await import("@opencode-ai/core/flag/flag")
+      Flag.OPENCODE_CONFIG = saved
+    }
   })
 })

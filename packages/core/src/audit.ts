@@ -50,6 +50,14 @@ export const EVENTS = [
   "memory.denied",
   "upgrade",
   "audit.forward_refused",
+  // XCOD-157: a sandbox's lifecycle, from the host. Id, project path, image and digest, resource
+  // limits, the lifecycle policy and outcome; never file contents or the transcript.
+  "sandbox.create",
+  "sandbox.attach",
+  "sandbox.finish",
+  "sandbox.retain",
+  "sandbox.destroy",
+  "sandbox.prune",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

@@ -38,9 +38,8 @@ export const DockerAdapter: WorkspaceAdapter = {
       id: decodeExtra(info.extra).sandbox,
       directory,
       config: SandboxConfig.load(directory),
-      secrets,
     })
-    await Sandbox.start(sandbox)
+    await Sandbox.start(sandbox, { secrets })
   },
   // Called on every workspace syncList, for every project, so it must not shell out to Docker
   // (which can be absent, or slow to answer): it reads the host-side sandbox metadata only.
