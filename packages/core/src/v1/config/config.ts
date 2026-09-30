@@ -20,6 +20,7 @@ import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
 import { ConfigSubagent } from "../../config/subagent"
 import { ConfigMemory } from "../../config/memory"
+import { ConfigSandbox } from "../../config/sandbox"
 
 export type Layout = ConfigLayoutV1.Layout
 
@@ -89,6 +90,9 @@ export const Info = Schema.Struct({
   ),
   memory: Schema.optional(ConfigMemory.Info).annotate({
     description: "Graph-based long-term memory, off by default",
+  }),
+  sandbox: Schema.optional(ConfigSandbox.Info).annotate({
+    description: "Sandboxed runs: the Lunos server and everything it spawns run in a Docker container",
   }),
   residency: Schema.optional(ConfigResidency.Info).annotate({
     description:

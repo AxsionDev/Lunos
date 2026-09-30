@@ -52,6 +52,10 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   disabled_providers: "Models & agents",
   permission: "Permissions",
   tools: "Permissions",
+  // XCOD-144: a sandbox bounds what the agent can do to this machine, the same question permissions
+  // answer, but enforced by the container rather than by prompts. Not residency: it doesn't decide
+  // where data goes (network egress isn't restricted yet).
+  sandbox: "Permissions",
   residency: "Residency & privacy",
   audit: "Residency & privacy",
   share: "Residency & privacy",
@@ -99,7 +103,20 @@ const DIALOG: Record<string, Dialog> = {
 }
 
 /** Changes the running app only picks up on a restart (the ticket's "restart required"). */
-const RESTART = ["plugin", "mcp", "memory", "lsp", "formatter", "server", "logLevel", "watcher", "enterprise", "tui."]
+const RESTART = [
+  "plugin",
+  "mcp",
+  "memory",
+  "lsp",
+  "formatter",
+  "server",
+  "logLevel",
+  "watcher",
+  "enterprise",
+  "tui.",
+  // Read once, when `lunos` / `lunos run` starts, to decide whether to start a sandbox.
+  "sandbox",
+]
 const NO_RESTART = ["tui.theme"]
 
 const READONLY = ["$schema", "$locked"]
@@ -112,6 +129,13 @@ const DEFAULTS: Record<string, unknown> = {
   subagent_depth: 1,
   marketplace_default: true,
   "memory.enabled": false,
+  "sandbox.enabled": false,
+  "sandbox.workspace": "copy",
+  "sandbox.on_finish": "destroy",
+  "sandbox.resources.cpus": 2,
+  "sandbox.resources.memory": "4g",
+  "sandbox.resources.pids": 512,
+  "sandbox.resources.tmp": "1g",
   "compaction.auto": true,
   "compaction.prune": false,
   "tool_output.max_lines": 2000,

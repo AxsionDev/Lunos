@@ -1,9 +1,11 @@
 import type { ProjectV2 } from "@opencode-ai/core/project"
 import type { WorkspaceAdapter, WorkspaceAdapterEntry } from "../types"
 import { WorktreeAdapter } from "./worktree"
+import { DockerAdapter } from "./docker"
 
 const BUILTIN: Record<string, WorkspaceAdapter> = {
   worktree: WorktreeAdapter,
+  docker: DockerAdapter,
 }
 
 const state = new Map<ProjectV2.ID, Map<string, WorkspaceAdapter>>()
