@@ -37,28 +37,88 @@ export const networkName = (id: string) => `lunos-sandbox-${id}-net`
 export const SANDBOX_ALIAS = "sandbox"
 export const EGRESS_ALIAS = "egress"
 
-const docker = (args: string[], options?: SandboxExec.Options) => SandboxExec.check(["docker", ...args], options)
+// XCOD-158: Docker or Podman. Every command below goes through `bin()`: the two CLIs take the same
+// arguments for everything the sandbox does, and differ only where output is parsed (`info`, `ps`),
+// which is why listing uses `inspect` templates both understand.
+/** `name` is the command; `engine` what answers it (a podman-docker shim is `docker` running podman). */
+export type Runtime = { name: "docker" | "podman"; engine: "docker" | "podman"; version: string }
 
-export async function available() {
-  const result = await SandboxExec.run(["docker", "info", "--format", "{{.ServerVersion}}"]).catch(() => undefined)
-  if (!result || result.code !== 0)
-    throw new Error(
-      "Sandboxed runs need Docker, and it isn't available: " +
-        (result?.stderr.trim() || "the docker command was not found") +
-        ". Install Docker Desktop or Docker Engine and start it, then try again.",
-    )
-  return result.stdout.trim()
+let runtime: Runtime | undefined
+
+/** The container CLI: the one `available()` found, or the one a known sandbox was made with (`use`). */
+export const bin = () => runtime?.name ?? "docker"
+
+/** Commands on an existing sandbox use the runtime that created it, without probing. */
+export function use(name: Runtime["name"] | undefined, engine: Runtime["engine"] | undefined = name) {
+  if (name && runtime?.name !== name) runtime = { name, engine: engine ?? name, version: name }
+}
+
+const engine = () => runtime?.engine ?? "docker"
+
+/**
+ * The runtime tmpfs, owned by the sandbox user. Podman refuses Docker's uid=/gid= options and has
+ * its own, `U`: chown to the container's user (verified on rootless Podman 5.8).
+ */
+export function runtimeTmpfs(on: Runtime["engine"] = engine()) {
+  const [uid, gid] = UID.split(":")
+  const owner = on === "podman" ? "U" : `uid=${uid},gid=${gid}`
+  return `${RUNTIME_DIR}:rw,noexec,nosuid,nodev,size=1m,mode=0700,${owner}`
+}
+
+/**
+ * The network the egress container starts on, before it joins the sandbox's internal one. Rootless
+ * Podman otherwise gives it `pasta` networking, which can't join a bridge network afterwards.
+ */
+export const outsideNetwork = (on: Runtime["engine"] = engine()) => (on === "podman" ? "podman" : "bridge")
+
+export const current = () => runtime
+
+const docker = (args: string[], options?: SandboxExec.Options) => SandboxExec.check([bin(), ...args], options)
+const run = (args: string[], options?: SandboxExec.Options) => SandboxExec.run([bin(), ...args], options)
+
+async function probe(name: Runtime["name"]): Promise<Runtime | string> {
+  // `podman info` has no .ServerVersion; .Version.Version is podman's. Both print "podman" for a
+  // podman-docker shim's `--version`, which is how a shim installed as `docker` is recognised.
+  const version = await SandboxExec.run([name, "--version"]).catch(() => undefined)
+  if (!version || version.code !== 0) return `the ${name} command was not found`
+  const actual = /podman/i.test(version.stdout) ? "podman" : name
+  const format = actual === "podman" ? "{{.Version.Version}}" : "{{.ServerVersion}}"
+  const info = await SandboxExec.run([name, "info", "--format", format]).catch(() => undefined)
+  if (!info || info.code !== 0)
+    return `${name} is installed but not running: ${info?.stderr.trim().split("\n")[0] ?? "no response"}`
+  return { name, engine: actual, version: `${actual} ${info.stdout.trim()}` }
+}
+
+/**
+ * Find a container runtime: `sandbox.runtime` if set, else Docker, then Podman. Throws, saying what
+ * was tried and why each failed, when neither is usable: a sandboxed run never falls back to the host.
+ */
+export async function available(preferred?: Runtime["name"]) {
+  const order: Runtime["name"][] = preferred ? [preferred] : ["docker", "podman"]
+  const reasons: string[] = []
+  for (const name of order) {
+    const found = await probe(name)
+    if (typeof found !== "string") {
+      runtime = found
+      return found.version
+    }
+    reasons.push(found)
+  }
+  throw new Error(
+    `Sandboxed runs need Docker or Podman, and ${preferred ? `${preferred} (sandbox.runtime) isn't` : "neither is"} available: ` +
+      reasons.join("; ") +
+      ". Install Docker Desktop, Docker Engine or Podman and start it, then try again. Nothing was run on this machine.",
+  )
 }
 
 export type Image = { ref: string; id: string; digest?: string }
 
 /** Resolve the image to an immutable ID, pulling it if it isn't present. */
 export async function image(ref: string): Promise<Image> {
-  const inspect = () =>
-    SandboxExec.run(["docker", "image", "inspect", ref, "--format", "{{.Id}}|{{json .RepoDigests}}"])
+  const inspect = () => SandboxExec.run([bin(), "image", "inspect", ref, "--format", "{{.Id}}|{{json .RepoDigests}}"])
   let result = await inspect()
   if (result.code !== 0) {
-    const pull = await SandboxExec.run(["docker", "pull", ref])
+    const pull = await SandboxExec.run([bin(), "pull", ref])
     if (pull.code !== 0)
       throw new Error(
         `Couldn't get the sandbox image ${ref}: ${pull.stderr.trim()}. ` +
@@ -89,6 +149,7 @@ export function createArgs(input: {
   env: Record<string, string>
   /** XCOD-157: "open" keeps Docker's default network; otherwise only the internal one, via the proxy. */
   network?: SandboxConfig.Network
+  engine?: Runtime["engine"]
 }) {
   const network = input.network ?? "open"
   const proxy = `http://${EGRESS_ALIAS}:${PROXY_PORT}`
@@ -132,7 +193,7 @@ export function createArgs(input: {
     "--tmpfs",
     `/tmp:rw,exec,nosuid,nodev,size=${input.resources.tmp}`,
     "--tmpfs",
-    `${RUNTIME_DIR}:rw,noexec,nosuid,nodev,size=1m,mode=0700,uid=${UID.split(":")[0]},gid=${UID.split(":")[1]}`,
+    runtimeTmpfs(input.engine),
     "--volume",
     `${volumeName(input.id)}:${ROOT}`,
     "--volume",
@@ -172,7 +233,7 @@ export async function seed(id: string, imageID: string, tar: string[], tarEnv?: 
   await SandboxExec.pipe(
     tar,
     [
-      "docker",
+      bin(),
       "run",
       "--rm",
       "-i",
@@ -208,7 +269,7 @@ export async function seedPolicy(id: string, imageID: string, dir: string, tarEn
   await SandboxExec.pipe(
     ["tar", "-c", "-f", "-", "-C", dir, "."],
     [
-      "docker",
+      bin(),
       "run",
       "--rm",
       "-i",
@@ -251,11 +312,14 @@ export function egressArgs(input: {
   image: Image
   allow: readonly string[]
   network?: SandboxConfig.Network
+  engine?: Runtime["engine"]
 }) {
   return [
     "create",
     "--name",
     egressName(input.id),
+    "--network",
+    outsideNetwork(input.engine),
     "--label",
     `${LABEL}.egress=${input.id}`,
     "--user",
@@ -301,12 +365,12 @@ export async function createEgress(input: {
 }
 
 export async function hasEgress(id: string) {
-  return (await SandboxExec.run(["docker", "container", "inspect", egressName(id)])).code === 0
+  return (await SandboxExec.run([bin(), "container", "inspect", egressName(id)])).code === 0
 }
 
 /** The egress proxy's decisions, one JSON line each, from its log. */
 export async function egressLog(id: string) {
-  const result = await SandboxExec.run(["docker", "logs", egressName(id)])
+  const result = await SandboxExec.run([bin(), "logs", egressName(id)])
   return result.stdout
 }
 
@@ -342,11 +406,11 @@ export async function stop(id: string) {
 
 /** Remove the container and its volume. Missing ones are not an error. */
 export async function remove(id: string) {
-  await SandboxExec.run(["docker", "rm", "--force", "--volumes", containerName(id)])
-  await SandboxExec.run(["docker", "rm", "--force", egressName(id)])
-  await SandboxExec.run(["docker", "network", "rm", networkName(id)])
+  await SandboxExec.run([bin(), "rm", "--force", "--volumes", containerName(id)])
+  await SandboxExec.run([bin(), "rm", "--force", egressName(id)])
+  await SandboxExec.run([bin(), "network", "rm", networkName(id)])
   for (const name of [volumeName(id), policyVolumeName(id)]) {
-    const volume = await SandboxExec.run(["docker", "volume", "rm", "--force", name])
+    const volume = await SandboxExec.run([bin(), "volume", "rm", "--force", name])
     if (volume.code !== 0) throw new Error(`docker volume rm ${name} failed: ${volume.stderr.trim()}`)
   }
 }
@@ -360,7 +424,7 @@ export async function hostPort(id: string) {
 }
 
 export async function logs(id: string, tail = 40) {
-  const result = await SandboxExec.run(["docker", "logs", "--tail", String(tail), containerName(id)])
+  const result = await SandboxExec.run([bin(), "logs", "--tail", String(tail), containerName(id)])
   return (result.stdout + result.stderr).trim()
 }
 
@@ -368,7 +432,7 @@ export async function logs(id: string, tail = 40) {
 export async function streamLogs(id: string, options: { tail?: number; follow?: boolean } = {}) {
   const proc = Bun.spawn(
     [
-      "docker",
+      bin(),
       "logs",
       ...(options.tail !== undefined ? ["--tail", String(options.tail)] : []),
       ...(options.follow ? ["--follow"] : []),
@@ -381,50 +445,41 @@ export async function streamLogs(id: string, options: { tail?: number; follow?: 
 
 /** One file's contents from the container (running or stopped), or undefined when it's absent. */
 export async function readFile(id: string, file: string) {
-  return SandboxExec.pipe(["docker", "cp", `${containerName(id)}:${file}`, "-"], ["tar", "-x", "-O", "-f", "-"]).catch(
+  return SandboxExec.pipe([bin(), "cp", `${containerName(id)}:${file}`, "-"], ["tar", "-x", "-O", "-f", "-"]).catch(
     () => undefined,
   )
 }
 
 /** Stream the workspace out of the container (running or stopped) and extract it into `into`. */
 export async function copyOut(id: string, into: string) {
-  await SandboxExec.pipe(
-    ["docker", "cp", `${containerName(id)}:${WORKSPACE}`, "-"],
-    ["tar", "-x", "-f", "-", "-C", into],
-  )
+  await SandboxExec.pipe([bin(), "cp", `${containerName(id)}:${WORKSPACE}`, "-"], ["tar", "-x", "-f", "-", "-C", into])
 }
 
 export type Listed = { id: string; name: string; state: string; status: string; project?: string; created: string }
 
-export async function list(): Promise<Listed[]> {
-  const out = await docker(["ps", "--all", "--filter", `label=${LABEL}`, "--format", "{{json .}}"])
+/** The `inspect` template listing reads: the same fields and syntax in Docker and Podman. */
+export const LIST_FORMAT = `{{index .Config.Labels "${LABEL}"}}\t{{.Name}}\t{{.State.Status}}\t{{index .Config.Labels "${LABEL}.project"}}\t{{.Created}}`
+
+/** Parse `inspect --format LIST_FORMAT` output. `ps --format {{json .}}` differs between the runtimes. */
+export function parseList(out: string): Listed[] {
   return out
     .split("\n")
     .filter(Boolean)
-    .map(
-      (line) => JSON.parse(line) as { Names: string; State: string; Status: string; Labels: string; CreatedAt: string },
-    )
-    .map((row) => {
-      const labels = Object.fromEntries(
-        row.Labels.split(",").map((pair) => {
-          const at = pair.indexOf("=")
-          return [pair.slice(0, at), pair.slice(at + 1)]
-        }),
-      )
-      return {
-        id: labels[LABEL],
-        name: row.Names,
-        state: row.State,
-        status: row.Status,
-        project: labels[`${LABEL}.project`],
-        created: row.CreatedAt,
-      }
+    .map((line) => {
+      const [id, name, state, project, created] = line.split("\t")
+      return { id, name: name.replace(/^\//, ""), state, status: state, project: project || undefined, created }
     })
-    .filter((row) => row.id)
+    .filter((row) => row.id && row.id !== "<no value>")
+}
+
+export async function list(): Promise<Listed[]> {
+  const ids = (await docker(["ps", "--all", "--quiet", "--filter", `label=${LABEL}`])).split("\n").filter(Boolean)
+  if (ids.length === 0) return []
+  return parseList(await docker(["inspect", "--format", LIST_FORMAT, ...ids]))
 }
 
 export async function exists(id: string) {
-  return (await SandboxExec.run(["docker", "container", "inspect", containerName(id)])).code === 0
+  return (await SandboxExec.run([bin(), "container", "inspect", containerName(id)])).code === 0
 }
 
 export * as SandboxDocker from "./docker"

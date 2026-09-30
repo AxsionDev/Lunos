@@ -139,4 +139,13 @@ export async function changedFiles(gitDir: string, from: string, to: string) {
     })
 }
 
+/**
+ * XCOD-158: the changes between two trees as one binary-safe patch, which `git apply` takes. Used
+ * for `sandbox.results: "patch"`, from the tree the sandbox started with, so it holds only what the
+ * agent changed and applies on top of the user's own uncommitted work.
+ */
+export async function diff(gitDir: string, from: string, to: string) {
+  return git(["--git-dir", gitDir, "diff", "--binary", "--full-index", from, to])
+}
+
 export * as SandboxGit from "./git"

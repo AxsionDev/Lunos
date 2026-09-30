@@ -32,6 +32,8 @@ export type Resolved = {
   requiredBy?: "managed" | "config"
   image: string
   workspace: "copy"
+  results: "branch" | "patch" | "none"
+  runtime?: "docker" | "podman"
   on_finish: "destroy" | "retain" | "destroy_on_success"
   /** How long a retained sandbox is kept, in milliseconds; undefined keeps it until destroyed. */
   retain_for?: number
@@ -125,6 +127,8 @@ export function resolve(info: ConfigSandbox.Info): Resolved {
     required: info.required ?? false,
     image: info.image ?? defaultImage(),
     workspace: info.workspace ?? "copy",
+    results: info.results ?? "branch",
+    runtime: info.runtime,
     on_finish: info.on_finish ?? "destroy",
     retain_for: info.retain_for ? duration(info.retain_for) : undefined,
     network: info.network ?? "policy",

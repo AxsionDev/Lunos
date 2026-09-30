@@ -66,6 +66,9 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
             },
           },
           usage: ConfigSettings.usage(sessions, USAGE_DAYS),
+          sandbox: await import("@/sandbox")
+            .then(({ Sandbox }) => Sandbox.status(scope?.worktree))
+            .catch(() => undefined),
         } as Schema.Schema.Type<typeof ConfigSettings.SnapshotSchema>
       })
     })

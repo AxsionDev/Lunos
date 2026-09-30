@@ -58,6 +58,13 @@ export const Info = Schema.Struct({
     description:
       'Extra hosts the sandbox may reach under network "policy", as "host" (port 443) or "host:port". Read from your global and managed config only, never a repository\'s',
   }),
+  results: Schema.Literals(["branch", "patch", "none"]).pipe(Schema.optional).annotate({
+    description:
+      'How the agent\'s changes come back: "branch" (default) as branch lunos/sandbox/<id>, "patch" as .opencode/sandbox/<id>/changes.patch (only the agent\'s changes, for `git apply`), "none" not at all. The transcript and summary always come back',
+  }),
+  runtime: Schema.Literals(["docker", "podman"]).pipe(Schema.optional).annotate({
+    description: "The container runtime. Unset: Docker if it's available, else Podman",
+  }),
   resources: Resources.pipe(Schema.optional).annotate({
     description: "CPU, memory, process and /tmp limits for the sandbox container",
   }),

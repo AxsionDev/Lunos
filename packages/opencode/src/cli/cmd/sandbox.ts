@@ -80,11 +80,16 @@ const secrets = (all: Record<string, unknown>): Record<string, string> =>
   Object.keys(all).length ? { OPENCODE_AUTH_CONTENT: JSON.stringify(all) } : {}
 
 function reportHandoff(result: Sandbox.Handoff) {
-  say(
-    `results on branch ${UI.Style.TEXT_HIGHLIGHT_BOLD}${result.branch}${UI.Style.TEXT_NORMAL} (${result.commit.slice(0, 12)})`,
-  )
-  for (const file of result.files) say(`  ${file.status}\t${file.path}`)
-  if (result.files.length === 0) say("  no changes")
+  if (result.mode === "branch")
+    say(
+      `results on branch ${UI.Style.TEXT_HIGHLIGHT_BOLD}${result.branch}${UI.Style.TEXT_NORMAL} (${result.commit?.slice(0, 12)})`,
+    )
+  if (result.mode === "patch")
+    say(`the agent's changes are in ${UI.Style.TEXT_HIGHLIGHT_BOLD}${result.patch}${UI.Style.TEXT_NORMAL} (git apply)`)
+  if (result.mode !== "none") {
+    for (const file of result.files) say(`  ${file.status}\t${file.path}`)
+    if (result.files.length === 0) say("  no changes")
+  } else say('changes not handed back (sandbox.results is "none")')
   say(`transcript and summary in ${result.results}`)
 }
 

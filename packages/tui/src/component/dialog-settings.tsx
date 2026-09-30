@@ -424,6 +424,17 @@ function StatusTab(props: { snapshot: SettingsSnapshot | undefined }) {
     return `on${config.embedding ? `, embeddings ${config.embedding}` : ""}${config.model ? `, model ${config.model}` : ""}`
   })
   const loaded = createMemo(() => (props.snapshot?.layers ?? []).filter((layer) => layer.loaded))
+  // XCOD-158: inside a sandbox, what it runs in; on this machine, the project's sandboxes.
+  const sandbox = createMemo(() => {
+    const info = props.snapshot?.sandbox
+    const inside = info?.inside
+    if (inside)
+      return `this session runs in sandbox ${inside.id}: ${inside.image ?? "image"} ${inside.digest ?? ""}, network ${inside.network ?? "open"}, results ${inside.results ?? "branch"}`
+    if (!info?.known.length) return "none for this project"
+    return info.known
+      .map((item) => `${item.id} (${item.network}${item.expires ? `, expires ${item.expires.slice(0, 16)}` : ""})`)
+      .join(", ")
+  })
   return (
     <box gap={1}>
       <box>
@@ -455,6 +466,9 @@ function StatusTab(props: { snapshot: SettingsSnapshot | undefined }) {
         </text>
         <text fg={theme.text}>
           <b>Memory</b> <span style={{ fg: theme.textMuted }}>{memory()}</span>
+        </text>
+        <text fg={theme.text} wrapMode="char">
+          <b>Sandbox</b> <span style={{ fg: theme.textMuted }}>{sandbox()}</span>
         </text>
         <text fg={theme.text}>
           <b>Locked by your organisation</b>{" "}
