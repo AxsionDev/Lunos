@@ -2,7 +2,7 @@
 
 Run the Lunos server, and everything it spawns, in a Docker container. Only the client (the TUI, or `lunos run`) stays on your machine. The agent can run commands, install packages and edit files without touching your working tree, and the results come back as a git branch.
 
-This page describes **what the first version (XCOD-144 slice 1) guarantees and what it does not**. Read the [limits](#what-a-sandbox-does-not-isolate-yet) before you rely on it as a security boundary.
+This page describes **what sandboxed runs guarantee today (XCOD-144 slice 1, XCOD-157) and what they don't**. Read the [limits](#what-a-sandbox-does-not-isolate-yet) before you rely on it as a security boundary.
 
 ## Starting one
 
@@ -33,20 +33,37 @@ Or turn it on for every run in a project or for yourself:
 
 If you interrupt a run (Ctrl-C), there are no results to hand back, so the sandbox is kept, stopped. `lunos sandbox destroy <id>` removes it.
 
+A task counts as **failed** when `lunos run` exits with an error, or when any session's last reply ended in an error (a provider error, for example). That is what `destroy_on_success` looks at.
+
 ## Keeping or throwing away the environment
 
-| `sandbox.on_finish`   | After a successful hand-back                                                                               |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `"destroy"` (default) | The container and its volume are removed. `docker ps -a` and `docker volume ls` show nothing left.         |
-| `"retain"`            | The container is stopped and kept, with its volume: the workspace, installed packages and session history. |
+| `sandbox.on_finish`    | After a successful hand-back                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `"destroy"` (default)  | The container and its volumes are removed. `docker ps -a` and `docker volume ls` show nothing left.        |
+| `"retain"`             | The container is stopped and kept, with its volume: the workspace, installed packages and session history. |
+| `"destroy_on_success"` | Removed if the task succeeded; kept, as with `retain`, if it failed, so you can see what went wrong.       |
+
+For one run, `--keep` retains and `--rm` destroys, whatever `sandbox.on_finish` says:
 
 ```sh
-lunos sandbox list             # every sandbox, running or kept, with its branch and project
-lunos sandbox attach <id>      # start a kept sandbox and reopen its last session in the TUI
-lunos sandbox destroy <id>     # remove the container and volume
+lunos run --sandbox --keep "try the migration"
+lunos --sandbox --rm
 ```
 
-`attach` reopens the TUI on the sandbox's most recent session, with its history. When you leave, the hand-back runs again: new changes are added to `lunos/sandbox/<id>` as another commit, and the sandbox is stopped and kept.
+A failed hand-back still keeps the sandbox, even with `--rm`.
+
+`sandbox.retain_for` (for example `"72h"`, `"30m"` or `"7d"`) limits how long a kept sandbox stays. Once it has expired, `lunos sandbox prune` removes it; so does the next sandboxed run, or any `lunos sandbox` command. Without `retain_for`, a kept sandbox stays until you destroy it.
+
+```sh
+lunos sandbox list             # every sandbox, running or kept, with its expiry, branch and project
+lunos sandbox attach <id>      # start a kept sandbox and reopen its last session in the TUI
+lunos sandbox logs <id>        # the sandbox server's log (-f to follow, --tail N)
+lunos sandbox stop <id>        # stop a running sandbox and keep it
+lunos sandbox destroy <id>     # remove the container and its volumes
+lunos sandbox prune            # remove kept sandboxes whose retain_for has expired
+```
+
+`attach` reopens the TUI on the sandbox's most recent session, with its history. When you leave, the hand-back runs again: new changes are added to `lunos/sandbox/<id>` as another commit, and the sandbox is stopped and kept (with a fresh `retain_for`, if one is set).
 
 ## Isolation defaults
 
@@ -54,7 +71,7 @@ These are fixed. Configuration can choose the image, the resources and the lifec
 
 - Runs as a non-root user (uid 1000), whatever the image's default user.
 - `--cap-drop ALL` and `no-new-privileges`. Docker's default seccomp profile applies (it is never overridden).
-- Read-only root filesystem. The only writable places are the sandbox volume (the workspace, and the home directory that holds session history) and an in-memory `/tmp`.
+- Read-only root filesystem. The only writable places are the sandbox volume (the workspace, and the home directory that holds session history), an in-memory `/tmp`, and a 1 MB in-memory `/run/lunos` that only the sandbox user can read (see [Credentials](#credentials)).
 - The Docker socket is never mounted. Nothing from your machine is mounted.
 - The image is pinned by its ID when the sandbox is created, and the digest is shown at start and recorded in `summary.json`.
 - Resource limits, from `sandbox.resources`:
@@ -85,19 +102,38 @@ bun run packages/opencode/script/sandbox-image.ts     # builds the Linux binary,
 
 ## Credentials
 
-Your provider credentials (the ones `lunos auth` stores, and any `*_API_KEY` environment variables) are passed to the container as environment variables when it is created. They are never written into the image or the workspace volume, and they don't appear in your machine's process list. They **are** visible to anyone who can run `docker inspect` on your machine, and they stay in a kept container's configuration. See the limits below.
+Your provider credentials (the ones `lunos auth` stores, and any `*_API_KEY` environment variables) and the sandbox server's password are handed to the container **after it starts**, not when it's created:
 
-Global config in your home directory is **not** copied in; the project's own `opencode.json` is (it's part of the repository). If you choose a model in global config, choose it in the project config or with `--model` for sandboxed runs.
+- Lunos writes them through `docker exec`, on stdin, into a file on the container's in-memory `/run/lunos`. The server reads the file into its own environment as it starts, and deletes it.
+- So they are never in the container's configuration (`docker inspect`), never in the image or on the sandbox volume, and never in your machine's process list.
+- When the sandbox stops, they are gone with the in-memory filesystem. **A kept sandbox holds no credentials.** `lunos sandbox attach` hands them over again.
+
+Inside a running sandbox, the server's environment does hold them, and processes the agent starts inherit it. A sandbox limits what the agent can do to your machine; it doesn't hide your provider key from the agent.
+
+## Your config and your organisation's
+
+Three layers of configuration reach the sandbox, as they would on your machine:
+
+- **Your global config** (`~/.config/opencode/opencode.json` and the files next to it, plus `OPENCODE_CONFIG` and `OPENCODE_CONFIG_CONTENT` if you set them) is passed in with the credentials, through the same in-memory file, so a literal key in it isn't written to the volume either. Inside, it's the server's `OPENCODE_CONFIG`, below the project config as usual. `{file:…}` references in it point at your machine's files, which don't exist in the container. Other files in your global config directory (agents, commands, plugins) are not copied.
+- **The project's config** is part of the repository copy.
+- **Your organisation's managed config** (`/Library/Application Support/Lunos`, `/etc/lunos`, `%ProgramData%\Lunos`, and on macOS the MDM profile) is copied into a separate volume, owned by root and mounted read-only at `/etc/lunos`, where Lunos reads managed config on Linux. Its `$locked` keys hold inside the sandbox exactly as they do on your machine, and the agent can't change them.
+
+So a residency policy set in your global config, or locked by your organisation, applies to every model call made inside the sandbox.
+
+## Audit
+
+With the audit trail on (`audit.enabled`, or a residency policy), the host records each sandbox's lifecycle as `sandbox.create`, `sandbox.attach`, `sandbox.finish`, `sandbox.retain`, `sandbox.destroy` and `sandbox.prune` events, with the image and its digest, the resource limits, the lifecycle policy and the outcome. Never file contents. See [the audit log](audit-log.md).
+
+These events go to the audit log your **global or managed** config names, never one the repository's config names: the repository is the code being sandboxed. Model calls made inside the sandbox are recorded by the server inside it, in the container's own audit log.
 
 ## What a sandbox does NOT isolate (yet)
 
 - **The kernel is shared.** A container is not a virtual machine. A kernel vulnerability, or a container-escape bug in Docker, defeats the isolation. For untrusted code where that matters, run Lunos in a VM.
 - **The network is open.** The container can reach anything your machine can reach, including your local network. Egress restriction (a residency-policy allow list enforced at the container level, and `sandbox.network: "policy" | "none" | "open"`) is not built yet.
-- **Credentials are in the container's configuration.** A kept (`retain`) container still holds your provider keys in its environment, readable with `docker inspect`. Removing them on retain and re-injecting them on attach is not built yet. Destroy sandboxes you no longer need.
 - **The volume has no size limit** on Docker's default volume driver; `tmp` limits only `/tmp`.
 - **Anything the agent can reach through the model provider or the network is not contained**: a sandbox limits what the agent can do to your machine, not what it can send out.
 
-Also not built yet: `destroy_on_success`, `retain_for` and `prune`, the `--keep` / `--rm` overrides, an organisation-lockable `sandbox.required`, a `mount` workspace mode, devcontainer images, Podman, `/sandbox` in the TUI, and sandbox status in `/settings`. Verified on macOS with Docker Desktop only so far.
+Also not built yet: an organisation-lockable `sandbox.required`, a `mount` workspace mode, devcontainer images, Podman, `/sandbox` in the TUI, and sandbox status in `/settings`. Verified on macOS with Docker Desktop only so far.
 
 ## Configuration reference
 
@@ -106,7 +142,8 @@ Also not built yet: `destroy_on_success`, `retain_for` and `prune`, the `--keep`
 | `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed |
 | `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                            |
 | `sandbox.workspace`        | `"copy"`                            | How the project gets in; `copy` is the only mode so far          |
-| `sandbox.on_finish`        | `"destroy"`                         | `destroy` or `retain`, after a successful hand-back              |
+| `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back |
+| `sandbox.retain_for`       | unset (kept until destroyed)        | How long a kept sandbox stays, e.g. `"72h"`; then it's pruned    |
 | `sandbox.resources.cpus`   | `2`                                 | `docker --cpus`                                                  |
 | `sandbox.resources.memory` | `"4g"`                              | `docker --memory`                                                |
 | `sandbox.resources.pids`   | `512`                               | `docker --pids-limit`                                            |

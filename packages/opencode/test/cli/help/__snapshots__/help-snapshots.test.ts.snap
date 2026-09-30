@@ -107,7 +107,11 @@ Options:
       --auto         auto-approve permissions that are not explicitly denied (dangerous!)
                                                                           [boolean] [default: false]
       --sandbox      run in an isolated Docker sandbox; results come back as branch
-                     lunos/sandbox/<id>                                                    [boolean]"
+                     lunos/sandbox/<id>                                                    [boolean]
+      --keep         with --sandbox: keep the sandbox when done, whatever sandbox.on_finish says
+                                                                                           [boolean]
+      --rm           with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says
+                                                                                           [boolean]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode debug --help 1`] = `

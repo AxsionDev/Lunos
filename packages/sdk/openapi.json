@@ -22488,7 +22488,11 @@
               },
               "on_finish": {
                 "type": "string",
-                "enum": ["destroy", "retain"]
+                "enum": ["destroy", "retain", "destroy_on_success"]
+              },
+              "retain_for": {
+                "type": "string",
+                "pattern": "^\\d+[mhd]$"
               },
               "resources": {
                 "type": "object",

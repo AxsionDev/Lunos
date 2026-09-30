@@ -10,9 +10,20 @@ export const UID = "1000:1000"
 export const ROOT = "/sandbox"
 export const WORKSPACE = `${ROOT}/workspace`
 export const HOME = `${ROOT}/home`
+/** XCOD-157: tmpfs for the runtime file (see boot.ts); owned by the sandbox user, gone on stop. */
+export const RUNTIME_DIR = "/run/lunos"
+export const RUNTIME_FILE = `${RUNTIME_DIR}/runtime.json`
+/**
+ * XCOD-157: where Lunos reads managed config on Linux. A separate volume, root-owned and mounted
+ * read-only, holds the organisation's managed config and the marker saying this is a sandbox, so
+ * neither can be changed from inside.
+ */
+export const POLICY_DIR = "/etc/lunos"
+export const MARKER = "sandbox.json"
 
 export const containerName = (id: string) => `lunos-sandbox-${id}`
 export const volumeName = (id: string) => `lunos-sandbox-${id}`
+export const policyVolumeName = (id: string) => `lunos-sandbox-${id}-policy`
 
 const docker = (args: string[], options?: SandboxExec.Options) => SandboxExec.check(["docker", ...args], options)
 
@@ -51,8 +62,9 @@ export async function image(ref: string): Promise<Image> {
 }
 
 /**
- * `docker create` arguments for the sandbox container. Secrets are passed as bare `-e NAME` so their
- * values come from the docker CLI's own environment and never appear in the host process list.
+ * `docker create` arguments for the sandbox container. No secret is among them: provider keys and
+ * the server password arrive after start, through the runtime file (`inject`), so they never show in
+ * `docker inspect` or on a retained container.
  */
 export function createArgs(input: {
   id: string
@@ -61,7 +73,6 @@ export function createArgs(input: {
   resources: SandboxConfig.Resolved["resources"]
   workdir: string
   env: Record<string, string>
-  secretNames: string[]
 }) {
   return [
     "create",
@@ -83,8 +94,12 @@ export function createArgs(input: {
     "--read-only",
     "--tmpfs",
     `/tmp:rw,exec,nosuid,nodev,size=${input.resources.tmp}`,
+    "--tmpfs",
+    `${RUNTIME_DIR}:rw,noexec,nosuid,nodev,size=1m,mode=0700,uid=${UID.split(":")[0]},gid=${UID.split(":")[1]}`,
     "--volume",
     `${volumeName(input.id)}:${ROOT}`,
+    "--volume",
+    `${policyVolumeName(input.id)}:${POLICY_DIR}:ro`,
     "--workdir",
     input.workdir,
     "--cpus",
@@ -96,8 +111,10 @@ export function createArgs(input: {
     // The server is reachable from the host's loopback only, on a port Docker picks.
     "--publish",
     `127.0.0.1::${PORT}`,
-    ...Object.entries(input.env).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
-    ...input.secretNames.flatMap((name) => ["--env", name]),
+    ...Object.entries({ ...input.env, LUNOS_SANDBOX_RUNTIME: RUNTIME_FILE }).flatMap(([key, value]) => [
+      "--env",
+      `${key}=${value}`,
+    ]),
     input.image.id,
     "serve",
     "--hostname",
@@ -109,6 +126,7 @@ export function createArgs(input: {
 
 export async function createVolume(id: string) {
   await docker(["volume", "create", "--label", `${LABEL}=${id}`, volumeName(id)])
+  await docker(["volume", "create", "--label", `${LABEL}=${id}`, policyVolumeName(id)])
 }
 
 /**
@@ -146,8 +164,66 @@ export async function seed(id: string, imageID: string, tar: string[], tarEnv?: 
   )
 }
 
-export async function create(args: string[], secrets: Record<string, string>) {
-  await docker(args, { env: secrets })
+/**
+ * Fill the policy volume from a directory holding managed.json (when the organisation has managed
+ * config) and the sandbox marker. Root-owned and world-readable, so the sandbox user can read it
+ * and, even before the read-only mount, not change it.
+ */
+export async function seedPolicy(id: string, imageID: string, dir: string, tarEnv?: Record<string, string>) {
+  await SandboxExec.pipe(
+    ["tar", "-c", "-f", "-", "-C", dir, "."],
+    [
+      "docker",
+      "run",
+      "--rm",
+      "-i",
+      "--network",
+      "none",
+      "--user",
+      "0:0",
+      "--cap-drop",
+      "ALL",
+      "--cap-add",
+      "CHOWN",
+      "--cap-add",
+      "FOWNER",
+      "--security-opt",
+      "no-new-privileges",
+      "--read-only",
+      "--volume",
+      `${policyVolumeName(id)}:${POLICY_DIR}`,
+      "--entrypoint",
+      "/bin/sh",
+      imageID,
+      "-c",
+      `tar -x -o -f - -C ${POLICY_DIR} && chown -R 0:0 ${POLICY_DIR} && chmod -R go-w,a+rX ${POLICY_DIR}`,
+    ],
+    { from: { env: tarEnv } },
+  )
+}
+
+export async function create(args: string[]) {
+  await docker(args)
+}
+
+/**
+ * Write the runtime file into the running container's tmpfs, as the sandbox user, through stdin: the
+ * values never appear in an argv, an environment or a file on the host.
+ */
+export async function inject(id: string, runtime: string) {
+  await docker(
+    [
+      "exec",
+      "-i",
+      "--user",
+      UID,
+      containerName(id),
+      "/bin/sh",
+      "-c",
+      `umask 077 && cat > ${RUNTIME_FILE}.part && mv ${RUNTIME_FILE}.part ${RUNTIME_FILE}`,
+    ],
+    { input: runtime },
+  )
 }
 
 export async function start(id: string) {
@@ -161,8 +237,10 @@ export async function stop(id: string) {
 /** Remove the container and its volume. Missing ones are not an error. */
 export async function remove(id: string) {
   await SandboxExec.run(["docker", "rm", "--force", "--volumes", containerName(id)])
-  const volume = await SandboxExec.run(["docker", "volume", "rm", "--force", volumeName(id)])
-  if (volume.code !== 0) throw new Error(`docker volume rm ${volumeName(id)} failed: ${volume.stderr.trim()}`)
+  for (const name of [volumeName(id), policyVolumeName(id)]) {
+    const volume = await SandboxExec.run(["docker", "volume", "rm", "--force", name])
+    if (volume.code !== 0) throw new Error(`docker volume rm ${name} failed: ${volume.stderr.trim()}`)
+  }
 }
 
 export async function hostPort(id: string) {
@@ -175,6 +253,21 @@ export async function hostPort(id: string) {
 export async function logs(id: string, tail = 40) {
   const result = await SandboxExec.run(["docker", "logs", "--tail", String(tail), containerName(id)])
   return (result.stdout + result.stderr).trim()
+}
+
+/** `docker logs`, straight to this process's stdout and stderr; `follow` streams until it stops. */
+export async function streamLogs(id: string, options: { tail?: number; follow?: boolean } = {}) {
+  const proc = Bun.spawn(
+    [
+      "docker",
+      "logs",
+      ...(options.tail !== undefined ? ["--tail", String(options.tail)] : []),
+      ...(options.follow ? ["--follow"] : []),
+      containerName(id),
+    ],
+    { stdout: "inherit", stderr: "inherit", stdin: "ignore" },
+  )
+  return proc.exited
 }
 
 /** Stream the workspace out of the container (running or stopped) and extract it into `into`. */

@@ -1,3 +1,5 @@
+// XCOD-157: first, so a sandbox's runtime values are in the environment before any module reads it.
+import "./sandbox/boot"
 import yargs from "yargs"
 import { ConfigPolicy } from "@/config/policy"
 import { AuditLog } from "@/audit/log"

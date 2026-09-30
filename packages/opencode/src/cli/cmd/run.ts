@@ -270,6 +270,14 @@ export const RunCommand = effectCmd({
       .option("sandbox", {
         type: "boolean",
         describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
+      })
+      .option("keep", {
+        type: "boolean",
+        describe: "with --sandbox: keep the sandbox when done, whatever sandbox.on_finish says",
+      })
+      .option("rm", {
+        type: "boolean",
+        describe: "with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says",
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
     if (sandboxWanted(args)) {
@@ -280,16 +288,20 @@ export const RunCommand = effectCmd({
       const directory = args.dir ? path.resolve(here, args.dir) : here
       return yield* Effect.tryPromise({
         try: () =>
-          runSandboxed(directory, async (conn) => {
-            await RunCommand.handler!({
-              ...args,
-              sandbox: false,
-              attach: conn.url,
-              dir: conn.directory,
-              password: conn.password,
-              username: "opencode",
-            } as never)
-          }),
+          runSandboxed(
+            directory,
+            async (conn) => {
+              await RunCommand.handler!({
+                ...args,
+                sandbox: false,
+                attach: conn.url,
+                dir: conn.directory,
+                password: conn.password,
+                username: "opencode",
+              } as never)
+            },
+            { keep: args.keep, rm: args.rm },
+          ),
         catch: (error) => error,
       }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
     }
@@ -1056,5 +1068,7 @@ export async function runMini(input: MiniCommandInput) {
     dangerouslySkipPermissions: false,
     demo: input.demo ?? false,
     sandbox: undefined,
+    keep: undefined,
+    rm: undefined,
   })
 }

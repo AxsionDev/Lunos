@@ -36,10 +36,16 @@ export const Info = Schema.Struct({
     description:
       'How the project gets into the sandbox. "copy" (the only mode so far): cloned into a container volume at the current commit, with uncommitted changes applied; the host working tree is never mounted',
   }),
-  on_finish: Schema.Literals(["destroy", "retain"]).pipe(Schema.optional).annotate({
+  on_finish: Schema.Literals(["destroy", "retain", "destroy_on_success"]).pipe(Schema.optional).annotate({
     description:
-      'What happens once the results are back on the host: "destroy" (default) removes the container and its volume, "retain" stops it so `lunos sandbox attach` can reopen it. A failed handoff always retains',
+      'What happens once the results are back on the host: "destroy" (default) removes the container and its volume, "retain" stops it so `lunos sandbox attach` can reopen it, "destroy_on_success" keeps it only when the task failed. --keep and --rm override it for one run. A failed handoff always retains',
   }),
+  retain_for: Schema.String.check(Schema.isPattern(/^\d+[mhd]$/))
+    .pipe(Schema.optional)
+    .annotate({
+      description:
+        'How long a retained sandbox is kept, e.g. "72h", "30m" or "7d". Once it has expired, `lunos sandbox prune` removes it, and so does the next sandboxed run or `lunos sandbox` command. Unset: kept until destroyed',
+    }),
   resources: Resources.pipe(Schema.optional).annotate({
     description: "CPU, memory, process and /tmp limits for the sandbox container",
   }),
