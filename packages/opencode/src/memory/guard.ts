@@ -52,6 +52,59 @@ function outside(file: string, worktree: string) {
   return relative.startsWith("..") || path.isAbsolute(relative)
 }
 
+/**
+ * XCOD-135: what external memory sources returned in this turn, by source name, read back from the
+ * turn's recalled `<memory>` block (a synthetic part of the last user message).
+ */
+export function recalledFromSources(messages: readonly SessionV1.WithParts[]) {
+  const out = new Map<string, string[]>()
+  const user = messages.findLast((message) => message.info.role === "user")
+  for (const part of user?.parts ?? []) {
+    if (part.type !== "text" || !part.synthetic || !part.text.includes("<memory-source ")) continue
+    let name: string | undefined
+    for (const line of part.text.split("\n")) {
+      const open = line.match(/^<memory-source name="([^"]+)"/)
+      if (open) {
+        name = open[1]
+        out.set(name, out.get(name) ?? [])
+      } else if (line.startsWith("</memory-source>")) name = undefined
+      else if (name && line.startsWith("- ")) out.get(name)!.push(line.slice(2).replace(/ \[source [^\]]+\]$/, ""))
+    }
+  }
+  return out
+}
+
+const words = (text: string) => new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
+
+/**
+ * XCOD-135: a fact taken from an external source may be kept only with that source as its provenance
+ * (`memory source <name>`), and only if that source was recalled in this turn. A fact that repeats a
+ * source's result under any other provenance ("user message") is refused, so where it came from
+ * stays honest; a person still approves the promotion like any other fact.
+ */
+export function provenance(messages: readonly SessionV1.WithParts[], fact: string, source: string) {
+  const recalled = recalledFromSources(messages)
+  const claimed = source
+    .trim()
+    .match(/^memory source (.+)$/i)?.[1]
+    ?.trim()
+  if (claimed) {
+    if (!recalled.has(claimed))
+      return `no memory source named "${claimed}" was recalled in this turn, so the fact can't be attributed to it`
+    return
+  }
+  const mine = words(fact)
+  if (mine.size < 3) return
+  for (const [name, items] of recalled)
+    for (const item of items) {
+      const theirs = words(item)
+      let shared = 0
+      for (const word of mine) if (theirs.has(word)) shared++
+      if (shared / mine.size >= 0.7)
+        return `it repeats what memory source "${name}" returned; to keep it, pass source "memory source ${name}" so it is stored as coming from that source`
+    }
+}
+
 export function secret(text: string): string | undefined {
   if (/\{(env|file):/.test(text)) return "it contains a {env:} or {file:} substitution"
   if (Audit.redact(text) !== text) return "it contains something shaped like a key, token or password"

@@ -152,6 +152,14 @@ verify` (`packages/opencode/src/memory/store.ts`).
 - **Encryption at rest, opt-in** (from the next release). `memory.encryption: "os-keychain"`
   encrypts the ledger line by line with AES-256-GCM, under a random key kept only in the OS keychain
   (`packages/opencode/src/memory/key.ts`). No key is written to config or disk.
+- **External memory sources are read-only and untrusted** (XCOD-135, OWASP ASI06). A knowledge
+  graph or MCP memory server in `memory.sources` is residency-checked by its declared `jurisdiction`
+  before it is first contacted, and never contacted if denied. Its results go through the same
+  secret and instruction-pattern screens as imports, are size-capped per source, appear in a
+  labelled `<memory-source>` section, and are never written to the local ledger. Keeping one takes a
+  `memory_remember` with the source as provenance; the same text under another provenance is refused. Only the configured
+  search tool (MCP) or two fixed read-only Cypher queries (graph) are ever run, and a slow source is
+  skipped after its timeout (`packages/opencode/src/memory/sources/`).
 - **Audit.** Every memory operation is an audit event (`memory.remember`, `recall`, `forget`,
   `outdate`, `import`, `export`, `purge`, `verify_failed`) with ids, counts and where it came from,
   never a fact's text or a recall query. The `memory` permission is asked about by scope, so

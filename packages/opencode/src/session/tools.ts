@@ -185,7 +185,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               source: {
                 type: "string",
                 description:
-                  'Where it came from: "user message", or the worktree-relative path of the file it was read from',
+                  'Where it came from: "user message", the worktree-relative path of the file it was read from, or "memory source <name>" for a fact from a <memory-source> section',
               },
               kind: {
                 type: "string",
@@ -222,7 +222,10 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               const ctx = context(params, opts)
               AuditLog.toolRun({ tool: "memory_remember", agent: ctx.agent, session: ctx.sessionID, args: {} })
               // Check first, so a person is never asked to approve something that would be refused.
-              const refusal = MemoryGuard.taint(input.messages, worktree) ?? MemoryGuard.secret(fact)
+              const refusal =
+                MemoryGuard.taint(input.messages, worktree) ??
+                MemoryGuard.provenance(input.messages, fact, source) ??
+                MemoryGuard.secret(fact)
               if (refusal) return finish("Not remembered", `Not remembered: ${refusal}.`, { refused: true })
               let expires: string | undefined
               if (params.expires !== undefined) {

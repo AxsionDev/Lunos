@@ -1,6 +1,7 @@
 export * as ConfigMemory from "./memory"
 
 import { Schema } from "effect"
+import { ConfigMemorySource } from "./memory-source"
 
 /**
  * An external memory database (XCOD-134). Credentials must be `{env:…}` or `{file:…}` references:
@@ -82,6 +83,10 @@ export const Info = Schema.Struct({
   })
     .pipe(Schema.optional)
     .annotate({ description: "Size caps" }),
+  sources: Schema.mutable(Schema.Array(ConfigMemorySource.Info)).pipe(Schema.optional).annotate({
+    description:
+      "External, read-only memory sources (XCOD-135): a knowledge graph or an MCP memory server recalled alongside local memory. Their results are untrusted reference, labelled with the source and never stored locally",
+  }),
   retention: Schema.Struct({
     days: Schema.Int.check(Schema.isGreaterThan(0)).pipe(Schema.optional).annotate({
       description:

@@ -55,6 +55,7 @@ import { eq } from "drizzle-orm"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { Memory } from "@/memory"
+import { MemorySources } from "@/memory/sources"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
 
@@ -140,6 +141,7 @@ const layer = Layer.effect(
     const llm = yield* LLM.Service
     const events = yield* EventV2Bridge.Service
     const memory = yield* Memory.Service
+    const memorySources = yield* MemorySources.Service
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
     const { db } = database
@@ -1404,13 +1406,25 @@ const layer = Layer.effect(
         const arg = input.arguments.trim().toLowerCase()
         if (arg === "off" || arg === "on") yield* memory.setSessionOff(input.sessionID, arg === "off")
         const verdict = yield* memory.decision(input.sessionID)
-        const status = verdict.on ? "Memory is on for this session." : `Memory is off: ${verdict.reason}.`
+        let status = verdict.on ? "Memory is on for this session." : `Memory is off: ${verdict.reason}.`
+        // XCOD-135: /memory sources [on|off <name>] lists external sources, or toggles one for this session.
+        const [sub, toggle, ...rest] = input.arguments.trim().split(/\s+/)
+        if (sub?.toLowerCase() === "sources") {
+          const name = rest.join(" ")
+          const known =
+            (toggle === "on" || toggle === "off") && name
+              ? yield* memorySources.setSessionOff(input.sessionID, name, toggle === "off")
+              : undefined
+          status =
+            (known === false ? `No memory source is named "${name}".\n\n` : "") +
+            MemorySources.describe(yield* memorySources.list(input.sessionID), verdict.on)
+        }
         return yield* prompt({
           sessionID: input.sessionID,
           messageID: input.messageID,
           model: input.model ? Provider.parseModel(input.model) : yield* currentModel(input.sessionID),
           agent: input.agent,
-          parts: [{ type: "text", text: `/memory${arg ? " " + arg : ""}\n\n${status}` }],
+          parts: [{ type: "text", text: `/memory${arg ? " " + input.arguments.trim() : ""}\n\n${status}` }],
           noReply: true,
         })
       }
@@ -1685,6 +1699,7 @@ export const node = LayerNode.make({
     RuntimeFlags.node,
     Database.node,
     Memory.node,
+    MemorySources.node,
   ],
 })
 
