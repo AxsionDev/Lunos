@@ -2220,6 +2220,7 @@ export type SettingsSnapshot = {
       created: string
       branch: string
       network: string
+      results?: string
       expires?: string
       handedOff?: string
     }>

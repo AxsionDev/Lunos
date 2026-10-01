@@ -34,10 +34,16 @@ export const DockerAdapter: WorkspaceAdapter = {
     const secrets = Object.fromEntries(
       Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     )
+    // XCOD-158: as `lunos run --sandbox` does. Expired sandboxes go first, and the providers you've
+    // stored with `lunos auth` (in OPENCODE_AUTH_CONTENT) go on the egress allow list, or under the
+    // default network policy the session would lose its model once warped in.
+    await Sandbox.prune().catch(() => [])
+    const stored = secrets.OPENCODE_AUTH_CONTENT ? Object.keys(JSON.parse(secrets.OPENCODE_AUTH_CONTENT)) : []
     const sandbox = await Sandbox.create({
       id: decodeExtra(info.extra).sandbox,
       directory,
       config: SandboxConfig.load(directory),
+      providers: stored,
     })
     await Sandbox.start(sandbox, { secrets })
   },
@@ -47,8 +53,10 @@ export const DockerAdapter: WorkspaceAdapter = {
     const { Sandbox } = await load()
     const project = context?.instance?.project.id
     if (!project) return []
+    // XCOD-158: a sandbox whose results have been handed back has ended. If on_finish kept it, it's
+    // stopped, so it can't serve a warp; `lunos sandbox attach` reopens it.
     return (await Sandbox.known())
-      .filter((meta) => meta.root === context?.instance?.worktree)
+      .filter((meta) => meta.root === context?.instance?.worktree && !meta.handedOff)
       .map((meta) => ({
         type: "docker",
         name: meta.id,
@@ -58,17 +66,20 @@ export const DockerAdapter: WorkspaceAdapter = {
         projectID: project,
       }))
   },
-  // Nothing is destroyed until the results are back on the host: hand them back first (branch plus
-  // transcript), and if that fails, throw and keep the container.
+  // Nothing is destroyed until the results are back on the host: hand them back first (as
+  // sandbox.results says, plus the transcript), then apply sandbox.on_finish, as `lunos run --sandbox`
+  // does. If the handoff fails, the sandbox is kept, stopped, and the error thrown.
   async remove(info) {
     const { Sandbox } = await load()
     const id = decodeExtra(info.extra).sandbox
     const meta = await Sandbox.meta(id).catch(() => undefined)
-    if (meta && (await Sandbox.SandboxDocker.exists(id))) {
-      const conn = await Sandbox.start(meta)
-      await Sandbox.handoff(meta, conn, { outcome: "workspace removed" })
-    }
-    await Sandbox.destroy(id)
+    if (!meta || !(await Sandbox.SandboxDocker.exists(id))) return Sandbox.destroy(id)
+    const conn = await Sandbox.start(meta)
+    const result = await Sandbox.handoff(meta, conn, { outcome: "workspace removed" }).catch(async (error) => {
+      await Sandbox.retain(meta, "handoff failed")
+      throw error
+    })
+    await Sandbox.finish(meta, { failed: result.failed, commit: result.commit, files: result.files.length })
   },
   async target(info) {
     const { Sandbox } = await load()

@@ -837,6 +837,7 @@ export const SnapshotSchema = Schema.Struct({
           created: Schema.String,
           branch: Schema.String,
           network: Schema.String,
+          results: Schema.optional(Schema.String),
           expires: Schema.optional(Schema.String),
           handedOff: Schema.optional(Schema.String),
         }),

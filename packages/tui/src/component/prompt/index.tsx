@@ -548,6 +548,28 @@ export function Prompt(props: PromptProps) {
           workspace.open()
         },
       },
+      // XCOD-158: by warp, so behind the same experimental flag.
+      {
+        title: "Sandbox",
+        desc: "Move the session into a new sandbox (/sandbox end ends it)",
+        name: "sandbox.start",
+        category: "Session",
+        enabled: Flag.OPENCODE_EXPERIMENTAL_WORKSPACES && !workspace.sandboxed(),
+        slashName: "sandbox",
+        run: () => {
+          void workspace.sandbox()
+        },
+      },
+      {
+        title: "End sandbox",
+        desc: "Bring the session back, and the sandbox's results with it",
+        name: "sandbox.end",
+        category: "Session",
+        enabled: Flag.OPENCODE_EXPERIMENTAL_WORKSPACES && workspace.sandboxed(),
+        run: () => {
+          void workspace.endSandbox()
+        },
+      },
       {
         title: "Move session",
         desc: "Move to another project dir",
@@ -969,6 +991,13 @@ export function Prompt(props: PromptProps) {
       input.clear()
       setStore("prompt", { input: "", parts: [] })
       dialog.replace(() => <DialogMemory />)
+      return false
+    }
+    // XCOD-158: `/sandbox end` has an argument too, so the slash list can't run it.
+    if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES && /^\/sandbox\s+end$/.test(store.prompt.input.trim())) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      void workspace.endSandbox()
       return false
     }
     // XCOD-129: `/restart --fresh` has an argument, so the slash list can't run it; neither goes

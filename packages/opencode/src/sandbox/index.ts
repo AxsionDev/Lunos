@@ -115,7 +115,15 @@ export type Status = {
   /** Set when this server runs inside a sandbox: what it's running in. */
   inside?: Marker
   /** Sandboxes this machine holds for the project, from host metadata (no Docker call). */
-  known: { id: string; created: string; branch: string; network: string; expires?: string; handedOff?: string }[]
+  known: {
+    id: string
+    created: string
+    branch: string
+    network: string
+    results?: string
+    expires?: string
+    handedOff?: string
+  }[]
 }
 
 /**
@@ -137,6 +145,7 @@ export async function status(root: string | undefined): Promise<Status> {
         created: info.created,
         branch: info.branch,
         network: info.network ?? "open",
+        results: info.results ?? "branch",
         // Metadata from older sandboxes can hold null here; the snapshot's fields are optional strings.
         expires: info.expires ?? undefined,
         handedOff: info.handedOff ?? undefined,
