@@ -120,6 +120,21 @@ async function project(name: string, sandbox: Record<string, unknown>) {
   return proj
 }
 
+// Rootless Podman keeps its images and state under $HOME and XDG_RUNTIME_DIR, which the throwaway
+// HOME below would hide: point it at the real store, so the image loaded before the run is there.
+async function podmanStore(): Promise<Record<string, string>> {
+  if (runtime !== "podman") return {}
+  const [graph, run] = (await $`podman info --format ${"{{.Store.GraphRoot}}|{{.Store.RunRoot}}"}`.text())
+    .trim()
+    .split("|")
+  const conf = path.join(root, "storage.conf")
+  await Bun.write(conf, `[storage]\ndriver = "overlay"\ngraphroot = "${graph}"\nrunroot = "${run}"\n`)
+  return {
+    CONTAINERS_STORAGE_CONF: conf,
+    ...(process.env.XDG_RUNTIME_DIR ? { XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR } : {}),
+  }
+}
+
 async function run(name: string, proj: string, steps: Step[], env: Record<string, string> = {}) {
   script = steps
   const home = path.join(root, name, "home")
@@ -136,6 +151,7 @@ async function run(name: string, proj: string, steps: Step[], env: Record<string
       XDG_CACHE_HOME: path.join(home, "cache"),
       FAKE_API_KEY: "sk-e2e-0123456789abcdef",
       OPENCODE_DISABLE_MODELS_FETCH: "1",
+      ...(await podmanStore()),
       ...env,
     },
     stdout: "pipe",
