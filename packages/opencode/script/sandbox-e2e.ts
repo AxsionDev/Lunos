@@ -120,19 +120,24 @@ async function project(name: string, sandbox: Record<string, unknown>) {
   return proj
 }
 
-// Rootless Podman keeps its images and state under $HOME and XDG_RUNTIME_DIR, which the throwaway
-// HOME below would hide: point it at the real store, so the image loaded before the run is there.
-async function podmanStore(): Promise<Record<string, string>> {
+// Rootless Podman finds its images and state through HOME and the XDG dirs, which the throwaway
+// ones below would hide: link its real store and config into them, so the image loaded before the
+// run is there.
+async function podmanStore(home: string): Promise<Record<string, string>> {
   if (runtime !== "podman") return {}
-  const [graph, run] = (await $`podman info --format ${"{{.Store.GraphRoot}}|{{.Store.RunRoot}}"}`.text())
-    .trim()
-    .split("|")
-  const conf = path.join(root, "storage.conf")
-  await Bun.write(conf, `[storage]\ndriver = "overlay"\ngraphroot = "${graph}"\nrunroot = "${run}"\n`)
-  return {
-    CONTAINERS_STORAGE_CONF: conf,
-    ...(process.env.XDG_RUNTIME_DIR ? { XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR } : {}),
-  }
+  const real = os.homedir()
+  for (const [from, to] of [
+    [
+      path.join(process.env.XDG_DATA_HOME ?? path.join(real, ".local", "share"), "containers"),
+      path.join(home, "data", "containers"),
+    ],
+    [
+      path.join(process.env.XDG_CONFIG_HOME ?? path.join(real, ".config"), "containers"),
+      path.join(home, "cfg", "containers"),
+    ],
+  ])
+    if (await fs.exists(from)) await fs.symlink(from, to).catch(() => {})
+  return process.env.XDG_RUNTIME_DIR ? { XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR } : {}
 }
 
 async function run(name: string, proj: string, steps: Step[], env: Record<string, string> = {}) {
@@ -151,7 +156,7 @@ async function run(name: string, proj: string, steps: Step[], env: Record<string
       XDG_CACHE_HOME: path.join(home, "cache"),
       FAKE_API_KEY: "sk-e2e-0123456789abcdef",
       OPENCODE_DISABLE_MODELS_FETCH: "1",
-      ...(await podmanStore()),
+      ...(await podmanStore(home)),
       ...env,
     },
     stdout: "pipe",
