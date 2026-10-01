@@ -71,6 +71,14 @@ export function runtimeTmpfs(on: Runtime["engine"] = engine()) {
  */
 export const outsideNetwork = (on: Runtime["engine"] = engine()) => (on === "podman" ? "podman" : "bridge")
 
+/**
+ * XCOD-158: the name a container reaches this machine by (a model served here, e.g. Ollama). Docker
+ * Desktop and Podman provide one; Docker Engine on Linux doesn't, so without this the egress proxy
+ * answered "Couldn't reach host.docker.internal". `host-gateway` works on Docker Desktop too.
+ */
+export const hostAlias = (on: Runtime["engine"] = engine()) =>
+  on === "podman" ? [] : ["--add-host", "host.docker.internal:host-gateway"]
+
 export const current = () => runtime
 
 const docker = (args: string[], options?: SandboxExec.Options) => SandboxExec.check([bin(), ...args], options)
@@ -156,7 +164,7 @@ export function createArgs(input: {
   const networkArgs =
     network === "open"
       ? // The server is reachable from the host's loopback only, on a port Docker picks.
-        ["--publish", `127.0.0.1::${PORT}`]
+        ["--publish", `127.0.0.1::${PORT}`, ...hostAlias(input.engine)]
       : // No route out and no published port: the egress container is the only way in or out.
         ["--network", networkName(input.id), "--network-alias", SANDBOX_ALIAS]
   const proxyEnv =
@@ -320,6 +328,7 @@ export function egressArgs(input: {
     egressName(input.id),
     "--network",
     outsideNetwork(input.engine),
+    ...hostAlias(input.engine),
     "--label",
     `${LABEL}.egress=${input.id}`,
     "--user",
