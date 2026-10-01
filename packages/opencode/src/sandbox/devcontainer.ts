@@ -162,8 +162,21 @@ export async function platformOf(image: SandboxDocker.Image) {
 /** Copy files out of an image without running it: create a container, `cp`, remove it. */
 async function copyOut(image: string, files: [from: string, to: string][]) {
   const id = (await docker(["create", image])).trim()
+  // Docker copies a symlink as a link unless told -L; Podman has no -L and follows it already. If a
+  // link still comes out (it would dangle here), copy what it points to instead.
+  const follow = SandboxDocker.current()?.engine === "podman" ? [] : ["-L"]
   try {
-    for (const [from, to] of files) await docker(["cp", "-L", `${id}:${from}`, to])
+    for (const [from, to] of files) {
+      let source = from
+      for (let hops = 0; ; hops++) {
+        await fs.rm(to, { force: true })
+        await docker(["cp", ...follow, `${id}:${source}`, to])
+        const stat = await fs.lstat(to)
+        if (!stat.isSymbolicLink()) break
+        if (hops === 5) throw new Error(`${from} in ${image} is a chain of symlinks`)
+        source = path.posix.resolve(path.posix.dirname(source), await fs.readlink(to))
+      }
+    }
   } finally {
     await run(["rm", "-f", id])
   }
@@ -172,10 +185,12 @@ async function copyOut(image: string, files: [from: string, to: string][]) {
 /** Whether an image is musl-based (Alpine): Lunos's loader would then change the image's own libc. */
 async function isMusl(image: string, arch: string) {
   const id = (await docker(["create", image])).trim()
+  const into = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-devcontainer-libc-"))
   try {
-    return (await run(["cp", `${id}:/lib/ld-musl-${arch}.so.1`, os.devNull])).code === 0
+    return (await run(["cp", `${id}:/lib/ld-musl-${arch}.so.1`, into])).code === 0
   } finally {
     await run(["rm", "-f", id])
+    await fs.rm(into, { recursive: true, force: true })
   }
 }
 
