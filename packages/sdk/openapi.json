@@ -22507,6 +22507,14 @@
                   "type": "string"
                 }
               },
+              "results": {
+                "type": "string",
+                "enum": ["branch", "patch", "none"]
+              },
+              "runtime": {
+                "type": "string",
+                "enum": ["docker", "podman"]
+              },
               "resources": {
                 "type": "object",
                 "properties": {
@@ -23162,6 +23170,69 @@
           },
           "usage": {
             "$ref": "#/components/schemas/SettingsUsage"
+          },
+          "sandbox": {
+            "type": "object",
+            "properties": {
+              "inside": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string"
+                  },
+                  "digest": {
+                    "type": "string"
+                  },
+                  "network": {
+                    "type": "string"
+                  },
+                  "results": {
+                    "type": "string"
+                  },
+                  "runtime": {
+                    "type": "string"
+                  },
+                  "created": {
+                    "type": "string"
+                  }
+                },
+                "required": ["id"],
+                "additionalProperties": false
+              },
+              "known": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "network": {
+                      "type": "string"
+                    },
+                    "expires": {
+                      "type": "string"
+                    },
+                    "handedOff": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "created", "branch", "network"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["known"],
+            "additionalProperties": false
           }
         },
         "required": ["rows", "layers", "locked", "files", "usage"],

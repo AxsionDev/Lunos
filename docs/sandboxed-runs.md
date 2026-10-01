@@ -19,7 +19,7 @@ Or turn it on for every run in a project or for yourself:
 }
 ```
 
-`--no-sandbox` overrides `sandbox.enabled` for one run. If any config layer (global, project, `OPENCODE_CONFIG_CONTENT`) turns it on, it is on: a repository's own config can't switch off a sandbox you asked for. `sandbox.enabled` applies to `lunos` and `lunos run` only; `lunos serve`, `lunos web`, `lunos acp` and the other commands still run on the host. Sandboxing needs Docker (Docker Desktop, or Docker Engine on Linux); if the `docker` command or daemon isn't available, Lunos says so and stops rather than running on the host.
+`--no-sandbox` overrides `sandbox.enabled` for one run. If any config layer (global, project, `OPENCODE_CONFIG_CONTENT`) turns it on, it is on: a repository's own config can't switch off a sandbox you asked for. `sandbox.enabled` applies to `lunos` and `lunos run` only; `lunos serve`, `lunos web`, `lunos acp` and the other commands still run on the host. Sandboxing needs Docker (Docker Desktop, or Docker Engine on Linux) or Podman, rootless included. Lunos uses Docker if it's available, else Podman; `sandbox.runtime` (`"docker"` or `"podman"`) picks one. If neither is available, Lunos says what it tried and stops rather than running on the host.
 
 ## What happens
 
@@ -57,6 +57,18 @@ With it set:
 
 Inside the sandbox, the requirement is met, so tools run normally. Lunos knows it's inside from a marker in the root-owned, read-only `/etc/lunos` volume, not from an environment variable, which anyone could set on the machine.
 
+## Getting the results back
+
+`sandbox.results` sets what comes back when the work is done:
+
+| `sandbox.results`    | What comes back, besides the transcript and summary                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `"branch"` (default) | Branch `lunos/sandbox/<id>`, as described above                                                                                                                                                  |
+| `"patch"`            | `.opencode/sandbox/<id>/changes.patch`: only the agent's changes, not your uncommitted work the sandbox started from, so `git apply` puts them on top of your working tree. No branch is created |
+| `"none"`             | Nothing: the changes stay in the sandbox (keep it, with `retain`, to look at them)                                                                                                               |
+
+Files Lunos itself would write into your project inside the sandbox (adding `$schema` to `opencode.json`, for example) are left alone, so the results hold only what the agent changed.
+
 ## Keeping or throwing away the environment
 
 | `sandbox.on_finish`    | After a successful hand-back                                                                               |
@@ -86,6 +98,10 @@ lunos sandbox prune            # remove kept sandboxes whose retain_for has expi
 ```
 
 `attach` reopens the TUI on the sandbox's most recent session, with its history. When you leave, the hand-back runs again: new changes are added to `lunos/sandbox/<id>` as another commit, and the sandbox is stopped and kept (with a fresh `retain_for`, if one is set).
+
+## Seeing sandboxes
+
+`/status` (the Status tab of `/settings`) shows a **Sandbox** line. In a session running in a sandbox, it names the sandbox, its image and pinned digest, its network mode and how results come back. On your machine, it lists the project's sandboxes, with their network mode and expiry. `lunos sandbox list` shows every sandbox on the machine.
 
 ## Isolation defaults
 
@@ -198,24 +214,28 @@ The agent runs as the same user as that server, so it could alter the log inside
 - **The kernel is shared.** A container is not a virtual machine. A kernel vulnerability, or a container-escape bug in Docker, defeats the isolation. For untrusted code where that matters, run Lunos in a VM.
 - **Allowed hosts are allowed for everything in the sandbox.** The proxy checks where a connection goes, not what it carries: a command in the sandbox can send data to your model provider, or to any other allowed host, as the agent itself can. With `"open"`, nothing is restricted.
 - **Each sandbox holds a Docker network while it exists.** Docker's default address pool has room for about 30 networks; destroy or prune kept sandboxes you don't need.
-- **The volume has no size limit** on Docker's default volume driver; `tmp` limits only `/tmp`.
+- **The volume has no size limit.** Docker's and Podman's default volume drivers can't cap a volume's size, and the container's own filesystem is read-only, so a limit on it would change nothing. `tmp` limits only `/tmp`. There is no `sandbox.resources.disk` for this reason: a limit that isn't enforced would be worse than none.
 - **Anything the agent can reach through the model provider or the network is not contained**: a sandbox limits what the agent can do to your machine, not what it can send out.
 
-Also not built yet: a `mount` workspace mode, devcontainer images, Podman, `/sandbox` in the TUI, and sandbox status in `/settings`. Verified on macOS with Docker Desktop only so far.
+Also not built yet: a `mount` workspace mode, devcontainer images, and `/sandbox` in the TUI.
+
+**Where it has been verified:** macOS with Docker Desktop, end to end. Rootless Podman 5.8 (netavark), with the full container lifecycle replayed in a Podman nested inside Docker Desktop, not on a Linux machine. Not yet on Linux with Docker Engine, or on Windows. On Podman, the host is `host.containers.internal` from inside a container, where Docker Desktop has `host.docker.internal`.
 
 ## Configuration reference
 
-| Key                        | Default                             | Meaning                                                          |
-| -------------------------- | ----------------------------------- | ---------------------------------------------------------------- |
-| `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed |
-| `sandbox.required`         | `false`                             | Nothing runs outside a sandbox; for locked managed config        |
-| `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                            |
-| `sandbox.workspace`        | `"copy"`                            | How the project gets in; `copy` is the only mode so far          |
-| `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back |
-| `sandbox.retain_for`       | unset (kept until destroyed)        | How long a kept sandbox stays, e.g. `"72h"`; then it's pruned    |
-| `sandbox.network`          | `"policy"`                          | `policy`, `none` or `open`; see [Network](#network)              |
-| `sandbox.allow`            | `[]`                                | Extra hosts under `policy`; global and managed config only       |
-| `sandbox.resources.cpus`   | `2`                                 | `docker --cpus`                                                  |
-| `sandbox.resources.memory` | `"4g"`                              | `docker --memory`                                                |
-| `sandbox.resources.pids`   | `512`                               | `docker --pids-limit`                                            |
-| `sandbox.resources.tmp`    | `"1g"`                              | Size of the in-memory `/tmp`                                     |
+| Key                        | Default                             | Meaning                                                                                |
+| -------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------- |
+| `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed                       |
+| `sandbox.required`         | `false`                             | Nothing runs outside a sandbox; for locked managed config                              |
+| `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                                                  |
+| `sandbox.workspace`        | `"copy"`                            | How the project gets in; `copy` is the only mode so far                                |
+| `sandbox.results`          | `"branch"`                          | `branch`, `patch` or `none`; see [Getting the results back](#getting-the-results-back) |
+| `sandbox.runtime`          | Docker, else Podman                 | `docker` or `podman`                                                                   |
+| `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back                       |
+| `sandbox.retain_for`       | unset (kept until destroyed)        | How long a kept sandbox stays, e.g. `"72h"`; then it's pruned                          |
+| `sandbox.network`          | `"policy"`                          | `policy`, `none` or `open`; see [Network](#network)                                    |
+| `sandbox.allow`            | `[]`                                | Extra hosts under `policy`; global and managed config only                             |
+| `sandbox.resources.cpus`   | `2`                                 | `docker --cpus`                                                                        |
+| `sandbox.resources.memory` | `"4g"`                              | `docker --memory`                                                                      |
+| `sandbox.resources.pids`   | `512`                               | `docker --pids-limit`                                                                  |
+| `sandbox.resources.tmp`    | `"1g"`                              | Size of the in-memory `/tmp`                                                           |

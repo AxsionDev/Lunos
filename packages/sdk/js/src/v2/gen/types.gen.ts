@@ -2006,6 +2006,8 @@ export type Config = {
     retain_for?: string
     network?: "policy" | "none" | "open"
     allow?: Array<string>
+    results?: "branch" | "patch" | "none"
+    runtime?: "docker" | "podman"
     resources?: {
       /**
        * CPUs the sandbox may use (docker --cpus). Default 2
@@ -2203,6 +2205,25 @@ export type SettingsSnapshot = {
     }
   }
   usage: SettingsUsage
+  sandbox?: {
+    inside?: {
+      id: string
+      image?: string
+      digest?: string
+      network?: string
+      results?: string
+      runtime?: string
+      created?: string
+    }
+    known: Array<{
+      id: string
+      created: string
+      branch: string
+      network: string
+      expires?: string
+      handedOff?: string
+    }>
+  }
 }
 
 export type SettingsSetInput = {

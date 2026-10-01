@@ -41,6 +41,11 @@ export type Meta = {
   on_finish: SandboxConfig.Resolved["on_finish"]
   retain_for?: number
   resources: SandboxConfig.Resolved["resources"]
+  /** XCOD-158: how the results come back; absent on older sandboxes, which used "branch". */
+  results?: SandboxConfig.Resolved["results"]
+  /** The container runtime that created it; absent on older sandboxes, which used Docker. */
+  runtime?: SandboxDocker.Runtime["name"]
+  engine?: SandboxDocker.Runtime["engine"]
   /** XCOD-157: absent on sandboxes made before network policy existed, which were "open". */
   network?: SandboxConfig.Network
   /** The egress proxy's allow list ("host:port"), fixed when the sandbox was created. */
@@ -60,8 +65,13 @@ export type Meta = {
 export type Connection = { url: string; password: string; headers: Record<string, string>; directory: string }
 
 export type Handoff = {
-  branch: string
-  commit: string
+  mode: SandboxConfig.Resolved["results"]
+  /** Set for "branch". */
+  branch?: string
+  /** Set for "patch": the file holding the agent's changes. */
+  patch?: string
+  /** The commit the workspace was recorded as ("branch" and "patch"), for the summary. */
+  commit?: string
   files: { status: string; path: string }[]
   results: string
   /** Whether a session's last reply ended in an error: what destroy_on_success keeps a sandbox for. */
@@ -77,6 +87,61 @@ export const resultsDir = (root: string, id: string) => path.join(root, ".openco
 async function saveMeta(meta: Meta) {
   await fs.mkdir(metaDir(), { recursive: true, mode: 0o700 })
   await fs.writeFile(metaFile(meta.id), JSON.stringify(meta, null, 2), { mode: 0o600 })
+}
+
+export type Marker = {
+  id: string
+  image?: string
+  digest?: string
+  network?: SandboxConfig.Network
+  results?: SandboxConfig.Resolved["results"]
+  runtime?: string
+  created?: string
+}
+
+export function markerOf(info: Meta): Marker {
+  return {
+    id: info.id,
+    image: info.image.ref,
+    digest: info.image.digest ?? info.image.id,
+    network: info.network ?? "open",
+    results: info.results ?? "branch",
+    runtime: info.engine ?? info.runtime ?? "docker",
+    created: info.created,
+  }
+}
+
+export type Status = {
+  /** Set when this server runs inside a sandbox: what it's running in. */
+  inside?: Marker
+  /** Sandboxes this machine holds for the project, from host metadata (no Docker call). */
+  known: { id: string; created: string; branch: string; network: string; expires?: string; handedOff?: string }[]
+}
+
+/**
+ * For the Status tab. Inside a sandbox, the marker (only when it matches LUNOS_SANDBOX, see
+ * SandboxConfig.inside); on the host, the project's sandboxes from their metadata.
+ */
+export async function status(root: string | undefined): Promise<Status> {
+  if (SandboxConfig.inside()) {
+    const marker = JSON.parse(
+      await fs.readFile(path.join(SandboxDocker.POLICY_DIR, SandboxDocker.MARKER), "utf8"),
+    ) as Marker
+    return { inside: marker, known: [] }
+  }
+  return {
+    known: (await known())
+      .filter((info) => !root || info.root === root)
+      .map((info) => ({
+        id: info.id,
+        created: info.created,
+        branch: info.branch,
+        network: info.network ?? "open",
+        // Metadata from older sandboxes can hold null here; the snapshot's fields are optional strings.
+        expires: info.expires ?? undefined,
+        handedOff: info.handedOff ?? undefined,
+      })),
+  }
 }
 
 /** What every sandbox audit event says about the sandbox. Never file contents. */
@@ -97,7 +162,9 @@ function auditFields(info: Meta) {
 export async function meta(id: string): Promise<Meta> {
   const text = await fs.readFile(metaFile(id), "utf8").catch(() => undefined)
   if (!text) throw new Error(`No sandbox ${id}. \`lunos sandbox list\` shows the ones that exist`)
-  return JSON.parse(text) as Meta
+  const info = JSON.parse(text) as Meta
+  SandboxDocker.use(info.runtime, info.engine)
+  return info
 }
 
 /** Provider keys: whatever the host's env holds under the *_API_KEY convention. */
@@ -120,7 +187,7 @@ export async function create(input: {
 }): Promise<Meta> {
   const log = input.log ?? (() => {})
   if (process.env.LUNOS_SANDBOX) throw new Error("Already running inside a sandbox; a sandbox can't start another")
-  await SandboxDocker.available()
+  await SandboxDocker.available(input.config.runtime)
   const repo = await SandboxGit.repo(input.directory)
   const id = input.id ?? randomBytes(4).toString("hex")
   if (!/^[a-z0-9-]{1,40}$/.test(id)) throw new Error(`Invalid sandbox id ${id}`)
@@ -167,6 +234,9 @@ export async function create(input: {
       on_finish: input.config.on_finish,
       retain_for: input.config.retain_for,
       resources: input.config.resources,
+      results: input.config.results,
+      runtime: SandboxDocker.current()?.name,
+      engine: SandboxDocker.current()?.engine,
       network,
       allow: computed.allow,
       password,
@@ -206,7 +276,9 @@ async function populate(
   const policy = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-policy-"))
   try {
     if (managed) await fs.writeFile(path.join(policy, "managed.json"), JSON.stringify(auditInside(managed), null, 2))
-    await fs.writeFile(path.join(policy, SandboxDocker.MARKER), JSON.stringify({ id: info.id }) + "\n")
+    // XCOD-158: the marker also tells the server inside what it's running in (the Status tab), since
+    // it can't ask Docker. Root-owned and read-only, like the rest of the policy volume.
+    await fs.writeFile(path.join(policy, SandboxDocker.MARKER), JSON.stringify(markerOf(info)) + "\n")
     await SandboxDocker.seedPolicy(info.id, info.image.id, policy, SandboxGit.TAR_ENV)
   } finally {
     await fs.rm(policy, { recursive: true, force: true })
@@ -397,6 +469,41 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
 
   const out = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-out-"))
   try {
+    const mode = info.results ?? "branch"
+    await fs.mkdir(results, { recursive: true })
+    await fs.writeFile(path.join(path.dirname(results), ".gitignore"), "*\n")
+    await fs.writeFile(path.join(results, "transcript.json"), JSON.stringify(sessions, null, 2))
+    await collectAudit(info, results)
+    const summary = (fields: Record<string, unknown>) =>
+      fs.writeFile(
+        path.join(results, "summary.json"),
+        JSON.stringify(
+          {
+            id: info.id,
+            image: info.image,
+            resources: info.resources,
+            network: info.network ?? "open",
+            base: info.base,
+            results: mode,
+            ...fields,
+            sessions: sessions.map((item) => ({
+              id: item.session.id,
+              title: item.session.title,
+              messages: item.messages.length,
+            })),
+            created: info.created,
+            finished: new Date().toISOString(),
+            ...extra,
+          },
+          null,
+          2,
+        ),
+      )
+    if (mode === "none") {
+      await summary({ files: [] })
+      return { mode, files: [], results, failed: failed(sessions) }
+    }
+
     await SandboxDocker.copyOut(info.id, out)
     const workTree = path.join(out, path.posix.basename(SandboxDocker.WORKSPACE))
     const previous = info.handedOff
@@ -415,40 +522,23 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
         ? parent
         : await SandboxGit.commit({ gitDir: info.gitDir, tree, parent, message: `sandbox ${info.id}: agent changes` })
 
-    await fs.mkdir(results, { recursive: true })
-    await fs.writeFile(path.join(path.dirname(results), ".gitignore"), "*\n")
-    await fs.writeFile(path.join(results, "transcript.json"), JSON.stringify(sessions, null, 2))
-    await collectAudit(info, results)
+    if (mode === "patch") {
+      // Only the agent's changes: from the tree the sandbox started with, not from the base commit.
+      const patch = path.join(results, "changes.patch")
+      await fs.writeFile(patch, await SandboxGit.diff(info.gitDir, info.seedTree, tree))
+      info.handedOff = commit
+      await saveMeta(info)
+      const files = await SandboxGit.changedFiles(info.gitDir, info.seedTree, tree)
+      await summary({ patch, commit, files })
+      return { mode, patch, commit, files, results, failed: failed(sessions) }
+    }
     await SandboxGit.setBranch({ gitDir: info.gitDir, branch: info.branch, commit, expected: previous })
     info.handedOff = commit
     await saveMeta(info)
     // Last, so a summary only ever describes a branch that exists.
     const files = await SandboxGit.changedFiles(info.gitDir, info.base, commit)
-    await fs.writeFile(
-      path.join(results, "summary.json"),
-      JSON.stringify(
-        {
-          id: info.id,
-          image: info.image,
-          resources: info.resources,
-          base: info.base,
-          branch: info.branch,
-          commit,
-          files,
-          sessions: sessions.map((item) => ({
-            id: item.session.id,
-            title: item.session.title,
-            messages: item.messages.length,
-          })),
-          created: info.created,
-          finished: new Date().toISOString(),
-          ...extra,
-        },
-        null,
-        2,
-      ),
-    )
-    return { branch: info.branch, commit, files, results, failed: failed(sessions) }
+    await summary({ branch: info.branch, commit, files })
+    return { mode, branch: info.branch, commit, files, results, failed: failed(sessions) }
   } finally {
     await fs.rm(out, { recursive: true, force: true })
   }
@@ -540,6 +630,7 @@ export async function known(): Promise<Meta[]> {
 }
 
 export async function list() {
+  await SandboxDocker.available()
   const rows = await SandboxDocker.list()
   return Promise.all(rows.map(async (row) => ({ ...row, meta: await meta(row.id).catch(() => undefined) })))
 }

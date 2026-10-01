@@ -636,3 +636,104 @@ describe("sandbox network", () => {
     expect(egress).not.toContain("lunos.sandbox=abcd1234")
   })
 })
+
+// XCOD-158: runtimes, result modes and status.
+describe("sandbox slice 3", () => {
+  test("results and runtime decode through both schemas; defaults are branch and auto-detect", () => {
+    const value = { results: "patch", runtime: "podman" } as const
+    expect(Schema.decodeUnknownSync(ConfigV1.Info)({ sandbox: value }).sandbox).toEqual(value)
+    expect(Schema.decodeUnknownSync(Config.Info)({ sandbox: value }).sandbox?.results).toBe("patch")
+    expect(() => Schema.decodeUnknownSync(ConfigV1.Info)({ sandbox: { runtime: "lxc" } })).toThrow()
+    expect(SandboxConfig.resolve({}).results).toBe("branch")
+    expect(SandboxConfig.resolve({}).runtime).toBeUndefined()
+  })
+
+  test("listing parses the inspect template both runtimes print, including podman's leading slash", () => {
+    const out = [
+      "abcd1234\t/lunos-sandbox-abcd1234\texited\t/repo\t2026-09-30T16:00:00Z",
+      "ef567890\tlunos-sandbox-ef567890\trunning\t\t2026-09-30T16:05:00.123456789+03:00",
+      // The egress container carries no lunos.sandbox label: its id renders as "<no value>".
+      "<no value>\tlunos-sandbox-abcd1234-egress\texited\t<no value>\t2026-09-30T16:00:00Z",
+    ].join("\n")
+    expect(SandboxDocker.parseList(out)).toEqual([
+      {
+        id: "abcd1234",
+        name: "lunos-sandbox-abcd1234",
+        state: "exited",
+        status: "exited",
+        project: "/repo",
+        created: "2026-09-30T16:00:00Z",
+      },
+      {
+        id: "ef567890",
+        name: "lunos-sandbox-ef567890",
+        state: "running",
+        status: "running",
+        project: undefined,
+        created: "2026-09-30T16:05:00.123456789+03:00",
+      },
+    ])
+  })
+
+  test("a patch holds only the agent's changes, and applies on top of the user's own uncommitted work", async () => {
+    await using tmp = await tmpdir({ git: true })
+    const root = tmp.path
+    await Bun.write(path.join(root, "a.txt"), "a\n")
+    await $`git add -A && git commit -qm base`.cwd(root).quiet()
+    await Bun.write(path.join(root, "mine.txt"), "the user's own work\n")
+    const repo = await SandboxGit.repo(root)
+    await using seedDir = await tmpdir()
+    const seed = path.join(seedDir.path, "ws")
+    await SandboxGit.seed({ ...repo, into: seed, branch: "lunos/sandbox/patch" })
+    const baseTree = await SandboxGit.treeOfCommit(repo.gitDir, repo.base)
+    const seedTree = await SandboxGit.tree({ gitDir: repo.gitDir, workTree: seed, startTree: baseTree })
+    await Bun.write(path.join(seed, "a.txt"), "a\nby the agent\n")
+    await Bun.write(path.join(seed, "agent.bin"), new Uint8Array([0, 1, 2, 255]))
+    const tree = await SandboxGit.tree({ gitDir: repo.gitDir, workTree: seed, startTree: seedTree })
+
+    const patch = await SandboxGit.diff(repo.gitDir, seedTree, tree)
+    expect(patch).toContain("a/a.txt")
+    expect(patch).toContain("GIT binary patch")
+    expect(patch).not.toContain("mine.txt")
+    await Bun.write(path.join(root, "changes.patch"), patch)
+    await $`git apply changes.patch`.cwd(root).quiet()
+    expect(await Bun.file(path.join(root, "a.txt")).text()).toBe("a\nby the agent\n")
+    expect(new Uint8Array(await Bun.file(path.join(root, "agent.bin")).arrayBuffer())).toEqual(
+      new Uint8Array([0, 1, 2, 255]),
+    )
+    expect(await Bun.file(path.join(root, "mine.txt")).text()).toBe("the user's own work\n")
+    // No branch was made.
+    expect((await $`git branch --list ${"lunos/sandbox/*"}`.cwd(root).text()).trim()).toBe("")
+  })
+
+  test("podman gets its own tmpfs owner option and starts the proxy on a bridge network", () => {
+    // Both found by replaying the lifecycle on rootless Podman 5.8: it rejects uid=, and a container
+    // started with its default (pasta) networking can't join the internal network afterwards.
+    expect(SandboxDocker.runtimeTmpfs("docker")).toEndWith(",uid=1000,gid=1000")
+    expect(SandboxDocker.runtimeTmpfs("podman")).toEndWith(",mode=0700,U")
+    const image = { ref: "x", id: "sha256:x" }
+    const pair = (args: string[], flag: string) => args[args.indexOf(flag) + 1]
+    expect(pair(SandboxDocker.egressArgs({ id: "a", image, allow: [], engine: "podman" }), "--network")).toBe("podman")
+    expect(pair(SandboxDocker.egressArgs({ id: "a", image, allow: [], engine: "docker" }), "--network")).toBe("bridge")
+  })
+
+  test("the marker tells the server inside what it runs in", () => {
+    const marker = Sandbox.markerOf({
+      id: "abcd1234",
+      image: { ref: "lunos-sandbox:local", id: "sha256:feed", digest: "lunos@sha256:beef" },
+      network: "policy",
+      results: "patch",
+      runtime: "podman",
+      created: "2026-09-30T16:00:00Z",
+    } as Sandbox.Meta)
+    expect(marker).toEqual({
+      id: "abcd1234",
+      image: "lunos-sandbox:local",
+      digest: "lunos@sha256:beef",
+      network: "policy",
+      results: "patch",
+      runtime: "podman",
+      created: "2026-09-30T16:00:00Z",
+    })
+  })
+})

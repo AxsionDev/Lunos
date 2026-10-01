@@ -134,6 +134,7 @@ const DEFAULTS: Record<string, unknown> = {
   "sandbox.workspace": "copy",
   "sandbox.on_finish": "destroy",
   "sandbox.network": "policy",
+  "sandbox.results": "branch",
   "sandbox.resources.cpus": 2,
   "sandbox.resources.memory": "4g",
   "sandbox.resources.pids": 512,
@@ -816,6 +817,32 @@ export const SnapshotSchema = Schema.Struct({
     project: Schema.Struct({ config: Schema.String, tui: Schema.String }),
   }),
   usage: Usage,
+  // XCOD-158: sandboxes, for the Status tab. Optional, so older servers still decode.
+  sandbox: Schema.optional(
+    Schema.Struct({
+      inside: Schema.optional(
+        Schema.Struct({
+          id: Schema.String,
+          image: Schema.optional(Schema.String),
+          digest: Schema.optional(Schema.String),
+          network: Schema.optional(Schema.String),
+          results: Schema.optional(Schema.String),
+          runtime: Schema.optional(Schema.String),
+          created: Schema.optional(Schema.String),
+        }),
+      ),
+      known: Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          created: Schema.String,
+          branch: Schema.String,
+          network: Schema.String,
+          expires: Schema.optional(Schema.String),
+          handedOff: Schema.optional(Schema.String),
+        }),
+      ),
+    }),
+  ),
 }).annotate({ identifier: "SettingsSnapshot" })
 
 export const SetInput = Schema.Struct({
