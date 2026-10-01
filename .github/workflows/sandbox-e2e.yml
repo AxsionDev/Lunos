@@ -1,0 +1,58 @@
+name: sandbox-e2e
+
+# XCOD-158: sandboxed runs end to end on a real Linux host, with Docker Engine and with rootless
+# Podman. packages/opencode/script/sandbox-e2e.ts drives `lunos run --sandbox` against a scripted
+# model on the runner: results as a branch and as a patch, egress refused, a clear error with no
+# runtime, and nothing left behind. GitHub-hosted runners, so it runs on this fork too. It's also
+# the only CI that builds a release binary (with package.json's Bun), so it runs on build.ts changes.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "packages/opencode/src/sandbox/**"
+      - "packages/opencode/script/sandbox-*"
+      - "packages/opencode/Dockerfile"
+      - "packages/opencode/script/build.ts"
+      - "packages/core/src/config/sandbox.ts"
+      - ".github/workflows/sandbox-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [docker, podman]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Build the sandbox image
+        timeout-minutes: 15
+        working-directory: packages/opencode
+        run: bun run script/sandbox-image.ts --tag lunos-sandbox:local
+
+      # Rootless Podman has its own image store: copy the image across, and use the name it loads as.
+      - name: Load the image into Podman
+        if: matrix.runtime == 'podman'
+        run: |
+          podman --version
+          podman info --format '{{.Host.Security.Rootless}} rootless, network {{.Host.NetworkBackend}}'
+          ref=$(docker save lunos-sandbox:local | podman load | sed -n 's/^Loaded image: //p' | head -1)
+          echo "IMAGE=$ref" >> "$GITHUB_ENV"
+
+      - name: Sandboxed runs end to end
+        timeout-minutes: 15
+        working-directory: packages/opencode
+        env:
+          SANDBOX_E2E_VERBOSE: "1"
+        run: bun run script/sandbox-e2e.ts --runtime ${{ matrix.runtime }} --image "${IMAGE:-lunos-sandbox:local}"
