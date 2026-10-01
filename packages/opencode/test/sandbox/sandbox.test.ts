@@ -697,7 +697,8 @@ describe("sandbox slice 3", () => {
     expect(patch).not.toContain("mine.txt")
     await Bun.write(path.join(root, "changes.patch"), patch)
     await $`git apply changes.patch`.cwd(root).quiet()
-    expect(await Bun.file(path.join(root, "a.txt")).text()).toBe("a\nby the agent\n")
+    // git apply checks text out with the user's own line endings: CRLF under Windows' core.autocrlf.
+    expect((await Bun.file(path.join(root, "a.txt")).text()).replaceAll("\r\n", "\n")).toBe("a\nby the agent\n")
     expect(new Uint8Array(await Bun.file(path.join(root, "agent.bin")).arrayBuffer())).toEqual(
       new Uint8Array([0, 1, 2, 255]),
     )
