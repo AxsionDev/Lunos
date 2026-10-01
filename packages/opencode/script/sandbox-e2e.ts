@@ -242,11 +242,16 @@ try {
     const proj = await project("noruntime", {})
     const bin = path.join(root, "noruntime", "bin")
     await fs.mkdir(bin, { recursive: true })
-    for (const tool of ["bun", "git"]) {
-      const found = Bun.which(tool)
-      if (found) await fs.symlink(found, path.join(bin, path.basename(found)))
-    }
-    const res = await run("noruntime", proj, [edit(), { text: "done" }], { PATH: bin })
+    // Copied, not linked: symlinks need Developer Mode on Windows. Git for Windows' git.exe finds
+    // the rest of Git relative to itself, so there its own directory goes on PATH instead (it holds
+    // no container runtime).
+    const git = Bun.which("git")
+    const gitDir = process.platform === "win32" && git ? [path.dirname(git)] : []
+    for (const found of [Bun.which("bun"), gitDir.length ? undefined : git])
+      if (found) await fs.copyFile(found, path.join(bin, path.basename(found)))
+    const res = await run("noruntime", proj, [edit(), { text: "done" }], {
+      PATH: [bin, ...gitDir].join(path.delimiter),
+    })
     check("no runtime: run fails", res.code !== 0)
     check(
       "no runtime: the error says neither runtime is available",
