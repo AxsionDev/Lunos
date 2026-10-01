@@ -59,8 +59,8 @@ const engine = () => runtime?.engine ?? "docker"
  * The runtime tmpfs, owned by the sandbox user. Podman refuses Docker's uid=/gid= options and has
  * its own, `U`: chown to the container's user (verified on rootless Podman 5.8).
  */
-export function runtimeTmpfs(on: Runtime["engine"] = engine()) {
-  const [uid, gid] = UID.split(":")
+export function runtimeTmpfs(on: Runtime["engine"] = engine(), user = UID) {
+  const [uid, gid] = user.split(":")
   const owner = on === "podman" ? "U" : `uid=${uid},gid=${gid}`
   return `${RUNTIME_DIR}:rw,noexec,nosuid,nodev,size=1m,mode=0700,${owner}`
 }
@@ -78,6 +78,80 @@ export const outsideNetwork = (on: Runtime["engine"] = engine()) => (on === "pod
  */
 export const hostAlias = (on: Runtime["engine"] = engine()) =>
   on === "podman" ? [] : ["--add-host", "host.docker.internal:host-gateway"]
+
+/**
+ * XCOD-158: who the sandbox runs as. `user` is the container user; `userns` a Podman user namespace.
+ * The default (uid 1000) suits copy mode everywhere. With the working tree bind-mounted, files the
+ * agent writes must end up owned by you, so mount mode depends on the runtime (see `mountIdentity`).
+ */
+export type Identity = { user: string; userns?: string }
+export const DEFAULT_IDENTITY: Identity = { user: UID }
+const usernsArgs = (identity: Identity) => (identity.userns ? ["--userns", identity.userns] : [])
+
+/**
+ * The identity for `workspace: "mount"`, or why it can't be offered here. Only what has been
+ * verified: Docker Desktop (its file sharing maps ownership to you), rootless Podman (keep-id maps
+ * uid 1000 to you), and rootful Docker Engine on Linux (the sandbox runs as your own uid). Never
+ * root, and never a chown of your files.
+ */
+export async function mountIdentity(
+  on: Runtime["engine"] = engine(),
+  host = { platform: process.platform, uid: process.getuid?.(), gid: process.getgid?.() },
+): Promise<Identity> {
+  if (on === "podman") {
+    const rootless = (await run(["info", "--format", "{{.Host.Security.Rootless}}"])).stdout.trim() === "true"
+    if (rootless) return { user: UID, userns: `keep-id:uid=${UID.split(":")[0]},gid=${UID.split(":")[1]}` }
+    return hostIdentity(host)
+  }
+  const info = (await run(["info", "--format", "{{.OperatingSystem}}|{{json .SecurityOptions}}"])).stdout
+  if (/rootless/.test(info))
+    throw new Error(
+      'sandbox.workspace "mount" isn\'t supported with rootless Docker yet: file ownership in your working tree ' +
+        'hasn\'t been verified there. Use "copy", or rootless Podman.',
+    )
+  if (/Docker Desktop/i.test(info) || host.platform !== "linux") return DEFAULT_IDENTITY
+  return hostIdentity(host)
+}
+
+function hostIdentity(host: { uid?: number; gid?: number }): Identity {
+  if (host.uid === undefined || host.gid === undefined) return DEFAULT_IDENTITY
+  if (host.uid === 0)
+    throw new Error(
+      'sandbox.workspace "mount" would run the sandbox as root, because you are root here. Use "copy", or run Lunos as a regular user.',
+    )
+  return { user: `${host.uid}:${host.gid}` }
+}
+
+/** XCOD-158: the host side of `workspace: "mount"` and of sandbox.mounts. */
+export type Binds = {
+  /** Your working tree, mounted read-write at WORKSPACE. Unset in copy mode. */
+  root?: string
+  /** Paths under root mounted read-only over it: .git, Lunos's own config. Relative to root. */
+  protect: string[]
+  /** Paths outside root mounted read-only at the same path: a linked worktree's git directories. */
+  outside: string[]
+  /** sandbox.mounts, already checked: read-only. */
+  extra: { source: string; target: string }[]
+}
+export const NO_BINDS: Binds = { protect: [], outside: [], extra: [] }
+
+const bind = (source: string, target: string, readonly: boolean) => [
+  "--mount",
+  `type=bind,source=${source},target=${target}${readonly ? ",readonly" : ""}`,
+]
+
+export function bindArgs(binds: Binds) {
+  return [
+    ...(binds.root ? bind(binds.root, WORKSPACE, false) : []),
+    ...(binds.root
+      ? binds.protect.flatMap((item) =>
+          bind(`${binds.root}/${item}`, `${WORKSPACE}/${item.split("\\").join("/")}`, true),
+        )
+      : []),
+    ...binds.outside.flatMap((item) => bind(item, item, true)),
+    ...binds.extra.flatMap((item) => bind(item.source, item.target, true)),
+  ]
+}
 
 export const current = () => runtime
 
@@ -158,8 +232,22 @@ export function createArgs(input: {
   /** XCOD-157: "open" keeps Docker's default network; otherwise only the internal one, via the proxy. */
   network?: SandboxConfig.Network
   engine?: Runtime["engine"]
+  identity?: Identity
+  binds?: Binds
 }) {
   const network = input.network ?? "open"
+  const identity = input.identity ?? DEFAULT_IDENTITY
+  const binds = input.binds ?? NO_BINDS
+  // XCOD-158: with the working tree mounted, git sees a directory it may not own (and .git read-only):
+  // trust it, and don't take optional locks such as `git status` refreshing the index.
+  const gitEnv: Record<string, string> = binds.root
+    ? {
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: "safe.directory",
+        GIT_CONFIG_VALUE_0: "*",
+        GIT_OPTIONAL_LOCKS: "0",
+      }
+    : {}
   const proxy = `http://${EGRESS_ALIAS}:${PROXY_PORT}`
   const networkArgs =
     network === "open"
@@ -190,9 +278,10 @@ export function createArgs(input: {
     `${LABEL}.project=${input.project}`,
     // Isolation defaults: non-root, no capabilities, no privilege escalation, Docker's default
     // seccomp profile (never overridden), read-only root filesystem. The only writable paths are
-    // the sandbox volume and /tmp. The Docker socket is never mounted.
+    // the sandbox volume, /tmp, and in mount mode your working tree. The Docker socket is never mounted.
     "--user",
-    UID,
+    identity.user,
+    ...usernsArgs(identity),
     "--cap-drop",
     "ALL",
     "--security-opt",
@@ -201,11 +290,12 @@ export function createArgs(input: {
     "--tmpfs",
     `/tmp:rw,exec,nosuid,nodev,size=${input.resources.tmp}`,
     "--tmpfs",
-    runtimeTmpfs(input.engine),
+    runtimeTmpfs(input.engine, identity.user),
     "--volume",
     `${volumeName(input.id)}:${ROOT}`,
     "--volume",
     `${policyVolumeName(input.id)}:${POLICY_DIR}:ro`,
+    ...bindArgs(binds),
     "--workdir",
     input.workdir,
     "--cpus",
@@ -215,10 +305,9 @@ export function createArgs(input: {
     "--pids-limit",
     String(input.resources.pids),
     ...networkArgs,
-    ...Object.entries({ ...input.env, ...proxyEnv, LUNOS_SANDBOX_RUNTIME: RUNTIME_FILE }).flatMap(([key, value]) => [
-      "--env",
-      `${key}=${value}`,
-    ]),
+    ...Object.entries({ ...input.env, ...proxyEnv, ...gitEnv, LUNOS_SANDBOX_RUNTIME: RUNTIME_FILE }).flatMap(
+      ([key, value]) => ["--env", `${key}=${value}`],
+    ),
     input.image.id,
     "serve",
     "--hostname",
@@ -237,7 +326,13 @@ export async function createVolume(id: string) {
  * Fill the volume from a tar stream in a throwaway container: no network, no host mounts, only the
  * CHOWN capability so the files end up owned by the sandbox user.
  */
-export async function seed(id: string, imageID: string, tar: string[], tarEnv?: Record<string, string>) {
+export async function seed(
+  id: string,
+  imageID: string,
+  tar: string[],
+  tarEnv?: Record<string, string>,
+  identity: Identity = DEFAULT_IDENTITY,
+) {
   await SandboxExec.pipe(
     tar,
     [
@@ -249,6 +344,9 @@ export async function seed(id: string, imageID: string, tar: string[], tarEnv?: 
       "none",
       "--user",
       "0:0",
+      // The same user namespace as the sandbox, or under Podman's keep-id the files' owner wouldn't
+      // be the sandbox user there.
+      ...usernsArgs(identity),
       "--cap-drop",
       "ALL",
       "--cap-add",
@@ -262,7 +360,7 @@ export async function seed(id: string, imageID: string, tar: string[], tarEnv?: 
       "/bin/sh",
       imageID,
       "-c",
-      `mkdir -p ${WORKSPACE} ${HOME} && tar -x -o -f - -C ${WORKSPACE} && chown -R ${UID} ${ROOT}`,
+      `mkdir -p ${WORKSPACE} ${HOME} && tar -x -o -f - -C ${WORKSPACE} && chown -R ${identity.user} ${ROOT}`,
     ],
     { from: { env: tarEnv } },
   )
@@ -273,7 +371,13 @@ export async function seed(id: string, imageID: string, tar: string[], tarEnv?: 
  * config) and the sandbox marker. Root-owned and world-readable, so the sandbox user can read it
  * and, even before the read-only mount, not change it.
  */
-export async function seedPolicy(id: string, imageID: string, dir: string, tarEnv?: Record<string, string>) {
+export async function seedPolicy(
+  id: string,
+  imageID: string,
+  dir: string,
+  tarEnv?: Record<string, string>,
+  identity: Identity = DEFAULT_IDENTITY,
+) {
   await SandboxExec.pipe(
     ["tar", "-c", "-f", "-", "-C", dir, "."],
     [
@@ -285,6 +389,7 @@ export async function seedPolicy(id: string, imageID: string, dir: string, tarEn
       "none",
       "--user",
       "0:0",
+      ...usernsArgs(identity),
       "--cap-drop",
       "ALL",
       "--cap-add",
@@ -387,13 +492,13 @@ export async function egressLog(id: string) {
  * Write the runtime file into the running container's tmpfs, as the sandbox user, through stdin: the
  * values never appear in an argv, an environment or a file on the host.
  */
-export async function inject(id: string, runtime: string) {
+export async function inject(id: string, runtime: string, identity: Identity = DEFAULT_IDENTITY) {
   await docker(
     [
       "exec",
       "-i",
       "--user",
-      UID,
+      identity.user,
       containerName(id),
       "/bin/sh",
       "-c",

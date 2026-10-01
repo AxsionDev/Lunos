@@ -89,7 +89,8 @@ function reportHandoff(result: Sandbox.Handoff) {
   if (result.mode !== "none") {
     for (const file of result.files) say(`  ${file.status}\t${file.path}`)
     if (result.files.length === 0) say("  no changes")
-  } else say('changes not handed back (sandbox.results is "none")')
+  } else if (result.workspace === "mount") say("the agent's changes are already in your working tree (workspace mount)")
+  else say('changes not handed back (sandbox.results is "none")')
   say(`transcript and summary in ${result.results}`)
 }
 

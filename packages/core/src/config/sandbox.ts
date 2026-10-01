@@ -6,7 +6,8 @@ import { Schema } from "effect"
  * Sandboxed runs (XCOD-144): run the Lunos server, and everything it spawns, in a Docker container.
  * Declared in both the v1 and v2 config schemas, so the live config path keeps it (the XCOD-68 /
  * XCOD-93 lesson). The isolation flags themselves are not configurable: config may choose the
- * image, resources and lifecycle, never capabilities or mounts.
+ * image, resources and lifecycle, never capabilities. XCOD-158: your global and managed config (never
+ * a repository's) may bind-mount the project (`workspace: "mount"`) and add read-only mounts.
  */
 export const Resources = Schema.Struct({
   cpus: Schema.Number.check(Schema.isGreaterThan(0)).pipe(Schema.optional).annotate({
@@ -36,10 +37,25 @@ export const Info = Schema.Struct({
     description:
       "Container image with Lunos as its entry point. Default ghcr.io/axsiondev/lunos:<the CLI's version>. The image is pinned by digest when the sandbox is created",
   }),
-  workspace: Schema.Literal("copy").pipe(Schema.optional).annotate({
+  workspace: Schema.Literals(["copy", "mount"]).pipe(Schema.optional).annotate({
     description:
-      'How the project gets into the sandbox. "copy" (the only mode so far): cloned into a container volume at the current commit, with uncommitted changes applied; the host working tree is never mounted',
+      'How the project gets into the sandbox. "copy" (default): cloned into a container volume at the current commit, with uncommitted changes applied; the host working tree is never mounted. "mount": your working tree itself, bind-mounted read-write, so the agent\'s changes are in it as they happen (no branch or patch); .git and Lunos\'s own config stay read-only. Reduced isolation, and a warning is shown. Read from your global and managed config only, never a repository\'s',
   }),
+  mounts: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        source: Schema.String.annotate({ description: "Absolute path on this machine" }),
+        target: Schema.String.pipe(Schema.optional).annotate({
+          description: "Absolute path in the sandbox. Default: the same as source",
+        }),
+      }),
+    ),
+  )
+    .pipe(Schema.optional)
+    .annotate({
+      description:
+        "Extra directories mounted read-only into the sandbox, e.g. a package cache. Read from your global and managed config only, never a repository's. Your home directory itself, /, SSH keys and container runtime sockets are refused",
+    }),
   on_finish: Schema.Literals(["destroy", "retain", "destroy_on_success"]).pipe(Schema.optional).annotate({
     description:
       'What happens once the results are back on the host: "destroy" (default) removes the container and its volume, "retain" stops it so `lunos sandbox attach` can reopen it, "destroy_on_success" keeps it only when the task failed. --keep and --rm override it for one run. A failed handoff always retains',

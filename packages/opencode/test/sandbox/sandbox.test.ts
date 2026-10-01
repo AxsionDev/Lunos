@@ -745,8 +745,150 @@ describe("sandbox slice 3", () => {
       digest: "lunos@sha256:beef",
       network: "policy",
       results: "patch",
+      workspace: "copy",
       runtime: "podman",
       created: "2026-09-30T16:00:00Z",
     })
+  })
+})
+
+// XCOD-158: workspace "mount" and sandbox.mounts.
+describe("workspace mount", () => {
+  /** Run with the given global config (yours) and managed config (your organisation's) in place. */
+  const withConfig = async (global: unknown, managed: unknown, fn: () => Promise<void>) => {
+    await fs.mkdir(Global.Path.config, { recursive: true })
+    const file = path.join(Global.Path.config, "opencode.json")
+    const saved = await Bun.file(file)
+      .text()
+      .catch(() => undefined)
+    await using managedDir = await tmpdir()
+    const savedManaged = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+    if (managed) {
+      await Bun.write(path.join(managedDir.path, "managed.json"), JSON.stringify(managed))
+      process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = managedDir.path
+    }
+    if (global) await Bun.write(file, JSON.stringify(global))
+    try {
+      await fn()
+    } finally {
+      if (saved === undefined) await fs.rm(file, { force: true })
+      else await Bun.write(file, saved)
+      if (savedManaged === undefined) delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+      else process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = savedManaged
+    }
+  }
+
+  test("only your config or your organisation's can mount; a repository can't, and a requirement holds", async () => {
+    await using project = await tmpdir({ git: true })
+    const extra = { source: project.path, target: "/cache" }
+    await Bun.write(
+      path.join(project.path, "opencode.json"),
+      JSON.stringify({ sandbox: { workspace: "mount", mounts: [extra] } }),
+    )
+    await withConfig(undefined, undefined, async () => {
+      const loaded = SandboxConfig.load(project.path)
+      expect(loaded.workspace).toBe("copy")
+      expect(loaded.mounts).toEqual([])
+    })
+    await withConfig({ sandbox: { workspace: "mount", mounts: [{ source: project.path }] } }, undefined, async () => {
+      const loaded = SandboxConfig.load(project.path)
+      expect(loaded.workspace).toBe("mount")
+      expect(loaded.mounts).toEqual([{ source: project.path, target: project.path }])
+    })
+    // The organisation requires sandboxes: your opting in doesn't weaken that; its own choice does.
+    await withConfig({ sandbox: { workspace: "mount" } }, { sandbox: { required: true } }, async () => {
+      expect(SandboxConfig.load(project.path).workspace).toBe("copy")
+    })
+    await withConfig(undefined, { sandbox: { required: true, workspace: "mount" } }, async () => {
+      expect(SandboxConfig.load(project.path).workspace).toBe("mount")
+    })
+    // Without a requirement, managed config still has the last word: "copy" there keeps everyone on copies.
+    await withConfig({ sandbox: { workspace: "mount" } }, { sandbox: { workspace: "copy" } }, async () => {
+      expect(SandboxConfig.load(project.path).workspace).toBe("copy")
+    })
+  })
+
+  test("the tree is mounted read-write with .git and Lunos's config read-only; copy mode mounts nothing", () => {
+    const base = {
+      id: "abcd1234",
+      project: "/repo",
+      image: { ref: "lunos-sandbox:local", id: "sha256:feed" },
+      resources: { cpus: 2, memory: "4g", pids: 512, tmp: "1g" },
+      workdir: SandboxDocker.WORKSPACE,
+      env: {},
+    }
+    expect(SandboxDocker.createArgs(base)).not.toContain("--mount")
+    const args = SandboxDocker.createArgs({
+      ...base,
+      identity: { user: "1001:1001" },
+      binds: {
+        root: "/home/me/repo",
+        protect: [".git", ".opencode"],
+        outside: ["/home/me/main/.git"],
+        extra: [{ source: "/home/me/.npm", target: "/cache/npm" }],
+      },
+    })
+    const mounts = args.flatMap((arg, index) => (args[index - 1] === "--mount" ? [arg] : []))
+    expect(mounts).toEqual([
+      `type=bind,source=/home/me/repo,target=${SandboxDocker.WORKSPACE}`,
+      `type=bind,source=/home/me/repo/.git,target=${SandboxDocker.WORKSPACE}/.git,readonly`,
+      `type=bind,source=/home/me/repo/.opencode,target=${SandboxDocker.WORKSPACE}/.opencode,readonly`,
+      "type=bind,source=/home/me/main/.git,target=/home/me/main/.git,readonly",
+      "type=bind,source=/home/me/.npm,target=/cache/npm,readonly",
+    ])
+    expect(args[args.indexOf("--user") + 1]).toBe("1001:1001")
+    expect(args.some((arg) => arg.includes("uid=1001,gid=1001"))).toBe(true)
+    expect(args).toContain("GIT_CONFIG_VALUE_0=*")
+    expect(args).toContain("GIT_OPTIONAL_LOCKS=0")
+    // Rootless Podman: the default user, mapped to you by keep-id.
+    const podman = SandboxDocker.createArgs({
+      ...base,
+      engine: "podman",
+      identity: { user: SandboxDocker.UID, userns: "keep-id:uid=1000,gid=1000" },
+    })
+    expect(podman[podman.indexOf("--userns") + 1]).toBe("keep-id:uid=1000,gid=1000")
+  })
+
+  test("extra mounts refuse your keys, a runtime's socket, the whole home or disk, and the sandbox's paths", async () => {
+    await using home = await tmpdir()
+    const { SandboxMount } = await import("../../src/sandbox/mount")
+    const cache = path.join(home.path, "cache")
+    const ssh = path.join(home.path, ".ssh")
+    await fs.mkdir(cache)
+    await fs.mkdir(ssh)
+    const env = { home: home.path, runtimeDir: path.join(home.path, "run") }
+    await fs.mkdir(env.runtimeDir)
+    const real = await fs.realpath(cache)
+    expect(SandboxMount.extra([{ source: cache, target: "/cache" }], env)).toEqual([{ source: real, target: "/cache" }])
+    const refused =
+      (source: string, target = "/x") =>
+      () =>
+        SandboxMount.extra([{ source, target }], env)
+    expect(refused("relative/path")).toThrow("absolute")
+    expect(refused(path.join(home.path, "missing"))).toThrow("doesn't exist")
+    expect(refused("/")).toThrow("whole filesystem")
+    expect(refused(home.path)).toThrow("whole home directory")
+    expect(refused(ssh)).toThrow(".ssh")
+    expect(refused(env.runtimeDir)).toThrow("socket")
+    expect(refused(cache, "/sandbox/home")).toThrow("overlaps")
+    expect(refused(cache, "/etc/lunos/x")).toThrow("overlaps")
+    expect(refused(cache, "/")).toThrow("absolute path in the sandbox")
+  })
+
+  test("a linked worktree's git directories are mounted read-only where git expects them", async () => {
+    await using main = await tmpdir({ git: true })
+    await Bun.write(path.join(main.path, "a.txt"), "a\n")
+    await $`git add -A && git commit -qm base`.cwd(main.path).quiet()
+    await using parent = await tmpdir()
+    const linked = path.join(parent.path, "wt")
+    await $`git worktree add -q ${linked}`.cwd(main.path).quiet()
+    const { SandboxMount } = await import("../../src/sandbox/mount")
+    const binds = await SandboxMount.workspace(linked)
+    expect(binds.protect).toContain(".git")
+    const common = await fs.realpath(path.join(main.path, ".git"))
+    expect(binds.outside.map((dir) => dir.replace(/\/$/, ""))).toContain(common)
+    expect(binds.outside.some((dir) => dir.startsWith(path.join(common, "worktrees")))).toBe(true)
+    // A plain repository's .git is under the tree: nothing outside.
+    expect((await SandboxMount.workspace(main.path)).outside).toEqual([])
   })
 })

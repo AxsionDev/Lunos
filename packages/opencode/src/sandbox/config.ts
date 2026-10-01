@@ -31,7 +31,13 @@ export type Resolved = {
   /** Where `required` came from, for the refusal message. */
   requiredBy?: "managed" | "config"
   image: string
-  workspace: "copy"
+  /**
+   * XCOD-158: "mount" bind-mounts your working tree. From your global and managed config only, and
+   * under a managed sandbox.required only if managed config itself chose it.
+   */
+  workspace: "copy" | "mount"
+  /** Extra read-only mounts, from your global and managed config only. */
+  mounts: { source: string; target: string }[]
   results: "branch" | "patch" | "none"
   runtime?: "docker" | "podman"
   on_finish: "destroy" | "retain" | "destroy_on_success"
@@ -127,6 +133,7 @@ export function resolve(info: ConfigSandbox.Info): Resolved {
     required: info.required ?? false,
     image: info.image ?? defaultImage(),
     workspace: info.workspace ?? "copy",
+    mounts: (info.mounts ?? []).map((item) => ({ source: item.source, target: item.target ?? item.source })),
     results: info.results ?? "branch",
     runtime: info.runtime,
     on_finish: info.on_finish ?? "destroy",
@@ -174,6 +181,14 @@ export function load(directory: string, worktree = worktreeOf(directory)): Resol
   )
   const allow = Array.from(new Set(mine.flatMap((layer) => layer?.allow ?? [])))
   const egressImage = mine.reduce<string | undefined>((acc, layer) => layer?.image ?? acc, undefined) ?? defaultImage()
+  // XCOD-158: a bind mount weakens the isolation, so it's yours or your organisation's to choose, as
+  // the network is; a repository can't. When the organisation requires sandboxes, only its own
+  // managed config can choose it: your opting in doesn't weaken what it required.
+  const managedRequired = managedLayer?.required === true
+  const workspace = managedRequired
+    ? (managedLayer?.workspace ?? "copy")
+    : (mine.reduce<ConfigSandbox.Info["workspace"]>((acc, layer) => layer?.workspace ?? acc, undefined) ?? "copy")
+  const mounts = mine.flatMap((layer) => layer?.mounts ?? [])
   // `enabled` and `required` aren't last-wins: a repository's own config must not be able to switch
   // off a sandbox the user or the organisation asked for, and so run itself (and its plugins) on the
   // host. Only --no-sandbox turns `enabled` off for a run, and nothing turns `required` off.
@@ -184,7 +199,11 @@ export function load(directory: string, worktree = worktreeOf(directory)): Resol
         ? "config"
         : undefined
   const enabled = !!requiredBy || layers.some((layer) => layer?.enabled === true)
-  return { ...resolve({ ...info, enabled, required: !!requiredBy, network, allow }), egressImage, requiredBy }
+  return {
+    ...resolve({ ...info, enabled, required: !!requiredBy, network, allow, workspace, mounts }),
+    egressImage,
+    requiredBy,
+  }
 }
 
 /**

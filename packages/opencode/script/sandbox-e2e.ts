@@ -341,7 +341,50 @@ try {
     }
   }
 
-  // 5. on_finish "destroy" (the default) leaves nothing behind.
+  // 5. workspace "mount", chosen in your global config (a repository can't): the agent's edit lands in
+  // your working tree, owned by you; .git stays read-only; no branch is made; the warning is shown.
+  {
+    const proj = await project("mount", {})
+    await Bun.write(
+      path.join(root, "mount", "home", "cfg", "opencode", "opencode.json"),
+      JSON.stringify({ sandbox: { workspace: "mount" } }),
+    )
+    const res = await run("mount", proj, [
+      {
+        tool: "bash",
+        args: {
+          command:
+            'echo mounted > m.txt; (echo "exit 1" > .git/hooks/pre-commit && echo HOOK=WRITTEN) || echo HOOK=REFUSED',
+          description: "edit the tree and try a git hook",
+        },
+      },
+      { text: "done" },
+    ])
+    check("mount: run exits 0", res.code === 0, res.output.slice(-2000))
+    check("mount: the warning is shown", res.output.includes("workspace mount"), res.output.slice(-1000))
+    const file = path.join(proj, "m.txt")
+    check(
+      "mount: the agent's edit is in the working tree",
+      (await Bun.file(file)
+        .text()
+        .catch(() => "")) === "mounted\n",
+    )
+    if (process.platform !== "win32") {
+      const owner = (await fs.stat(file).catch(() => undefined))?.uid
+      check("mount: and it's owned by you", owner === process.getuid?.(), `owner ${owner}, you ${process.getuid?.()}`)
+    }
+    const out = await results(proj)
+    check(
+      "mount: a git hook can't be written",
+      out?.transcript.includes("HOOK=REFUSED") ?? false,
+      out?.transcript.slice(-500),
+    )
+    check("mount: no hook reached the host", !(await Bun.file(path.join(proj, ".git", "hooks", "pre-commit")).exists()))
+    const branches = await $`git branch --list ${"lunos/sandbox/*"}`.cwd(proj).quiet().text()
+    check("mount: no branch is made", branches.trim() === "", branches)
+  }
+
+  // 6. on_finish "destroy" (the default) leaves nothing behind.
   const after = await leftovers()
   for (const kind of KINDS) {
     const left = after[kind].filter((id) => !before[kind].includes(id))

@@ -402,6 +402,13 @@ mirror it to your registry and set `sandbox.image` in global or managed config f
 without access to ghcr.io (the egress proxy then runs from your mirror too). See
 [sandboxed runs](../sandboxed-runs.md#network).
 
+`sandbox.workspace: "mount"` (XCOD-158, unreleased) bind-mounts a developer's working tree into the
+sandbox instead of copying it: weaker isolation, so only global and managed config can choose it,
+and under a managed `sandbox.required` only managed config. To keep everyone on copies, set
+`"sandbox": { "workspace": "copy" }` in managed config and lock `sandbox`. `sandbox.mounts` (extra
+read-only directories, e.g. a shared package cache) follows the same rule. See
+[sandboxed runs](../sandboxed-runs.md#mounting-your-working-tree-reduced-isolation).
+
 ### External memory database
 
 From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your team runs, instead of on each developer's machine. A team then shares project memory, backs it up with its normal database tooling, and decides where the data sits.
