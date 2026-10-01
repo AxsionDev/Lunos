@@ -19,6 +19,15 @@ Or turn it on for every run in a project or for yourself:
 }
 ```
 
+### From a running session: `/sandbox` (experimental)
+
+With `OPENCODE_EXPERIMENTAL_WORKSPACES=1`, `/sandbox` in the TUI moves the session you're in into a new sandbox, with its history, and the rest of the conversation runs there. It uses the experimental workspace "warp", which is why it needs the flag.
+
+- The sandbox starts from your project as `--sandbox` does: the current commit plus your uncommitted changes.
+- **`/sandbox end`** brings the session back to this machine, then hands the sandbox's results back (as `sandbox.results` says, below) and applies `sandbox.on_finish`. The TUI says where the agent's changes went.
+- File changes are never copied across a warp into or out of a sandbox, whoever asks (the TUI, the SDK or the desktop app): its changes come back only through the hand-back. The server refuses such a warp.
+- A sandbox kept by `on_finish` isn't offered for warping again; `lunos sandbox attach <id>` reopens it.
+
 `--no-sandbox` overrides `sandbox.enabled` for one run. If any config layer (global, project, `OPENCODE_CONFIG_CONTENT`) turns it on, it is on: a repository's own config can't switch off a sandbox you asked for. `sandbox.enabled` applies to `lunos` and `lunos run` only; `lunos serve`, `lunos web`, `lunos acp` and the other commands still run on the host. Sandboxing needs Docker (Docker Desktop, or Docker Engine on Linux) or Podman, rootless included. Lunos uses Docker if it's available, else Podman; `sandbox.runtime` (`"docker"` or `"podman"`) picks one. If neither is available, Lunos says what it tried and stops rather than running on the host.
 
 ## What happens
@@ -217,7 +226,7 @@ The agent runs as the same user as that server, so it could alter the log inside
 - **The volume has no size limit.** Docker's and Podman's default volume drivers can't cap a volume's size, and the container's own filesystem is read-only, so a limit on it would change nothing. `tmp` limits only `/tmp`. There is no `sandbox.resources.disk` for this reason: a limit that isn't enforced would be worse than none.
 - **Anything the agent can reach through the model provider or the network is not contained**: a sandbox limits what the agent can do to your machine, not what it can send out.
 
-Also not built yet: a `mount` workspace mode, devcontainer images, and `/sandbox` in the TUI.
+Also not built yet: a `mount` workspace mode, and devcontainer images.
 
 **Where it has been verified:** macOS with Docker Desktop, end to end. Rootless Podman 5.8 (netavark), with the full container lifecycle replayed in a Podman nested inside Docker Desktop, not on a Linux machine. Not yet on Linux with Docker Engine, or on Windows. On Podman, the host is `host.containers.internal` from inside a container, where Docker Desktop has `host.docker.internal`.
 

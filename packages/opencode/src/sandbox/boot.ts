@@ -24,8 +24,17 @@ export type Runtime = {
 
 export const GLOBAL_CONFIG = "global.json"
 
-/** The keys the runtime can set that Flag reads once, at load, rather than on every access. */
-const SNAPSHOTTED = ["OPENCODE_SERVER_PASSWORD", "OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT"] as const
+/**
+ * The keys the runtime can set that Flag reads once, at load, rather than on every access.
+ * XCOD-158: the workspace control plane (warp into a docker workspace) sends OPENCODE_WORKSPACE_ID
+ * too; without it the server inside didn't know its workspace and refused /sync/steal.
+ */
+const SNAPSHOTTED = [
+  "OPENCODE_SERVER_PASSWORD",
+  "OPENCODE_CONFIG",
+  "OPENCODE_CONFIG_CONTENT",
+  "OPENCODE_WORKSPACE_ID",
+] as const
 
 const WAIT_MS = 30_000
 

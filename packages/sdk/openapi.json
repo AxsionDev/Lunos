@@ -23219,6 +23219,9 @@
                     "network": {
                       "type": "string"
                     },
+                    "results": {
+                      "type": "string"
+                    },
                     "expires": {
                       "type": "string"
                     },
