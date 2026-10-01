@@ -187,7 +187,11 @@ for (const item of targets) {
     format: "esm",
     minify: true,
     sourcemap: sourcemapsFlag ? "linked" : "none",
-    splitting: true,
+    // XCOD-159: off, because with it Bun 1.3.14 (package.json's pin, which the release builds with)
+    // emits a chunk of core/src/schema.ts twice under one name and fails: "Multiple files share the
+    // same output path". Hash-unique chunk names don't avoid it, and neither do static imports of the
+    // sandbox. Costs 79 MB per binary, 8 MB per download (Linux x64 musl: 188 -> 267 MB; .tar.gz 64 -> 72 MB).
+    splitting: false,
     compile: {
       autoloadBunfig: false,
       autoloadDotenv: false,
