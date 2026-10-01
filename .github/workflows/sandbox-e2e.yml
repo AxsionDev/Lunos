@@ -3,7 +3,8 @@ name: sandbox-e2e
 # XCOD-158: sandboxed runs end to end on a real Linux host, with Docker Engine and with rootless
 # Podman. packages/opencode/script/sandbox-e2e.ts drives `lunos run --sandbox` against a scripted
 # model on the runner: results as a branch and as a patch, egress refused, a clear error with no
-# runtime, and nothing left behind. GitHub-hosted runners, so it runs on this fork too.
+# runtime, and nothing left behind. GitHub-hosted runners, so it runs on this fork too. It's also
+# the only CI that builds a release binary (with package.json's Bun), so it runs on build.ts changes.
 
 on:
   pull_request:
@@ -12,6 +13,7 @@ on:
       - "packages/opencode/src/sandbox/**"
       - "packages/opencode/script/sandbox-*"
       - "packages/opencode/Dockerfile"
+      - "packages/opencode/script/build.ts"
       - "packages/core/src/config/sandbox.ts"
       - ".github/workflows/sandbox-e2e.yml"
   workflow_dispatch:
