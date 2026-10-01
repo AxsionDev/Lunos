@@ -2002,6 +2002,7 @@ export type Config = {
     required?: boolean
     image?: string
     workspace?: "copy" | "mount"
+    devcontainer?: "off" | "image" | "build"
     mounts?: Array<{
       /**
        * Absolute path on this machine
@@ -2220,6 +2221,7 @@ export type SettingsSnapshot = {
       network?: string
       results?: string
       workspace?: string
+      devcontainer?: string
       runtime?: string
       created?: string
     }

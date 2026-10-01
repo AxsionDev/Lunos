@@ -22489,6 +22489,10 @@
                 "type": "string",
                 "enum": ["copy", "mount"]
               },
+              "devcontainer": {
+                "type": "string",
+                "enum": ["off", "image", "build"]
+              },
               "mounts": {
                 "type": "array",
                 "items": {
@@ -23210,6 +23214,9 @@
                     "type": "string"
                   },
                   "workspace": {
+                    "type": "string"
+                  },
+                  "devcontainer": {
                     "type": "string"
                   },
                   "runtime": {

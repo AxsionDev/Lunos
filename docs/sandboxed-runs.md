@@ -136,7 +136,12 @@ These are the defaults. `tmp` is the size of the in-memory `/tmp`.
 
 ## The image
 
-The default is `ghcr.io/axsiondev/lunos:<the CLI's version>`. Set `sandbox.image` to use another image; it must have `lunos` as its entry point, and `/bin/sh` and `tar` (used once, to fill the volume). `git` in the image is recommended, so the agent has a working repository.
+The default is `ghcr.io/axsiondev/lunos:<the CLI's version>`. Set `sandbox.image` to use another image; it must have `lunos` as its entry point, and `/bin/sh`, `cat` and `mv` (used to pass the sandbox its credentials at start). `git` in the image is recommended, so the agent has a working repository. The volumes are always filled from the Lunos image, never from one a repository chose.
+
+Where `sandbox.image` is set matters:
+
+- **In your global or managed config**, it's the Lunos image to use, for example a mirror of it on a registry your machines can reach. The egress proxy runs from it, and a project's devcontainer gets Lunos from it.
+- **In a repository's config**, it's that repository's choice of toolchain image. It wins over the repository's devcontainer, but never runs the proxy or fills the volumes.
 
 To build the image locally, for example for a development build of Lunos:
 
@@ -147,6 +152,26 @@ bun run packages/opencode/script/sandbox-image.ts     # builds the Linux binary,
 ```json
 { "sandbox": { "image": "lunos-sandbox:local" } }
 ```
+
+### The project's devcontainer
+
+If the project has a `.devcontainer/devcontainer.json` (or `.devcontainer.json`, or a single `.devcontainer/<name>/devcontainer.json`), and its own config doesn't set `sandbox.image`, the sandbox uses that devcontainer's image as its toolchain, with Lunos added. A Go project's `mcr.microsoft.com/devcontainers/go` gives the agent `go`; a Python one gives it `python`.
+
+- **`image`: used automatically.** Lunos is added to it without running anything of the image: the files come from the Lunos image, and the generated Dockerfile is only `FROM`, `COPY`, `ENV` and `ENTRYPOINT`. The result is cached, and checked by running it as the sandbox does (no network, no capabilities). The image's own tools and `PATH` are unchanged.
+- **`build` (a Dockerfile): only if you allow it.** Building runs the repository's own build steps on your machine, with the network open, before any sandbox exists. So it happens only when your global or managed config says so:
+
+  ```json
+  { "sandbox": { "devcontainer": "build" } }
+  ```
+
+  Without that, the default image is used, and Lunos says how to allow the build. A repository's config can't allow it. Under a managed `sandbox.required`, only managed config can.
+
+- **Not applied:** `features`, the lifecycle commands (`postCreateCommand` and the rest), `remoteUser`, `containerEnv`, `runArgs`, `mounts` and the other settings for an editor's container. Lunos names the ones it ignored. Docker Compose devcontainers (`dockerComposeFile`) aren't supported.
+- **Off:** `"sandbox": { "devcontainer": "off" }`. A repository can turn it off for itself.
+- **Limits:**
+  - musl-based images (Alpine) aren't supported as a devcontainer base yet. Lunos's own musl runtime would change their libc.
+  - The image must exist for your machine's architecture (amd64 or arm64).
+  - Under the default network policy, tools that download (`go mod download`, `pip install`) need their hosts in `sandbox.allow`, e.g. `proxy.golang.org`.
 
 ## Credentials
 
@@ -254,26 +279,25 @@ From your global and managed config only. Refused: `/`, your home directory itse
 - **In `workspace: "mount"`, your working tree.** See [above](#mounting-your-working-tree-reduced-isolation): the agent writes to it directly, and only `.git` and Lunos's own config are read-only.
 - **Anything the agent can reach through the model provider or the network is not contained**: a sandbox limits what the agent can do to your machine, not what it can send out.
 
-Also not built yet: devcontainer images.
-
 **Where it has been verified:** end to end (`packages/opencode/script/sandbox-e2e.ts`) on macOS with Docker Desktop, and on Linux (GitHub's `ubuntu-24.04`) with Docker Engine and with rootless Podman 4.9, in CI on every sandbox change. Not yet on Windows: `packages/opencode/script/sandbox-e2e.ps1` runs the same checks there. On Podman, the host is `host.containers.internal` from inside a container; on Docker, `host.docker.internal` (Lunos maps it on Docker Engine, which doesn't have it).
 
 ## Configuration reference
 
-| Key                        | Default                             | Meaning                                                                                |
-| -------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------- |
-| `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed                       |
-| `sandbox.required`         | `false`                             | Nothing runs outside a sandbox; for locked managed config                              |
-| `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                                                  |
-| `sandbox.workspace`        | `"copy"`                            | `copy`, or `mount` (reduced isolation); global and managed config only                 |
-| `sandbox.mounts`           | `[]`                                | Extra read-only mounts, `{ source, target? }`; global and managed config only          |
-| `sandbox.results`          | `"branch"`                          | `branch`, `patch` or `none`; see [Getting the results back](#getting-the-results-back) |
-| `sandbox.runtime`          | Docker, else Podman                 | `docker` or `podman`                                                                   |
-| `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back                       |
-| `sandbox.retain_for`       | unset (kept until destroyed)        | How long a kept sandbox stays, e.g. `"72h"`; then it's pruned                          |
-| `sandbox.network`          | `"policy"`                          | `policy`, `none` or `open`; see [Network](#network)                                    |
-| `sandbox.allow`            | `[]`                                | Extra hosts under `policy`; global and managed config only                             |
-| `sandbox.resources.cpus`   | `2`                                 | `docker --cpus`                                                                        |
-| `sandbox.resources.memory` | `"4g"`                              | `docker --memory`                                                                      |
-| `sandbox.resources.pids`   | `512`                               | `docker --pids-limit`                                                                  |
-| `sandbox.resources.tmp`    | `"1g"`                              | Size of the in-memory `/tmp`                                                           |
+| Key                        | Default                             | Meaning                                                                                 |
+| -------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------- |
+| `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed                        |
+| `sandbox.required`         | `false`                             | Nothing runs outside a sandbox; for locked managed config                               |
+| `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                                                   |
+| `sandbox.workspace`        | `"copy"`                            | `copy`, or `mount` (reduced isolation); global and managed config only                  |
+| `sandbox.mounts`           | `[]`                                | Extra read-only mounts, `{ source, target? }`; global and managed config only           |
+| `sandbox.devcontainer`     | `"image"`                           | `image`, `build` or `off`; see [The project's devcontainer](#the-projects-devcontainer) |
+| `sandbox.results`          | `"branch"`                          | `branch`, `patch` or `none`; see [Getting the results back](#getting-the-results-back)  |
+| `sandbox.runtime`          | Docker, else Podman                 | `docker` or `podman`                                                                    |
+| `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back                        |
+| `sandbox.retain_for`       | unset (kept until destroyed)        | How long a kept sandbox stays, e.g. `"72h"`; then it's pruned                           |
+| `sandbox.network`          | `"policy"`                          | `policy`, `none` or `open`; see [Network](#network)                                     |
+| `sandbox.allow`            | `[]`                                | Extra hosts under `policy`; global and managed config only                              |
+| `sandbox.resources.cpus`   | `2`                                 | `docker --cpus`                                                                         |
+| `sandbox.resources.memory` | `"4g"`                              | `docker --memory`                                                                       |
+| `sandbox.resources.pids`   | `512`                               | `docker --pids-limit`                                                                   |
+| `sandbox.resources.tmp`    | `"1g"`                              | Size of the in-memory `/tmp`                                                            |

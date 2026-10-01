@@ -13,6 +13,7 @@ import { SandboxAllow } from "./allow"
 import type { SandboxEgress } from "./egress"
 import { SandboxGit } from "./git"
 import { SandboxMount } from "./mount"
+import { SandboxDevcontainer } from "./devcontainer"
 
 // XCOD-144 slice 1: the lifecycle of one sandbox. `create` copies the repo into a container volume
 // and creates (but doesn't start) the container; `start` runs the Lunos server in it; `handoff`
@@ -44,6 +45,8 @@ export type Meta = {
   resources: SandboxConfig.Resolved["resources"]
   /** XCOD-158: how the results come back; absent on older sandboxes, which used "branch". */
   results?: SandboxConfig.Resolved["results"]
+  /** XCOD-158: the devcontainer the image was made from: its file, and its base image. */
+  devcontainer?: { file: string; base: string; digest?: string; built?: boolean }
   /** XCOD-158: "mount" when your working tree is bind-mounted; unset (copy) otherwise. */
   workspace?: SandboxConfig.Resolved["workspace"]
   /** Who the sandbox runs as; unset is the default uid 1000. */
@@ -105,6 +108,8 @@ export type Marker = {
   network?: SandboxConfig.Network
   results?: SandboxConfig.Resolved["results"]
   workspace?: SandboxConfig.Resolved["workspace"]
+  /** The devcontainer base image, when the sandbox's image was made from one. */
+  devcontainer?: string
   runtime?: string
   created?: string
 }
@@ -117,6 +122,7 @@ export function markerOf(info: Meta): Marker {
     network: info.network ?? "open",
     results: info.results ?? "branch",
     workspace: info.workspace ?? "copy",
+    ...(info.devcontainer ? { devcontainer: info.devcontainer.digest ?? info.devcontainer.base } : {}),
     runtime: info.engine ?? info.runtime ?? "docker",
     created: info.created,
   }
@@ -215,8 +221,14 @@ export async function create(input: {
   if (!/^[a-z0-9-]{1,40}$/.test(id)) throw new Error(`Invalid sandbox id ${id}`)
   const branch = branchName(id)
 
-  log(`image ${input.config.image}`)
-  const image = await SandboxDocker.image(input.config.image)
+  // The trusted image: Lunos's own, or a sandbox.image your global or managed config set. XCOD-158:
+  // it also fills the volumes, runs the egress proxy, and supplies Lunos for a devcontainer image.
+  const trusted = await SandboxDocker.image(input.config.egressImage)
+  const chosen = await devcontainerImage(repo.root, input.config, trusted, log)
+  if (!chosen.image) log(`image ${input.config.image}`)
+  const image =
+    chosen.image ??
+    (input.config.image === input.config.egressImage ? trusted : await SandboxDocker.image(input.config.image))
   const managed = await SandboxConfig.managedDoc()
   const network = input.config.network
   const computed = SandboxAllow.compute({
@@ -225,9 +237,11 @@ export async function create(input: {
     network,
     extra: input.config.allow,
   })
-  // The proxy comes from the Lunos image, or from a sandbox.image your global or managed config set;
-  // never from one a repository chose, which would let it bring its own egress filter.
-  const egressImage = network === "open" ? undefined : await SandboxDocker.image(input.config.egressImage)
+  // The proxy comes from the trusted image, never from one a repository chose, which would let it
+  // bring its own egress filter. The same image fills the volumes (as root, with CHOWN), so a
+  // repository's image never writes the policy volume (the marker, the organisation's managed
+  // config) or runs as root here.
+  const egressImage = network === "open" ? undefined : trusted
   if (network === "open") log("network open: the sandbox can reach anything this machine can")
   else log(`network ${network}: ${network === "none" ? "nothing" : computed.allow.join(", ")} allowed`)
   for (const item of computed.denied) log(`not allowed by the residency policy: ${item.provider}`)
@@ -274,6 +288,7 @@ export async function create(input: {
       directory: workdir,
       branch,
       image,
+      ...(chosen.devcontainer ? { devcontainer: chosen.devcontainer } : {}),
       on_finish: input.config.on_finish,
       retain_for: input.config.retain_for,
       resources: input.config.resources,
@@ -292,7 +307,7 @@ export async function create(input: {
 
     // Nothing has run yet, so a failure from here on can clean up after itself.
     try {
-      await populate(result, seed, managed, egressImage)
+      await populate(result, seed, managed, egressImage, trusted)
     } catch (error) {
       await remove(id).catch(() => {})
       throw error
@@ -304,11 +319,62 @@ export async function create(input: {
   }
 }
 
+/**
+ * XCOD-158: the sandbox image from the project's devcontainer.json, when no sandbox.image is set and
+ * sandbox.devcontainer allows it; otherwise nothing, and the configured image is used.
+ */
+async function devcontainerImage(
+  root: string,
+  config: SandboxConfig.Resolved,
+  trusted: SandboxDocker.Image,
+  log: (line: string) => void,
+): Promise<{ image?: SandboxDocker.Image; devcontainer?: Meta["devcontainer"] }> {
+  if (config.devcontainer === "off") return {}
+  const file = SandboxDevcontainer.find(root)
+  if (!file) return {}
+  if (config.imageSet) {
+    log(`${file} not used: the project's config sets sandbox.image`)
+    return {}
+  }
+  const spec = SandboxDevcontainer.read(root, file)
+  if (spec.unsupported) {
+    log(`${file} not used: ${spec.unsupported}`)
+    return {}
+  }
+  if (spec.ignored.length) log(`${file}: not applied in a sandbox: ${spec.ignored.join(", ")}`)
+  const platform = await SandboxDevcontainer.platformOf(trusted)
+  let base: SandboxDocker.Image
+  if (spec.image) {
+    log(`devcontainer image ${spec.image} (from ${file})`)
+    base = await SandboxDevcontainer.pull(spec.image, platform)
+  } else if (config.devcontainer === "build") {
+    base = await SandboxDevcontainer.buildBase(spec.build!, platform, log)
+  } else {
+    log(
+      `${file} builds its image from a Dockerfile, which would run the repository's build steps on this machine; ` +
+        `not built. Allow it with "sandbox": { "devcontainer": "build" } in your global config, or set sandbox.image.`,
+    )
+    return {}
+  }
+  const image = await SandboxDevcontainer.prepare(base, trusted)
+  log(`sandbox image ${image.ref}: ${base.digest ?? base.ref} with Lunos added`)
+  return {
+    image,
+    devcontainer: {
+      file,
+      base: base.ref,
+      ...(base.digest ? { digest: base.digest } : {}),
+      ...(spec.build ? { built: true } : {}),
+    },
+  }
+}
+
 async function populate(
   info: Meta,
   seed: string,
   managed: Record<string, unknown> | undefined,
   egressImage: SandboxDocker.Image | undefined,
+  trusted: SandboxDocker.Image,
 ) {
   await SandboxDocker.createVolume(info.id)
   if (egressImage)
@@ -318,14 +384,14 @@ async function populate(
       allow: info.allow ?? [],
       network: info.network,
     })
-  await SandboxDocker.seed(info.id, info.image.id, SandboxGit.tar(seed), SandboxGit.TAR_ENV, info.identity)
+  await SandboxDocker.seed(info.id, trusted.id, SandboxGit.tar(seed), SandboxGit.TAR_ENV, info.identity)
   const policy = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-policy-"))
   try {
     if (managed) await fs.writeFile(path.join(policy, "managed.json"), JSON.stringify(auditInside(managed), null, 2))
     // XCOD-158: the marker also tells the server inside what it's running in (the Status tab), since
     // it can't ask Docker. Root-owned and read-only, like the rest of the policy volume.
     await fs.writeFile(path.join(policy, SandboxDocker.MARKER), JSON.stringify(markerOf(info)) + "\n")
-    await SandboxDocker.seedPolicy(info.id, info.image.id, policy, SandboxGit.TAR_ENV, info.identity)
+    await SandboxDocker.seedPolicy(info.id, trusted.id, policy, SandboxGit.TAR_ENV, info.identity)
   } finally {
     await fs.rm(policy, { recursive: true, force: true })
   }
@@ -530,6 +596,7 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
           {
             id: info.id,
             image: info.image,
+            ...(info.devcontainer ? { devcontainer: info.devcontainer } : {}),
             resources: info.resources,
             network: info.network ?? "open",
             base: info.base,
