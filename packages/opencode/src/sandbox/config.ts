@@ -38,6 +38,18 @@ export type Resolved = {
   workspace: "copy" | "mount"
   /** Extra read-only mounts, from your global and managed config only. */
   mounts: { source: string; target: string }[]
+  /**
+   * XCOD-158: how far the project's devcontainer.json is used. "build" from your global or managed
+   * config only (a repository can only turn it off), and under a managed requirement only if managed
+   * config chose it.
+   */
+  devcontainer: "off" | "image" | "build"
+  /**
+   * Whether the repository's own config set sandbox.image: its explicit choice of toolchain wins over
+   * its devcontainer. In your global or managed config, sandbox.image is the Lunos image to use (a
+   * mirror, say), and a devcontainer is still applied on top of it.
+   */
+  imageSet: boolean
   results: "branch" | "patch" | "none"
   runtime?: "docker" | "podman"
   on_finish: "destroy" | "retain" | "destroy_on_success"
@@ -134,6 +146,8 @@ export function resolve(info: ConfigSandbox.Info): Resolved {
     image: info.image ?? defaultImage(),
     workspace: info.workspace ?? "copy",
     mounts: (info.mounts ?? []).map((item) => ({ source: item.source, target: item.target ?? item.source })),
+    devcontainer: info.devcontainer ?? "image",
+    imageSet: false,
     results: info.results ?? "branch",
     runtime: info.runtime,
     on_finish: info.on_finish ?? "destroy",
@@ -189,6 +203,13 @@ export function load(directory: string, worktree = worktreeOf(directory)): Resol
     ? (managedLayer?.workspace ?? "copy")
     : (mine.reduce<ConfigSandbox.Info["workspace"]>((acc, layer) => layer?.workspace ?? acc, undefined) ?? "copy")
   const mounts = mine.flatMap((layer) => layer?.mounts ?? [])
+  // Building a devcontainer runs the repository's Dockerfile here: yours to allow, as mount is. A
+  // repository can turn the devcontainer off for itself, never raise it.
+  const mineDevcontainer = managedRequired
+    ? (managedLayer?.devcontainer ?? "image")
+    : (mine.reduce<ConfigSandbox.Info["devcontainer"]>((acc, layer) => layer?.devcontainer ?? acc, undefined) ??
+      "image")
+  const devcontainer = project.some((layer) => layer?.devcontainer === "off") ? "off" : mineDevcontainer
   // `enabled` and `required` aren't last-wins: a repository's own config must not be able to switch
   // off a sandbox the user or the organisation asked for, and so run itself (and its plugins) on the
   // host. Only --no-sandbox turns `enabled` off for a run, and nothing turns `required` off.
@@ -200,9 +221,10 @@ export function load(directory: string, worktree = worktreeOf(directory)): Resol
         : undefined
   const enabled = !!requiredBy || layers.some((layer) => layer?.enabled === true)
   return {
-    ...resolve({ ...info, enabled, required: !!requiredBy, network, allow, workspace, mounts }),
+    ...resolve({ ...info, enabled, required: !!requiredBy, network, allow, workspace, mounts, devcontainer }),
     egressImage,
     requiredBy,
+    imageSet: project.some((layer) => layer?.image !== undefined),
   }
 }
 

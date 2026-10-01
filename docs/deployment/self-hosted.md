@@ -409,6 +409,13 @@ and under a managed `sandbox.required` only managed config. To keep everyone on 
 read-only directories, e.g. a shared package cache) follows the same rule. See
 [sandboxed runs](../sandboxed-runs.md#mounting-your-working-tree-reduced-isolation).
 
+A project's devcontainer image (XCOD-158, unreleased) becomes its sandbox's toolchain, with Lunos
+added from the Lunos image (your mirror, if `sandbox.image` points at one). A devcontainer that
+builds from a Dockerfile is built only with `"sandbox": { "devcontainer": "build" }` in global or
+managed config, since building runs the repository's own steps on the developer's machine. Lock
+`"devcontainer": "off"` to rule devcontainers out. See
+[sandboxed runs](../sandboxed-runs.md#the-projects-devcontainer).
+
 ### External memory database
 
 From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your team runs, instead of on each developer's machine. A team then shares project memory, backs it up with its normal database tooling, and decides where the data sits.

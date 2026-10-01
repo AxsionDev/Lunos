@@ -41,6 +41,10 @@ export const Info = Schema.Struct({
     description:
       'How the project gets into the sandbox. "copy" (default): cloned into a container volume at the current commit, with uncommitted changes applied; the host working tree is never mounted. "mount": your working tree itself, bind-mounted read-write, so the agent\'s changes are in it as they happen (no branch or patch); .git and Lunos\'s own config stay read-only. Reduced isolation, and a warning is shown. Read from your global and managed config only, never a repository\'s',
   }),
+  devcontainer: Schema.Literals(["off", "image", "build"]).pipe(Schema.optional).annotate({
+    description:
+      'Use the project\'s .devcontainer/devcontainer.json for the sandbox\'s toolchain, unless the project\'s own config sets sandbox.image. A sandbox.image in your global or managed config is the Lunos image the devcontainer gets Lunos from. "image" (default): its `image`, with Lunos added (nothing of the image runs on this machine). "build": also its `build` (Dockerfile), which runs the repository\'s build steps on this machine, with the network open; only your global or managed config can choose it. "off": ignore it. A repository\'s config can only turn it off',
+  }),
   mounts: Schema.mutable(
     Schema.Array(
       Schema.Struct({

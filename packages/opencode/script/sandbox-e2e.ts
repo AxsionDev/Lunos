@@ -279,11 +279,13 @@ try {
     const proj = await project("warp", {})
     const { env } = await sandboxEnv("warp", { OPENCODE_EXPERIMENTAL_WORKSPACES: "1" })
     const port = 20_000 + Math.floor(Math.random() * 10_000)
+    // Its output goes to a file: an unread pipe fills up and then the server can't even exit.
+    const serverLog = path.join(root, "warp", "server.log")
     const server = Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "serve", "--port", String(port)], {
       cwd: proj,
       env,
-      stdout: "pipe",
-      stderr: "pipe",
+      stdout: Bun.file(serverLog),
+      stderr: Bun.file(serverLog),
     })
     try {
       const base = `http://127.0.0.1:${port}`
@@ -336,8 +338,15 @@ try {
       }
     } finally {
       server.kill()
+      if ((await Promise.race([server.exited.then(() => true), Bun.sleep(10_000).then(() => false)])) === false)
+        server.kill(9)
       await server.exited
-      if (process.env.SANDBOX_E2E_VERBOSE) console.log(await new Response(server.stderr).text().catch(() => ""))
+      if (process.env.SANDBOX_E2E_VERBOSE)
+        console.log(
+          await Bun.file(serverLog)
+            .text()
+            .catch(() => ""),
+        )
     }
   }
 
@@ -384,7 +393,81 @@ try {
     check("mount: no branch is made", branches.trim() === "", branches)
   }
 
-  // 6. on_finish "destroy" (the default) leaves nothing behind.
+  // 6. The project's devcontainer as the sandbox's toolchain. The Lunos image is set in your global
+  // config, as for a mirror; the project's config sets no image, so its devcontainer is used.
+  {
+    const devcontainer = async (name: string, json: unknown, global: Record<string, unknown> = {}) => {
+      const proj = await project(name, {})
+      const config = JSON.parse(await Bun.file(path.join(proj, "opencode.json")).text())
+      delete config.sandbox.image
+      // The probe reads files outside the project (/etc, /built); permissions aren't what this tests.
+      config.permission = "allow"
+      await Bun.write(path.join(proj, "opencode.json"), JSON.stringify(config))
+      await Bun.write(path.join(proj, ".devcontainer", "devcontainer.json"), JSON.stringify(json))
+      await Bun.write(
+        path.join(proj, ".devcontainer", "Dockerfile"),
+        "FROM debian:bookworm-slim\nRUN echo built > /built\n",
+      )
+      await $`git add -A && git -c user.email=e2e@lunos -c user.name=e2e commit -qm devcontainer`.cwd(proj).quiet()
+      await Bun.write(
+        path.join(root, name, "home", "cfg", "opencode", "opencode.json"),
+        JSON.stringify({ sandbox: { image, ...global } }),
+      )
+      return proj
+    }
+    // The markers are assembled by the shell, so they're in the output only, never in the command.
+    const probe = {
+      tool: "bash",
+      args: {
+        command:
+          'M=MARK; echo "${M}_DEBIAN_$(cat /etc/debian_version 2>/dev/null || echo none)"; ' +
+          'apt-get --version >/dev/null 2>&1 && echo "${M}_APT_OK"; ' +
+          'echo "${M}_BUILT_$(cat /built 2>/dev/null || echo no)"',
+        description: "what is this image",
+      },
+    }
+
+    // The image: used automatically, with Lunos added; the image's own glibc tools still work.
+    const proj = await devcontainer("devc-image", { image: "debian:bookworm-slim", postCreateCommand: "echo hi" })
+    const res = await run("devc-image", proj, [probe, { text: "done" }])
+    check("devcontainer: run exits 0", res.code === 0, res.output.slice(-2000))
+    check("devcontainer: its image is used", res.output.includes("devcontainer image debian:bookworm-slim"))
+    check(
+      "devcontainer: editor-only keys are named, not applied",
+      res.output.includes("not applied in a sandbox: postCreateCommand"),
+    )
+    const transcript = (await results(proj))?.transcript ?? ""
+    check("devcontainer: the tool ran in the image", /MARK_DEBIAN_\d+/.test(transcript), transcript.slice(-800))
+    check("devcontainer: the image's own tools still work", transcript.includes("MARK_APT_OK"))
+
+    // A Dockerfile without your opt-in: not built, and you're told how to allow it.
+    const unbuilt = await devcontainer("devc-nobuild", { build: { dockerfile: "Dockerfile" } })
+    const refused = await run("devc-nobuild", unbuilt, [probe, { text: "done" }])
+    check(
+      "devcontainer: a Dockerfile isn't built without your opt-in",
+      refused.output.includes('"devcontainer": "build"'),
+      refused.output.slice(-1000),
+    )
+    const notBuilt = (await results(unbuilt))?.transcript ?? ""
+    check(
+      "devcontainer: and the default image is used",
+      notBuilt.includes("MARK_BUILT_no") && notBuilt.includes("MARK_DEBIAN_none"),
+      notBuilt.slice(-800),
+    )
+
+    // With your opt-in (global config), it's built and used.
+    const built = await devcontainer("devc-build", { build: { dockerfile: "Dockerfile" } }, { devcontainer: "build" })
+    const ok = await run("devc-build", built, [probe, { text: "done" }])
+    check("devcontainer: with your opt-in, the Dockerfile is built", ok.code === 0, ok.output.slice(-1500))
+    const builtTranscript = (await results(built))?.transcript ?? ""
+    check(
+      "devcontainer: and its image is used",
+      builtTranscript.includes("MARK_BUILT_built"),
+      builtTranscript.slice(-800),
+    )
+  }
+
+  // 7. on_finish "destroy" (the default) leaves nothing behind.
   const after = await leftovers()
   for (const kind of KINDS) {
     const left = after[kind].filter((id) => !before[kind].includes(id))
