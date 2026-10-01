@@ -716,6 +716,11 @@ describe("sandbox slice 3", () => {
     const pair = (args: string[], flag: string) => args[args.indexOf(flag) + 1]
     expect(pair(SandboxDocker.egressArgs({ id: "a", image, allow: [], engine: "podman" }), "--network")).toBe("podman")
     expect(pair(SandboxDocker.egressArgs({ id: "a", image, allow: [], engine: "docker" }), "--network")).toBe("bridge")
+    // XCOD-158: Docker Engine on Linux has no host.docker.internal unless it's mapped; Podman has its own.
+    expect(pair(SandboxDocker.egressArgs({ id: "a", image, allow: [], engine: "docker" }), "--add-host")).toBe(
+      "host.docker.internal:host-gateway",
+    )
+    expect(SandboxDocker.egressArgs({ id: "a", image, allow: [], engine: "podman" })).not.toContain("--add-host")
   })
 
   test("the marker tells the server inside what it runs in", () => {
