@@ -347,7 +347,10 @@ describe("sandbox host config", () => {
     const file = path.join(tmp.path, "runtime.json")
     await Bun.write(
       file,
-      JSON.stringify({ env: { X157_SENTINEL_API_KEY: "sk-sentinel" }, config: { residency: { allow: ["eu"] } } }),
+      JSON.stringify({
+        env: { X157_SENTINEL_API_KEY: "sk-sentinel", OPENCODE_WORKSPACE_ID: "wrk_x158" },
+        config: { residency: { allow: ["eu"] } },
+      }),
     )
     const saved = process.env.OPENCODE_CONFIG
     delete process.env.OPENCODE_CONFIG
@@ -363,12 +366,16 @@ describe("sandbox host config", () => {
       // Flag snapshots some keys at load; the compiled binary may have loaded it before boot ran.
       const { Flag } = await import("@opencode-ai/core/flag/flag")
       expect(Flag.OPENCODE_CONFIG).toBe(env.OPENCODE_CONFIG)
+      // XCOD-158: a docker workspace's id, or the server inside refuses the warp (/sync/steal).
+      expect(Flag.OPENCODE_WORKSPACE_ID).toBe("wrk_x158")
     } finally {
       delete process.env.X157_SENTINEL_API_KEY
+      delete process.env.OPENCODE_WORKSPACE_ID
       if (saved === undefined) delete process.env.OPENCODE_CONFIG
       else process.env.OPENCODE_CONFIG = saved
       const { Flag } = await import("@opencode-ai/core/flag/flag")
       Flag.OPENCODE_CONFIG = saved
+      Flag.OPENCODE_WORKSPACE_ID = undefined
     }
   })
 })
