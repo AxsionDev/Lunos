@@ -12,6 +12,7 @@ import { $ } from "bun"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import { SandboxDocker } from "../src/sandbox/docker"
 
 const dir = path.resolve(import.meta.dirname, "..")
@@ -140,12 +141,12 @@ async function podmanStore(home: string): Promise<Record<string, string>> {
   return process.env.XDG_RUNTIME_DIR ? { XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR } : {}
 }
 
-async function run(name: string, proj: string, steps: Step[], env: Record<string, string> = {}) {
-  script = steps
+/** A throwaway HOME and XDG dirs for one scenario, and the environment that points Lunos at them. */
+async function sandboxEnv(name: string, env: Record<string, string> = {}) {
   const home = path.join(root, name, "home")
   for (const sub of ["", "cfg", "data", "state", "cache"]) await fs.mkdir(path.join(home, sub), { recursive: true })
-  const proc = Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "run", "--sandbox", "do the task"], {
-    cwd: proj,
+  return {
+    home,
     env: {
       PATH: process.env.PATH ?? "",
       HOME: home,
@@ -159,6 +160,15 @@ async function run(name: string, proj: string, steps: Step[], env: Record<string
       ...(await podmanStore(home)),
       ...env,
     },
+  }
+}
+
+async function run(name: string, proj: string, steps: Step[], extra: Record<string, string> = {}) {
+  script = steps
+  const { home, env } = await sandboxEnv(name, extra)
+  const proc = Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "run", "--sandbox", "do the task"], {
+    cwd: proj,
+    env,
     stdout: "pipe",
     stderr: "pipe",
     timeout: 300_000,
@@ -261,7 +271,77 @@ try {
     check("no runtime: the host tree is untouched", !(await Bun.file(path.join(proj, "c.txt")).exists()))
   }
 
-  // 4. on_finish "destroy" (the default) leaves nothing behind.
+  // 4. `/sandbox` and `/sandbox end` in the TUI, through the same server calls the TUI makes: a host
+  // server (experimental workspaces on) creates a docker workspace and warps a session into it; the
+  // agent's tools run inside, with default permissions; copying file changes back is refused; ending
+  // it brings the agent's change back as a branch.
+  {
+    const proj = await project("warp", {})
+    const { env } = await sandboxEnv("warp", { OPENCODE_EXPERIMENTAL_WORKSPACES: "1" })
+    const port = 20_000 + Math.floor(Math.random() * 10_000)
+    const server = Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "serve", "--port", String(port)], {
+      cwd: proj,
+      env,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    try {
+      const base = `http://127.0.0.1:${port}`
+      for (let i = 0; i < 120; i++) {
+        const up = await fetch(`${base}/session?directory=${encodeURIComponent(proj)}`).then(
+          (response) => response.ok,
+          () => false,
+        )
+        if (up) break
+        await Bun.sleep(500)
+      }
+      const client = createOpencodeClient({ baseUrl: base, directory: proj })
+      const session = await client.session.create({})
+      const sessionID = session.data?.id
+      check("warp: a session on the host", !!sessionID, JSON.stringify(session.error))
+      const created = await client.experimental.workspace.create({ type: "docker", branch: null })
+      const workspace = created.data
+      check("warp: a sandbox workspace is created", workspace?.type === "docker", JSON.stringify(created.error))
+      if (sessionID && workspace) {
+        const into = await client.experimental.workspace.warp({ id: workspace.id, sessionID, copyChanges: false })
+        check("warp: the session moves into the sandbox", !into.error, JSON.stringify(into.error))
+        script = [
+          {
+            tool: "write",
+            args: { filePath: path.posix.join(SandboxDocker.WORKSPACE, "w.txt"), content: "written in the sandbox\n" },
+          },
+          { tool: "bash", args: { command: 'echo "INSIDE=$LUNOS_SANDBOX"', description: "where am I" } },
+          { text: "done" },
+        ]
+        const prompt = await client.session.prompt({
+          sessionID,
+          workspace: workspace.id,
+          parts: [{ type: "text", text: "do the task" }],
+        })
+        check("warp: the prompt runs", !prompt.error, JSON.stringify(prompt.error))
+        const messages = JSON.stringify((await client.session.messages({ sessionID })).data ?? [])
+        const sandboxID = (workspace.extra as { sandbox?: string } | null)?.sandbox
+        check("warp: the tool ran inside the sandbox", messages.includes(`INSIDE=${sandboxID}`))
+        check("warp: nothing was written to the host tree", !(await Bun.file(path.join(proj, "w.txt")).exists()))
+        const pending = (await client.permission.list()).data ?? []
+        check("warp: default permissions asked nothing", pending.length === 0, JSON.stringify(pending))
+        const copy = await client.experimental.workspace.warp({ id: null, sessionID, copyChanges: true })
+        check("warp: copying file changes back is refused", !!copy.error, "the warp was allowed")
+        const back = await client.experimental.workspace.warp({ id: null, sessionID, copyChanges: false })
+        check("warp: the session comes back", !back.error, JSON.stringify(back.error))
+        const removed = await client.experimental.workspace.remove({ id: workspace.id })
+        check("warp: ending the sandbox succeeds", !removed.error, JSON.stringify(removed.error))
+        const shown = await $`git show ${workspace.branch ?? ""}:w.txt`.cwd(proj).nothrow().quiet().text()
+        check("warp: the agent's change is on the branch", shown === "written in the sandbox\n", shown)
+      }
+    } finally {
+      server.kill()
+      await server.exited
+      if (process.env.SANDBOX_E2E_VERBOSE) console.log(await new Response(server.stderr).text().catch(() => ""))
+    }
+  }
+
+  // 5. on_finish "destroy" (the default) leaves nothing behind.
   const after = await leftovers()
   for (const kind of KINDS) {
     const left = after[kind].filter((id) => !before[kind].includes(id))
