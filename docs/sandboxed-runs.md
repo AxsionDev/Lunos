@@ -32,7 +32,7 @@ With `OPENCODE_EXPERIMENTAL_WORKSPACES=1`, `/sandbox` in the TUI moves the sessi
 
 ## What happens
 
-1. **Copy.** Your repository is copied into a new Docker volume: the current commit (depth 1), with your uncommitted changes applied — staged, unstaged, and untracked files that aren't gitignored. Ignored files (`.env`, `node_modules`, build output) are **not** copied. Your working tree is never mounted into the container, read-write or read-only. The copy has to be a git repository with at least one commit.
+1. **Copy.** Your repository is copied into a new Docker volume: the current commit (depth 1), with your uncommitted changes applied — staged, unstaged, and untracked files that aren't gitignored. Ignored files (`.env`, `node_modules`, build output) are **not** copied. Your working tree is never mounted into the container, read-write or read-only, unless you choose [`workspace: "mount"`](#mounting-your-working-tree-reduced-isolation). The copy has to be a git repository with at least one commit.
 2. **Run.** A container starts from the sandbox image, running `lunos serve`. Sessions, subagents, background jobs, tool calls, `bash` commands, and the MCP and LSP servers are all started by that server, so they run inside the container; no Lunos server runs on your machine. The client on your machine talks to it over a port bound to `127.0.0.1`, protected by a random password.
 3. **Hand back.** When the work is done — `lunos run` has finished, or you quit the TUI — Lunos:
    - writes every session's transcript (`transcript.json`) and a run summary (`summary.json`: image digest, resource limits, base commit, changed files) to `.opencode/sandbox/<id>/` in your repository (ignored by git by default);
@@ -114,12 +114,12 @@ lunos sandbox prune            # remove kept sandboxes whose retain_for has expi
 
 ## Isolation defaults
 
-These are fixed. Configuration can choose the image, the resources and the lifecycle; it can't add capabilities, mounts or privileges.
+These are fixed. Configuration can choose the image, the resources and the lifecycle; it can't add capabilities or privileges. Your own and your organisation's config (never a repository's) can mount your working tree and extra read-only directories; see [below](#mounting-your-working-tree-reduced-isolation).
 
-- Runs as a non-root user (uid 1000), whatever the image's default user.
+- Runs as a non-root user (uid 1000), whatever the image's default user. With `workspace: "mount"` on Docker Engine on Linux, it runs as your own (non-root) uid instead, so the files it writes are yours.
 - `--cap-drop ALL` and `no-new-privileges`. Docker's default seccomp profile applies (it is never overridden).
 - Read-only root filesystem. The only writable places are the sandbox volume (the workspace, and the home directory that holds session history), an in-memory `/tmp`, and a 1 MB in-memory `/run/lunos` that only the sandbox user can read (see [Credentials](#credentials)).
-- The Docker socket is never mounted. Nothing from your machine is mounted.
+- The Docker socket is never mounted. Nothing from your machine is mounted, unless your global or managed config asks for it (`sandbox.workspace`, `sandbox.mounts`).
 - No route out except through the egress proxy, unless `sandbox.network` is `"open"` (see [Network](#network)).
 - The image is pinned by its ID when the sandbox is created, and the digest is shown at start and recorded in `summary.json`.
 - Resource limits, from `sandbox.resources`:
@@ -218,17 +218,45 @@ What happens inside the sandbox (model calls, tool runs, permission decisions) i
 
 The agent runs as the same user as that server, so it could alter the log inside before it's collected. The records it can't reach are the host's own `sandbox.*` events.
 
+## Mounting your working tree (reduced isolation)
+
+By default the sandbox works on a copy, and its changes come back as a branch or a patch. If you'd rather it worked on your working tree itself (to see changes as they happen, or because the project is too big to copy), set it in **your global config** or your organisation's managed config:
+
+```json
+{ "sandbox": { "workspace": "mount" } }
+```
+
+A repository's own config can't choose this, as it can't open the network: a bind mount is weaker isolation, so it's yours to choose. When managed config sets `sandbox.required`, only managed config can choose `mount`.
+
+What changes:
+
+- **Your working tree is mounted read-write.** The agent's changes are in it as they happen. Nothing is handed back at the end, because there's nothing to hand back: no branch, no patch (`sandbox.results` doesn't apply). The transcript and summary still come back to `.opencode/sandbox/<id>/`.
+- **Read-only, mounted over it:** `.git` (so the agent can't add git hooks or change git config, which run on your machine), and Lunos's own config: `.opencode/`, `opencode.json`, `opencode.jsonc` (so it can't add a plugin or command that your next `lunos` outside a sandbox would load). Only those that exist can be protected: if there's no `opencode.json`, the agent can create one. In a linked git worktree, the git directories its `.git` file points at are mounted read-only too, at the same path.
+- **Not protected, and the warning at start says so:** anything else the agent leaves in your tree runs on your machine the next time you run it: `package.json` scripts, `Makefile`s, `.envrc`, `.husky/`, build scripts, `.gitmodules` URLs. Review the changes before you run them.
+- **Who owns what it writes:** you. On Docker Desktop, file sharing maps ownership to you; on rootless Podman, `--userns=keep-id` maps the sandbox user to you; on Docker Engine on Linux, the sandbox runs as your own uid. Rootless Docker isn't supported in mount mode yet, and Lunos refuses rather than guess. It never runs the sandbox as root, and never changes the ownership of your files.
+
+### Extra read-only directories
+
+`sandbox.mounts` adds directories from this machine, read-only, in either mode; for example a package cache:
+
+```json
+{ "sandbox": { "mounts": [{ "source": "/home/me/.cache/go-build", "target": "/cache/go-build" }] } }
+```
+
+From your global and managed config only. Refused: `/`, your home directory itself, anything holding or inside `~/.ssh`, `~/.gnupg` or `~/.docker`, and anything holding a container runtime's socket (`/var/run/docker.sock`, `/run/podman`, `$XDG_RUNTIME_DIR`), which would let the sandbox start containers on your machine. A target can't be inside the sandbox's own `/sandbox`, `/etc/lunos` or `/run/lunos`.
+
 ## What a sandbox does NOT isolate (yet)
 
 - **The kernel is shared.** A container is not a virtual machine. A kernel vulnerability, or a container-escape bug in Docker, defeats the isolation. For untrusted code where that matters, run Lunos in a VM.
 - **Allowed hosts are allowed for everything in the sandbox.** The proxy checks where a connection goes, not what it carries: a command in the sandbox can send data to your model provider, or to any other allowed host, as the agent itself can. With `"open"`, nothing is restricted.
 - **Each sandbox holds a Docker network while it exists.** Docker's default address pool has room for about 30 networks; destroy or prune kept sandboxes you don't need.
 - **The volume has no size limit.** Docker's and Podman's default volume drivers can't cap a volume's size, and the container's own filesystem is read-only, so a limit on it would change nothing. `tmp` limits only `/tmp`. There is no `sandbox.resources.disk` for this reason: a limit that isn't enforced would be worse than none.
+- **In `workspace: "mount"`, your working tree.** See [above](#mounting-your-working-tree-reduced-isolation): the agent writes to it directly, and only `.git` and Lunos's own config are read-only.
 - **Anything the agent can reach through the model provider or the network is not contained**: a sandbox limits what the agent can do to your machine, not what it can send out.
 
-Also not built yet: a `mount` workspace mode, and devcontainer images.
+Also not built yet: devcontainer images.
 
-**Where it has been verified:** macOS with Docker Desktop, end to end. Rootless Podman 5.8 (netavark), with the full container lifecycle replayed in a Podman nested inside Docker Desktop, not on a Linux machine. Not yet on Linux with Docker Engine, or on Windows. On Podman, the host is `host.containers.internal` from inside a container, where Docker Desktop has `host.docker.internal`.
+**Where it has been verified:** end to end (`packages/opencode/script/sandbox-e2e.ts`) on macOS with Docker Desktop, and on Linux (GitHub's `ubuntu-24.04`) with Docker Engine and with rootless Podman 4.9, in CI on every sandbox change. Not yet on Windows: `packages/opencode/script/sandbox-e2e.ps1` runs the same checks there. On Podman, the host is `host.containers.internal` from inside a container; on Docker, `host.docker.internal` (Lunos maps it on Docker Engine, which doesn't have it).
 
 ## Configuration reference
 
@@ -237,7 +265,8 @@ Also not built yet: a `mount` workspace mode, and devcontainer images.
 | `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed                       |
 | `sandbox.required`         | `false`                             | Nothing runs outside a sandbox; for locked managed config                              |
 | `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                                                  |
-| `sandbox.workspace`        | `"copy"`                            | How the project gets in; `copy` is the only mode so far                                |
+| `sandbox.workspace`        | `"copy"`                            | `copy`, or `mount` (reduced isolation); global and managed config only                 |
+| `sandbox.mounts`           | `[]`                                | Extra read-only mounts, `{ source, target? }`; global and managed config only          |
 | `sandbox.results`          | `"branch"`                          | `branch`, `patch` or `none`; see [Getting the results back](#getting-the-results-back) |
 | `sandbox.runtime`          | Docker, else Podman                 | `docker` or `podman`                                                                   |
 | `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back                       |

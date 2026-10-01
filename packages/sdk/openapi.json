@@ -22487,7 +22487,24 @@
               },
               "workspace": {
                 "type": "string",
-                "enum": ["copy"]
+                "enum": ["copy", "mount"]
+              },
+              "mounts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "description": "Absolute path on this machine"
+                    },
+                    "target": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["source"],
+                  "additionalProperties": false
+                }
               },
               "on_finish": {
                 "type": "string",
@@ -23192,6 +23209,9 @@
                   "results": {
                     "type": "string"
                   },
+                  "workspace": {
+                    "type": "string"
+                  },
                   "runtime": {
                     "type": "string"
                   },
@@ -23220,6 +23240,9 @@
                       "type": "string"
                     },
                     "results": {
+                      "type": "string"
+                    },
+                    "workspace": {
                       "type": "string"
                     },
                     "expires": {

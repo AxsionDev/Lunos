@@ -153,7 +153,8 @@ export function usePromptWorkspace(sessionID?: string) {
     }
     const id = space.name
     const settings = await sdk.client.config.settings().catch(() => undefined)
-    const results = settings?.data?.sandbox?.known.find((item) => item.id === id)?.results ?? "branch"
+    const known = settings?.data?.sandbox?.known.find((item) => item.id === id)
+    const results = known?.results ?? "branch"
     const back = await warpWorkspaceSession({
       dialog,
       sdk,
@@ -181,11 +182,13 @@ export function usePromptWorkspace(sessionID?: string) {
       return
     }
     const where =
-      results === "patch"
-        ? `the agent's changes are in .opencode/sandbox/${id}/changes.patch (git apply)`
-        : results === "none"
-          ? 'its changes weren\'t handed back (sandbox.results is "none")'
-          : `the agent's changes are on branch ${space.branch ?? `lunos/sandbox/${id}`}`
+      known?.workspace === "mount"
+        ? "the agent's changes are already in your working tree (workspace mount)"
+        : results === "patch"
+          ? `the agent's changes are in .opencode/sandbox/${id}/changes.patch (git apply)`
+          : results === "none"
+            ? 'its changes weren\'t handed back (sandbox.results is "none")'
+            : `the agent's changes are on branch ${space.branch ?? `lunos/sandbox/${id}`}`
     toast.show({
       variant: "success",
       message: `Sandbox ${id} ended: ${where}. Transcript and summary in .opencode/sandbox/${id}/.`,

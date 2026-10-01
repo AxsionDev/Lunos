@@ -2001,7 +2001,14 @@ export type Config = {
     enabled?: boolean
     required?: boolean
     image?: string
-    workspace?: "copy"
+    workspace?: "copy" | "mount"
+    mounts?: Array<{
+      /**
+       * Absolute path on this machine
+       */
+      source: string
+      target?: string
+    }>
     on_finish?: "destroy" | "retain" | "destroy_on_success"
     retain_for?: string
     network?: "policy" | "none" | "open"
@@ -2212,6 +2219,7 @@ export type SettingsSnapshot = {
       digest?: string
       network?: string
       results?: string
+      workspace?: string
       runtime?: string
       created?: string
     }
@@ -2221,6 +2229,7 @@ export type SettingsSnapshot = {
       branch: string
       network: string
       results?: string
+      workspace?: string
       expires?: string
       handedOff?: string
     }>

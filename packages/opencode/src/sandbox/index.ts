@@ -12,6 +12,7 @@ import { SandboxDocker } from "./docker"
 import { SandboxAllow } from "./allow"
 import type { SandboxEgress } from "./egress"
 import { SandboxGit } from "./git"
+import { SandboxMount } from "./mount"
 
 // XCOD-144 slice 1: the lifecycle of one sandbox. `create` copies the repo into a container volume
 // and creates (but doesn't start) the container; `start` runs the Lunos server in it; `handoff`
@@ -43,6 +44,12 @@ export type Meta = {
   resources: SandboxConfig.Resolved["resources"]
   /** XCOD-158: how the results come back; absent on older sandboxes, which used "branch". */
   results?: SandboxConfig.Resolved["results"]
+  /** XCOD-158: "mount" when your working tree is bind-mounted; unset (copy) otherwise. */
+  workspace?: SandboxConfig.Resolved["workspace"]
+  /** Who the sandbox runs as; unset is the default uid 1000. */
+  identity?: SandboxDocker.Identity
+  /** What is mounted from this machine, already checked. */
+  binds?: SandboxDocker.Binds
   /** The container runtime that created it; absent on older sandboxes, which used Docker. */
   runtime?: SandboxDocker.Runtime["name"]
   engine?: SandboxDocker.Runtime["engine"]
@@ -76,6 +83,8 @@ export type Handoff = {
   results: string
   /** Whether a session's last reply ended in an error: what destroy_on_success keeps a sandbox for. */
   failed: boolean
+  /** XCOD-158: "mount": nothing was handed back because the changes are already in your working tree. */
+  workspace?: SandboxConfig.Resolved["workspace"]
 }
 
 export const branchName = (id: string) => `lunos/sandbox/${id}`
@@ -95,6 +104,7 @@ export type Marker = {
   digest?: string
   network?: SandboxConfig.Network
   results?: SandboxConfig.Resolved["results"]
+  workspace?: SandboxConfig.Resolved["workspace"]
   runtime?: string
   created?: string
 }
@@ -106,6 +116,7 @@ export function markerOf(info: Meta): Marker {
     digest: info.image.digest ?? info.image.id,
     network: info.network ?? "open",
     results: info.results ?? "branch",
+    workspace: info.workspace ?? "copy",
     runtime: info.engine ?? info.runtime ?? "docker",
     created: info.created,
   }
@@ -121,6 +132,7 @@ export type Status = {
     branch: string
     network: string
     results?: string
+    workspace?: string
     expires?: string
     handedOff?: string
   }[]
@@ -146,6 +158,7 @@ export async function status(root: string | undefined): Promise<Status> {
         branch: info.branch,
         network: info.network ?? "open",
         results: info.results ?? "branch",
+        workspace: info.workspace ?? "copy",
         // Metadata from older sandboxes can hold null here; the snapshot's fields are optional strings.
         expires: info.expires ?? undefined,
         handedOff: info.handedOff ?? undefined,
@@ -219,15 +232,36 @@ export async function create(input: {
   else log(`network ${network}: ${network === "none" ? "nothing" : computed.allow.join(", ")} allowed`)
   for (const item of computed.denied) log(`not allowed by the residency policy: ${item.provider}`)
 
+  // XCOD-158: sandbox.mounts (read-only, checked) in either mode; in mount mode, your working tree too.
+  const mount = input.config.workspace === "mount"
+  const identity = mount ? await SandboxDocker.mountIdentity() : undefined
+  const binds: SandboxDocker.Binds = {
+    ...SandboxDocker.NO_BINDS,
+    ...(mount ? await SandboxMount.workspace(repo.root) : {}),
+    extra: SandboxMount.extra(input.config.mounts),
+  }
+  for (const item of binds.extra) log(`mounting ${item.source} read-only at ${item.target}`)
+  if (mount) {
+    log(
+      `WARNING: workspace mount: ${repo.root} is mounted read-write, so the agent changes it directly and ` +
+        `anything it leaves there (build scripts, package.json scripts, .envrc, Makefiles) runs on this machine ` +
+        `the next time you run it. ${binds.protect.join(", ") || "Nothing"} stays read-only. Reduced isolation.`,
+    )
+    if (input.config.results !== "none")
+      log(`sandbox.results "${input.config.results}" doesn't apply: the changes are already in your working tree`)
+  }
+
   const seed = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-seed-"))
   try {
-    log(`copying ${repo.root} at ${repo.base.slice(0, 12)} (with uncommitted changes)`)
-    await SandboxGit.seed({ ...repo, into: seed, branch })
-    const seedTree = await SandboxGit.tree({
-      gitDir: repo.gitDir,
-      workTree: seed,
-      startTree: await SandboxGit.treeOfCommit(repo.gitDir, repo.base),
-    })
+    const baseTree = await SandboxGit.treeOfCommit(repo.gitDir, repo.base)
+    // In mount mode the volume holds only the sandbox's home: the workspace is your tree itself.
+    if (!mount) {
+      log(`copying ${repo.root} at ${repo.base.slice(0, 12)} (with uncommitted changes)`)
+      await SandboxGit.seed({ ...repo, into: seed, branch })
+    }
+    const seedTree = mount
+      ? baseTree
+      : await SandboxGit.tree({ gitDir: repo.gitDir, workTree: seed, startTree: baseTree })
 
     const password = randomBytes(24).toString("base64url")
     const workdir = path.posix.join(SandboxDocker.WORKSPACE, repo.relative.split(path.sep).join("/"))
@@ -243,7 +277,10 @@ export async function create(input: {
       on_finish: input.config.on_finish,
       retain_for: input.config.retain_for,
       resources: input.config.resources,
-      results: input.config.results,
+      results: mount ? "none" : input.config.results,
+      workspace: mount ? "mount" : undefined,
+      identity,
+      binds: binds.root || binds.extra.length ? binds : undefined,
       runtime: SandboxDocker.current()?.name,
       engine: SandboxDocker.current()?.engine,
       network,
@@ -281,14 +318,14 @@ async function populate(
       allow: info.allow ?? [],
       network: info.network,
     })
-  await SandboxDocker.seed(info.id, info.image.id, SandboxGit.tar(seed), SandboxGit.TAR_ENV)
+  await SandboxDocker.seed(info.id, info.image.id, SandboxGit.tar(seed), SandboxGit.TAR_ENV, info.identity)
   const policy = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-sandbox-policy-"))
   try {
     if (managed) await fs.writeFile(path.join(policy, "managed.json"), JSON.stringify(auditInside(managed), null, 2))
     // XCOD-158: the marker also tells the server inside what it's running in (the Status tab), since
     // it can't ask Docker. Root-owned and read-only, like the rest of the policy volume.
     await fs.writeFile(path.join(policy, SandboxDocker.MARKER), JSON.stringify(markerOf(info)) + "\n")
-    await SandboxDocker.seedPolicy(info.id, info.image.id, policy, SandboxGit.TAR_ENV)
+    await SandboxDocker.seedPolicy(info.id, info.image.id, policy, SandboxGit.TAR_ENV, info.identity)
   } finally {
     await fs.rm(policy, { recursive: true, force: true })
   }
@@ -306,6 +343,9 @@ async function populate(
         OPENCODE_DISABLE_AUTOUPDATE: "1",
       },
       network: info.network,
+      engine: info.engine,
+      identity: info.identity,
+      binds: info.binds,
     }),
   )
 }
@@ -423,7 +463,7 @@ export async function start(
 ): Promise<Connection> {
   const timeoutMs = options.timeoutMs ?? 60_000
   await SandboxDocker.start(info.id)
-  await SandboxDocker.inject(info.id, runtime(info, options.secrets ?? {}))
+  await SandboxDocker.inject(info.id, runtime(info, options.secrets ?? {}), info.identity)
   if (options.attach) AuditLog.emit("sandbox.attach", auditFields(info))
   const conn = connection(info, await SandboxDocker.hostPort(info.id))
   const started = Date.now()
@@ -494,6 +534,7 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
             network: info.network ?? "open",
             base: info.base,
             results: mode,
+            workspace: info.workspace ?? "copy",
             ...fields,
             sessions: sessions.map((item) => ({
               id: item.session.id,
@@ -510,7 +551,7 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
       )
     if (mode === "none") {
       await summary({ files: [] })
-      return { mode, files: [], results, failed: failed(sessions) }
+      return { mode, files: [], results, failed: failed(sessions), workspace: info.workspace }
     }
 
     await SandboxDocker.copyOut(info.id, out)
