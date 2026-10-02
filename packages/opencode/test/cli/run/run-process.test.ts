@@ -1,3 +1,4 @@
+import fs from "node:fs"
 // Subprocess integration tests for `opencode run` (non-interactive mode).
 // These exercise the real CLI binary against a TestLLMServer running in the
 // same process. See `test/lib/cli-process.ts` for the harness — each test uses
@@ -142,6 +143,32 @@ describe("opencode run (non-interactive subprocess)", () => {
             .slice(0, -1)
             .every((line) => line.length > 0),
         ).toBe(true)
+      }),
+    CONCURRENT_TIMEOUT,
+  )
+
+  // XCOD-150: the child inherited the test process's $PWD, so its project was the repo checkout.
+  cliIt.concurrent(
+    "runs in the fixture directory, not the repo checkout",
+    ({ llm, home, opencode }) =>
+      Effect.gen(function* () {
+        // Not `pwd -P`: on Windows the bash tool runs PowerShell, where `-P` is ambiguous.
+        const command = `bun -e "console.log(process.cwd())"`
+        yield* llm.push(reply().tool("bash", { command, description: "Print the directory" }))
+        yield* llm.text("done")
+
+        const result = yield* opencode.run("where am I", {
+          format: "json",
+          extraArgs: ["--dangerously-skip-permissions"],
+        })
+
+        opencode.expectExit(result, 0)
+        const tool = opencode.parseJsonEvents(result.stdout).find((e: any) => e.type === "tool_use")
+        const cwd = String((tool as any)?.part?.state?.output ?? "").trim()
+        // Windows can name the same directory by its short (RUNNER~1) or long form, in any case.
+        const same = (p: string) => p.toLowerCase()
+        const fixture = [home, fs.realpathSync(home), fs.realpathSync.native(home)].map(same)
+        expect(fixture).toContain(same(fs.existsSync(cwd) ? fs.realpathSync.native(cwd) : cwd))
       }),
     CONCURRENT_TIMEOUT,
   )

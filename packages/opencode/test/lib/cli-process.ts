@@ -86,6 +86,10 @@ function isolatedEnv(home: string, configJson: string): Record<string, string> {
   return {
     OPENCODE_TEST_HOME: home,
     HOME: home,
+    // XCOD-150: `lunos run` takes its project from $PWD, which the child otherwise inherited from the
+    // test process: every harness run used the repo checkout as its project. The fixture is the
+    // project, as the child's cwd already is.
+    PWD: home,
     XDG_CONFIG_HOME: path.join(home, ".config"),
     XDG_DATA_HOME: path.join(home, ".local/share"),
     XDG_STATE_HOME: path.join(home, ".local/state"),
@@ -429,7 +433,7 @@ export function withCliFixture<A, E>(
         Effect.sync(() =>
           Bun.spawn(["bun", "run", cliEntry, ...argv], {
             cwd: opts?.cwd ?? home,
-            env: { ...process.env, ...env, ...opts?.env },
+            env: { ...process.env, ...env, PWD: opts?.cwd ?? home, ...opts?.env },
             stdin: "pipe",
             stdout: "pipe",
             stderr: "pipe",
