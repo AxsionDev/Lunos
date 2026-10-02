@@ -1,5 +1,6 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { dirname, isAbsolute, join, parse, relative, resolve as pathResolve, sep } from "path"
+import { win32 as pathWin32 } from "path"
 import { existsSync, readdirSync, realpathSync } from "fs"
 import * as NFS from "fs/promises"
 import { lookup } from "mime-types"
@@ -282,6 +283,45 @@ export namespace FSUtil {
    */
   export function resolveOnDisk(base: string, p: string): string {
     return onDiskCase(pathResolve(base, windowsPath(p)))
+  }
+
+  /**
+   * XCOD-149: a path rule's pattern spelled as request paths are (long names). On Windows, TEMP and
+   * the XDG dirs can come as 8.3 short names (`C:\\Users\\RUNNER~1\\…`); request paths are expanded
+   * to `C:\\Users\\runneradmin\\…`, so a short-form rule never matched them. The longest existing
+   * prefix before any glob is expanded; the rest, glob included, is kept as written. Elsewhere, for
+   * patterns that aren't absolute paths, and when expanding changes nothing, the pattern is returned
+   * byte-for-byte unchanged (separators included).
+   */
+  export function canonicalPattern(
+    p: string,
+    os: { platform: string; exists: (p: string) => boolean; realpath: (p: string) => string } = {
+      platform: process.platform,
+      exists: existsSync,
+      realpath: (item) => realpathSync.native(item),
+    },
+  ): string {
+    if (os.platform !== "win32") return p
+    const win = pathWin32
+    const glob = p.search(/[*?[{]/)
+    const literal = glob === -1 ? p : p.slice(0, glob)
+    // Cut points: every separator in the literal part, plus its end when there's no glob. Longest first.
+    const cuts = [...literal.matchAll(/[\\/]/g)].map((m) => m.index!)
+    if (glob === -1) cuts.push(p.length)
+    const same = (a: string, b: string) => win.normalize(a).toLowerCase() === win.normalize(b).toLowerCase()
+    for (const cut of cuts.reverse()) {
+      const prefix = p.slice(0, cut)
+      if (!win.isAbsolute(prefix) || !os.exists(prefix)) continue
+      const expanded = (() => {
+        try {
+          return os.realpath(prefix)
+        } catch {
+          return prefix
+        }
+      })()
+      return same(expanded, prefix) ? p : expanded + p.slice(cut)
+    }
+    return p
   }
 
   export function normalizePathPattern(p: string): string {

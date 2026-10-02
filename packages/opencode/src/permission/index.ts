@@ -5,6 +5,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
 import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 
@@ -194,6 +195,9 @@ const layer = Layer.effect(
   }),
 )
 
+/** Permissions whose patterns are filesystem paths. */
+const PATH_PERMISSIONS = ["external_directory", "read", "edit"]
+
 function expand(pattern: string): string {
   if (pattern.startsWith("~/")) return os.homedir() + pattern.slice(1)
   if (pattern === "~") return os.homedir()
@@ -209,8 +213,16 @@ export function fromConfig(permission: ConfigPermissionV1.Info) {
       ruleset.push({ permission: key, action: value, pattern: "*" })
       continue
     }
+    // XCOD-149: a path rule written with a Windows 8.3 short name also gets its long form, so it matches
+    // expanded request paths. The rule as written stays, for callers that still pass the short form.
+    const path = PATH_PERMISSIONS.includes(key)
     ruleset.push(
-      ...Object.entries(value).map(([pattern, action]) => ({ permission: key, pattern: expand(pattern), action })),
+      ...Object.entries(value).flatMap(([pattern, action]) => {
+        const written = expand(pattern)
+        const long = path ? FSUtil.canonicalPattern(written) : written
+        const rule = { permission: key, pattern: written, action }
+        return long === written ? [rule] : [rule, { ...rule, pattern: long }]
+      }),
     )
   }
   return ruleset

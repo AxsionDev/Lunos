@@ -78,3 +78,47 @@ describe("FSUtil.resolveOnDisk", () => {
     expect(FSUtil.resolveOnDisk(os.homedir(), bash)).toBe(FSUtil.normalizePath(file))
   })
 })
+
+// XCOD-149: Windows 8.3 short names in rule patterns. Simulated: this machine can't create them.
+describe("FSUtil.canonicalPattern", () => {
+  const disk = new Map([
+    ["C:\\PROGRA~1", "C:\\Program Files"],
+    ["C:\\PROGRA~1\\foo", "C:\\Program Files\\foo"],
+    ["C:\\Users\\RUNNER~1\\AppData\\Local\\Temp", "C:\\Users\\runneradmin\\AppData\\Local\\Temp"],
+  ])
+  const windows = {
+    platform: "win32",
+    exists: (p: string) => disk.has(p) || [...disk.keys()].some((key) => key.startsWith(p + "\\")) || p === "C:\\",
+    realpath: (p: string) => disk.get(p) ?? p,
+  }
+
+  test("expands the existing short-name prefix and keeps the glob", () => {
+    expect(FSUtil.canonicalPattern("C:\\PROGRA~1\\foo\\*", windows)).toBe("C:\\Program Files\\foo\\*")
+    expect(FSUtil.canonicalPattern("C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\opencode\\*", windows)).toBe(
+      "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\opencode\\*",
+    )
+  })
+
+  test("a rule written short matches the long-form request path (so its allow or deny applies)", () => {
+    const { Wildcard } = require("../src/util/wildcard") as typeof import("../src/util/wildcard")
+    const pattern = FSUtil.canonicalPattern("C:\\PROGRA~1\\foo\\*", windows)
+    expect(Wildcard.match("C:\\Program Files\\foo\\bar.txt", pattern)).toBe(true)
+  })
+
+  test("leaves everything else alone: other platforms, non-paths, nothing on disk", () => {
+    expect(FSUtil.canonicalPattern("C:\\PROGRA~1\\foo\\*", { ...windows, platform: "darwin" })).toBe(
+      "C:\\PROGRA~1\\foo\\*",
+    )
+    expect(FSUtil.canonicalPattern("*", windows)).toBe("*")
+    expect(FSUtil.canonicalPattern("src/**", windows)).toBe("src/**")
+    expect(FSUtil.canonicalPattern("D:\\nothing\\here\\*", { ...windows, exists: () => false })).toBe(
+      "D:\\nothing\\here\\*",
+    )
+  })
+
+  test("a long-name path is returned exactly as written, mixed separators included", () => {
+    const home = { ...windows, exists: (p: string) => p === "C:\\Users\\runneradmin" || p === "C:" }
+    expect(FSUtil.canonicalPattern("C:\\Users\\runneradmin/projects/*", home)).toBe("C:\\Users\\runneradmin/projects/*")
+    expect(FSUtil.canonicalPattern("C:\\Users\\RUNNERADMIN\\*", home)).toBe("C:\\Users\\RUNNERADMIN\\*")
+  })
+})
