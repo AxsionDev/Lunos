@@ -746,6 +746,17 @@ export const RunCommand = effectCmd({
           return false
         }
 
+        // XCOD-148: a rejected prompt can be reported both by the prompt call and by the session's
+        // error event, whichever arrives first; --format json gets exactly one error record. Returns
+        // whether JSON mode handled it (as emit does), so text mode is unchanged.
+        let errorRecorded = false
+        function emitError(error: unknown) {
+          if (args.format !== "json") return false
+          if (errorRecorded) return true
+          errorRecorded = true
+          return emit("error", { error })
+        }
+
         // Consume one subscribed event stream for the active session and mirror it
         // to stdout/UI. `client` is passed explicitly because attach mode may
         // rebind the SDK to the session's directory after the subscription is
@@ -842,7 +853,7 @@ export const RunCommand = effectCmd({
                 err = String(props.error.data.message)
               }
               error = error ? error + EOL + err : err
-              if (emit("error", { error: props.error })) continue
+              if (emitError(props.error)) continue
               UI.error(err)
             }
 
@@ -908,7 +919,7 @@ export const RunCommand = effectCmd({
               variant: args.variant,
             })
             if (result.error) {
-              if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
+              if (!emitError(result.error)) UI.error(formatRunError(result.error))
               process.exitCode = 1
               return
             }
@@ -925,7 +936,7 @@ export const RunCommand = effectCmd({
             parts: [...files, { type: "text", text: message }],
           })
           if (result.error) {
-            if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
+            if (!emitError(result.error)) UI.error(formatRunError(result.error))
             process.exitCode = 1
             return
           }
