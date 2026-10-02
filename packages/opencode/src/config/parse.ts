@@ -32,6 +32,27 @@ export function jsonc(text: string, filepath: string): unknown {
   return data
 }
 
+/**
+ * XCOD-151: parse config text after {env:}/{file:} substitution, but never show it. An error is
+ * reported against `original`, the text as written, where references are still `{env:NAME}`; if the
+ * original parses, the substitution itself broke the document, and only the reference names are
+ * given. The substituted text can hold secrets, so it never appears in an error.
+ */
+export function jsoncSubstituted(original: string, expanded: string, filepath: string): unknown {
+  const errors: JsoncParseError[] = []
+  const data = parseJsoncImpl(expanded, errors, { allowTrailingComma: true })
+  if (!errors.length) return data
+  jsonc(original, filepath)
+  const references = Array.from(new Set(original.match(/\{(?:env|file):[^}]+\}/g) ?? []))
+  throw new JsonError({
+    path: filepath,
+    message:
+      `the file is valid as written, but not once ${references.join(", ") || "its references"} ` +
+      "are filled in. A value placed outside a string must be valid JSON on its own (a number, true/false, an object); " +
+      "put the reference inside quotes to use it as text.",
+  })
+}
+
 export function schema<S extends EffectSchema.Decoder<unknown, never>>(
   schema: S,
   data: unknown,

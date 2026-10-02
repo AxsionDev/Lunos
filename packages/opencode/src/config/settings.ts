@@ -672,7 +672,7 @@ function issues(error: unknown) {
 /** Decodes a whole file's text the way the live config loader does. */
 export async function decode(target: Target, text: string, file: string) {
   const expanded = await ConfigVariable.substitute({ text, type: "path", path: file, missing: "empty" })
-  const parsed = ConfigParse.jsonc(expanded, file)
+  const parsed = ConfigParse.jsoncSubstituted(text, expanded, file)
   if (target === "tui") return ConfigParse.schema(TuiConfig.Info, parsed, file) as unknown
   return ConfigParse.schema(
     ConfigV1.Info,
