@@ -70,6 +70,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **The default agent asks before commands that publish or reach outside the project** (XCOD-164):
+  `git push`, `git remote add`/`set-url`, `git config --global`/`--system`, `gh repo create`/`delete`,
+  `gh pr create`/`merge`, `gh release create`, `npm`/`pnpm`/`yarn`/`bun publish`, `cargo publish`,
+  `twine upload` and `docker push`. In the TUI you're asked; `lunos run` can't ask, so it refuses
+  them. Before, they ran unasked: one run committed, rewrote the global git config, added a remote
+  and tried `git push` and `gh repo create --public`. Allow them again in your config, e.g.
+  `"permission": { "bash": { "git push *": "allow" } }`, or `"bash": "allow"` for everything.
+
 - **`/connect` is now `/providers`,** the same word as the `lunos providers` CLI command. It opens
   on your configured providers, each with its status (connected, expired or error), auth method and
   jurisdiction, with **Add provider** (the old connect flow), **Log out** and **Set as default for

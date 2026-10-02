@@ -35,6 +35,27 @@ import { Reference } from "@opencode-ai/core/reference"
 import { Location } from "@opencode-ai/core/location"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 
+/** XCOD-164: shell commands the default agent asks before running. Matched as command prefixes. */
+export const OUTWARD_COMMANDS = [
+  "git push",
+  "git remote add",
+  "git remote set-url",
+  "git config --global",
+  "git config --system",
+  "gh repo create",
+  "gh repo delete",
+  "gh pr create",
+  "gh pr merge",
+  "gh release create",
+  "npm publish",
+  "pnpm publish",
+  "yarn publish",
+  "bun publish",
+  "cargo publish",
+  "twine upload",
+  "docker push",
+]
+
 export const Info = Schema.Struct({
   name: Schema.String,
   description: Schema.optional(Schema.String),
@@ -127,6 +148,14 @@ const layer = Layer.effect(
           external_directory: {
             "*": "ask",
             ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
+          },
+          // XCOD-164: commands that publish, reach a remote, or change state outside the project
+          // ask first. A recording run once committed, rewrote the global git config, added a
+          // remote and tried `git push` and `gh repo create --public` unasked. Under `lunos run`,
+          // asking means refusing. Your own or your organisation's config can allow them.
+          bash: {
+            "*": "allow",
+            ...Object.fromEntries(OUTWARD_COMMANDS.map((command) => [`${command} *`, "ask"])),
           },
           question: "deny",
           plan_enter: "deny",
