@@ -152,7 +152,9 @@ describe("opencode run (non-interactive subprocess)", () => {
     "runs in the fixture directory, not the repo checkout",
     ({ llm, home, opencode }) =>
       Effect.gen(function* () {
-        yield* llm.push(reply().tool("bash", { command: "pwd -P", description: "Print the directory" }))
+        // Not `pwd -P`: on Windows the bash tool runs PowerShell, where `-P` is ambiguous.
+        const command = `bun -e "console.log(process.cwd())"`
+        yield* llm.push(reply().tool("bash", { command, description: "Print the directory" }))
         yield* llm.text("done")
 
         const result = yield* opencode.run("where am I", {
@@ -161,9 +163,12 @@ describe("opencode run (non-interactive subprocess)", () => {
         })
 
         opencode.expectExit(result, 0)
-        const output = JSON.stringify(opencode.parseJsonEvents(result.stdout))
-        const fixture = fs.realpathSync(home)
-        expect(output).toContain(JSON.stringify(fixture).slice(1, -1))
+        const tool = opencode.parseJsonEvents(result.stdout).find((e: any) => e.type === "tool_use")
+        const cwd = String((tool as any)?.part?.state?.output ?? "").trim()
+        // Windows can name the same directory by its short (RUNNER~1) or long form, in any case.
+        const same = (p: string) => p.toLowerCase()
+        const fixture = [home, fs.realpathSync(home), fs.realpathSync.native(home)].map(same)
+        expect(fixture).toContain(same(fs.existsSync(cwd) ? fs.realpathSync.native(cwd) : cwd))
       }),
     CONCURRENT_TIMEOUT,
   )
