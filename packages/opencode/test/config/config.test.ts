@@ -719,25 +719,20 @@ it.instance("handles environment variable substitution", () =>
   ),
 )
 
-it.instance("preserves env variables when adding $schema to config", () =>
+// XCOD-165: a project's opencode.json is often tracked; loading it must not change it.
+it.instance("loading a config without $schema leaves the file byte-identical", () =>
   withProcessEnv(
     "PRESERVE_VAR",
     "secret_value",
     Effect.gen(function* () {
       const test = yield* TestInstance
-      // Config without $schema - should trigger auto-add
-      yield* FSUtil.use.writeWithDirs(
-        path.join(test.directory, "opencode.json"),
-        JSON.stringify({ username: "{env:PRESERVE_VAR}" }),
-      )
+      const file = path.join(test.directory, "opencode.json")
+      const original = JSON.stringify({ username: "{env:PRESERVE_VAR}" })
+      yield* FSUtil.use.writeWithDirs(file, original)
       const config = yield* Config.use.get()
       expect(config.username).toBe("secret_value")
-
-      // Read the file to verify the env variable was preserved
-      const content = yield* FSUtil.use.readFileString(path.join(test.directory, "opencode.json"))
-      expect(content).toContain("{env:PRESERVE_VAR}")
-      expect(content).not.toContain("secret_value")
-      expect(content).toContain("$schema")
+      expect(config.$schema).toBe("https://opencode.ai/config.json")
+      expect(yield* FSUtil.use.readFileString(file)).toBe(original)
     }),
   ),
 )
