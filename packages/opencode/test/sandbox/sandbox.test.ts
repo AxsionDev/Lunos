@@ -883,13 +883,16 @@ describe("workspace mount", () => {
     const linked = path.join(parent.path, "wt")
     await $`git worktree add -q ${linked}`.cwd(main.path).quiet()
     const { SandboxMount } = await import("../../src/sandbox/mount")
+    // On Windows those directories are Windows paths, which git in a Linux container can't use.
+    await expect(SandboxMount.workspace(linked, "win32")).rejects.toThrow("linked git worktree on Windows")
+    // A plain repository's .git is under the tree: nothing outside, on any platform.
+    expect((await SandboxMount.workspace(main.path, "win32")).outside).toEqual([])
+    if (process.platform === "win32") return
     const binds = await SandboxMount.workspace(linked)
     expect(binds.protect).toContain(".git")
     const common = await fs.realpath(path.join(main.path, ".git"))
-    expect(binds.outside.map((dir) => dir.replace(/\/$/, ""))).toContain(common)
+    expect(binds.outside).toContain(common)
     expect(binds.outside.some((dir) => dir.startsWith(path.join(common, "worktrees")))).toBe(true)
-    // A plain repository's .git is under the tree: nothing outside.
-    expect((await SandboxMount.workspace(main.path)).outside).toEqual([])
   })
 })
 

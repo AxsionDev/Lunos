@@ -30,24 +30,46 @@ export async function gitDirsOutside(root: string): Promise<string[]> {
     "--git-dir",
     "--git-common-dir",
   ])
+  // git prints C:/forward/slashes on Windows: compare in this platform's form.
   const inside = (dir: string) => dir === root || dir.startsWith(root + path.sep)
-  return Array.from(new Set(out.split("\n").map((line) => line.trim()))).filter((dir) => dir && !inside(dir))
+  return Array.from(
+    new Set(
+      out
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => path.resolve(line)),
+    ),
+  ).filter((dir) => !inside(dir))
 }
 
 /** Your working tree's mounts for `workspace: "mount"`. */
-export async function workspace(root: string): Promise<Pick<SandboxDocker.Binds, "root" | "protect" | "outside">> {
+export async function workspace(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<Pick<SandboxDocker.Binds, "root" | "protect" | "outside">> {
+  const outside = await gitDirsOutside(root)
+  // A linked worktree's .git names its git directories by Windows paths there, which git in a Linux
+  // container can't open, so they can't be mounted where git expects them.
+  if (outside.length && platform === "win32")
+    throw new Error(
+      'sandbox.workspace "mount" isn\'t supported in a linked git worktree on Windows: its git directories ' +
+        `(${outside.join(", ")}) are Windows paths, which git in the sandbox can't use. Use "copy", or the main checkout.`,
+    )
   return {
     root,
     protect: PROTECTED.filter((item) => existsSync(path.join(root, item))),
-    outside: await gitDirsOutside(root),
+    outside,
   }
 }
 
 const SANDBOX_PATHS = [SandboxDocker.ROOT, SandboxDocker.POLICY_DIR, SandboxDocker.RUNTIME_DIR]
 
 /** Whether `inner` is `outer` or inside it. */
-const within = (inner: string, outer: string) =>
-  inner === outer || inner.startsWith(outer.endsWith(path.sep) ? outer : outer + path.sep)
+const within = (inner: string, outer: string, sep: string = path.sep) =>
+  inner === outer || inner.startsWith(outer.endsWith(sep) ? outer : outer + sep)
+/** For paths in the sandbox: always POSIX, whatever this machine is. */
+const withinSandbox = (inner: string, outer: string) => within(inner, outer, "/")
 
 const real = (item: string) => {
   try {
@@ -93,7 +115,7 @@ export function extra(
     if (!path.posix.isAbsolute(item.target) || target === "/")
       throw refuse(`the target ${item.target} must be an absolute path in the sandbox, other than /`)
     for (const reserved of SANDBOX_PATHS)
-      if (within(target, reserved) || within(reserved, target))
+      if (withinSandbox(target, reserved) || withinSandbox(reserved, target))
         throw refuse(`the target ${target} overlaps the sandbox's own ${reserved}`)
     return { source, target }
   })
