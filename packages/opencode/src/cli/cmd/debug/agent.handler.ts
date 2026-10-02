@@ -58,12 +58,26 @@ const run = Effect.fn("Cli.debug.agent.body")(function* (
     return
   }
 
+  // XCOD-167: an MCP server can add ~30 tools to every session, and small models then call tools
+  // that don't exist. Say how many this agent gets, and how to drop a server's tools.
+  const enabled = Object.entries(resolvedTools).filter(([, on]) => on !== false).length
   const output = {
     ...agent,
     tools: resolvedTools,
+    toolCount: enabled,
+    ...(enabled > TOOL_WARNING
+      ? {
+          warning:
+            `${enabled} tools: small models start calling tools that don't exist past about ${TOOL_WARNING}. ` +
+            `Drop an MCP server's tools for this agent or project with "permission": { "<server>_*": "deny" }.`,
+        }
+      : {}),
   }
   yield* writeStdoutEffect(JSON.stringify(output, null, 2) + EOL)
 })
+
+/** Past this many tools, `lunos debug agent` warns (XCOD-167). */
+export const TOOL_WARNING = 20
 
 const getAvailableTools = Effect.fn("Cli.debug.agent.getAvailableTools")(function* (agent: Agent.Info) {
   const provider = yield* Provider.Service
