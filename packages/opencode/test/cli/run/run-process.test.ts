@@ -1,3 +1,4 @@
+import fs from "node:fs"
 // Subprocess integration tests for `opencode run` (non-interactive mode).
 // These exercise the real CLI binary against a TestLLMServer running in the
 // same process. See `test/lib/cli-process.ts` for the harness — each test uses
@@ -142,6 +143,27 @@ describe("opencode run (non-interactive subprocess)", () => {
             .slice(0, -1)
             .every((line) => line.length > 0),
         ).toBe(true)
+      }),
+    CONCURRENT_TIMEOUT,
+  )
+
+  // XCOD-150: the child inherited the test process's $PWD, so its project was the repo checkout.
+  cliIt.concurrent(
+    "runs in the fixture directory, not the repo checkout",
+    ({ llm, home, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.push(reply().tool("bash", { command: "pwd -P", description: "Print the directory" }))
+        yield* llm.text("done")
+
+        const result = yield* opencode.run("where am I", {
+          format: "json",
+          extraArgs: ["--dangerously-skip-permissions"],
+        })
+
+        opencode.expectExit(result, 0)
+        const output = JSON.stringify(opencode.parseJsonEvents(result.stdout))
+        const fixture = fs.realpathSync(home)
+        expect(output).toContain(JSON.stringify(fixture).slice(1, -1))
       }),
     CONCURRENT_TIMEOUT,
   )
