@@ -289,8 +289,9 @@ export namespace FSUtil {
    * XCOD-149: a path rule's pattern spelled as request paths are (long names). On Windows, TEMP and
    * the XDG dirs can come as 8.3 short names (`C:\\Users\\RUNNER~1\\…`); request paths are expanded
    * to `C:\\Users\\runneradmin\\…`, so a short-form rule never matched them. The longest existing
-   * prefix before any glob is expanded; the rest, glob included, is kept as written. Elsewhere, and
-   * for patterns that aren't absolute paths, the pattern is returned unchanged.
+   * prefix before any glob is expanded; the rest, glob included, is kept as written. Elsewhere, for
+   * patterns that aren't absolute paths, and when expanding changes nothing, the pattern is returned
+   * byte-for-byte unchanged (separators included).
    */
   export function canonicalPattern(
     p: string,
@@ -304,26 +305,23 @@ export namespace FSUtil {
     const win = pathWin32
     const glob = p.search(/[*?[{]/)
     const literal = glob === -1 ? p : p.slice(0, glob)
-    const cut = Math.max(literal.lastIndexOf("\\"), literal.lastIndexOf("/"))
-    const base = glob === -1 ? p : cut === -1 ? "" : p.slice(0, cut)
-    if (!base || !win.isAbsolute(base)) return p
-    const rest = p.slice(base.length)
-    const missing: string[] = []
-    let existing = win.normalize(base)
-    while (!os.exists(existing)) {
-      const parent = win.dirname(existing)
-      if (parent === existing) return p
-      missing.unshift(win.basename(existing))
-      existing = parent
+    // Cut points: every separator in the literal part, plus its end when there's no glob. Longest first.
+    const cuts = [...literal.matchAll(/[\\/]/g)].map((m) => m.index!)
+    if (glob === -1) cuts.push(p.length)
+    const same = (a: string, b: string) => win.normalize(a).toLowerCase() === win.normalize(b).toLowerCase()
+    for (const cut of cuts.reverse()) {
+      const prefix = p.slice(0, cut)
+      if (!win.isAbsolute(prefix) || !os.exists(prefix)) continue
+      const expanded = (() => {
+        try {
+          return os.realpath(prefix)
+        } catch {
+          return prefix
+        }
+      })()
+      return same(expanded, prefix) ? p : expanded + p.slice(cut)
     }
-    const expanded = (() => {
-      try {
-        return os.realpath(existing)
-      } catch {
-        return existing
-      }
-    })()
-    return win.join(expanded, ...missing) + rest
+    return p
   }
 
   export function normalizePathPattern(p: string): string {

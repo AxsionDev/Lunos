@@ -115,4 +115,10 @@ describe("FSUtil.canonicalPattern", () => {
       "D:\\nothing\\here\\*",
     )
   })
+
+  test("a long-name path is returned exactly as written, mixed separators included", () => {
+    const home = { ...windows, exists: (p: string) => p === "C:\\Users\\runneradmin" || p === "C:" }
+    expect(FSUtil.canonicalPattern("C:\\Users\\runneradmin/projects/*", home)).toBe("C:\\Users\\runneradmin/projects/*")
+    expect(FSUtil.canonicalPattern("C:\\Users\\RUNNERADMIN\\*", home)).toBe("C:\\Users\\RUNNERADMIN\\*")
+  })
 })

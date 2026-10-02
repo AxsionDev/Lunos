@@ -213,14 +213,16 @@ export function fromConfig(permission: ConfigPermissionV1.Info) {
       ruleset.push({ permission: key, action: value, pattern: "*" })
       continue
     }
-    // XCOD-149: path rules are spelled as request paths are, so a Windows 8.3 short name matches.
+    // XCOD-149: a path rule written with a Windows 8.3 short name also gets its long form, so it matches
+    // expanded request paths. The rule as written stays, for callers that still pass the short form.
     const path = PATH_PERMISSIONS.includes(key)
     ruleset.push(
-      ...Object.entries(value).map(([pattern, action]) => ({
-        permission: key,
-        pattern: path ? FSUtil.canonicalPattern(expand(pattern)) : expand(pattern),
-        action,
-      })),
+      ...Object.entries(value).flatMap(([pattern, action]) => {
+        const written = expand(pattern)
+        const long = path ? FSUtil.canonicalPattern(written) : written
+        const rule = { permission: key, pattern: written, action }
+        return long === written ? [rule] : [rule, { ...rule, pattern: long }]
+      }),
     )
   }
   return ruleset
