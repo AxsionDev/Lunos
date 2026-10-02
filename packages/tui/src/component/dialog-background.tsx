@@ -5,13 +5,36 @@ import { useSDK } from "../context/sdk"
 import { useRoute } from "../context/route"
 import { useToast } from "../ui/toast"
 import { useTheme } from "../context/theme"
+import { Locale } from "../util/locale"
 
-function elapsed(ms: number) {
+export function elapsed(ms: number) {
+  // The API can send "NaN" for a job that hasn't started: nothing to show then.
+  if (!Number.isFinite(ms)) return undefined
   const seconds = Math.floor(ms / 1000)
   if (seconds < 60) return `${seconds}s`
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes}m ${seconds % 60}s`
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
+/** The longest model id a row shows whole; longer ones keep their start and end. */
+export const MODEL_WIDTH = 32
+
+/**
+ * One job's row. XCOD-161: the model sits in the footer, which never shrinks, beside its status and
+ * elapsed time. After the title it was clipped off whenever the title was long.
+ */
+export function row(job: { agent?: string; model?: string; status: string; elapsedMs: number | string }) {
+  return {
+    description: job.agent,
+    footer: [
+      job.model ? Locale.truncateMiddle(job.model, MODEL_WIDTH) : undefined,
+      job.status,
+      elapsed(Number(job.elapsedMs)),
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  }
 }
 
 /**
@@ -37,8 +60,7 @@ export function DialogBackground() {
     (jobs() ?? []).map((job) => ({
       title: job.title ?? job.id,
       value: job.id,
-      description: [job.agent, job.model].filter(Boolean).join(" · "),
-      footer: `${job.status} · ${elapsed(Number(job.elapsedMs))}`,
+      ...row(job),
       bg: job.status === "error" ? theme.error : undefined,
       sessionID: job.sessionID ?? job.id,
     }))
