@@ -25,7 +25,7 @@ export function cliErrorMessage(input: unknown): string | undefined {
       `Model not found: ${field(model, "providerID")}/${field(model, "modelID")}`,
       ...(suggestions.length ? ["Did you mean: " + suggestions.join(", ")] : []),
       "Try: `lunos models` to list available models",
-      "Or check your config (opencode.json) provider/model names",
+      `Or declare it in your config (opencode.json): provider.${field(model, "providerID")}.models`,
     ].join("\n")
   }
 
