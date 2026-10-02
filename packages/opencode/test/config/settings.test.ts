@@ -92,6 +92,49 @@ describe("settings set", () => {
     expect(JSON.parse(await read(result.file))).toMatchObject({ compaction: { auto: false } })
   })
 
+  // XCOD-158: a repository's config is ignored for these, so a project write is refused, not lost.
+  test("sandbox settings a repository can't choose are refused in project config, and saved in yours", async () => {
+    const project = path.join(root, "project", ".opencode", "opencode.json")
+    for (const [key, value] of [
+      ["sandbox.workspace", "mount"],
+      ["sandbox.devcontainer", "build"],
+      ["sandbox.network", "open"],
+    ] as const) {
+      await expect(ConfigSettings.set({ key, value, scope: "project", ctx: ctx(), locked: [] })).rejects.toThrow(
+        `${key} can't be set in project config`,
+      )
+    }
+    expect(existsSync(project)).toBe(false)
+    // What a repository may do: make it stricter, or turn its devcontainer off.
+    for (const [key, value] of [
+      ["sandbox.workspace", "copy"],
+      ["sandbox.devcontainer", "off"],
+      ["sandbox.network", "none"],
+    ] as const)
+      await ConfigSettings.set({ key, value, scope: "project", ctx: ctx(), locked: [] })
+    expect(JSON.parse(await read(project))).toMatchObject({
+      sandbox: { workspace: "copy", devcontainer: "off", network: "none" },
+    })
+    const mine = await ConfigSettings.set({
+      key: "sandbox.workspace",
+      value: "mount",
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+    })
+    expect(JSON.parse(await read(mine.file))).toMatchObject({ sandbox: { workspace: "mount" } })
+    // A list of objects is set whole, as JSON, and checked against the schema.
+    const mounts = '[{ "source": "/srv/cache", "target": "/cache" }]'
+    await expect(
+      ConfigSettings.set({ key: "sandbox.mounts", value: mounts, scope: "project", ctx: ctx(), locked: [] }),
+    ).rejects.toThrow("sandbox.mounts can't be set in project config")
+    await ConfigSettings.set({ key: "sandbox.mounts", value: mounts, scope: "user", ctx: ctx(), locked: [] })
+    expect(JSON.parse(await read(mine.file)).sandbox.mounts).toEqual([{ source: "/srv/cache", target: "/cache" }])
+    await expect(
+      ConfigSettings.set({ key: "sandbox.mounts", value: '[{ "target": 1 }]', scope: "user", ctx: ctx(), locked: [] }),
+    ).rejects.toThrow("Invalid value for sandbox.mounts")
+  })
+
   test("an invalid enum value lists the allowed values and writes nothing", async () => {
     const before = '{\n  // untouched\n  "autoupdate": "notify"\n}\n'
     await fs.writeFile(userFile(), before)

@@ -1,6 +1,7 @@
 import { useProject } from "../../context/project"
 import { useSync } from "../../context/sync"
-import { createMemo, Show } from "solid-js"
+import { createMemo, createResource, Show } from "solid-js"
+import { useSDK } from "../../context/sdk"
 import { useTheme } from "../../context/theme"
 import { useTuiConfig } from "../../config"
 import { InstallationChannel, versionLabel } from "@opencode-ai/core/installation/version"
@@ -22,6 +23,20 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     return project.workspace.get(workspaceID)
   }
   const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
+  const sdk = useSDK()
+  // XCOD-158: what the session's sandbox runs, from its own server (the marker it was created with):
+  // the image and its pinned digest, and the devcontainer it came from. Asked once per workspace;
+  // nothing is shown outside a sandbox.
+  const [sandbox] = createResource(
+    () => ({ workspace: session()?.workspaceID ?? "" }),
+    async (key) => {
+      const result = await sdk.client.config
+        .settings(key.workspace ? { workspace: key.workspace } : {})
+        .catch(() => undefined)
+      return result?.data?.sandbox?.inside
+    },
+  )
+  const short = (digest: string) => digest.replace(/^.*@/, "").replace(/^(sha256:[0-9a-f]{12})[0-9a-f]+$/, "$1")
 
   return (
     <Show when={session()}>
@@ -76,6 +91,15 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                       )}
                     </Show>
                   </text>
+                </Show>
+                <Show when={sandbox()}>
+                  {(inside) => (
+                    <text fg={theme.textMuted}>
+                      sandbox {inside().id}
+                      {inside().devcontainer ? ` · devcontainer ${short(inside().devcontainer!)}` : ""}
+                      {inside().digest ? ` · ${short(inside().digest!)}` : ""}
+                    </text>
+                  )}
                 </Show>
                 <Show when={session()!.share?.url}>
                   <text fg={theme.textMuted}>{session()!.share!.url}</text>

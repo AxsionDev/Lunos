@@ -135,6 +135,7 @@ const DEFAULTS: Record<string, unknown> = {
   "sandbox.on_finish": "destroy",
   "sandbox.network": "policy",
   "sandbox.results": "branch",
+  "sandbox.devcontainer": "image",
   "sandbox.resources.cpus": 2,
   "sandbox.resources.memory": "4g",
   "sandbox.resources.pids": 512,
@@ -312,9 +313,14 @@ function walk(prefix: string, target: Target, category: Category, ast: SchemaAST
     const key = `${prefix}.${String(prop.name)}`
     const child = entry(key, target, category, prop.type, false)
     if (child.kind !== "object") return [child]
+    // XCOD-158: a list of objects has no fields to walk into, so it isn't listed; these are, edited
+    // as JSON, whole. (Not every such list: keybinds and hooks have their own screens.)
+    if (WHOLE_LISTS.includes(key)) return [child]
     return walk(key, target, category, prop.type, depth + 1)
   })
 }
+
+const WHOLE_LISTS = ["sandbox.mounts"]
 
 let cached: Entry[] | undefined
 
@@ -689,6 +695,34 @@ function stable(value: unknown): string {
 export type SetResult = { key: string; value: unknown; file: string; scope: Scope; restart: boolean; changed: boolean }
 
 /**
+ * XCOD-158: sandbox settings a repository's config can't choose (they'd weaken the sandbox), so a
+ * write to project config would be ignored when it loads. Refused up front instead, with why. Each
+ * returns the reason for a value, or undefined when a project may set it.
+ */
+const USER_ONLY: Record<string, (value: unknown) => string | undefined> = {
+  "sandbox.allow": () => "extra hosts for the sandbox's network are yours to allow, not a repository's",
+  "sandbox.workspace": (value) =>
+    value === "copy" ? undefined : "mounting your working tree weakens the sandbox, so it's yours to choose",
+  "sandbox.mounts": () => "mounting directories from this machine is yours to choose, not a repository's",
+  "sandbox.devcontainer": (value) =>
+    value === "off"
+      ? undefined
+      : "a repository can only turn its devcontainer off; building one runs its steps on this machine",
+  "sandbox.network": (value) =>
+    value === "open" ? "a repository can make the sandbox's network stricter, never open it" : undefined,
+}
+
+/** Why `key` = `value` can't go in project config, or undefined when it can. */
+export function projectRefusal(key: string, value: unknown) {
+  const rule = Object.entries(USER_ONLY).find(([entry]) => key === entry || key.startsWith(`${entry}.`))?.[1]
+  const reason = rule?.(value)
+  return reason
+    ? `${key} can't be set in project config (${reason}): a repository's config is ignored for it. ` +
+        "Save it to your user config instead."
+    : undefined
+}
+
+/**
  * Validates and writes one setting. Refuses locked keys with the policy message, rejects values
  * the live schema wouldn't load (listing the allowed values), and edits the file in place with
  * jsonc-parser so comments and formatting survive. Nothing is written unless every check passes.
@@ -720,6 +754,8 @@ export async function set(input: {
     throw new SettingError(ConfigPolicy.message(lockedKey), "locked")
   }
   const value = coerce(item, input.value)
+  const refusal = input.scope === "project" ? projectRefusal(item.key, value) : undefined
+  if (refusal) throw new SettingError(refusal, "invalid")
   const file = targetFile(item.target, input.scope, input.ctx)
   const before = await readText(file)
   const schema = item.target === "config" ? "https://opencode.ai/config.json" : "https://opencode.ai/tui.json"
