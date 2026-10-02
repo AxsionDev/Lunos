@@ -29,6 +29,7 @@ import * as OtelTracer from "@effect/opentelemetry/Tracer"
 import { LLMAISDK } from "./llm/ai-sdk"
 import { LLMNativeRuntime } from "./llm/native-runtime"
 import { LLMRequestPrep } from "./llm/request"
+import { unknownToolError } from "@/tool/invalid"
 
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 
@@ -301,11 +302,15 @@ const live: Layer.Layer<
                 toolName: lower,
               }
             }
+            // XCOD-167: a made-up tool name gets the nearest real ones, not "invalid arguments".
+            const unknown = !prepared.tools[failed.toolCall.toolName]
             return {
               ...failed.toolCall,
               input: JSON.stringify({
                 tool: failed.toolCall.toolName,
-                error: failed.error.message,
+                error: unknown
+                  ? unknownToolError(failed.toolCall.toolName, Object.keys(prepared.tools))
+                  : failed.error.message,
               }),
               toolName: "invalid",
             }
