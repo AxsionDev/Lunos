@@ -77,6 +77,7 @@ async function substituteWellKnownRemoteConfig(input: {
   const url = await ConfigVariable.substitute({
     text: input.value.url,
     type: "virtual",
+    into: "plain",
     dir: input.dir,
     source: input.source,
     env: input.env,
@@ -91,6 +92,7 @@ async function substituteWellKnownRemoteConfig(input: {
               await ConfigVariable.substitute({
                 text: value,
                 type: "virtual",
+                into: "plain",
                 dir: input.dir,
                 source: input.source,
                 env: input.env,
@@ -255,7 +257,7 @@ const layer = Layer.effect(
             : { text, type: "virtual", ...options, env },
         ),
       )
-      const parsed = ConfigParse.jsonc(expanded, source)
+      const parsed = ConfigParse.jsoncSubstituted(text, expanded, source)
       const data = yield* decodeConfig(parsed, source)
       if (!("path" in options)) return data
 
