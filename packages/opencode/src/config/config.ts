@@ -260,14 +260,10 @@ const layer = Layer.effect(
       if (!("path" in options)) return data
 
       yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
-      if (!data.$schema) {
-        data.$schema = "https://opencode.ai/config.json"
-        // XCOD-158: in a sandbox the file is the user's project, and this edit would come back with
-        // the agent's changes as one nobody made.
-        if (process.env.LUNOS_SANDBOX) return data
-        const updated = text.replace(/^\s*\{/, '{\n  "$schema": "https://opencode.ai/config.json",')
-        yield* fs.writeFileString(options.path, updated).pipe(Effect.catch(() => Effect.void))
-      }
+      // XCOD-165: the schema is only filled in memory. Loading a config file never writes to it: a
+      // project's opencode.json is often tracked, and this edit showed up in `git status` (and, in a
+      // sandbox, among the agent's changes) as one nobody made.
+      if (!data.$schema) data.$schema = "https://opencode.ai/config.json"
       return data
     })
 
