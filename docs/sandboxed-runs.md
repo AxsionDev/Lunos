@@ -110,7 +110,7 @@ lunos sandbox prune            # remove kept sandboxes whose retain_for has expi
 
 ## Seeing sandboxes
 
-`/status` (the Status tab of `/settings`) shows a **Sandbox** line. In a session running in a sandbox, it names the sandbox, its image and pinned digest, its network mode and how results come back. On your machine, it lists the project's sandboxes, with their network mode and expiry. `lunos sandbox list` shows every sandbox on the machine.
+In a session running in a sandbox, the sidebar under the session's title shows the sandbox's id and its image's pinned digest (and the devcontainer image it came from, if any). `/status` (the Status tab of `/settings`) shows a **Sandbox** line. In a session running in a sandbox, it names the sandbox, its image and pinned digest, its network mode and how results come back. On your machine, it lists the project's sandboxes, with their network mode and expiry. `lunos sandbox list` shows every sandbox on the machine.
 
 ## Isolation defaults
 
@@ -219,6 +219,8 @@ By default a sandbox can reach only what it needs. `sandbox.network` sets how mu
 **Audit.** Each connection the proxy allows or refuses is a `sandbox.egress` event in your audit log: the host, the port, and whether it was allowed. A reused connection counts once, not per request. The proxy writes these, outside the sandbox, so the agent can't alter them. At the end of a run, Lunos also lists the connections it refused.
 
 The model list isn't fetched from models.dev inside a sandbox with a network policy; the list built into Lunos is used.
+
+Every `sandbox.*` setting is also in `/settings` and `lunos settings`. The ones a repository's config can't choose (`allow`, `mounts`, `workspace: "mount"`, `devcontainer: "build"`, `network: "open"`) can only be saved to your user config there: saving them to project config is refused, since a repository's config is ignored for them.
 
 ## Your config and your organisation's
 
