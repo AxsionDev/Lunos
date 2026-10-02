@@ -74,7 +74,7 @@ describe("cli.error", () => {
       "Model not found: anthropic/claude-sonet-4",
       "Did you mean: claude-sonnet-4",
       "Try: `lunos models` to list available models",
-      "Or check your config (opencode.json) provider/model names",
+      "Or declare it in your config (opencode.json): provider.anthropic.models",
     ].join("\n")
 
     expect(FormatError({ name: "ProviderModelNotFoundError", data })).toBe(expected)

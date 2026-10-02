@@ -65,7 +65,7 @@ export function FormatError(input: unknown): string | undefined {
       `Model not found: ${stringField(providerModelNotFound, "providerID")}/${stringField(providerModelNotFound, "modelID")}`,
       ...(suggestions.length ? ["Did you mean: " + suggestions.join(", ")] : []),
       `Try: \`lunos models\` to list available models`,
-      `Or check your config (opencode.json) provider/model names`,
+      `Or declare it in your config (opencode.json): provider.${stringField(providerModelNotFound, "providerID")}.models`,
     ].join("\n")
   }
 
