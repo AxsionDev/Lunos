@@ -13,9 +13,18 @@ process.chdir(dir)
 
 const generated = await import("./generate.ts")
 
+// XCOD-177: licence notices for what ships, built into the binary (`lunos licenses`) and copied into
+// every npm package. The build stops on a shipped licence the gate doesn't allow.
+const shippedPackages = shipped()
+const licenceProblems = problems(shippedPackages)
+if (licenceProblems.length) throw new Error(`build: licences not allowed:\n${licenceProblems.join("\n")}`)
+const notices = render(shippedPackages, [bunNotice()])
+await Bun.write("./THIRD_PARTY_NOTICES", notices)
+
 import { Script } from "@opencode-ai/script"
 import pkg from "../package.json"
 import { platformMeta } from "./package-meta"
+import { bunNotice, problems, render, shipped } from "./notices"
 
 // Published brand identity, mirroring script/publish.ts. Deliberately NOT derived from this
 // package's `name`, which stays "opencode" to avoid a duplicate workspace name (XCOD-4).
@@ -216,6 +225,7 @@ for (const item of targets) {
       FFF_LIBC: JSON.stringify(item.abi === "musl" ? "musl" : "gnu"),
       OPENCODE_VERSION: `'${Script.version}'`,
       OPENCODE_MODELS_DEV: generated.modelsData,
+      LUNOS_THIRD_PARTY_NOTICES: JSON.stringify(notices),
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
@@ -256,6 +266,8 @@ for (const item of targets) {
       2,
     ),
   )
+  await Bun.write(`dist/${name}/THIRD_PARTY_NOTICES`, notices)
+  await Bun.write(`dist/${name}/LICENSE`, await Bun.file("../../LICENSE").text())
   binaries[name] = Script.version
 }
 
@@ -264,6 +276,8 @@ if (Script.release) {
     // `key` already carries the brand (see the name construction above), so it doubles as the
     // release asset name the `install` script asks for — "${APP}-${target}" with APP=lunos.
     // This previously needed a rename because the npm package name was still "opencode-*".
+    // XCOD-177: the licence notices go in the archive next to the binary (install only moves the binary).
+    await $`cp ../LICENSE ../THIRD_PARTY_NOTICES .`.cwd(`dist/${key}/bin`)
     if (key.includes("linux")) {
       await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
     } else {
