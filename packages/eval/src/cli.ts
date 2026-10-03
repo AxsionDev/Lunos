@@ -4,7 +4,7 @@
 // proxy, generates one Harbor job per model and trial, and writes the report.
 //
 //   bun src/cli.ts estimate --config eval.config.json --tasks 250
-//   bun src/cli.ts run --config eval.config.json --tasks 250 [--yes] [--out runs/<date>]
+//   bun src/cli.ts run --config eval.config.json --tasks 250 [--yes] [--out runs/<date>] [--concurrency 4]
 //   bun src/cli.ts run ... --agent oracle   (Harbor's reference-solution agent: checks the whole
 //                                            pipeline without calling a model)
 //
@@ -146,7 +146,8 @@ async function run(args: string[]) {
           trial,
           proxyURL,
           jobsDir: path.join(out, "jobs"),
-          concurrency: 4,
+          // Match the provider key's rate limit: requests over it come back 429 and the task doesn't run.
+          concurrency: Number(flag(args, "concurrency", "4")),
           agent,
         })
         const jobFile = path.join(out, `${job.job_name}.json`)

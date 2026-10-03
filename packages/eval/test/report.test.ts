@@ -115,9 +115,7 @@ describe("patched tasks", () => {
       ledger: [],
       patched: ["polyglot_java_b"],
     }
-    expect(markdown(build(input))).toContain(
-      "**Changed from the upstream tasks:** in 1 task image (`polyglot_java_b`)",
-    )
+    expect(markdown(build(input))).toContain("**Changed from the upstream tasks:** in 1 task image (`polyglot_java_b`)")
     expect(markdown(build({ ...input, agent: "oracle" }))).toContain("`polyglot_java_b`")
   })
 
@@ -125,5 +123,38 @@ describe("patched tasks", () => {
     expect(markdown(build({ config, taskCount: 1, results: [], ledger: [] }))).not.toContain(
       "Changed from the upstream",
     )
+  })
+})
+
+describe("tasks that never got a fair attempt", () => {
+  test("a rate-limited or never-started task makes the model INCOMPLETE, with no pass rate", () => {
+    const report = build({
+      config,
+      taskCount: 2,
+      results: [
+        result("mistral/x", 1, "a", true),
+        { ...result("mistral/x", 1, "b", false), error: "ApiRateLimitError" },
+        result("mistral/x", 2, "a", true),
+        { ...result("mistral/x", 2, "b", false), error: "AgentSetupTimeoutError" },
+      ],
+      ledger: [],
+    })
+    const eu = report.models[0]
+    expect(eu.status).toBe("incomplete")
+    expect(eu.reason).toBe("2 task runs did not run (AgentSetupTimeoutError, ApiRateLimitError)")
+    expect(eu.passRate).toBeUndefined()
+  })
+
+  test("a task the agent ran and failed still counts as a failure", () => {
+    const report = build({
+      config,
+      taskCount: 1,
+      results: [
+        { ...result("mistral/x", 1, "a", false), error: "NonZeroAgentExitCodeError" },
+        result("mistral/x", 2, "a", true),
+      ],
+      ledger: [],
+    })
+    expect(report.models[0].status).toBe("complete")
   })
 })

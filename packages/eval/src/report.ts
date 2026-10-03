@@ -33,6 +33,18 @@ export type ModelReport = {
   refusedRequests: number
 }
 
+/**
+ * Harbor exceptions that mean the task never got a fair attempt: the provider refused the request,
+ * or Lunos never started. Counted as "did not run", never as a model failure.
+ */
+export const DID_NOT_RUN = new Set([
+  "ApiRateLimitError",
+  "AgentSetupTimeoutError",
+  "EnvironmentStartTimeoutError",
+  "DockerBuildError",
+  "RewardFileNotFoundError",
+])
+
 function median(values: number[]) {
   if (!values.length) return undefined
   const sorted = [...values].sort((a, b) => a - b)
@@ -61,13 +73,16 @@ export function build(input: {
       return { trial: i + 1, passed, total: runs.length, rate: runs.length ? passed / runs.length : 0 }
     })
     const missing = trials.some((trial) => trial.total < input.taskCount)
-    const status = missing || refused > 0 ? "incomplete" : "complete"
+    const notRun = results.filter((result) => result.error && DID_NOT_RUN.has(result.error))
+    const status = missing || refused > 0 || notRun.length > 0 ? "incomplete" : "complete"
     const reason =
       refused > 0
         ? `budget cap reached: ${refused} requests refused`
         : missing
           ? "not every task ran in every trial"
-          : undefined
+          : notRun.length > 0
+            ? `${notRun.length} task runs did not run (${[...new Set(notRun.map((result) => result.error))].sort().join(", ")})`
+            : undefined
     const base = {
       model: model.model,
       cls: model.cls,
