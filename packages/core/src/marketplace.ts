@@ -36,13 +36,23 @@ export type Source = typeof Source.Type
 export class Review extends Schema.Class<Review>("Marketplace.Review")({
   status: Schema.Literals(["verified", "community"]).annotate({
     description:
-      "verified: reviewed against docs/marketplace-review.md by a named reviewer. community: listed, not reviewed",
+      "verified: checked against docs/marketplace-review.md by the maintainer agent and approved by a named person. community: listed, not reviewed",
   }),
   reviewed_version: Schema.String.pipe(Schema.optional).annotate({
     description: "The exact version that was reviewed. Installs are pinned to it",
   }),
   reviewed_at: Schema.String.pipe(Schema.optional).annotate({ description: "ISO date of the review" }),
-  reviewer: Schema.String.pipe(Schema.optional).annotate({ description: "The person who did the review" }),
+  reviewer: Schema.String.pipe(Schema.optional).annotate({
+    description: "The named person who approved the review. Never the maintainer agent",
+  }),
+  // XCOD-198: the maintainer agent's report the approval was based on. Optional, and clients before
+  // these fields existed ignore them.
+  agent_version: Schema.String.pipe(Schema.optional).annotate({
+    description: "Version of the marketplace maintainer agent (script/marketplace-check.ts) whose report was reviewed",
+  }),
+  agent_report: Schema.String.pipe(Schema.optional).annotate({
+    description: "Path of that report in the repository, e.g. marketplace-reviews/2026-10-03.md",
+  }),
 }) {}
 
 const Curation = {

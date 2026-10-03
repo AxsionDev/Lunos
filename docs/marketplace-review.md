@@ -9,8 +9,11 @@ entries are added and removed, and what has been checked so far.
 
 Every entry carries a `review` block:
 
-- **`verified`**: a named reviewer checked the entry against every criterion below, at the exact
-  version in `review.reviewed_version`. Lunos installs that version and nothing else.
+- **`verified`**: the marketplace maintainer agent checked the entry against the criteria below, and
+  a named person read its report, checked what it can't (criteria 4–6), and approved the entry at
+  the exact version in `review.reviewed_version`. Lunos installs that version and nothing else. The
+  entry records who approved it (`reviewer`) and which agent report they read (`agent_version`,
+  `agent_report`).
 - **`community`**: listed so people can find it, **not reviewed**. Installing it needs
   `--allow-unreviewed`, and an organisation can forbid that (`marketplace_unreviewed: false`,
   locked in managed config).
@@ -49,13 +52,36 @@ A **community** entry must still meet criterion 1 (an OSI licence) to be listed 
   instead: `npx pkg@version`, `uvx pkg==version`, and container images by digest.
 - **Skill sources and hooks** are URLs and commands, not packages; they are reviewed as written.
 
+## The maintainer agent
+
+`script/marketplace-check.ts` runs on every pull request that changes `marketplace.json` and weekly
+(`.github/workflows/marketplace-check.yml`). For each entry it records, from the npm registry and
+GitHub:
+
+- the licence in the manifest, on npm, and in the source repository; copyleft is flagged, a non-OSI
+  or changed licence fails (criterion 1)
+- the source repository, whether it is archived, and its last commit (criteria 2–3)
+- the text of any `preinstall` / `install` / `postinstall` script (criterion 6)
+- whether `integrity` still matches the registry, and whether a newer version exists (criterion 7)
+- whether an MCP server's command is pinned to a version or image digest
+- the network access the entry **declares** in `egress`. The agent doesn't observe network traffic;
+  checking that declaration is part of the person's review (criterion 5).
+
+It proposes a verdict per entry (keep, keep with a warning, needs a person's review, delist) and
+writes the report to `marketplace-reviews/<date>.md` and `.json`. Weekly reports arrive as a pull
+request.
+
+**What it never does:** edit `marketplace.json`, or mark an entry verified. Telemetry (criterion 4)
+and whether an entry's tools and permissions are proportionate (criterion 6) need a person. A test
+fails any `verified` entry that doesn't name a person as `reviewer` and the agent version they read.
+
 ## Adding an entry
 
 Open a pull request against `marketplace.json` in the Lunos repository with the entry, its SPDX
 `license`, the version you are proposing and its `integrity`, and `review: { "status":
 "community" }`. A maintainer who reviews it against the criteria above changes the status to
 `verified` and fills in `reviewed_version`, `reviewed_at`, `reviewer` and `egress` in the same
-pull request.
+pull request, with `agent_version` and `agent_report` naming the agent report they read.
 
 ## Removing an entry
 
@@ -66,6 +92,21 @@ the log below. Users who already installed it keep it until they remove it; `lun
 list` shows it only if it's still listed.
 
 ## Review log
+
+### 2026-10-03: first maintainer-agent report (proposed verdicts, nothing changed)
+
+Full report: [`marketplace-reviews/2026-10-03.md`](../marketplace-reviews/2026-10-03.md). 32 entries:
+27 keep, 4 keep with a warning, 1 needs a person's review. The four flagged entries, with what was
+checked first-hand:
+
+| Entry                              | Finding                                                                                                                                                                                                                                       | Proposed                                                                                |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `opencode-skillful`                | `zenobi-us/opencode-skillful` is **archived** (GitHub API), last push 2026-02-13. MIT.                                                                                                                                                        | Keep as community with a warning, or remove; it fails criterion 3 for verified          |
+| `opencode-antigravity-auth`        | `NoeFabris/opencode-antigravity-auth` is **archived** (GitHub API), last push 2026-08-27. MIT.                                                                                                                                                | Same as above                                                                           |
+| `opencode-dynamic-context-pruning` | **AGPL-3.0-or-later** on npm and in the repository (OSI-approved copyleft). Repository active (push 2026-09-25).                                                                                                                              | Keep, with the licence shown, so users know it's copyleft                               |
+| `opencode-conductor`               | `postinstall` runs `node scripts/postinstall.cjs` (read at 1.32.0): no network access; it copies `conductor.md` and the plugin's slash-command files into `~/.config/opencode/agent/` and `command/`, **overwriting files of the same name**. | Keep as community; tell users it writes to their global config on install. Not verified |
+
+The decision on each is ITService EOOD's, through a pull request.
 
 ### 2026-09-25: first catalogue pass (facts only, no entry verified)
 
