@@ -21,6 +21,7 @@ import { harborJob } from "./job"
 import { worstCase } from "./prices"
 import { startProxy, type Route } from "./proxy"
 import { stage } from "./stage"
+import { agentBinaries } from "./agent-bin"
 import { build, markdown, type TaskResult } from "./report"
 
 const repo = path.resolve(import.meta.dir, "../../..")
@@ -122,6 +123,10 @@ async function run(args: string[]) {
 
   // Harbor builds from our exported copy of each registry dataset (see stage.ts).
   const { datasets, patched } = await stage(config, path.join(repo, "packages/eval/runs/datasets"))
+  // The Lunos binary each container gets, downloaded and verified once (not needed for --agent).
+  const binaries = agent
+    ? undefined
+    : (await agentBinaries(config.lunosVersion, path.join(repo, "packages/eval/runs/agent"))).dir
 
   const results: TaskResult[] = []
   try {
@@ -153,6 +158,8 @@ async function run(args: string[]) {
           .env({
             ...process.env,
             PYTHONPATH: path.join(import.meta.dir, "../harbor"),
+            // Read by harbor/lunos_agent.py: Harbor only accepts its opencode agent's kwargs.
+            LUNOS_EVAL_BINARIES: binaries ?? "",
             [model.keyEnv]: "via-lunos-eval-proxy",
           })
           .nothrow()

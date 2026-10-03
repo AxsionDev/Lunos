@@ -52,6 +52,12 @@ Registry datasets (Aider Polyglot) are exported to `runs/datasets/` and built fr
 - The Java tasks hard-code the amd64 `JAVA_HOME`. It's pointed at the host's JDK, and the report
   says which tasks were changed.
 
+The Lunos agent doesn't install anything in the task container. `src/agent-bin.ts` downloads the
+release's `lunos-linux-<arch>.tar.gz` once (checked against the release's SHA256SUMS) and the
+ripgrep build pinned for the offline bundles, and `harbor/lunos_agent.py` copies both in. Installing
+with apt and `npm i -g lunos-ai` failed on the Ubuntu 22.04 task images (Node 12) and used most of
+Harbor's 360 s agent-setup limit.
+
 ## Lunos task set
 
 `tasks/` holds tasks taken from real Lunos fixes, in Harbor's format. Each one's test fails on the
