@@ -27,6 +27,18 @@ Related reference documents:
 [Marketplace review criteria](../marketplace-review.md) ·
 [`SECURITY.md`](../../SECURITY.md)
 
+## Sign-offs
+
+People who reviewed parts of this pack, and what they checked. A review is of the pack as it stood
+on that date.
+
+| What                                                                                  | Who                                             | Date       |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------- | ---------- |
+| [Data protection](data-protection.md) note                                            | Ivan Antonov, ITService EOOD's in-house counsel | 2026-09-26 |
+| security@lunos.tech receives mail (test message sent and received)                    | ITService EOOD                                  | 2026-09-29 |
+| Independent re-check of the five-statement spot-check of this pack against the source | Ivan P                                          | 2026-10-01 |
+| [Security support period](cra-readiness.md#security-support-period): 6 months         | ITService EOOD                                  | 2026-10-02 |
+
 **Reporting a vulnerability:** privately through
 [GitHub Security Advisories](https://github.com/AxsionDev/Lunos/security/advisories/new), or by email
 to security@lunos.tech. See [`SECURITY.md`](../../SECURITY.md).
