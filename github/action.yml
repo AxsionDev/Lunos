@@ -1,5 +1,5 @@
-name: "opencode GitHub Action"
-description: "Run opencode in GitHub Actions workflows"
+name: "Lunos GitHub Action"
+description: "Run Lunos in GitHub Actions workflows"
 branding:
   icon: "code"
   color: "orange"
@@ -13,8 +13,13 @@ inputs:
     description: "Agent to use. Must be a primary agent. Falls back to default_agent from config or 'build' if not found."
     required: false
 
+  version:
+    description: "Lunos version to install from npm (lunos-ai). Defaults to the latest release."
+    required: false
+    default: "latest"
+
   share:
-    description: "Share the opencode session (defaults to true for public repos)"
+    description: "Share the Lunos session (off unless true; sharing must also be enabled in your Lunos config)"
     required: false
 
   prompt:
@@ -22,12 +27,12 @@ inputs:
     required: false
 
   use_github_token:
-    description: "Use GITHUB_TOKEN directly instead of OpenCode App token exchange. When true, skips OIDC and uses the GITHUB_TOKEN env var."
+    description: "Use the GITHUB_TOKEN env var: the workflow's token or a personal access token. The default; set false only with oidc_base_url."
     required: false
-    default: "false"
+    default: "true"
 
   mentions:
-    description: "Comma-separated list of trigger phrases (case-insensitive). Defaults to '/opencode,/oc'"
+    description: "Comma-separated list of trigger phrases (case-insensitive). Defaults to '/lunos,/oc'"
     required: false
 
   variant:
@@ -35,39 +40,21 @@ inputs:
     required: false
 
   oidc_base_url:
-    description: "Base URL for OIDC token exchange API. Only required when running a custom GitHub App install. Defaults to https://api.opencode.ai"
+    description: "Base URL of a GitHub App token-exchange service you run. Only with use_github_token: false; there is no default."
     required: false
 
 runs:
   using: "composite"
   steps:
-    - name: Get opencode version
-      id: version
+    # npm 12 skips install scripts unless allowed, and lunos-ai needs its postinstall.
+    - name: Install Lunos
       shell: bash
-      run: |
-        VERSION=$(curl -sf https://api.github.com/repos/anomalyco/opencode/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
-        echo "version=${VERSION:-latest}" >> $GITHUB_OUTPUT
+      run: npm install -g "lunos-ai@${{ inputs.version }}" --allow-scripts=lunos-ai
 
-    - name: Cache opencode
-      id: cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.opencode/bin
-        key: opencode-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
-
-    - name: Install opencode
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      run: curl -fsSL https://opencode.ai/install | bash
-
-    - name: Add opencode to PATH
-      shell: bash
-      run: echo "$HOME/.opencode/bin" >> $GITHUB_PATH
-
-    - name: Run opencode
+    - name: Run Lunos
       shell: bash
       id: run_opencode
-      run: opencode github run
+      run: lunos github run
       env:
         MODEL: ${{ inputs.model }}
         AGENT: ${{ inputs.agent }}

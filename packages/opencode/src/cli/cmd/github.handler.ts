@@ -1,5 +1,4 @@
 import path from "path"
-import { exec } from "child_process"
 import { Filesystem } from "@/util/filesystem"
 import * as prompts from "@clack/prompts"
 import { map, pipe, sortBy, values } from "remeda"
@@ -33,6 +32,7 @@ import { setTimeout as sleep } from "node:timers/promises"
 import { Process } from "@/util/process"
 import { parseGitHubRemote } from "@/util/repository"
 import { Effect } from "effect"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { extractResponseText, formatPromptTooLargeError } from "./github.shared"
 
 type GitHubAuthor = {
@@ -142,7 +142,7 @@ type IssueQueryResponse = {
 
 const AGENT_USERNAME = "opencode-agent[bot]"
 const AGENT_REACTION = "eyes"
-const WORKFLOW_FILE = ".github/workflows/opencode.yml"
+const WORKFLOW_FILE = ".github/workflows/lunos.yml"
 
 // Event categories for routing
 // USER_EVENTS: triggered by user actions, have actor/issueId, support reactions/comments
@@ -165,7 +165,8 @@ export const githubInstall = Effect.fn("Cli.github.install")(function* () {
       UI.empty()
       prompts.intro("Install GitHub agent")
       const app = await getAppInfo()
-      await installGitHubApp()
+      // XCOD-174: no GitHub App step. The workflow runs with the repo's own GITHUB_TOKEN (or a token you
+      // add); a Lunos GitHub App comes with Lunos Cloud.
 
       const providers = await Effect.runPromise(modelsDev.get()).then((p) => {
         // TODO: add guide for copilot, for now just hide it
@@ -202,7 +203,10 @@ export const githubInstall = Effect.fn("Cli.github.install")(function* () {
             "",
             "    3. Go to a GitHub issue and comment `/oc summarize` to see the agent in action",
             "",
-            "   Learn more about the GitHub agent - https://opencode.ai/docs/github/#usage-examples",
+            "   The workflow uses the repo's GITHUB_TOKEN with the permissions it lists. To act as another",
+            "   account, store a fine-grained personal access token as a secret and pass it instead.",
+            "",
+            "   Learn more about the GitHub agent - https://docs.lunos.tech/docs/github/",
           ].join("\n"),
         )
       }
@@ -277,66 +281,18 @@ export const githubInstall = Effect.fn("Cli.github.install")(function* () {
         return model
       }
 
-      async function installGitHubApp() {
-        const s = prompts.spinner()
-        s.start("Installing GitHub app")
-
-        // Get installation
-        const installation = await getInstallation()
-        if (installation) return s.stop("GitHub app already installed")
-
-        // Open browser
-        const url = "https://github.com/apps/opencode-agent"
-        const command =
-          process.platform === "darwin"
-            ? `open "${url}"`
-            : process.platform === "win32"
-              ? `start "" "${url}"`
-              : `xdg-open "${url}"`
-
-        exec(command, (error) => {
-          if (error) {
-            prompts.log.warn(`Could not open browser. Please visit: ${url}`)
-          }
-        })
-
-        // Wait for installation
-        s.message("Waiting for GitHub app to be installed")
-        const MAX_RETRIES = 120
-        let retries = 0
-        do {
-          const installation = await getInstallation()
-          if (installation) break
-
-          if (retries > MAX_RETRIES) {
-            s.stop(
-              `Failed to detect GitHub app installation. Make sure to install the app for the \`${app.owner}/${app.repo}\` repository.`,
-            )
-            throw new UI.CancelledError()
-          }
-
-          retries++
-          await sleep(1000)
-        } while (true) // oxlint-disable-line no-constant-condition
-
-        s.stop("Installed GitHub app")
-
-        async function getInstallation() {
-          return await fetch(`https://api.opencode.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`)
-            .then((res) => res.json())
-            .then((data) => data.installation)
-        }
+      /** The release tag matching this CLI, so the action runs the same Lunos version. */
+      function actionRef() {
+        return InstallationVersion === "local" ? "dev" : `v${InstallationVersion}`
       }
 
       async function addWorkflowFiles() {
-        const envStr =
-          provider === "amazon-bedrock"
-            ? ""
-            : `\n        env:${providers[provider].env.map((e) => `\n          ${e}: \${{ secrets.${e} }}`).join("")}`
+        const secrets = provider === "amazon-bedrock" ? [] : providers[provider].env
+        const envStr = `\n        env:${["GITHUB_TOKEN", ...secrets].map((e) => `\n          ${e}: \${{ secrets.${e} }}`).join("")}`
 
         await Filesystem.write(
           path.join(app.root, WORKFLOW_FILE),
-          `name: opencode
+          `name: lunos
 
 on:
   issue_comment:
@@ -345,28 +301,26 @@ on:
     types: [created]
 
 jobs:
-  opencode:
+  lunos:
     if: |
       contains(github.event.comment.body, ' /oc') ||
       startsWith(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, ' /opencode') ||
-      startsWith(github.event.comment.body, '/opencode')
+      contains(github.event.comment.body, ' /lunos') ||
+      startsWith(github.event.comment.body, '/lunos')
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write
+      pull-requests: write
+      issues: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          persist-credentials: false
 
-      - name: Run opencode
-        uses: anomalyco/opencode/github@latest${envStr}
+      - name: Run Lunos
+        uses: AxsionDev/Lunos/github@${actionRef()}${envStr}
         with:
-          model: ${provider}/${model}`,
+          model: ${provider}/${model}${InstallationVersion === "local" ? "" : `\n          version: ${InstallationVersion}`}
+          use_github_token: true`,
         )
 
         prompts.log.success(`Added workflow file: "${WORKFLOW_FILE}"`)
@@ -428,14 +382,14 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
         ? (payload as IssueCommentEvent | IssuesEvent).issue.number
         : (payload as PullRequestEvent | PullRequestReviewCommentEvent).pull_request.number
     const runUrl = `/${owner}/${repo}/actions/runs/${runId}`
-    const shareBaseUrl = isMock ? "https://dev.opencode.ai" : "https://opencode.ai"
 
     let appToken: string
     let octoRest: Octokit
     let octoGraph: typeof graphql
     let gitConfig: string
     let session: { id: SessionID; title: string; version: string }
-    let shareId: string | undefined
+    let shareUrl: string | undefined
+    let reactionUser: string | undefined
     let exitCode = 0
     let githubClientReady = false
     type PromptFiles = Awaited<ReturnType<typeof getUserPrompt>>["promptFiles"]
@@ -471,10 +425,10 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
 
     try {
       if (useGithubToken) {
-        const githubToken = process.env["GITHUB_TOKEN"]
+        const githubToken = process.env["GITHUB_TOKEN"] ?? (isMock ? args.token : undefined)
         if (!githubToken) {
           throw new Error(
-            "GITHUB_TOKEN environment variable is not set. When using use_github_token, you must provide GITHUB_TOKEN.",
+            "GITHUB_TOKEN is not set. Pass the workflow's token (env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}) or a fine-grained personal access token. See https://docs.lunos.tech/docs/github/",
           )
         }
         appToken = githubToken
@@ -495,7 +449,9 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       // Skip permission check and reactions for repo events (no actor to check, no issue to react to)
       if (isUserEvent) {
         await assertPermissions()
-        await addReaction(commentType)
+        // The reaction's author depends on the token (github-actions[bot] for GITHUB_TOKEN, the
+        // account for a personal token), so remember who added it to remove the same one later.
+        reactionUser = (await addReaction(commentType)).data.user?.login
       }
 
       // Setup opencode session
@@ -512,12 +468,9 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
         }),
       )
       await subscribeSessionEvents()
-      shareId = await (async () => {
-        if (share === false) return
-        if (!share && repoData.data.private) return
-        await runLocalEffect(sessionShare.share(session.id))
-        return session.id.slice(-8)
-      })()
+      // XCOD-174: share only when asked (SHARE=true), and link to wherever the share service put it.
+      // Upstream shared public repos by default and linked to its own share site.
+      shareUrl = share === true ? (await runLocalEffect(sessionShare.share(session.id))).url : undefined
       console.log("opencode session", session.id)
 
       // Handle event types:
@@ -547,7 +500,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             repoData.data.default_branch,
             branch,
             summary,
-            `${response}\n\nTriggered by ${triggerType}${footer({ image: true })}`,
+            `${response}\n\nTriggered by ${triggerType}${footer()}`,
           )
           if (pr) {
             console.log(`Created PR #${pr}`)
@@ -576,8 +529,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             const summary = await summarize(response)
             await pushToLocalBranch(summary, uncommittedChanges)
           }
-          const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
-          await createComment(`${response}${footer({ image: !hasShared })}`)
+          await createComment(`${response}${footer()}`)
           await removeReaction(commentType)
         }
         // Fork PR
@@ -594,8 +546,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             const summary = await summarize(response)
             await pushToForkBranch(summary, prData, uncommittedChanges)
           }
-          const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
-          await createComment(`${response}${footer({ image: !hasShared })}`)
+          await createComment(`${response}${footer()}`)
           await removeReaction(commentType)
         }
       }
@@ -610,7 +561,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
         if (switched) {
           // Agent switched branches (likely created its own branch/PR).
           // Don't push the stale infrastructure branch — just comment.
-          await createComment(`${response}${footer({ image: true })}`)
+          await createComment(`${response}${footer()}`)
           await removeReaction(commentType)
         } else if (dirty) {
           const summary = await summarize(response)
@@ -619,16 +570,16 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             repoData.data.default_branch,
             branch,
             summary,
-            `${response}\n\nCloses #${issueId}${footer({ image: true })}`,
+            `${response}\n\nCloses #${issueId}${footer()}`,
           )
           if (pr) {
-            await createComment(`Created PR #${pr}${footer({ image: true })}`)
+            await createComment(`Created PR #${pr}${footer()}`)
           } else {
-            await createComment(`${response}${footer({ image: true })}`)
+            await createComment(`${response}${footer()}`)
           }
           await removeReaction(commentType)
         } else {
-          await createComment(`${response}${footer({ image: true })}`)
+          await createComment(`${response}${footer()}`)
           await removeReaction(commentType)
         }
       }
@@ -687,16 +638,16 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
 
     function normalizeUseGithubToken() {
       const value = process.env["USE_GITHUB_TOKEN"]
-      if (!value) return false
+      // XCOD-174: your own token by default. The app-token exchange needs a GitHub App and an exchange
+      // service you run (OIDC_BASE_URL); there is no Lunos one yet, and upstream's is US-hosted.
+      if (!value) return !process.env["OIDC_BASE_URL"]
       if (value === "true") return true
       if (value === "false") return false
       throw new Error(`Invalid use_github_token value: ${value}. Must be a boolean.`)
     }
 
-    function normalizeOidcBaseUrl(): string {
-      const value = process.env["OIDC_BASE_URL"]
-      if (!value) return "https://api.opencode.ai"
-      return value.replace(/\/+$/, "")
+    function normalizeOidcBaseUrl() {
+      return process.env["OIDC_BASE_URL"]?.replace(/\/+$/, "")
     }
 
     function isIssueCommentEvent(
@@ -744,7 +695,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       }
 
       const reviewContext = getReviewCommentContext()
-      const mentions = (process.env["MENTIONS"] || "/opencode,/oc")
+      const mentions = (process.env["MENTIONS"] || "/lunos,/oc")
         .split(",")
         .map((m) => m.trim().toLowerCase())
         .filter(Boolean)
@@ -994,6 +945,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
     }
 
     async function exchangeForAppToken(token: string) {
+      if (!oidcBaseUrl) throw new Error("OIDC_BASE_URL is not set. Set use_github_token: true and provide GITHUB_TOKEN.")
       const response = token.startsWith("github_pat_")
         ? await fetch(`${oidcBaseUrl}/exchange_github_app_token_with_pat`, {
             method: "POST",
@@ -1223,7 +1175,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             content: AGENT_REACTION,
           })
 
-          const eyesReaction = reactions.data.find((r) => r.user?.login === AGENT_USERNAME)
+          const eyesReaction = reactions.data.find((r) => r.user?.login === (reactionUser ?? AGENT_USERNAME))
           if (!eyesReaction) return
 
           return await octoRest.rest.reactions.deleteForPullRequestComment({
@@ -1241,7 +1193,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
           content: AGENT_REACTION,
         })
 
-        const eyesReaction = reactions.data.find((r) => r.user?.login === AGENT_USERNAME)
+        const eyesReaction = reactions.data.find((r) => r.user?.login === (reactionUser ?? AGENT_USERNAME))
         if (!eyesReaction) return
 
         return await octoRest.rest.reactions.deleteForIssueComment({
@@ -1259,7 +1211,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
         content: AGENT_REACTION,
       })
 
-      const eyesReaction = reactions.data.find((r) => r.user?.login === AGENT_USERNAME)
+      const eyesReaction = reactions.data.find((r) => r.user?.login === (reactionUser ?? AGENT_USERNAME))
       if (!eyesReaction) return
 
       await octoRest.rest.reactions.deleteForIssue({
@@ -1351,18 +1303,10 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       }
     }
 
-    function footer(opts?: { image?: boolean }) {
-      const image = (() => {
-        if (!shareId) return ""
-        if (!opts?.image) return ""
-
-        const titleAlt = encodeURIComponent(session.title.substring(0, 50))
-        const title64 = Buffer.from(session.title.substring(0, 700), "utf8").toString("base64")
-
-        return `<a href="${shareBaseUrl}/s/${shareId}"><img width="200" alt="${titleAlt}" src="https://social-cards.sst.dev/opencode-share/${title64}.png?model=${providerID}/${modelID}&version=${session.version}&id=${shareId}" /></a>\n`
-      })()
-      const shareUrl = shareId ? `[Lunos session](${shareBaseUrl}/s/${shareId})&nbsp;&nbsp;|&nbsp;&nbsp;` : ""
-      return `\n\n${image}${shareUrl}[github run](${runUrl})`
+    function footer() {
+      // No social-card image: it was rendered by upstream's service (social-cards.sst.dev).
+      const link = shareUrl ? `[Lunos session](${shareUrl})&nbsp;&nbsp;|&nbsp;&nbsp;` : ""
+      return `\n\n${link}[github run](${runUrl})`
     }
 
     async function fetchRepo() {

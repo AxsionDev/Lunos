@@ -51,7 +51,7 @@ export const CALLS: Call[] = [
   {
     id: "models-catalogue",
     what: "Models catalogue refresh",
-    hosts: "models.opencode.ai (or `OPENCODE_MODELS_URL`)",
+    hosts: "models.dev (or `OPENCODE_MODELS_URL`)",
     when: "startup, then hourly",
     offline: "blocked",
     alsoOffBy: "`OPENCODE_DISABLE_MODELS_FETCH`. The catalogue snapshot built into the binary is used instead",

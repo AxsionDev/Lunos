@@ -6,6 +6,5 @@ export const EXCLUDED_PAGES = [
   "go", // OpenCode Go, upstream's subscription
   "ecosystem", // upstream's community listing
   "share", // opncd.ai sharing; Lunos turns sharing off by default
-  "github", // `github install` uses upstream's GitHub app and api.opencode.ai
   "gitlab", // upstream's GitLab integration
 ]
