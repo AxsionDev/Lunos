@@ -758,7 +758,7 @@ export async function set(input: {
   if (refusal) throw new SettingError(refusal, "invalid")
   const file = targetFile(item.target, input.scope, input.ctx)
   const before = await readText(file)
-  const schema = item.target === "config" ? "https://opencode.ai/config.json" : "https://opencode.ai/tui.json"
+  const schema = item.target === "config" ? "https://lunos.tech/config.json" : "https://lunos.tech/tui.json"
   const base = before && before.trim() ? before : `{\n  "$schema": "${schema}"\n}\n`
   const jsonPath = item.key.split(".").slice(item.target === "tui" ? 1 : 0)
   // A leaf under a key that holds a non-object (`"formatter": false`) can't be set by path.

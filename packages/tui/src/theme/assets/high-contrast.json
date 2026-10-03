@@ -1,5 +1,5 @@
 {
-  "$schema": "https://opencode.ai/theme.json",
+  "$schema": "https://lunos.tech/theme.json",
   "defs": {
     "d_bg": "#000000",
     "d_panel": "#000000",

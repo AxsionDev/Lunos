@@ -5,11 +5,10 @@
 //
 // It renames the product, the command, the npm package and install/support links. It keeps
 // every identifier the Lunos binary still reads: `opencode.json`, `.opencode/`, `OPENCODE_*`,
-// `@opencode-ai/*`, the `$schema` URLs, and third-party names (see the Naming page).
+// `@opencode-ai/*`, and third-party names (see the Naming page).
 
 /** Identifiers that stay "opencode" because Lunos still uses them, or because they aren't ours. */
 const KEEP: RegExp[] = [
-  /https:\/\/opencode\.ai\/(?:config|tui|theme)\.json/g, // $schema URLs the CLI writes
   /\bopencode\.jsonc?\b/g,
   /\bopencode\.local\b/g,
   /\.well-known\/opencode\b/g,
@@ -45,6 +44,8 @@ const REWRITE: [RegExp, string][] = [
   ],
   [/https:\/\/github\.com\/anomalyco\/opencode\b/g, "https://github.com/AxsionDev/Lunos"],
   [/https:\/\/opencode\.ai\/docs\/?/g, "/docs/"],
+  // XCOD-174: the $schema URLs the CLI writes now point at the schemas lunos.tech publishes.
+  [/https:\/\/opencode\.ai\/(config|tui|theme|desktop-theme)\.json/g, "https://lunos.tech/$1.json"],
 ]
 
 type Segment = { code: boolean; text: string }

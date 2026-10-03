@@ -31,15 +31,6 @@ export const ALLOWED: Record<string, string> = {
   "packages/desktop/src/main/external-url.test.ts": "test fixture",
   "packages/session-ui/src/components/markdown-inline-code-kind.test.ts": "test fixture",
   "packages/ui/src/context/marked-parser.test.ts": "test fixture",
-  // JSON Schema URLs: replaced by Lunos-hosted schemas in the second XCOD-174 change.
-  "packages/ui/src/theme/": "theme $schema URL, until lunos.tech publishes theme.json",
-  "packages/tui/src/theme/assets/": "theme $schema URL, until lunos.tech publishes theme.json",
-  "packages/opencode/src/config/config.ts": "config $schema URL, until lunos.tech publishes config.json",
-  "packages/opencode/src/config/settings.ts": "config and tui $schema URLs, until lunos.tech publishes them",
-  "packages/opencode/src/config/tui-migrate.ts": "tui $schema URL, until lunos.tech publishes tui.json",
-  "packages/core/src/plugin/skill/customize-opencode.md": "config $schema URL, until lunos.tech publishes config.json",
-  "packages/eval/src/job.ts": "config $schema URL, until lunos.tech publishes config.json",
-  "packages/sdk/js/src/gen/types.gen.ts": "generated from config descriptions; regenerated with the schema change",
 }
 
 const SCANNED = /^(packages\/[^/]+\/(?:[^/]+\/)?src\/|github\/)/

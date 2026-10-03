@@ -20,7 +20,6 @@ describe("rebrand", () => {
       "`OPENCODE_CONFIG_DIR`",
       "GITLAB_TOKEN_OPENCODE",
       'import { tool } from "@opencode-ai/plugin"',
-      '"$schema": "https://opencode.ai/config.json"',
       "createOpencodeClient",
       "x-opencode-session",
       "ai.opencode.managed",
@@ -70,10 +69,10 @@ describe("rebrand", () => {
     )
   })
 
-  test("a config example keeps its keys and schema", () => {
+  test("a config example keeps its keys, and its schema points at lunos.tech", () => {
     const json =
       '```json title="opencode.json"\n{\n  "$schema": "https://opencode.ai/config.json",\n  "model": "anthropic/x"\n}\n```\n'
-    expect(rebrand(json)).toBe(json)
+    expect(rebrand(json)).toBe(json.replace("https://opencode.ai/config.json", "https://lunos.tech/config.json"))
   })
 })
 
