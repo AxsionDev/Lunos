@@ -65,20 +65,54 @@ function licenceFiles(dir: string) {
     .map((name) => ({ name, text: readFileSync(path.join(dir, name), "utf8").replace(/\r\n/g, "\n").trim() }))
 }
 
+/** devDependencies that build or test the desktop app and are not part of it. */
+const BUILD_ONLY =
+  /^(@types\/|@typescript\/|typescript$|vite$|electron-vite$|electron-builder$|electron$|@sentry\/vite-plugin$|@actions\/|@valibot\/to-json-schema$|zod-openapi$)/
+
+export const desktop = path.resolve(opencode, "../desktop")
+const app = path.resolve(opencode, "../app")
+const ui = path.resolve(opencode, "../ui")
+
+/** What the desktop app ships: its own code and renderer, and the CLI it runs as a Node sidecar. */
+export function shippedDesktop() {
+  return shipped([desktop, opencode], [desktop, app, ui])
+}
+
+/**
+ * Electron's own licences. electron-builder packages Electron's LICENSE and the Chromium licence
+ * file (LICENSES.chromium.html) with every desktop build, next to the executable.
+ */
+export function electronNotice() {
+  const version = readJson(path.join(desktop, "package.json")).devDependencies.electron
+  return {
+    title: `Electron ${version} and Chromium (the desktop app's runtime)`,
+    text: [
+      "Electron is MIT-licensed. Its LICENSE file and the licences of Chromium and the other software",
+      "Electron includes (LICENSES.chromium.html) are shipped with the app, next to its executable",
+      "(on macOS, inside Lunos.app/Contents/Frameworks/Electron Framework.framework/Resources).",
+    ].join("\n"),
+  }
+}
+
 const isWorkspace = (dir: string) =>
   dir.startsWith(root + path.sep) && !dir.includes(`${path.sep}node_modules${path.sep}`)
 
 /** Every third-party package the CLI can ship, sorted by name and version. */
-export function shipped(start = opencode) {
+export function shipped(starts = [opencode], bundled: string[] = []) {
   const seen = new Map<string, Pkg>()
   const visited = new Set<string>()
-  const queue = [start]
+  const queue = [...starts]
   while (queue.length) {
     const dir = queue.shift()!
     if (visited.has(dir)) continue
     visited.add(dir)
     const pkg = readJson(path.join(dir, "package.json"))
     const deps = { ...pkg.dependencies, ...pkg.optionalDependencies }
+    // A workspace whose devDependencies are bundled into what ships (the desktop app's renderer is
+    // built by Vite from them), minus the tools that only build it.
+    if (bundled.includes(dir))
+      for (const name of Object.keys(pkg.devDependencies ?? {}))
+        if (!BUILD_ONLY.test(name)) deps[name] ??= pkg.devDependencies[name]
     // A peer dependency is only shipped when something installed it; resolve it if present.
     for (const name of Object.keys(pkg.peerDependencies ?? {})) deps[name] ??= "peer"
     for (const name of Object.keys(deps)) {
@@ -224,7 +258,9 @@ export function bunNotice() {
 }
 
 if (import.meta.main) {
-  const packages = shipped()
+  // --desktop: the desktop app's notices (packages/desktop's prebuild), otherwise the CLI's.
+  const isDesktop = process.argv.includes("--desktop")
+  const packages = isDesktop ? shippedDesktop() : shipped()
   if (process.argv.includes("--check")) {
     const found = problems(packages)
     console.log(`licences: ${packages.length} shipped packages checked`)
@@ -238,7 +274,7 @@ if (import.meta.main) {
   } else {
     const index = process.argv.indexOf("--output")
     const out = index === -1 ? path.join(opencode, "THIRD_PARTY_NOTICES") : path.resolve(process.argv[index + 1])
-    await Bun.write(out, render(packages, [bunNotice()]))
+    await Bun.write(out, render(packages, isDesktop ? [electronNotice()] : [bunNotice()]))
     console.log(`notices: ${packages.length} packages -> ${out}`)
   }
 }

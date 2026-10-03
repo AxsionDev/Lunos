@@ -1,4 +1,5 @@
-import { BrowserWindow, Menu } from "electron"
+import { app, BrowserWindow, Menu, shell } from "electron"
+import path from "node:path"
 import type { MenuItemConstructorOptions } from "electron"
 import {
   DESKTOP_MENU,
@@ -54,6 +55,7 @@ function nativeItem(entry: DesktopMenuEntry, deps: Deps): MenuItemConstructorOpt
       runDesktopMenuAction(BrowserWindow.getFocusedWindow(), action, {
         checkForUpdates: deps.checkForUpdates,
         relaunch: deps.relaunch,
+        licenses: openLicenses,
       })
   }
   if (entry.href) {
@@ -66,4 +68,12 @@ function nativeItem(entry: DesktopMenuEntry, deps: Deps): MenuItemConstructorOpt
 
 function nativeRole(role: DesktopMenuRole) {
   return role as NonNullable<MenuItemConstructorOptions["role"]>
+}
+
+/** XCOD-177: the notices file packaged next to the app (resources/ when run from source). */
+function openLicenses() {
+  const file = app.isPackaged
+    ? path.join(process.resourcesPath, "THIRD_PARTY_NOTICES")
+    : path.join(app.getAppPath(), "resources", "THIRD_PARTY_NOTICES")
+  void shell.openPath(file)
 }

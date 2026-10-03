@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test"
-import { allowed, ALLOWED, bunNotice, problems, render, shipped, standardText, type Pkg } from "../../script/notices"
+import {
+  allowed,
+  ALLOWED,
+  bunNotice,
+  electronNotice,
+  problems,
+  render,
+  shipped,
+  shippedDesktop,
+  standardText,
+  type Pkg,
+} from "../../script/notices"
 import { NOT_BUILT, notices } from "../../src/cli/cmd/licenses"
 
 const pkg = (name: string, license: string | undefined, text?: string): Pkg => ({
@@ -78,6 +89,20 @@ describe("notices", () => {
     const text = render(shipped(), [bunNotice()])
     expect(text).toContain("Permission is hereby granted, free of charge")
     expect(text).toContain("Bun itself is MIT-licensed")
+  }, 60_000)
+})
+
+describe("desktop app notices", () => {
+  test("cover the renderer's bundled packages and the CLI, without the app's build tools, and pass the gate", () => {
+    const packages = shippedDesktop()
+    const names = new Set(packages.map((item) => item.name))
+    for (const name of ["solid-js", "electron-updater", "effect"]) expect(names.has(name), name).toBe(true)
+    // The desktop app's own build tools aren't counted. (Others can still come in as some package's
+    // peer dependency; the notices are a superset of what ships, never a subset.)
+    for (const name of ["electron-builder", "electron-vite"]) expect(names.has(name), name).toBe(false)
+    expect(packages.length).toBeGreaterThan(shipped().length)
+    expect(problems(packages)).toEqual([])
+    expect(electronNotice().text).toContain("LICENSES.chromium.html")
   }, 60_000)
 })
 
