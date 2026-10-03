@@ -111,7 +111,8 @@ export const OpencodePlugin = define<HttpClient.HttpClient | EventV2.Service | S
       draft.update("opencode", (integration) => {
         integration.name = "OpenCode"
       })
-      draft.method.update(oauth(http))
+      // XCOD-174: no OpenCode Console sign-in. It's upstream's US-hosted service, and Lunos Cloud
+      // accounts don't exist yet. An API key the user sets still works.
       draft.method.update({ integrationID: "opencode", method: { type: "key", label: "API key (service account)" } })
     })
 
@@ -174,16 +175,9 @@ export const OpencodePlugin = define<HttpClient.HttpClient | EventV2.Service | S
       const item = catalog.provider.get(ProviderV2.ID.opencode)
       if (!item) return
       const hasKey = Boolean(process.env.OPENCODE_API_KEY || connected || item.provider.request.body.apiKey)
-      catalog.provider.update(item.provider.id, (provider) => {
-        if (!hasKey) provider.request.body.apiKey = "public"
-      })
-      if (hasKey) return
-      for (const model of item.models.values()) {
-        if (!model.cost.some((cost) => cost.input > 0)) continue
-        catalog.model.update(item.provider.id, model.id, (draft) => {
-          draft.enabled = false
-        })
-      }
+      // XCOD-174: upstream's free tier (a shared "public" key against opencode.ai) is not offered;
+      // without a key of the user's own, the provider isn't listed at all.
+      if (!hasKey) catalog.provider.remove(item.provider.id)
     })
 
     const refresh = () => loading.withPermit(load().pipe(Effect.andThen(ctx.catalog.reload())))

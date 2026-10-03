@@ -51,7 +51,7 @@ export const CALLS: Call[] = [
   {
     id: "models-catalogue",
     what: "Models catalogue refresh",
-    hosts: "models.opencode.ai (or `OPENCODE_MODELS_URL`)",
+    hosts: "models.dev (or `OPENCODE_MODELS_URL`)",
     when: "startup, then hourly",
     offline: "blocked",
     alsoOffBy: "`OPENCODE_DISABLE_MODELS_FETCH`. The catalogue snapshot built into the binary is used instead",
@@ -111,18 +111,10 @@ export const CALLS: Call[] = [
   },
   {
     id: "console-account",
-    what: "opencode console account: organisation config and token refresh",
-    hosts: "opencode.ai, or your account URL",
-    when: "startup, only if you logged in with `lunos account login`",
+    what: "Console account: organisation config and token refresh",
+    hosts: "the console URL you logged in to (there is no default)",
+    when: "startup, only if you logged in with `lunos account login <url>`",
     offline: "blocked",
-  },
-  {
-    id: "web-ui",
-    what: "Web UI fallback proxy",
-    hosts: "app.opencode.ai",
-    when: "`lunos serve` / `lunos web`, only in builds without the embedded UI",
-    offline: "blocked",
-    alsoOffBy: "`OPENCODE_DISABLE_EMBEDDED_WEB_UI`",
   },
   {
     id: "memory-deps",
@@ -205,7 +197,7 @@ export const CALLS: Call[] = [
   {
     id: "commands",
     what: "`account login`, `providers login`, `import <url>`, `github install` / `run`",
-    hosts: "opencode.ai, api.github.com, the URL you pass",
+    hosts: "api.github.com, the URL you pass",
     when: "only when you run that command",
     offline: "command",
   },
