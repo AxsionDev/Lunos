@@ -80,3 +80,50 @@ describe("report", () => {
     expect(md).not.toMatch(/openai\/y`[^\n]*100\.0%/)
   })
 })
+
+describe("pipeline check", () => {
+  test("an oracle run names no model result and lists the tasks that failed", () => {
+    const report = build({
+      config: { ...config, models: [config.models[1]] },
+      taskCount: 2,
+      results: [result("openai/y", 1, "a", true), result("openai/y", 1, "b", false)],
+      ledger: [],
+      agent: "oracle",
+    })
+    expect(report.failed).toEqual(["b"])
+    const md = markdown(report)
+    expect(md).toContain("pipeline check")
+    expect(md).toContain("**Not a model result.**")
+    expect(md).toContain("**1 of 2 task runs passed.**")
+    expect(md).toContain("- `b`")
+    expect(md).not.toContain("openai/y")
+    expect(md).not.toContain("All model runs completed")
+  })
+
+  test("a model run lists no failed tasks", () => {
+    const report = build({ config, taskCount: 1, results: [result("mistral/x", 1, "a", false)], ledger: [] })
+    expect(report.failed).toEqual([])
+  })
+})
+
+describe("patched tasks", () => {
+  test("are disclosed in a model report and a pipeline check", () => {
+    const input = {
+      config,
+      taskCount: 1,
+      results: [result("mistral/x", 1, "a", true)],
+      ledger: [],
+      patched: ["polyglot_java_b"],
+    }
+    expect(markdown(build(input))).toContain(
+      "**Changed from the upstream tasks:** in 1 task image (`polyglot_java_b`)",
+    )
+    expect(markdown(build({ ...input, agent: "oracle" }))).toContain("`polyglot_java_b`")
+  })
+
+  test("nothing is said when no task was patched", () => {
+    expect(markdown(build({ config, taskCount: 1, results: [], ledger: [] }))).not.toContain(
+      "Changed from the upstream",
+    )
+  })
+})

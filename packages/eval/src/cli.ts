@@ -20,6 +20,7 @@ import { describe, estimate } from "./estimate"
 import { harborJob } from "./job"
 import { worstCase } from "./prices"
 import { startProxy, type Route } from "./proxy"
+import { stage } from "./stage"
 import { build, markdown, type TaskResult } from "./report"
 
 const repo = path.resolve(import.meta.dir, "../../..")
@@ -119,6 +120,9 @@ async function run(args: string[]) {
   // Containers reach the host's proxy by this name (Docker Desktop; on Linux add it with --add-host).
   const proxyURL = `http://${flag(args, "proxy-host", "host.docker.internal")}:${proxy.port}/${token}`
 
+  // Harbor builds from our exported copy of each registry dataset (see stage.ts).
+  const { datasets, patched } = await stage(config, path.join(repo, "packages/eval/runs/datasets"))
+
   const results: TaskResult[] = []
   try {
     for (const model of config.models) {
@@ -132,7 +136,7 @@ async function run(args: string[]) {
           break
         }
         const job = harborJob({
-          config,
+          config: { ...config, datasets },
           model,
           trial,
           proxyURL,
@@ -160,7 +164,7 @@ async function run(args: string[]) {
     proxy.stop(true)
   }
 
-  const report = build({ config, taskCount: tasks, results, ledger: ledger.entries })
+  const report = build({ config, taskCount: tasks, results, ledger: ledger.entries, agent, patched })
   await Bun.write(path.join(out, "report.json"), JSON.stringify({ report, results }, null, 2))
   const md = path.resolve(flag(args, "report", path.join(repo, "specs/eval", `${date}.md`)))
   await fs.mkdir(path.dirname(md), { recursive: true })
