@@ -67,11 +67,11 @@ The action and the `version` it installs are pinned to the Lunos version that wr
 
 By default the workflow uses the repository's own `GITHUB_TOKEN`, which GitHub creates for each run. The `permissions` block gives it what Lunos needs:
 
-| Permission | Why |
-| --- | --- |
-| `contents: write` | push commits and branches |
-| `pull-requests: write` | open pull requests and comment on them |
-| `issues: write` | comment on issues and add a reaction to the triggering comment |
+| Permission             | Why                                                            |
+| ---------------------- | -------------------------------------------------------------- |
+| `contents: write`      | push commits and branches                                      |
+| `pull-requests: write` | open pull requests and comment on them                         |
+| `issues: write`        | comment on issues and add a reaction to the triggering comment |
 
 Lunos then acts as `github-actions[bot]`. One GitHub limit applies: pushes and pull requests made with `GITHUB_TOKEN` don't start other workflows, so your CI won't run on a pull request Lunos opens.
 
@@ -83,16 +83,16 @@ To act as a different account, or to have CI run on Lunos's pull requests, use a
 
 ## Action inputs
 
-| Input | Default | What it does |
-| --- | --- | --- |
-| `model` | (required) | `provider/model` to run |
-| `version` | `latest` | `lunos-ai` version to install |
-| `agent` | the config's default agent | a primary agent to use |
-| `prompt` | the comment | replaces the prompt |
-| `mentions` | `/lunos,/oc` | comma-separated trigger phrases |
-| `variant` | none | provider-specific reasoning effort |
-| `share` | off | `true` shares the session; sharing must also be enabled in your Lunos config |
-| `use_github_token` | `true` | use the `GITHUB_TOKEN` env var |
-| `oidc_base_url` | none | only with `use_github_token: false`: a GitHub App token-exchange service you run |
+| Input              | Default                    | What it does                                                                     |
+| ------------------ | -------------------------- | -------------------------------------------------------------------------------- |
+| `model`            | (required)                 | `provider/model` to run                                                          |
+| `version`          | `latest`                   | `lunos-ai` version to install                                                    |
+| `agent`            | the config's default agent | a primary agent to use                                                           |
+| `prompt`           | the comment                | replaces the prompt                                                              |
+| `mentions`         | `/lunos,/oc`               | comma-separated trigger phrases                                                  |
+| `variant`          | none                       | provider-specific reasoning effort                                               |
+| `share`            | off                        | `true` shares the session; sharing must also be enabled in your Lunos config     |
+| `use_github_token` | `true`                     | use the `GITHUB_TOKEN` env var                                                   |
+| `oidc_base_url`    | none                       | only with `use_github_token: false`: a GitHub App token-exchange service you run |
 
 A Lunos GitHub App, which would remove the token step, is planned with Lunos Cloud.

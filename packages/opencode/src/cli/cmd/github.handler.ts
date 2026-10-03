@@ -946,7 +946,8 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
     }
 
     async function exchangeForAppToken(token: string) {
-      if (!oidcBaseUrl) throw new Error("OIDC_BASE_URL is not set. Set use_github_token: true and provide GITHUB_TOKEN.")
+      if (!oidcBaseUrl)
+        throw new Error("OIDC_BASE_URL is not set. Set use_github_token: true and provide GITHUB_TOKEN.")
       const response = token.startsWith("github_pat_")
         ? await fetch(`${oidcBaseUrl}/exchange_github_app_token_with_pat`, {
             method: "POST",
