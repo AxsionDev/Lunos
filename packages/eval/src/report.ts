@@ -33,6 +33,18 @@ export type ModelReport = {
   refusedRequests: number
 }
 
+/**
+ * Harbor exceptions that mean the task never got a fair attempt: the provider refused the request,
+ * or Lunos never started. Counted as "did not run", never as a model failure.
+ */
+export const DID_NOT_RUN = new Set([
+  "ApiRateLimitError",
+  "AgentSetupTimeoutError",
+  "EnvironmentStartTimeoutError",
+  "DockerBuildError",
+  "RewardFileNotFoundError",
+])
+
 function median(values: number[]) {
   if (!values.length) return undefined
   const sorted = [...values].sort((a, b) => a - b)
@@ -40,7 +52,16 @@ function median(values: number[]) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
-export function build(input: { config: EvalConfig; taskCount: number; results: TaskResult[]; ledger: Entry[] }) {
+export function build(input: {
+  config: EvalConfig
+  taskCount: number
+  results: TaskResult[]
+  ledger: Entry[]
+  /** A built-in Harbor agent ran instead of Lunos, e.g. "oracle": a pipeline check, not a result. */
+  agent?: string
+  /** Tasks whose Dockerfile the harness patched (stage.ts). Disclosed, since it changes the benchmark. */
+  patched?: string[]
+}) {
   const models: ModelReport[] = input.config.models.map((model) => {
     const results = input.results.filter((result) => result.model === model.model)
     const entries = input.ledger.filter((entry) => entry.model === model.model)
@@ -52,13 +73,16 @@ export function build(input: { config: EvalConfig; taskCount: number; results: T
       return { trial: i + 1, passed, total: runs.length, rate: runs.length ? passed / runs.length : 0 }
     })
     const missing = trials.some((trial) => trial.total < input.taskCount)
-    const status = missing || refused > 0 ? "incomplete" : "complete"
+    const notRun = results.filter((result) => result.error && DID_NOT_RUN.has(result.error))
+    const status = missing || refused > 0 || notRun.length > 0 ? "incomplete" : "complete"
     const reason =
       refused > 0
         ? `budget cap reached: ${refused} requests refused`
         : missing
           ? "not every task ran in every trial"
-          : undefined
+          : notRun.length > 0
+            ? `${notRun.length} task runs did not run (${[...new Set(notRun.map((result) => result.error))].sort().join(", ")})`
+            : undefined
     const base = {
       model: model.model,
       cls: model.cls,
@@ -95,6 +119,12 @@ export function build(input: { config: EvalConfig; taskCount: number; results: T
     budget: input.config.budget,
     totalSpend: models.reduce((sum, model) => sum + model.spend, 0),
     complete: models.every((model) => model.status === "complete"),
+    agent: input.agent,
+    patched: [...(input.patched ?? [])].sort(),
+    /** Under the oracle every task should pass; one that doesn't is broken, not a model result. */
+    failed: input.agent
+      ? [...new Set(input.results.filter((result) => !result.passed).map((result) => result.task))].sort()
+      : [],
     models,
   }
 }
@@ -103,6 +133,7 @@ const pct = (value: number) => `${(value * 100).toFixed(1)}%`
 const eur = (value: number | undefined) => (value === undefined ? "–" : `€${value.toFixed(2)}`)
 
 export function markdown(report: ReturnType<typeof build>) {
+  if (report.agent) return pipelineCheck(report)
   const lines = [
     `# Lunos evaluation, ${report.date}`,
     "",
@@ -114,6 +145,7 @@ export function markdown(report: ReturnType<typeof build>) {
     "",
     "**Method:** pass@1, one attempt per task with no test feedback; the grading tests are hidden from the agent and copied in only to grade. Lunos runs with `LUNOS_OFFLINE=1`: no web tools, and only LSP servers and formatters already in the image. These numbers measure Lunos's own agent and are not comparable with Aider's leaderboard, which uses Aider's harness and protocol.",
     "",
+    ...patchNote(report),
     "| Model | Class | Residency | Pass rate (mean, min–max) | Cost / run | Cost / solved | Median time | Tool error rate | Status |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...report.models.map((model) =>
@@ -142,5 +174,31 @@ export function markdown(report: ReturnType<typeof build>) {
         `- \`${model.model}\` (${model.residency.join(", ")}): ${model.upstreamHosts.map((host) => `\`${host}\``).join(", ") || "none"}`,
     ),
   ]
+  return lines.join("\n") + "\n"
+}
+
+function patchNote(report: ReturnType<typeof build>) {
+  if (!report.patched.length) return []
+  return [
+    `**Changed from the upstream tasks:** in ${report.patched.length} task image${report.patched.length === 1 ? "" : "s"} (${report.patched.map((task) => `\`${task}\``).join(", ")}), \`JAVA_HOME\` points at the JDK for the host's architecture instead of the hard-coded amd64 path, which doesn't exist on arm64. The tasks and their tests are unchanged.`,
+    "",
+  ]
+}
+
+/** A run with a built-in Harbor agent: no model was called, so no model is named as a result. */
+function pipelineCheck(report: ReturnType<typeof build>) {
+  const trials = report.models.flatMap((model) => model.trials)
+  const passed = trials.reduce((sum, trial) => sum + trial.passed, 0)
+  const total = trials.reduce((sum, trial) => sum + trial.total, 0)
+  const lines = [
+    `# Lunos evaluation pipeline check, ${report.date}`,
+    "",
+    `> [!CAUTION]\n> **Not a model result.** Harbor's \`${report.agent}\` agent ran instead of Lunos: no model was called. Every task should pass; a task that fails here is broken and must be excluded from the paid run.`,
+    "",
+    `Lunos ${report.lunosVersion}, run seed ${report.seed}. **${passed} of ${total} task runs passed.** Spend €${report.totalSpend.toFixed(2)}.`,
+    "",
+    ...patchNote(report),
+  ]
+  if (report.failed.length) lines.push("", "## Tasks that failed", "", ...report.failed.map((task) => `- \`${task}\``))
   return lines.join("\n") + "\n"
 }

@@ -4,7 +4,7 @@
 // proxy, generates one Harbor job per model and trial, and writes the report.
 //
 //   bun src/cli.ts estimate --config eval.config.json --tasks 250
-//   bun src/cli.ts run --config eval.config.json --tasks 250 [--yes] [--out runs/<date>]
+//   bun src/cli.ts run --config eval.config.json --tasks 250 [--yes] [--out runs/<date>] [--concurrency 4]
 //   bun src/cli.ts run ... --agent oracle   (Harbor's reference-solution agent: checks the whole
 //                                            pipeline without calling a model)
 //
@@ -20,6 +20,8 @@ import { describe, estimate } from "./estimate"
 import { harborJob } from "./job"
 import { worstCase } from "./prices"
 import { startProxy, type Route } from "./proxy"
+import { stage } from "./stage"
+import { agentBinaries } from "./agent-bin"
 import { build, markdown, type TaskResult } from "./report"
 
 const repo = path.resolve(import.meta.dir, "../../..")
@@ -119,6 +121,13 @@ async function run(args: string[]) {
   // Containers reach the host's proxy by this name (Docker Desktop; on Linux add it with --add-host).
   const proxyURL = `http://${flag(args, "proxy-host", "host.docker.internal")}:${proxy.port}/${token}`
 
+  // Harbor builds from our exported copy of each registry dataset (see stage.ts).
+  const { datasets, patched } = await stage(config, path.join(repo, "packages/eval/runs/datasets"))
+  // The Lunos binary each container gets, downloaded and verified once (not needed for --agent).
+  const binaries = agent
+    ? undefined
+    : (await agentBinaries(config.lunosVersion, path.join(repo, "packages/eval/runs/agent"))).dir
+
   const results: TaskResult[] = []
   try {
     for (const model of config.models) {
@@ -132,12 +141,13 @@ async function run(args: string[]) {
           break
         }
         const job = harborJob({
-          config,
+          config: { ...config, datasets },
           model,
           trial,
           proxyURL,
           jobsDir: path.join(out, "jobs"),
-          concurrency: 4,
+          // Match the provider key's rate limit: requests over it come back 429 and the task doesn't run.
+          concurrency: Number(flag(args, "concurrency", "4")),
           agent,
         })
         const jobFile = path.join(out, `${job.job_name}.json`)
@@ -149,6 +159,8 @@ async function run(args: string[]) {
           .env({
             ...process.env,
             PYTHONPATH: path.join(import.meta.dir, "../harbor"),
+            // Read by harbor/lunos_agent.py: Harbor only accepts its opencode agent's kwargs.
+            LUNOS_EVAL_BINARIES: binaries ?? "",
             [model.keyEnv]: "via-lunos-eval-proxy",
           })
           .nothrow()
@@ -160,7 +172,7 @@ async function run(args: string[]) {
     proxy.stop(true)
   }
 
-  const report = build({ config, taskCount: tasks, results, ledger: ledger.entries })
+  const report = build({ config, taskCount: tasks, results, ledger: ledger.entries, agent, patched })
   await Bun.write(path.join(out, "report.json"), JSON.stringify({ report, results }, null, 2))
   const md = path.resolve(flag(args, "report", path.join(repo, "specs/eval", `${date}.md`)))
   await fs.mkdir(path.dirname(md), { recursive: true })
