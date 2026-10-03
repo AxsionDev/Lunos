@@ -15,9 +15,10 @@ const dim = (value: string) => UI.Style.TEXT_DIM + value + UI.Style.TEXT_NORMAL
 
 const activeSuffix = (isActive: boolean) => (isActive ? dim(" (active)") : "")
 
-// XCOD-174: there is no default account server. Upstream's console (opencode.ai) is US-hosted, and
+// XCOD-174: there is no default account server. Upstream's hosted console is in the US, and
 // Lunos Cloud accounts don't exist yet; `login <url>` still works against a console you run.
-export const NO_ACCOUNT_SERVER = "Lunos Cloud accounts aren't available yet. To use a console you run, pass its URL: lunos account login <url>"
+export const NO_ACCOUNT_SERVER =
+  "Lunos Cloud accounts aren't available yet. To use a console you run, pass its URL: lunos account login <url>"
 
 export const formatAccountLabel = (account: { email: string; url: string }, isActive: boolean) =>
   `${account.email} ${dim(account.url)}${activeSuffix(isActive)}`

@@ -17,7 +17,7 @@ import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { ServerAuth } from "../../src/server/auth"
 import { authorizationRouterMiddleware } from "../../src/server/routes/instance/httpapi/middleware/authorization"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
-import { serveEmbeddedUIEffect, serveUIEffect } from "../../src/server/shared/ui"
+import { NO_EMBEDDED_UI, serveEmbeddedUIEffect, serveUIEffect } from "../../src/server/shared/ui"
 import { testEffect } from "../lib/effect"
 
 const testStateLayer = Layer.effectDiscard(
@@ -184,118 +184,23 @@ function responseText(response: Response) {
 }
 
 describe("HttpApi UI fallback", () => {
-  it.live("serves the web UI through the HTTP API app", () =>
+  it.live("without an embedded UI, says so instead of proxying to upstream's hosted UI", () =>
     Effect.gen(function* () {
       let proxiedUrl: string | undefined
 
       const response = yield* uiApp({
         disableEmbeddedWebUi: true,
         client: httpClient(
-          new Response("<html>opencode</html>", { headers: { "content-type": "text/html" } }),
+          new Response("<html>upstream</html>", { headers: { "content-type": "text/html" } }),
           (request) => {
             proxiedUrl = request.url
           },
         ),
       }).request("/")
 
-      expect(response.status).toBe(200)
-      expect(response.headers.get("content-type")).toContain("text/html")
-      expect(yield* responseText(response)).toBe("<html>opencode</html>")
-      expect(proxiedUrl).toBe("https://app.opencode.ai/")
-    }),
-  )
-
-  it.live("strips upstream transfer encoding headers from proxied assets", () =>
-    Effect.gen(function* () {
-      let proxiedUrl: string | undefined
-
-      const response = yield* Effect.gen(function* () {
-        const fs = yield* FSUtil.Service
-        const client = yield* HttpClient.HttpClient
-        const flags = yield* RuntimeFlags.Service
-        return yield* serveUIEffect(HttpServerRequest.fromWeb(new Request("http://localhost/assets/app.js")), {
-          fs,
-          client,
-          disableEmbeddedWebUi: flags.disableEmbeddedWebUi,
-        })
-      }).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            RuntimeFlags.layer({ disableEmbeddedWebUi: true }),
-            Layer.succeed(
-              HttpClient.HttpClient,
-              HttpClient.make((request) => {
-                proxiedUrl = request.url
-                return Effect.succeed(
-                  HttpClientResponse.fromWeb(
-                    request,
-                    new Response("console.log('ok')", {
-                      headers: {
-                        "content-encoding": "br",
-                        "content-length": "999",
-                        "content-type": "text/javascript",
-                      },
-                    }),
-                  ),
-                )
-              }),
-            ),
-          ),
-        ),
-        Effect.map(HttpServerResponse.toWeb),
-      )
-
-      expect(response.status).toBe(200)
-      expect(proxiedUrl).toBe("https://app.opencode.ai/assets/app.js")
-      expect(response.headers.get("content-encoding")).toBeNull()
-      expect(response.headers.get("content-length")).not.toBe("999")
-      expect(response.headers.get("content-type")).toContain("text/javascript")
-      expect(yield* responseText(response)).toBe("console.log('ok')")
-    }),
-  )
-
-  // Regression for #25698 (Ope): upstream `transfer-encoding: chunked` was
-  // forwarded through the proxy while the proxy itself re-frames the body,
-  // causing browsers to fail with `ERR_INVALID_CHUNKED_ENCODING`.
-  it.live("strips upstream transfer-encoding header from proxied assets", () =>
-    Effect.gen(function* () {
-      const response = yield* Effect.gen(function* () {
-        const fs = yield* FSUtil.Service
-        const client = yield* HttpClient.HttpClient
-        const flags = yield* RuntimeFlags.Service
-        return yield* serveUIEffect(HttpServerRequest.fromWeb(new Request("http://localhost/")), {
-          fs,
-          client,
-          disableEmbeddedWebUi: flags.disableEmbeddedWebUi,
-        })
-      }).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            RuntimeFlags.layer({ disableEmbeddedWebUi: true }),
-            Layer.succeed(
-              HttpClient.HttpClient,
-              HttpClient.make((request) =>
-                Effect.succeed(
-                  HttpClientResponse.fromWeb(
-                    request,
-                    new Response("<html>opencode</html>", {
-                      headers: {
-                        "transfer-encoding": "chunked",
-                        "content-type": "text/html",
-                      },
-                    }),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Effect.map(HttpServerResponse.toWeb),
-      )
-
-      expect(response.status).toBe(200)
-      expect(response.headers.get("transfer-encoding")).toBeNull()
-      expect(yield* responseText(response)).toBe("<html>opencode</html>")
+      expect(response.status).toBe(503)
+      expect(yield* responseText(response)).toBe(NO_EMBEDDED_UI)
+      expect(proxiedUrl).toBeUndefined()
     }),
   )
 
@@ -388,8 +293,9 @@ describe("HttpApi UI fallback", () => {
         client: httpClient(new Response("<html>opencode</html>", { headers: { "content-type": "text/html" } })),
       }).request(`/?auth_token=${btoa("opencode:secret")}`)
 
-      expect(response.status).toBe(200)
-      expect(yield* responseText(response)).toBe("<html>opencode</html>")
+      // Past auth (not 401), so the UI handler answered.
+      expect(response.status).toBe(503)
+      expect(yield* responseText(response)).toBe(NO_EMBEDDED_UI)
     }),
   )
 
@@ -403,7 +309,8 @@ describe("HttpApi UI fallback", () => {
         headers: { authorization: `Basic ${btoa("opencode:secret")}` },
       })
 
-      expect(response.status).toBe(200)
+      // Past auth (not 401), so the UI handler answered.
+      expect(response.status).toBe(503)
     }),
   )
 
@@ -417,7 +324,8 @@ describe("HttpApi UI fallback", () => {
         headers: { authorization: `Basic ${btoa("opencode:sec:ret")}` },
       })
 
-      expect(response.status).toBe(200)
+      // Past auth (not 401), so the UI handler answered.
+      expect(response.status).toBe(503)
     }),
   )
 
