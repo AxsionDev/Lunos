@@ -315,6 +315,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Run Lunos
         uses: AxsionDev/Lunos/github@${actionRef()}${envStr}
@@ -443,9 +445,9 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       githubClientReady = true
 
       const { userPrompt, promptFiles } = await getUserPrompt()
-      if (!useGithubToken) {
-        await configureGit(appToken)
-      }
+      // XCOD-174: also with your own token, so pushes use the token you passed (a personal token's
+      // pushes start CI; checkout's GITHUB_TOKEN credentials don't) and commits have an author.
+      await configureGit(appToken)
       // Skip permission check and reactions for repo events (no actor to check, no issue to react to)
       if (isUserEvent) {
         await assertPermissions()
@@ -604,10 +606,9 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       // Also output the clean error message for the action to capture
       //core.setOutput("prepare_error", e.message);
     } finally {
-      if (!useGithubToken) {
-        await restoreGitConfig()
-        await revokeAppToken()
-      }
+      await restoreGitConfig()
+      // Only an app token this run minted is revoked, never a token the user supplied.
+      if (!useGithubToken) await revokeAppToken()
     }
     process.exit(exitCode)
 
@@ -988,8 +989,13 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       const newCredentials = Buffer.from(`x-access-token:${appToken}`, "utf8").toString("base64")
 
       await gitRun(["config", "--local", config, `AUTHORIZATION: basic ${newCredentials}`])
-      await gitRun(["config", "--global", "user.name", AGENT_USERNAME])
-      await gitRun(["config", "--global", "user.email", `${AGENT_USERNAME}@users.noreply.github.com`])
+      // With GITHUB_TOKEN the pushes are made as github-actions[bot]; commit as it too.
+      const name = useGithubToken ? "github-actions[bot]" : AGENT_USERNAME
+      const email = useGithubToken
+        ? "41898282+github-actions[bot]@users.noreply.github.com"
+        : `${AGENT_USERNAME}@users.noreply.github.com`
+      await gitRun(["config", "--global", "user.name", name])
+      await gitRun(["config", "--global", "user.email", email])
     }
 
     async function restoreGitConfig() {

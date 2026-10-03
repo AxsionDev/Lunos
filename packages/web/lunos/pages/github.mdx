@@ -47,6 +47,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Run Lunos
         uses: AxsionDev/Lunos/github@vX.Y.Z # your Lunos version
@@ -59,7 +61,7 @@ jobs:
           use_github_token: true
 ```
 
-The action and the `version` it installs are pinned to the Lunos version that wrote the workflow. The action installs `lunos-ai` from npm and runs `lunos github run`.
+The action and the `version` it installs are pinned to the Lunos version that wrote the workflow. The action installs `lunos-ai` from npm and runs `lunos github run`. Lunos pushes with the token in `GITHUB_TOKEN`, so checkout doesn't keep its own credentials.
 
 ## The token
 
