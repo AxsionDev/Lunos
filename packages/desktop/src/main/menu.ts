@@ -1,5 +1,4 @@
-import { app, BrowserWindow, Menu, shell } from "electron"
-import path from "node:path"
+import { BrowserWindow, Menu } from "electron"
 import type { MenuItemConstructorOptions } from "electron"
 import {
   DESKTOP_MENU,
@@ -9,7 +8,7 @@ import {
 } from "@opencode-ai/app/desktop-menu"
 
 import { UPDATER_ENABLED } from "./constants"
-import { runDesktopMenuAction } from "./desktop-menu-actions"
+import { openLicenses, runDesktopMenuAction } from "./desktop-menu-actions"
 import { openExternalURL } from "./windows"
 import { nativeT } from "./native-translations"
 
@@ -55,7 +54,7 @@ function nativeItem(entry: DesktopMenuEntry, deps: Deps): MenuItemConstructorOpt
       runDesktopMenuAction(BrowserWindow.getFocusedWindow(), action, {
         checkForUpdates: deps.checkForUpdates,
         relaunch: deps.relaunch,
-        licenses: openLicenses,
+        licenses: () => void openLicenses(),
       })
   }
   if (entry.href) {
@@ -68,12 +67,4 @@ function nativeItem(entry: DesktopMenuEntry, deps: Deps): MenuItemConstructorOpt
 
 function nativeRole(role: DesktopMenuRole) {
   return role as NonNullable<MenuItemConstructorOptions["role"]>
-}
-
-/** XCOD-177: the notices file packaged next to the app (resources/ when run from source). */
-function openLicenses() {
-  const file = app.isPackaged
-    ? path.join(process.resourcesPath, "THIRD_PARTY_NOTICES")
-    : path.join(app.getAppPath(), "resources", "THIRD_PARTY_NOTICES")
-  void shell.openPath(file)
 }

@@ -53,12 +53,12 @@ const getBase = (appId: string): Configuration => ({
     "out/**/*",
     "resources/**/*",
     "!resources/opencode-cli*",
-    "!resources/THIRD_PARTY_NOTICES",
+    "!resources/THIRD_PARTY_NOTICES.txt",
     "!resources/LICENSE",
   ],
   extraResources: [
     // XCOD-177: outside the asar archive, so Help → Third-Party Licences can open it as a file.
-    { from: "resources/", to: "", filter: ["THIRD_PARTY_NOTICES", "LICENSE"] },
+    { from: "resources/", to: "", filter: ["THIRD_PARTY_NOTICES.txt", "LICENSE"] },
     ...(channel === "dev"
       ? [
           {
