@@ -7,7 +7,7 @@ import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 
 import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
-import { runDesktopMenuAction } from "./desktop-menu-actions"
+import { openLicenses, runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
@@ -295,6 +295,7 @@ export function registerIpcHandlers(deps: Deps) {
     runDesktopMenuAction(BrowserWindow.fromWebContents(event.sender), action, {
       checkForUpdates: () => void deps.showUpdater(),
       relaunch: deps.relaunch,
+      licenses: () => void openLicenses(),
     })
   })
 }

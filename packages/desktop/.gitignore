@@ -27,3 +27,5 @@ out/
 resources/opencode-cli*
 resources/icons
 resources/*.metainfo.xml
+resources/THIRD_PARTY_NOTICES.txt
+resources/LICENSE

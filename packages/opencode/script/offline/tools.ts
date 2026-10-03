@@ -142,7 +142,16 @@ export async function addTools(archive: string, root: string, cache: string) {
   const cosignFile = await download(tools.cosign, cache)
   await copyFile(cosignFile, path.join(dir, tools.cosign.name))
   await chmod(path.join(dir, tools.cosign.name), 0o755)
-  lines.push(`${TOOLS_DIR}/${tools.cosign.name}  cosign ${COSIGN_VERSION} (Apache-2.0)`)
+  // XCOD-177: cosign ships as a bare binary with no licence file, so the standard Apache-2.0 text
+  // goes next to it (the SPDX text script/notices.ts also uses).
+  await mkdir(path.join(dir, "licenses"), { recursive: true })
+  await copyFile(
+    path.join(import.meta.dir, "../notices/spdx/Apache-2.0.txt"),
+    path.join(dir, "licenses", "cosign-LICENSE"),
+  )
+  lines.push(
+    `${TOOLS_DIR}/${tools.cosign.name}  cosign ${COSIGN_VERSION} (Apache-2.0; ${TOOLS_DIR}/licenses/cosign-LICENSE)`,
+  )
   lines.push(`  from ${tools.cosign.url}`, `  sha256 ${tools.cosign.sha256}`, "")
 
   if (tools.rg) {
@@ -155,7 +164,15 @@ export async function addTools(archive: string, root: string, cache: string) {
       path.join(dir, tools.rg.name),
     )
     await chmod(path.join(dir, tools.rg.name), 0o755)
-    lines.push(`${TOOLS_DIR}/${tools.rg.name}  ripgrep ${RIPGREP_VERSION} (MIT or Unlicense), unpacked from`)
+    // XCOD-177: ripgrep's own licence files, from the same release archive.
+    for (const file of ["COPYING", "LICENSE-MIT", "UNLICENSE"])
+      await copyFile(
+        path.join(unpack, `ripgrep-${RIPGREP_VERSION}-${tools.rg.target}`, file),
+        path.join(dir, "licenses", `ripgrep-${file}`),
+      )
+    lines.push(
+      `${TOOLS_DIR}/${tools.rg.name}  ripgrep ${RIPGREP_VERSION} (MIT or Unlicense; ${TOOLS_DIR}/licenses/ripgrep-*), unpacked from`,
+    )
     lines.push(`  ${tools.rg.url}`, `  sha256 ${tools.rg.sha256} (of that archive)`, "")
   } else {
     lines.push("No ripgrep: there is no ripgrep build for this platform. Install it from your OS packages.", "")
