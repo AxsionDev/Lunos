@@ -7,7 +7,7 @@ import type { EvalConfig, ModelConfig } from "./config"
 export function lunosConfig(model: ModelConfig, proxyURL: string, auditPath: string) {
   const [provider, id] = model.model.split("/", 2)
   return {
-    $schema: "https://opencode.ai/config.json",
+    $schema: "https://lunos.tech/config.json",
     model: model.model,
     small_model: model.model,
     enabled_providers: [provider],
