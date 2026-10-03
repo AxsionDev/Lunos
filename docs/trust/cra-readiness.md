@@ -26,7 +26,21 @@ questions for counsel are listed in the assessment.
 | Private vulnerability reporting    | Enabled (GitHub Security Advisories)                                                         | [Report a vulnerability](https://github.com/AxsionDev/Lunos/security/advisories/new) |
 | Dedicated security contact address | security@lunos.tech                                                                          | [`SECURITY.md`](../../SECURITY.md#reporting-security-issues)                         |
 | Verifiable releases                | npm provenance, and signed checksums from v1.18.40                                           | [Supply chain](supply-chain.md)                                                      |
-| Support periods                    | **Not yet defined**                                                                          | To be decided by ITService EOOD. Until then, fixes ship in the latest release only   |
+| Support periods                    | **6 months of security fixes** for each release from its release date, from v1.18.43 onward  | [Security support period](#security-support-period)                                  |
+
+## Security support period
+
+Decided by ITService EOOD on 2026-10-02:
+
+- **Each release gets security fixes for 6 months from its release date**, starting with v1.18.43.
+  Releases before v1.18.43 have no support period: fixes for them ship only in a later release.
+- A security fix ships as a new release. Its GitHub Security Advisory names the affected versions
+  and the release that fixes them ([`SECURITY.md`](../../SECURITY.md)).
+- **How you learn a release is out of support:** its release date is on its
+  [GitHub Release](https://github.com/AxsionDev/Lunos/releases) and on
+  [lunos.tech/changelog](https://lunos.tech/changelog); support ends 6 months after that date.
+  When a newer release exists, Lunos says so at startup (`There is a new version: … please run
+"lunos update"`), and `lunos update` moves to it.
 
 Readiness groundwork detail: [`.claude/docs/xcod-64-cra-readiness.md`](../../.claude/docs/xcod-64-cra-readiness.md).
 

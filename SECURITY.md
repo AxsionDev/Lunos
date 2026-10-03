@@ -42,6 +42,13 @@ These are open, tracked, and listed here rather than omitted:
 
 ---
 
+# Supported Versions
+
+Each release gets security fixes for 6 months from its release date, starting with v1.18.43.
+Releases before v1.18.43 have no support period. Release dates are on the
+[GitHub Releases](https://github.com/AxsionDev/Lunos/releases) page; see
+[CRA readiness](docs/trust/cra-readiness.md#security-support-period) for how fixes are delivered.
+
 # Reporting Security Issues
 
 We appreciate your efforts to responsibly disclose your findings, and will make every effort to acknowledge your contributions.

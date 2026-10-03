@@ -116,8 +116,8 @@ O = {
     # Threat and vulnerability management
     "TVM-02.2": ("No", "No application-layer vulnerability scanning of Lunos is performed.", ""),
     "TVM-02.4": ("N/A", "No scans are performed (see TVM-02.2).", ""),
-    "TVM-02.5": ("Partial", "Fixes ship in new releases; Lunos announces new releases and can upgrade itself when the customer allows it. Support periods are not yet defined.", "docs/trust/cra-readiness.md"),
-    "TVM-02.6": ("No", "Support periods and patching time frames are not yet defined.", "docs/trust/cra-readiness.md"),
+    "TVM-02.5": ("Partial", "Fixes ship in new releases; Lunos announces new releases and can upgrade itself when the customer allows it. Each release gets security fixes for 6 months from its release date, from v1.18.43.", "docs/trust/cra-readiness.md#security-support-period"),
+    "TVM-02.6": ("Partial", "The support period is published: 6 months of security fixes per release, from v1.18.43. Patching time frames for individual vulnerabilities are not committed to; acknowledgement is within 6 business days.", "docs/trust/cra-readiness.md#security-support-period"),
 }
 
 def main():
