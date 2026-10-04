@@ -120,14 +120,49 @@ O = {
     "TVM-02.6": ("Partial", "The support period is published: 6 months of security fixes per release, from v1.18.43. Patching time frames for individual vulnerabilities are not committed to; acknowledgement is within 6 business days.", "docs/trust/cra-readiness.md#security-support-period"),
 }
 
+# XCOD-196: ITService EOOD's answers to the organisational questions, filled in org-answers.csv
+# (one row per question that would otherwise say "Axsion to answer"). A row with no answer yet
+# keeps "Axsion to answer". Answers must be true today: a planned control is "No" with the quarter
+# in `planned`, never "Yes".
+ANSWERS = {"Yes", "No", "Partial", "N/A"}
+
+
+def org_answers(path=os.path.join(HERE, "org-answers.csv")):
+    out, problems = {}, []
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            answer = row["answer"].strip()
+            if not answer:
+                continue
+            qid, note = row["id"], row["explanation"].strip()
+            if answer not in ANSWERS:
+                problems.append(f"{qid}: answer must be one of {sorted(ANSWERS)}, not {answer!r}")
+            if not note:
+                problems.append(f"{qid}: needs a short explanation")
+            planned = row["planned"].strip()
+            if planned and answer != "No":
+                problems.append(f"{qid}: a planned control is answered No (planned for {planned}), not {answer}")
+            if planned:
+                note = f"{note} Planned for {planned}."
+            out[qid] = (answer, note, row["evidence"].strip())
+    if problems:
+        raise SystemExit("org-answers.csv:\n  " + "\n  ".join(problems))
+    return out
+
+
 def main():
     qs = json.load(open(os.path.join(HERE, "caiq-v3.0.1-questions.json")))
+    ORG_ANSWERS = org_answers()
     rows = []
     for q in qs:
         domain = q["domain"]
         qid = q["id"]
         status, note, src = O.get(qid) or DEFAULTS[domain]
-        rows.append({"domain": domain, "id": qid, "question": q["q"], "answer": status, "notes": note, "source": (REL + src) if src else ""})
+        if status == "Axsion to answer" and qid in ORG_ANSWERS:
+            status, note, src = ORG_ANSWERS[qid]
+        # Evidence for an organisational answer may be a document outside the repository (a policy name).
+        source = (REL + src) if src and not src.startswith(("http", "ITService")) else src
+        rows.append({"domain": domain, "id": qid, "question": q["q"], "answer": status, "notes": note, "source": source})
     with open(os.path.join(HERE, "caiq-v3.0.1-answers.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
         w.writeheader(); w.writerows(rows)
