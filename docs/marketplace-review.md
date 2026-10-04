@@ -71,6 +71,14 @@ It proposes a verdict per entry (keep, keep with a warning, needs a person's rev
 writes the report to `marketplace-reviews/<date>.md` and `.json`. Weekly reports arrive as a pull
 request.
 
+**Judgement.** For each entry the fact check didn't simply keep, `script/marketplace-judge.ts` asks
+Lunos, on an EU model (Mistral by default), to recommend keep, keep with a warning, delist or
+propose verified, from the check's findings only. An answer that isn't in the expected shape is
+dropped, and "propose verified" is withdrawn while any finding is open. The recommendation goes in
+`marketplace-reviews/<date>.judgement.md`; it is advice to the approver, never a fact or a decision.
+
+**Approver.** Petar Minev approves every change to `marketplace.json` (`.github/CODEOWNERS`).
+
 **What it never does:** edit `marketplace.json`, or mark an entry verified. Telemetry (criterion 4)
 and whether an entry's tools and permissions are proportionate (criterion 6) need a person. A test
 fails any `verified` entry that doesn't name a person as `reviewer` and the agent version they read.
