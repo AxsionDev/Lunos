@@ -53,21 +53,6 @@
       "integrity": "sha512-txV23q60qvdFLa6SEH4jzqUt7NvsjzhP5SIGwut44dUkGKrt13IFtcn60037pUcvyEdHvFRvf11pUzBy2gifFQ=="
     },
     {
-      "name": "opencode-antigravity-auth",
-      "source": {
-        "type": "npm",
-        "package": "opencode-antigravity-auth",
-        "version": "1.6.0"
-      },
-      "description": "Use Antigravity's free models instead of API billing",
-      "category": "auth",
-      "review": {
-        "status": "community"
-      },
-      "license": "MIT",
-      "integrity": "sha512-8HLksis3yfHxZ6hzye78eEWNV6lRDL/yCtSD8sUaernyGFvIxSywFVwLsfum50wZ6ZEwJqs6moeiSGb6EE1p+Q=="
-    },
-    {
       "name": "opencode-devcontainers",
       "source": {
         "type": "npm",
@@ -89,7 +74,7 @@
         "package": "@tarquinen/opencode-dcp",
         "version": "3.2.0"
       },
-      "description": "Optimize token usage by pruning obsolete tool outputs",
+      "description": "Optimize token usage by pruning obsolete tool outputs. Licensed AGPL-3.0 (copyleft).",
       "category": "context",
       "review": {
         "status": "community"
@@ -218,21 +203,6 @@
       "integrity": "sha512-CgwEdf8Q1W8lYviqyWIJ6hMQp98DP4gnzGUoEP4UkSjH8sEnq4spGm5EbUhQCGvyFDOh0X8aJt341jmRAZAuNA=="
     },
     {
-      "name": "opencode-skillful",
-      "source": {
-        "type": "npm",
-        "package": "@zenobius/opencode-skillful",
-        "version": "1.2.5"
-      },
-      "description": "Allow OpenCode agents to lazy load prompts on demand with skill discovery and injection",
-      "category": "context",
-      "review": {
-        "status": "community"
-      },
-      "license": "MIT",
-      "integrity": "sha512-CSl/6FgcXGf2aiJvcFPHE07KkHclVOdvI5ldnFc1Ejy8YGQBG3hjkPIqkrmr4Py1h4q8zqUlhyBP6I9bVSxBgw=="
-    },
-    {
       "name": "opencode-supermemory",
       "source": {
         "type": "npm",
@@ -269,7 +239,7 @@
         "package": "opencode-conductor-plugin",
         "version": "1.32.0"
       },
-      "description": "Protocol-Driven Workflow: Automation of the Context -> Spec -> Plan -> Implement lifecycle.",
+      "description": "Protocol-Driven Workflow: Automation of the Context -> Spec -> Plan -> Implement lifecycle. On install it copies an agent and slash commands into ~/.config/opencode, replacing files of the same name.",
       "category": "workflow",
       "review": {
         "status": "community"
