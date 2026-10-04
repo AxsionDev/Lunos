@@ -309,7 +309,7 @@ The repository ships a reference configuration for exactly this deployment: [`ex
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://lunos.tech/config.json",
   "residency": {
     "allow": ["eu"],
     "audit": true

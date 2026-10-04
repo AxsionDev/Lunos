@@ -21,7 +21,7 @@ describe("lunos settings (subprocess)", () => {
     "set writes the user config, keeps comments, and the live loader reads it back",
     ({ opencode, home }) =>
       Effect.gen(function* () {
-        yield* seed(home, '{\n  // my comment\n  "$schema": "https://opencode.ai/config.json"\n}\n')
+        yield* seed(home, '{\n  // my comment\n  "$schema": "https://lunos.tech/config.json"\n}\n')
         const share = yield* opencode.spawn(["settings", "set", "share", "manual"])
         expect(share.exitCode).toBe(0)
         const depth = yield* opencode.spawn(["settings", "set", "subagent_depth", "2"])
@@ -46,7 +46,7 @@ describe("lunos settings (subprocess)", () => {
       Effect.gen(function* () {
         // With $schema already there: the loader adds it to files that lack it, which isn't a write of ours.
         const before =
-          '{\n  // untouched\n  "$schema": "https://opencode.ai/config.json",\n  "autoupdate": "notify"\n}\n'
+          '{\n  // untouched\n  "$schema": "https://lunos.tech/config.json",\n  "autoupdate": "notify"\n}\n'
         yield* seed(home, before)
         const result = yield* opencode.spawn(["settings", "set", "autoupdate", "sometimes"])
         expect(result.exitCode).not.toBe(0)
@@ -68,7 +68,7 @@ describe("lunos settings (subprocess)", () => {
             JSON.stringify({ $locked: ["share"], share: "manual" }),
           )
         })
-        const seeded = '{\n  "$schema": "https://opencode.ai/config.json"\n}\n'
+        const seeded = '{\n  "$schema": "https://lunos.tech/config.json"\n}\n'
         yield* seed(home, seeded)
         const env = { OPENCODE_TEST_MANAGED_CONFIG_DIR: managed }
         const result = yield* opencode.spawn(["settings", "set", "share", "auto"], { env })

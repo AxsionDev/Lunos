@@ -4,7 +4,12 @@
   "title": "OpenCode Desktop Theme",
   "description": "A theme definition for the OpenCode desktop application",
   "type": "object",
-  "required": ["name", "id", "light", "dark"],
+  "required": [
+    "name",
+    "id",
+    "light",
+    "dark"
+  ],
   "properties": {
     "$schema": {
       "type": "string",
@@ -43,7 +48,17 @@
       "type": "object",
       "description": "The legacy semantic seed set used to generate a theme",
       "additionalProperties": false,
-      "required": ["neutral", "primary", "success", "warning", "error", "info", "interactive", "diffAdd", "diffDelete"],
+      "required": [
+        "neutral",
+        "primary",
+        "success",
+        "warning",
+        "error",
+        "info",
+        "interactive",
+        "diffAdd",
+        "diffDelete"
+      ],
       "properties": {
         "neutral": {
           "$ref": "#/definitions/HexColor",
@@ -87,7 +102,15 @@
       "type": "object",
       "description": "A compact semantic palette used to derive the full theme programmatically",
       "additionalProperties": false,
-      "required": ["neutral", "ink", "primary", "success", "warning", "error", "info"],
+      "required": [
+        "neutral",
+        "ink",
+        "primary",
+        "success",
+        "warning",
+        "error",
+        "info"
+      ],
       "properties": {
         "neutral": {
           "$ref": "#/definitions/HexColor",
@@ -138,7 +161,18 @@
     "ThemeVariant": {
       "type": "object",
       "description": "A theme variant (light or dark) with either a compact palette or legacy seeds and optional overrides",
-      "oneOf": [{ "required": ["seeds"] }, { "required": ["palette"] }],
+      "oneOf": [
+        {
+          "required": [
+            "seeds"
+          ]
+        },
+        {
+          "required": [
+            "palette"
+          ]
+        }
+      ],
       "properties": {
         "seeds": {
           "$ref": "#/definitions/ThemeSeedColors",

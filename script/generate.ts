@@ -16,4 +16,7 @@ await $`bun ./script/upstream-version.ts`
 // XCOD-121: the outbound-call table in docs/deployment/self-hosted.md comes from Offline.CALLS.
 await $`bun ./script/offline-calls.ts`
 
+// XCOD-174: the JSON Schemas lunos.tech publishes (config, tui, theme, desktop-theme), from source.
+await $`bun ./script/schemas.ts`
+
 await $`./script/format.ts`

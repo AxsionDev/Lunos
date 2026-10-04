@@ -72,7 +72,7 @@ describe("settings registry", () => {
 
 describe("settings set", () => {
   test("writes the user config and keeps its comments", async () => {
-    await fs.writeFile(userFile(), '{\n  // keep me\n  "$schema": "https://opencode.ai/config.json"\n}\n')
+    await fs.writeFile(userFile(), '{\n  // keep me\n  "$schema": "https://lunos.tech/config.json"\n}\n')
     const result = await ConfigSettings.set({ key: "share", value: "disabled", scope: "user", ctx: ctx(), locked: [] })
     expect(result.file).toBe(userFile())
     const text = await read(userFile())
