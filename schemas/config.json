@@ -4,12 +4,7 @@
   "$defs": {
     "LogLevel": {
       "type": "string",
-      "enum": [
-        "DEBUG",
-        "INFO",
-        "WARN",
-        "ERROR"
-      ],
+      "enum": ["DEBUG", "INFO", "WARN", "ERROR"],
       "description": "Log level"
     },
     "ServerConfig": {
@@ -85,21 +80,15 @@
             },
             {
               "type": "string",
-              "enum": [
-                "NaN"
-              ]
+              "enum": ["NaN"]
             },
             {
               "type": "string",
-              "enum": [
-                "Infinity"
-              ]
+              "enum": ["Infinity"]
             },
             {
               "type": "string",
-              "enum": [
-                "-Infinity"
-              ]
+              "enum": ["-Infinity"]
             }
           ],
           "description": "Milliseconds before the command is killed. Defaults to 30000."
@@ -109,9 +98,7 @@
           "description": "Set true to keep the hook configured but inactive."
         }
       },
-      "required": [
-        "command"
-      ],
+      "required": ["command"],
       "additionalProperties": false
     },
     "MemorySourceConfig": {
@@ -123,10 +110,7 @@
         },
         "type": {
           "type": "string",
-          "enum": [
-            "graph",
-            "mcp"
-          ],
+          "enum": ["graph", "mcp"],
           "description": "\"graph\": a read-only query against a Neo4j knowledge graph. \"mcp\": a search tool on an MCP server configured under \"mcp\""
         },
         "jurisdiction": {
@@ -163,10 +147,7 @@
         },
         "query": {
           "type": "string",
-          "enum": [
-            "fulltext",
-            "contains"
-          ],
+          "enum": ["fulltext", "contains"],
           "description": "graph: how nodes are found. \"fulltext\" (the default) uses a full-text index; \"contains\" matches node names containing a word of the question"
         },
         "index": {
@@ -194,10 +175,7 @@
           "description": "mcp: the tool argument that takes the query (default \"query\")"
         }
       },
-      "required": [
-        "name",
-        "type"
-      ],
+      "required": ["name", "type"],
       "additionalProperties": false
     },
     "MemoryBackendConfig": {
@@ -205,11 +183,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": [
-            "embedded",
-            "neo4j",
-            "memgraph"
-          ],
+          "enum": ["embedded", "neo4j", "memgraph"],
           "description": "\"embedded\" (the default: memory on this machine), \"neo4j\", or \"memgraph\" (experimental, not supported yet: refused when memory starts)"
         },
         "url": {
@@ -258,10 +232,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": [
-              "project",
-              "user"
-            ]
+            "enum": ["project", "user"]
           },
           "description": "Where memory is kept: \"project\" (.opencode/memory/graph/ in the project) and/or \"user\" (the Lunos data directory). Default [\"project\"]"
         },
@@ -334,10 +305,7 @@
         },
         "encryption": {
           "type": "string",
-          "enum": [
-            "off",
-            "os-keychain"
-          ],
+          "enum": ["off", "os-keychain"],
           "description": "Encrypt the provenance ledger (facts.jsonl) with a key kept in the OS keychain: \"os-keychain\", or \"off\" (the default). The memory engine's own database files are not encrypted; use full-disk encryption for those"
         },
         "backend": {
@@ -354,13 +322,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": [
-              "eu",
-              "us",
-              "other",
-              "configurable",
-              "unknown"
-            ]
+            "enum": ["eu", "us", "other", "configurable", "unknown"]
           },
           "description": "Regions this deployment may send model requests to, e.g. [\"eu\"]. Providers outside this list are blocked before any request is made. Providers with no recorded jurisdiction are always denied. \"configurable\" providers (Azure, Bedrock, Vertex) are denied unless explicitly listed, because their region cannot be verified from here."
         },
@@ -379,11 +341,7 @@
             "properties": {
               "region": {
                 "type": "string",
-                "enum": [
-                  "eu",
-                  "us",
-                  "other"
-                ],
+                "enum": ["eu", "us", "other"],
                 "description": "Where this endpoint processes data. Your declaration: Lunos can't verify it."
               },
               "note": {
@@ -391,17 +349,13 @@
                 "description": "What the declaration rests on, recorded for reviewers, e.g. \"vLLM on our Frankfurt servers\""
               }
             },
-            "required": [
-              "region"
-            ],
+            "required": ["region"],
             "additionalProperties": false
           },
           "description": "Jurisdictions this deployment declares for endpoints Lunos can't assess, keyed by provider id: self-hosted models (vLLM, Ollama) or a built-in provider pointed at another host. A declaration never changes a built-in provider's claim for its own API. Recorded in the audit log with basis \"declared\". Lock it with managed config ($locked: [\"residency\"])."
         }
       },
-      "required": [
-        "allow"
-      ],
+      "required": ["allow"],
       "additionalProperties": false
     },
     "ConfigV2.Reference.Git": {
@@ -420,9 +374,7 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "repository"
-      ],
+      "required": ["repository"],
       "additionalProperties": false
     },
     "ConfigV2.Reference.Local": {
@@ -438,9 +390,7 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "path"
-      ],
+      "required": ["path"],
       "additionalProperties": false
     },
     "SubagentConfig": {
@@ -482,11 +432,7 @@
     },
     "PermissionActionConfig": {
       "type": "string",
-      "enum": [
-        "ask",
-        "allow",
-        "deny"
-      ]
+      "enum": ["ask", "allow", "deny"]
     },
     "PermissionObjectConfig": {
       "type": "object",
@@ -600,11 +546,7 @@
         },
         "mode": {
           "type": "string",
-          "enum": [
-            "subagent",
-            "primary",
-            "all"
-          ]
+          "enum": ["subagent", "primary", "all"]
         },
         "hidden": {
           "type": "boolean",
@@ -621,15 +563,7 @@
             },
             {
               "type": "string",
-              "enum": [
-                "primary",
-                "secondary",
-                "accent",
-                "success",
-                "warning",
-                "error",
-                "info"
-              ]
+              "enum": ["primary", "secondary", "accent", "success", "warning", "error", "info"]
             }
           ],
           "description": "Hex color code (e.g., #FF5733) or theme color (e.g., primary)"
@@ -710,9 +644,7 @@
                 },
                 {
                   "type": "boolean",
-                  "enum": [
-                    false
-                  ]
+                  "enum": [false]
                 }
               ],
               "description": "Timeout in milliseconds for full requests to this provider. Set to false to disable timeout."
@@ -726,9 +658,7 @@
                 },
                 {
                   "type": "boolean",
-                  "enum": [
-                    false
-                  ]
+                  "enum": [false]
                 }
               ],
               "description": "Timeout in milliseconds to wait for response headers (default: 300000). Set to false to disable timeout."
@@ -742,9 +672,7 @@
                 },
                 {
                   "type": "boolean",
-                  "enum": [
-                    false
-                  ]
+                  "enum": [false]
                 }
               ],
               "description": "Timeout in milliseconds between streamed SSE chunks for this provider (default: 300000). If no chunk arrives within this window, the request is aborted. Set to false to disable timeout."
@@ -789,11 +717,7 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "enum": [
-                          "reasoning",
-                          "reasoning_content",
-                          "reasoning_text"
-                        ]
+                        "enum": ["reasoning", "reasoning_content", "reasoning_text"]
                       },
                       {
                         "type": "string"
@@ -807,11 +731,7 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "enum": [
-                              "reasoning",
-                              "reasoning_content",
-                              "reasoning_text"
-                            ]
+                            "enum": ["reasoning", "reasoning_content", "reasoning_text"]
                           },
                           {
                             "type": "string"
@@ -819,9 +739,7 @@
                         ]
                       }
                     },
-                    "required": [
-                      "field"
-                    ],
+                    "required": ["field"],
                     "additionalProperties": false
                   }
                 ]
@@ -857,17 +775,11 @@
                         "type": "number"
                       }
                     },
-                    "required": [
-                      "input",
-                      "output"
-                    ],
+                    "required": ["input", "output"],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "input",
-                  "output"
-                ],
+                "required": ["input", "output"],
                 "additionalProperties": false
               },
               "limit": {
@@ -883,10 +795,7 @@
                     "type": "number"
                   }
                 },
-                "required": [
-                  "context",
-                  "output"
-                ],
+                "required": ["context", "output"],
                 "additionalProperties": false
               },
               "modalities": {
@@ -896,26 +805,14 @@
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "enum": [
-                        "text",
-                        "audio",
-                        "image",
-                        "video",
-                        "pdf"
-                      ]
+                      "enum": ["text", "audio", "image", "video", "pdf"]
                     }
                   },
                   "output": {
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "enum": [
-                        "text",
-                        "audio",
-                        "image",
-                        "video",
-                        "pdf"
-                      ]
+                      "enum": ["text", "audio", "image", "video", "pdf"]
                     }
                   }
                 },
@@ -926,12 +823,7 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "alpha",
-                  "beta",
-                  "deprecated",
-                  "active"
-                ]
+                "enum": ["alpha", "beta", "deprecated", "active"]
               },
               "provider": {
                 "type": "object",
@@ -979,9 +871,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": [
-            "local"
-          ],
+          "enum": ["local"],
           "description": "Type of MCP server connection"
         },
         "command": {
@@ -1013,10 +903,7 @@
           "description": "Timeout in ms for MCP server requests. Defaults to 5000 (5 seconds) if not specified."
         }
       },
-      "required": [
-        "type",
-        "command"
-      ],
+      "required": ["type", "command"],
       "additionalProperties": false
     },
     "McpOAuthConfig": {
@@ -1052,9 +939,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": [
-            "remote"
-          ],
+          "enum": ["remote"],
           "description": "Type of MCP server connection"
         },
         "url": {
@@ -1079,9 +964,7 @@
             },
             {
               "type": "boolean",
-              "enum": [
-                false
-              ]
+              "enum": [false]
             }
           ],
           "description": "OAuth authentication configuration for the MCP server. Set to false to disable OAuth auto-detection."
@@ -1093,18 +976,12 @@
           "description": "Timeout in ms for MCP server requests. Defaults to 5000 (5 seconds) if not specified."
         }
       },
-      "required": [
-        "type",
-        "url"
-      ],
+      "required": ["type", "url"],
       "additionalProperties": false
     },
     "LayoutConfig": {
       "type": "string",
-      "enum": [
-        "auto",
-        "stretch"
-      ]
+      "enum": ["auto", "stretch"]
     },
     "ImageAttachmentConfig": {
       "type": "object",
@@ -1146,10 +1023,7 @@
     },
     "Policy.Effect": {
       "type": "string",
-      "enum": [
-        "allow",
-        "deny"
-      ]
+      "enum": ["allow", "deny"]
     },
     "ConfigV2.Experimental.Policy": {
       "type": "object",
@@ -1160,9 +1034,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "enum": [
-                    "provider.use"
-                  ]
+                  "enum": ["provider.use"]
                 }
               ]
             }
@@ -1175,11 +1047,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "action",
-        "effect",
-        "resource"
-      ],
+      "required": ["action", "effect", "resource"],
       "additionalProperties": false
     },
     "Config": {
@@ -1233,9 +1101,7 @@
                 "type": "boolean"
               }
             },
-            "required": [
-              "template"
-            ],
+            "required": ["template"],
             "additionalProperties": false
           },
           "description": "Command configuration, see https://docs.lunos.tech/docs/commands/"
@@ -1384,19 +1250,12 @@
             },
             "workspace": {
               "type": "string",
-              "enum": [
-                "copy",
-                "mount"
-              ],
+              "enum": ["copy", "mount"],
               "description": "How the project gets into the sandbox. \"copy\" (default): cloned into a container volume at the current commit, with uncommitted changes applied; the host working tree is never mounted. \"mount\": your working tree itself, bind-mounted read-write, so the agent's changes are in it as they happen (no branch or patch); .git and Lunos's own config stay read-only. Reduced isolation, and a warning is shown. Read from your global and managed config only, never a repository's"
             },
             "devcontainer": {
               "type": "string",
-              "enum": [
-                "off",
-                "image",
-                "build"
-              ],
+              "enum": ["off", "image", "build"],
               "description": "Use the project's .devcontainer/devcontainer.json for the sandbox's toolchain, unless the project's own config sets sandbox.image. A sandbox.image in your global or managed config is the Lunos image the devcontainer gets Lunos from. \"image\" (default): its `image`, with Lunos added (nothing of the image runs on this machine). \"build\": also its `build` (Dockerfile), which runs the repository's build steps on this machine, with the network open; only your global or managed config can choose it. \"off\": ignore it. A repository's config can only turn it off"
             },
             "mounts": {
@@ -1413,20 +1272,14 @@
                     "description": "Absolute path in the sandbox. Default: the same as source"
                   }
                 },
-                "required": [
-                  "source"
-                ],
+                "required": ["source"],
                 "additionalProperties": false
               },
               "description": "Extra directories mounted read-only into the sandbox, e.g. a package cache. Read from your global and managed config only, never a repository's. Your home directory itself, /, SSH keys and container runtime sockets are refused"
             },
             "on_finish": {
               "type": "string",
-              "enum": [
-                "destroy",
-                "retain",
-                "destroy_on_success"
-              ],
+              "enum": ["destroy", "retain", "destroy_on_success"],
               "description": "What happens once the results are back on the host: \"destroy\" (default) removes the container and its volume, \"retain\" stops it so `lunos sandbox attach` can reopen it, \"destroy_on_success\" keeps it only when the task failed. --keep and --rm override it for one run. A failed handoff always retains"
             },
             "retain_for": {
@@ -1436,11 +1289,7 @@
             },
             "network": {
               "type": "string",
-              "enum": [
-                "policy",
-                "none",
-                "open"
-              ],
+              "enum": ["policy", "none", "open"],
               "description": "What the sandbox can reach. \"policy\" (default): only the model endpoints the residency policy allows, remote MCP servers, the npm registry and sandbox.allow, enforced by an egress proxy outside the container. \"none\": nothing. \"open\": anything this machine can reach (a warning is shown). A repository's config can only make it stricter"
             },
             "allow": {
@@ -1452,19 +1301,12 @@
             },
             "results": {
               "type": "string",
-              "enum": [
-                "branch",
-                "patch",
-                "none"
-              ],
+              "enum": ["branch", "patch", "none"],
               "description": "How the agent's changes come back: \"branch\" (default) as branch lunos/sandbox/<id>, \"patch\" as .opencode/sandbox/<id>/changes.patch (only the agent's changes, for `git apply`), \"none\" not at all. The transcript and summary always come back"
             },
             "runtime": {
               "type": "string",
-              "enum": [
-                "docker",
-                "podman"
-              ],
+              "enum": ["docker", "podman"],
               "description": "The container runtime. Unset: Docker if it's available, else Podman"
             },
             "resources": {
@@ -1478,21 +1320,15 @@
                     },
                     {
                       "type": "string",
-                      "enum": [
-                        "NaN"
-                      ]
+                      "enum": ["NaN"]
                     },
                     {
                       "type": "string",
-                      "enum": [
-                        "Infinity"
-                      ]
+                      "enum": ["Infinity"]
                     },
                     {
                       "type": "string",
-                      "enum": [
-                        "-Infinity"
-                      ]
+                      "enum": ["-Infinity"]
                     }
                   ],
                   "description": "CPUs the sandbox may use (docker --cpus). Default 2"
@@ -1598,11 +1434,7 @@
         },
         "share": {
           "type": "string",
-          "enum": [
-            "manual",
-            "auto",
-            "disabled"
-          ],
+          "enum": ["manual", "auto", "disabled"],
           "description": "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing"
         },
         "autoshare": {
@@ -1616,9 +1448,7 @@
             },
             {
               "type": "string",
-              "enum": [
-                "notify"
-              ]
+              "enum": ["notify"]
             }
           ],
           "description": "Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications"
@@ -1738,9 +1568,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "enabled"
-                ],
+                "required": ["enabled"],
                 "additionalProperties": false
               }
             ]
@@ -1799,14 +1627,10 @@
                     "properties": {
                       "disabled": {
                         "type": "boolean",
-                        "enum": [
-                          true
-                        ]
+                        "enum": [true]
                       }
                     },
-                    "required": [
-                      "disabled"
-                    ],
+                    "required": ["disabled"],
                     "additionalProperties": false
                   },
                   {
@@ -1837,9 +1661,7 @@
                         "type": "object"
                       }
                     },
-                    "required": [
-                      "command"
-                    ],
+                    "required": ["command"],
                     "additionalProperties": false
                   }
                 ]
