@@ -14,6 +14,7 @@ import { $ } from "bun"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
+import prettier from "prettier"
 
 const root = path.resolve(import.meta.dir, "..")
 const OUT = path.join(root, "schemas")
@@ -34,12 +35,17 @@ async function render() {
     "desktop-theme.json": await Bun.file(path.join(root, "packages/ui/src/theme/desktop-theme.schema.json")).json(),
   }
   await fs.rm(tmp, { recursive: true, force: true })
-  // Every schema names its own Lunos URL, so editors and validators resolve it there.
+  // Every schema names its own Lunos URL, so editors and validators resolve it there. Formatted
+  // here, as script/format.ts would, so the generate workflow's format step leaves them unchanged
+  // and --check compares like with like.
   return Object.fromEntries(
-    Object.entries(files).map(([name, schema]) => [
-      name,
-      JSON.stringify({ ...(schema as object), $id: schemaURL(name) }, null, 2) + "\n",
-    ]),
+    await Promise.all(
+      Object.entries(files).map(async ([name, schema]) => {
+        const file = path.join(OUT, name)
+        const text = JSON.stringify({ ...(schema as object), $id: schemaURL(name) }, null, 2)
+        return [name, await prettier.format(text, { ...(await prettier.resolveConfig(file)), filepath: file })] as const
+      }),
+    ),
   )
 }
 
