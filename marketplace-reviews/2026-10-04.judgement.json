@@ -1,0 +1,34 @@
+{
+  "model": "openai/gpt-5.3-codex",
+  "date": "2026-10-04",
+  "judgements": [
+    {
+      "name": "opencode-dynamic-context-pruning",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 1 (warn): AGPL-3.0-or-later is OSI-approved copyleft and should be clearly disclosed to users.",
+        "Criterion 5 (info): no egress is declared, which is needed before network behavior can be verified."
+      ],
+      "user_note": "This plugin is retained, but users should be informed it uses AGPL copyleft licensing and that network egress declarations are still missing."
+    },
+    {
+      "name": "opencode-conductor",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 6 warning: package runs a postinstall script (`node scripts/postinstall.cjs`), so script contents should be reviewed before verification.",
+        "Criterion 5 info: no egress is declared, which is required before network behavior can be verified."
+      ],
+      "user_note": "This entry can remain community-listed, but it should not be promoted to verified until egress is declared and the postinstall script is reviewed."
+    },
+    {
+      "name": "opencode-sentry-monitor",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 2 warning: no public source repository found, so maintenance/activity cannot be verified.",
+        "Criterion 5 info: no egress declared, which is required before network behavior can be verified."
+      ],
+      "user_note": "This plugin can remain listed in community, but it should not be marked verified until public source and egress declarations are provided."
+    }
+  ],
+  "dropped": []
+}
