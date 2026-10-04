@@ -1,6 +1,6 @@
 # Data protection (GDPR)
 
-Reviewed by ITService EOOD's counsel, September 2026. This note describes how Lunos works, so that
+Reviewed by Ivan Antonov, ITService EOOD's in-house counsel, on 2026-09-26. This note describes how Lunos works, so that
 the organisation deploying it can do its own assessment. It is not legal advice for your deployment.
 
 ## Roles
