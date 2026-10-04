@@ -18,6 +18,8 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+## [1.18.43] - 2026-10-04
+
 ### Added
 
 - **`/restart`** stops Lunos and starts it again, back in the same session with your unsent prompt
@@ -437,7 +439,10 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.39...dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.43...dev
+[1.18.43]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.43
+[1.18.41]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.41
+[1.18.40]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.40
 [1.18.39]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.39
 [1.18.38]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.38
 [1.18.37]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.37
