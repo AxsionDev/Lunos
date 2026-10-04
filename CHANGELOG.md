@@ -51,8 +51,72 @@ reasoning behind a change are published separately as **Lunos Notes**.
   source as provenance. New audit events `memory.source_query` and `memory.source_denied`
   (XCOD-135).
 
+- **Sandboxed runs** (XCOD-144, XCOD-157, XCOD-158). `lunos run --sandbox` and `lunos --sandbox` run
+  the Lunos server, and everything it starts, in a container; only the client stays on your
+  machine. Docker or Podman (`sandbox.runtime`). The repository plus your uncommitted changes is
+  copied into a volume; your working tree is never mounted. The container runs as a non-root user
+  with every capability dropped, a read-only root filesystem, no host mounts and no Docker socket.
+  - **Results** (`sandbox.results`): a branch `lunos/sandbox/<id>` (default), a patch in
+    `.opencode/sandbox/<id>/changes.patch`, or none; the transcript and summary always come back.
+    `sandbox.on_finish` destroys or keeps the container, only after the hand-back succeeded.
+  - **Your global and organisation config apply inside the sandbox**, and provider keys reach it at
+    run time through a private tmpfs, never in the image or the container's environment.
+  - **`sandbox.required`** (organisation policy) refuses tools that would run outside a sandbox,
+    and **`sandbox.network`** limits what the sandbox can reach: `policy` (default) allows only the
+    model endpoints your residency policy permits, remote MCP servers, the npm registry and
+    `sandbox.allow`, through an egress proxy outside the container; `none` allows nothing; `open`
+    allows everything.
+  - **`sandbox.workspace: "mount"`** works on your tree directly, with reduced isolation and a
+    warning; `.git` and Lunos's config stay read-only. **`sandbox.mounts`** adds read-only
+    directories.
+  - **The project's devcontainer** supplies the toolchain when its `image` is set; building its
+    Dockerfile needs `"sandbox": { "devcontainer": "build" }` in your global or managed config.
+  - **`/sandbox`** and **`/sandbox end`** move a TUI session into a sandbox and back (behind
+    `OPENCODE_EXPERIMENTAL_WORKSPACES`). The session header shows the sandbox and its image digest,
+    `/settings` lists every `sandbox.*` key, and the Status tab lists the project's sandboxes.
+  - A repository's own config can't choose the settings that weaken isolation (`allow`, `mounts`,
+    `workspace: "mount"`, `devcontainer: "build"`, `network: "open"`).
+- **Memory lifecycle** (XCOD-136): a fact can be marked outdated (`lunos memory outdate`, `ctrl+u` in
+  the memory browser, or `memory_remember` with `replaces`); it stays in the ledger but is no longer
+  recalled, and `search --history` still finds it. A contradicting fact asks whether to replace or
+  keep both. Facts can expire (`memory.retention.days`, or `expires` per fact), the ledger is
+  integrity-checked, can be encrypted at rest, and every memory operation is in the audit log.
+- **Memory in an external Neo4j database** (XCOD-134), so a team shares one ledger: one node per
+  fact with its provenance and a checksum, full-text recall, and project and user scopes kept apart.
+  `memory.backend.jurisdiction` is checked against your residency policy before Lunos connects, and
+  `lunos memory migrate` moves embedded memory across.
+- **Third-party licence notices** (XCOD-177). Every npm package, release archive and offline bundle
+  carries `LICENSE` and `THIRD_PARTY_NOTICES`, generated at build time from what ships, including
+  the Bun runtime's licence. `lunos licenses [--output <file>]` prints them, offline. The desktop
+  app has **Help → Third-Party Licences**, and the VS Code extension includes both files. The build
+  fails on a copyleft or undeclared licence that isn't on a reviewed allowlist.
+- **Lunos JSON Schemas** (XCOD-174). `https://lunos.tech/config.json`, `tui.json`, `theme.json` and
+  `desktop-theme.json`, generated from the source and covering Lunos's own keys (`sandbox`,
+  `residency`, `memory`, `audit`, `hooks`). The `$schema` Lunos writes now points there.
+- **The GitHub agent works with your own token** (XCOD-174). `lunos github install` writes
+  `.github/workflows/lunos.yml`, which runs `AxsionDev/Lunos/github` with the repository's
+  `GITHUB_TOKEN` (or a fine-grained personal access token); there is no GitHub App to install and
+  no token-exchange service. Triggered by `/lunos` or `/oc`. Setup and permissions:
+  [docs.lunos.tech/docs/github](https://docs.lunos.tech/docs/github/).
+- **Unknown tools name the nearest real ones** (XCOD-167): when a model calls a tool that doesn't
+  exist, the error lists the closest names. `"permission": { "<server>_*": "deny" }` keeps an MCP
+  server's tools out of a project or agent entirely (`docs/mcp-tools.md`).
+- **Accessibility checks for the desktop and web app** (XCOD-141): automated axe-core checks in CI
+  on 9 screens in light and dark, with the serious and critical findings fixed; the TUI shows status
+  with glyphs as well as colour.
+
 ### Security
 
+- **No request to upstream opencode's services on any default path** (XCOD-174). There is no
+  OpenCode Console sign-in (`lunos account login` needs a URL you run) and no shared free-tier key
+  for the `opencode` provider. The model catalogue comes from models.dev. A build without the
+  embedded web UI says so instead of loading upstream's hosted one, and the local server no longer
+  trusts upstream's web origins. Docs links, the system prompts and request headers point at
+  Lunos. A CI test fails on a new upstream address, and the offline-egress check proves a normal run
+  and a `lunos github` run make no connection to it.
+- **Secrets with quotes load correctly, and a config parse error never prints them** (XCOD-151).
+  An `{env:}` or `{file:}` value containing `"`, `\` or a newline made the config invalid, and the
+  error printed the whole substituted config, secret included.
 - **Memory now refuses instruction-shaped text** ("ignore all previous instructions", chat role
   markers, tool-call syntax), for the agent's `memory_remember` as well as imports (XCOD-133).
 
@@ -98,6 +162,18 @@ false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `auto
 
 ### Fixed
 
+- Loading config no longer writes `$schema` into the project's `opencode.json`, a tracked file
+  (XCOD-165).
+- The built-in configuration skill is `customize-lunos` and points at `lunos settings`, not at
+  upstream's schema or commands (XCOD-168).
+- An unknown model says `Model not found: …` with suggestions, not `Unexpected server error`
+  (XCOD-166).
+- `/tasks` no longer cuts a background job's model off; it moved to the row's footer (XCOD-161).
+- `lunos stats` totals no longer round to `$0.00` beside non-zero model costs (XCOD-169).
+- `lunos run --format json` writes at most one error record (XCOD-148).
+- Windows: a path with no drive letter resolves against the project, not the process's drive, and
+  permission rules written with 8.3 short names (`C:\PROGRA~1\…`) match long-form paths
+  (XCOD-137, XCOD-149).
 - A legacy keybind name in `tui.json` (such as `agent_list`, renamed in XCOD-40) was silently
   dropped when the config loaded, instead of resolving to its new name (XCOD-130).
 
