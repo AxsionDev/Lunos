@@ -47,5 +47,6 @@ describe("marketplace judgement (XCOD-198)", () => {
   test("the provider's key variable comes from the model id", () => {
     expect(keyEnv("mistral/mistral-small-latest")).toBe("MISTRAL_API_KEY")
     expect(keyEnv("scaleway/qwen")).toBe("SCALEWAY_API_KEY")
+    expect(keyEnv("openai/gpt-5.3-codex")).toBe("OPENAI_API_KEY")
   })
 })

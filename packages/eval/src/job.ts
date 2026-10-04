@@ -13,7 +13,9 @@ export function lunosConfig(model: ModelConfig, proxyURL: string, auditPath: str
     enabled_providers: [provider],
     provider: {
       [provider]: {
-        npm: "@ai-sdk/openai-compatible",
+        // OpenAI's own SDK for OpenAI models: Codex is served only through the Responses API, which
+        // the generic OpenAI-compatible client doesn't call (XCOD-200).
+        npm: provider === "openai" ? "@ai-sdk/openai" : "@ai-sdk/openai-compatible",
         options: { baseURL: `${proxyURL}/${model.id}/v1`, apiKey: "via-lunos-eval-proxy" },
         models: { [id]: { name: id, tool_call: true } },
       },

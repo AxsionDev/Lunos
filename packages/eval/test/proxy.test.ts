@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { Ledger } from "../src/budget"
 import type { ApiPrice } from "../src/prices"
-import { startProxy, usageFromSse } from "../src/proxy"
+import { startProxy, usageFromSse, usageOf } from "../src/proxy"
 
 const price: ApiPrice = {
   kind: "api",
@@ -136,5 +136,21 @@ describe("metering proxy", () => {
       output: 2,
       cacheRead: 0,
     })
+  })
+
+  test("reads Responses API usage (Codex), in a body and in a stream's response.completed event", () => {
+    expect(
+      usageOf({ usage: { input_tokens: 120, output_tokens: 30, input_tokens_details: { cached_tokens: 20 } } }),
+    ).toEqual({
+      input: 120,
+      output: 30,
+      cacheRead: 20,
+    })
+    const sse = [
+      'data: {"type":"response.output_text.delta","delta":"ok"}',
+      'data: {"type":"response.completed","response":{"usage":{"input_tokens":200,"output_tokens":50}}}',
+      "",
+    ].join("\n")
+    expect(usageFromSse(sse)).toEqual({ input: 200, output: 50, cacheRead: 0 })
   })
 })
