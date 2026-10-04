@@ -80,3 +80,81 @@ describe("report", () => {
     expect(md).not.toMatch(/openai\/y`[^\n]*100\.0%/)
   })
 })
+
+describe("pipeline check", () => {
+  test("an oracle run names no model result and lists the tasks that failed", () => {
+    const report = build({
+      config: { ...config, models: [config.models[1]] },
+      taskCount: 2,
+      results: [result("openai/y", 1, "a", true), result("openai/y", 1, "b", false)],
+      ledger: [],
+      agent: "oracle",
+    })
+    expect(report.failed).toEqual(["b"])
+    const md = markdown(report)
+    expect(md).toContain("pipeline check")
+    expect(md).toContain("**Not a model result.**")
+    expect(md).toContain("**1 of 2 task runs passed.**")
+    expect(md).toContain("- `b`")
+    expect(md).not.toContain("openai/y")
+    expect(md).not.toContain("All model runs completed")
+  })
+
+  test("a model run lists no failed tasks", () => {
+    const report = build({ config, taskCount: 1, results: [result("mistral/x", 1, "a", false)], ledger: [] })
+    expect(report.failed).toEqual([])
+  })
+})
+
+describe("patched tasks", () => {
+  test("are disclosed in a model report and a pipeline check", () => {
+    const input = {
+      config,
+      taskCount: 1,
+      results: [result("mistral/x", 1, "a", true)],
+      ledger: [],
+      patched: ["polyglot_java_b"],
+    }
+    expect(markdown(build(input))).toContain("**Changed from the upstream tasks:** in 1 task image (`polyglot_java_b`)")
+    expect(markdown(build({ ...input, agent: "oracle" }))).toContain("`polyglot_java_b`")
+  })
+
+  test("nothing is said when no task was patched", () => {
+    expect(markdown(build({ config, taskCount: 1, results: [], ledger: [] }))).not.toContain(
+      "Changed from the upstream",
+    )
+  })
+})
+
+describe("tasks that never got a fair attempt", () => {
+  test("a rate-limited or never-started task makes the model INCOMPLETE, with no pass rate", () => {
+    const report = build({
+      config,
+      taskCount: 2,
+      results: [
+        result("mistral/x", 1, "a", true),
+        { ...result("mistral/x", 1, "b", false), error: "ApiRateLimitError" },
+        result("mistral/x", 2, "a", true),
+        { ...result("mistral/x", 2, "b", false), error: "AgentSetupTimeoutError" },
+      ],
+      ledger: [],
+    })
+    const eu = report.models[0]
+    expect(eu.status).toBe("incomplete")
+    expect(eu.reason).toBe("2 task runs did not run (AgentSetupTimeoutError, ApiRateLimitError)")
+    expect(eu.passRate).toBeUndefined()
+  })
+
+  test("a task the agent ran and failed still counts as a failure", () => {
+    const report = build({
+      config,
+      taskCount: 1,
+      results: [
+        { ...result("mistral/x", 1, "a", false), error: "NonZeroAgentExitCodeError" },
+        result("mistral/x", 2, "a", true),
+      ],
+      ledger: [],
+    })
+    expect(report.models[0].status).toBe("complete")
+  })
+})

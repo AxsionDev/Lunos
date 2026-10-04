@@ -39,7 +39,24 @@ tasks on EU, self-hosted and frontier models, and what that costs. Results are p
 
 Needs Docker and [uv](https://docs.astral.sh/uv/) (Harbor runs with `uvx --from harbor`).
 `--agent oracle` runs the whole pipeline with Harbor's reference-solution agent instead of Lunos,
-at no cost; `--report <file>` writes the report somewhere other than `specs/eval/`.
+at no cost; `--report <file>` writes the report somewhere other than `specs/eval/`. Its report is
+titled "pipeline check" and lists the tasks that failed: a task that fails under the oracle is
+broken and must be left out of the paid run.
+
+Registry datasets (Aider Polyglot) are exported to `runs/datasets/` and built from there
+(`src/stage.ts`), for two reasons:
+
+- Exported task files are all dated 1970 and most oracle payloads are the same size, so BuildKit
+  reused one task's solution file in other tasks' images (`--no-cache` doesn't help). Each task's
+  files get their own date.
+- The Java tasks hard-code the amd64 `JAVA_HOME`. It's pointed at the host's JDK, and the report
+  says which tasks were changed.
+
+The Lunos agent doesn't install anything in the task container. `src/agent-bin.ts` downloads the
+release's `lunos-linux-<arch>.tar.gz` once (checked against the release's SHA256SUMS) and the
+ripgrep build pinned for the offline bundles, and `harbor/lunos_agent.py` copies both in. Installing
+with apt and `npm i -g lunos-ai` failed on the Ubuntu 22.04 task images (Node 12) and used most of
+Harbor's 360 s agent-setup limit.
 
 ## Lunos task set
 
@@ -52,6 +69,10 @@ uvx --from harbor harbor run -p packages/eval/tasks -a oracle
 ```
 
 ## Verified end to end (2026-09-27, no spend)
+
+- 2026-10-03: oracle on the 3 Lunos tasks + the 30-task Aider Polyglot slice, 33/33. Each trial's
+  oracle log shows it applied its own exercise's solution (before the fix, 8 of 30 Polyglot tasks
+  passed, some with another task's solution).
 
 - Oracle agent through the CLI's own job files: 3/3 tasks in each of 2 trials, report complete.
 - Lunos 1.18.40 in Harbor's containers, through the proxy, to a priced mock model: 6 requests
