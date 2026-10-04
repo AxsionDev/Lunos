@@ -84,14 +84,30 @@ export function guard(judgement: Judgement, report: Report): Judgement {
   return judgement
 }
 
-/** Runs Lunos once, non-interactively, with no tools that reach the network. */
 /**
- * Runs Lunos once, non-interactively, in a fresh data directory (so a provider login saved on the
- * machine doesn't replace the key) with the model declared, since offline mode only knows the
- * built-in catalogue.
+ * The SDK and API address for each provider the judge can use. Offline mode doesn't download the
+ * model catalogue, so on a fresh machine (CI) the provider is unknown unless declared in full.
+ */
+export const PROVIDERS: Record<string, { npm: string; api: string }> = {
+  openai: { npm: "@ai-sdk/openai", api: "https://api.openai.com/v1" },
+  mistral: { npm: "@ai-sdk/mistral", api: "https://api.mistral.ai/v1" },
+}
+
+/** The Lunos config that declares `model` without the downloaded catalogue. */
+export function judgeConfig(model: string) {
+  const [provider, id] = model.split("/", 2)
+  const known = PROVIDERS[provider]
+  if (!known)
+    throw new Error(`marketplace-judge: no SDK and API address for provider "${provider}"; add it to PROVIDERS`)
+  return { provider: { [provider]: { ...known, models: { [id]: { name: id, tool_call: true } } } } }
+}
+
+/**
+ * Runs Lunos once, non-interactively, with no tools that reach the network, in a fresh data and
+ * cache directory: a provider login saved on the machine doesn't replace the key, and a cached
+ * catalogue doesn't hide a declaration that CI would need.
  */
 async function ask(model: string, text: string) {
-  const [provider, id] = model.split("/", 2)
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-judge-"))
   const result =
     await $`bun run ${path.join(root, "packages/opencode/src/index.ts")} run --model ${model} ${text} </dev/null`
@@ -100,9 +116,8 @@ async function ask(model: string, text: string) {
         LUNOS_OFFLINE: "1",
         XDG_DATA_HOME: path.join(home, "data"),
         XDG_STATE_HOME: path.join(home, "state"),
-        OPENCODE_CONFIG_CONTENT: JSON.stringify({
-          provider: { [provider]: { models: { [id]: { name: id, tool_call: true } } } },
-        }),
+        XDG_CACHE_HOME: path.join(home, "cache"),
+        OPENCODE_CONFIG_CONTENT: JSON.stringify(judgeConfig(model)),
       })
       .cwd(root)
       .quiet()

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Report } from "../../../../script/marketplace-check"
-import { guard, keyEnv, parse, prompt } from "../../../../script/marketplace-judge"
+import { guard, judgeConfig, keyEnv, parse, prompt } from "../../../../script/marketplace-judge"
 
 // XCOD-198 AC6: the model's answer is only accepted in a fixed shape, and never overrides the facts.
 const report: Report = {
@@ -48,5 +48,18 @@ describe("marketplace judgement (XCOD-198)", () => {
     expect(keyEnv("mistral/mistral-small-latest")).toBe("MISTRAL_API_KEY")
     expect(keyEnv("scaleway/qwen")).toBe("SCALEWAY_API_KEY")
     expect(keyEnv("openai/gpt-5.3-codex")).toBe("OPENAI_API_KEY")
+  })
+
+  test("declares the provider in full, so it works without a downloaded catalogue (CI)", () => {
+    expect(judgeConfig("openai/gpt-5.3-codex")).toEqual({
+      provider: {
+        openai: {
+          npm: "@ai-sdk/openai",
+          api: "https://api.openai.com/v1",
+          models: { "gpt-5.3-codex": { name: "gpt-5.3-codex", tool_call: true } },
+        },
+      },
+    })
+    expect(() => judgeConfig("unknown/x")).toThrow("add it to PROVIDERS")
   })
 })

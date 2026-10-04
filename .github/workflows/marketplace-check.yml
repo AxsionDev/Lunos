@@ -64,7 +64,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           date=$(date -u +%F)
-          branch="marketplace-check/$date"
+          # The run ID keeps a second run on the same day (e.g. workflow_dispatch) off an existing branch.
+          branch="marketplace-check/$date-$GITHUB_RUN_ID"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
