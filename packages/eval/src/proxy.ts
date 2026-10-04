@@ -20,12 +20,23 @@ export type Route = {
   price: ApiPrice
 }
 
-/** OpenAI-style usage from a JSON body or the last usage-bearing SSE chunk. */
+/**
+ * OpenAI-style usage from a JSON body or an SSE chunk: Chat Completions (`usage.prompt_tokens`) or
+ * the Responses API (`usage.input_tokens`, top level or in a `response.completed` event's
+ * `response`). XCOD-200: OpenAI's Codex models are served only through the Responses API.
+ */
 export function usageOf(value: unknown): Usage | undefined {
-  const usage = (value as { usage?: Record<string, unknown> } | null)?.usage
-  if (!usage || typeof usage.prompt_tokens !== "number" || typeof usage.completion_tokens !== "number") return
-  const details = usage.prompt_tokens_details as { cached_tokens?: number } | undefined
-  return { input: usage.prompt_tokens, output: usage.completion_tokens, cacheRead: details?.cached_tokens ?? 0 }
+  const body = value as { usage?: Record<string, unknown>; response?: { usage?: Record<string, unknown> } } | null
+  const usage = body?.usage ?? body?.response?.usage
+  if (!usage) return
+  if (typeof usage.prompt_tokens === "number" && typeof usage.completion_tokens === "number") {
+    const details = usage.prompt_tokens_details as { cached_tokens?: number } | undefined
+    return { input: usage.prompt_tokens, output: usage.completion_tokens, cacheRead: details?.cached_tokens ?? 0 }
+  }
+  if (typeof usage.input_tokens === "number" && typeof usage.output_tokens === "number") {
+    const details = usage.input_tokens_details as { cached_tokens?: number } | undefined
+    return { input: usage.input_tokens, output: usage.output_tokens, cacheRead: details?.cached_tokens ?? 0 }
+  }
 }
 
 export function usageFromSse(text: string): Usage | undefined {
@@ -79,10 +90,12 @@ export function startProxy(input: {
 
       const body = (await request.json().catch(() => undefined)) as Record<string, unknown> | undefined
       if (!body) return new Response("eval proxy: request body must be JSON", { status: 400 })
-      // Metering needs the usage chunk at the end of a stream.
-      if (body.stream) body.stream_options = { ...(body.stream_options as object), include_usage: true }
+      // Metering needs the usage chunk at the end of a stream. The Responses API always ends a stream
+      // with a response.completed event that carries usage, and rejects stream_options.
+      const responses = /\/responses\/?$/.test(url.pathname)
+      if (body.stream && !responses) body.stream_options = { ...(body.stream_options as object), include_usage: true }
       const text = JSON.stringify(body)
-      const maxTokens = Number(body.max_completion_tokens ?? body.max_tokens) || undefined
+      const maxTokens = Number(body.max_completion_tokens ?? body.max_tokens ?? body.max_output_tokens) || undefined
       const needed = worstCase(route.price, Buffer.byteLength(text), maxTokens)
 
       let settle: ReturnType<Ledger["reserve"]>

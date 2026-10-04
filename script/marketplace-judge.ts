@@ -2,15 +2,18 @@
 
 // XCOD-198 AC6: the marketplace maintainer agent's judgement step. For each entry the fact check
 // (script/marketplace-check.ts) didn't simply keep, Lunos itself reads the facts and recommends what
-// to do, on a configurable model (default: Mistral, an EU provider). The model never supplies a
+// to do, on a configurable model (default: OpenAI's gpt-5.3-codex, a US provider; Petar,
+// 2026-10-04). The model never supplies a
 // fact: it only sees the check's findings, and its answer must match a fixed shape or it's dropped.
 // Nothing here edits marketplace.json or marks an entry verified; a named person decides.
 //
-//   bun script/marketplace-judge.ts [--report marketplace-reviews/<date>.json] [--model mistral/mistral-small-latest]
+//   bun script/marketplace-judge.ts [--report marketplace-reviews/<date>.json] [--model openai/gpt-5.3-codex]
 //
-// Needs the model provider's key (e.g. MISTRAL_API_KEY). Without it, it says so and exits 0, so
+// Needs the model provider's key (e.g. OPENAI_API_KEY). Without it, it says so and exits 0, so
 // pull requests from forks, which get no secrets, still pass.
 
+import fs from "fs/promises"
+import os from "os"
 import path from "path"
 import { $ } from "bun"
 import type { Report } from "./marketplace-check"
@@ -82,13 +85,29 @@ export function guard(judgement: Judgement, report: Report): Judgement {
 }
 
 /** Runs Lunos once, non-interactively, with no tools that reach the network. */
+/**
+ * Runs Lunos once, non-interactively, in a fresh data directory (so a provider login saved on the
+ * machine doesn't replace the key) with the model declared, since offline mode only knows the
+ * built-in catalogue.
+ */
 async function ask(model: string, text: string) {
+  const [provider, id] = model.split("/", 2)
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-judge-"))
   const result =
     await $`bun run ${path.join(root, "packages/opencode/src/index.ts")} run --model ${model} ${text} </dev/null`
-      .env({ ...process.env, LUNOS_OFFLINE: "1" })
+      .env({
+        ...process.env,
+        LUNOS_OFFLINE: "1",
+        XDG_DATA_HOME: path.join(home, "data"),
+        XDG_STATE_HOME: path.join(home, "state"),
+        OPENCODE_CONFIG_CONTENT: JSON.stringify({
+          provider: { [provider]: { models: { [id]: { name: id, tool_call: true } } } },
+        }),
+      })
       .cwd(root)
       .quiet()
       .nothrow()
+  await fs.rm(home, { recursive: true, force: true })
   // Colour codes stripped, so the error line can be read.
   const output = (result.stdout.toString() + result.stderr.toString()).replace(/\x1b\[[0-9;]*m/g, "")
   // Lunos prints a failed model call as "Error: …" (e.g. "Error: Rate limit exceeded").
@@ -123,7 +142,7 @@ export function markdown(
 if (import.meta.main) {
   const args = process.argv.slice(2)
   const option = (name: string, fallback: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback)
-  const model = option("--model", "mistral/mistral-small-latest")
+  const model = option("--model", "openai/gpt-5.3-codex")
   if (!process.env[keyEnv(model)]) {
     console.log(`marketplace-judge: ${keyEnv(model)} is not set; skipping the judgement step (facts only).`)
     process.exit(0)

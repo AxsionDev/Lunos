@@ -6,7 +6,7 @@ name: marketplace-check
 #
 # - On a pull request that changes marketplace.json: the report goes to the job summary and as an
 #   artifact. Pull requests from forks get no secrets: the fact check needs none, and the judgement
-#   step (script/marketplace-judge.ts, MISTRAL_API_KEY) is skipped.
+#   step (script/marketplace-judge.ts, OPENAI_API_KEY) is skipped.
 # - Weekly: the report is committed on a branch and opened as a pull request for review.
 
 on:
@@ -40,11 +40,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bun script/marketplace-check.ts --out marketplace-reviews > report.md
 
-      # AC6: Lunos on an EU model recommends what to do with each flagged entry, from the facts only.
+      # AC6: Lunos on OpenAI's gpt-5.3-codex (US provider; Petar, 2026-10-04) recommends what to do
+      # with each flagged entry, from the facts only.
       # Skipped when the key isn't available (pull requests from forks get no secrets).
       - name: Judge the flagged entries
         env:
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: bun script/marketplace-judge.ts >> report.md
 
       - name: Report

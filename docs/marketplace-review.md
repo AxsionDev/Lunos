@@ -72,7 +72,7 @@ writes the report to `marketplace-reviews/<date>.md` and `.json`. Weekly reports
 request.
 
 **Judgement.** For each entry the fact check didn't simply keep, `script/marketplace-judge.ts` asks
-Lunos, on an EU model (Mistral by default), to recommend keep, keep with a warning, delist or
+Lunos, on OpenAI's `gpt-5.3-codex` (a US provider; the model is configurable), to recommend keep, keep with a warning, delist or
 propose verified, from the check's findings only. An answer that isn't in the expected shape is
 dropped, and "propose verified" is withdrawn while any finding is open. The recommendation goes in
 `marketplace-reviews/<date>.judgement.md`; it is advice to the approver, never a fact or a decision.
