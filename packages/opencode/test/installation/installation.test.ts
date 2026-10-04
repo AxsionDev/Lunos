@@ -1,4 +1,4 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { makeGlobalNode } from "@opencode-ai/core/effect/app-node"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
@@ -182,5 +182,61 @@ describe("installation", () => {
         expect(error.stderr).not.toContain("command output")
       }),
     )
+
+    // A user saw only "Upgrade failed for npm (exit code 14)" (v1.18.43) and had nothing to act on.
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        (cmd) => {
+          if (cmd === "npm")
+            return {
+              code: 14,
+              stderr: [
+                "npm error code EBUSY",
+                "npm error syscall rename",
+                "npm error path C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\lunos-ai",
+                "npm error //registry.example.com/:_authToken=secret",
+                "npm error A complete log of this run can be found in: C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-04T12_06_15_180Z-debug-0.log",
+              ].join("\n"),
+            }
+          return ""
+        },
+      ),
+    ).effect("names npm's error code and debug log, and nothing else from its output", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(Installation.use.upgrade("npm", "9.9.9"))
+        expect(error.stderr).toBe(
+          "Upgrade failed for npm (exit code 14, npm error EBUSY).\n" +
+            "npm's log: C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-04T12_06_15_180Z-debug-0.log",
+        )
+        expect(error.stderr).not.toContain("secret")
+        expect(error.stderr).not.toContain("syscall")
+      }),
+    )
+  })
+
+  describe("failureDetail", () => {
+    test("reads npm 10 (ERR!) and npm 12 (error) output", () => {
+      expect(Installation.failureDetail("npm ERR! code EACCES\n").code).toBe("EACCES")
+      expect(Installation.failureDetail("npm error code E403").code).toBe("E403")
+    })
+
+    test("reads pnpm's error codes", () => {
+      expect(Installation.failureDetail(" ERR_PNPM_EACCES  permission denied").code).toBe("ERR_PNPM_EACCES")
+    })
+
+    test("never takes free text as a code", () => {
+      expect(Installation.failureDetail("npm error code token=abc123").code).toBeUndefined()
+      expect(Installation.failureDetail("something went wrong").code).toBeUndefined()
+    })
+
+    test("takes the log path only from npm's own log line", () => {
+      expect(
+        Installation.failureDetail(
+          "npm error A complete log of this run can be found in: /home/u/.npm/_logs/x-debug-0.log",
+        ).log,
+      ).toBe("/home/u/.npm/_logs/x-debug-0.log")
+      expect(Installation.failureDetail("see /tmp/secret.log").log).toBeUndefined()
+    })
   })
 })

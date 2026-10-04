@@ -77,6 +77,18 @@ export class UpgradeFailedError extends Schema.TaggedErrorClass<UpgradeFailedErr
   }
 }
 
+/**
+ * What a failed upgrade can say without echoing the package manager's output, which may carry
+ * registry tokens: its error code (`EBUSY`, `EACCES`, `ERR_PNPM_…`; capitals, digits and `_`
+ * only) and the path of npm's debug log, which holds the full story on the user's own machine.
+ */
+export function failureDetail(output: string) {
+  const code =
+    output.match(/^npm (?:error|ERR!) code ([A-Z0-9_]+)\s*$/m)?.[1] ?? output.match(/\b(ERR_PNPM_[A-Z0-9_]+)\b/)?.[1]
+  const log = output.match(/^npm (?:error|ERR!) A complete log of this run can be found in: (\S+\.log)\s*$/m)?.[1]
+  return { code, log }
+}
+
 const NpmPackage = Schema.Struct({ version: Schema.String })
 
 export interface Interface {
@@ -130,8 +142,11 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
     )
 
     const upgradeFailure = (method: Method, result?: { code: number; stdout: string; stderr: string }) => {
-      if (result) return `Upgrade failed for ${method} (exit code ${result.code}).`
-      return `Upgrade failed for ${method}.`
+      if (!result) return `Upgrade failed for ${method}.`
+      const detail = failureDetail(result.stdout + "\n" + result.stderr)
+      const code = detail.code ? `, ${method} error ${detail.code}` : ""
+      const log = detail.log ? `\n${method}'s log: ${detail.log}` : ""
+      return `Upgrade failed for ${method} (exit code ${result.code}${code}).${log}`
     }
 
     const result: Interface = {
