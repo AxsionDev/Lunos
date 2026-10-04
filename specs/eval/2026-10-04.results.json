@@ -1,0 +1,361 @@
+{
+  "report": {
+    "date": "2026-10-04",
+    "lunosVersion": "1.18.42",
+    "seed": 20260927,
+    "usdToEur": {
+      "rate": 0.8909,
+      "date": "2026-10-02"
+    },
+    "budget": {
+      "name": "rerun-2026-10-codex",
+      "total": 25,
+      "classes": {
+        "us-api": 25
+      }
+    },
+    "totalSpend": 1.7943615978,
+    "complete": true,
+    "patched": [
+      "polyglot_java_book-store",
+      "polyglot_java_dominoes",
+      "polyglot_java_mazy-mice",
+      "polyglot_java_rational-numbers",
+      "polyglot_java_variable-length-quantity"
+    ],
+    "failed": [],
+    "models": [
+      {
+        "model": "openai/gpt-5.3-codex",
+        "cls": "us-api",
+        "residency": [
+          "us"
+        ],
+        "status": "complete",
+        "trials": [
+          {
+            "trial": 1,
+            "passed": 21,
+            "total": 33,
+            "rate": 0.6363636363636364
+          }
+        ],
+        "spend": 1.7943615978,
+        "upstreamHosts": [
+          "api.openai.com"
+        ],
+        "refusedRequests": 0,
+        "passRate": {
+          "mean": 0.6363636363636364,
+          "min": 0.6363636363636364,
+          "max": 0.6363636363636364
+        },
+        "costPerRun": 1.7943615978,
+        "costPerSolved": 0.08544579037142858,
+        "medianSeconds": 33.036,
+        "toolErrorRate": 0.05263157894736842
+      }
+    ]
+  },
+  "results": [
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "lunos/xcod-118-lag-wording",
+      "passed": true,
+      "seconds": 10.665,
+      "toolCalls": 3,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_python_affine-cipher",
+      "passed": true,
+      "seconds": 13.313,
+      "toolCalls": 3,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_java_mazy-mice",
+      "passed": true,
+      "seconds": 381.815,
+      "toolCalls": 8,
+      "toolErrors": 1
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_javascript_meetup",
+      "passed": true,
+      "seconds": 17.334,
+      "toolCalls": 5,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_python_zipper",
+      "passed": true,
+      "seconds": 23.932,
+      "toolCalls": 7,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_cpp_binary-search-tree",
+      "passed": false,
+      "seconds": 36.064,
+      "toolCalls": 10,
+      "toolErrors": 0,
+      "error": "RewardFileNotFoundError"
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_cpp_crypto-square",
+      "passed": true,
+      "seconds": 29.672,
+      "toolCalls": 8,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_go_bowling",
+      "passed": true,
+      "seconds": 35.824,
+      "toolCalls": 4,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_rust_xorcism",
+      "passed": true,
+      "seconds": 64.801,
+      "toolCalls": 19,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "lunos/xcod-111-npm12-upgrade-hint",
+      "passed": false,
+      "seconds": 10.23,
+      "toolCalls": 2,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_python_zebra-puzzle",
+      "passed": true,
+      "seconds": 32.51,
+      "toolCalls": 10,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_go_react",
+      "passed": false,
+      "seconds": 37.637,
+      "toolCalls": 4,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_cpp_meetup",
+      "passed": false,
+      "seconds": 60.404,
+      "toolCalls": 14,
+      "toolErrors": 0,
+      "error": "RewardFileNotFoundError"
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_java_dominoes",
+      "passed": false,
+      "seconds": 364.434,
+      "toolCalls": 13,
+      "toolErrors": 3
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_go_pov",
+      "passed": true,
+      "seconds": 42.421,
+      "toolCalls": 4,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_rust_alphametics",
+      "passed": false,
+      "seconds": 34.297,
+      "toolCalls": 8,
+      "toolErrors": 2
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_java_book-store",
+      "passed": true,
+      "seconds": 385.927,
+      "toolCalls": 8,
+      "toolErrors": 1
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_rust_wordy",
+      "passed": true,
+      "seconds": 45.279,
+      "toolCalls": 11,
+      "toolErrors": 2
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_javascript_phone-number",
+      "passed": true,
+      "seconds": 16.751,
+      "toolCalls": 4,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_javascript_ledger",
+      "passed": true,
+      "seconds": 32.054,
+      "toolCalls": 6,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_java_variable-length-quantity",
+      "passed": false,
+      "seconds": 406.15,
+      "toolCalls": 12,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_java_rational-numbers",
+      "passed": false,
+      "seconds": 413.903,
+      "toolCalls": 13,
+      "toolErrors": 1
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_python_forth",
+      "passed": false,
+      "seconds": 33.036,
+      "toolCalls": 5,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_python_grep",
+      "passed": false,
+      "seconds": 18.585,
+      "toolCalls": 4,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_javascript_affine-cipher",
+      "passed": true,
+      "seconds": 17.96,
+      "toolCalls": 4,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_go_counter",
+      "passed": false,
+      "seconds": 38.473,
+      "toolCalls": 5,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_cpp_gigasecond",
+      "passed": true,
+      "seconds": 23.571,
+      "toolCalls": 10,
+      "toolErrors": 1
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_rust_dot-dsl",
+      "passed": false,
+      "seconds": 33.442,
+      "toolCalls": 9,
+      "toolErrors": 1
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_rust_forth",
+      "passed": true,
+      "seconds": 66.991,
+      "toolCalls": 12,
+      "toolErrors": 1
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_cpp_bank-account",
+      "passed": true,
+      "seconds": 20.931,
+      "toolCalls": 5,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_javascript_connect",
+      "passed": true,
+      "seconds": 23.91,
+      "toolCalls": 8,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "lunos/xcod-77-piped-output",
+      "passed": true,
+      "seconds": 14.601,
+      "toolCalls": 5,
+      "toolErrors": 0
+    },
+    {
+      "model": "openai/gpt-5.3-codex",
+      "trial": 1,
+      "task": "aider/polyglot_go_transpose",
+      "passed": true,
+      "seconds": 27.384,
+      "toolCalls": 4,
+      "toolErrors": 0
+    }
+  ]
+}

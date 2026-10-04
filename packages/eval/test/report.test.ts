@@ -145,7 +145,7 @@ describe("tasks that never got a fair attempt", () => {
     expect(eu.passRate).toBeUndefined()
   })
 
-  test("a task the agent ran and failed still counts as a failure", () => {
+  test("a task the agent ran and failed still counts as a failure, including code that didn't compile", () => {
     const report = build({
       config,
       taskCount: 1,
