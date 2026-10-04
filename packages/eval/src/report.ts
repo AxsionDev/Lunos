@@ -35,14 +35,15 @@ export type ModelReport = {
 
 /**
  * Harbor exceptions that mean the task never got a fair attempt: the provider refused the request,
- * or Lunos never started. Counted as "did not run", never as a model failure.
+ * or Lunos never started. Counted as "did not run", never as a model failure. Not
+ * RewardFileNotFoundError: the Polyglot C++ tests exit without a reward when the agent's code
+ * doesn't compile, which is the agent's failure (the oracle check compiles every task).
  */
 export const DID_NOT_RUN = new Set([
   "ApiRateLimitError",
   "AgentSetupTimeoutError",
   "EnvironmentStartTimeoutError",
   "DockerBuildError",
-  "RewardFileNotFoundError",
 ])
 
 function median(values: number[]) {
