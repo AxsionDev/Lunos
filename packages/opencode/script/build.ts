@@ -18,13 +18,13 @@ const generated = await import("./generate.ts")
 const shippedPackages = shipped()
 const licenceProblems = problems(shippedPackages)
 if (licenceProblems.length) throw new Error(`build: licences not allowed:\n${licenceProblems.join("\n")}`)
-const notices = render(shippedPackages, [bunNotice()])
+const notices = render(shippedPackages, [bunNotice(), lgplNotice()])
 await Bun.write("./THIRD_PARTY_NOTICES", notices)
 
 import { Script } from "@opencode-ai/script"
 import pkg from "../package.json"
 import { platformMeta } from "./package-meta"
-import { bunNotice, problems, render, shipped } from "./notices"
+import { bunNotice, lgplNotice, problems, render, shipped } from "./notices"
 
 // Published brand identity, mirroring script/publish.ts. Deliberately NOT derived from this
 // package's `name`, which stays "opencode" to avoid a duplicate workspace name (XCOD-4).
