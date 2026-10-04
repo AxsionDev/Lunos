@@ -93,6 +93,23 @@ list` shows it only if it's still listed.
 
 ## Review log
 
+### 2026-10-04: decisions on the first agent report (Petar Minev)
+
+**Removed** (archived repository: no maintainer to fix them, criterion 3):
+
+| Entry                     | Package                       | Version | Why                                                                                       |
+| ------------------------- | ----------------------------- | ------- | ----------------------------------------------------------------------------------------- |
+| opencode-skillful         | `@zenobius/opencode-skillful` | 1.2.5   | `zenobi-us/opencode-skillful` archived, last push 2026-02-13                              |
+| opencode-antigravity-auth | `opencode-antigravity-auth`   | 1.6.0   | `NoeFabris/opencode-antigravity-auth` archived, last push 2026-08-27; handles credentials |
+
+**Kept as community, with a note in the description users see:**
+
+- `opencode-dynamic-context-pruning`: "Licensed AGPL-3.0 (copyleft)."
+- `opencode-conductor`: "On install it copies an agent and slash commands into ~/.config/opencode,
+  replacing files of the same name." (Its `postinstall` at 1.32.0 makes no network calls.)
+
+Users who already installed a removed entry keep it until they uninstall it.
+
 ### 2026-10-03: first maintainer-agent report (proposed verdicts, nothing changed)
 
 Full report: [`marketplace-reviews/2026-10-03.md`](../marketplace-reviews/2026-10-03.md). 32 entries:
