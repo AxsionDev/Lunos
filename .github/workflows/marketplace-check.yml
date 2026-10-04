@@ -1,0 +1,67 @@
+name: marketplace-check
+
+# XCOD-198: the marketplace maintainer agent. Checks every marketplace.json entry against
+# docs/marketplace-review.md (script/marketplace-check.ts) and proposes verdicts. It never edits
+# marketplace.json and never marks anything verified: a named person approves changes in a PR.
+#
+# - On a pull request that changes marketplace.json: the report goes to the job summary and as an
+#   artifact. Pull requests from forks get no secrets, and the check needs none.
+# - Weekly: the report is committed on a branch and opened as a pull request for review.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths: [marketplace.json, script/marketplace-check.ts, docs/marketplace-review.md]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Check the marketplace
+        env:
+          # Read-only GitHub API calls (archived, last push, licence); avoids the anonymous rate limit.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun script/marketplace-check.ts --out marketplace-reviews > report.md
+
+      - name: Report
+        run: cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: marketplace-report
+          path: marketplace-reviews/
+
+      # The weekly report is proposed, never pushed to dev. A PR opened with GITHUB_TOKEN doesn't start
+      # other workflows; the report is documentation, so that's fine.
+      - name: Open a pull request with the weekly report
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          date=$(date -u +%F)
+          branch="marketplace-check/$date"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add marketplace-reviews/
+          git commit -m "marketplace-check: weekly report $date"
+          git push origin "$branch"
+          gh pr create --base dev --head "$branch" \
+            --title "Marketplace check: weekly report $date" \
+            --body "Report from the marketplace maintainer agent (script/marketplace-check.ts). It proposes verdicts only: change an entry in marketplace.json in a separate PR, approved by a named person (docs/marketplace-review.md)."
