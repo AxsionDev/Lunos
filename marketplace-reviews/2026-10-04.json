@@ -739,9 +739,7 @@
       "facts": {
         "url": "https://raw.githubusercontent.com/AxsionDev/Lunos/dcfe4a6013c963afd5bbbf1dd65e162ef4ae4b00/marketplace/skills/",
         "egress": {
-          "declared": [
-            "raw.githubusercontent.com"
-          ],
+          "declared": ["raw.githubusercontent.com"],
           "verified": false
         }
       },
@@ -773,11 +771,7 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": [
-          "npx",
-          "-y",
-          "@modelcontextprotocol/server-filesystem@2026.8.31"
-        ],
+        "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem@2026.8.31"],
         "pin": {
           "runner": "npx",
           "spec": "@modelcontextprotocol/server-filesystem@2026.8.31",
@@ -803,10 +797,7 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": [
-          "uvx",
-          "mcp-server-git==2026.8.18"
-        ],
+        "command": ["uvx", "mcp-server-git==2026.8.18"],
         "pin": {
           "runner": "uvx",
           "spec": "mcp-server-git==2026.8.18",
@@ -832,10 +823,7 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": [
-          "uvx",
-          "mcp-server-fetch==2026.8.18"
-        ],
+        "command": ["uvx", "mcp-server-fetch==2026.8.18"],
         "pin": {
           "runner": "uvx",
           "spec": "mcp-server-fetch==2026.8.18",
@@ -861,11 +849,7 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": [
-          "npx",
-          "-y",
-          "@playwright/mcp@0.0.82"
-        ],
+        "command": ["npx", "-y", "@playwright/mcp@0.0.82"],
         "pin": {
           "runner": "npx",
           "spec": "@playwright/mcp@0.0.82",
@@ -925,10 +909,7 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": [
-          "uvx",
-          "postgres-mcp==0.3.0"
-        ],
+        "command": ["uvx", "postgres-mcp==0.3.0"],
         "pin": {
           "runner": "uvx",
           "spec": "postgres-mcp==0.3.0",
@@ -954,11 +935,7 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": [
-          "npx",
-          "-y",
-          "mcp-searxng@2.4.0"
-        ],
+        "command": ["npx", "-y", "mcp-searxng@2.4.0"],
         "pin": {
           "runner": "npx",
           "spec": "mcp-searxng@2.4.0",
