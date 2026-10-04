@@ -1053,7 +1053,7 @@ function App(props: {
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          openUrl("https://opencode.ai/docs").catch(() => {})
+          openUrl("https://docs.lunos.tech/docs/").catch(() => {})
           dialog.clear()
         },
         category: "System",

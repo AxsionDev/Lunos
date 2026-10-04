@@ -293,7 +293,9 @@ describe("HttpApi Server.listen", () => {
       return true
     }) as typeof process.stderr.write
     try {
-      const response = await Server.Default().app.request("/status")
+      // XCOD-174: a real route. "/status" isn't one: it fell through to the web-UI fallback, which
+      // used to proxy to upstream's hosted UI over the network and now answers 503.
+      const response = await Server.Default().app.request("/global/health")
       expect(response.status).toBe(200)
     } finally {
       process.stderr.write = original

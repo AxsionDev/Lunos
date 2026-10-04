@@ -28,5 +28,10 @@ jobs:
       - name: Install strace
         run: sudo apt-get install -y -qq strace ripgrep
 
-      - name: Offline run contacts only the model endpoint
+      # XCOD-174: upstream's hostnames resolve to a sinkhole, so any request to them shows up in the
+      # trace; the online `lunos run` and `lunos github run` dry run must make none.
+      - name: Point upstream's hostnames at a sinkhole
+        run: bun script/offline-egress.ts --hosts-line | sudo tee -a /etc/hosts
+
+      - name: Offline run contacts only the model endpoint; no default run reaches upstream
         run: bun script/offline-egress.ts --online

@@ -506,8 +506,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
             "X-Source": "opencode",
           },
         },
@@ -517,8 +517,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
           },
         },
       }),
@@ -527,8 +527,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: provider.source === "config",
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
             "X-BILLING-INVOKE-ORIGIN": "OpenCode",
           },
         },
@@ -538,8 +538,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://opencode.ai/",
-            "x-title": "opencode",
+            "http-referer": "https://lunos.tech/",
+            "x-title": "Lunos",
           },
         },
       }),
@@ -643,8 +643,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
           },
         },
       }),
@@ -949,8 +949,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
           },
         },
       }),
