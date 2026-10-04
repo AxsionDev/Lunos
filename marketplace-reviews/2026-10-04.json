@@ -93,41 +93,6 @@
     },
     {
       "kind": "plugin",
-      "name": "opencode-antigravity-auth",
-      "status": "community",
-      "facts": {
-        "package": "opencode-antigravity-auth",
-        "version": "1.6.0",
-        "latest": "1.6.0",
-        "published": "2026-02-20T18:58:53.562Z",
-        "npm_license": "MIT",
-        "integrity_matches": true,
-        "install_scripts": {},
-        "repository": "NoeFabris/opencode-antigravity-auth",
-        "repo_archived": true,
-        "repo_pushed_at": "2026-08-27T23:19:26Z",
-        "repo_license": "MIT",
-        "egress": {
-          "declared": null,
-          "verified": false
-        }
-      },
-      "findings": [
-        {
-          "severity": "warn",
-          "criterion": "3",
-          "message": "the repository is archived (no active maintainer)"
-        },
-        {
-          "severity": "info",
-          "criterion": "5",
-          "message": "no egress declared (needed before it can be verified)"
-        }
-      ],
-      "verdict": "keep-with-warning"
-    },
-    {
-      "kind": "plugin",
       "name": "opencode-devcontainers",
       "status": "community",
       "facts": {
@@ -443,40 +408,6 @@
     },
     {
       "kind": "plugin",
-      "name": "opencode-skillful",
-      "status": "community",
-      "facts": {
-        "package": "@zenobius/opencode-skillful",
-        "version": "1.2.5",
-        "latest": "1.2.5",
-        "published": "2026-02-13T09:32:58.734Z",
-        "integrity_matches": true,
-        "install_scripts": {},
-        "repository": "zenobi-us/opencode-skillful",
-        "repo_archived": true,
-        "repo_pushed_at": "2026-02-13T09:32:25Z",
-        "repo_license": "MIT",
-        "egress": {
-          "declared": null,
-          "verified": false
-        }
-      },
-      "findings": [
-        {
-          "severity": "warn",
-          "criterion": "3",
-          "message": "the repository is archived (no active maintainer)"
-        },
-        {
-          "severity": "info",
-          "criterion": "5",
-          "message": "no egress declared (needed before it can be verified)"
-        }
-      ],
-      "verdict": "keep-with-warning"
-    },
-    {
-      "kind": "plugin",
       "name": "opencode-supermemory",
       "status": "community",
       "facts": {
@@ -739,7 +670,9 @@
       "facts": {
         "url": "https://raw.githubusercontent.com/AxsionDev/Lunos/dcfe4a6013c963afd5bbbf1dd65e162ef4ae4b00/marketplace/skills/",
         "egress": {
-          "declared": ["raw.githubusercontent.com"],
+          "declared": [
+            "raw.githubusercontent.com"
+          ],
           "verified": false
         }
       },
@@ -771,7 +704,11 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem@2026.8.31"],
+        "command": [
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-filesystem@2026.8.31"
+        ],
         "pin": {
           "runner": "npx",
           "spec": "@modelcontextprotocol/server-filesystem@2026.8.31",
@@ -797,7 +734,10 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": ["uvx", "mcp-server-git==2026.8.18"],
+        "command": [
+          "uvx",
+          "mcp-server-git==2026.8.18"
+        ],
         "pin": {
           "runner": "uvx",
           "spec": "mcp-server-git==2026.8.18",
@@ -823,7 +763,10 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": ["uvx", "mcp-server-fetch==2026.8.18"],
+        "command": [
+          "uvx",
+          "mcp-server-fetch==2026.8.18"
+        ],
         "pin": {
           "runner": "uvx",
           "spec": "mcp-server-fetch==2026.8.18",
@@ -849,7 +792,11 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": ["npx", "-y", "@playwright/mcp@0.0.82"],
+        "command": [
+          "npx",
+          "-y",
+          "@playwright/mcp@0.0.82"
+        ],
         "pin": {
           "runner": "npx",
           "spec": "@playwright/mcp@0.0.82",
@@ -909,7 +856,10 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": ["uvx", "postgres-mcp==0.3.0"],
+        "command": [
+          "uvx",
+          "postgres-mcp==0.3.0"
+        ],
         "pin": {
           "runner": "uvx",
           "spec": "postgres-mcp==0.3.0",
@@ -935,7 +885,11 @@
       "status": "community",
       "facts": {
         "type": "local",
-        "command": ["npx", "-y", "mcp-searxng@2.4.0"],
+        "command": [
+          "npx",
+          "-y",
+          "mcp-searxng@2.4.0"
+        ],
         "pin": {
           "runner": "npx",
           "spec": "mcp-searxng@2.4.0",
