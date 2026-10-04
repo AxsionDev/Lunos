@@ -34,7 +34,16 @@ export function lunosStarlight(options) {
       ...filterSidebar(options.sidebar),
       {
         label: "Lunos",
-        items: ["lunos-fork", "data-residency", "offline-mode", "marketplace", "memory", "artifacts", "models-tested", "trust"],
+        items: [
+          "lunos-fork",
+          "data-residency",
+          "offline-mode",
+          "marketplace",
+          "memory",
+          "artifacts",
+          "models-tested",
+          "trust",
+        ],
       },
     ],
   }

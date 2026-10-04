@@ -28,9 +28,7 @@
       {
         "model": "openai/gpt-5.3-codex",
         "cls": "us-api",
-        "residency": [
-          "us"
-        ],
+        "residency": ["us"],
         "status": "complete",
         "trials": [
           {
@@ -41,9 +39,7 @@
           }
         ],
         "spend": 1.7943615978,
-        "upstreamHosts": [
-          "api.openai.com"
-        ],
+        "upstreamHosts": ["api.openai.com"],
         "refusedRequests": 0,
         "passRate": {
           "mean": 0.6363636363636364,
