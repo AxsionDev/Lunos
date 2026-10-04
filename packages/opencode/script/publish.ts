@@ -81,8 +81,11 @@ await $`mkdir -p ./dist/${brand}`
 await $`mkdir -p ./dist/${brand}/bin`
 await $`cp ./script/postinstall.mjs ./dist/${brand}/postinstall.mjs`
 await Bun.file(`./dist/${brand}/LICENSE`).write(await Bun.file("../../LICENSE").text())
-// XCOD-177: written by build.ts from the shipped packages.
-await Bun.file(`./dist/${brand}/THIRD_PARTY_NOTICES`).write(await Bun.file("./THIRD_PARTY_NOTICES").text())
+// XCOD-177: build.ts writes the same notices into every platform package. This job runs on a
+// different runner from the build and only gets dist/ as an artifact, so take them from there.
+const notices = new Bun.Glob("*/THIRD_PARTY_NOTICES").scanSync({ cwd: "./dist" }).next().value
+if (!notices) throw new Error("no dist/*/THIRD_PARTY_NOTICES; build.ts writes one per platform package")
+await Bun.file(`./dist/${brand}/THIRD_PARTY_NOTICES`).write(await Bun.file(`./dist/${notices}`).text())
 await Bun.file(`./dist/${brand}/README.md`).write(await Bun.file("./script/npm-readme.md").text())
 await Bun.file(`./dist/${brand}/bin/${brand}.exe`).write(
   [
