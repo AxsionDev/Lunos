@@ -31,6 +31,7 @@ money, so it **stops for the owner's approval before any paid request**. Read
 
    Registry datasets use the bare name (`aider/aider-polyglot`, no `@latest`). Task names carry the
    org prefix (`aider/polyglot_python_forth`).
+
 2. **Count the tasks.** `--tasks` is the total across all datasets (local tasks + listed registry tasks).
 3. **Estimate (free):** `bun packages/eval/src/cli.ts estimate --config packages/eval/eval.config.json --tasks <n>`
 4. **Pipeline check (free).** Use Harbor's reference-solution agent: no model calls, no key needed.
