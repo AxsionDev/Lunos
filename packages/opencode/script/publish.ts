@@ -81,6 +81,8 @@ await $`mkdir -p ./dist/${brand}`
 await $`mkdir -p ./dist/${brand}/bin`
 await $`cp ./script/postinstall.mjs ./dist/${brand}/postinstall.mjs`
 await Bun.file(`./dist/${brand}/LICENSE`).write(await Bun.file("../../LICENSE").text())
+// XCOD-177: written by build.ts from the shipped packages.
+await Bun.file(`./dist/${brand}/THIRD_PARTY_NOTICES`).write(await Bun.file("./THIRD_PARTY_NOTICES").text())
 await Bun.file(`./dist/${brand}/README.md`).write(await Bun.file("./script/npm-readme.md").text())
 await Bun.file(`./dist/${brand}/bin/${brand}.exe`).write(
   [
