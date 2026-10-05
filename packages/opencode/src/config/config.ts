@@ -625,6 +625,8 @@ const layer = Layer.effect(
         }
 
         const managedLayers = yield* loadManaged()
+        // XCOD-202: what user and project config said about permissions, before managed config wins.
+        const unmanaged = { permission: result.permission, agent: result.agent, source: origins.permission?.source }
         for (const layer of managedLayers.layers) yield* mergeManaged(layer.source, layer.info)
 
         for (const [name, mode] of Object.entries(result.mode ?? {})) {
@@ -636,9 +638,11 @@ const layer = Layer.effect(
           })
         }
 
+        let envPermission: unknown
         if (Flag.OPENCODE_PERMISSION) {
           try {
-            result.permission = mergeDeep(result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+            envPermission = JSON.parse(Flag.OPENCODE_PERMISSION)
+            result.permission = mergeDeep(result.permission ?? {}, envPermission as ConfigPermissionV1.Info)
             origins.permission = { layer: "env", source: "OPENCODE_PERMISSION" }
           } catch (err) {
             yield* Effect.logWarning("OPENCODE_PERMISSION contains invalid JSON, skipping", { err })
@@ -677,7 +681,15 @@ const layer = Layer.effect(
         const unknownLocks = ConfigPolicy.unknownKeys(locked)
         if (unknownLocks.length)
           yield* Effect.logWarning(`$locked lists keys this version doesn't know: ${unknownLocks.join(", ")}`)
+        // XCOD-202: a locked permission that user or project config, or OPENCODE_PERMISSION, sets
+        // differently is refused (and audited).
+        for (const key of ConfigPolicy.permissionOverrides(unmanaged, managedLayers.doc, locked))
+          yield* ConfigPolicy.refused(key, key.startsWith("agent.") ? "agent config" : (unmanaged.source ?? "config"))
+        for (const key of ConfigPolicy.permissionOverrides({ permission: envPermission }, managedLayers.doc, locked))
+          yield* ConfigPolicy.refused(key, "OPENCODE_PERMISSION")
         result = ConfigPolicy.apply(result, managedLayers.doc, locked)
+        result = ConfigPolicy.applyAgentPermissions(result, managedLayers.doc, locked)
+        ConfigPolicy.activatePermission(locked, managedLayers.doc)
         for (const key of locked) {
           const top = key.split(".")[0]
           const layer = managedLayers.layers.findLast((item) => ConfigPolicy.get(item.info, key) !== undefined)

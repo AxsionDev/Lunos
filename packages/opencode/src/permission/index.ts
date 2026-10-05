@@ -8,6 +8,7 @@ import os from "os"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { ConfigPolicy } from "@/config/policy"
 
 export const Event = PermissionV1.Event
 
@@ -69,10 +70,13 @@ const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
+      // XCOD-202: the organisation's locked rules come last, so no wildcard, agent rule or
+      // "always allow" above them can win.
+      const locked = fromConfig(ConfigPolicy.lockedPermission() as ConfigPermissionV1.Info)
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        const rule = evaluate(request.permission, pattern, ruleset, approved)
+        const rule = evaluate(request.permission, pattern, ruleset, approved, locked)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           AuditLog.emit("permission.decision", {
@@ -82,7 +86,7 @@ const layer = Layer.effect(
             decision: "denied by rule",
           })
           return yield* new PermissionV1.DeniedError({
-            ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
+            ruleset: [...ruleset, ...locked].filter((rule) => Wildcard.match(request.permission, rule.permission)),
           })
         }
         if (rule.action === "allow") continue
@@ -126,19 +130,23 @@ const layer = Layer.effect(
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
       pending.delete(input.requestID)
+      // XCOD-202: "always allow" can't stick to a permission the organisation locked; it counts once.
+      const downgraded = input.reply === "always" && ConfigPolicy.isPermissionLocked(existing.info.permission)
+      if (downgraded) yield* ConfigPolicy.refused(ConfigPolicy.permissionKey(existing.info.permission), "always allow")
+      const answer = downgraded ? "once" : input.reply
       AuditLog.emit("permission.decision", {
         session: existing.info.sessionID,
         permission: existing.info.permission,
         patterns: existing.info.patterns,
-        decision: input.reply === "reject" ? "denied" : input.reply === "always" ? "allowed always" : "allowed once",
+        decision: answer === "reject" ? "denied" : answer === "always" ? "allowed always" : "allowed once",
       })
       yield* events.publish(Event.Replied, {
         sessionID: existing.info.sessionID,
         requestID: existing.info.id,
-        reply: input.reply,
+        reply: answer,
       })
 
-      if (input.reply === "reject") {
+      if (answer === "reject") {
         yield* Deferred.fail(
           existing.deferred,
           input.message
@@ -160,7 +168,7 @@ const layer = Layer.effect(
       }
 
       yield* Deferred.succeed(existing.deferred, undefined)
-      if (input.reply === "once") return
+      if (answer === "once") return
 
       for (const pattern of existing.info.always) {
         approved.push({

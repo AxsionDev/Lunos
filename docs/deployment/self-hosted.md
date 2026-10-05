@@ -385,6 +385,18 @@ A sample policy with a macOS profile and Windows and Linux deployment notes is i
 [`examples/managed-policy/`](../../examples/managed-policy/). To check a machine, run
 `lunos debug config --sources`: it shows which layer set each key and which are locked.
 
+**Locking permissions** (XCOD-202, unreleased). `"$locked": ["permission.webfetch"]` with
+`"permission": { "webfetch": "ask" }` fixes one tool's rule; `"$locked": ["permission"]` fixes all
+of them. A locked rule holds wherever another rule would otherwise win: a later `"*": "allow"` in
+user or project config, an agent's own `permission`, `OPENCODE_PERMISSION` and
+`OPENCODE_CONFIG_CONTENT`. Under a lock, an agent's own rule for that tool (under `"permission"`,
+all of an agent's `permission`) comes from the policy only. "Always allow" on a locked permission
+counts for that request only. `--auto` (`--yolo`, `--dangerously-skip-permissions`) doesn't answer
+for a locked permission: `lunos run` rejects the request, the TUI asks. Refused config values,
+"always allow" and `lunos run --auto` are in the audit log as `policy.override_refused`; a user
+config that repeats the policy's rule isn't. Lock a tool with a value: a locked tool the policy
+doesn't set falls back to the default, which a wildcard rule elsewhere can still change.
+
 **Requiring sandboxed runs** (XCOD-157, unreleased). `"$locked": ["sandbox.required"]` with
 `"sandbox": { "required": true }` means nothing runs on developers' machines except in a Docker
 sandbox: `lunos` and `lunos run` start one automatically, `lunos serve`, `web`, `acp`, `github` and

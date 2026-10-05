@@ -195,7 +195,11 @@ export const {
 
         case "permission.asked": {
           const request = event.properties
-          if (permission.mode === "auto") {
+          // XCOD-202: auto-approve doesn't answer for a permission the organisation locked; it asks.
+          const locked = (store.config.$locked ?? []).some(
+            (key) => key === "permission" || key === `permission.${request.permission}`,
+          )
+          if (permission.mode === "auto" && !locked) {
             void sdk.client.permission.reply({
               requestID: request.id,
               reply: "once",
