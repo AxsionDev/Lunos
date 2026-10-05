@@ -1994,6 +1994,7 @@ export type Config = {
     forward?: {
       syslog?: string
       otlp?: string
+      region?: "eu" | "us" | "other"
     }
   }
   memory?: MemoryConfig

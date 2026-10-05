@@ -22463,6 +22463,10 @@
                   },
                   "otlp": {
                     "type": "string"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": ["eu", "us", "other"]
                   }
                 },
                 "additionalProperties": false
