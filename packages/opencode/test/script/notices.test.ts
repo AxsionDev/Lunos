@@ -4,6 +4,7 @@ import {
   ALLOWED,
   bunNotice,
   electronNotice,
+  lgplNotice,
   problems,
   render,
   shipped,
@@ -83,6 +84,16 @@ describe("notices", () => {
     const notice = bunNotice()
     expect(notice.title).toContain("the runtime compiled into the lunos binary")
     expect(notice.text).toContain("JavaScriptCore")
+  })
+
+  test("the LGPL section pins the exact WebKit and tinycc sources and carries both licence texts", () => {
+    const notice = lgplNotice()
+    expect(notice.text).toMatch(/github\.com\/oven-sh\/WebKit\/tree\/[0-9a-f]{40}/)
+    expect(notice.text).toMatch(/github\.com\/oven-sh\/tinycc\/tree\/[0-9a-f]{40}/)
+    expect(notice.text).toContain("GNU LIBRARY GENERAL PUBLIC LICENSE")
+    expect(notice.text).toContain("Version 2.1, February 1999")
+    expect(notice.text.match(/END OF TERMS AND CONDITIONS/g)).toHaveLength(2)
+    expect(notice.text).toContain("https://github.com/AxsionDev/Lunos")
   })
 
   test("the real notices carry the MIT permission sentence and the Bun section", () => {

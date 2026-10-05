@@ -257,6 +257,44 @@ export function bunNotice() {
   }
 }
 
+/**
+ * XCOD-177: what LGPL-2.x asks of a binary that statically links an LGPL library (Bun links
+ * JavaScriptCore/WebKit and tinycc): the exact library sources, a way to relink, and the licence
+ * texts. Counsel (2026-10-04) accepted pointing to Bun's published forks and Lunos's public source.
+ */
+export function lgplNotice() {
+  const version = readJson(path.join(root, "package.json")).packageManager.replace(/^bun@/, "")
+  const pins = readJson(path.join(opencode, "script/notices/bun-lgpl.json"))
+  if (pins.bun !== version)
+    throw new Error(
+      `notices: bun-lgpl.json pins Bun ${pins.bun}, the build uses ${version}; refresh it from ${pins.source}`,
+    )
+  const spdx = (id: string) => readFileSync(path.join(opencode, `script/notices/spdx/${id}.txt`), "utf8")
+  return {
+    title: `LGPL libraries in the Bun ${version} runtime (JavaScriptCore/WebKit, tinycc)`,
+    text: [
+      `The lunos binary is compiled with Bun ${version}, which statically links JavaScriptCore and WebCore`,
+      "from WebKit (LGPL-2.0) and tinycc (LGPL-2.1). The exact sources of those libraries are:",
+      "",
+      `  WebKit:  https://github.com/oven-sh/WebKit/tree/${pins.webkit}`,
+      `  tinycc:  https://github.com/oven-sh/tinycc/tree/${pins.tinycc}`,
+      "",
+      "To use a modified copy of either library: rebuild Bun with it, following Bun's instructions above,",
+      "then rebuild Lunos with that Bun from its source at the matching release tag",
+      "(https://github.com/AxsionDev/Lunos), using packages/opencode/script/build.ts.",
+      "Lunos's own source is public under the MIT licence, so nothing in it prevents this.",
+      "",
+      "--- GNU Library General Public License, version 2 (LGPL-2.0) ---",
+      "",
+      spdx("LGPL-2.0-only"),
+      "",
+      "--- GNU Lesser General Public License, version 2.1 (LGPL-2.1) ---",
+      "",
+      spdx("LGPL-2.1-only"),
+    ].join("\n"),
+  }
+}
+
 if (import.meta.main) {
   // --desktop: the desktop app's notices (packages/desktop's prebuild), otherwise the CLI's.
   const isDesktop = process.argv.includes("--desktop")
@@ -274,7 +312,9 @@ if (import.meta.main) {
   } else {
     const index = process.argv.indexOf("--output")
     const out = index === -1 ? path.join(opencode, "THIRD_PARTY_NOTICES") : path.resolve(process.argv[index + 1])
-    await Bun.write(out, render(packages, isDesktop ? [electronNotice()] : [bunNotice()]))
+    // The desktop app ships the lunos binary as its sidecar, so Bun's notices apply to it too.
+    const runtime = [bunNotice(), lgplNotice()]
+    await Bun.write(out, render(packages, isDesktop ? [electronNotice(), ...runtime] : runtime))
     console.log(`notices: ${packages.length} packages -> ${out}`)
   }
 }
