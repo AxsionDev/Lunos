@@ -32,14 +32,14 @@ With neither, no file is written.
 }
 ```
 
-| Key            | Default                                                                       | Meaning                                                                                                     |
-| -------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `enabled`      | `false`, or on when a residency policy audits                                 | Write the log                                                                                               |
-| `path`         | `residency.auditPath`, else `residency-egress.log` in the Lunos log directory | Where the log lives. `audit.path` wins over `residency.auditPath`                                           |
-| `redact`       | none                                                                          | Regular expressions masked as `[redacted]` in every recorded string, on top of the built-in secret patterns |
-| `max_bytes`    | 10 MB                                                                         | Rotate the active file at this size; rotated files are `<path>.<timestamp>`                                 |
-| `max_age_days` | 90                                                                            | Delete rotated files older than this                                                                        |
-| `forward`      | none                                                                          | Also send every line to a SIEM (see [Forwarding](#forwarding-to-a-siem))                                    |
+| Key            | Default                                                                       | Meaning                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `enabled`      | `false`, or on when a residency policy audits                                 | Write the log                                                                                                       |
+| `path`         | `residency.auditPath`, else `residency-egress.log` in the Lunos log directory | Where the log lives. `audit.path` wins over `residency.auditPath`                                                   |
+| `redact`       | none                                                                          | Regular expressions masked as `[redacted]` in every recorded string, on top of the built-in secret patterns         |
+| `max_bytes`    | 10 MB                                                                         | Rotate the active file at this size; rotated files are `<path>.<timestamp>`                                         |
+| `max_age_days` | 90                                                                            | Delete rotated files older than this                                                                                |
+| `forward`      | none                                                                          | Also send every line to a SIEM; `region` declares where it processes data (see [Forwarding](#forwarding-to-a-siem)) |
 
 An organisation can force the log on and stop developers changing it by locking it in managed
 config: `"$locked": ["audit"]` with `"audit": { "enabled": true, ... }` (see the
@@ -159,7 +159,22 @@ Sending never blocks or fails a session: a sink that is down is reported on stde
 file is still written. The destination is checked like any self-hosted endpoint: under a residency
 policy it counts as `unknown`, so an EU-only policy refuses it unless `"unknown"` is allowed.
 Loopback (`127.0.0.1`, `localhost`) never leaves the machine and is always allowed. A refused
-destination is recorded as `audit.forward_refused`.
+destination is recorded as `audit.forward_refused`, with the region it was checked as.
+
+**Declaring the destination's region** (XCOD-201, unreleased). To forward off the machine under an
+EU-only policy without allowing `"unknown"` (which would also allow model providers in unknown
+regions), declare where the destinations process data:
+
+```json
+"audit": { "forward": { "syslog": "udp://logs.internal.example:514", "region": "eu" } }
+```
+
+`region` is `eu`, `us` or `other`, and covers both `syslog` and `otlp`. A declared region is checked
+against `residency.allow` instead of `unknown`, so `"region": "us"` is refused under an EU-only policy
+even when `"unknown"` is allowed. Lunos can't verify the declaration. Set it in managed config and
+lock it with `"$locked": ["audit.forward"]` (or `"audit"`): then user and project config can't add
+or change it, and the policy's destinations are the only ones used. Without a lock, `region` is
+whatever the user's own config says.
 
 ### Recipe: rsyslog to a file per host
 

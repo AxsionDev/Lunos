@@ -9,6 +9,23 @@ describe("ConfigPolicy (XCOD-102)", () => {
     expect(ConfigPolicy.isLocked(["share"], "shared")).toBe(false)
   })
 
+  // XCOD-201: the forwarding region is part of the audit.forward lock.
+  test("under a lock on audit or audit.forward, user config can't add or change the forwarding region", () => {
+    const managed = { audit: { forward: { syslog: "udp://siem.internal:514", region: "eu" } } }
+    type Doc = { audit: { forward?: { syslog?: string; region?: string } } }
+    const user: Doc = { audit: { forward: { syslog: "udp://elsewhere:514", region: "us" } } }
+    for (const lock of ["audit", "audit.forward"]) {
+      const next = ConfigPolicy.apply(user as Record<string, unknown>, managed, [lock]) as Doc
+      expect(next.audit.forward).toEqual({ syslog: "udp://siem.internal:514", region: "eu" })
+    }
+    const unset = ConfigPolicy.apply(
+      user as Record<string, unknown>,
+      { audit: { forward: { syslog: "udp://siem.internal:514" } } },
+      ["audit.forward"],
+    ) as Doc
+    expect(unset.audit.forward).toEqual({ syslog: "udp://siem.internal:514" })
+  })
+
   test("apply replaces dotted keys and leaves siblings alone", () => {
     const next: Record<string, unknown> = ConfigPolicy.apply(
       { memory: { enabled: true, scope: ["user"] } } as Record<string, unknown>,

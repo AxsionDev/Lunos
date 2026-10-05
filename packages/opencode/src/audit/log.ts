@@ -15,7 +15,7 @@ export type Settings = {
   redact: readonly string[]
   maxBytes?: number
   maxAgeDays?: number
-  forward?: { syslog?: string; otlp?: string }
+  forward?: { syslog?: string; otlp?: string; region?: "eu" | "us" | "other" }
   /** The residency policy's allowed regions, if one is set: forwarding destinations are checked against it. */
   residencyAllow?: readonly string[]
 }
@@ -26,7 +26,7 @@ type AuditBlock = {
   redact?: readonly string[]
   max_bytes?: number
   max_age_days?: number
-  forward?: { syslog?: string; otlp?: string }
+  forward?: { syslog?: string; otlp?: string; region?: "eu" | "us" | "other" }
 }
 
 export const DEFAULT_FILE = () => path.join(Global.Path.log, "residency-egress.log")

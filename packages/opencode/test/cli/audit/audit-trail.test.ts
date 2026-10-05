@@ -1,8 +1,9 @@
 // XCOD-103: the audit trail end to end, through the real CLI and a fake LLM: a session that runs
 // bash and is refused one permission, a marketplace install, a locked-share refusal, forwarding to
 // a real local syslog listener, verify before and after tampering, and CSV export.
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import dgram from "dgram"
+import os from "os"
 import { Effect } from "effect"
 import fs from "fs/promises"
 import path from "path"
@@ -154,6 +155,87 @@ describe("audit trail (subprocess)", () => {
             host: "siem.example.test:514",
             allowed: false,
           }),
+        )
+      }),
+    60_000,
+  )
+
+  // XCOD-201: an EU-only policy forwards off the machine to a destination managed config declares EU.
+  const lan = Object.values(os.networkInterfaces())
+    .flat()
+    .find((item) => item && item.family === "IPv4" && !item.internal)?.address
+  // Needs a non-loopback address to listen on; machines without a network skip it.
+  const onLan: typeof cliIt.live = lan ? cliIt.live : (name) => test.skip(name, () => {})
+
+  onLan(
+    "forwarding to another host declared EU under an EU-only policy reaches it; a user can't declare it",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const log = path.join(home, "audit", "audit.log")
+        const received: string[] = []
+        const listener = dgram.createSocket("udp4")
+        listener.on("message", (message) => received.push(message.toString()))
+        const port = yield* Effect.promise(
+          () => new Promise<number>((resolve) => listener.bind(0, lan!, () => resolve(listener.address().port))),
+        )
+        yield* Effect.addFinalizer(() => Effect.sync(() => listener.close()))
+        const managed = path.join(home, "managed")
+        const syslog = `udp://${lan}:${port}`
+        yield* Effect.promise(async () => {
+          await fs.mkdir(path.join(home, ".config", "opencode"), { recursive: true })
+          await fs.mkdir(managed, { recursive: true })
+          await fs.writeFile(
+            path.join(managed, "managed.json"),
+            JSON.stringify({
+              $locked: ["residency", "audit.forward", "marketplace_allow"],
+              residency: { allow: ["eu"] },
+              audit: { forward: { syslog, region: "eu" } },
+              marketplace_allow: [],
+            }),
+          )
+          await fs.writeFile(
+            path.join(home, ".config", "opencode", "opencode.json"),
+            JSON.stringify({ audit: { path: log } }),
+          )
+        })
+        const env = { OPENCODE_TEST_MANAGED_CONFIG_DIR: managed }
+        // A refused `marketplace add` writes audit lines (marketplace.refused, policy.override_refused).
+        const source = path.join(home, "mp.json")
+        const refusedAdd = () => opencode.spawn(["marketplace", "add", source], { env })
+        yield* refusedAdd()
+        yield* Effect.promise(async () => {
+          for (let i = 0; i < 100 && received.length === 0; i++) await Bun.sleep(20)
+        })
+        expect(received.length).toBeGreaterThan(0)
+        expect(received.some((message) => message.includes('"event":"marketplace.refused"'))).toBe(true)
+        const lines = (yield* Effect.promise(() => fs.readFile(log, "utf8"))).split("\n").filter(Boolean)
+        expect(lines.some((line) => JSON.parse(line).event === "audit.forward_refused")).toBe(false)
+
+        // The same destination with the region declared in user config, and no lock: refused.
+        received.length = 0
+        yield* Effect.promise(async () => {
+          await fs.writeFile(
+            path.join(managed, "managed.json"),
+            JSON.stringify({
+              $locked: ["residency", "audit.forward"],
+              residency: { allow: ["eu"] },
+              audit: { forward: { syslog } },
+            }),
+          )
+          await fs.writeFile(
+            path.join(home, ".config", "opencode", "opencode.json"),
+            JSON.stringify({ audit: { path: log, forward: { syslog, region: "eu" } } }),
+          )
+        })
+        yield* refusedAdd()
+        yield* Effect.promise(() => Bun.sleep(300))
+        expect(received).toEqual([])
+        const events = (yield* Effect.promise(() => fs.readFile(log, "utf8")))
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line))
+        expect(events).toContainEqual(
+          expect.objectContaining({ event: "audit.forward_refused", via: "syslog", region: "unknown", allowed: false }),
         )
       }),
     60_000,

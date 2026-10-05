@@ -36,6 +36,25 @@ describe("AuditForward (XCOD-103)", () => {
     expect(AuditForward.allowed(new URL("https://localhost:4318"), ["eu"])).toBe(true)
   })
 
+  // XCOD-201: managed config can declare where a destination processes data.
+  test("a declared region is checked against the residency policy instead of 'unknown'", () => {
+    const siem = new URL("udp://siem.internal:514")
+    expect(AuditForward.allowed(siem, ["eu"], "eu")).toBe(true)
+    expect(AuditForward.allowed(siem, ["eu"], "us")).toBe(false)
+    // Declaring a region outside the policy isn't rescued by allowing "unknown".
+    expect(AuditForward.allowed(siem, ["eu", "unknown"], "us")).toBe(false)
+    expect(AuditForward.allowed(siem, ["eu"], undefined)).toBe(false)
+    expect(AuditForward.allowed(siem, undefined, "us")).toBe(true)
+  })
+
+  test("the declared region is carried into the audit settings", () => {
+    const settings = AuditLog.resolve({
+      residency: { allow: ["eu"] },
+      audit: { forward: { syslog: "udp://siem.internal:514", region: "eu" } },
+    })
+    expect(settings.forward).toEqual({ syslog: "udp://siem.internal:514", region: "eu" })
+  })
+
   test("syslog lines are RFC 5424 with the audit facility and the JSON line as message", () => {
     const line = JSON.stringify({ v: 1, event: "tool.run" })
     expect(AuditForward.syslogMessage(line, "tool.run")).toMatch(/^<110>1 \S+ \S+ lunos \d+ tool\.run - \{"v":1/)
