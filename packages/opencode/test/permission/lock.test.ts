@@ -149,9 +149,10 @@ it.instance(
 )
 
 // PO decision (2026-10-05): a lock fixes the configured rule, but "always allow" and --auto still
-// work in the session. Neither writes to config, so nothing persists past the session (AC4).
+// work. "Always allow" is held in memory for the project until restart and never written to
+// config, so nothing persists (AC4).
 it.instance(
-  "always allow on a locked permission holds for the session and refuses nothing",
+  "always allow on a locked permission holds until restart and refuses nothing",
   () =>
     Effect.gen(function* () {
       lockWebfetch()

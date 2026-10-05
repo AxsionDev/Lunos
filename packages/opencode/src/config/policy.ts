@@ -144,7 +144,7 @@ export function unknownKeys(locked: ReadonlyArray<string>) {
 // XCOD-202: permission rules are matched last-wins with wildcards, so replacing the locked keys in
 // config isn't enough: a `"*": "allow"` later in user config or an agent's own `permission` would
 // still outrank them. The permission service evaluates these managed rules after the configured
-// ones instead (the user's in-session "always allow" still answers a locked "ask"). Managed config
+// ones instead (the user's own "always allow" still answers a locked "ask"). Managed config
 // is machine-wide, so this is process state, set on every config load (like `AuditLog.activate`).
 type PermissionLock = { all: boolean; tools: ReadonlySet<string>; rules: Record_ }
 let permissionLock: PermissionLock = { all: false, tools: new Set(), rules: {} }

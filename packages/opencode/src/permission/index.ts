@@ -91,12 +91,13 @@ const layer = Layer.effect(
       for (const pattern of request.patterns) {
         // XCOD-202: the organisation's locked rule outranks any wildcard or agent rule in config,
         // but never lifts a deny: a lock can't loosen what Lunos itself restricts. The user's own
-        // in-session "always allow" still answers a locked "ask"; it never reaches config.
+        // "always allow" (held in memory for this project until restart) still answers a locked
+        // "ask"; it never reaches config.
         const base = evaluate(request.permission, pattern, ruleset, approved)
         const lockedRule = match(request.permission, pattern, locked)
-        const session = match(request.permission, pattern, approved)
+        const allowed = match(request.permission, pattern, approved)
         const rule =
-          base.action === "deny" ? base : lockedRule?.action === "deny" ? lockedRule : (session ?? lockedRule ?? base)
+          base.action === "deny" ? base : lockedRule?.action === "deny" ? lockedRule : (allowed ?? lockedRule ?? base)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           AuditLog.emit("permission.decision", {

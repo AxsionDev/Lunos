@@ -395,11 +395,11 @@ log as `policy.override_refused`; a user config that repeats the policy's rule i
 loosens what Lunos itself restricts: a built-in deny (the plan agent's edits, tools a subagent isn't
 given) still denies, and agents can still read their own truncated tool output unless the policy
 names that directory. A lock fixes the configured rule, not the developer's answers: on a locked
-`"ask"`, "always allow" still holds for the rest of the session, and `--auto` (`--yolo`,
-`--dangerously-skip-permissions`) still answers. Neither is ever written to config, and neither can
-lift a locked `"deny"`. Every answer is in the audit log as `permission.decision`. Lock a tool with
-a value: a locked tool the policy doesn't set falls back to the default, which a wildcard rule
-elsewhere can still change.
+`"ask"`, "always allow" still holds, for every session in that project until Lunos restarts, and
+`--auto` (`--yolo`, `--dangerously-skip-permissions`) still answers. Neither is ever written to
+config, and neither can lift a locked `"deny"`. Every answer is in the audit log as
+`permission.decision`. Lock a tool with a value: a locked tool the policy doesn't set falls back to
+the default, which a wildcard rule elsewhere can still change.
 
 **Requiring sandboxed runs** (XCOD-157, unreleased). `"$locked": ["sandbox.required"]` with
 `"sandbox": { "required": true }` means nothing runs on developers' machines except in a Docker
