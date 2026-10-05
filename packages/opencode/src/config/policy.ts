@@ -29,7 +29,14 @@ export const KNOWN = [
   // XCOD-157: an organisation can require sandboxed runs.
   "sandbox",
   "sandbox.required",
+  // XCOD-202: every permission, or one tool's (`permission.webfetch`, `permission.bash`, …).
+  "permission",
 ] as const
+
+/** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */
+export function isKnown(key: string) {
+  return (KNOWN as ReadonlyArray<string>).includes(key) || /^permission\.[^.]+$/.test(key)
+}
 
 type Record_ = Record<string, unknown>
 const isRecord = (value: unknown): value is Record_ => !!value && typeof value === "object" && !Array.isArray(value)
@@ -131,7 +138,96 @@ export function strip<T>(doc: T): T {
 }
 
 export function unknownKeys(locked: ReadonlyArray<string>) {
-  return locked.filter((key) => !(KNOWN as ReadonlyArray<string>).includes(key))
+  return locked.filter((key) => !isKnown(key))
+}
+
+// XCOD-202: permission rules are matched last-wins with wildcards, so replacing the locked keys in
+// config isn't enough: a `"*": "allow"` later in user config, an agent's own `permission`, or an
+// "always allow" from the session would still outrank them. The permission service evaluates
+// these managed rules after everything else instead. Managed config is machine-wide, so this is
+// process state, set on every config load (like `AuditLog.activate`).
+type PermissionLock = { all: boolean; tools: ReadonlySet<string>; rules: Record_ }
+let permissionLock: PermissionLock = { all: false, tools: new Set(), rules: {} }
+
+/** The permission part of the lock, from the resolved `$locked` list and the managed document. */
+export function activatePermission(locked: ReadonlyArray<string>, managed: unknown) {
+  const raw = get(managed, "permission")
+  const rules: Record_ = typeof raw === "string" ? { "*": raw } : isRecord(raw) ? { ...raw } : {}
+  if (locked.includes("permission")) {
+    permissionLock = { all: true, tools: new Set(), rules }
+    return
+  }
+  const tools = new Set(
+    locked.filter((key) => key.startsWith("permission.")).map((key) => key.slice("permission.".length)),
+  )
+  permissionLock = {
+    all: false,
+    tools,
+    rules: Object.fromEntries(
+      [...tools].filter((tool) => rules[tool] !== undefined).map((tool) => [tool, rules[tool]]),
+    ),
+  }
+}
+
+/**
+ * Locked permission keys that user or project config (or an env var) sets differently from managed
+ * config, top level and per agent. Each is refused on load; an unchanged copy of the policy isn't.
+ */
+export function permissionOverrides(resolved: Record_, managed: Record_, locked: ReadonlyArray<string>) {
+  const keys = locked.filter((key) => key === "permission" || key.startsWith("permission."))
+  // `"permission": "ask"` is shorthand for `{ "*": "ask" }`; resolved config holds the long form.
+  const long = (value: unknown) => (typeof value === "string" ? { "*": value } : value)
+  const differs = (a: unknown, b: unknown) =>
+    a !== undefined && !Bun.deepEquals(a, b) && !Bun.deepEquals(long(a), long(b))
+  const found = keys.filter((key) => differs(get(resolved, key), get(managed, key)))
+  const agents = isRecord(resolved.agent) ? Object.keys(resolved.agent) : []
+  for (const name of agents)
+    for (const key of keys) {
+      const own = key.replace(/^permission/, `agent.${name}.permission`)
+      if (differs(get(resolved, own), get(managed, own))) found.push(own)
+    }
+  return found
+}
+
+/**
+ * An agent's own `permission` merges after the top-level one, so under a lock it can only hold what
+ * managed config gives that agent: all of it under `permission`, the one tool under `permission.x`.
+ */
+export function applyAgentPermissions<T extends Record_>(
+  resolved: T,
+  managed: Record_,
+  locked: ReadonlyArray<string>,
+): T {
+  const keys = locked.filter((key) => key === "permission" || key.startsWith("permission."))
+  if (!keys.length || !isRecord(resolved.agent)) return resolved
+  const next = { ...resolved } as Record_
+  next.agent = { ...resolved.agent }
+  for (const name of Object.keys(next.agent as Record_))
+    for (const key of keys) {
+      const own = key.replace(/^permission/, `agent.${name}.permission`)
+      set(next, own, get(managed, own))
+    }
+  return next as T
+}
+
+/** The `$locked` entry covering a permission, if any: what `--auto` must not answer for. */
+export function permissionLockFor(locked: ReadonlyArray<string>, permission: string) {
+  return locked.find((key) => isLocked([key], `permission.${permission}`))
+}
+
+/** The managed rules for locked permissions, in config shape. */
+export function lockedPermission(): Record_ {
+  return permissionLock.rules
+}
+
+/** Whether the organisation has locked this permission (or all of them). */
+export function isPermissionLocked(permission: string) {
+  return permissionLock.all || permissionLock.tools.has(permission)
+}
+
+/** The `$locked` key that covers this permission, for refusals and messages. */
+export function permissionKey(permission: string) {
+  return permissionLock.all ? "permission" : `permission.${permission}`
 }
 
 /** The one message every refused override shows, whichever surface it came through. */

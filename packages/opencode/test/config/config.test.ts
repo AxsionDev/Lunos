@@ -6,6 +6,7 @@ import { Cause, Effect, Exit, Layer, Logger, Option } from "effect"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { ConfigManaged } from "@/config/managed"
 import { ConfigParse } from "../../src/config/parse"
 import { ConfigV2Compat } from "../../src/config/v2-compat"
@@ -1640,6 +1641,67 @@ it.instance(
   { config: { share: "auto", autoshare: true, autoupdate: true } },
 )
 
+// XCOD-202: permission is lockable, as a whole or per tool. The lock is process state; reset it.
+afterEach(() => ConfigPolicy.activatePermission([], {}))
+
+it.instance(
+  "a locked permission holds the managed rule, refuses the override and covers agents",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["permission.webfetch"], permission: { webfetch: "ask" } })
+    const refusals: ConfigPolicy.Refusal[] = []
+    const off = ConfigPolicy.onRefused((refusal) => refusals.push(refusal))
+    yield* Effect.addFinalizer(() => Effect.sync(() => off()))
+
+    const config = yield* Config.use.get()
+    expect(config.permission?.webfetch).toBe("ask")
+    // A lock on one tool leaves the user's other rules alone.
+    expect(config.permission?.bash).toBe("allow")
+    expect(config.agent?.build?.permission?.webfetch).toBeUndefined()
+    expect(config.agent?.build?.permission?.edit).toBe("deny")
+    expect(refusals.map((item) => item.key).sort()).toEqual(["agent.build.permission.webfetch", "permission.webfetch"])
+    expect(ConfigPolicy.isPermissionLocked("webfetch")).toBe(true)
+    expect(ConfigPolicy.isPermissionLocked("bash")).toBe(false)
+  }),
+  {
+    config: {
+      permission: { webfetch: "allow", bash: "allow" },
+      agent: { build: { permission: { webfetch: "allow", edit: "deny" } } },
+    },
+  },
+)
+
+it.instance(
+  "a lock on all of permission replaces the user's and every agent's rules",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["permission"], permission: { webfetch: "ask" } })
+
+    const config = yield* Config.use.get()
+    expect(config.permission).toEqual({ webfetch: "ask" })
+    expect(config.agent?.build?.permission).toBeUndefined()
+    expect(ConfigPolicy.isPermissionLocked("bash")).toBe(true)
+  }),
+  {
+    config: {
+      permission: { webfetch: "allow", bash: "allow" },
+      agent: { build: { permission: { bash: "allow" } } },
+    },
+  },
+)
+
+it.instance(
+  "a user config that repeats the locked rule isn't refused",
+  Effect.gen(function* () {
+    yield* writeManagedSettingsEffect({ $locked: ["permission.webfetch"], permission: { webfetch: "ask" } })
+    const refusals: ConfigPolicy.Refusal[] = []
+    const off = ConfigPolicy.onRefused((refusal) => refusals.push(refusal))
+    yield* Effect.addFinalizer(() => Effect.sync(() => off()))
+
+    yield* Config.use.get()
+    expect(refusals).toEqual([])
+  }),
+  { config: { permission: { webfetch: "ask" } } },
+)
+
 it.instance(
   "$locked outside managed config is ignored",
   Effect.gen(function* () {
@@ -2329,6 +2391,44 @@ describe("OPENCODE_PERMISSION env var", () => {
         const config = yield* Config.use.get()
         // Regression: load() used to throw before returning anything.
         expect(config).toBeDefined()
+      }),
+    ),
+  )
+})
+
+// XCOD-202: environment variables can't change a locked permission either.
+describe("locked permission from the environment", () => {
+  const refusals = (keys: string[]) => {
+    const off = ConfigPolicy.onRefused((refusal) => keys.push(`${refusal.key} via ${refusal.via}`))
+    return Effect.addFinalizer(() => Effect.sync(() => off()))
+  }
+
+  it.instance("OPENCODE_PERMISSION can't allow a locked permission", () =>
+    withProcessEnv(
+      "OPENCODE_PERMISSION",
+      JSON.stringify({ webfetch: "allow" }),
+      Effect.gen(function* () {
+        yield* writeManagedSettingsEffect({ $locked: ["permission.webfetch"], permission: { webfetch: "ask" } })
+        const seen: string[] = []
+        yield* refusals(seen)
+        const config = yield* Config.use.get()
+        expect(config.permission?.webfetch).toBe("ask")
+        expect(seen).toEqual(["permission.webfetch via OPENCODE_PERMISSION"])
+      }),
+    ),
+  )
+
+  it.instance("OPENCODE_CONFIG_CONTENT can't allow a locked permission", () =>
+    withProcessEnv(
+      "OPENCODE_CONFIG_CONTENT",
+      JSON.stringify({ permission: { webfetch: "allow" } }),
+      Effect.gen(function* () {
+        yield* writeManagedSettingsEffect({ $locked: ["permission.webfetch"], permission: { webfetch: "ask" } })
+        const seen: string[] = []
+        yield* refusals(seen)
+        const config = yield* Config.use.get()
+        expect(config.permission?.webfetch).toBe("ask")
+        expect(seen.map((item) => item.split(" via ")[0])).toEqual(["permission.webfetch"])
       }),
     ),
   )

@@ -5,9 +5,12 @@ import { InstanceState } from "@/effect/instance-state"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
 import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
+import path from "path"
+import { TRUNCATION_DIR } from "@/tool/truncation-dir"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { ConfigPolicy } from "@/config/policy"
 
 export const Event = PermissionV1.Event
 
@@ -27,16 +30,29 @@ interface State {
   approved: PermissionV1.Rule[]
 }
 
+function match(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]) {
+  return rulesets
+    .flat()
+    .findLast((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern))
+}
+
 export function evaluate(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]): PermissionV1.Rule {
-  return (
-    rulesets
-      .flat()
-      .findLast((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern)) ?? {
-      action: "ask",
-      permission,
-      pattern: "*",
-    }
-  )
+  return match(permission, pattern, ...rulesets) ?? { action: "ask", permission, pattern: "*" }
+}
+
+const TRUNCATED = path.join(TRUNCATION_DIR, "*")
+
+/**
+ * XCOD-202: the managed rules for locked permissions. Every agent may read truncated tool output
+ * (agent.ts), so that allow follows them unless the policy names the directory itself.
+ */
+function lockedRules() {
+  const config = ConfigPolicy.lockedPermission() as ConfigPermissionV1.Info
+  const rules = fromConfig(config)
+  if (!rules.some((rule) => rule.permission === "external_directory")) return rules
+  const own = config.external_directory
+  if (typeof own === "object" && TRUNCATED in own) return rules
+  return [...rules, ...fromConfig({ external_directory: { [TRUNCATED]: "allow" } })]
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
@@ -69,10 +85,14 @@ const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
+      const locked = lockedRules()
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        const rule = evaluate(request.permission, pattern, ruleset, approved)
+        // XCOD-202: the organisation's locked rule outranks any wildcard, agent rule or "always
+        // allow", but never lifts a deny: a lock can't loosen what Lunos itself restricts.
+        const base = evaluate(request.permission, pattern, ruleset, approved)
+        const rule = base.action === "deny" ? base : (match(request.permission, pattern, locked) ?? base)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           AuditLog.emit("permission.decision", {
@@ -82,7 +102,7 @@ const layer = Layer.effect(
             decision: "denied by rule",
           })
           return yield* new PermissionV1.DeniedError({
-            ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
+            ruleset: [...ruleset, ...locked].filter((rule) => Wildcard.match(request.permission, rule.permission)),
           })
         }
         if (rule.action === "allow") continue
@@ -126,19 +146,23 @@ const layer = Layer.effect(
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
       pending.delete(input.requestID)
+      // XCOD-202: "always allow" can't stick to a permission the organisation locked; it counts once.
+      const downgraded = input.reply === "always" && ConfigPolicy.isPermissionLocked(existing.info.permission)
+      if (downgraded) yield* ConfigPolicy.refused(ConfigPolicy.permissionKey(existing.info.permission), "always allow")
+      const answer = downgraded ? "once" : input.reply
       AuditLog.emit("permission.decision", {
         session: existing.info.sessionID,
         permission: existing.info.permission,
         patterns: existing.info.patterns,
-        decision: input.reply === "reject" ? "denied" : input.reply === "always" ? "allowed always" : "allowed once",
+        decision: answer === "reject" ? "denied" : answer === "always" ? "allowed always" : "allowed once",
       })
       yield* events.publish(Event.Replied, {
         sessionID: existing.info.sessionID,
         requestID: existing.info.id,
-        reply: input.reply,
+        reply: answer,
       })
 
-      if (input.reply === "reject") {
+      if (answer === "reject") {
         yield* Deferred.fail(
           existing.deferred,
           input.message
@@ -160,7 +184,7 @@ const layer = Layer.effect(
       }
 
       yield* Deferred.succeed(existing.deferred, undefined)
-      if (input.reply === "once") return
+      if (answer === "once") return
 
       for (const pattern of existing.info.always) {
         approved.push({
