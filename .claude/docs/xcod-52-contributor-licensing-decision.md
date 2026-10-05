@@ -1,5 +1,10 @@
 # XCOD-52 — Contributor licensing posture: **DCO** (DECIDED)
 
+> **Revisited 2026-10-04 by [XCOD-183](./xcod-183-open-core-decision.md) (open core).** A commercial
+> layer is now planned, as separate code in separate repositories. The DCO stays: nothing in this
+> repository is relicensed, so the relicensing right a CLA would give is still not needed. The
+> "MIT-only, no commercial edition" ruling below is superseded on that point only.
+
 **Status:** decided · **Date:** 2026-09-19 · **Decided by:** Petar Minev (product owner)
 **Epic:** XCOD-15 · **Follow-up from:** XCOD-17 · **Sibling:** [xcod-17-legal-entity-decision.md](./xcod-17-legal-entity-decision.md)
 
