@@ -19,6 +19,8 @@ export const KNOWN = [
   "marketplace_default",
   "marketplace_allow",
   "marketplace_unreviewed",
+  // XCOD-209: an organisation can forbid importing agents.
+  "agent_import",
   "autoupdate",
   "memory",
   "memory.enabled",

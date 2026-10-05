@@ -1710,6 +1710,10 @@
           "type": "boolean",
           "description": "Whether the built-in lunos-community marketplace is used (default: true)"
         },
+        "agent_import": {
+          "type": "boolean",
+          "description": "Whether `lunos agent import` may add agents from bundles and Claude Code files (default: true). Organisation policy: lock it in managed config to forbid imports"
+        },
         "marketplace_unreviewed": {
           "type": "boolean",
           "description": "Organisation policy: false forbids installing marketplace entries that aren't verified (--allow-unreviewed), when locked in managed config"
