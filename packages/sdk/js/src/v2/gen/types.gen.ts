@@ -2133,6 +2133,7 @@ export type Config = {
   attachment?: AttachmentConfig
   marketplace?: Array<string>
   marketplace_default?: boolean
+  agent_import?: boolean
   marketplace_unreviewed?: boolean
   marketplace_allow?: Array<string>
   enterprise?: {

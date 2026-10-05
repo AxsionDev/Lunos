@@ -22903,6 +22903,9 @@
           "marketplace_default": {
             "type": "boolean"
           },
+          "agent_import": {
+            "type": "boolean"
+          },
           "marketplace_unreviewed": {
             "type": "boolean"
           },
