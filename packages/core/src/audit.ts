@@ -63,6 +63,9 @@ export const EVENTS = [
   // XCOD-157: one decision of a sandbox's egress proxy (network "policy" or "none"): destination
   // host and port, and whether it was allowed. Never a URL path, a header or a body.
   "sandbox.egress",
+  // XCOD-211: an unattended agent run finished. Agent, job, status, stop reason, steps, spend,
+  // duration and the permissions it was refused; never the prompt, the output or file contents.
+  "agent.run",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

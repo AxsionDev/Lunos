@@ -195,6 +195,13 @@ export const CALLS: Call[] = [
     offline: "yours",
   },
   {
+    id: "agent-run-notify",
+    what: "Notification after an unattended agent run (`lunos agent run --notify`)",
+    hosts: "the https URL you pass to --notify",
+    when: "after a scheduled or unattended run, only if you set --notify",
+    offline: "blocked",
+  },
+  {
     id: "commands",
     what: "`account login`, `providers login`, `import <url>`, `agent import <url>`, `github install` / `run`",
     hosts: "api.github.com, the URL you pass",

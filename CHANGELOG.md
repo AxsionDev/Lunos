@@ -20,6 +20,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Run agents unattended, now or on a schedule.** `lunos agent run <name> --prompt …` runs an
+  agent with hard limits on time, spend and steps (subagents included), in the Docker sandbox by
+  default. Nobody approves anything: every permission prompt is refused and reported, and the agent
+  is told why. `--schedule "<cron>"` installs a launchd, systemd or Task Scheduler job;
+  `lunos agent schedule list|remove` manages them. Each run writes a report and an `agent.run`
+  audit event, and `--notify` can POST the outcome to a webhook. See
+  [Running agents unattended](docs/unattended-agents.md) (XCOD-211, part of XCOD-203).
+
 - **Share an agent as one file.** `lunos agent export <name>` writes the agent, the MCP servers it
   uses and the skills it names into a `.lunos-agent` bundle, with MCP environment variables and
   headers by name only, never by value. `lunos agent import <file|url>` shows what the agent may
