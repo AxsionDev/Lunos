@@ -20,7 +20,6 @@ import { open } from "node:fs/promises"
 import { Effect } from "effect"
 import { UI } from "../ui"
 import { effectCmd, fail } from "../effect-cmd"
-import { ConfigPolicy } from "@/config/policy"
 import { wanted as sandboxWanted } from "./sandbox"
 import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
@@ -766,9 +765,6 @@ export const RunCommand = effectCmd({
           const toggles = new Map<string, boolean>()
           const sessions = new Set([sessionID])
           let error: string | undefined
-          // XCOD-202: --auto can't answer for a permission the organisation locked.
-          const locked = auto ? ((await client.config.get()).data?.$locked ?? []) : []
-          const refusedAuto = new Set<string>()
 
           for await (const event of events.stream) {
             if (event.type === "session.created" && event.properties.info.parentID) {
@@ -873,12 +869,7 @@ export const RunCommand = effectCmd({
               const permission = event.properties
               if (!sessions.has(permission.sessionID)) continue
 
-              const lock = ConfigPolicy.permissionLockFor(locked, permission.permission)
-              if (auto && lock && !refusedAuto.has(lock)) {
-                refusedAuto.add(lock)
-                await Effect.runPromise(ConfigPolicy.refused(lock, "--auto")).catch(() => undefined)
-              }
-              if (auto && !lock) {
+              if (auto) {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "once",

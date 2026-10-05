@@ -142,10 +142,10 @@ export function unknownKeys(locked: ReadonlyArray<string>) {
 }
 
 // XCOD-202: permission rules are matched last-wins with wildcards, so replacing the locked keys in
-// config isn't enough: a `"*": "allow"` later in user config, an agent's own `permission`, or an
-// "always allow" from the session would still outrank them. The permission service evaluates
-// these managed rules after everything else instead. Managed config is machine-wide, so this is
-// process state, set on every config load (like `AuditLog.activate`).
+// config isn't enough: a `"*": "allow"` later in user config or an agent's own `permission` would
+// still outrank them. The permission service evaluates these managed rules after the configured
+// ones instead (the user's own "always allow" still answers a locked "ask"). Managed config
+// is machine-wide, so this is process state, set on every config load (like `AuditLog.activate`).
 type PermissionLock = { all: boolean; tools: ReadonlySet<string>; rules: Record_ }
 let permissionLock: PermissionLock = { all: false, tools: new Set(), rules: {} }
 
@@ -210,11 +210,6 @@ export function applyAgentPermissions<T extends Record_>(
   return next as T
 }
 
-/** The `$locked` entry covering a permission, if any: what `--auto` must not answer for. */
-export function permissionLockFor(locked: ReadonlyArray<string>, permission: string) {
-  return locked.find((key) => isLocked([key], `permission.${permission}`))
-}
-
 /** The managed rules for locked permissions, in config shape. */
 export function lockedPermission(): Record_ {
   return permissionLock.rules
@@ -223,11 +218,6 @@ export function lockedPermission(): Record_ {
 /** Whether the organisation has locked this permission (or all of them). */
 export function isPermissionLocked(permission: string) {
   return permissionLock.all || permissionLock.tools.has(permission)
-}
-
-/** The `$locked` key that covers this permission, for refusals and messages. */
-export function permissionKey(permission: string) {
-  return permissionLock.all ? "permission" : `permission.${permission}`
 }
 
 /** The one message every refused override shows, whichever surface it came through. */
