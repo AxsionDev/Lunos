@@ -18,6 +18,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Changed
+
+- **Stricter front-matter parsing.** Agent, mode and command files must use YAML (or JSON) front
+  matter; a file using any other front-matter language is now refused with an error naming the
+  file, and skipped (XCOD-208).
+
 ## [1.18.44] - 2026-10-05
 
 ### Fixed
