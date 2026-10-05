@@ -166,8 +166,12 @@ exports[`opencode CLI help-text snapshots every documented command emits stable 
 manage agents
 
 Commands:
-  lunos agent create  create a new agent
-  lunos agent list    list all available agents
+  lunos agent create           create a new agent
+  lunos agent list             list all available agents
+  lunos agent export <name>    export an agent, with the MCP servers and skills it uses, as a bundle
+                               to share
+  lunos agent import <source>  import an agent from a bundle (file or https URL) or a Claude Code
+                               subagent file (.md)
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -668,6 +672,51 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent export --help 1`] = `
+"lunos agent export <name>
+
+export an agent, with the MCP servers and skills it uses, as a bundle to share
+
+Positionals:
+  name  agent to export                                                          [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+  -o, --output      file to write (default: <name>.lunos-agent)                             [string]
+      --mcp         comma-separated MCP servers to include, besides those the agent's permissions
+                    name                                                                    [string]
+      --skill       comma-separated skills to include, besides those the agent's permissions name
+                                                                                            [string]
+      --force       overwrite the output file                             [boolean] [default: false]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent import --help 1`] = `
+"lunos agent import <source>
+
+import an agent from a bundle (file or https URL) or a Claude Code subagent file (.md)
+
+Positionals:
+  source  bundle file, https URL, or .claude/agents/*.md                         [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --name        import under this name                                                  [string]
+      --project     add to this project (.opencode/) instead of your global config
+                                                                          [boolean] [default: false]
+      --trust       keep the bundle's allow on bash, edit and task (otherwise they become ask)
+                                                                          [boolean] [default: false]
+      --dry-run     show what would be imported, write nothing            [boolean] [default: false]
+  -y, --yes         import without asking                                 [boolean] [default: false]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode session list --help 1`] = `

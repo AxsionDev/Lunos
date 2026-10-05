@@ -18,6 +18,17 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **Share an agent as one file.** `lunos agent export <name>` writes the agent, the MCP servers it
+  uses and the skills it names into a `.lunos-agent` bundle, with MCP environment variables and
+  headers by name only, never by value. `lunos agent import <file|url>` shows what the agent may
+  do, what it adds and where its model runs before writing anything. Imported agents ask before
+  bash, edits and subagents unless you pass `--trust`, and Claude Code subagent files import with
+  a report of the fields that didn't carry over. An organisation can turn imports off with a
+  locked `agent_import: false`. See [Sharing agents](docs/sharing-agents.md) (XCOD-209, part of
+  XCOD-203).
+
 ### Changed
 
 - **Stricter front-matter parsing.** Agent, mode and command files must use YAML (or JSON) front

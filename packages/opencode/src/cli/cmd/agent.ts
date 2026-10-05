@@ -10,6 +10,7 @@ import { EOL } from "os"
 import type { Argv } from "yargs"
 import { Effect } from "effect"
 import { effectCmd } from "../effect-cmd"
+import { AgentExportCommand, AgentImportCommand } from "./agent-bundle"
 
 type AgentMode = "all" | "primary" | "subagent"
 
@@ -337,6 +338,12 @@ const AgentListCommand = effectCmd({
 export const AgentCommand = cmd({
   command: "agent",
   describe: "manage agents",
-  builder: (yargs) => yargs.command(AgentCreateCommand).command(AgentListCommand).demandCommand(),
+  builder: (yargs) =>
+    yargs
+      .command(AgentCreateCommand)
+      .command(AgentListCommand)
+      .command(AgentExportCommand)
+      .command(AgentImportCommand)
+      .demandCommand(),
   async handler() {},
 })

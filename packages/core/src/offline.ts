@@ -196,7 +196,7 @@ export const CALLS: Call[] = [
   },
   {
     id: "commands",
-    what: "`account login`, `providers login`, `import <url>`, `github install` / `run`",
+    what: "`account login`, `providers login`, `import <url>`, `agent import <url>`, `github install` / `run`",
     hosts: "api.github.com, the URL you pass",
     when: "only when you run that command",
     offline: "command",

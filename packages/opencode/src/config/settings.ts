@@ -64,6 +64,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   marketplace: "Marketplace & plugins",
   marketplace_default: "Marketplace & plugins",
   marketplace_unreviewed: "Marketplace & plugins",
+  agent_import: "Models & agents",
   marketplace_allow: "Marketplace & plugins",
   plugin: "Marketplace & plugins",
   layout: "Appearance",

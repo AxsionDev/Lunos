@@ -199,6 +199,10 @@ export const Info = Schema.Struct({
   marketplace_default: Schema.optional(Schema.Boolean).annotate({
     description: "Whether the built-in lunos-community marketplace is used (default: true)",
   }),
+  agent_import: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Whether `lunos agent import` may add agents from bundles and Claude Code files (default: true). Organisation policy: lock it in managed config to forbid imports",
+  }),
   marketplace_unreviewed: Schema.optional(Schema.Boolean).annotate({
     description:
       "Organisation policy: false forbids installing marketplace entries that aren't verified (--allow-unreviewed), when locked in managed config",
