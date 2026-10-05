@@ -216,6 +216,13 @@ have begun to diverge. Treat it as a reference, not as Lunos documentation.
 If you're interested in contributing to Lunos, please read our
 [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
 
+### Licence
+
+Lunos is MIT-licensed, and everything in this repository stays MIT. ITService EOOD, which develops
+Lunos, is planning paid additions, such as a hosted service (Lunos Cloud) and team features. Those
+will be new code in separate repositories, under their own licences. Nothing in this repository
+will move behind a paywall. See [docs/licensing.md](docs/licensing.md).
+
 ### Building on OpenCode
 
 If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
