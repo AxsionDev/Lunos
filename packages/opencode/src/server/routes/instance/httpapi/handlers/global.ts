@@ -90,11 +90,11 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       const method = yield* installation.method()
       if (method === "unknown") {
         return HttpServerResponse.jsonUnsafe(
-          { success: false as const, error: "Unknown installation method" },
+          { success: false as const, error: Installation.unpublishedMessage(method) },
           { status: 400 },
         )
       }
-      const target = ctx.payload.target
+      const target = ctx.payload.target ?? (yield* installation.latest(method))
       const result = yield* installation.upgrade(method, target).pipe(
         Effect.as({ success: true as const, version: target }),
         Effect.catch((err) =>

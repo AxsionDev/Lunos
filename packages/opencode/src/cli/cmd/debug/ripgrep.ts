@@ -4,6 +4,7 @@ import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { effectCmd } from "../../effect-cmd"
 import { cmd } from "../cmd"
 import { InstanceRef } from "@/effect/instance-ref"
+import { writeStdoutEffect } from "../../stdout"
 
 export const RipgrepCommand = cmd({
   command: "rg",
@@ -40,7 +41,7 @@ const FilesCommand = effectCmd({
         limit: args.limit ?? 10_000,
       })
       .pipe(Effect.orDie)
-    process.stdout.write(files.map((file) => file.path).join(EOL) + EOL)
+    yield* writeStdoutEffect(files.map((file) => file.path).join(EOL) + EOL)
   }),
 })
 
@@ -74,6 +75,6 @@ const SearchCommand = effectCmd({
         limit: args.limit ?? 10_000,
       })
       .pipe(Effect.orDie)
-    process.stdout.write(JSON.stringify(results, null, 2) + EOL)
+    yield* writeStdoutEffect(JSON.stringify(results, null, 2) + EOL)
   }),
 })

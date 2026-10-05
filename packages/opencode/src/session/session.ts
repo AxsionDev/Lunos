@@ -328,11 +328,32 @@ export const Event = {
   Error: SessionV1.Event.Error,
 }
 
+// `plan`, `research` and `dev-cycle` must stay in lockstep: each agent's
+// permissions are built from the same directory name (see agent/agent.ts), so
+// a change here that isn't mirrored there leaves a mode allowed to write to a
+// path it is never told about, or told about a path it cannot write. For
+// `dev-cycle` the keyed entry is `external_directory` rather than `edit`
+// (agent.ts:230) — it does not restrict edits, but an unmirrored rename there
+// sends every artifact write outside the worktree to the `"*": "ask"` default.
+/** Directory an artifact kind lives in: in the worktree (reviewable, committable) under VCS. */
+export function artifactDir(dir: string, instance: InstanceContext) {
+  return instance.project.vcs ? path.join(instance.worktree, ".opencode", dir) : path.join(Global.Path.data, dir)
+}
+
+function artifact(dir: string, input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return path.join(artifactDir(dir, instance), [input.time.created, input.slug].join("-") + ".md")
+}
+
 export function plan(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
-  const base = instance.project.vcs
-    ? path.join(instance.worktree, ".opencode", "plans")
-    : path.join(Global.Path.data, "plans")
-  return path.join(base, [input.time.created, input.slug].join("-") + ".md")
+  return artifact("plans", input, instance)
+}
+
+export function research(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return artifact("research", input, instance)
+}
+
+export function devcycle(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return artifact("dev-cycle", input, instance)
 }
 
 export const getUsage = (input: { model: Provider.Model; usage: Usage; metadata?: ProviderMetadata }) => {

@@ -15,6 +15,7 @@ import { useTuiPaths } from "../../context/runtime"
 import { useTuiConfig } from "../../config"
 import { useLocation } from "../../context/location"
 import { useTheme, selectedForeground } from "../../context/theme"
+import { useToast } from "../../ui/toast"
 import { SplitBorder } from "../../ui/border"
 import { useTerminalDimensions } from "@opentui/solid"
 import { Locale } from "../../util/locale"
@@ -65,6 +66,7 @@ export type AutocompleteOption = {
   display: string
   value?: string
   aliases?: string[]
+  aliasHints?: Record<string, string>
   disabled?: boolean
   description?: string
   isDirectory?: boolean
@@ -87,6 +89,7 @@ export function Autocomplete(props: {
   const editor = useEditorContext()
   const sdk = useSDK()
   const sync = useSync()
+  const toast = useToast()
   const data = useData()
   const project = useProject()
   const slashes = useCommandSlashes()
@@ -553,8 +556,10 @@ export function Autocomplete(props: {
   function select() {
     const selected = options()[store.selected]
     if (!selected) return
+    const hint = store.visible === "/" ? selected.aliasHints?.["/" + search().trim()] : undefined
     hide()
     selected.onSelect?.()
+    if (hint) toast.show({ variant: "info", message: hint, duration: 5000 })
   }
 
   function expandDirectory() {

@@ -7,7 +7,12 @@ import { FSUtil } from "@opencode-ai/core/fs-util"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
-const file = path.join(Global.Path.data, "auth.json")
+// XCOD-157: inside a sandbox the data directory is on the sandbox volume, which outlives the run
+// when the sandbox is kept. Credentials written there (a refreshed OAuth token, with everything else
+// `all()` returns) would stay behind, so they go on the runtime tmpfs instead, gone on stop.
+const file = process.env.LUNOS_SANDBOX_RUNTIME
+  ? path.join(path.dirname(process.env.LUNOS_SANDBOX_RUNTIME), "auth.json")
+  : path.join(Global.Path.data, "auth.json")
 
 const fail = (message: string) => (cause: unknown) => new AuthError({ message, cause })
 

@@ -1,11 +1,16 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { AuditLog } from "@/audit/log"
 import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { InstanceState } from "@/effect/instance-state"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
 import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
+import path from "path"
+import { TRUNCATION_DIR } from "@/tool/truncation-dir"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { ConfigPolicy } from "@/config/policy"
 
 export const Event = PermissionV1.Event
 
@@ -25,16 +30,29 @@ interface State {
   approved: PermissionV1.Rule[]
 }
 
+function match(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]) {
+  return rulesets
+    .flat()
+    .findLast((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern))
+}
+
 export function evaluate(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]): PermissionV1.Rule {
-  return (
-    rulesets
-      .flat()
-      .findLast((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern)) ?? {
-      action: "ask",
-      permission,
-      pattern: "*",
-    }
-  )
+  return match(permission, pattern, ...rulesets) ?? { action: "ask", permission, pattern: "*" }
+}
+
+const TRUNCATED = path.join(TRUNCATION_DIR, "*")
+
+/**
+ * XCOD-202: the managed rules for locked permissions. Every agent may read truncated tool output
+ * (agent.ts), so that allow follows them unless the policy names the directory itself.
+ */
+function lockedRules() {
+  const config = ConfigPolicy.lockedPermission() as ConfigPermissionV1.Info
+  const rules = fromConfig(config)
+  if (!rules.some((rule) => rule.permission === "external_directory")) return rules
+  const own = config.external_directory
+  if (typeof own === "object" && TRUNCATED in own) return rules
+  return [...rules, ...fromConfig({ external_directory: { [TRUNCATED]: "allow" } })]
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
@@ -67,14 +85,24 @@ const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
+      const locked = lockedRules()
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        const rule = evaluate(request.permission, pattern, ruleset, approved)
+        // XCOD-202: the organisation's locked rule outranks any wildcard, agent rule or "always
+        // allow", but never lifts a deny: a lock can't loosen what Lunos itself restricts.
+        const base = evaluate(request.permission, pattern, ruleset, approved)
+        const rule = base.action === "deny" ? base : (match(request.permission, pattern, locked) ?? base)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
+          AuditLog.emit("permission.decision", {
+            session: request.sessionID,
+            permission: request.permission,
+            patterns: request.patterns,
+            decision: "denied by rule",
+          })
           return yield* new PermissionV1.DeniedError({
-            ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
+            ruleset: [...ruleset, ...locked].filter((rule) => Wildcard.match(request.permission, rule.permission)),
           })
         }
         if (rule.action === "allow") continue
@@ -97,6 +125,12 @@ const layer = Layer.effect(
 
       const deferred = yield* Deferred.make<void, PermissionV1.RejectedError | PermissionV1.CorrectedError>()
       pending.set(id, { info, deferred })
+      AuditLog.emit("permission.decision", {
+        session: info.sessionID,
+        permission: info.permission,
+        patterns: info.patterns,
+        decision: "asked",
+      })
       yield* events.publish(Event.Asked, info)
       return yield* Effect.ensuring(
         Deferred.await(deferred),
@@ -112,13 +146,23 @@ const layer = Layer.effect(
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
       pending.delete(input.requestID)
+      // XCOD-202: "always allow" can't stick to a permission the organisation locked; it counts once.
+      const downgraded = input.reply === "always" && ConfigPolicy.isPermissionLocked(existing.info.permission)
+      if (downgraded) yield* ConfigPolicy.refused(ConfigPolicy.permissionKey(existing.info.permission), "always allow")
+      const answer = downgraded ? "once" : input.reply
+      AuditLog.emit("permission.decision", {
+        session: existing.info.sessionID,
+        permission: existing.info.permission,
+        patterns: existing.info.patterns,
+        decision: answer === "reject" ? "denied" : answer === "always" ? "allowed always" : "allowed once",
+      })
       yield* events.publish(Event.Replied, {
         sessionID: existing.info.sessionID,
         requestID: existing.info.id,
-        reply: input.reply,
+        reply: answer,
       })
 
-      if (input.reply === "reject") {
+      if (answer === "reject") {
         yield* Deferred.fail(
           existing.deferred,
           input.message
@@ -140,7 +184,7 @@ const layer = Layer.effect(
       }
 
       yield* Deferred.succeed(existing.deferred, undefined)
-      if (input.reply === "once") return
+      if (answer === "once") return
 
       for (const pattern of existing.info.always) {
         approved.push({
@@ -175,6 +219,9 @@ const layer = Layer.effect(
   }),
 )
 
+/** Permissions whose patterns are filesystem paths. */
+const PATH_PERMISSIONS = ["external_directory", "read", "edit"]
+
 function expand(pattern: string): string {
   if (pattern.startsWith("~/")) return os.homedir() + pattern.slice(1)
   if (pattern === "~") return os.homedir()
@@ -190,8 +237,16 @@ export function fromConfig(permission: ConfigPermissionV1.Info) {
       ruleset.push({ permission: key, action: value, pattern: "*" })
       continue
     }
+    // XCOD-149: a path rule written with a Windows 8.3 short name also gets its long form, so it matches
+    // expanded request paths. The rule as written stays, for callers that still pass the short form.
+    const path = PATH_PERMISSIONS.includes(key)
     ruleset.push(
-      ...Object.entries(value).map(([pattern, action]) => ({ permission: key, pattern: expand(pattern), action })),
+      ...Object.entries(value).flatMap(([pattern, action]) => {
+        const written = expand(pattern)
+        const long = path ? FSUtil.canonicalPattern(written) : written
+        const rule = { permission: key, pattern: written, action }
+        return long === written ? [rule] : [rule, { ...rule, pattern: long }]
+      }),
     )
   }
   return ruleset
@@ -204,9 +259,16 @@ export function merge(...rulesets: PermissionV1.Ruleset[]): PermissionV1.Rule[] 
 export function disabled(tools: string[], ruleset: PermissionV1.Ruleset): Set<string> {
   const edits = ["edit", "write", "apply_patch"]
   const reads = ["list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource"]
+  const memory = ["memory_remember", "memory_search"]
   return new Set(
     tools.filter((tool) => {
-      const permission = edits.includes(tool) ? "edit" : reads.includes(tool) ? "read" : tool
+      const permission = edits.includes(tool)
+        ? "edit"
+        : reads.includes(tool)
+          ? "read"
+          : memory.includes(tool)
+            ? "memory"
+            : tool
       const rule = ruleset.findLast((rule) => Wildcard.match(permission, rule.permission))
       return rule?.pattern === "*" && rule.action === "deny"
     }),

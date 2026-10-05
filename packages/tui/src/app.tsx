@@ -1,10 +1,19 @@
 import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
+import { animationsEnabled } from "./util/motion"
+import { DialogArtifacts } from "./component/dialog-artifacts"
+import { DialogBackground } from "./component/dialog-background"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import {
+  InstallationVersion,
+  manualInstallCommand,
+  newVersionMessage,
+  updateRestartHint,
+} from "@opencode-ai/core/installation/version"
+import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
@@ -26,9 +35,10 @@ import {
 } from "solid-js"
 import { TuiPathsProvider, TuiStartupProvider, TuiTerminalEnvironmentProvider, useTuiStartup } from "./context/runtime"
 import { DialogProvider, useDialog } from "./ui/dialog"
-import { DialogProvider as DialogProviderList } from "./component/dialog-provider"
+import { DialogProvider as DialogProviderConnect, DialogProviders } from "./component/dialog-provider"
 import { ErrorComponent } from "./component/error-component"
 import { PluginRouteMissing } from "./component/plugin-route-missing"
+import { UpdateNotice } from "./component/update-notice"
 import { ProjectProvider, useProject } from "./context/project"
 import { EditorContextProvider } from "./context/editor"
 import { useEvent } from "./context/event"
@@ -43,10 +53,11 @@ import { DialogModel } from "./component/dialog-model"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogStatus } from "./component/dialog-status"
+import { DialogSettings } from "./component/dialog-settings"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
-import { DialogAgent } from "./component/dialog-agent"
+import { DialogMode } from "./component/dialog-mode"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
@@ -86,6 +97,15 @@ import * as TuiAudio from "./audio"
 import { win32DisableProcessedInput, win32FlushInputBuffer } from "./terminal-win32"
 import { destroyRenderer } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
+import {
+  restartBanner,
+  restartBusyMessage,
+  restartDraft,
+  type RestartChoice,
+  type RestartHost,
+  type Restarted,
+} from "./util/restart"
+import { DialogSelect } from "./ui/dialog-select"
 
 registerOpencodeSpinner()
 
@@ -110,13 +130,13 @@ const appBindingCommands = [
   "model.cycle_recent_reverse",
   "model.cycle_favorite",
   "model.cycle_favorite_reverse",
-  "agent.list",
+  "mode.list",
   "mcp.list",
-  "agent.cycle",
-  "agent.cycle.reverse",
+  "mode.cycle",
+  "mode.cycle.reverse",
   "variant.cycle",
   "variant.list",
-  "provider.connect",
+  "provider.list",
   "console.org.switch",
   "opencode.status",
   "opencode.debug",
@@ -130,6 +150,7 @@ const appBindingCommands = [
   "app.debug",
   "app.console",
   "app.heap_snapshot",
+  "app.restart",
   "terminal.suspend",
   "terminal.title.toggle",
   "app.toggle.animations",
@@ -144,11 +165,19 @@ export type TuiInput = {
   args: Args
   config: TuiConfig.Resolved
   onSnapshot?: () => Promise<string[]>
+  /** Called once the app listens for server events, so one-off events sent after it aren't lost. */
+  onListening?: () => void
   directory?: string
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
   events?: EventSource
   pluginHost: TuiPluginHost
+  /** XCOD-129: offers `/restart`, and receives the request once the user confirms it. */
+  restart?: RestartHost
+  /** XCOD-129: set when this process is the relaunch of a `/restart`. */
+  restarted?: Restarted & { sessionID?: string }
+  /** Called once the TUI has loaded its data: a relaunch counts as started from here. */
+  onStarted?: () => void
 }
 
 function errorMessage(error: unknown) {
@@ -166,26 +195,17 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-function isVersionGreater(left: string, right: string) {
-  const parse = (value: string) => {
-    const [core, prerelease] = value.replace(/^v/, "").split("-", 2)
-    return { core: core.split(".").map((part) => Number.parseInt(part, 10) || 0), prerelease }
-  }
-  const a = parse(left)
-  const b = parse(right)
-  for (let index = 0; index < Math.max(a.core.length, b.core.length); index++) {
-    const difference = (a.core[index] ?? 0) - (b.core[index] ?? 0)
-    if (difference) return difference > 0
-  }
-  if (a.prerelease === b.prerelease) return false
-  if (!a.prerelease) return true
-  if (!b.prerelease) return false
-  return a.prerelease.localeCompare(b.prerelease, undefined, { numeric: true }) > 0
-}
-
 export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
   const global = yield* Global.Service
-  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown }
+  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown, restarting: false }
+  // XCOD-129: a restart replaces this process, so the "continue with lunos -s" epilogue is noise.
+  const restartHost: RestartHost | undefined = input.restart && {
+    ...input.restart,
+    request: (request) => {
+      exit.restarting = true
+      input.restart?.request(request)
+    },
+  }
   const result = yield* Effect.scoped(
     Effect.gen(function* () {
       const renderer = yield* Effect.acquireRelease(
@@ -317,7 +337,11 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                   <LocationProvider>
                                                                     <App
                                                                       onSnapshot={input.onSnapshot}
+                                                                      onListening={input.onListening}
                                                                       pluginHost={input.pluginHost}
+                                                                      restart={restartHost}
+                                                                      restarted={input.restarted}
+                                                                      onStarted={input.onStarted}
                                                                     />
                                                                   </LocationProvider>
                                                                 </EditorContextProvider>
@@ -360,11 +384,18 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       process.stderr.write((cliErrorMessage(result.reason) ?? errorFormat(result.reason)) + "\n")
       process.exitCode = 1
     }
-    if (result.epilogue) process.stdout.write(result.epilogue + "\n")
+    if (result.epilogue && !exit.restarting) process.stdout.write(result.epilogue + "\n")
   })
 })
 
-function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPluginHost }) {
+function App(props: {
+  onSnapshot?: () => Promise<string[]>
+  onListening?: () => void
+  pluginHost: TuiPluginHost
+  restart?: RestartHost
+  restarted?: Restarted & { sessionID?: string }
+  onStarted?: () => void
+}) {
   const startup = useTuiStartup()
   const tuiConfig = useTuiConfig()
   const route = useRoute()
@@ -407,6 +438,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     }),
   )
   const [ready, setReady] = createSignal(false)
+  // XCOD-147: set only by this session's update check, never from persisted state, so the notice
+  // can't outlive a switch that turned checks off.
+  const [availableVersion, setAvailableVersion] = createSignal<string | undefined>()
+  const updateNotice = createMemo(() => {
+    const version = availableVersion()
+    return version && InstallationVersion !== "local" && isVersionGreater(version, InstallationVersion)
+      ? version
+      : undefined
+  })
   props.pluginHost
     .start({
       api,
@@ -456,14 +496,14 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
 
     if (route.data.type === "home") {
-      renderer.setTerminalTitle("OpenCode")
+      renderer.setTerminalTitle("Lunos")
       return
     }
 
     if (route.data.type === "session") {
       const session = sync.session.get(route.data.sessionID)
       if (!session || isDefaultTitle(session.title)) {
-        renderer.setTerminalTitle("OpenCode")
+        renderer.setTerminalTitle("Lunos")
         return
       }
 
@@ -479,8 +519,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
 
   const args = useArgs()
   onMount(() => {
+    for (const item of tuiConfig.deprecatedKeybinds) {
+      toast.show({
+        variant: "warning",
+        message: `Keybind "${item.legacy}" is deprecated, use "${item.canonical}" instead`,
+        duration: 5000,
+      })
+    }
     batch(() => {
-      if (args.agent) local.agent.set(args.agent)
+      if (args.mode) local.mode.set(args.mode)
       if (args.model) {
         const { providerID, modelID } = Model.parse(args.model)
         if (!providerID || !modelID)
@@ -495,9 +542,29 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         route.navigate({
           type: "session",
           sessionID: args.sessionID,
+          // XCOD-129: after /restart, the unsent prompt comes back with the session.
+          prompt: props.restarted?.draft,
         })
+      } else if (props.restarted?.draft) {
+        route.navigate({ type: "home", prompt: props.restarted.draft })
       }
     })
+    // XCOD-128: `lunos settings` starts on the settings screen.
+    if (args.settings) dialog.replace(() => <DialogSettings tab={args.settings} />)
+    if (props.restarted)
+      toast.show({
+        variant: "success",
+        message: restartBanner(props.restarted, InstallationVersion),
+        duration: 8000,
+      })
+  })
+
+  // XCOD-129: a relaunch has started once its data is loaded; a later error is an ordinary one.
+  let started = false
+  createEffect(() => {
+    if (started || sync.status !== "complete") return
+    started = true
+    props.onStarted?.()
   })
 
   let continued = false
@@ -545,7 +612,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       (isEmpty, wasEmpty) => {
         // only trigger when we transition into an empty-provider state
         if (!isEmpty || wasEmpty) return
-        dialog.replace(() => <DialogProviderList />)
+        dialog.replace(() => <DialogProviderConnect />)
       },
     ),
   )
@@ -558,6 +625,121 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (workspace?.type !== "worktree" || !workspace.directory) return
     return workspace
   })
+  // XCOD-129: /restart. Set by /update, so the restart runs the newly installed version.
+  const [upgradedTo, setUpgradedTo] = createSignal<string | undefined>()
+  // While "wait for the current turn" is pending; running /restart again cancels it.
+  const [restartPending, setRestartPending] = createSignal<{ cancel: () => void } | undefined>()
+
+  const busySessionIDs = () =>
+    Object.entries(sync.data.session_status)
+      .filter(([, status]) => status && status.type !== "idle")
+      .map(([id]) => id)
+
+  // Every job, not only this session's: shutting the worker down stops all of them.
+  async function runningJobs() {
+    const result = await sdk.client.experimental.background.list().catch(() => undefined)
+    return (result?.data ?? []).filter((job) => job.status === "running")
+  }
+
+  async function settled(timeout: number | undefined, cancelled: () => boolean) {
+    const deadline = timeout === undefined ? undefined : Date.now() + timeout
+    while (!cancelled()) {
+      if (busySessionIDs().length === 0 && (await runningJobs()).length === 0) return true
+      if (deadline !== undefined && Date.now() > deadline) return false
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+    return false
+  }
+
+  async function restart(fresh: boolean) {
+    const host = props.restart
+    if (!host) {
+      toast.show({ variant: "warning", message: "Restart isn't available in this client." })
+      return
+    }
+    const pending = restartPending()
+    if (pending) {
+      pending.cancel()
+      toast.show({ variant: "info", message: "Restart cancelled." })
+      return
+    }
+    const cancelled: string[] = []
+
+    // Attached to a server this client doesn't own: the turn and its jobs run there and carry on.
+    if (!host.attach) {
+      const jobs = await runningJobs()
+      // A background job's own session is busy too; count it as the job, not as a turn.
+      const turns = () => busySessionIDs().filter((id) => !jobs.some((job) => job.sessionID === id))
+      const message = restartBusyMessage({ busySessions: turns().length, runningJobs: jobs.map((j) => j.id) })
+      if (message) {
+        const choice = await new Promise<RestartChoice>((resolve) => {
+          dialog.replace(
+            () => (
+              <DialogSelect<RestartChoice>
+                title="Restart Lunos?"
+                placeholder={message}
+                skipFilter
+                options={[
+                  { title: "Wait for the current turn, then restart", value: "wait" },
+                  { title: "Stop and restart (cancels running work)", value: "stop" },
+                  { title: "Cancel", value: "cancel" },
+                ]}
+                onSelect={(option) => {
+                  resolve(option.value)
+                  dialog.clear()
+                }}
+              />
+            ),
+            () => resolve("cancel"),
+          )
+        })
+        if (choice === "cancel") return
+        if (choice === "wait") {
+          let stop = false
+          setRestartPending({ cancel: () => (stop = true) })
+          toast.show({
+            variant: "info",
+            message: "Lunos will restart when the current work finishes. Run /restart again to cancel.",
+            duration: 8000,
+          })
+          const done = await settled(undefined, () => stop)
+          setRestartPending(undefined)
+          if (!done) return
+        }
+        if (choice === "stop") {
+          const busy = turns()
+          if (busy.length) cancelled.push(busy.length === 1 ? "the current turn" : `${busy.length} running turns`)
+          for (const job of jobs) cancelled.push(`background job ${job.title ?? job.id}`)
+          await Promise.all([
+            ...busy.map((sessionID) => sdk.client.session.abort({ sessionID }).catch(() => {})),
+            ...jobs.map((job) => sdk.client.experimental.background.cancel({ jobID: job.id }).catch(() => {})),
+          ])
+          // Never restart while a tool may still be writing: wait until the aborted work has
+          // actually stopped, and give up (without restarting) if it doesn't.
+          if (!(await settled(15_000, () => false))) {
+            toast.show({
+              variant: "error",
+              message: "The running work didn't stop within 15s, so Lunos didn't restart. Try /restart again.",
+              duration: 8000,
+            })
+            return
+          }
+        }
+      }
+    }
+
+    const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
+    // Read last: while waiting, the user may have typed more, or sent what was there.
+    const draft = restartDraft(promptRef.current?.current)
+    host.request({ sessionID: fresh ? undefined : sessionID, fresh, draft, cancelled, upgraded: upgradedTo() })
+    if (host.attach)
+      toast.show({
+        variant: "info",
+        message: `Restarting this client only; the server at ${host.attach} keeps running.`,
+      })
+    exit()
+  }
+
   const appCommands = createMemo(() =>
     [
       {
@@ -578,6 +760,26 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         slashAliases: ["resume", "continue"],
         run: () => {
           dialog.replace(() => <DialogSessionList />)
+        },
+      },
+      {
+        name: "artifact.list",
+        title: "Plans and research notes",
+        category: "Session",
+        slashName: "artifacts",
+        slashAliases: ["plans"],
+        run: () => {
+          dialog.replace(() => <DialogArtifacts />)
+        },
+      },
+      {
+        name: "background.list",
+        title: "Background subagents",
+        category: "Session",
+        slashName: "tasks",
+        slashAliases: ["background"],
+        run: () => {
+          dialog.replace(() => <DialogBackground />)
         },
       },
       {
@@ -632,7 +834,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "model.list",
         title: "Switch model",
         suggested: true,
-        category: "Agent",
+        category: "Mode",
         slashName: "models",
         // Bias /mo toward /models over /move without changing global fuzzy scoring.
         slashAliases: ["mo"],
@@ -643,7 +845,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_recent",
         title: "Model cycle",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycle(1)
@@ -652,7 +854,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_recent_reverse",
         title: "Model cycle reverse",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycle(-1)
@@ -661,7 +863,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_favorite",
         title: "Favorite cycle",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycleFavorite(1)
@@ -670,43 +872,49 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_favorite_reverse",
         title: "Favorite cycle reverse",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycleFavorite(-1)
         },
       },
       {
-        name: "agent.list",
-        title: "Switch agent",
-        category: "Agent",
-        slashName: "agents",
+        name: "mode.list",
+        title: "Switch mode",
+        category: "Mode",
+        slashName: "modes",
+        // Deprecated alias (XCOD-40): "/agents" still resolves here via fuzzy
+        // slash matching (isVisiblePaletteCommand excludes hidden commands
+        // from the slash list, so a separate hidden alias command would
+        // never actually be reachable — this must be an alias on the visible
+        // command, not a second entry).
+        slashAliases: ["agents"],
         run: () => {
-          dialog.replace(() => <DialogAgent />)
+          dialog.replace(() => <DialogMode />)
         },
       },
       {
         name: "mcp.list",
         title: "Toggle MCPs",
-        category: "Agent",
+        category: "Mode",
         slashName: "mcps",
         run: () => {
           dialog.replace(() => <DialogMcp />)
         },
       },
       {
-        name: "agent.cycle",
-        title: "Agent cycle",
-        category: "Agent",
+        name: "mode.cycle",
+        title: "Mode cycle",
+        category: "Mode",
         hidden: true,
         run: () => {
-          local.agent.move(1)
+          local.mode.move(1)
         },
       },
       {
         name: "variant.cycle",
         title: "Variant cycle",
-        category: "Agent",
+        category: "Mode",
         run: () => {
           local.model.variant.cycle()
         },
@@ -714,7 +922,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "variant.list",
         title: "Switch model variant",
-        category: "Agent",
+        category: "Mode",
         hidden: local.model.variant.list().length === 0,
         slashName: "variants",
         run: () => {
@@ -729,23 +937,36 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         },
       },
       {
-        name: "agent.cycle.reverse",
-        title: "Agent cycle reverse",
-        category: "Agent",
+        name: "mode.cycle.reverse",
+        title: "Mode cycle reverse",
+        category: "Mode",
         hidden: true,
         run: () => {
-          local.agent.move(-1)
+          local.mode.move(-1)
         },
       },
       {
-        name: "provider.connect",
-        title: "Connect provider",
+        name: "provider.list",
+        title: "Providers",
         suggested: !connected(),
-        slashName: "connect",
+        slashName: "providers",
+        // XCOD-130: the old slash name still resolves here, with a rename hint. Remove in 1.21.0.
+        slashAliases: ["connect"],
+        slashAliasHints: { connect: "/connect is now /providers" },
         run: () => {
-          dialog.replace(() => <DialogProviderList />)
+          dialog.replace(() => <DialogProviders />)
         },
         category: "Provider",
+      },
+      {
+        // XCOD-130: pre-rename command id, kept for plugins and /tui/execute-command callers.
+        name: "provider.connect",
+        title: "Providers",
+        category: "Provider",
+        hidden: true,
+        run: () => {
+          dialog.replace(() => <DialogProviders />)
+        },
       },
       ...(sync.data.console_state.switchableOrgCount > 1
         ? [
@@ -762,6 +983,17 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
             },
           ]
         : []),
+      {
+        // XCOD-128: every configuration option in one place; /config is Claude Code's name for it.
+        name: "settings.open",
+        title: "Settings",
+        slashName: "settings",
+        slashAliases: ["config"],
+        run: () => {
+          dialog.replace(() => <DialogSettings tab="settings" />)
+        },
+        category: "System",
+      },
       {
         name: "opencode.status",
         title: "View status",
@@ -821,11 +1053,47 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          openUrl("https://opencode.ai/docs").catch(() => {})
+          openUrl("https://docs.lunos.tech/docs/").catch(() => {})
           dialog.clear()
         },
         category: "System",
       },
+      {
+        name: "app.upgrade",
+        title: "Update Lunos",
+        slashName: "update",
+        // `/upgrade` was the name until XCOD-147; it keeps working.
+        slashAliases: ["upgrade"],
+        run: () => {
+          dialog.clear()
+          void runUpgrade(undefined)
+        },
+        category: "System",
+      },
+      ...(props.restart
+        ? [
+            {
+              name: "app.restart",
+              title: "Restart Lunos",
+              desc: props.restart.attach ? "Restart this client (the server keeps running)" : undefined,
+              slashName: "restart",
+              run: () => {
+                dialog.clear()
+                void restart(false)
+              },
+              category: "System",
+            },
+            {
+              name: "app.restart.fresh",
+              title: "Restart Lunos in a new session",
+              run: () => {
+                dialog.clear()
+                void restart(true)
+              },
+              category: "System",
+            },
+          ]
+        : []),
       {
         name: "app.exit",
         title: "Exit the app",
@@ -894,10 +1162,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       },
       {
         name: "app.toggle.animations",
-        title: kv.get("animations_enabled", true) ? "Disable animations" : "Enable animations",
+        title:
+          tuiConfig.reduced_motion === true
+            ? "Animations are off (reduced_motion in config)"
+            : animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled"))
+              ? "Disable animations"
+              : "Enable animations",
         category: "System",
         run: () => {
-          kv.set("animations_enabled", !kv.get("animations_enabled", true))
+          if (tuiConfig.reduced_motion !== true)
+            kv.set("animations_enabled", !animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled")))
           dialog.clear()
         },
       },
@@ -1030,9 +1304,48 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     })
   })
 
+  // One flow for the reminder dialog and /update. `target` undefined means "latest";
+  // the server resolves it from the lunos-ai registry entry.
+  async function runUpgrade(target: string | undefined) {
+    toast.show({
+      variant: "info",
+      message: target ? `Updating to Lunos v${target}…` : "Updating Lunos to the latest release…",
+      duration: 30000,
+    })
+
+    const result = await sdk.client.global.upgrade({ target })
+
+    if (result.error || !result.data?.success) {
+      // A refused upgrade comes back as a 400 whose body is `{ success: false, error }`.
+      const body = (result.error ?? result.data) as { error?: unknown } | undefined
+      const reason =
+        typeof body?.error === "string" ? body.error : result.error ? errorMessage(result.error) : "Update failed"
+      toast.show({
+        variant: "error",
+        title: "Update Failed",
+        // XCOD-111: always the full `npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`, using
+        // the version the update check found when /update didn't name one.
+        message: `${reason}\nTo update manually, run: ${manualInstallCommand(target ?? updateNotice())}`,
+        duration: 15000,
+      })
+      return
+    }
+
+    setAvailableVersion(undefined)
+    setUpgradedTo(result.data.version)
+    // XCOD-129: the app stays open; /restart relaunches the new version back in this session.
+    await DialogAlert.show(
+      dialog,
+      "Update Complete",
+      `Updated to Lunos v${result.data.version}. ${updateRestartHint(result.data.version)}`,
+    )
+  }
+
   event.on("installation.update-available", async (evt) => {
-    console.log("installation.update-available", evt)
     const version = evt.properties.version
+    // Kept after the dialog is dismissed or skipped: the bottom-right notice stays until the
+    // update is installed.
+    setAvailableVersion(version)
 
     const skipped = kv.get("skipped_version")
     if (skipped && !isVersionGreater(version, skipped)) return
@@ -1040,43 +1353,22 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     const choice = await DialogConfirm.show(
       dialog,
       `Update Available`,
-      `A new release v${version} is available. Would you like to update now?`,
+      `${newVersionMessage(version)} (you have ${InstallationVersion}), or /update here.\nRelease notes: https://github.com/AxsionDev/Lunos/releases/tag/v${version}\n\nUpdate now?`,
       "skip",
     )
 
-    if (choice === false) {
+    // Once per new version: "skip" and Esc both mean "not now", and the bottom-right notice keeps
+    // saying the update exists. Without this the dialog blocked every start (XCOD-147).
+    if (choice !== true) {
       kv.set("skipped_version", version)
       return
     }
 
-    if (choice !== true) return
-
-    toast.show({
-      variant: "info",
-      message: `Updating to v${version}…`,
-      duration: 30000,
-    })
-
-    const result = await sdk.client.global.upgrade({ target: version })
-
-    if (result.error || !result.data?.success) {
-      toast.show({
-        variant: "error",
-        title: "Update Failed",
-        message: "Update failed",
-        duration: 10000,
-      })
-      return
-    }
-
-    await DialogAlert.show(
-      dialog,
-      "Update Complete",
-      `Successfully updated to OpenCode v${result.data.version}. Please restart the application.`,
-    )
-
-    void exit()
+    await runUpgrade(version)
   })
+  // The update check (XCOD-147) starts only once mounted, when the SDK's event subscription (set up
+  // in its provider's onMount, which runs first) and the handler above both exist.
+  onMount(() => props.onListening?.())
 
   const plugin = createMemo(() => {
     if (!ready()) return
@@ -1123,6 +1415,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           </Switch>
           {plugin()}
         </box>
+        <UpdateNotice version={updateNotice()} />
         <box flexShrink={0}>
           <pluginRuntime.Slot name="app_bottom" />
         </box>

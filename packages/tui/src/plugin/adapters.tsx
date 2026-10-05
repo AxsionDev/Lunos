@@ -327,6 +327,20 @@ export function createTuiApiAdapters(input: Input): Omit<TuiPluginApi, "lifecycl
           message: "plugins.install is only available in plugin context",
         }
       },
+      async discover() {
+        return { marketplaceCount: 0, marketplaces: [], plugins: [] }
+      },
+    },
+    marketplace: {
+      async discover() {
+        return { marketplaceCount: 0, marketplaces: [], items: [] }
+      },
+      async plan() {
+        return { ok: false, message: "marketplace.plan is only available in plugin context" }
+      },
+      async install() {
+        return { ok: false, message: "marketplace.install is only available in plugin context" }
+      },
     },
     theme: {
       get current() {

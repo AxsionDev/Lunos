@@ -46,7 +46,10 @@ export function DialogWorkspaceList() {
           value: { workspace },
           footer: workspace.type,
           details: expanded[workspace.id] && workspace.directory ? [workspace.directory] : undefined,
-          gutter: () => <text fg={status === "connected" ? theme.success : theme.error}>●</text>,
+          // XCOD-107: a distinct glyph, so the state doesn't rely on colour alone.
+          gutter: () => (
+            <text fg={status === "connected" ? theme.success : theme.error}>{status === "connected" ? "●" : "✕"}</text>
+          ),
         }
       }),
   )

@@ -16,6 +16,7 @@ import { getScrollAcceleration } from "../../util/scroll"
 import { useTuiConfig } from "../../config"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
+import { selectionMarker } from "../../util/status-glyph"
 
 type PermissionStage = "permission" | "always" | "reject"
 
@@ -141,11 +142,11 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
           body={
             <Switch>
               <Match when={props.request.always.length === 1 && props.request.always[0] === "*"}>
-                <TextBody title={"This will allow " + props.request.permission + " until OpenCode is restarted."} />
+                <TextBody title={"This will allow " + props.request.permission + " until Lunos is restarted."} />
               </Match>
               <Match when={true}>
                 <box paddingLeft={1} gap={1}>
-                  <text fg={theme.textMuted}>This will allow the following patterns until OpenCode is restarted</text>
+                  <text fg={theme.textMuted}>This will allow the following patterns until Lunos is restarted</text>
                   <box>
                     <For each={props.request.always}>
                       {(pattern) => (
@@ -357,6 +358,41 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
               }
             }
 
+            // XCOD-94 / XCOD-136: what would be remembered, and the fact it contradicts, if any.
+            if (permission === "memory") {
+              const meta = props.request.metadata ?? {}
+              const fact = typeof meta["fact"] === "string" ? meta["fact"] : ""
+              const source = typeof meta["source"] === "string" ? meta["source"] : ""
+              const scope = typeof meta["scope"] === "string" ? meta["scope"] : ""
+              const kind = typeof meta["kind"] === "string" ? meta["kind"] : ""
+              const raw = meta["contradicts"]
+              const contradicts =
+                raw && typeof raw === "object" && typeof (raw as { text?: unknown }).text === "string"
+                  ? (raw as { id?: string; text: string })
+                  : undefined
+              return {
+                icon: "◆",
+                title: `Remember in ${scope || "project"} memory`,
+                body: (
+                  <box paddingLeft={1} gap={1}>
+                    <text fg={theme.text}>{fact}</text>
+                    <text fg={theme.textMuted}>{`From ${source}${kind ? ` · ${kind}` : ""}`}</text>
+                    <Show when={contradicts}>
+                      {(item) => (
+                        <box>
+                          <text fg={theme.warning}>{`Contradicts ${item().id ?? "a remembered fact"}:`}</text>
+                          <text fg={theme.text}>{item().text}</text>
+                          <text fg={theme.textMuted}>
+                            If you allow it, you'll be asked whether to replace the old fact or keep both.
+                          </text>
+                        </box>
+                      )}
+                    </Show>
+                  </box>
+                ),
+              }
+            }
+
             if (permission === "doom_loop") {
               return {
                 icon: "⟳",
@@ -483,7 +519,7 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
           <text fg={theme.text}>Reject permission</text>
         </box>
         <box paddingLeft={1}>
-          <text fg={theme.textMuted}>Tell OpenCode what to do differently</text>
+          <text fg={theme.textMuted}>Tell Lunos what to do differently</text>
         </box>
       </box>
       <box
@@ -688,6 +724,8 @@ function Prompt<const T extends Record<string, string>>(props: {
                 }}
               >
                 <text fg={option === store.selected ? selectedForeground(theme, theme.warning) : theme.textMuted}>
+                  {/* XCOD-141: a marker as well as the highlight, so the choice doesn't rely on colour alone. */}
+                  {selectionMarker(option === store.selected)}
                   {props.options[option]}
                 </text>
               </box>

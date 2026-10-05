@@ -1,6 +1,7 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { BuiltinTuiPlugin } from "../builtins"
 import { createMemo, For, Match, Show, Switch, createSignal } from "solid-js"
+import { statusGlyph } from "../../util/status-glyph"
 
 const id = "internal:sidebar-mcp"
 
@@ -53,7 +54,7 @@ function View(props: { api: TuiPluginApi }) {
                     fg: dot(item.status),
                   }}
                 >
-                  •
+                  {statusGlyph(item.status)}
                 </text>
                 <text fg={theme().text} wrapMode="word">
                   {item.name}{" "}

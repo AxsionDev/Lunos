@@ -4,6 +4,7 @@ export type DesktopMenuPlatform = "macos" | "windows"
 
 export type DesktopMenuAction =
   | "app.checkForUpdates"
+  | "app.licenses"
   | "app.relaunch"
   | "edit.undo"
   | "edit.redo"
@@ -88,6 +89,8 @@ export const DESKTOP_MENU: DesktopMenu[] = [
       { type: "item", labelKey: "desktop.menu.reloadWebview", action: "view.reload" },
       { type: "item", labelKey: "desktop.menu.restart", action: "app.relaunch" },
       { type: "item", labelKey: "desktop.menu.exportLogs", command: "logs.export" },
+      // XCOD-177: the third-party licence notices shipped with the app.
+      { type: "item", labelKey: "desktop.menu.licenses", action: "app.licenses" },
       { type: "separator" },
       { type: "item", role: "hide" },
       { type: "item", role: "hideOthers" },
@@ -279,19 +282,21 @@ export const DESKTOP_MENU: DesktopMenu[] = [
     id: "help",
     labelKey: "desktop.menu.help",
     items: [
-      { type: "item", labelKey: "desktop.menu.documentation", href: "https://opencode.ai/docs" },
-      { type: "item", labelKey: "desktop.menu.supportForum", href: "https://discord.com/invite/opencode" },
+      // XCOD-123: Lunos's docs and tracker. "Support forum" points at GitHub issues until the Lunos
+      // community channel exists (XCOD-125).
+      { type: "item", labelKey: "desktop.menu.documentation", href: "https://docs.lunos.tech/docs/" },
+      { type: "item", labelKey: "desktop.menu.supportForum", href: "https://github.com/AxsionDev/Lunos/issues" },
       { type: "item", labelKey: "desktop.menu.exportLogs", command: "logs.export" },
       { type: "separator" },
       {
         type: "item",
         labelKey: "desktop.menu.shareFeedback",
-        href: "https://github.com/anomalyco/opencode/issues/new?template=feature_request.yml",
+        href: "https://github.com/AxsionDev/Lunos/issues/new?template=feature-request.yml",
       },
       {
         type: "item",
         labelKey: "desktop.menu.reportBug",
-        href: "https://github.com/anomalyco/opencode/issues/new?template=bug_report.yml",
+        href: "https://github.com/AxsionDev/Lunos/issues/new?template=bug-report.yml",
       },
     ],
   },

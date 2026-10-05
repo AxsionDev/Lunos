@@ -1,7 +1,7 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode acp --help 1`] = `
-"opencode acp
+"lunos acp
 
 start ACP (Agent Client Protocol) server
 
@@ -22,16 +22,17 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp --help 1`] = `
-"opencode mcp
+"lunos mcp
 
 manage MCP (Model Context Protocol) servers
 
 Commands:
-  opencode mcp add [name]     add an MCP server
-  opencode mcp list           list MCP servers and their status                        [aliases: ls]
-  opencode mcp auth [name]    authenticate with an OAuth-enabled MCP server
-  opencode mcp logout [name]  remove OAuth credentials for an MCP server
-  opencode mcp debug <name>   debug OAuth connection for an MCP server
+  lunos mcp add [name]      add an MCP server
+  lunos mcp list            list MCP servers and their status                          [aliases: ls]
+  lunos mcp search <query>  search MCP servers across added marketplaces
+  lunos mcp auth [name]     authenticate with an OAuth-enabled MCP server
+  lunos mcp logout [name]   remove OAuth credentials for an MCP server
+  lunos mcp debug <name>    debug OAuth connection for an MCP server
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -42,9 +43,9 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode attach --help 1`] = `
-"opencode attach <url>
+"lunos attach <url>
 
-attach to a running opencode server
+attach to a running Lunos server
 
 Positionals:
   url  http://localhost:4096                                                     [string] [required]
@@ -68,9 +69,9 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode run --help 1`] = `
-"opencode run [message..]
+"lunos run [message..]
 
-run opencode with a message
+run Lunos with a message
 
 Positionals:
   message  message to send                                                     [array] [default: []]
@@ -87,12 +88,12 @@ Options:
       --fork         fork the session before continuing (requires --continue or --session) [boolean]
       --share        share the session                                                     [boolean]
   -m, --model        model to use in the format of provider/model                           [string]
-      --agent        agent to use                                                           [string]
+      --mode         mode to use                                                            [string]
       --format       format: default (formatted) or json (raw JSON events)
                                           [string] [choices: "default", "json"] [default: "default"]
   -f, --file         file(s) to attach to message                                            [array]
       --title        title for the session (uses truncated prompt if no value provided)     [string]
-      --attach       attach to a running opencode server (e.g., http://localhost:4096)      [string]
+      --attach       attach to a running Lunos server (e.g., http://localhost:4096)         [string]
   -p, --password     basic auth password (defaults to OPENCODE_SERVER_PASSWORD)             [string]
   -u, --username     basic auth username (defaults to OPENCODE_SERVER_USERNAME or 'opencode')
                                                                                             [string]
@@ -104,28 +105,34 @@ Options:
       --thinking     show thinking blocks                                                  [boolean]
   -i, --interactive  run in direct interactive split-footer mode          [boolean] [default: false]
       --auto         auto-approve permissions that are not explicitly denied (dangerous!)
-                                                                          [boolean] [default: false]"
+                                                                          [boolean] [default: false]
+      --sandbox      run in an isolated Docker sandbox; results come back as branch
+                     lunos/sandbox/<id>                                                    [boolean]
+      --keep         with --sandbox: keep the sandbox when done, whatever sandbox.on_finish says
+                                                                                           [boolean]
+      --rm           with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says
+                                                                                           [boolean]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode debug --help 1`] = `
-"opencode debug
+"lunos debug
 
 debugging and troubleshooting tools
 
 Commands:
-  opencode debug config        show resolved configuration
-  opencode debug lsp           LSP debugging utilities
-  opencode debug rg            ripgrep debugging utilities
-  opencode debug file          file system debugging utilities
-  opencode debug scrap         list all known projects
-  opencode debug skill         list all available skills
-  opencode debug snapshot      snapshot debugging utilities
-  opencode debug startup       print startup timing
-  opencode debug agent <name>  show agent configuration details
-  opencode debug v2            debug v2 catalog and built-in plugins
-  opencode debug info          show debug information
-  opencode debug paths         show global paths (data, config, cache, state)
-  opencode debug wait          wait indefinitely (for debugging)
+  lunos debug config        show resolved configuration
+  lunos debug lsp           LSP debugging utilities
+  lunos debug rg            ripgrep debugging utilities
+  lunos debug file          file system debugging utilities
+  lunos debug scrap         list all known projects
+  lunos debug skill         list all available skills
+  lunos debug snapshot      snapshot debugging utilities
+  lunos debug startup       print startup timing
+  lunos debug agent <name>  show agent configuration details
+  lunos debug v2            debug v2 catalog and built-in plugins
+  lunos debug info          show version, platform and install details to paste into a bug report
+  lunos debug paths         show global paths (data, config, cache, state)
+  lunos debug wait          wait indefinitely (for debugging)
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -136,14 +143,14 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers --help 1`] = `
-"opencode providers
+"lunos providers
 
 manage AI providers and credentials
 
 Commands:
-  opencode providers list               list providers and credentials                 [aliases: ls]
-  opencode providers login [url]        log in to a provider
-  opencode providers logout [provider]  log out from a configured provider
+  lunos providers list               list configured providers                         [aliases: ls]
+  lunos providers login [url]        add provider (API key or OAuth login)
+  lunos providers logout [provider]  log out of a configured provider
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -154,13 +161,13 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent --help 1`] = `
-"opencode agent
+"lunos agent
 
 manage agents
 
 Commands:
-  opencode agent create  create a new agent
-  opencode agent list    list all available agents
+  lunos agent create  create a new agent
+  lunos agent list    list all available agents
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -170,13 +177,13 @@ Options:
       --pure        run without external plugins                                           [boolean]"
 `;
 
-exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode upgrade --help 1`] = `
-"opencode upgrade [target]
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode update --help 1`] = `
+"lunos update [target]
 
-upgrade opencode to the latest or a specific version
+update Lunos to the latest or a specific version
 
 Positionals:
-  target  version to upgrade to, for ex '0.1.48' or 'v0.1.48'                               [string]
+  target  version to update to, for ex '0.1.48' or 'v0.1.48'                                [string]
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -184,14 +191,30 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
-  -m, --method      installation method to use
-                          [string] [choices: "curl", "npm", "pnpm", "bun", "brew", "choco", "scoop"]"
+  -m, --method      installation method to use              [string] [choices: "npm", "pnpm", "bun"]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode upgrade --help 1`] = `
+"lunos update [target]
+
+update Lunos to the latest or a specific version
+
+Positionals:
+  target  version to update to, for ex '0.1.48' or 'v0.1.48'                                [string]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+  -m, --method      installation method to use              [string] [choices: "npm", "pnpm", "bun"]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode uninstall --help 1`] = `
-"opencode uninstall
+"lunos uninstall
 
-uninstall opencode and remove all related files
+uninstall Lunos and remove all related files
 
 Options:
   -h, --help         show help                                                             [boolean]
@@ -206,9 +229,9 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode serve --help 1`] = `
-"opencode serve
+"lunos serve
 
-starts a headless opencode server
+starts a headless Lunos server
 
 Options:
   -h, --help         show help                                                             [boolean]
@@ -226,9 +249,9 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode web --help 1`] = `
-"opencode web
+"lunos web
 
-start opencode server and open web interface
+start Lunos server and open web interface
 
 Options:
   -h, --help         show help                                                             [boolean]
@@ -246,7 +269,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode models --help 1`] = `
-"opencode models [provider]
+"lunos models [provider]
 
 list all available models
 
@@ -264,7 +287,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode stats --help 1`] = `
-"opencode stats
+"lunos stats
 
 show token usage and cost statistics
 
@@ -282,7 +305,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode export --help 1`] = `
-"opencode export [sessionID]
+"lunos export [sessionID]
 
 export session data as JSON
 
@@ -299,7 +322,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode import --help 1`] = `
-"opencode import <file>
+"lunos import <file>
 
 import session data from JSON file or URL
 
@@ -315,13 +338,13 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode github --help 1`] = `
-"opencode github
+"lunos github
 
 manage GitHub agent
 
 Commands:
-  opencode github install  install the GitHub agent
-  opencode github run      run the GitHub agent
+  lunos github install  install the GitHub agent
+  lunos github run      run the GitHub agent
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -332,9 +355,9 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode pr --help 1`] = `
-"opencode pr <number>
+"lunos pr <number>
 
-fetch and checkout a GitHub PR branch, then run opencode
+fetch and checkout a GitHub PR branch, then run Lunos
 
 Positionals:
   number  PR number to checkout                                                  [number] [required]
@@ -348,13 +371,13 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode session --help 1`] = `
-"opencode session
+"lunos session
 
 manage sessions
 
 Commands:
-  opencode session list                list sessions
-  opencode session delete <sessionID>  delete a session
+  lunos session list                list sessions
+  lunos session delete <sessionID>  delete a session
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -365,12 +388,18 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode plugin --help 1`] = `
-"opencode plugin <module>
+"lunos plugin
 
-install plugin and update config
+manage plugins
+
+Commands:
+  lunos plugin add <name>      install a plugin by name from an added marketplace
+  lunos plugin <module>        install plugin and update config                            [default]
+  lunos plugin list            list plugins available across added marketplaces
+  lunos plugin search <query>  search plugins across added marketplaces
 
 Positionals:
-  module  npm module name                                                        [string] [required]
+  module  npm module name                                                                   [string]
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -382,14 +411,66 @@ Options:
   -f, --force       replace existing plugin version                       [boolean] [default: false]"
 `;
 
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory --help 1`] = `
+"lunos memory
+
+review, search, export, import, migrate, outdate, verify and forget long-term memory
+
+Commands:
+  lunos memory list            list remembered facts, with where each came from and their state
+  lunos memory show <id>       show one fact and its provenance
+  lunos memory search <query>  search memory the way the agent does
+  lunos memory forget <id>     remove one fact from memory
+  lunos memory outdate <id>    mark a fact as no longer true: kept for history, but no longer
+                               recalled
+  lunos memory status          show whether memory is on, how many facts are in each state, and any
+                               quarantined facts
+  lunos memory verify          re-check every ledger entry's integrity hash and the hash chain;
+                               quarantined facts are listed
+  lunos memory purge           delete all of a memory's stored facts and graph (hand-written notes
+                               are kept)
+  lunos memory export          export all memory as a versioned bundle (facts, graph, notes,
+                               provenance), or as one Markdown file per fact with --format markdown
+  lunos memory import <path>   import memory from a Lunos bundle, Markdown, or AGENTS.md / CLAUDE.md
+                               / Claude Code memory notes; previews first
+  lunos memory migrate         move embedded memory into the external database set in
+                               memory.backend; previews first
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings --help 1`] = `
+"lunos settings
+
+view and change settings (opens the settings screen)
+
+Commands:
+  lunos settings list               list every setting with its value and where it comes from
+  lunos settings get <key>          print one setting's current value
+  lunos settings set <key> <value>  change one setting in your user config (or the project's, with
+                                    --project)
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]"
+`;
+
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode db --help 1`] = `
-"opencode db
+"lunos db
 
 database tools
 
 Commands:
-  opencode db [query]     open an interactive sqlite3 shell or run a query                 [default]
-  opencode db path        print the database path
+  lunos db [query]     open an interactive sqlite3 shell or run a query                    [default]
+  lunos db path        print the database path
 
 Positionals:
   query  SQL query to execute                                                               [string]
@@ -403,8 +484,41 @@ Options:
       --format      Output format                 [string] [choices: "json", "tsv"] [default: "tsv"]"
 `;
 
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings list --help 1`] = `
+"lunos settings list
+
+list every setting with its value and where it comes from
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --json        print JSON                                            [boolean] [default: false]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode settings set --help 1`] = `
+"lunos settings set <key> <value>
+
+change one setting in your user config (or the project's, with --project)
+
+Positionals:
+  key    setting key, e.g. share or compaction.auto                              [string] [required]
+  value  new value (JSON for lists and objects)                                  [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --project     write to .opencode/opencode.json in this project instead of your user config
+                                                                          [boolean] [default: false]"
+`;
+
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp list --help 1`] = `
-"opencode mcp list
+"lunos mcp list
 
 list MCP servers and their status
 
@@ -417,7 +531,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp add --help 1`] = `
-"opencode mcp add [name]
+"lunos mcp add [name]
 
 add an MCP server
 
@@ -425,23 +539,27 @@ Positionals:
   name  name of the MCP server                                                              [string]
 
 Options:
-  -h, --help        show help                                                              [boolean]
-  -v, --version     show version number                                                    [boolean]
-      --print-logs  print logs to stderr                                                   [boolean]
-      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
-      --pure        run without external plugins                                           [boolean]
-      --url         URL for a remote MCP server                                             [string]
-      --env         environment variable for a local MCP server (KEY=VALUE)                  [array]
-      --header      HTTP header for a remote MCP server (KEY=VALUE)                          [array]"
+  -h, --help              show help                                                        [boolean]
+  -v, --version           show version number                                              [boolean]
+      --print-logs        print logs to stderr                                             [boolean]
+      --log-level         log level             [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure              run without external plugins                                     [boolean]
+      --url               URL for a remote MCP server                                       [string]
+      --env               environment variable for a local MCP server (KEY=VALUE)            [array]
+      --header            HTTP header for a remote MCP server (KEY=VALUE)                    [array]
+      --allow-unreviewed  when adding from a marketplace, allow an entry the marketplace hasn't
+                          verified                                        [boolean] [default: false]
+      --yes               skip the confirmation prompt when adding from a marketplace
+                                                                          [boolean] [default: false]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp auth --help 1`] = `
-"opencode mcp auth [name]
+"lunos mcp auth [name]
 
 authenticate with an OAuth-enabled MCP server
 
 Commands:
-  opencode mcp auth list  list OAuth-capable MCP servers and their auth status         [aliases: ls]
+  lunos mcp auth list  list OAuth-capable MCP servers and their auth status            [aliases: ls]
 
 Positionals:
   name  name of the MCP server                                                              [string]
@@ -455,7 +573,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp logout --help 1`] = `
-"opencode mcp logout [name]
+"lunos mcp logout [name]
 
 remove OAuth credentials for an MCP server
 
@@ -471,9 +589,9 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers list --help 1`] = `
-"opencode providers list
+"lunos providers list
 
-list providers and credentials
+list configured providers
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -484,12 +602,12 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers login --help 1`] = `
-"opencode providers login [url]
+"lunos providers login [url]
 
-log in to a provider
+add provider (API key or OAuth login)
 
 Positionals:
-  url  opencode auth provider                                                               [string]
+  url  Lunos auth provider                                                                  [string]
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -502,9 +620,9 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers logout --help 1`] = `
-"opencode providers logout [provider]
+"lunos providers logout [provider]
 
-log out from a configured provider
+log out of a configured provider
 
 Positionals:
   provider  provider id or name to log out from                                             [string]
@@ -518,7 +636,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent create --help 1`] = `
-"opencode agent create
+"lunos agent create
 
 create a new agent
 
@@ -530,15 +648,17 @@ Options:
       --pure                  run without external plugins                                 [boolean]
       --path                  directory path to generate the agent file                     [string]
       --description           what the agent should do                                      [string]
-      --mode                  agent mode            [string] [choices: "all", "primary", "subagent"]
-      --permissions, --tools  comma-separated list of permissions to allow (default: all).
-                              Available: "bash, read, edit, glob, grep, webfetch, task, todowrite,
-                              websearch, lsp, skill"                                        [string]
+      --role                  agent role (worker classification, unrelated to the Mode switcher)
+                                                    [string] [choices: "all", "primary", "subagent"]
+      --permissions, --tools  comma-separated list of permissions to allow (default: "read, glob,
+                              grep, webfetch, todowrite, websearch, lsp, skill"). Available: "bash,
+                              read, edit, glob, grep, webfetch, task, todowrite, websearch, lsp,
+                              skill"                                                        [string]
   -m, --model                 model to use in the format of provider/model                  [string]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent list --help 1`] = `
-"opencode agent list
+"lunos agent list
 
 list all available agents
 
@@ -551,7 +671,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode session list --help 1`] = `
-"opencode session list
+"lunos session list
 
 list sessions
 
@@ -566,7 +686,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode session delete --help 1`] = `
-"opencode session delete <sessionID>
+"lunos session delete <sessionID>
 
 delete a session
 
@@ -582,7 +702,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode github install --help 1`] = `
-"opencode github install
+"lunos github install
 
 install the GitHub agent
 
@@ -595,7 +715,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode github run --help 1`] = `
-"opencode github run
+"lunos github run
 
 run the GitHub agent
 
@@ -609,8 +729,62 @@ Options:
       --token       GitHub personal access token (github_pat_********)                      [string]"
 `;
 
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory export --help 1`] = `
+"lunos memory export
+
+export all memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file
+per fact with --format markdown
+
+Options:
+  -h, --help           show help                                                           [boolean]
+  -v, --version        show version number                                                 [boolean]
+      --print-logs     print logs to stderr                                                [boolean]
+      --log-level      log level                [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure           run without external plugins                                        [boolean]
+      --format         bundle: everything, machine-readable (lunos-memory/1). markdown: one file per
+                       fact, for git review      [choices: "bundle", "markdown"] [default: "bundle"]
+      --scope          which memory to export [choices: "project", "user", "both"] [default: "both"]
+      --since          bundle: only facts saved on or after this date (ISO 8601)            [string]
+      --out            bundle: where to write it (default: ./lunos-memory-<time>, plus .zip or
+                       .zip.enc)                                                            [string]
+      --zip            bundle: write one .zip file instead of a directory [boolean] [default: false]
+      --encrypt        bundle: encrypt the .zip with a passphrase (asked for, or
+                       LUNOS_MEMORY_PASSPHRASE); never stored             [boolean] [default: false]
+      --graph          bundle: include the entity graph (reading it starts memory; --no-graph
+                       exports without)                                    [boolean] [default: true]
+      --include-index  bundle: also copy the engine's database files, for a same-version,
+                       same-engine restore                                [boolean] [default: false]
+      --dir            markdown: where to write the files (default: .opencode/memory/export)[string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory import --help 1`] = `
+"lunos memory import <path>
+
+import memory from a Lunos bundle, Markdown, or AGENTS.md / CLAUDE.md / Claude Code memory notes;
+previews first
+
+Positionals:
+  path  a bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file
+                                                                                 [string] [required]
+
+Options:
+  -h, --help               show help                                                       [boolean]
+  -v, --version            show version number                                             [boolean]
+      --print-logs         print logs to stderr                                            [boolean]
+      --log-level          log level            [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure               run without external plugins                                    [boolean]
+      --scope              put everything in this memory (default: a bundle fact's own scope;
+                           project for Markdown)                        [choices: "project", "user"]
+      --yes                write the new rows (without it, only preview)  [boolean] [default: false]
+      --dry-run            only preview, even with --yes                  [boolean] [default: false]
+      --as-facts           import AGENTS.md, CLAUDE.md, Claude Code memory and bundle notes as facts
+                           instead of notes                               [boolean] [default: false]
+      --include-conflicts  with --yes, also write rows marked conflict or near-duplicate
+                                                                          [boolean] [default: false]"
+`;
+
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode db path --help 1`] = `
-"opencode db path
+"lunos db path
 
 print the database path
 

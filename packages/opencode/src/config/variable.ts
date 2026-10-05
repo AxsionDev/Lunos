@@ -20,6 +20,44 @@ type SubstituteInput = ParseSource & {
   text: string
   missing?: "error" | "empty"
   env?: Record<string, string>
+  /**
+   * XCOD-151: "json" (default) when `text` is a JSON/JSONC document: a value placed inside a string
+   * literal is escaped, so a secret holding `"`, `\` or a newline neither breaks the document nor
+   * changes. "plain" when `text` is already a value (a URL, a header): inserted as is.
+   */
+  into?: "json" | "plain"
+}
+
+/**
+ * Whether `index` in a JSONC document falls inside a string literal. Comments are skipped, so a
+ * quote in one doesn't flip the state.
+ */
+export function insideString(text: string, index: number) {
+  let inString = false
+  for (let i = 0; i < index; i++) {
+    const char = text[i]
+    if (inString) {
+      if (char === "\\") i++
+      else if (char === '"') inString = false
+      continue
+    }
+    if (char === '"') inString = true
+    else if (char === "/" && text[i + 1] === "/") {
+      const end = text.indexOf("\n", i)
+      if (end === -1 || end >= index) return false
+      i = end
+    } else if (char === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2)
+      if (end === -1 || end >= index) return false
+      i = end + 1
+    }
+  }
+  return inString
+}
+
+/** The value as it must appear at `index`: escaped inside a JSON string literal, as is elsewhere. */
+function place(value: string, text: string, index: number, into: "json" | "plain") {
+  return into === "json" && insideString(text, index) ? JSON.stringify(value).slice(1, -1) : value
 }
 
 function source(input: ParseSource) {
@@ -33,9 +71,10 @@ function dir(input: ParseSource) {
 /** Apply {env:VAR} and {file:path} substitutions to config text. */
 export async function substitute(input: SubstituteInput) {
   const missing = input.missing ?? "error"
-  let text = input.text.replace(/\{env:([^}]+)\}/g, (_, varName) => {
-    return (input.env?.[varName] ?? process.env[varName]) || ""
-  })
+  const into = input.into ?? "json"
+  let text = input.text.replace(/\{env:([^}]+)\}/g, (_, varName: string, index: number) =>
+    place((input.env?.[varName] ?? process.env[varName]) || "", input.text, index, into),
+  )
 
   const fileMatches = Array.from(text.matchAll(/\{file:[^}]+\}/g))
   if (!fileMatches.length) return text
@@ -82,7 +121,7 @@ export async function substitute(input: SubstituteInput) {
       })
     ).trim()
 
-    out += JSON.stringify(fileContent).slice(1, -1)
+    out += place(fileContent, text, index, into)
     cursor = index + token.length
   }
 

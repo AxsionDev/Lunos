@@ -46,6 +46,7 @@ export const Definitions = {
   leader: keybind(LeaderDefault, "Leader key for keybind combinations"),
 
   app_exit: keybind("ctrl+c,ctrl+d,<leader>q", "Exit the application"),
+  app_restart: keybind("none", "Restart Lunos"),
   app_debug: keybind("none", "Toggle debug panel"),
   app_console: keybind("none", "Toggle console"),
   app_heap_snapshot: keybind("none", "Write heap snapshot"),
@@ -116,6 +117,7 @@ export const Definitions = {
   session_quick_switch_9: keybind("<leader>9", "Switch to session in quick slot 9"),
 
   stash_delete: keybind("ctrl+d", "Delete stash entry"),
+  background_cancel: keybind("ctrl+d", "Cancel background subagent"),
   model_provider_list: keybind("ctrl+a", "Open provider list from model dialog"),
   model_favorite_toggle: keybind("ctrl+f", "Toggle model favorite status"),
   model_list: keybind("<leader>m", "List available models"),
@@ -124,11 +126,11 @@ export const Definitions = {
   model_cycle_favorite: keybind("none", "Next favorite model"),
   model_cycle_favorite_reverse: keybind("none", "Previous favorite model"),
   mcp_list: keybind("none", "List MCP servers"),
-  provider_connect: keybind("none", "Connect provider"),
+  provider_list: keybind("none", "Manage providers"),
   console_org_switch: keybind("none", "Switch console organization"),
-  agent_list: keybind("<leader>a", "List agents"),
-  agent_cycle: keybind("tab", "Next agent"),
-  agent_cycle_reverse: keybind("shift+tab", "Previous agent"),
+  mode_list: keybind("<leader>a", "List modes"),
+  mode_cycle: keybind("tab", "Next mode"),
+  mode_cycle_reverse: keybind("shift+tab", "Previous mode"),
   variant_cycle: keybind("ctrl+t", "Cycle model variants"),
   variant_list: keybind("none", "List model variants"),
 
@@ -211,6 +213,12 @@ export const Definitions = {
   "dialog.move_session.new": keybind("ctrl+m", "New project copy"),
   "dialog.move_session.delete": keybind("ctrl+d", "Delete project copy"),
   "dialog.move_session.refresh": keybind("ctrl+r", "Refresh project copies"),
+  "dialog.memory.forget": keybind("ctrl+d", "Forget a fact in the memory browser"),
+  "dialog.memory.outdate": keybind("ctrl+u", "Mark a fact outdated in the memory browser"),
+  "dialog.memory.export": keybind("ctrl+s", "Export memory from the memory browser"),
+  "dialog.memory.import": keybind("ctrl+o", "Import memory from the memory browser"),
+  "dialog.memory.import.all": keybind("ctrl+a", "Approve or reject every importable row in the import preview"),
+  "dialog.memory.import.apply": keybind("ctrl+s", "Write the approved rows of the import preview"),
   "prompt.autocomplete.prev": keybind("up,ctrl+p", "Move to previous autocomplete item"),
   "prompt.autocomplete.next": keybind("down,ctrl+n", "Move to next autocomplete item"),
   "prompt.autocomplete.hide": keybind("escape", "Hide autocomplete"),
@@ -219,12 +227,15 @@ export const Definitions = {
   "permission.prompt.fullscreen": keybind("ctrl+f", "Toggle permission prompt fullscreen"),
   "plugins.toggle": keybind("space", "Toggle plugin"),
   "dialog.plugins.install": keybind("shift+i", "Install plugin from plugin dialog"),
+  "dialog.plugins.discover": keybind("shift+d", "Discover plugins from plugin dialog"),
+  "dialog.plugins.discover.next_kind": keybind("ctrl+o", "Next content tab (Plugins, Skills, Hooks, MCP) in Discover"),
 
   terminal_suspend: keybind("ctrl+z", "Suspend terminal"),
   terminal_title_toggle: keybind("none", "Toggle terminal title"),
   tips_toggle: keybind("<leader>h", "Toggle tips on home screen"),
   plugin_manager: keybind("none", "Open plugin manager dialog"),
   plugin_install: keybind("none", "Install plugin"),
+  plugin_discover: keybind("none", "Discover plugins"),
 
   which_key_toggle: keybind("ctrl+alt+k", "Toggle which-key panel"),
   which_key_layout_toggle: keybind("ctrl+alt+shift+k", "Switch which-key layout"),
@@ -242,12 +253,27 @@ export const Definitions = {
 type KeybindName = keyof typeof Definitions
 const KeybindNames = new Set<string>(Object.keys(Definitions))
 
+/**
+ * Pre-rename keybind names, kept working as deprecated aliases so existing
+ * user configs don't hard-error (XCOD-40). Each maps to the canonical
+ * post-rename name it now resolves to.
+ */
+export const KeybindAliases: Record<string, KeybindName> = {
+  agent_list: "mode_list",
+  agent_cycle: "mode_cycle",
+  agent_cycle_reverse: "mode_cycle_reverse",
+  // XCOD-130: the provider command was renamed to /providers.
+  provider_connect: "provider_list",
+}
+
 export const KeybindOverrides = Schema.Struct(
   Object.fromEntries(
-    Object.entries(Definitions).map(([name, item]) => [
-      name,
-      Schema.optional(BindingValueSchema).annotate({ description: item.description }),
-    ]),
+    [
+      ...Object.entries(Definitions).map(([name, item]) => [name, item.description]),
+      // Legacy names stay in the schema so a config decode keeps them for resolveKeybindAliases,
+      // which maps them onto their canonical names and reports them as deprecated.
+      ...Object.entries(KeybindAliases).map(([legacy, canonical]) => [legacy, `Deprecated: use ${canonical}`]),
+    ].map(([name, description]) => [name, Schema.optional(BindingValueSchema).annotate({ description })]),
   ),
 ).annotate({ description: "TUI keybinding overrides" })
 export const Descriptions = Object.fromEntries(
@@ -255,6 +281,7 @@ export const Descriptions = Object.fromEntries(
 ) as Record<KeybindName, string>
 export const CommandMap = {
   app_exit: "app.exit",
+  app_restart: "app.restart",
   app_debug: "app.debug",
   app_console: "app.console",
   app_heap_snapshot: "app.heap_snapshot",
@@ -322,6 +349,7 @@ export const CommandMap = {
   session_quick_switch_8: "session.quick_switch.8",
   session_quick_switch_9: "session.quick_switch.9",
   stash_delete: "stash.delete",
+  background_cancel: "background.cancel",
   model_provider_list: "model.dialog.provider",
   model_favorite_toggle: "model.dialog.favorite",
   model_list: "model.list",
@@ -330,11 +358,11 @@ export const CommandMap = {
   model_cycle_favorite: "model.cycle_favorite",
   model_cycle_favorite_reverse: "model.cycle_favorite_reverse",
   mcp_list: "mcp.list",
-  provider_connect: "provider.connect",
+  provider_list: "provider.list",
   console_org_switch: "console.org.switch",
-  agent_list: "agent.list",
-  agent_cycle: "agent.cycle",
-  agent_cycle_reverse: "agent.cycle.reverse",
+  mode_list: "mode.list",
+  mode_cycle: "mode.cycle",
+  mode_cycle_reverse: "mode.cycle.reverse",
   variant_cycle: "variant.cycle",
   variant_list: "variant.list",
   messages_page_up: "session.page.up",
@@ -406,6 +434,7 @@ export const CommandMap = {
   tips_toggle: "tips.toggle",
   plugin_manager: "plugins.list",
   plugin_install: "plugins.install",
+  plugin_discover: "plugins.discover",
   which_key_toggle: "which-key.toggle",
   which_key_layout_toggle: "which-key.layout.toggle",
   which_key_pending_toggle: "which-key.pending.toggle",
@@ -446,13 +475,37 @@ export function defaultValue(name: KeybindName) {
   return Definitions[name].default
 }
 
+/**
+ * Resolves legacy keybind names in a raw overrides object onto their
+ * canonical names, without mutating the input. Returns the resolved object
+ * (safe to validate/parse) and the list of legacy aliases that were found,
+ * so a caller can surface a deprecation notice.
+ */
+export function resolveKeybindAliases(input: Record<string, unknown>): {
+  resolved: Record<string, unknown>
+  deprecated: { legacy: string; canonical: KeybindName }[]
+} {
+  const resolved = { ...input }
+  const deprecated: { legacy: string; canonical: KeybindName }[] = []
+  for (const [legacy, canonical] of Object.entries(KeybindAliases)) {
+    if (!(legacy in resolved)) continue
+    const value = resolved[legacy]
+    delete resolved[legacy]
+    deprecated.push({ legacy, canonical })
+    if (resolved[canonical] !== undefined) continue
+    resolved[canonical] = value
+  }
+  return { resolved, deprecated }
+}
+
 export function parse(keybinds: KeybindOverrides): Keybinds {
-  const invalid = unknownKeys(keybinds)
+  const { resolved } = resolveKeybindAliases(keybinds)
+  const invalid = unknownKeys(resolved)
   if (invalid.length) throw new Error(`Unrecognized keybind${invalid.length === 1 ? "" : "s"}: ${invalid.join(", ")}`)
   return Object.fromEntries(
     Object.entries(Definitions).map(([name, item]) => [
       name,
-      decodeBindingValue(keybinds[name as KeybindName] ?? item.default),
+      decodeBindingValue(resolved[name as KeybindName] ?? item.default),
     ]),
   ) as Keybinds
 }
@@ -460,7 +513,7 @@ export function parse(keybinds: KeybindOverrides): Keybinds {
 export const Keybinds = { parse }
 
 export function unknownKeys(input: object) {
-  return Object.keys(input).filter((key) => !KeybindNames.has(key))
+  return Object.keys(input).filter((key) => !KeybindNames.has(key) && !(key in KeybindAliases))
 }
 
 export function bindingDefaults(): BindingDefaults<Renderable, KeyEvent> {

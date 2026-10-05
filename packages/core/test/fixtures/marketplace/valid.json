@@ -1,0 +1,33 @@
+{
+  "name": "lunos-community",
+  "owner": {
+    "name": "Lunos Community",
+    "url": "https://github.com/lunos-community"
+  },
+  "description": "Community-curated plugins for Lunos.",
+  "version": "1.0.0",
+  "plugins": [
+    {
+      "name": "conventional-commits",
+      "source": {
+        "type": "npm",
+        "package": "@lunos-community/conventional-commits",
+        "version": "^1.2.0"
+      },
+      "description": "Enforces Conventional Commits message format.",
+      "author": "Lunos Community",
+      "category": "git",
+      "tags": ["git", "commits"]
+    },
+    {
+      "name": "rust-analyzer-bridge",
+      "source": {
+        "type": "github",
+        "repo": "lunos-community/rust-analyzer-bridge",
+        "ref": "v2"
+      },
+      "description": "Bridges rust-analyzer diagnostics into Lunos.",
+      "category": "lsp"
+    }
+  ]
+}

@@ -2,12 +2,12 @@
   "name": "@opencode-ai/web",
   "type": "module",
   "license": "MIT",
-  "version": "1.18.34",
+  "version": "1.18.44",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "bun lunos/prepare.ts && astro dev",
     "dev:remote": "VITE_API_URL=https://api.opencode.ai astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "bun lunos/prepare.ts && astro build",
     "preview": "astro preview",
     "astro": "astro"
   },

@@ -1,0 +1,305 @@
+# Sandboxed runs
+
+Run the Lunos server, and everything it spawns, in a Docker container. Only the client (the TUI, or `lunos run`) stays on your machine. The agent can run commands, install packages and edit files without touching your working tree, and the results come back as a git branch.
+
+This page describes **what sandboxed runs guarantee today (XCOD-144 slice 1, XCOD-157) and what they don't**. Read the [limits](#what-a-sandbox-does-not-isolate-yet) before you rely on it as a security boundary.
+
+## Starting one
+
+```sh
+lunos run --sandbox "upgrade the test runner and fix what breaks"   # headless
+lunos --sandbox                                                     # TUI
+```
+
+Or turn it on for every run in a project or for yourself:
+
+```json
+{
+  "sandbox": { "enabled": true }
+}
+```
+
+### From a running session: `/sandbox` (experimental)
+
+With `OPENCODE_EXPERIMENTAL_WORKSPACES=1`, `/sandbox` in the TUI moves the session you're in into a new sandbox, with its history, and the rest of the conversation runs there. It uses the experimental workspace "warp", which is why it needs the flag.
+
+- The sandbox starts from your project as `--sandbox` does: the current commit plus your uncommitted changes.
+- **`/sandbox end`** brings the session back to this machine, then hands the sandbox's results back (as `sandbox.results` says, below) and applies `sandbox.on_finish`. The TUI says where the agent's changes went.
+- File changes are never copied across a warp into or out of a sandbox, whoever asks (the TUI, the SDK or the desktop app): its changes come back only through the hand-back. The server refuses such a warp.
+- A sandbox kept by `on_finish` isn't offered for warping again; `lunos sandbox attach <id>` reopens it.
+
+`--no-sandbox` overrides `sandbox.enabled` for one run. If any config layer (global, project, `OPENCODE_CONFIG_CONTENT`) turns it on, it is on: a repository's own config can't switch off a sandbox you asked for. `sandbox.enabled` applies to `lunos` and `lunos run` only; `lunos serve`, `lunos web`, `lunos acp` and the other commands still run on the host. Sandboxing needs Docker (Docker Desktop, or Docker Engine on Linux) or Podman, rootless included. Lunos uses Docker if it's available, else Podman; `sandbox.runtime` (`"docker"` or `"podman"`) picks one. If neither is available, Lunos says what it tried and stops rather than running on the host.
+
+## What happens
+
+1. **Copy.** Your repository is copied into a new Docker volume: the current commit (depth 1), with your uncommitted changes applied — staged, unstaged, and untracked files that aren't gitignored. Ignored files (`.env`, `node_modules`, build output) are **not** copied. Your working tree is never mounted into the container, read-write or read-only, unless you choose [`workspace: "mount"`](#mounting-your-working-tree-reduced-isolation). The copy has to be a git repository with at least one commit.
+2. **Run.** A container starts from the sandbox image, running `lunos serve`. Sessions, subagents, background jobs, tool calls, `bash` commands, and the MCP and LSP servers are all started by that server, so they run inside the container; no Lunos server runs on your machine. The client on your machine talks to it over a port bound to `127.0.0.1`, protected by a random password.
+3. **Hand back.** When the work is done — `lunos run` has finished, or you quit the TUI — Lunos:
+   - writes every session's transcript (`transcript.json`) and a run summary (`summary.json`: image digest, resource limits, base commit, changed files) to `.opencode/sandbox/<id>/` in your repository (ignored by git by default);
+   - stops the container and copies its workspace out;
+   - creates the branch **`lunos/sandbox/<id>`** on your repository, starting at the commit you were on. If you had uncommitted changes, they become the first commit on the branch, so the second commit holds exactly the agent's changes. Your working tree, index and current branch are not touched.
+4. **Finish.** Then `sandbox.on_finish` applies (below). **Nothing is destroyed until the hand-back has succeeded.** If it fails — the repository is read-only, the branch already exists, the disk is full — the container is kept (stopped) whatever the policy says, and the reason is shown.
+
+If you interrupt a run (Ctrl-C), there are no results to hand back, so the sandbox is kept, stopped. `lunos sandbox destroy <id>` removes it.
+
+A task counts as **failed** when `lunos run` exits with an error, or when any session's last reply ended in an error (a provider error, for example). That is what `destroy_on_success` looks at.
+
+## Requiring sandboxes (organisations)
+
+`sandbox.required: true` means nothing runs on the machine except in a sandbox. It belongs in [managed config](deployment/self-hosted.md#organisation-policy-settings-developers-cant-change), locked so users can't change it:
+
+```json
+{
+  "$locked": ["sandbox.required"],
+  "sandbox": { "required": true }
+}
+```
+
+With it set:
+
+- `lunos` and `lunos run` always start a sandbox, as if `--sandbox` were passed. `--no-sandbox` is refused.
+- `lunos serve`, `lunos web`, `lunos acp`, `lunos github` and `lunos pr` refuse to start: each would run a server, and so agents and tools, on the machine.
+- Any agent tool call made by a server outside a sandbox is refused, whatever started that server (the desktop app, an integration). This is the last line: it holds even for a server that was already running when the policy arrived.
+- Every refusal says why, and is recorded as a `sandbox.refused` audit event.
+- A repository's config can't turn it off. Nor can `sandbox.enabled: false` or `OPENCODE_CONFIG_CONTENT`.
+- `lunos run --attach <url>` still works: it runs nothing here, only a client for a server somewhere else.
+
+Inside the sandbox, the requirement is met, so tools run normally. Lunos knows it's inside from a marker in the root-owned, read-only `/etc/lunos` volume, not from an environment variable, which anyone could set on the machine.
+
+## Getting the results back
+
+`sandbox.results` sets what comes back when the work is done:
+
+| `sandbox.results`    | What comes back, besides the transcript and summary                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `"branch"` (default) | Branch `lunos/sandbox/<id>`, as described above                                                                                                                                                  |
+| `"patch"`            | `.opencode/sandbox/<id>/changes.patch`: only the agent's changes, not your uncommitted work the sandbox started from, so `git apply` puts them on top of your working tree. No branch is created |
+| `"none"`             | Nothing: the changes stay in the sandbox (keep it, with `retain`, to look at them)                                                                                                               |
+
+Files Lunos itself would write into your project inside the sandbox (adding `$schema` to `opencode.json`, for example) are left alone, so the results hold only what the agent changed.
+
+## Keeping or throwing away the environment
+
+| `sandbox.on_finish`    | After a successful hand-back                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `"destroy"` (default)  | The container and its volumes are removed. `docker ps -a` and `docker volume ls` show nothing left.        |
+| `"retain"`             | The container is stopped and kept, with its volume: the workspace, installed packages and session history. |
+| `"destroy_on_success"` | Removed if the task succeeded; kept, as with `retain`, if it failed, so you can see what went wrong.       |
+
+For one run, `--keep` retains and `--rm` destroys, whatever `sandbox.on_finish` says:
+
+```sh
+lunos run --sandbox --keep "try the migration"
+lunos --sandbox --rm
+```
+
+A failed hand-back still keeps the sandbox, even with `--rm`.
+
+`sandbox.retain_for` (for example `"72h"`, `"30m"` or `"7d"`) limits how long a kept sandbox stays. Once it has expired, `lunos sandbox prune` removes it; so does the next sandboxed run, or any `lunos sandbox` command. Without `retain_for`, a kept sandbox stays until you destroy it.
+
+```sh
+lunos sandbox list             # every sandbox, running or kept, with its expiry, branch and project
+lunos sandbox attach <id>      # start a kept sandbox and reopen its last session in the TUI
+lunos sandbox logs <id>        # the sandbox server's log (-f to follow, --tail N)
+lunos sandbox stop <id>        # stop a running sandbox and keep it
+lunos sandbox destroy <id>     # remove the container and its volumes
+lunos sandbox prune            # remove kept sandboxes whose retain_for has expired
+```
+
+`attach` reopens the TUI on the sandbox's most recent session, with its history. When you leave, the hand-back runs again: new changes are added to `lunos/sandbox/<id>` as another commit, and the sandbox is stopped and kept (with a fresh `retain_for`, if one is set).
+
+## Seeing sandboxes
+
+In a session running in a sandbox, the sidebar under the session's title shows the sandbox's id and its image's pinned digest (and the devcontainer image it came from, if any). `/status` (the Status tab of `/settings`) shows a **Sandbox** line. In a session running in a sandbox, it names the sandbox, its image and pinned digest, its network mode and how results come back. On your machine, it lists the project's sandboxes, with their network mode and expiry. `lunos sandbox list` shows every sandbox on the machine.
+
+## Isolation defaults
+
+These are fixed. Configuration can choose the image, the resources and the lifecycle; it can't add capabilities or privileges. Your own and your organisation's config (never a repository's) can mount your working tree and extra read-only directories; see [below](#mounting-your-working-tree-reduced-isolation).
+
+- Runs as a non-root user (uid 1000), whatever the image's default user. With `workspace: "mount"` on Docker Engine on Linux, it runs as your own (non-root) uid instead, so the files it writes are yours.
+- `--cap-drop ALL` and `no-new-privileges`. Docker's default seccomp profile applies (it is never overridden).
+- Read-only root filesystem. The only writable places are the sandbox volume (the workspace, and the home directory that holds session history), an in-memory `/tmp`, and a 1 MB in-memory `/run/lunos` that only the sandbox user can read (see [Credentials](#credentials)).
+- The Docker socket is never mounted. Nothing from your machine is mounted, unless your global or managed config asks for it (`sandbox.workspace`, `sandbox.mounts`).
+- No route out except through the egress proxy, unless `sandbox.network` is `"open"` (see [Network](#network)).
+- The image is pinned by its ID when the sandbox is created, and the digest is shown at start and recorded in `summary.json`.
+- Resource limits, from `sandbox.resources`:
+
+```json
+{
+  "sandbox": {
+    "resources": { "cpus": 2, "memory": "4g", "pids": 512, "tmp": "1g" }
+  }
+}
+```
+
+These are the defaults. `tmp` is the size of the in-memory `/tmp`.
+
+## The image
+
+The default is `ghcr.io/axsiondev/lunos:<the CLI's version>`. Set `sandbox.image` to use another image; it must have `lunos` as its entry point, and `/bin/sh`, `cat` and `mv` (used to pass the sandbox its credentials at start). `git` in the image is recommended, so the agent has a working repository. The volumes are always filled from the Lunos image, never from one a repository chose.
+
+Where `sandbox.image` is set matters:
+
+- **In your global or managed config**, it's the Lunos image to use, for example a mirror of it on a registry your machines can reach. The egress proxy runs from it, and a project's devcontainer gets Lunos from it.
+- **In a repository's config**, it's that repository's choice of toolchain image. It wins over the repository's devcontainer, but never runs the proxy or fills the volumes.
+
+To build the image locally, for example for a development build of Lunos:
+
+```sh
+bun run packages/opencode/script/sandbox-image.ts     # builds the Linux binary, then tags lunos-sandbox:local
+```
+
+```json
+{ "sandbox": { "image": "lunos-sandbox:local" } }
+```
+
+### The project's devcontainer
+
+If the project has a `.devcontainer/devcontainer.json` (or `.devcontainer.json`, or a single `.devcontainer/<name>/devcontainer.json`), and its own config doesn't set `sandbox.image`, the sandbox uses that devcontainer's image as its toolchain, with Lunos added. A Go project's `mcr.microsoft.com/devcontainers/go` gives the agent `go`; a Python one gives it `python`.
+
+- **`image`: used automatically.** Lunos is added to it without running anything of the image: the files come from the Lunos image, and the generated Dockerfile is only `FROM`, `COPY`, `ENV` and `ENTRYPOINT`. The result is cached, and checked by running it as the sandbox does (no network, no capabilities). The image's own tools and `PATH` are unchanged.
+- **`build` (a Dockerfile): only if you allow it.** Building runs the repository's own build steps on your machine, with the network open, before any sandbox exists. So it happens only when your global or managed config says so:
+
+  ```json
+  { "sandbox": { "devcontainer": "build" } }
+  ```
+
+  Without that, the default image is used, and Lunos says how to allow the build. A repository's config can't allow it. Under a managed `sandbox.required`, only managed config can.
+
+- **Not applied:** `features`, the lifecycle commands (`postCreateCommand` and the rest), `remoteUser`, `containerEnv`, `runArgs`, `mounts` and the other settings for an editor's container. Lunos names the ones it ignored. Docker Compose devcontainers (`dockerComposeFile`) aren't supported.
+- **Off:** `"sandbox": { "devcontainer": "off" }`. A repository can turn it off for itself.
+- **Limits:**
+  - musl-based images (Alpine) aren't supported as a devcontainer base yet. Lunos's own musl runtime would change their libc.
+  - The image must exist for your machine's architecture (amd64 or arm64).
+  - Under the default network policy, tools that download (`go mod download`, `pip install`) need their hosts in `sandbox.allow`, e.g. `proxy.golang.org`.
+
+## Credentials
+
+Your provider credentials (the ones `lunos auth` stores, and any `*_API_KEY` environment variables) and the sandbox server's password are handed to the container **after it starts**, not when it's created:
+
+- Lunos writes them through `docker exec`, on stdin, into a file on the container's in-memory `/run/lunos`. The server reads the file into its own environment as it starts, and deletes it.
+- So they are never in the container's configuration (`docker inspect`), never in the image or on the sandbox volume, and never in your machine's process list.
+- When the sandbox stops, they are gone with the in-memory filesystem. **A kept sandbox holds no credentials.** `lunos sandbox attach` hands them over again.
+- Credentials Lunos writes inside the sandbox, such as a refreshed OAuth token, go to the same in-memory filesystem, not to the volume.
+
+Inside a running sandbox, the server's environment does hold them, and processes the agent starts inherit it. A sandbox limits what the agent can do to your machine; it doesn't hide your provider key from the agent.
+
+## Network
+
+By default a sandbox can reach only what it needs. `sandbox.network` sets how much:
+
+| `sandbox.network`    | The sandbox can reach                                                                                     |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| `"policy"` (default) | The allow list below, and nothing else                                                                    |
+| `"none"`             | Nothing, not even a model provider. For a local model, allow its host with `"policy"` and `sandbox.allow` |
+| `"open"`             | Anything your machine can reach, including your local network. A warning is shown at start                |
+
+**How it's enforced.** Outside Lunos, at the container level:
+
+- The sandbox container is attached only to its own internal Docker network, which has no route out and doesn't resolve outside names.
+- Its only way out is a second, small container: an egress proxy started from the Lunos image, or from your `sandbox.image` if your global or managed config sets it (a mirror, say), but never from an image a repository chose. The sandbox's `HTTP_PROXY` and `HTTPS_PROXY` point at it.
+- The proxy forwards a connection only to an allowed `host:port`; anything else gets `403 Forbidden` ("Blocked by the Lunos sandbox network policy"). A command that ignores the proxy settings has no route at all.
+- The same container relays your client's connection to the sandbox server, because an internal network can't publish a port.
+
+**The allow list** is worked out on your machine when the sandbox is created, and shown at start:
+
+- **Model endpoints.** Each provider in your config at its `baseURL`, and the API host of each provider you have credentials for (`lunos auth`, or a `*_API_KEY` variable). Under a [residency policy](data-residency.md), only providers the policy allows.
+- **Remote MCP servers** in your config.
+- **The npm registry** (`registry.npmjs.org`), for LSP servers and packages the agent installs.
+- **`sandbox.allow`**, from your global or managed config: extra hosts, as `"host"` (port 443) or `"host:port"`. A leading dot allows subdomains: `".internal.example.eu"`.
+
+```json
+{
+  "sandbox": { "network": "policy", "allow": ["artifacts.example.eu", "10.0.0.5:8000"] }
+}
+```
+
+**A repository can make the network stricter, never looser.** Its config can set `"none"`, but its `"open"` and its `sandbox.allow` are ignored. It can still add a provider with its own `baseURL` to its config. That endpoint is on the allow list, since the agent needs it, unless a residency policy (locked in managed config, if you want it to hold) refuses that provider.
+
+**Audit.** Each connection the proxy allows or refuses is a `sandbox.egress` event in your audit log: the host, the port, and whether it was allowed. A reused connection counts once, not per request. The proxy writes these, outside the sandbox, so the agent can't alter them. At the end of a run, Lunos also lists the connections it refused.
+
+The model list isn't fetched from models.dev inside a sandbox with a network policy; the list built into Lunos is used.
+
+Every `sandbox.*` setting is also in `/settings` and `lunos settings`. The ones a repository's config can't choose (`allow`, `mounts`, `workspace: "mount"`, `devcontainer: "build"`, `network: "open"`) can only be saved to your user config there: saving them to project config is refused, since a repository's config is ignored for them.
+
+## Your config and your organisation's
+
+Three layers of configuration reach the sandbox, as they would on your machine:
+
+- **Your global config** (`~/.config/opencode/opencode.json` and the files next to it, plus `OPENCODE_CONFIG` and `OPENCODE_CONFIG_CONTENT` if you set them) is passed in with the credentials, through the same in-memory file, so a literal key in it isn't written to the volume either. Inside, it's the server's `OPENCODE_CONFIG`, below the project config as usual. `{file:…}` references in it point at your machine's files, which don't exist in the container. Other files in your global config directory (agents, commands, plugins) are not copied.
+- **The project's config** is part of the repository copy.
+- **Your organisation's managed config** (`/Library/Application Support/Lunos`, `/etc/lunos`, `%ProgramData%\Lunos`, and on macOS the MDM profile) is copied into a separate volume, owned by root and mounted read-only at `/etc/lunos`, where Lunos reads managed config on Linux. Its `$locked` keys hold inside the sandbox exactly as they do on your machine, and the agent can't change them.
+
+So a residency policy set in your global config, or locked by your organisation, applies to every model call made inside the sandbox.
+
+## Audit
+
+With the audit trail on (`audit.enabled`, or a residency policy), the host records each sandbox's lifecycle as `sandbox.create`, `sandbox.attach`, `sandbox.finish`, `sandbox.retain`, `sandbox.destroy` and `sandbox.prune` events, with the image and its digest, the resource limits, the lifecycle policy and the outcome. Never file contents. See [the audit log](audit-log.md).
+
+These events go to the audit log your **global or managed** config names, never one the repository's config names: the repository is the code being sandboxed.
+
+What happens inside the sandbox (model calls, tool runs, permission decisions) is recorded by the server there, whenever your config turns auditing on. Its log is written in the sandbox, since your audit path doesn't exist there, and at every hand-back:
+
+- it's copied to `.opencode/sandbox/<id>/audit.log`;
+- each new event is added to your own audit log, tagged `sandbox: <id>`, with its original time as `sandbox_time`. So there's one trail, and `audit.forward` sends the sandbox's events to your SIEM from your machine. The server inside doesn't forward anything itself.
+
+The agent runs as the same user as that server, so it could alter the log inside before it's collected. The records it can't reach are the host's own `sandbox.*` events.
+
+## Mounting your working tree (reduced isolation)
+
+By default the sandbox works on a copy, and its changes come back as a branch or a patch. If you'd rather it worked on your working tree itself (to see changes as they happen, or because the project is too big to copy), set it in **your global config** or your organisation's managed config:
+
+```json
+{ "sandbox": { "workspace": "mount" } }
+```
+
+A repository's own config can't choose this, as it can't open the network: a bind mount is weaker isolation, so it's yours to choose. When managed config sets `sandbox.required`, only managed config can choose `mount`.
+
+What changes:
+
+- **Your working tree is mounted read-write.** The agent's changes are in it as they happen. Nothing is handed back at the end, because there's nothing to hand back: no branch, no patch (`sandbox.results` doesn't apply). The transcript and summary still come back to `.opencode/sandbox/<id>/`.
+- **Read-only, mounted over it:** `.git` (so the agent can't add git hooks or change git config, which run on your machine), and Lunos's own config: `.opencode/`, `opencode.json`, `opencode.jsonc` (so it can't add a plugin or command that your next `lunos` outside a sandbox would load). Only those that exist can be protected: if there's no `opencode.json`, the agent can create one. In a linked git worktree, the git directories its `.git` file points at are mounted read-only too, at the same path; on Windows that can't work (they're Windows paths, which git in the sandbox can't open), so mount mode is refused in a linked worktree there.
+- **Not protected, and the warning at start says so:** anything else the agent leaves in your tree runs on your machine the next time you run it: `package.json` scripts, `Makefile`s, `.envrc`, `.husky/`, build scripts, `.gitmodules` URLs. Review the changes before you run them.
+- **Who owns what it writes:** you. On Docker Desktop, file sharing maps ownership to you; on rootless Podman, `--userns=keep-id` maps the sandbox user to you; on Docker Engine on Linux, the sandbox runs as your own uid. Rootless Docker isn't supported in mount mode yet, and Lunos refuses rather than guess. It never runs the sandbox as root, and never changes the ownership of your files.
+
+### Extra read-only directories
+
+`sandbox.mounts` adds directories from this machine, read-only, in either mode; for example a package cache:
+
+```json
+{ "sandbox": { "mounts": [{ "source": "/home/me/.cache/go-build", "target": "/cache/go-build" }] } }
+```
+
+From your global and managed config only. Refused: `/`, your home directory itself, anything holding or inside `~/.ssh`, `~/.gnupg` or `~/.docker`, and anything holding a container runtime's socket (`/var/run/docker.sock`, `/run/podman`, `$XDG_RUNTIME_DIR`), which would let the sandbox start containers on your machine. A target can't be inside the sandbox's own `/sandbox`, `/etc/lunos` or `/run/lunos`.
+
+## What a sandbox does NOT isolate (yet)
+
+- **The kernel is shared.** A container is not a virtual machine. A kernel vulnerability, or a container-escape bug in Docker, defeats the isolation. For untrusted code where that matters, run Lunos in a VM.
+- **Allowed hosts are allowed for everything in the sandbox.** The proxy checks where a connection goes, not what it carries: a command in the sandbox can send data to your model provider, or to any other allowed host, as the agent itself can. With `"open"`, nothing is restricted.
+- **Each sandbox holds a Docker network while it exists.** Docker's default address pool has room for about 30 networks; destroy or prune kept sandboxes you don't need.
+- **The volume has no size limit.** Docker's and Podman's default volume drivers can't cap a volume's size, and the container's own filesystem is read-only, so a limit on it would change nothing. `tmp` limits only `/tmp`. There is no `sandbox.resources.disk` for this reason: a limit that isn't enforced would be worse than none.
+- **In `workspace: "mount"`, your working tree.** See [above](#mounting-your-working-tree-reduced-isolation): the agent writes to it directly, and only `.git` and Lunos's own config are read-only.
+- **Anything the agent can reach through the model provider or the network is not contained**: a sandbox limits what the agent can do to your machine, not what it can send out.
+
+**Where it has been verified:** end to end (`packages/opencode/script/sandbox-e2e.ts`) on macOS with Docker Desktop, and on Linux (GitHub's `ubuntu-24.04`) with Docker Engine and with rootless Podman 4.9, in CI on every sandbox change. Not yet on Windows: `packages/opencode/script/sandbox-e2e.ps1` runs the same checks there. On Podman, the host is `host.containers.internal` from inside a container; on Docker, `host.docker.internal` (Lunos maps it on Docker Engine, which doesn't have it).
+
+## Configuration reference
+
+| Key                        | Default                             | Meaning                                                                                 |
+| -------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------- |
+| `sandbox.enabled`          | `false`                             | `lunos` and `lunos run` sandboxed, as if `--sandbox` were passed                        |
+| `sandbox.required`         | `false`                             | Nothing runs outside a sandbox; for locked managed config                               |
+| `sandbox.image`            | `ghcr.io/axsiondev/lunos:<version>` | Image with `lunos` as its entry point                                                   |
+| `sandbox.workspace`        | `"copy"`                            | `copy`, or `mount` (reduced isolation); global and managed config only                  |
+| `sandbox.mounts`           | `[]`                                | Extra read-only mounts, `{ source, target? }`; global and managed config only           |
+| `sandbox.devcontainer`     | `"image"`                           | `image`, `build` or `off`; see [The project's devcontainer](#the-projects-devcontainer) |
+| `sandbox.results`          | `"branch"`                          | `branch`, `patch` or `none`; see [Getting the results back](#getting-the-results-back)  |
+| `sandbox.runtime`          | Docker, else Podman                 | `docker` or `podman`                                                                    |
+| `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back                        |
+| `sandbox.retain_for`       | unset (kept until destroyed)        | How long a kept sandbox stays, e.g. `"72h"`; then it's pruned                           |
+| `sandbox.network`          | `"policy"`                          | `policy`, `none` or `open`; see [Network](#network)                                     |
+| `sandbox.allow`            | `[]`                                | Extra hosts under `policy`; global and managed config only                              |
+| `sandbox.resources.cpus`   | `2`                                 | `docker --cpus`                                                                         |
+| `sandbox.resources.memory` | `"4g"`                              | `docker --memory`                                                                       |
+| `sandbox.resources.pids`   | `512`                               | `docker --pids-limit`                                                                   |
+| `sandbox.resources.tmp`    | `"1g"`                              | Size of the in-memory `/tmp`                                                            |

@@ -1,17 +1,17 @@
 ---
 title: CLI
-description: OpenCode CLI options and commands.
+description: Lunos CLI options and commands.
 ---
 
 import { Tabs, TabItem } from "@astrojs/starlight/components"
 
-The OpenCode CLI by default starts the [TUI](/docs/tui) when run without any arguments.
+The Lunos CLI by default starts the [TUI](/docs/tui) when run without any arguments.
 
 ```bash
 opencode
 ```
 
-But it also accepts commands as documented on this page. This allows you to interact with OpenCode programmatically.
+But it also accepts commands as documented on this page. This allows you to interact with Lunos programmatically.
 
 ```bash
 opencode run "Explain how closures work in JavaScript"
@@ -21,7 +21,7 @@ opencode run "Explain how closures work in JavaScript"
 
 ### tui
 
-Start the OpenCode terminal user interface.
+Start the Lunos terminal user interface.
 
 ```bash
 opencode [project]
@@ -48,13 +48,13 @@ opencode [project]
 
 ## Commands
 
-The OpenCode CLI also has the following commands.
+The Lunos CLI also has the following commands.
 
 ---
 
 ### agent
 
-Manage agents for OpenCode.
+Manage agents for Lunos.
 
 ```bash
 opencode agent [command]
@@ -98,13 +98,13 @@ opencode agent list
 
 ### attach
 
-Attach a terminal to an already running OpenCode backend server started via `serve` or `web` commands.
+Attach a terminal to an already running Lunos backend server started via `serve` or `web` commands.
 
 ```bash
 opencode attach [url]
 ```
 
-This allows using the TUI with a remote OpenCode backend. For example:
+This allows using the TUI with a remote Lunos backend. For example:
 
 ```bash
 # Start the backend server for web/mobile access
@@ -139,13 +139,13 @@ opencode auth [command]
 
 #### login
 
-OpenCode is powered by the provider list at [Models.dev](https://models.dev), so you can use `opencode auth login` to configure API keys for any provider you'd like to use. This is stored in `~/.local/share/opencode/auth.json`.
+Lunos is powered by the provider list at [Models.dev](https://models.dev), so you can use `opencode auth login` to configure API keys for any provider you'd like to use. This is stored in `~/.local/share/opencode/auth.json`.
 
 ```bash
 opencode auth login
 ```
 
-When OpenCode starts up it loads the providers from the credentials file. And if there are any keys defined in your environments or a `.env` file in your project.
+When Lunos starts up it loads the providers from the credentials file. And if there are any keys defined in your environments or a `.env` file in your project.
 
 ##### Flags
 
@@ -328,7 +328,7 @@ opencode models anthropic
 | <nobr><code>{"--refresh"}</code></nobr> | Refresh the models cache from models.dev                     |
 | <nobr><code>{"--verbose"}</code></nobr> | Use more verbose model output (includes metadata like costs) |
 
-Use the `--refresh` flag to update the cached model list. This is useful when new models have been added to a provider and you want to see them in OpenCode.
+Use the `--refresh` flag to update the cached model list. This is useful when new models have been added to a provider and you want to see them in Lunos.
 
 ```bash
 opencode models --refresh
@@ -387,7 +387,7 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 ### serve
 
-Start a headless OpenCode server for API access. Check out the [server docs](/docs/server) for the full HTTP interface.
+Start a headless Lunos server for API access. Check out the [server docs](/docs/server) for the full HTTP interface.
 
 ```bash
 opencode serve
@@ -409,7 +409,7 @@ This starts an HTTP server that provides API access to opencode functionality wi
 
 ### session
 
-Manage OpenCode sessions.
+Manage Lunos sessions.
 
 ```bash
 opencode session [command]
@@ -419,7 +419,7 @@ opencode session [command]
 
 #### list
 
-List all OpenCode sessions.
+List all Lunos sessions.
 
 ```bash
 opencode session list
@@ -436,7 +436,7 @@ opencode session list
 
 #### delete
 
-Delete an OpenCode session.
+Delete an Lunos session.
 
 ```bash
 opencode session delete <sessionID>
@@ -446,7 +446,7 @@ opencode session delete <sessionID>
 
 ### stats
 
-Show token usage and cost statistics for your OpenCode sessions.
+Show token usage and cost statistics for your Lunos sessions.
 
 ```bash
 opencode stats
@@ -460,6 +460,51 @@ opencode stats
 | <nobr><code>{"--tools"}</code></nobr>   | Number of tools to show (all)                                               |
 | <nobr><code>{"--models"}</code></nobr>  | Show model usage breakdown (hidden by default). Pass a number to show top N |
 | <nobr><code>{"--project"}</code></nobr> | Filter by project (all projects, empty string: current project)             |
+
+---
+
+### memory
+
+Review long-term memory (see [Rules: long-term memory](/docs/rules#long-term-memory)). `list`, `show` and `export --format markdown` read what is stored without starting memory. A bundle export starts memory to read the graph, unless you pass `--no-graph`.
+
+```bash
+opencode memory list [--scope project|user]
+opencode memory show <id>
+opencode memory search <query>
+opencode memory forget <id>
+opencode memory purge --scope project|user --yes
+opencode memory export [--format bundle|markdown] [--scope project|user|both] [--since <date>]
+                       [--out <path>] [--zip] [--encrypt] [--no-graph] [--include-index] [--dir <path>]
+opencode memory import <path> [--scope project|user] [--yes] [--dry-run] [--as-facts] [--include-conflicts]
+opencode memory migrate --to neo4j [--scope project|user] [--yes] [--include-conflicts]
+opencode memory status
+```
+
+- `export` writes all of memory as a versioned bundle (facts, graph, notes and provenance) to `./lunos-memory-<time>/`, or a `.zip` with `--zip`, or an encrypted `.zip.enc` with `--encrypt`. See [Rules: exporting memory](/docs/rules#exporting-memory).
+- `export --format markdown` writes one Markdown file per fact, with its provenance, to `.opencode/memory/export/` (or `--dir`) so you can review memory in git.
+- `forget` removes the fact from memory and from that Markdown export folder. Bundles already written are snapshots and keep it.
+- `import` reads a bundle, Markdown, or `AGENTS.md` / `CLAUDE.md` / Claude Code memory, verifies and screens every fact, and shows a preview of new, duplicate, conflict and rejected rows. It writes only with `--yes`. See [Rules: importing memory](/docs/rules#importing-memory).
+- `purge` deletes a memory's stored facts and graph. Your notes in `.opencode/memory/*.md` are kept.
+- `migrate --to neo4j` moves this machine's embedded memory into the external database set in `memory.backend`: it exports a bundle and imports it with the same preview, keeping each fact's id and provenance. It writes only with `--yes`. See [Rules: an external memory database](/docs/rules#an-external-memory-database).
+- `status` shows whether memory is on, the backend and whether it can be reached, and each scope's fact count and last write.
+
+---
+
+### settings
+
+View and change settings. With no subcommand it opens the TUI on the [settings screen](/docs/tui#settings-1).
+
+```bash
+opencode settings
+opencode settings list [--json]
+opencode settings get <key>
+opencode settings set <key> <value> [--project]
+```
+
+- `set` writes your user config, or `.opencode/opencode.json` with `--project`, keeping comments. It
+  validates the value against the config schema and refuses keys locked by your organisation, exiting
+  non-zero with the reason. Lists take comma-separated values or JSON; structured settings take JSON.
+- See [Config: Settings](/docs/config#settings).
 
 ---
 
@@ -483,13 +528,13 @@ If you don't provide a session ID, you'll be prompted to select from available s
 
 ### import
 
-Import session data from a JSON file or OpenCode share URL.
+Import session data from a JSON file or Lunos share URL.
 
 ```bash
 opencode import <file>
 ```
 
-You can import from a local file or an OpenCode share URL.
+You can import from a local file or an Lunos share URL.
 
 ```bash
 opencode import session.json
@@ -500,13 +545,13 @@ opencode import https://opncd.ai/s/abc123
 
 ### web
 
-Start a headless OpenCode server with a web interface.
+Start a headless Lunos server with a web interface.
 
 ```bash
 opencode web
 ```
 
-This starts an HTTP server and opens a web browser to access OpenCode through a web interface. Set `OPENCODE_SERVER_PASSWORD` to enable HTTP basic auth (username defaults to `opencode`).
+This starts an HTTP server and opens a web browser to access Lunos through a web interface. Set `OPENCODE_SERVER_PASSWORD` to enable HTTP basic auth (username defaults to `opencode`).
 
 #### Flags
 
@@ -568,7 +613,7 @@ opencode plug <module>
 
 ### pr
 
-Fetch and checkout a GitHub PR branch, then run OpenCode.
+Fetch and checkout a GitHub PR branch, then run Lunos.
 
 ```bash
 opencode pr <number>
@@ -614,7 +659,7 @@ opencode debug [command]
 
 ### uninstall
 
-Uninstall OpenCode and remove all related files.
+Uninstall Lunos and remove all related files.
 
 ```bash
 opencode uninstall
@@ -631,25 +676,48 @@ opencode uninstall
 
 ---
 
-### upgrade
+### update
 
-Updates opencode to the latest version or a specific version.
-
-```bash
-opencode upgrade [target]
-```
-
-To upgrade to the latest version.
+Updates Lunos to the latest version or a specific version. `lunos upgrade` is an alias and still works.
 
 ```bash
-opencode upgrade
+lunos update [target]
 ```
 
-To upgrade to a specific version.
+To update to the latest version.
 
 ```bash
-opencode upgrade v0.1.48
+lunos update
 ```
+
+When you're already on the latest version, this prints `Lunos is up to date (X.Y.Z).` and exits 0.
+
+To update to a specific version.
+
+```bash
+lunos update v0.1.48
+```
+
+If the update fails, Lunos prints the command to run by hand. For npm installs that's
+`npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`.
+
+A running TUI keeps using the old version until it restarts. After `/update` in the TUI, run
+`/restart`: it starts the newly installed version back in the same session. See
+[`/restart`](/docs/tui#restart).
+
+#### New version notice
+
+Every time Lunos starts it asks the npm registry (`lunos-ai`, or the registry in your `.npmrc`) for
+the latest version. The check runs in the background, never delays startup, and gives up after 3
+seconds; if it fails, the last known result is used.
+
+- In the TUI, the bottom-right corner shows `There is a new version: X.Y.Z — please run lunos update`
+  on every screen until you update (`New version: X.Y.Z · lunos update` below 100 columns).
+- Plain commands such as `lunos models` print `There is a new version: X.Y.Z — please run "lunos update"`
+  to stderr, at most once a day. It never goes to stdout, so piped output stays clean.
+
+No check is made, and no notice shown, with `"autoupdate": false`, `LUNOS_DISABLE_AUTOUPDATE=1`,
+`LUNOS_OFFLINE=1`, or when an organisation policy sets `"autoupdate": false`.
 
 #### Flags
 
@@ -675,7 +743,7 @@ The opencode CLI takes the following global flags.
 
 ## Environment variables
 
-OpenCode can be configured using environment variables.
+Lunos can be configured using environment variables.
 
 | Variable                              | Type    | Description                                       |
 | ------------------------------------- | ------- | ------------------------------------------------- |

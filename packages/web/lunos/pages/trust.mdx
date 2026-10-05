@@ -1,0 +1,48 @@
+---
+title: Trust and compliance
+description: Security, supply-chain, data-protection and accessibility documentation for reviewers.
+---
+
+The **Trust pack** is for procurement officers and security reviewers. It answers the questions that security, data-protection and accessibility checklists ask. Every statement links to the document or code behind it. It is versioned with the repository, and nothing in it is a certification or a claim of compliance.
+
+| Document                                                                                                                                                                          | What it answers                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [What Lunos claims, and what it doesn't](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md#2-what-is-true-today--the-sovereignty-claim-stated-precisely) | The claim table every other document must agree with. CI checks that they do           |
+| [Security overview](https://github.com/AxsionDev/Lunos/blob/dev/docs/trust/security-overview.md)                                                                                  | Architecture, trust boundaries, and a threat model: what is mitigated and what isn't   |
+| [Supply chain](https://github.com/AxsionDev/Lunos/blob/dev/docs/trust/supply-chain.md)                                                                                            | How releases are built and how to verify them. How marketplace entries are reviewed    |
+| [CRA readiness](https://github.com/AxsionDev/Lunos/blob/dev/docs/trust/cra-readiness.md)                                                                                          | Where Lunos stands under the EU Cyber Resilience Act, the SBOM, vulnerability handling |
+| [Data protection](https://github.com/AxsionDev/Lunos/blob/dev/docs/trust/data-protection.md)                                                                                      | GDPR roles, what reaches model providers, and a DPIA-support checklist                 |
+| [Accessibility](https://github.com/AxsionDev/Lunos/blob/dev/docs/trust/accessibility.md)                                                                                          | The accessibility statement and conformance report                                     |
+| [CSA CAIQ v3.0.1 answers](https://github.com/AxsionDev/Lunos/blob/dev/docs/trust/questionnaire-caiq-v3.0.1.md)                                                                    | Pre-filled answers to all 295 CAIQ questions                                           |
+
+Related:
+
+- [Self-hosted deployment guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md)
+- [Data residency](/docs/data-residency)
+- [Audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md)
+
+## Reporting a vulnerability
+
+Report it privately, never in a public issue:
+
+- through [GitHub Security Advisories](https://github.com/AxsionDev/Lunos/security/advisories/new)
+- by email to security@lunos.tech
+
+See [`SECURITY.md`](https://github.com/AxsionDev/Lunos/blob/dev/SECURITY.md).
+
+## Release and support policy
+
+Each release gets **security fixes for 6 months from its release date**, starting with v1.18.43. Releases before v1.18.43 have no support period. A security fix ships as a new release, and its GitHub Security Advisory names the affected versions and the release that fixes them.
+
+To see whether your release is still supported, check its date on [GitHub Releases](https://github.com/AxsionDev/Lunos/releases) or [lunos.tech/changelog](https://lunos.tech/changelog): support ends 6 months after it. When a newer release exists, Lunos says so at startup (`There is a new version: … please run "lunos update"`), and `lunos update` moves to it.
+
+The policy is in [CRA readiness](https://github.com/AxsionDev/Lunos/blob/dev/docs/trust/cra-readiness.md#security-support-period).
+
+## Sign-offs
+
+| What                                                                    | Who                                             | Date       |
+| ----------------------------------------------------------------------- | ----------------------------------------------- | ---------- |
+| Data protection note                                                    | Ivan Antonov, ITService EOOD's in-house counsel | 2026-09-26 |
+| security@lunos.tech receives mail (test message sent and received)      | ITService EOOD                                  | 2026-09-29 |
+| Independent re-check of the five-statement spot-check of the Trust pack | Ivan P                                          | 2026-10-01 |
+| 6-month security support period                                         | ITService EOOD                                  | 2026-10-02 |

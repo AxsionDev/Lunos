@@ -19,7 +19,9 @@ import { pathToFileURL } from "url"
 import { open } from "node:fs/promises"
 import { Effect } from "effect"
 import { UI } from "../ui"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, fail } from "../effect-cmd"
+import { ConfigPolicy } from "@/config/policy"
+import { wanted as sandboxWanted } from "./sandbox"
 import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
@@ -128,7 +130,8 @@ export const RunCommand = effectCmd({
   describe: "run opencode with a message",
   // --attach connects to a remote server (no local instance needed); the
   // default path runs an in-process server and needs the project instance.
-  instance: (args) => !args.attach,
+  // --sandbox (XCOD-144) doesn't either: it must not initialise the project's plugins on the host.
+  instance: (args) => !args.attach && !sandboxWanted(args),
   // For --dir without --attach, load instance for the resolved target dir.
   // The handler also chdirs (preserving the legacy order: chdir → file resolution).
   directory: (args) => (args.dir && !args.attach ? path.resolve(process.cwd(), args.dir) : process.cwd()),
@@ -167,9 +170,14 @@ export const RunCommand = effectCmd({
         alias: ["m"],
         describe: "model to use in the format of provider/model",
       })
+      .option("mode", {
+        type: "string",
+        describe: "mode to use",
+      })
       .option("agent", {
         type: "string",
-        describe: "agent to use",
+        hidden: true,
+        describe: "deprecated, use --mode",
       })
       .option("format", {
         type: "string",
@@ -259,8 +267,50 @@ export const RunCommand = effectCmd({
         default: false,
         hidden: true,
         describe: "enable direct interactive demo slash commands; pass one as the message to run it immediately",
+      })
+      .option("sandbox", {
+        type: "boolean",
+        describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
+      })
+      .option("keep", {
+        type: "boolean",
+        describe: "with --sandbox: keep the sandbox when done, whatever sandbox.on_finish says",
+      })
+      .option("rm", {
+        type: "boolean",
+        describe: "with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says",
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
+    if (args.sandbox === false && !args.attach) {
+      const { refuseHost } = yield* Effect.promise(() => import("./sandbox"))
+      const refused = yield* Effect.promise(() => refuseHost("`lunos run --no-sandbox`"))
+      if (refused) return yield* fail(refused)
+    }
+    if (sandboxWanted(args)) {
+      if (args.attach) return yield* fail("--sandbox cannot be used with --attach")
+      if (args.mini) return yield* fail("--sandbox cannot be used with --mini yet")
+      const { runSandboxed } = yield* Effect.promise(() => import("./sandbox"))
+      const here = Filesystem.resolve(process.env.PWD ?? process.cwd())
+      const directory = args.dir ? path.resolve(here, args.dir) : here
+      return yield* Effect.tryPromise({
+        try: () =>
+          runSandboxed(
+            directory,
+            async (conn) => {
+              await RunCommand.handler!({
+                ...args,
+                sandbox: false,
+                attach: conn.url,
+                dir: conn.directory,
+                password: conn.password,
+                username: "opencode",
+              } as never)
+            },
+            { keep: args.keep, rm: args.rm },
+          ),
+        catch: (error) => error,
+      }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
+    }
     const { Agent } = yield* Effect.promise(() => import("@/agent/agent"))
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
     const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))
@@ -272,6 +322,11 @@ export const RunCommand = effectCmd({
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
       const auto = args.auto || args.yolo || args["dangerously-skip-permissions"]
+      // XCOD-40: --agent is deprecated in favor of --mode; --mode wins if both are set.
+      if (args.agent && !args.mode) {
+        UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL, `--agent is deprecated, use --mode instead`)
+      }
+      const modeArg = args.mode ?? args.agent
       const thinking = interactive ? (args.thinking ?? true) : (args.thinking ?? false)
       const die = (message: string): never => {
         UI.error(message)
@@ -536,12 +591,14 @@ export const RunCommand = effectCmd({
         const cfg = await sdk.config.get()
         if (!cfg.data) return
         if (cfg.data.share !== "auto" && !flags.autoShare && !args.share) return
-        const res = await sdk.session.share({ sessionID }).catch((error) => {
-          if (error instanceof Error && error.message.includes("disabled")) {
-            UI.println(UI.Style.TEXT_DANGER_BOLD + "!  " + error.message)
-          }
-          return { error }
-        })
+        const res = await sdk.session.share({ sessionID }).catch((error) => ({ error }))
+        const refusal = res.error as { _tag?: string; message?: string } | undefined
+        if (
+          refusal?._tag === "ShareDisabledError" ||
+          (refusal instanceof Error && refusal.message.includes("disabled"))
+        ) {
+          UI.println(UI.Style.TEXT_WARNING_BOLD + "!  " + refusal.message)
+        }
         if (!res.error && "data" in res && res.data?.share?.url) {
           UI.println(UI.Style.TEXT_INFO_BOLD + "~  " + res.data.share.url)
         }
@@ -593,8 +650,8 @@ export const RunCommand = effectCmd({
       }
 
       async function localAgent() {
-        if (!args.agent) return undefined
-        const name = args.agent
+        if (!modeArg) return undefined
+        const name = modeArg
 
         const entry = await Effect.runPromise(
           agentSvc.get(name).pipe(Effect.provideService(InstanceRef, localInstance)),
@@ -603,7 +660,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" not found. Falling back to default agent`,
+            `mode "${name}" not found. Falling back to default mode`,
           )
           return undefined
         }
@@ -611,7 +668,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" is a subagent, not a primary agent. Falling back to default agent`,
+            `mode "${name}" is a subagent, not a primary mode. Falling back to default mode`,
           )
           return undefined
         }
@@ -619,8 +676,8 @@ export const RunCommand = effectCmd({
       }
 
       async function attachAgent(sdk: OpencodeClient) {
-        if (!args.agent) return undefined
-        const name = args.agent
+        if (!modeArg) return undefined
+        const name = modeArg
 
         const modes = await sdk.app
           .agents(undefined, { throwOnError: true })
@@ -631,7 +688,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `failed to list agents from ${args.attach}. Falling back to default agent`,
+            `failed to list modes from ${args.attach}. Falling back to default mode`,
           )
           return undefined
         }
@@ -641,7 +698,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" not found. Falling back to default agent`,
+            `mode "${name}" not found. Falling back to default mode`,
           )
           return undefined
         }
@@ -650,7 +707,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" is a subagent, not a primary agent. Falling back to default agent`,
+            `mode "${name}" is a subagent, not a primary mode. Falling back to default mode`,
           )
           return undefined
         }
@@ -659,7 +716,7 @@ export const RunCommand = effectCmd({
       }
 
       async function pickAgent(sdk: OpencodeClient) {
-        if (!args.agent) return undefined
+        if (!modeArg) return undefined
         if (args.attach) {
           return attachAgent(sdk)
         }
@@ -690,6 +747,17 @@ export const RunCommand = effectCmd({
           return false
         }
 
+        // XCOD-148: a rejected prompt can be reported both by the prompt call and by the session's
+        // error event, whichever arrives first; --format json gets exactly one error record. Returns
+        // whether JSON mode handled it (as emit does), so text mode is unchanged.
+        let errorRecorded = false
+        function emitError(error: unknown) {
+          if (args.format !== "json") return false
+          if (errorRecorded) return true
+          errorRecorded = true
+          return emit("error", { error })
+        }
+
         // Consume one subscribed event stream for the active session and mirror it
         // to stdout/UI. `client` is passed explicitly because attach mode may
         // rebind the SDK to the session's directory after the subscription is
@@ -698,6 +766,9 @@ export const RunCommand = effectCmd({
           const toggles = new Map<string, boolean>()
           const sessions = new Set([sessionID])
           let error: string | undefined
+          // XCOD-202: --auto can't answer for a permission the organisation locked.
+          const locked = auto ? ((await client.config.get()).data?.$locked ?? []) : []
+          const refusedAuto = new Set<string>()
 
           for await (const event of events.stream) {
             if (event.type === "session.created" && event.properties.info.parentID) {
@@ -786,7 +857,7 @@ export const RunCommand = effectCmd({
                 err = String(props.error.data.message)
               }
               error = error ? error + EOL + err : err
-              if (emit("error", { error: props.error })) continue
+              if (emitError(props.error)) continue
               UI.error(err)
             }
 
@@ -802,7 +873,12 @@ export const RunCommand = effectCmd({
               const permission = event.properties
               if (!sessions.has(permission.sessionID)) continue
 
-              if (auto) {
+              const lock = ConfigPolicy.permissionLockFor(locked, permission.permission)
+              if (auto && lock && !refusedAuto.has(lock)) {
+                refusedAuto.add(lock)
+                await Effect.runPromise(ConfigPolicy.refused(lock, "--auto")).catch(() => undefined)
+              }
+              if (auto && !lock) {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "once",
@@ -852,7 +928,7 @@ export const RunCommand = effectCmd({
               variant: args.variant,
             })
             if (result.error) {
-              if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
+              if (!emitError(result.error)) UI.error(formatRunError(result.error))
               process.exitCode = 1
               return
             }
@@ -869,7 +945,7 @@ export const RunCommand = effectCmd({
             parts: [...files, { type: "text", text: message }],
           })
           if (result.error) {
-            if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
+            if (!emitError(result.error)) UI.error(formatRunError(result.error))
             process.exitCode = 1
             return
           }
@@ -878,6 +954,9 @@ export const RunCommand = effectCmd({
         }
 
         const model = pick(args.model)
+        // The server answers from `subagent.background` config or the old env flag (XCOD-82).
+        const capabilities = await client.experimental.capabilities.get().catch(() => undefined)
+        const backgroundSubagents = capabilities?.data?.backgroundSubagents ?? flags.experimentalBackgroundSubagents
         const { runInteractiveMode } = await import("./run/runtime")
         try {
           await runInteractiveMode({
@@ -895,7 +974,7 @@ export const RunCommand = effectCmd({
             initialInput,
             createSession: createFreshSession,
             thinking,
-            backgroundSubagents: flags.experimentalBackgroundSubagents,
+            backgroundSubagents,
             demo: args.demo,
           })
         } catch (error) {
@@ -924,7 +1003,7 @@ export const RunCommand = effectCmd({
             session,
             share,
             createSession: createFreshSession,
-            agent: args.agent,
+            agent: modeArg,
             model,
             variant: args.variant,
             replay,
@@ -972,7 +1051,7 @@ type MiniCommandInput = {
   session?: string
   fork?: boolean
   model?: string
-  agent?: string
+  mode?: string
   prompt?: string
   replay?: boolean
   replayLimit?: number
@@ -991,7 +1070,8 @@ export async function runMini(input: MiniCommandInput) {
     fork: input.fork,
     share: undefined,
     model: input.model,
-    agent: input.agent,
+    mode: input.mode,
+    agent: undefined,
     format: "default",
     file: undefined,
     title: undefined,
@@ -1012,5 +1092,8 @@ export async function runMini(input: MiniCommandInput) {
     "dangerously-skip-permissions": false,
     dangerouslySkipPermissions: false,
     demo: input.demo ?? false,
+    sandbox: undefined,
+    keep: undefined,
+    rm: undefined,
   })
 }

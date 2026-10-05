@@ -1,4 +1,9 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import path from "path"
+import { Global } from "@opencode-ai/core/global"
+import { Residency } from "@opencode-ai/core/residency"
+import { AuditLog } from "@/audit/log"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import type * as SDK from "@opencode-ai/sdk/v2"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
@@ -19,8 +24,10 @@ import { SessionShareTable } from "@opencode-ai/core/share/sql"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { EventV2 } from "@opencode-ai/core/event"
+import { Offline } from "@opencode-ai/core/offline"
 
-const disabled = process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1"
+const disabled =
+  process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1" || Offline.enabled()
 
 export type Api = {
   create: string
@@ -79,6 +86,11 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ShareNext") {}
+
+/** A share upload the residency policy refused (XCOD-80). A plain refusal, not a fault. */
+export class ResidencyDeniedError extends Schema.TaggedErrorClass<ResidencyDeniedError>()("ShareResidencyDeniedError", {
+  message: Schema.String,
+}) {}
 
 export const use = serviceUse(Service)
 
@@ -203,13 +215,42 @@ const layer = Layer.effect(
       }),
     )
 
+    // XCOD-80: every share upload (create, sync, remove) goes through here, so this is where the
+    // residency policy applies. A denied target fails closed and is written to the audit log,
+    // exactly like a denied model provider.
+    const enforce = Effect.fnUntraced(function* (target: string, baseUrl: string) {
+      const residency = AuditLog.residency(yield* cfg.get())
+      if (!residency) return
+      yield* Effect.try({
+        try: () =>
+          Residency.enforce({
+            providerID: target,
+            baseURL: baseUrl,
+            resolved: residency,
+            defaultAuditPath: path.join(Global.Path.log, "residency-egress.log"),
+            fetch: undefined,
+          }),
+        catch: (error) =>
+          error instanceof Residency.DeniedError
+            ? new ResidencyDeniedError({
+                message: `Session sharing to ${new URL(baseUrl).host} is blocked by the data-residency policy. ${error.decision.reason}`,
+              })
+            : error,
+      })
+      // Allowed share uploads are audited too, so the log answers "what left, and where to".
+      Residency.audit(residency, path.join(Global.Path.log, "residency-egress.log"), target, baseUrl, true)
+    })
+
     const request = Effect.fn("ShareNext.request")(function* () {
       const headers: Record<string, string> = {}
       const active = yield* account.active()
       if (Option.isNone(active) || !active.value.active_org_id) {
-        const baseUrl = (yield* cfg.get()).enterprise?.url ?? "https://opncd.ai"
+        const enterprise = (yield* cfg.get()).enterprise?.url
+        const baseUrl = enterprise ?? "https://opncd.ai"
+        yield* enforce(enterprise ? Jurisdiction.SHARE_ENTERPRISE : Jurisdiction.SHARE_OPNCD, baseUrl)
         return { headers, api: legacyApi, baseUrl } satisfies Req
       }
+      yield* enforce(Jurisdiction.SHARE_OPNCD, active.value.url)
 
       const token = yield* account.token(active.value.id)
       if (Option.isNone(token)) {

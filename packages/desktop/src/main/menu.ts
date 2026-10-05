@@ -8,7 +8,7 @@ import {
 } from "@opencode-ai/app/desktop-menu"
 
 import { UPDATER_ENABLED } from "./constants"
-import { runDesktopMenuAction } from "./desktop-menu-actions"
+import { openLicenses, runDesktopMenuAction } from "./desktop-menu-actions"
 import { openExternalURL } from "./windows"
 import { nativeT } from "./native-translations"
 
@@ -54,6 +54,7 @@ function nativeItem(entry: DesktopMenuEntry, deps: Deps): MenuItemConstructorOpt
       runDesktopMenuAction(BrowserWindow.getFocusedWindow(), action, {
         checkForUpdates: deps.checkForUpdates,
         relaunch: deps.relaunch,
+        licenses: () => void openLicenses(),
       })
   }
   if (entry.href) {

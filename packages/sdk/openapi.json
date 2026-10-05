@@ -548,8 +548,8 @@
             }
           }
         },
-        "description": "Upgrade opencode to the specified version.",
-        "summary": "Upgrade opencode",
+        "description": "Upgrade Lunos to the specified version, or to the latest release when no target is given.",
+        "summary": "Upgrade Lunos",
         "requestBody": {
           "content": {
             "application/json": {
@@ -560,7 +560,6 @@
                     "type": "string"
                   }
                 },
-                "required": ["target"],
                 "additionalProperties": false
               }
             }
@@ -736,6 +735,121 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.config.update({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/config/settings": {
+      "get": {
+        "tags": ["config"],
+        "operationId": "config.settings",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every setting, with value, source and lock",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Every configuration option generated from the config schema, with its current value (secrets masked), the layer it came from, whether organisation policy locks it, the loaded config files and 30-day usage.",
+        "summary": "List settings",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.config.settings({\n  ...\n})"
+          }
+        ]
+      },
+      "patch": {
+        "tags": ["config"],
+        "operationId": "config.settingsSet",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result of the change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsSetResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Validate one setting against the config schema and write it to the user or project config, keeping comments. Refuses keys locked by organisation policy.",
+        "summary": "Change one setting",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsSetInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.config.settingsSet({\n  ...\n})"
           }
         ]
       }
@@ -1690,6 +1804,202 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.session.background({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/artifact": {
+      "get": {
+        "tags": ["experimental"],
+        "operationId": "experimental.artifact.list",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["plan", "research", "dev-cycle"]
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plans, research notes and dev-cycle records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArtifactItem"
+                  },
+                  "description": "Plans, research notes and dev-cycle records"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.",
+        "summary": "List artifacts",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.artifact.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/background": {
+      "get": {
+        "tags": ["experimental"],
+        "operationId": "experimental.background.list",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "sessionID",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Background subagent jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BackgroundJobItem"
+                  },
+                  "description": "Background subagent jobs"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "List subagent jobs with status, elapsed time, agent and resolved model. Pass sessionID to list only that session's jobs.",
+        "summary": "List background subagents",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.background.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/background/{jobID}/cancel": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.background.cancel",
+        "parameters": [
+          {
+            "name": "jobID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether a running job was cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "description": "Whether a running job was cancelled"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Cancel a running background subagent job and its child session.",
+        "summary": "Cancel a background subagent",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.background.cancel({\n  ...\n})"
           }
         ]
       }
@@ -2819,6 +3129,12 @@
                       },
                       "content": {
                         "type": "string"
+                      },
+                      "allowedTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
                       }
                     },
                     "required": ["name", "location", "content"],
@@ -4801,10 +5117,623 @@
         },
         "description": "Reject a question request from the AI assistant.",
         "summary": "Reject question request",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "drafts": {
+                    "$ref": "#/components/schemas/QuestionDrafts"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "x-codeSamples": [
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.question.reject({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory": {
+      "get": {
+        "tags": ["memory"],
+        "operationId": "memory.list",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored facts, with provenance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          }
+        },
+        "description": "List facts in long-term memory with where each came from. Does not start memory.",
+        "summary": "List memory",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/{id}/related": {
+      "get": {
+        "tags": ["memory"],
+        "operationId": "memory.related",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Relationships between entities around this fact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Relationships between entities around this fact"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MemoryNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryNotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Entities and relationships in the memory graph around one fact.",
+        "summary": "Fact connections",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.related({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/export": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.export",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Where the export was written, and what it holds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryExportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/effect_HttpApiError_BadRequest"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Export long-term memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file per fact.",
+        "summary": "Export memory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryExportInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.export({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/import/preview": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.importPreview",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What the import would do; nothing is written",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryImportPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "MemoryImportRefusedError | MemoryPassphraseRequiredError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MemoryImportRefusedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MemoryPassphraseRequiredError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Read and verify a bundle, Markdown or another agent's memory file, screen every fact with the write guard, and show each as new, duplicate, conflict or rejected. Writes nothing.",
+        "summary": "Preview a memory import",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryImportInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.importPreview({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/import": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.import",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What was imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "MemoryImportRefusedError | MemoryPassphraseRequiredError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MemoryImportRefusedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MemoryPassphraseRequiredError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Import the approved rows of a preview. The input is read, verified and screened again; only rows named in accept are written.",
+        "summary": "Import memory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryImportApplyInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.import({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/{id}/outdate": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.outdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fact marked outdated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "description": "Fact marked outdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/effect_HttpApiError_BadRequest"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MemoryNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryNotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.",
+        "summary": "Mark a fact outdated",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.outdate({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/{id}/forget": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.forget",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fact forgotten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "description": "Fact forgotten"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/effect_HttpApiError_BadRequest"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MemoryNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryNotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Remove one fact from long-term memory.",
+        "summary": "Forget a fact",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.forget({\n  ...\n})"
           }
         ]
       }
@@ -5041,6 +5970,64 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.provider.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/provider/configured": {
+      "get": {
+        "tags": ["provider"],
+        "operationId": "provider.configured",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configured providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConfiguredProvider"
+                  },
+                  "description": "Configured providers"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "List the providers with a stored credential or loaded from the environment or config, with auth method, status and jurisdiction. Never includes secrets.",
+        "summary": "List configured providers",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.provider.configured({\n  ...\n})"
           }
         ]
       }
@@ -6881,6 +7868,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ShareDisabledError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareDisabledError"
                 }
               }
             }
@@ -19817,7 +20814,8 @@
                               "session.last",
                               "prompt.clear",
                               "prompt.submit",
-                              "agent.cycle"
+                              "agent.cycle",
+                              "mode.cycle"
                             ]
                           },
                           {
@@ -20561,6 +21559,204 @@
         "additionalProperties": false,
         "description": "Server configuration for opencode serve and web commands"
       },
+      "MemorySourceConfig": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A unique name for the source, e.g. \"platform-kg\". Shown as the label on everything it returns"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["graph", "mcp"],
+            "description": "\"graph\": a read-only query against a Neo4j knowledge graph. \"mcp\": a search tool on an MCP server configured under \"mcp\""
+          },
+          "jurisdiction": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "trusted": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string",
+            "enum": ["fulltext", "contains"]
+          },
+          "index": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "server": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "argument": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "type"],
+        "additionalProperties": false
+      },
+      "MemoryBackendConfig": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["embedded", "neo4j", "memgraph"]
+          },
+          "url": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "jurisdiction": {
+            "type": "string"
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "allow_insecure": {
+            "type": "boolean"
+          },
+          "user": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemoryConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["project", "user"]
+            }
+          },
+          "model": {
+            "type": "string"
+          },
+          "embedding": {
+            "type": "string"
+          },
+          "retrieval": {
+            "type": "object",
+            "properties": {
+              "max_tokens": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "max_facts": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "max_fact_chars": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemorySourceConfig"
+            }
+          },
+          "retention": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "grace_days": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "encryption": {
+            "type": "string",
+            "enum": ["off", "os-keychain"]
+          },
+          "backend": {
+            "$ref": "#/components/schemas/MemoryBackendConfig"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubagentConfig": {
+        "type": "object",
+        "properties": {
+          "background": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "dynamic": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
       "PermissionActionConfig": {
         "type": "string",
         "enum": ["ask", "allow", "deny"]
@@ -21121,6 +22317,12 @@
           "$schema": {
             "type": "string"
           },
+          "$locked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "shell": {
             "type": "string"
           },
@@ -21175,6 +22377,210 @@
               }
             },
             "additionalProperties": false
+          },
+          "hooks": {
+            "type": "object",
+            "properties": {
+              "tool.execute.before": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "tool.execute.after": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "command.execute.before": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.created": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.idle": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.compacted": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.deleted": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              },
+              "session.error": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConfigV2HooksEntry"
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "audit": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "redact": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "max_bytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "max_age_days": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "forward": {
+                "type": "object",
+                "properties": {
+                  "syslog": {
+                    "type": "string"
+                  },
+                  "otlp": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryConfig"
+          },
+          "sandbox": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "image": {
+                "type": "string"
+              },
+              "workspace": {
+                "type": "string",
+                "enum": ["copy", "mount"]
+              },
+              "devcontainer": {
+                "type": "string",
+                "enum": ["off", "image", "build"]
+              },
+              "mounts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "description": "Absolute path on this machine"
+                    },
+                    "target": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["source"],
+                  "additionalProperties": false
+                }
+              },
+              "on_finish": {
+                "type": "string",
+                "enum": ["destroy", "retain", "destroy_on_success"]
+              },
+              "retain_for": {
+                "type": "string",
+                "pattern": "^\\d+[mhd]$"
+              },
+              "network": {
+                "type": "string",
+                "enum": ["policy", "none", "open"]
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "results": {
+                "type": "string",
+                "enum": ["branch", "patch", "none"]
+              },
+              "runtime": {
+                "type": "string",
+                "enum": ["docker", "podman"]
+              },
+              "resources": {
+                "type": "object",
+                "properties": {
+                  "cpus": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["NaN"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["Infinity"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["-Infinity"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["Infinity", "-Infinity", "NaN"]
+                      }
+                    ],
+                    "description": "CPUs the sandbox may use (docker --cpus). Default 2"
+                  },
+                  "memory": {
+                    "type": "string"
+                  },
+                  "pids": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  },
+                  "tmp": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "residency": {
+            "$ref": "#/components/schemas/ConfigV2Residency"
           },
           "references": {
             "type": "object",
@@ -21285,6 +22691,9 @@
           },
           "default_agent": {
             "type": "string"
+          },
+          "subagent": {
+            "$ref": "#/components/schemas/SubagentConfig"
           },
           "subagent_depth": {
             "type": "integer",
@@ -21481,6 +22890,24 @@
           "attachment": {
             "$ref": "#/components/schemas/AttachmentConfig"
           },
+          "marketplace": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "marketplace_default": {
+            "type": "boolean"
+          },
+          "marketplace_unreviewed": {
+            "type": "boolean"
+          },
+          "marketplace_allow": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "enterprise": {
             "type": "object",
             "properties": {
@@ -21564,6 +22991,351 @@
           }
         },
         "additionalProperties": false
+      },
+      "SettingRow": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string",
+            "enum": ["config", "tui"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["boolean", "enum", "string", "number", "list", "object"]
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            }
+          },
+          "dialog": {
+            "type": "string",
+            "enum": ["models", "themes", "mcps", "providers", "modes"]
+          },
+          "restart": {
+            "type": "boolean"
+          },
+          "deprecated": {
+            "type": "boolean"
+          },
+          "top": {
+            "type": "boolean"
+          },
+          "readonly": {
+            "type": "boolean"
+          },
+          "value": {},
+          "display": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["default", "user", "project", "env", "managed", "remote"]
+          },
+          "from": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "override": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "target",
+          "label",
+          "category",
+          "description",
+          "kind",
+          "restart",
+          "deprecated",
+          "top",
+          "readonly",
+          "display",
+          "source",
+          "locked",
+          "secret"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsUsage": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number"
+          },
+          "sessions": {
+            "type": "number"
+          },
+          "cost": {
+            "type": "number"
+          },
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "number"
+              },
+              "output": {
+                "type": "number"
+              },
+              "reasoning": {
+                "type": "number"
+              },
+              "cache_read": {
+                "type": "number"
+              },
+              "cache_write": {
+                "type": "number"
+              }
+            },
+            "required": ["input", "output", "reasoning", "cache_read", "cache_write"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["days", "sessions", "cost", "tokens"],
+        "additionalProperties": false
+      },
+      "SettingsSnapshot": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingRow"
+            }
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "layer": {
+                  "type": "string",
+                  "enum": ["default", "user", "project", "env", "managed", "remote", "cli"]
+                },
+                "path": {
+                  "type": "string"
+                },
+                "loaded": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["layer", "path", "loaded"],
+              "additionalProperties": false
+            }
+          },
+          "locked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "files": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "type": "object",
+                "properties": {
+                  "config": {
+                    "type": "string"
+                  },
+                  "tui": {
+                    "type": "string"
+                  }
+                },
+                "required": ["config", "tui"],
+                "additionalProperties": false
+              },
+              "project": {
+                "type": "object",
+                "properties": {
+                  "config": {
+                    "type": "string"
+                  },
+                  "tui": {
+                    "type": "string"
+                  }
+                },
+                "required": ["config", "tui"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["user", "project"],
+            "additionalProperties": false
+          },
+          "usage": {
+            "$ref": "#/components/schemas/SettingsUsage"
+          },
+          "sandbox": {
+            "type": "object",
+            "properties": {
+              "inside": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string"
+                  },
+                  "digest": {
+                    "type": "string"
+                  },
+                  "network": {
+                    "type": "string"
+                  },
+                  "results": {
+                    "type": "string"
+                  },
+                  "workspace": {
+                    "type": "string"
+                  },
+                  "devcontainer": {
+                    "type": "string"
+                  },
+                  "runtime": {
+                    "type": "string"
+                  },
+                  "created": {
+                    "type": "string"
+                  }
+                },
+                "required": ["id"],
+                "additionalProperties": false
+              },
+              "known": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "network": {
+                      "type": "string"
+                    },
+                    "results": {
+                      "type": "string"
+                    },
+                    "workspace": {
+                      "type": "string"
+                    },
+                    "expires": {
+                      "type": "string"
+                    },
+                    "handedOff": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "created", "branch", "network"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["known"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["rows", "layers", "locked", "files", "usage"],
+        "additionalProperties": false
+      },
+      "SettingsSetInput": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["user", "project"]
+          }
+        },
+        "required": ["key", "value", "scope"],
+        "additionalProperties": false
+      },
+      "SettingsSetResult": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "enum": [true]
+              },
+              "key": {
+                "type": "string"
+              },
+              "value": {},
+              "file": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string",
+                "enum": ["user", "project"]
+              },
+              "restart": {
+                "type": "boolean"
+              },
+              "changed": {
+                "type": "boolean"
+              }
+            },
+            "required": ["ok", "key", "file", "scope", "restart", "changed"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "enum": [false]
+              },
+              "error": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": ["ok", "error", "code"],
+            "additionalProperties": false
+          }
+        ]
       },
       "Model": {
         "type": "object",
@@ -22208,6 +23980,150 @@
         "required": ["id", "slug", "projectID", "directory", "title", "version", "time", "project"],
         "additionalProperties": false
       },
+      "ArtifactItem": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["plan", "research", "dev-cycle"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          }
+        },
+        "required": ["kind", "title", "path", "created"],
+        "additionalProperties": false
+      },
+      "BackgroundJobItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "error", "cancelled"]
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "elapsedMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "agent": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "modelRule": {
+            "type": "string"
+          },
+          "parentSessionID": {
+            "type": "string"
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "status", "startedAt", "elapsedMs"],
+        "additionalProperties": false
+      },
       "McpResource": {
         "type": "object",
         "properties": {
@@ -22564,6 +24480,9 @@
           "variant": {
             "type": "string"
           },
+          "modelSpec": {
+            "type": "string"
+          },
           "prompt": {
             "type": "string"
           },
@@ -22847,6 +24766,685 @@
         "required": ["_tag", "requestID", "message"],
         "additionalProperties": false
       },
+      "QuestionDrafts": {
+        "type": "object",
+        "properties": {
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionAnswer"
+            },
+            "description": "Answers picked so far, in question order"
+          },
+          "custom": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["answers"],
+        "additionalProperties": false
+      },
+      "MemoryFact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "user"]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "agent": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "importedFrom": {
+            "type": "string"
+          },
+          "originSource": {
+            "type": "string"
+          },
+          "originDate": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["active", "outdated", "expired", "purge", "quarantined"],
+            "description": "XCOD-136: active (recalled), outdated, expired (not recalled; deleted after the grace period), purge (due for deletion) or quarantined (failed the ledger's integrity check)"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["observed", "inferred"]
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "invalidAt": {
+            "type": "string"
+          },
+          "replacedBy": {
+            "type": "string"
+          },
+          "replaces": {
+            "type": "string"
+          },
+          "expires": {
+            "type": "string"
+          },
+          "quarantined": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "scope", "text", "sessionID", "agent", "source", "date", "state"],
+        "additionalProperties": false
+      },
+      "MemoryList": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "description": "Whether memory is on"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryFact"
+            }
+          }
+        },
+        "required": ["on", "facts"],
+        "additionalProperties": false
+      },
+      "MemoryUnavailableError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["MemoryUnavailableError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "MemoryNotFoundError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["MemoryNotFoundError"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "id", "message"],
+        "additionalProperties": false
+      },
+      "MemoryExportInput": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": ["bundle", "markdown"]
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "user", "both"]
+          },
+          "since": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string"
+          },
+          "graph": {
+            "type": "boolean"
+          },
+          "includeIndex": {
+            "type": "boolean"
+          },
+          "out": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemoryExportResult": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": ["bundle", "markdown"]
+          },
+          "facts": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "entities": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "relations": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "graph": {
+            "type": "boolean"
+          },
+          "encrypted": {
+            "type": "boolean"
+          },
+          "decrypt": {
+            "type": "string"
+          }
+        },
+        "required": ["path", "format", "facts", "notes", "entities", "relations", "graph", "encrypted"],
+        "additionalProperties": false
+      },
+      "MemoryImportInput": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "user"]
+          },
+          "asFacts": {
+            "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string"
+          }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "MemoryImportRow": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["fact", "note"]
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "user"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["new", "duplicate", "conflict", "rejected"]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "near": {
+            "type": "boolean"
+          },
+          "otherID": {
+            "type": "string"
+          },
+          "otherText": {
+            "type": "string"
+          }
+        },
+        "required": ["key", "kind", "scope", "status", "reason", "text", "file"],
+        "additionalProperties": false
+      },
+      "MemoryImportPreview": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["bundle", "markdown"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "encrypted": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryImportRow"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "new": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              "duplicate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              "conflict": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              "rejected": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              }
+            },
+            "required": ["new", "duplicate", "conflict", "rejected"],
+            "additionalProperties": false
+          },
+          "limit": {
+            "type": "string"
+          },
+          "extractionModel": {
+            "type": "string"
+          },
+          "extractionCalls": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "embedding": {
+            "type": "string"
+          },
+          "remoteEmbeddingCalls": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "sha256",
+          "encrypted",
+          "warnings",
+          "rows",
+          "counts",
+          "extractionModel",
+          "extractionCalls",
+          "embedding",
+          "remoteEmbeddingCalls"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryImportRefusedError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["MemoryImportRefusedError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "MemoryPassphraseRequiredError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["MemoryPassphraseRequiredError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "MemoryImportApplyInput": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "A bundle folder, .zip or .zip.enc, a Markdown file or folder, or another agent's memory file"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "user"]
+          },
+          "asFacts": {
+            "type": "boolean"
+          },
+          "passphrase": {
+            "type": "string"
+          },
+          "accept": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Keys of the preview rows to write. Rejected rows and exact duplicates are never written"
+          }
+        },
+        "required": ["path", "accept"],
+        "additionalProperties": false
+      },
+      "MemoryImportResult": {
+        "type": "object",
+        "properties": {
+          "facts": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "noteParagraphs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": ["text", "reason"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["facts", "noteParagraphs", "notes", "failed"],
+        "additionalProperties": false
+      },
       "PermissionRequest": {
         "type": "object",
         "properties": {
@@ -22908,6 +25506,44 @@
           }
         },
         "required": ["_tag", "requestID", "message"],
+        "additionalProperties": false
+      },
+      "ConfiguredProvider": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": ["api", "oauth", "wellknown", "env", "config", "custom"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["connected", "expired", "error"]
+          },
+          "stored": {
+            "type": "boolean"
+          },
+          "jurisdiction": {
+            "type": "object",
+            "properties": {
+              "region": {
+                "type": "string",
+                "enum": ["eu", "us", "other", "configurable", "unknown"]
+              },
+              "basis": {
+                "type": "string"
+              }
+            },
+            "required": ["region", "basis"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "name", "method", "status", "stored", "jurisdiction"],
         "additionalProperties": false
       },
       "ProviderAuthMethod": {
@@ -23091,6 +25727,20 @@
             }
           }
         }
+      },
+      "ShareDisabledError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["ShareDisabledError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
       },
       "TextPartInput": {
         "type": "object",
@@ -23305,7 +25955,8 @@
                       "session.last",
                       "prompt.clear",
                       "prompt.submit",
-                      "agent.cycle"
+                      "agent.cycle",
+                      "mode.cycle"
                     ]
                   },
                   {
@@ -24393,7 +27044,8 @@
                       "session.last",
                       "prompt.clear",
                       "prompt.submit",
-                      "agent.cycle"
+                      "agent.cycle",
+                      "mode.cycle"
                     ]
                   },
                   {
@@ -27021,6 +29673,107 @@
           }
         },
         "required": ["type", "id", "syncEvent"],
+        "additionalProperties": false
+      },
+      "ConfigV2HooksMatcher": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConfigV2HooksEntry": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Command and arguments to run, as an array — not passed through a shell, so no quoting or injection concerns."
+          },
+          "matcher": {
+            "$ref": "#/components/schemas/ConfigV2HooksMatcher"
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "Milliseconds before the command is killed. Defaults to 30000."
+          },
+          "disabled": {
+            "type": "boolean"
+          }
+        },
+        "required": ["command"],
+        "additionalProperties": false
+      },
+      "ConfigV2Residency": {
+        "type": "object",
+        "properties": {
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["eu", "us", "other", "configurable", "unknown"]
+            },
+            "description": "Regions this deployment may send model requests to, e.g. [\"eu\"]. Providers outside this list are blocked before any request is made. Providers with no recorded jurisdiction are always denied. \"configurable\" providers (Azure, Bedrock, Vertex) are denied unless explicitly listed, because their region cannot be verified from here."
+          },
+          "audit": {
+            "type": "boolean"
+          },
+          "auditPath": {
+            "type": "string"
+          },
+          "endpoints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "region": {
+                  "type": "string",
+                  "enum": ["eu", "us", "other"],
+                  "description": "Where this endpoint processes data. Your declaration: Lunos can't verify it."
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "required": ["region"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["allow"],
         "additionalProperties": false
       },
       "ConfigV2ReferenceGit": {
@@ -30696,6 +33449,12 @@
           "slash": {
             "type": "boolean"
           },
+          "allowedTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "location": {
             "type": "string"
           },
@@ -32832,7 +35591,8 @@
                       "session.last",
                       "prompt.clear",
                       "prompt.submit",
-                      "agent.cycle"
+                      "agent.cycle",
+                      "mode.cycle"
                     ]
                   },
                   {
@@ -36854,6 +39614,10 @@
     {
       "name": "question",
       "description": "Question routes."
+    },
+    {
+      "name": "memory",
+      "description": "Long-term memory routes."
     },
     {
       "name": "permission",

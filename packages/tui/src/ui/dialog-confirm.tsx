@@ -5,6 +5,7 @@ import { createStore } from "solid-js/store"
 import { For } from "solid-js"
 import { Locale } from "../util/locale"
 import { useBindings } from "../keymap"
+import { selectionMarker } from "../util/status-glyph"
 
 export type DialogConfirmProps = {
   title: string
@@ -80,6 +81,8 @@ export function DialogConfirm(props: DialogConfirmProps) {
               }}
             >
               <text fg={key === store.active ? theme.selectedListItemText : theme.textMuted}>
+                {/* XCOD-141: a marker as well as the highlight, so the choice doesn't rely on colour alone. */}
+                {selectionMarker(key === store.active)}
                 {Locale.titlecase(key === "cancel" ? (props.label ?? key) : key)}
               </text>
             </box>

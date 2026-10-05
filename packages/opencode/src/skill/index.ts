@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { SkillScope } from "./scope"
 import path from "path"
 import { Effect, Layer, Context, Schema } from "effect"
 import { NamedError } from "@opencode-ai/core/util/error"
@@ -29,9 +30,10 @@ const SKILL_PATTERN = "**/SKILL.md"
 // invalid config, so users hit cryptic startup errors. Loading this skill
 // when the model is asked to touch opencode's own config files gives it the
 // actual schemas instead of guesses.
-const CUSTOMIZE_OPENCODE_SKILL_NAME = "customize-opencode"
+// XCOD-168: named for the product; the body file keeps upstream's name, to merge cleanly.
+const CUSTOMIZE_OPENCODE_SKILL_NAME = "customize-lunos"
 const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
-  "Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself."
+  "Use ONLY when the user is editing or creating Lunos's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/ (Lunos keeps those upstream file names). Also use when creating or fixing Lunos agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring Lunos itself."
 const CUSTOMIZE_OPENCODE_SKILL_BODY = SkillPlugin.CustomizeOpencodeContent
 
 export const Info = Schema.Struct({
@@ -39,6 +41,8 @@ export const Info = Schema.Struct({
   description: Schema.optional(Schema.String),
   location: Schema.String,
   content: Schema.String,
+  /** Tools this skill restricts the agent to while active (`allowed-tools` frontmatter, XCOD-83). */
+  allowedTools: Schema.optional(Schema.Array(Schema.String)),
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
@@ -136,6 +140,7 @@ const add = Effect.fnUntraced(function* (state: State, match: string, events: Ev
     description: md.data.description,
     location: match,
     content: md.content,
+    allowedTools: SkillScope.parseAllowedTools((md.data as Record<string, unknown>)["allowed-tools"]),
   }
 })
 

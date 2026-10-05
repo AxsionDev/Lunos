@@ -390,7 +390,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
               options: () => props.controls.agents.options.map((name) => ({ id: name, label: name })),
               current: () => props.controls.agents.current,
               onSelect: (value: string) => props.controls.agents.select(value),
-              keybind: () => command.keybindParts("agent.cycle"),
+              keybind: () => command.keybindParts("mode.cycle"),
             }
           : undefined
       },

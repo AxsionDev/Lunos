@@ -231,13 +231,8 @@ export const ReadTool = Tool.define<
       ctx: Tool.Context<Metadata>,
     ) {
       const instance = yield* InstanceState.context
-      let filepath = params.filePath
-      if (!path.isAbsolute(filepath)) {
-        filepath = path.resolve(instance.directory, filepath)
-      }
-      if (process.platform === "win32") {
-        filepath = FSUtil.normalizePath(filepath)
-      }
+      // Permission patterns are matched as strings; spell the path as it is on disk.
+      const filepath = FSUtil.resolveOnDisk(instance.directory, params.filePath)
       const title = path.relative(instance.worktree, filepath)
 
       const stat = yield* fs.stat(filepath).pipe(

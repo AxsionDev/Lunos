@@ -1,4 +1,7 @@
 import { Account } from "@/account/account"
+import { SessionArtifacts } from "@/session/artifacts"
+import * as BackgroundList from "@/background/list"
+import { backgroundEnabled } from "@/background/enabled"
 import { Agent } from "@/agent/agent"
 import { BackgroundJob } from "@/background/job"
 import { Config } from "@/config/config"
@@ -7,7 +10,8 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { MCP } from "@/mcp"
 import { Project } from "@/project/project"
 import { Session } from "@/session/session"
-import type { SessionID } from "@/session/schema"
+import { SessionID } from "@/session/schema"
+import { SessionRunState } from "@/session/run-state"
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { ToolRegistry } from "@/tool/registry"
 import { Worktree } from "@/worktree"
@@ -34,10 +38,11 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const worktreeSvc = yield* Worktree.Service
     const sessions = yield* Session.Service
     const background = yield* BackgroundJob.Service
+    const runState = yield* SessionRunState.Service
     const flags = yield* RuntimeFlags.Service
 
     const capabilities = Effect.fn("ExperimentalHttpApi.capabilities")(function* () {
-      return { backgroundSubagents: flags.experimentalBackgroundSubagents }
+      return { backgroundSubagents: backgroundEnabled(flags.experimentalBackgroundSubagents, yield* config.get()) }
     })
 
     const getConsole = Effect.fn("ExperimentalHttpApi.console")(function* () {
@@ -159,7 +164,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const sessionBackground = Effect.fn("ExperimentalHttpApi.sessionBackground")(function* (ctx: {
       params: { sessionID: SessionID }
     }) {
-      if (!flags.experimentalBackgroundSubagents) return false
+      if (!backgroundEnabled(flags.experimentalBackgroundSubagents, yield* config.get())) return false
       const jobs = (yield* background.list()).filter(
         (job) =>
           job.type === "task" &&
@@ -169,6 +174,30 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       )
       const promoted = yield* Effect.forEach(jobs, (job) => background.promote(job.id), { concurrency: "unbounded" })
       return promoted.some((job) => job !== undefined)
+    })
+
+    const artifacts = Effect.fn("ExperimentalHttpApi.artifacts")(function* (ctx: {
+      query: { kind?: SessionArtifacts.Kind }
+    }) {
+      const instance = yield* InstanceState.context
+      return yield* Effect.promise(() => SessionArtifacts.list(instance, ctx.query.kind))
+    })
+
+    // XCOD-82: the list the TUI, app and ACP render. Task jobs only; newest first.
+    const backgroundJobs = Effect.fn("ExperimentalHttpApi.backgroundJobs")(function* (ctx: {
+      query: { sessionID?: string }
+    }) {
+      return BackgroundList.list(yield* background.list(), ctx.query.sessionID)
+    })
+
+    const backgroundJobCancel = Effect.fn("ExperimentalHttpApi.backgroundJobCancel")(function* (ctx: {
+      params: { jobID: string }
+    }) {
+      const job = yield* background.get(ctx.params.jobID)
+      if (job?.status !== "running") return false
+      // Same path as aborting the job's own session: cancels the job and its descendants.
+      yield* runState.cancel(SessionID.make(ctx.params.jobID))
+      return true
     })
 
     const resource = Effect.fn("ExperimentalHttpApi.resource")(function* () {
@@ -188,6 +217,9 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("worktreeReset", worktreeReset)
       .handle("session", session)
       .handle("sessionBackground", sessionBackground)
+      .handle("backgroundJobs", backgroundJobs)
+      .handle("artifacts", artifacts)
+      .handle("backgroundJobCancel", backgroundJobCancel)
       .handle("resource", resource)
   }),
 )

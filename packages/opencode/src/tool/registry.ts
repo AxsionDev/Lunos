@@ -9,7 +9,10 @@ import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
-import { TaskTool } from "./task"
+import { TaskTool, withModelParameter } from "./task"
+import { ToolJsonSchema } from "./json-schema"
+import { Residency } from "@opencode-ai/core/residency"
+import { SubagentModel } from "../agent/subagent-model"
 import { Database } from "@opencode-ai/core/database/database"
 import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
@@ -54,6 +57,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
+import { Offline } from "@opencode-ai/core/offline"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -238,9 +242,10 @@ const layer = Layer.effect(
             tool.edit,
             tool.write,
             tool.task,
-            tool.fetch,
+            // Offline mode (XCOD-121) doesn't offer the tools that reach the internet.
+            ...(Offline.enabled() ? [] : [tool.fetch]),
             tool.todo,
-            tool.search,
+            ...(Offline.enabled() ? [] : [tool.search]),
             tool.skill,
             tool.patch,
             ...(tool.execute ? [tool.execute] : []),
@@ -302,6 +307,10 @@ const layer = Layer.effect(
         return true
       })
 
+      // XCOD-82: allowed per-task models, minus any the residency policy would deny.
+      const cfg = yield* config.get()
+      const subagentModels = SubagentModel.allowed(cfg, Residency.resolve(cfg.residency))
+
       const codeModeDescription = filtered.some((tool) => tool.id === "execute")
         ? yield* describeCodeMode(input)
         : undefined
@@ -316,10 +325,14 @@ const layer = Layer.effect(
             jsonSchema: tool.jsonSchema,
           }
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
-          const jsonSchema =
+          const pluginSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
               ? output.jsonSchema
               : undefined
+          const jsonSchema =
+            tool.id === TaskTool.id && subagentModels.length
+              ? withModelParameter(pluginSchema ?? ToolJsonSchema.fromTool(tool), subagentModels)
+              : pluginSchema
           return {
             id: tool.id,
             description: [

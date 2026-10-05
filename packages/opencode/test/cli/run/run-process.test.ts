@@ -1,3 +1,4 @@
+import fs from "node:fs"
 // Subprocess integration tests for `opencode run` (non-interactive mode).
 // These exercise the real CLI binary against a TestLLMServer running in the
 // same process. See `test/lib/cli-process.ts` for the harness — each test uses
@@ -7,6 +8,11 @@ import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
+
+// Concurrent tests share a capped pool of CLI child slots (see cli-process.ts),
+// so a test may wait for a slot before its child starts. The per-child kill
+// timeout still bounds the child; this bounds the test including that wait.
+const CONCURRENT_TIMEOUT = 120_000
 
 describe("opencode run (non-interactive subprocess)", () => {
   // Happy path: prompt completes, output reaches stdout, process exits 0.
@@ -20,7 +26,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("hello from the test llm\n")
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -42,7 +48,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("before tool\nafter tool\n")
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -59,7 +65,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(plain, 0)
         expect(plain.stdout).toBe("visible\n")
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   // Regression for #27371: an unknown model used to hang the process forever
@@ -79,7 +85,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.durationMs).toBeLessThan(15_000)
       }),
-    30_000,
+    CONCURRENT_TIMEOUT,
   )
 
   // The test provider's SSE error item is interpreted by the SDK as an unknown
@@ -102,7 +108,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.stdout).toBe("partial response\nrecovered\n")
         expect(result.stderr).not.toContain("upstream provider exploded mid-stream")
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   // --format json puts one JSON object per line on stdout for each emitted
@@ -139,7 +145,33 @@ describe("opencode run (non-interactive subprocess)", () => {
             .every((line) => line.length > 0),
         ).toBe(true)
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
+  )
+
+  // XCOD-150: the child inherited the test process's $PWD, so its project was the repo checkout.
+  cliIt.concurrent(
+    "runs in the fixture directory, not the repo checkout",
+    ({ llm, home, opencode }) =>
+      Effect.gen(function* () {
+        // Not `pwd -P`: on Windows the bash tool runs PowerShell, where `-P` is ambiguous.
+        const command = `bun -e "console.log(process.cwd())"`
+        yield* llm.push(reply().tool("bash", { command, description: "Print the directory" }))
+        yield* llm.text("done")
+
+        const result = yield* opencode.run("where am I", {
+          format: "json",
+          extraArgs: ["--dangerously-skip-permissions"],
+        })
+
+        opencode.expectExit(result, 0)
+        const tool = opencode.parseJsonEvents(result.stdout).find((e: any) => e.type === "tool_use")
+        const cwd = String((tool as any)?.part?.state?.output ?? "").trim()
+        // Windows can name the same directory by its short (RUNNER~1) or long form, in any case.
+        const same = (p: string) => p.toLowerCase()
+        const fixture = [home, fs.realpathSync(home), fs.realpathSync.native(home)].map(same)
+        expect(fixture).toContain(same(fs.existsSync(cwd) ? fs.realpathSync.native(cwd) : cwd))
+      }),
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -162,7 +194,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         })
         expect(result.stdout.split("\n").filter(Boolean)).toHaveLength(1)
       }),
-    30_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -211,7 +243,7 @@ describe("opencode run (non-interactive subprocess)", () => {
             .every((line) => line.startsWith("{")),
         ).toBe(true)
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -246,7 +278,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(events[7]?.part).toEqual(expect.objectContaining({ type: "text", text: "recovered" }))
         expect(events.at(-1)?.part).toEqual(expect.objectContaining({ type: "step-finish", reason: "stop" }))
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -282,7 +314,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(explicitlyDenied.stdout).toContain("continued after explicit denial")
         expect(yield* Effect.promise(() => Bun.file(`${home}/explicitly-denied`).exists())).toBe(false)
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.live(
@@ -318,7 +350,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("Cannot attach local directory without a shared filesystem")
       }),
-    30_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.live(

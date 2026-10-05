@@ -14,6 +14,7 @@ import { iife } from "../../../util/iife"
 import { fail } from "../../effect-cmd"
 import { InstanceRef } from "@/effect/instance-ref"
 import type { InstanceContext } from "@/project/instance-context"
+import { writeStdoutEffect } from "../../stdout"
 
 export const debugAgent = Effect.fn("Cli.debug.agent")(function* (args: {
   name: string
@@ -53,16 +54,30 @@ const run = Effect.fn("Cli.debug.agent.body")(function* (
     const params = parseToolParams(args.params)
     const toolCtx = yield* createToolContext(agent, ctx)
     const result = yield* tool.execute(params, toolCtx)
-    process.stdout.write(JSON.stringify({ tool: toolID, input: params, result }, null, 2) + EOL)
+    yield* writeStdoutEffect(JSON.stringify({ tool: toolID, input: params, result }, null, 2) + EOL)
     return
   }
 
+  // XCOD-167: an MCP server can add ~30 tools to every session, and small models then call tools
+  // that don't exist. Say how many this agent gets, and how to drop a server's tools.
+  const enabled = Object.entries(resolvedTools).filter(([, on]) => on !== false).length
   const output = {
     ...agent,
     tools: resolvedTools,
+    toolCount: enabled,
+    ...(enabled > TOOL_WARNING
+      ? {
+          warning:
+            `${enabled} tools: small models start calling tools that don't exist past about ${TOOL_WARNING}. ` +
+            `Drop an MCP server's tools for this agent or project with "permission": { "<server>_*": "deny" }.`,
+        }
+      : {}),
   }
-  process.stdout.write(JSON.stringify(output, null, 2) + EOL)
+  yield* writeStdoutEffect(JSON.stringify(output, null, 2) + EOL)
 })
+
+/** Past this many tools, `lunos debug agent` warns (XCOD-167). */
+export const TOOL_WARNING = 20
 
 const getAvailableTools = Effect.fn("Cli.debug.agent.getAvailableTools")(function* (agent: Agent.Info) {
   const provider = yield* Provider.Service

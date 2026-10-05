@@ -42,6 +42,9 @@ export interface DialogSelectProps<T> {
     side?: "left" | "right"
     hidden?: boolean
     disabled?: boolean | ((option: DialogSelectOption<T> | undefined) => boolean)
+    // Fire even when no row is selected (e.g. switching tabs away from an empty list). Such an
+    // action receives no option.
+    withoutSelection?: boolean
     onTrigger: (option: DialogSelectOption<T>) => void
   }[]
   footerHints?: {
@@ -97,6 +100,8 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   let selection: { value: T; category?: string } | undefined
   let resetSelection = false
   let visibilityGeneration = 0
+  // The last option reported through onMove, so a parent echoing it back as `current` is ignored.
+  let reported: { value: T } | undefined
 
   createEffect(
     on(
@@ -272,8 +277,13 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   })
 
   createEffect(
-    on([() => store.filter, () => props.current], ([filter, current]) => {
+    on([() => store.filter, () => props.current], ([filter, current], previous) => {
       if (filter.length > 0) resetSelection = true
+      // XCOD-206: a parent that feeds onMove back into `current` (/settings, plugins) must not
+      // re-centre the list. With the wheel, re-centring puts another row under the pointer, hover
+      // selects it, its echo re-centres again, and the list jumps instead of scrolling.
+      const echo = previous?.[0] === filter && reported !== undefined && isDeepEqual(current, reported.value)
+      if (echo) return
       setTimeout(() => {
         if (filter.length > 0) {
           moveTo(0, true, false)
@@ -304,7 +314,10 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       selection = option
       resetSelection = !preserve
     }
-    if (option) props.onMove?.(option)
+    if (option) {
+      reported = { value: option.value }
+      props.onMove?.(option)
+    }
     scrollToSelection(center)
   }
 
@@ -442,8 +455,8 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
             if (isActionDisabled(item)) return
             setStore("input", "keyboard")
             const option = selected()
-            if (!option) return
-            item.onTrigger(option)
+            if (!option && !item.withoutSelection) return
+            item.onTrigger(option!)
           },
         })),
       ],
@@ -505,8 +518,8 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     if (!item || !isActionItem(item) || isActionDisabled(item)) return
     setStore("input", "keyboard")
     const option = selected()
-    if (!option) return
-    item.onTrigger(option)
+    if (!option && !item.withoutSelection) return
+    item.onTrigger(option!)
   }
 
   function isActionItem(item: VisibleAction): item is Action & { label: string } {

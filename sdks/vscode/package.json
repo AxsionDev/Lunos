@@ -1,85 +1,42 @@
 {
-  "name": "opencode",
-  "displayName": "opencode",
-  "description": "opencode for VS Code",
-  "version": "1.18.34",
-  "publisher": "sst-dev",
+  "name": "lunos",
+  "displayName": "Lunos",
+  "description": "Lunos, the EU-sovereign, self-hostable AI coding agent, in VS Code",
+  "version": "1.18.44",
+  "publisher": "axsion",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anomalyco/opencode"
+    "url": "https://github.com/AxsionDev/Lunos"
+  },
+  "homepage": "https://lunos.tech",
+  "bugs": {
+    "url": "https://github.com/AxsionDev/Lunos/issues"
   },
   "license": "MIT",
   "icon": "images/icon.png",
   "galleryBanner": {
-    "color": "#000000",
+    "color": "#1e1e2e",
     "theme": "dark"
   },
+  "keywords": [
+    "ai",
+    "coding agent",
+    "self-hosted",
+    "eu",
+    "lunos"
+  ],
   "engines": {
     "vscode": "^1.94.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:opencode.openTerminal",
+    "onCommand:opencode.openNewTerminal",
+    "onCommand:opencode.addFilepathToTerminal"
+  ],
   "main": "./dist/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "opencode.openTerminal",
-        "title": "Open opencode",
-        "icon": {
-          "light": "images/button-dark.svg",
-          "dark": "images/button-light.svg"
-        }
-      },
-      {
-        "command": "opencode.openNewTerminal",
-        "title": "Open opencode in new tab",
-        "icon": {
-          "light": "images/button-dark.svg",
-          "dark": "images/button-light.svg"
-        }
-      },
-      {
-        "command": "opencode.addFilepathToTerminal",
-        "title": "Add Filepath to Terminal"
-      }
-    ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "opencode.openNewTerminal",
-          "group": "navigation"
-        }
-      ]
-    },
-    "keybindings": [
-      {
-        "command": "opencode.openTerminal",
-        "title": "Run opencode",
-        "key": "cmd+escape",
-        "mac": "cmd+escape",
-        "win": "ctrl+escape",
-        "linux": "ctrl+escape"
-      },
-      {
-        "command": "opencode.openNewTerminal",
-        "title": "Run opencode",
-        "key": "cmd+shift+escape",
-        "mac": "cmd+shift+escape",
-        "win": "ctrl+shift+escape",
-        "linux": "ctrl+shift+escape"
-      },
-      {
-        "command": "opencode.addFilepathToTerminal",
-        "title": "opencode: Insert At-Mentioned",
-        "key": "cmd+alt+k",
-        "mac": "cmd+alt+k",
-        "win": "ctrl+alt+K",
-        "linux": "ctrl+alt+K"
-      }
-    ]
-  },
   "scripts": {
     "vscode:prepublish": "bun run package",
     "compile": "bun run check-types && bun run lint && node esbuild.js",
@@ -104,5 +61,74 @@
     "typescript": "^5.8.3",
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "lunos.openTerminal",
+        "title": "Open Lunos",
+        "category": "Lunos",
+        "icon": {
+          "light": "images/button-dark.svg",
+          "dark": "images/button-light.svg"
+        }
+      },
+      {
+        "command": "lunos.openNewTerminal",
+        "title": "Open Lunos in New Tab",
+        "category": "Lunos",
+        "icon": {
+          "light": "images/button-dark.svg",
+          "dark": "images/button-light.svg"
+        }
+      },
+      {
+        "command": "lunos.addFilepathToTerminal",
+        "title": "Add File Path to Lunos",
+        "category": "Lunos"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "lunos.openNewTerminal",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "lunos.openTerminal",
+        "key": "cmd+escape",
+        "mac": "cmd+escape",
+        "win": "ctrl+escape",
+        "linux": "ctrl+escape"
+      },
+      {
+        "command": "lunos.openNewTerminal",
+        "key": "cmd+shift+escape",
+        "mac": "cmd+shift+escape",
+        "win": "ctrl+shift+escape",
+        "linux": "ctrl+shift+escape"
+      },
+      {
+        "command": "lunos.addFilepathToTerminal",
+        "key": "cmd+alt+k",
+        "mac": "cmd+alt+k",
+        "win": "ctrl+alt+K",
+        "linux": "ctrl+alt+K"
+      }
+    ],
+    "configuration": {
+      "title": "Lunos",
+      "properties": {
+        "lunos.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Full path to the `lunos` executable. Leave empty to use the `lunos` on your `PATH`. Machine scope, so a workspace can't point it at a different program."
+        }
+      }
+    }
   }
 }

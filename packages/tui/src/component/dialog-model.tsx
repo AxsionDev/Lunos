@@ -9,7 +9,8 @@ import * as fuzzysort from "fuzzysort"
 import { useConnected } from "./use-connected"
 import { useSync } from "../context/sync"
 
-export function DialogModel(props: { providerID?: string }) {
+/** `onPick` (XCOD-128, /settings) receives the choice instead of it becoming the session's model. */
+export function DialogModel(props: { providerID?: string; onPick?: (providerID: string, modelID: string) => void }) {
   const local = useLocal()
   const sync = useSync()
   const dialog = useDialog()
@@ -140,6 +141,7 @@ export function DialogModel(props: { providerID?: string }) {
   })
 
   function onSelect(providerID: string, modelID: string) {
+    if (props.onPick) return props.onPick(providerID, modelID)
     local.model.set({ providerID, modelID }, { recent: true })
     const list = local.model.variant.list()
     const cur = local.model.variant.selected()
@@ -160,7 +162,7 @@ export function DialogModel(props: { providerID?: string }) {
       actions={[
         {
           command: "model.dialog.provider",
-          title: connected() ? "Connect provider" : "View all providers",
+          title: connected() ? "Add provider" : "View all providers",
           onTrigger() {
             dialog.replace(() => <DialogProvider />)
           },

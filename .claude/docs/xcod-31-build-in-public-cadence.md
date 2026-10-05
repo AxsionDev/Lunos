@@ -1,0 +1,229 @@
+# Build-in-public cadence — runbook (XCOD-31)
+
+> [!IMPORTANT]
+> **The habit starts now; publication starts at Phase 0 exit.**
+> Notes are written as work lands — that is the point of a cadence, and it cannot be
+> back-filled convincingly later. But nothing in `.claude/docs/notes/` goes to a public
+> channel until **Phase 0 exits (XCOD-15 / XCOD-20)**. Writing is ungated. Publishing is gated.
+> See [The gate](#the-gate) before posting anything anywhere.
+
+**Reference:** `.claude/docs/lunos-marketing-gtm-plan.md` §5, §6-7, §9.7, §10.
+
+---
+
+## Why this exists
+
+A cadence of small public updates compounds trust in a way a single launch moment cannot. The
+GTM plan calls it _low effort, high compounding trust signal_ — and it solves the content-calendar
+problem permanently, because the roadmap's own phase-exit criteria decide what gets written and
+when. Nobody has to invent something to say.
+
+The failure mode this guards against is the opposite of silence: **a loud launch on an unmodified
+fork.** That reads as vaporware and cannot be redone.
+
+---
+
+## What triggers a note
+
+A note is written when one of these happens — not on a calendar:
+
+| Trigger                                        | Note type           | Example                                                               |
+| ---------------------------------------------- | ------------------- | --------------------------------------------------------------------- |
+| A **roadmap phase exits**                      | Milestone post      | Phase 0 exit — the launch moment                                      |
+| A **Phase 1 differentiator ships**             | Milestone post      | EU model routing live; self-hosted deployment guide; CRA/SBOM mapping |
+| An **epic ships**                              | Milestone post      | The marketplace epic (XCOD-7) — demo-able, screenshot/GIF-friendly    |
+| **~2 weeks of merged work** with no milestone  | Sprint note         | The seeded entry below                                                |
+| A **decision worth showing the reasoning for** | Sprint note section | Merge-over-rebase (XCOD-16); the name freeze (XCOD-22)                |
+
+If two weeks pass and none of the above fired, that is itself the signal — write nothing rather
+than manufacture an update. An honest gap beats filler.
+
+**`CHANGELOG.md` is updated on a different rhythm: as work merges, not per note.** Add the entry
+under `[Unreleased]` when the change lands, and promote `[Unreleased]` to a version heading at
+release time. Keep its **Known limitations** section current — that section is the reason the rest
+of the file is credible, and it is the first thing to go stale.
+
+### The CRA angle is time-sensitive
+
+The CRA/SBOM mapping milestone is flagged in the GTM plan as **genuinely newsworthy**. When that
+milestone lands it warrants a milestone post, not a line in a sprint note.
+
+**Corrected 2026-09-20 (XCOD-54):** this previously cited a "May 2026 deadline". No CRA milestone
+falls in May 2026. Article 71 sets three: 11 June 2026 (Chapter IV), **11 September 2026**
+(Article 14 reporting, manufacturers), and 11 December 2027 (general application). Note the news
+hook is weaker than assumed — per
+[xcod-54-cra-status-assessment.md](xcod-54-cra-status-assessment.md), unmonetised Lunos is most
+likely outside CRA scope, so an SBOM is readiness and marketing rather than compliance. Say it that
+way; claiming compliance with an obligation that does not bind us would be an overclaim of the same
+family XCOD-55 warns about.
+
+---
+
+## Where notes live
+
+```
+.claude/docs/notes/YYYY-MM-DD-<slug>.md
+```
+
+Notes are one of **three distinct changelog-shaped artifacts**. Keeping them separate is what stops
+each from being a worse version of another:
+
+| Artifact          | Location              | Answers                                 | Produced by                                                                                |
+| ----------------- | --------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Per-release notes | GitHub Release body   | _What changed in this release_          | Generated — `script/version.ts` → `script/changelog.ts` → `gh release create --notes-file` |
+| `CHANGELOG.md`    | Repo root             | _What changed across releases_, curated | Hand-written, updated as work merges                                                       |
+| **Lunos Notes**   | `.claude/docs/notes/` | **_Why we did it that way_**            | Hand-written, per trigger above                                                            |
+
+The notes are the only one of the three that is narrative. A generator cannot produce
+"we measured 109 conflicts rebasing and 0 merging, so here is the policy" — that is the half worth
+reading, and the half that does the build-in-public work.
+
+**On the root `CHANGELOG.md`:** upstream has no changelog at its root, so a fork-only file there
+carries near-zero merge risk — git conflicts only when both sides modify the same file. The
+upstream sync policy (`.claude/docs/xcod-16-upstream-sync-policy.md`) governs shared files; a file
+upstream never touches is not one of them.
+
+**This path is a staging area, not the published home.** `.claude/` is internal working space; a
+note is _copied out_ to its public channel at publication time and the copy becomes canonical. The
+staged file stays as the drafting record. `.claude/docs/notes/` never itself becomes public.
+
+**Publication target once the gate opens:** GitHub Releases (attached to the release the note
+covers) and/or GitHub Discussions. That keeps channel #1 — GitHub itself — as the canonical public
+home, with every other channel linking back to it.
+
+---
+
+## Format template
+
+```markdown
+# Lunos Notes — <period or milestone>
+
+**Date:** YYYY-MM-DD · **Covers:** <ticket range or phase>
+
+## What shipped
+
+<3-6 bullets. Each names the user-visible effect, not the commit.>
+
+## What we decided, and why
+
+<1-3 decisions with the reasoning shown. This is the part people actually read.>
+
+## What is still broken or unproven
+
+<Honest. Named blockers with ticket keys. Never omit this section.>
+
+## Next
+
+<2-3 items. No dates unless they are already committed publicly.>
+```
+
+**Tone rules** (inherited from `.claude/docs/xcod-27-fork-faq-draft.md`):
+
+- **Never disparage upstream.** The fork exists because opencode is good enough to build on.
+- **Never claim unverified parity or working installs.** Every claim must be true at publication
+  time. If it is not yet verified, it goes in _"still broken or unproven"_ instead.
+- Lead with sovereignty and compliance, not feature-parity (GTM plan §3).
+
+---
+
+## The gate
+
+**Hold Show HN, press outreach, and any paid channel** until **both**:
+
+1. Phase 0 exits — **XCOD-15** / **XCOD-20**, _and_
+2. one real Phase 1 differentiator is live.
+
+This is an explicit gate, not a task. Nothing completes it; it either holds or it is violated.
+
+**Current status — 2026-09-18: the gate HOLDS, on XCOD-15 alone.** XCOD-20's acceptance criteria are
+now all met — AC-3 (splash / default theme) was verified 2026-09-18, see
+`xcod-20-ac3-splash-theme-verification.md` — and the ticket sits in _in Review_ pending the owner's
+Phase 0 exit call. **XCOD-15 remains open, so publication stays gated.**
+
+> [!WARNING]
+> **Before publishing, clear XCOD-56** — the first-run branding defect found during the AC-3
+> verification. `packages/tui/src/feature-plugins/home/tips-view.tsx` still tells users to run
+> `opencode …` commands that do not exist on a `lunos` install. The launch post drives traffic
+> straight at that screen.
+
+Re-check both tickets before any publication. The gate is not satisfied by this document existing.
+
+---
+
+## Channel sequencing — operational checklist
+
+Run top to bottom. **Do not skip ahead**; each tier assumes the one above it is already true.
+
+> [!NOTE]
+> **One deliberate reorder from XCOD-31's list.** The ticket enumerates GitHub → Reddit → Fosstodon
+> → Digital SME → opencode ecosystem → FOSDEM/Sofia. This checklist keeps GitHub first and the
+> venues last, but promotes **Digital SME and design partners above Reddit/Fosstodon** — because
+> the GTM plan calls Digital SME _the cheapest, warmest distribution available_ (§6-7) and rates
+> design-partner outreach above any public post at this stage (§5), and because both are **ungated**
+> while the cold channels are not. Warm before cold; the relative order of the cold channels is
+> unchanged from the ticket.
+
+### Tier 0 — before anything is public
+
+- [ ] **Gate check.** XCOD-15 and XCOD-20 both closed? If no, stop. Only Tier 1 items marked
+      _(ungated)_ are available.
+- [ ] One real Phase 1 differentiator live and demonstrable?
+- [ ] Every claim in the note verified true _today_, not "true when drafted"?
+
+### Tier 1 — GitHub itself _(free and compounding; start here always)_
+
+- [ ] README current and leading with the §3 positioning _(ungated — already done, XCOD-23)_
+- [ ] Roadmap visible and current _(ungated)_
+- [ ] `good-first-issue` labels applied to real, genuinely small issues _(ungated)_
+- [ ] Note published to Releases / Discussions
+
+### Tier 2 — warm distribution _(cheapest, highest-trust — do before cold channels)_
+
+- [ ] **Digital SME Alliance** — leverage the CRA compliance guide co-authorship. The GTM plan
+      calls this _the cheapest, warmest distribution available_. Strongest fit for the CRA/SBOM
+      milestone specifically.
+- [ ] **Design partners** — 3-5 warm ECRIS/euLISA-adjacent and Axsion-network contacts (XCOD-29).
+      Private outreach, _not_ a public post. **Ungated and can start immediately** — the GTM plan
+      rates this above any public post at this stage.
+
+### Tier 3 — community channels
+
+- [ ] **Reddit** — r/opensource, r/selfhosted, r/programming, r/LocalLLaMA.
+      As **build-in-public updates, not announcements.** Framing matters more than timing here.
+- [ ] **Fosstodon / EU Mastodon** — matters more than X for this audience.
+- [ ] **opencode's own community / `ecosystem.mdx`** — a fork listing itself respectfully.
+      Read the tone rules above twice before writing this one.
+
+### Tier 4 — venues _(low-cost rehearsal before any high-stakes post)_
+
+- [ ] **FOSDEM** — Brussels, early February.
+- [ ] **Local Sofia meetups.**
+
+### Tier 5 — held behind the gate
+
+- [ ] ~~Show HN~~ — **held.** One shot; spend it on a real differentiator.
+- [ ] ~~Press outreach~~ — **held.**
+- [ ] ~~Any paid channel~~ — **held.**
+
+---
+
+## Metrics to watch
+
+Per GTM plan §8 and XCOD-30 — what a note is _for_, so cadence can be judged:
+
+- GitHub stars and forks; **unique contributors** (a better OSS-credibility signal than stars)
+- CLI install counts (a manual proxy is acceptable until telemetry exists)
+- README / landing-page → email-capture conversion
+- **Design-partner conversations opened and signed reference deployments** — _the metric that
+  actually matters for this business model_
+
+**Explicitly vanity, do not optimise for:** follower counts, post likes.
+
+---
+
+## Related
+
+- `.claude/docs/lunos-marketing-gtm-plan.md` — the source plan
+- `.claude/docs/xcod-31-phase-0-launch-post-draft.md` — the staged Phase 0 exit post
+- `.claude/docs/xcod-27-fork-faq-draft.md` — the FAQ that answers the predictable objections
+- `.claude/docs/xcod-16-upstream-sync-policy.md` — why fork-owned paths are preferred

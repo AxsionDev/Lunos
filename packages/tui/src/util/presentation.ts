@@ -1,6 +1,12 @@
+// Lunos wordmark (plain-ANSI variant of packages/tui/src/logo.ts — kept in sync manually).
 const logo = {
-  left: ["                   ", "█▀▀█ █▀▀█ █▀▀█ █▀▀▄", "█__█ █__█ █^^^ █__█", "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀"],
-  right: ["             ▄     ", "█▀▀▀ █▀▀█ █▀▀█ █▀▀█", "█___ █__█ █__█ █^^^", "▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀"],
+  left: ["", "", "", ""],
+  right: [
+    "                        ",
+    "█    █  █ █▄ █ █▀▀█ █▀▀▀",
+    "█    █  █ █ ▄█ █  █ ▀▀▀█",
+    "█▄▄▄ ▀▄▄▀ ▀  ▀ ▀▀▀▀ ▄▄▄█",
+  ],
 }
 
 const reset = "\x1b[0m"
@@ -32,7 +38,7 @@ export function sessionEpilogue(input: { title: string; sessionID?: string }) {
     ...wordmark("  "),
     "",
     `  ${weak("Session")}${bold}${input.title}${reset}`,
-    `  ${weak("Continue")}${bold}opencode -s ${input.sessionID}${reset}`,
+    `  ${weak("Continue")}${bold}lunos -s ${input.sessionID}${reset}`,
     "",
   ].join("\n")
 }

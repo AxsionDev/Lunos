@@ -1,6 +1,10 @@
-# Contributing to OpenCode
+# Contributing to Lunos
 
-We want to make it easy for you to contribute to OpenCode. Here are the most common type of changes that get merged:
+> **Lunos** is a fork of [opencode](https://github.com/anomalyco/opencode), maintained by
+> ITService EOOD (Axsion). It is not affiliated with the opencode team. Report Lunos issues and
+> send Lunos pull requests here, not to opencode.
+
+We want to make it easy for you to contribute to Lunos. Here are the most common type of changes that get merged:
 
 - Bug fixes
 - Additional LSPs / Formatters
@@ -14,10 +18,9 @@ However, any UI or core product feature must go through a design review with the
 
 If you are unsure if a PR would be accepted, feel free to ask a maintainer or look for issues with any of the following labels:
 
-- [`help wanted`](https://github.com/anomalyco/opencode/issues?q=is%3Aissue%20state%3Aopen%20label%3Ahelp-wanted)
-- [`good first issue`](https://github.com/anomalyco/opencode/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22)
-- [`bug`](https://github.com/anomalyco/opencode/issues?q=is%3Aissue%20state%3Aopen%20label%3Abug)
-- [`perf`](https://github.com/anomalyco/opencode/issues?q=is%3Aopen%20is%3Aissue%20label%3A%22perf%22)
+- [`good first issue`](https://github.com/AxsionDev/Lunos/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22)
+- [`help wanted`](https://github.com/AxsionDev/Lunos/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22)
+- [`bug`](https://github.com/AxsionDev/Lunos/issues?q=is%3Aissue%20state%3Aopen%20label%3Abug)
 
 > [!NOTE]
 > PRs that ignore these guardrails will likely be closed.
@@ -29,7 +32,44 @@ Want to take on an issue? Leave a comment and a maintainer may assign it to you 
 New providers shouldn't require many if ANY code changes, but if you want to add support for a new provider first make a PR to:
 https://github.com/anomalyco/models.dev
 
-## Developing OpenCode
+A provider also needs a jurisdiction entry in `packages/core/src/jurisdiction.ts`, or the
+data-residency policy refuses it. Run `bun ./script/jurisdictions.ts` afterwards to regenerate
+`docs/provider-jurisdictions.md`.
+
+## Lunos and upstream opencode
+
+Lunos merges upstream opencode's `dev` branch every week, as a pull request opened by the
+`upstream-sync` workflow. **We merge, never rebase** (XCOD-16), so upstream history stays intact
+and each sync is reviewable. The workflow resolves exactly one kind of conflict by itself: a
+`package.json` whose only conflict is the `"version"` line keeps Lunos's version. Anything else
+opens a draft PR labelled `upstream-conflict` for a person to resolve. The README badge shows how far behind upstream Lunos is.
+
+That shapes how to change code:
+
+- **Lunos-only features go in Lunos-owned files where possible**, not scattered through upstream
+  files. Every line changed in an upstream file can conflict on the next sync. Prefer a small hook
+  in the upstream file that calls into a new Lunos module (see `packages/core/src/offline.ts` or
+  `packages/web/lunos/` for the pattern).
+- **Upstream files Lunos changes on purpose** are listed in
+  [`.github/lunos-owned-paths`](.github/lunos-owned-paths). If you change another upstream file in
+  a way that must survive syncs, add it there, so sync PRs flag upstream edits to it for review.
+- **Fixes that aren't Lunos-specific belong upstream.** If you fix a bug that also exists in
+  opencode, consider sending it to [anomalyco/opencode](https://github.com/anomalyco/opencode)
+  too; it reaches Lunos with the next sync.
+
+Where the Lunos-specific code lives:
+
+| Area                                     | Code                                                                                |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- |
+| Data residency, jurisdictions, audit log | `packages/core/src/residency.ts`, `jurisdiction.ts`, `packages/opencode/src/audit/` |
+| Offline mode                             | `packages/core/src/offline.ts`                                                      |
+| Organisation policy                      | `packages/opencode/src/config/policy.ts`                                            |
+| Marketplace                              | `packages/opencode/src/marketplace/`, `marketplace/`                                |
+| Memory                                   | `packages/opencode/src/memory/`                                                     |
+| Docs rebrand                             | `packages/web/lunos/`                                                               |
+| Upstream sync                            | `script/upstream-sync.ts`, `.github/workflows/upstream-sync*.yml`                   |
+
+## Developing Lunos
 
 - Requirements: Bun 1.3+
 - Install dependencies and start the dev server from the repo root:
@@ -41,13 +81,13 @@ https://github.com/anomalyco/models.dev
 
 ### Running against a different directory
 
-By default, `bun dev` runs OpenCode in the `packages/opencode` directory. To run it against a different directory or repository:
+By default, `bun dev` runs Lunos in the `packages/opencode` directory. To run it against a different directory or repository:
 
 ```bash
 bun dev <directory>
 ```
 
-To run OpenCode in the root of the opencode repo itself:
+To run Lunos in the root of this repo itself:
 
 ```bash
 bun dev .
@@ -64,21 +104,22 @@ To compile a standalone executable:
 Then run it with:
 
 ```bash
-./packages/opencode/dist/opencode-<platform>/bin/opencode
+./packages/opencode/dist/lunos-<platform>/bin/opencode
 ```
 
 Replace `<platform>` with your platform (e.g., `darwin-arm64`, `linux-x64`).
 
 - Core pieces:
-  - `packages/opencode`: OpenCode core business logic & server.
-  - `packages/opencode/src/cli/cmd/tui/`: The TUI code, written in SolidJS with [opentui](https://github.com/sst/opentui)
+  - `packages/opencode`: the `lunos` CLI, business logic and server
+  - `packages/core`: shared core (config, providers, residency, npm, tools)
+  - `packages/tui`: the TUI, written in SolidJS with [opentui](https://github.com/sst/opentui)
   - `packages/app`: The shared web UI components, written in SolidJS
   - `packages/desktop`: The native desktop app, built with Electron (wraps `packages/app`)
   - `packages/plugin`: Source for `@opencode-ai/plugin`
 
-### Understanding bun dev vs opencode
+### Understanding bun dev vs lunos
 
-During development, `bun dev` is the local equivalent of the built `opencode` command. Both run the same CLI interface:
+During development, `bun dev` is the local equivalent of the built `lunos` command. Both run the same CLI interface:
 
 ```bash
 # Development (from project root)
@@ -88,15 +129,15 @@ bun dev web              # Start server + open web interface
 bun dev <directory>      # Start TUI in specific directory
 
 # Production
-opencode --help          # Show all available commands
-opencode serve           # Start headless API server
-opencode web             # Start server + open web interface
-opencode <directory>     # Start TUI in specific directory
+lunos --help             # Show all available commands
+lunos serve              # Start headless API server
+lunos web                # Start server + open web interface
+lunos <directory>        # Start TUI in specific directory
 ```
 
 ### Running the API Server
 
-To start the OpenCode headless API server:
+To start the Lunos headless API server:
 
 ```bash
 bun dev serve
@@ -112,7 +153,7 @@ bun dev serve --port 8080
 
 To test UI changes during development:
 
-1. **First, start the OpenCode server** (see [Running the API Server](#running-the-api-server) section above)
+1. **First, start the Lunos server** (see [Running the API Server](#running-the-api-server) section above)
 2. **Then run the web app:**
 
 ```bash
@@ -143,20 +184,32 @@ bun run --cwd packages/desktop package
 
 Please try to follow the [style guide](./AGENTS.md)
 
+### Running tests
+
+Run tests from a package directory, never from the repo root (the root `test` script refuses):
+
+```bash
+cd packages/opencode && bun test test/config   # one area
+bun turbo test --continue                       # everything, as CI runs it
+bun turbo typecheck
+```
+
+`dev` has some pre-existing test failures, more on Windows than Linux. Don't let a red CI run
+alarm you. What matters is whether your change adds a failure that the latest `dev` run doesn't
+have; reviewers check that against the `test` workflow's run on `dev`.
+
 ### Setting up a Debugger
 
 Bun debugging is currently rough around the edges. We hope this guide helps you get set up and avoid some pain points.
 
-The most reliable way to debug OpenCode is to run it manually in a terminal via `bun run --inspect=<url> dev ...` and attach
+The most reliable way to debug Lunos is to run it manually in a terminal via `bun run --inspect=<url> dev ...` and attach
 your debugger via that URL. Other methods can result in breakpoints being mapped incorrectly, at least in VSCode (YMMV).
 
 Caveats:
 
-- If you want to run the OpenCode TUI and have breakpoints triggered in the server code, you might need to run `bun dev spawn` instead of
-  the usual `bun dev`. This is because `bun dev` runs the server in a worker thread and breakpoints might not work there.
-- If `spawn` does not work for you, you can debug the server separately:
+- `bun dev` runs the server in a worker thread, so breakpoints in server code may not trigger from the TUI. Debug the server separately:
   - Debug server: `bun run --inspect=ws://localhost:6499/ --cwd packages/opencode ./src/index.ts serve --port 4096`,
-    then attach TUI with `opencode attach http://localhost:4096`
+    then attach TUI with `lunos attach http://localhost:4096`
   - Debug TUI: `bun run --inspect=ws://localhost:6499/ --cwd packages/opencode ./src/index.ts`
 
 Other tips and tricks:
@@ -171,9 +224,38 @@ If you use VSCode, you can use our example configurations [.vscode/settings.exam
 Some debug methods that can be problematic:
 
 - Debug configurations with `"request": "launch"` can have breakpoints incorrectly mapped and thus unusable
-- The same problem arises when running OpenCode in the VSCode `JavaScript Debug Terminal`
+- The same problem arises when running Lunos in the VSCode `JavaScript Debug Terminal`
 
 With that said, you may want to try these methods, as they might work for you.
+
+## Contributor licensing — sign your commits (DCO)
+
+Lunos uses the [Developer Certificate of Origin](https://developercertificate.org/) (DCO) 1.1.
+Every commit must carry a `Signed-off-by` line:
+
+```
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+Add it automatically with `git commit -s`. To sign off a branch you already wrote, use
+`git rebase --signoff dev`.
+
+**What you are certifying.** The DCO is a statement that you have the right to submit the code —
+that you wrote it, or that it came from a compatible source and you are permitted to contribute it.
+Read the full text at [developercertificate.org](https://developercertificate.org/).
+
+**What you are _not_ doing.** Signing off transfers no copyright. You keep ownership of your
+contribution; it is simply licensed under this project's MIT licence, the same terms as the rest of
+Lunos. There is no CLA to sign and no signature database — the sign-off lives in the commit trailer,
+nowhere else.
+
+Use your real name and a reachable email address. `git config user.name` and `user.email` should be
+set accordingly before you start.
+
+> [!NOTE]
+> This requirement is not yet enforced by automation. It will be once the project receives its first
+> external pull request or the repository is made public, whichever comes first. Please follow it
+> regardless — commits without a sign-off will need amending before merge.
 
 ## Pull Request Expectations
 
@@ -250,23 +332,18 @@ These are not strictly enforced, they are just general guidelines:
 
 ## Feature Requests
 
-For net-new functionality, start with a design conversation. Open an issue describing the problem, your proposed approach (optional), and why it belongs in OpenCode. The core team will help decide whether it should move forward; please wait for that approval instead of opening a feature PR directly.
+For net-new functionality, start with a design conversation. Open an issue describing the problem, your proposed approach (optional), and why it belongs in Lunos. The core team will help decide whether it should move forward; please wait for that approval instead of opening a feature PR directly.
 
 ## Issue Requirements
 
-All issues **must** use one of our issue templates:
+Use one of the issue templates:
 
-- **Bug report** — for reporting bugs (requires a description)
-- **Feature request** — for suggesting enhancements (requires verification checkbox and description)
-- **Question** — for asking questions (requires the question)
+- **Bug report**: for bugs. Include your Lunos version (`lunos --version --verbose`) and OS.
+- **Feature request**: for enhancements.
 
-Blank issues are not allowed. When a new issue is opened, an automated check verifies that it follows a template and meets our contributing guidelines. If an issue doesn't meet the requirements, you'll receive a comment explaining what needs to be fixed and have **72 hours** to edit the issue. After that, it will be automatically closed.
+For questions and help, open an issue labelled `question` until the Lunos community channel is
+live. **Report security vulnerabilities privately, as described in [`SECURITY.md`](./SECURITY.md),
+never in a public issue.**
 
-Issues may be flagged for:
-
-- Not using a template
-- Required fields left empty or filled with placeholder text
-- AI-generated walls of text
-- Missing meaningful content
-
-If you believe your issue was incorrectly flagged, let a maintainer know.
+Keep issues short and specific. Issues that are empty, placeholder text or AI-generated walls of
+text may be closed.

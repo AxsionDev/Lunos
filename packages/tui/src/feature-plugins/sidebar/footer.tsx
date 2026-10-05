@@ -1,4 +1,5 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
+import { versionLabel } from "@opencode-ai/core/installation/version"
 import type { BuiltinTuiPlugin } from "../builtins"
 import { createMemo, Show } from "solid-js"
 import { abbreviateHome } from "../../runtime"
@@ -53,13 +54,13 @@ function View(props: { api: TuiPluginApi; sessionID: string }) {
                 ✕
               </text>
             </box>
-            <text fg={theme().textMuted}>OpenCode includes free models so you can start immediately.</text>
+            <text fg={theme().textMuted}>Lunos includes free models so you can start immediately.</text>
             <text fg={theme().textMuted}>
               Connect from 75+ providers to use other models, including Claude, GPT, Gemini etc
             </text>
             <box flexDirection="row" gap={1} justifyContent="space-between">
-              <text fg={theme().text}>Connect provider</text>
-              <text fg={theme().textMuted}>/connect</text>
+              <text fg={theme().text}>Add provider</text>
+              <text fg={theme().textMuted}>/providers</text>
             </box>
           </box>
         </box>
@@ -69,11 +70,12 @@ function View(props: { api: TuiPluginApi; sessionID: string }) {
         <span style={{ fg: theme().text }}>{path().name}</span>
       </text>
       <text fg={theme().textMuted}>
-        <span style={{ fg: theme().success }}>•</span> <b>Open</b>
+        <span style={{ fg: theme().success }}>•</span>{" "}
+        {/* Unsplit wordmark: per logo.ts, "Lunos" renders entirely in the bold/bright tone. */}
         <span style={{ fg: theme().text }}>
-          <b>Code</b>
+          <b>Lunos</b>
         </span>{" "}
-        <span>{props.api.app.version}</span>
+        <span>{versionLabel(props.api.app.version).replace(/^Lunos /, "")}</span>
       </text>
     </box>
   )

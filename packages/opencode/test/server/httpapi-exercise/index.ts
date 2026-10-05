@@ -162,6 +162,38 @@ const scenarios: Scenario[] = [
     .at((ctx) => ({ path: "/config", headers: ctx.headers(), body: { username: 1 } }))
     .status(400),
   http.protected.get("/config/providers", "config.providers").json(),
+  http.protected.get("/config/settings", "config.settings").json(200, (body) => {
+    object(body)
+    array(body.rows)
+    check(
+      (body.rows as { key: string }[]).some((row) => row.key === "share"),
+      "settings should list the share key",
+    )
+  }),
+  http.protected
+    .patch("/config/settings", "config.settingsSet.invalid")
+    .at((ctx) => ({
+      path: "/config/settings",
+      headers: ctx.headers(),
+      body: { key: "autoupdate", value: "sometimes", scope: "project" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === false, "an invalid value should be refused")
+      check(String(body.error).includes("Allowed values"), "the refusal should list the allowed values")
+    }),
+  http.protected
+    .patch("/config/settings", "config.settingsSet")
+    .mutating()
+    .at((ctx) => ({
+      path: "/config/settings",
+      headers: ctx.headers(),
+      body: { key: "snapshot", value: "false", scope: "project" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === true, "a valid project setting should be written")
+    }),
   http.protected.get("/project", "project.list").json(200, array, "status"),
   http.protected.get("/project/current", "project.current").json(
     200,
@@ -263,6 +295,20 @@ const scenarios: Scenario[] = [
     .status(204, undefined, "status"),
   http.protected.get("/provider", "provider.list").json(),
   http.protected.get("/provider/auth", "provider.auth").json(),
+  http.protected
+    .get("/provider/configured", "provider.configured")
+    .seeded(() =>
+      Effect.promise(() =>
+        Bun.write(
+          path.join(exerciseDataDirectory, "auth.json"),
+          JSON.stringify({ "httpapi-configured": { type: "api", key: "must-not-leak" } }),
+        ),
+      ),
+    )
+    .json(200, (body) => {
+      array(body)
+      check(!JSON.stringify(body).includes("must-not-leak"), "configured providers must not expose credential secrets")
+    }),
   http.protected
     .post("/provider/{providerID}/oauth/authorize", "provider.oauth.authorize")
     .at((ctx) => ({
@@ -593,6 +639,23 @@ const scenarios: Scenario[] = [
     .json(200, (body) => {
       check(body === false, "background route should be a no-op without running subagents")
     }),
+  http.protected.get("/experimental/background", "experimental.background.list").json(200, (body) => {
+    array(body)
+    check(body.length === 0, "no background jobs should exist in a fresh instance")
+  }),
+  http.protected
+    .post("/experimental/background/{jobID}/cancel", "experimental.background.cancel")
+    .mutating()
+    .at((ctx) => ({
+      path: route("/experimental/background/{jobID}/cancel", { jobID: "ses_missing" }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      check(body === false, "cancelling an unknown job should be a no-op")
+    }),
+  http.protected.get("/experimental/artifact", "experimental.artifact.list").json(200, (body) => {
+    array(body)
+  }),
   http.protected.get("/experimental/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")
@@ -1657,10 +1720,15 @@ const scenarios: Scenario[] = [
     .seeded((ctx) => ctx.session({ title: "Share session" }))
     .at((ctx) => ({ path: route("/session/{sessionID}/share", { sessionID: ctx.state.id }), headers: ctx.headers() }))
     .json(
-      200,
-      (body, ctx) => {
+      403,
+      (body) => {
+        // Lunos defaults `share` to "disabled": the route refuses plainly instead of uploading.
         object(body)
-        check(body.id === ctx.state.id, "share should return the session")
+        check(body._tag === "ShareDisabledError", "share should be refused while sharing is disabled")
+        check(
+          typeof body.message === "string" && body.message.includes('"share": "manual"'),
+          "refusal should say how to enable sharing",
+        )
       },
       "status",
     ),

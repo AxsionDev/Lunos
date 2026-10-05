@@ -1,0 +1,1 @@
+`bun /app/print.ts | jq length` fails with a JSON parse error. Run in a terminal the output is complete, but when it is piped to another program it stops partway through, in the middle of a string. Fix `/app/print.ts` so its output is complete however it is consumed. The script must still exit with status 0 when it is done.

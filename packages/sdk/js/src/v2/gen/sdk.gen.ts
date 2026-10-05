@@ -22,6 +22,10 @@ import type {
   ConfigGetResponses,
   ConfigProvidersErrors,
   ConfigProvidersResponses,
+  ConfigSettingsErrors,
+  ConfigSettingsResponses,
+  ConfigSettingsSetErrors,
+  ConfigSettingsSetResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
   EventSubscribeResponses,
@@ -29,6 +33,12 @@ import type {
   EventTuiPromptAppend,
   EventTuiSessionSelect,
   EventTuiToastShow,
+  ExperimentalArtifactListErrors,
+  ExperimentalArtifactListResponses,
+  ExperimentalBackgroundCancelErrors,
+  ExperimentalBackgroundCancelResponses,
+  ExperimentalBackgroundListErrors,
+  ExperimentalBackgroundListResponses,
   ExperimentalCapabilitiesGetErrors,
   ExperimentalCapabilitiesGetResponses,
   ExperimentalConsoleGetErrors,
@@ -111,6 +121,23 @@ import type {
   McpRemoteConfig,
   McpStatusErrors,
   McpStatusResponses,
+  MemoryExportErrors,
+  MemoryExportInput,
+  MemoryExportResponses,
+  MemoryForgetErrors,
+  MemoryForgetResponses,
+  MemoryImportApplyInput,
+  MemoryImportErrors,
+  MemoryImportInput,
+  MemoryImportPreviewErrors,
+  MemoryImportPreviewResponses,
+  MemoryImportResponses,
+  MemoryListErrors,
+  MemoryListResponses,
+  MemoryOutdateErrors,
+  MemoryOutdateResponses,
+  MemoryRelatedErrors,
+  MemoryRelatedResponses,
   ModelRef,
   MoveSessionDestination,
   OutputFormat,
@@ -145,6 +172,8 @@ import type {
   PromptInput,
   ProviderAuthErrors,
   ProviderAuthResponses,
+  ProviderConfiguredErrors,
+  ProviderConfiguredResponses,
   ProviderListErrors,
   ProviderListResponses,
   ProviderOauthAuthorizeErrors,
@@ -168,6 +197,7 @@ import type {
   PtyUpdateErrors,
   PtyUpdateResponses,
   QuestionAnswer,
+  QuestionDrafts,
   QuestionListErrors,
   QuestionListResponses,
   QuestionRejectErrors,
@@ -223,6 +253,7 @@ import type {
   SessionUnshareResponses,
   SessionUpdateErrors,
   SessionUpdateResponses,
+  SettingsSetInput,
   SubtaskPartInput,
   SyncHistoryListErrors,
   SyncHistoryListResponses,
@@ -886,6 +917,118 @@ export class Session extends HeyApiClient {
   }
 }
 
+export class Artifact extends HeyApiClient {
+  /**
+   * List artifacts
+   *
+   * List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      kind?: "plan" | "research" | "dev-cycle"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "kind" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalArtifactListResponses,
+      ExperimentalArtifactListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/artifact",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Background extends HeyApiClient {
+  /**
+   * List background subagents
+   *
+   * List subagent jobs with status, elapsed time, agent and resolved model. Pass sessionID to list only that session's jobs.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalBackgroundListResponses,
+      ExperimentalBackgroundListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Cancel a background subagent
+   *
+   * Cancel a running background subagent job and its child session.
+   */
+  public cancel<ThrowOnError extends boolean = false>(
+    parameters: {
+      jobID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "jobID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalBackgroundCancelResponses,
+      ExperimentalBackgroundCancelErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background/{jobID}/cancel",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Resource extends HeyApiClient {
   /**
    * Get MCP resources
@@ -1261,6 +1404,16 @@ export class Experimental extends HeyApiClient {
     return (this._session ??= new Session({ client: this.client }))
   }
 
+  private _artifact?: Artifact
+  get artifact(): Artifact {
+    return (this._artifact ??= new Artifact({ client: this.client }))
+  }
+
+  private _background?: Background
+  get background(): Background {
+    return (this._background ??= new Background({ client: this.client }))
+  }
+
   private _resource?: Resource
   get resource(): Resource {
     return (this._resource ??= new Resource({ client: this.client }))
@@ -1353,9 +1506,9 @@ export class Global extends HeyApiClient {
   }
 
   /**
-   * Upgrade opencode
+   * Upgrade Lunos
    *
-   * Upgrade opencode to the specified version.
+   * Upgrade Lunos to the specified version, or to the latest release when no target is given.
    */
   public upgrade<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1472,6 +1625,73 @@ export class Config2 extends HeyApiClient {
     )
     return (options?.client ?? this.client).patch<ConfigUpdateResponses, ConfigUpdateErrors, ThrowOnError>({
       url: "/config",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * List settings
+   *
+   * Every configuration option generated from the config schema, with its current value (secrets masked), the layer it came from, whether organisation policy locks it, the loaded config files and 30-day usage.
+   */
+  public settings<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ConfigSettingsResponses, ConfigSettingsErrors, ThrowOnError>({
+      url: "/config/settings",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Change one setting
+   *
+   * Validate one setting against the config schema and write it to the user or project config, keeping comments. Refuses keys locked by organisation policy.
+   */
+  public settingsSet<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      settingsSetInput?: SettingsSetInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "settingsSetInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<ConfigSettingsSetResponses, ConfigSettingsSetErrors, ThrowOnError>({
+      url: "/config/settings",
       ...options,
       ...params,
       headers: {
@@ -3059,6 +3279,7 @@ export class Question extends HeyApiClient {
       requestID: string
       directory?: string
       workspace?: string
+      drafts?: QuestionDrafts
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3070,12 +3291,261 @@ export class Question extends HeyApiClient {
             { in: "path", key: "requestID" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "body", key: "drafts" },
           ],
         },
       ],
     )
     return (options?.client ?? this.client).post<QuestionRejectResponses, QuestionRejectErrors, ThrowOnError>({
       url: "/question/{requestID}/reject",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Memory extends HeyApiClient {
+  /**
+   * List memory
+   *
+   * List facts in long-term memory with where each came from. Does not start memory.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryListResponses, MemoryListErrors, ThrowOnError>({
+      url: "/memory",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Fact connections
+   *
+   * Entities and relationships in the memory graph around one fact.
+   */
+  public related<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryRelatedResponses, MemoryRelatedErrors, ThrowOnError>({
+      url: "/memory/{id}/related",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Export memory
+   *
+   * Export long-term memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file per fact.
+   */
+  public export<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryExportInput?: MemoryExportInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryExportInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryExportResponses, MemoryExportErrors, ThrowOnError>({
+      url: "/memory/export",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview a memory import
+   *
+   * Read and verify a bundle, Markdown or another agent's memory file, screen every fact with the write guard, and show each as new, duplicate, conflict or rejected. Writes nothing.
+   */
+  public importPreview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryImportInput?: MemoryImportInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryImportInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryImportPreviewResponses, MemoryImportPreviewErrors, ThrowOnError>(
+      {
+        url: "/memory/import/preview",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  /**
+   * Import memory
+   *
+   * Import the approved rows of a preview. The input is read, verified and screened again; only rows named in accept are written.
+   */
+  public import<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryImportApplyInput?: MemoryImportApplyInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryImportApplyInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryImportResponses, MemoryImportErrors, ThrowOnError>({
+      url: "/memory/import",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Mark a fact outdated
+   *
+   * Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.
+   */
+  public outdate<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+      by?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "by" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryOutdateResponses, MemoryOutdateErrors, ThrowOnError>({
+      url: "/memory/{id}/outdate",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Forget a fact
+   *
+   * Remove one fact from long-term memory.
+   */
+  public forget<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryForgetResponses, MemoryForgetErrors, ThrowOnError>({
+      url: "/memory/{id}/forget",
       ...options,
       ...params,
     })
@@ -3318,6 +3788,36 @@ export class Provider extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<ProviderListResponses, ProviderListErrors, ThrowOnError>({
       url: "/provider",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List configured providers
+   *
+   * List the providers with a stored credential or loaded from the environment or config, with auth method, status and jurisdiction. Never includes secrets.
+   */
+  public configured<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ProviderConfiguredResponses, ProviderConfiguredErrors, ThrowOnError>({
+      url: "/provider/configured",
       ...options,
       ...params,
     })
@@ -7180,6 +7680,11 @@ export class OpencodeClient extends HeyApiClient {
   private _question?: Question
   get question(): Question {
     return (this._question ??= new Question({ client: this.client }))
+  }
+
+  private _memory?: Memory
+  get memory(): Memory {
+    return (this._memory ??= new Memory({ client: this.client }))
   }
 
   private _permission?: Permission
