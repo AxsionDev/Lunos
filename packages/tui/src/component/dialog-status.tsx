@@ -1,4 +1,5 @@
 import { fileURLToPath } from "bun"
+import path from "path"
 import { useTheme } from "../context/theme"
 import { useSync } from "../context/sync"
 import { For, Match, Switch, Show, createMemo } from "solid-js"
@@ -24,9 +25,9 @@ export function StatusServers() {
     const result = list.map((item) => {
       const value = typeof item === "string" ? item : item[0]
       if (value.startsWith("file://")) {
-        const path = fileURLToPath(value)
-        const parts = path.split("/")
-        const filename = parts.pop() || path
+        const filePath = fileURLToPath(value)
+        const parts = filePath.split(path.sep)
+        const filename = parts.pop() || filePath
         if (!filename.includes(".")) return { name: filename }
         const basename = filename.split(".")[0]
         if (basename === "index") {
