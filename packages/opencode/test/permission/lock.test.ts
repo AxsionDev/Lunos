@@ -148,8 +148,10 @@ it.instance(
   { git: true },
 )
 
+// PO decision (2026-10-05): a lock fixes the configured rule, but "always allow" and --auto still
+// work in the session. Neither writes to config, so nothing persists past the session (AC4).
 it.instance(
-  "always allow on a locked permission counts once and is refused",
+  "always allow on a locked permission holds for the session and refuses nothing",
   () =>
     Effect.gen(function* () {
       lockWebfetch()
@@ -162,53 +164,43 @@ it.instance(
         patterns: ["https://example.com"],
         metadata: {},
         always: ["*"],
-        ruleset: Permission.fromConfig({ webfetch: "ask" }),
+        // A user wildcard allow doesn't skip the locked "ask"...
+        ruleset: Permission.fromConfig({ "*": "allow" }),
       }
 
       const first = yield* ask(request).pipe(Effect.forkScoped)
       const [pending] = yield* waitForPending(1)
       yield* reply({ requestID: pending.id, reply: "always" })
       yield* Fiber.join(first)
-      expect(refusals.map((item) => item.key)).toEqual(["permission.webfetch"])
+      expect(refusals).toEqual([])
 
-      // Asked again: the "always" didn't stick.
-      const second = yield* ask(request).pipe(Effect.forkScoped)
-      expect(yield* waitForPending(1)).toHaveLength(1)
-      yield* rejectAll()
-      yield* Fiber.await(second)
+      // ...but the user's "always allow" answers it from then on.
+      expect(yield* ask(request)).toBeUndefined()
     }),
   { git: true },
 )
 
 it.instance(
-  "a lock on all permissions covers tools managed config doesn't list, for always allow",
+  "always allow can't lift a locked deny",
   () =>
     Effect.gen(function* () {
-      ConfigPolicy.activatePermission(["permission"], { permission: { webfetch: "ask" } })
-      expect(ConfigPolicy.isPermissionLocked("bash")).toBe(true)
-      expect(ConfigPolicy.permissionKey("bash")).toBe("permission")
+      ConfigPolicy.activatePermission(["permission.bash"], { permission: { bash: { "*": "ask", "rm *": "deny" } } })
       const first = yield* ask({
         sessionID: session,
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: ["ls"],
-        ruleset: Permission.fromConfig({ bash: "ask" }),
+        always: ["*"],
+        ruleset: [],
       }).pipe(Effect.forkScoped)
       const [pending] = yield* waitForPending(1)
       yield* reply({ requestID: pending.id, reply: "always" })
       yield* Fiber.join(first)
-      const second = yield* ask({
-        sessionID: session,
-        permission: "bash",
-        patterns: ["ls"],
-        metadata: {},
-        always: ["ls"],
-        ruleset: Permission.fromConfig({ bash: "ask" }),
-      }).pipe(Effect.forkScoped)
-      expect(yield* waitForPending(1)).toHaveLength(1)
-      yield* rejectAll()
-      yield* Fiber.await(second)
+
+      const err = yield* fail(
+        ask({ sessionID: session, permission: "bash", patterns: ["rm -rf /"], metadata: {}, always: [], ruleset: [] }),
+      )
+      expect(err).toBeInstanceOf(PermissionV1.DeniedError)
     }),
   { git: true },
 )
@@ -305,10 +297,3 @@ it.instance(
     }),
   { git: true },
 )
-
-test("--auto doesn't answer for a locked permission", () => {
-  expect(ConfigPolicy.permissionLockFor(["share", "permission.webfetch"], "webfetch")).toBe("permission.webfetch")
-  expect(ConfigPolicy.permissionLockFor(["share", "permission.webfetch"], "bash")).toBeUndefined()
-  expect(ConfigPolicy.permissionLockFor(["permission"], "bash")).toBe("permission")
-  expect(ConfigPolicy.permissionLockFor([], "bash")).toBeUndefined()
-})

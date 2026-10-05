@@ -89,10 +89,14 @@ const layer = Layer.effect(
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        // XCOD-202: the organisation's locked rule outranks any wildcard, agent rule or "always
-        // allow", but never lifts a deny: a lock can't loosen what Lunos itself restricts.
+        // XCOD-202: the organisation's locked rule outranks any wildcard or agent rule in config,
+        // but never lifts a deny: a lock can't loosen what Lunos itself restricts. The user's own
+        // in-session "always allow" still answers a locked "ask"; it never reaches config.
         const base = evaluate(request.permission, pattern, ruleset, approved)
-        const rule = base.action === "deny" ? base : (match(request.permission, pattern, locked) ?? base)
+        const lockedRule = match(request.permission, pattern, locked)
+        const session = match(request.permission, pattern, approved)
+        const rule =
+          base.action === "deny" ? base : lockedRule?.action === "deny" ? lockedRule : (session ?? lockedRule ?? base)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           AuditLog.emit("permission.decision", {
@@ -146,23 +150,19 @@ const layer = Layer.effect(
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
       pending.delete(input.requestID)
-      // XCOD-202: "always allow" can't stick to a permission the organisation locked; it counts once.
-      const downgraded = input.reply === "always" && ConfigPolicy.isPermissionLocked(existing.info.permission)
-      if (downgraded) yield* ConfigPolicy.refused(ConfigPolicy.permissionKey(existing.info.permission), "always allow")
-      const answer = downgraded ? "once" : input.reply
       AuditLog.emit("permission.decision", {
         session: existing.info.sessionID,
         permission: existing.info.permission,
         patterns: existing.info.patterns,
-        decision: answer === "reject" ? "denied" : answer === "always" ? "allowed always" : "allowed once",
+        decision: input.reply === "reject" ? "denied" : input.reply === "always" ? "allowed always" : "allowed once",
       })
       yield* events.publish(Event.Replied, {
         sessionID: existing.info.sessionID,
         requestID: existing.info.id,
-        reply: answer,
+        reply: input.reply,
       })
 
-      if (answer === "reject") {
+      if (input.reply === "reject") {
         yield* Deferred.fail(
           existing.deferred,
           input.message
@@ -184,7 +184,7 @@ const layer = Layer.effect(
       }
 
       yield* Deferred.succeed(existing.deferred, undefined)
-      if (answer === "once") return
+      if (input.reply === "once") return
 
       for (const pattern of existing.info.always) {
         approved.push({
