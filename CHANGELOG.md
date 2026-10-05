@@ -18,6 +18,20 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+## [1.18.44] - 2026-10-05
+
+### Fixed
+
+- **A failed update says why.** When `lunos update` or the TUI's update dialog fails, it now names
+  the package manager's error code (e.g. `EBUSY`, `EACCES`, `ERR_PNPM_…`) and the path of npm's
+  debug log, instead of only the exit code. Nothing else from the package manager's output is
+  shown, since it can contain registry tokens (XCOD-171).
+- **Licence notices cover Bun's LGPL libraries in full.** `THIRD_PARTY_NOTICES` and
+  `lunos licenses` now include the LGPL-2.0 and LGPL-2.1 texts, the exact WebKit and tinycc commits
+  that Bun 1.3.14 statically links, and how to relink with a modified copy. The desktop app's
+  notices now include Bun's licence and this section too, since it ships the `lunos` binary
+  (XCOD-177).
+
 ## [1.18.43] - 2026-10-04
 
 ### Added
@@ -439,7 +453,8 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.43...dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.44...dev
+[1.18.44]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.44
 [1.18.43]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.43
 [1.18.41]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.41
 [1.18.40]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.40
