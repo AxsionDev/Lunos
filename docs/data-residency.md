@@ -133,7 +133,7 @@ Notes for reviewers:
 
 - **Blocked attempts are recorded too**, with `"allowed": false`. A log that only shows successful calls cannot answer "did anything try to leave the region?", which is the question that matters.
 - **Only the destination host is recorded — never the request path or body.** An audit trail of what left must not itself become a copy of what left.
-- The log is a local file. Nothing is sent to ITService EOOD; Lunos is self-hosted and operates no service that could receive it. You can forward it to your own SIEM ([Forwarding](audit-log.md#forwarding-to-a-siem)), which is off unless you configure it.
+- The log is a local file. Nothing is sent to ITService EOOD; Lunos is self-hosted and operates no service that could receive it. You can forward it to your own SIEM ([Forwarding](audit-log.md#forwarding-to-a-siem)), which is off unless you configure it. Under an EU-only policy, a forwarding destination on another host counts as `unknown` unless managed config declares its region (`audit.forward.region`, e.g. `"eu"`).
 - Turn logging off, keeping enforcement, with `"audit": false`.
 
 ## Full example

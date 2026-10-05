@@ -84,6 +84,10 @@ export const Info = Schema.Struct({
           otlp: Schema.optional(Schema.String).annotate({
             description: "Forward every line as an OTLP log record, e.g. https://collector.internal:4318",
           }),
+          region: Schema.optional(Schema.Literals(["eu", "us", "other"])).annotate({
+            description:
+              'Where the forwarding destinations process data, checked against residency.allow (without it they count as "unknown"). Your declaration: Lunos can\'t verify it. Set it in managed config and lock audit.forward so only an administrator can declare it',
+          }),
         }),
       ),
     }),

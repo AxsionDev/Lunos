@@ -9,6 +9,8 @@ import { AuditLog } from "./log"
 // over UDP) or OTLP logs (HTTP/JSON). Off unless configured. The destination is treated like any
 // self-hosted endpoint for the residency policy: region "unknown", so an EU-only policy refuses
 // it unless "unknown" is allowed. Loopback never leaves the machine and is always allowed.
+// XCOD-201: `audit.forward.region` declares where the destinations process data; a declared
+// region is checked against the policy instead of "unknown".
 // Forwarding never blocks or fails a session: sends are asynchronous, the OTLP queue is bounded,
 // and failures are logged.
 
@@ -19,10 +21,10 @@ export function loopback(host: string) {
   return name === "localhost" || name === "::1" || name.startsWith("127.")
 }
 
-export function allowed(url: URL, residencyAllow: readonly string[] | undefined) {
+export function allowed(url: URL, residencyAllow: readonly string[] | undefined, region?: string) {
   if (!residencyAllow) return true
   if (loopback(url.hostname)) return true
-  return residencyAllow.includes("unknown")
+  return residencyAllow.includes(region ?? "unknown")
 }
 
 export function syslogMessage(line: string, event: string, now = new Date()) {
@@ -76,24 +78,25 @@ export function start(settings: AuditLog.Settings) {
 
   const syslog = settings.forward.syslog ? parse(settings.forward.syslog) : undefined
   const otlp = settings.forward.otlp ? parse(settings.forward.otlp) : undefined
+  const region = settings.forward.region
   for (const [kind, url] of [
     ["syslog", syslog],
     ["otlp", otlp],
   ] as const) {
     if (!url) continue
-    if (!allowed(url, settings.residencyAllow) && !refused.has(url.href)) {
+    if (!allowed(url, settings.residencyAllow, region) && !refused.has(url.href)) {
       refused.add(url.href)
       AuditLog.emit("audit.forward_refused", {
         via: kind,
         host: url.host,
-        region: "unknown",
+        region: region ?? "unknown",
         allowed: false,
         reason: "forwarding destination denied by the residency policy",
       })
     }
   }
 
-  if (syslog && allowed(syslog, settings.residencyAllow)) {
+  if (syslog && allowed(syslog, settings.residencyAllow, region)) {
     const socket = dgram.createSocket(syslog.hostname.includes(":") ? "udp6" : "udp4")
     socket.unref()
     socket.on("error", (err) => console.error("[audit] syslog forwarding failed:", err.message))
@@ -105,7 +108,7 @@ export function start(settings: AuditLog.Settings) {
     )
   }
 
-  if (otlp && allowed(otlp, settings.residencyAllow)) {
+  if (otlp && allowed(otlp, settings.residencyAllow, region)) {
     const endpoint = otlp.pathname.endsWith("/v1/logs") ? otlp.href : new URL("/v1/logs", otlp).href
     let queue: string[] = []
     let sending = false
