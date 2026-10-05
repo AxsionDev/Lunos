@@ -1641,7 +1641,9 @@ it.instance(
   { config: { share: "auto", autoshare: true, autoupdate: true } },
 )
 
-// XCOD-202: permission is lockable, as a whole or per tool.
+// XCOD-202: permission is lockable, as a whole or per tool. The lock is process state; reset it.
+afterEach(() => ConfigPolicy.activatePermission([], {}))
+
 it.instance(
   "a locked permission holds the managed rule, refuses the override and covers agents",
   Effect.gen(function* () {

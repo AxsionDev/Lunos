@@ -392,10 +392,14 @@ user or project config, an agent's own `permission`, `OPENCODE_PERMISSION` and
 `OPENCODE_CONFIG_CONTENT`. Under a lock, an agent's own rule for that tool (under `"permission"`,
 all of an agent's `permission`) comes from the policy only. "Always allow" on a locked permission
 counts for that request only. `--auto` (`--yolo`, `--dangerously-skip-permissions`) doesn't answer
-for a locked permission: `lunos run` rejects the request, the TUI asks. Refused config values,
-"always allow" and `lunos run --auto` are in the audit log as `policy.override_refused`; a user
-config that repeats the policy's rule isn't. Lock a tool with a value: a locked tool the policy
-doesn't set falls back to the default, which a wildcard rule elsewhere can still change.
+for a locked permission: `lunos run` rejects the request, the TUI asks. Refused config values and
+"always allow" are in the audit log as `policy.override_refused`, and so is `lunos run --auto` when
+the run hosts its own server (not with `--attach` or `--sandbox`); a user config that repeats the
+policy's rule isn't. A lock never loosens what Lunos itself restricts: a built-in deny (the plan
+agent's edits, tools a subagent isn't given) still denies, and agents can still read their own
+truncated tool output unless the policy names that directory. Lock a tool with a value: a locked
+tool the policy doesn't set falls back to the default, which a wildcard rule elsewhere can still
+change.
 
 **Requiring sandboxed runs** (XCOD-157, unreleased). `"$locked": ["sandbox.required"]` with
 `"sandbox": { "required": true }` means nothing runs on developers' machines except in a Docker

@@ -5,6 +5,8 @@ import { InstanceState } from "@/effect/instance-state"
 import { Wildcard } from "@opencode-ai/core/util/wildcard"
 import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
+import path from "path"
+import { TRUNCATION_DIR } from "@/tool/truncation-dir"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -28,16 +30,29 @@ interface State {
   approved: PermissionV1.Rule[]
 }
 
+function match(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]) {
+  return rulesets
+    .flat()
+    .findLast((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern))
+}
+
 export function evaluate(permission: string, pattern: string, ...rulesets: PermissionV1.Ruleset[]): PermissionV1.Rule {
-  return (
-    rulesets
-      .flat()
-      .findLast((rule) => Wildcard.match(permission, rule.permission) && Wildcard.match(pattern, rule.pattern)) ?? {
-      action: "ask",
-      permission,
-      pattern: "*",
-    }
-  )
+  return match(permission, pattern, ...rulesets) ?? { action: "ask", permission, pattern: "*" }
+}
+
+const TRUNCATED = path.join(TRUNCATION_DIR, "*")
+
+/**
+ * XCOD-202: the managed rules for locked permissions. Every agent may read truncated tool output
+ * (agent.ts), so that allow follows them unless the policy names the directory itself.
+ */
+function lockedRules() {
+  const config = ConfigPolicy.lockedPermission() as ConfigPermissionV1.Info
+  const rules = fromConfig(config)
+  if (!rules.some((rule) => rule.permission === "external_directory")) return rules
+  const own = config.external_directory
+  if (typeof own === "object" && TRUNCATED in own) return rules
+  return [...rules, ...fromConfig({ external_directory: { [TRUNCATED]: "allow" } })]
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
@@ -70,13 +85,14 @@ const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
-      // XCOD-202: the organisation's locked rules come last, so no wildcard, agent rule or
-      // "always allow" above them can win.
-      const locked = fromConfig(ConfigPolicy.lockedPermission() as ConfigPermissionV1.Info)
+      const locked = lockedRules()
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        const rule = evaluate(request.permission, pattern, ruleset, approved, locked)
+        // XCOD-202: the organisation's locked rule outranks any wildcard, agent rule or "always
+        // allow", but never lifts a deny: a lock can't loosen what Lunos itself restricts.
+        const base = evaluate(request.permission, pattern, ruleset, approved)
+        const rule = base.action === "deny" ? base : (match(request.permission, pattern, locked) ?? base)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           AuditLog.emit("permission.decision", {

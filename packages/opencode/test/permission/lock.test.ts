@@ -6,6 +6,8 @@ import { EventV2Bridge } from "../../src/event-v2-bridge"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Permission } from "../../src/permission"
 import { ConfigPolicy } from "../../src/config/policy"
+import { TRUNCATION_DIR } from "../../src/tool/truncation-dir"
+import path from "path"
 import { InstanceBootstrap } from "../../src/project/bootstrap"
 import { InstanceStore } from "../../src/project/instance-store"
 import { TestInstance, tmpdirScoped } from "../fixture/fixture"
@@ -235,4 +237,78 @@ test("permission keys are known lock keys", () => {
   expect(
     ConfigPolicy.unknownKeys(["permission", "permission.webfetch", "permission.bash", "permission.a.b", "nope"]),
   ).toEqual(["permission.a.b", "nope"])
+})
+
+// A lock can't loosen what Lunos itself restricts, and can't block reading truncated tool output.
+
+it.instance(
+  "a locked allow doesn't lift an agent's or a session's deny",
+  () =>
+    Effect.gen(function* () {
+      ConfigPolicy.activatePermission(["permission.edit"], { permission: { edit: "allow" } })
+      // The plan agent denies edits; the task tool denies tools on subagent sessions.
+      const plan = Permission.merge(Permission.fromConfig({ "*": "allow" }), Permission.fromConfig({ edit: "deny" }))
+      const err = yield* fail(
+        ask({
+          sessionID: session,
+          permission: "edit",
+          patterns: ["src/index.ts"],
+          metadata: {},
+          always: [],
+          ruleset: plan,
+        }),
+      )
+      expect(err).toBeInstanceOf(PermissionV1.DeniedError)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "a locked external_directory still lets the agent read truncated tool output",
+  () =>
+    Effect.gen(function* () {
+      ConfigPolicy.activatePermission(["permission"], { permission: { external_directory: "ask" } })
+      // agent.ts appends this allow to every agent.
+      const agent = Permission.fromConfig({ external_directory: { [path.join(TRUNCATION_DIR, "*")]: "allow" } })
+      const result = yield* ask({
+        sessionID: session,
+        permission: "external_directory",
+        patterns: [path.join(TRUNCATION_DIR, "tool_abc")],
+        metadata: {},
+        always: [],
+        ruleset: agent,
+      })
+      expect(result).toBeUndefined()
+    }),
+  { git: true },
+)
+
+it.instance(
+  "a policy that names the truncation directory itself is followed",
+  () =>
+    Effect.gen(function* () {
+      ConfigPolicy.activatePermission(["permission"], {
+        permission: { external_directory: { [path.join(TRUNCATION_DIR, "*")]: "deny" } },
+      })
+      const agent = Permission.fromConfig({ external_directory: { [path.join(TRUNCATION_DIR, "*")]: "allow" } })
+      const err = yield* fail(
+        ask({
+          sessionID: session,
+          permission: "external_directory",
+          patterns: [path.join(TRUNCATION_DIR, "tool_abc")],
+          metadata: {},
+          always: [],
+          ruleset: agent,
+        }),
+      )
+      expect(err).toBeInstanceOf(PermissionV1.DeniedError)
+    }),
+  { git: true },
+)
+
+test("--auto doesn't answer for a locked permission", () => {
+  expect(ConfigPolicy.permissionLockFor(["share", "permission.webfetch"], "webfetch")).toBe("permission.webfetch")
+  expect(ConfigPolicy.permissionLockFor(["share", "permission.webfetch"], "bash")).toBeUndefined()
+  expect(ConfigPolicy.permissionLockFor(["permission"], "bash")).toBe("permission")
+  expect(ConfigPolicy.permissionLockFor([], "bash")).toBeUndefined()
 })

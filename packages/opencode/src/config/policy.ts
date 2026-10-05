@@ -210,6 +210,11 @@ export function applyAgentPermissions<T extends Record_>(
   return next as T
 }
 
+/** The `$locked` entry covering a permission, if any: what `--auto` must not answer for. */
+export function permissionLockFor(locked: ReadonlyArray<string>, permission: string) {
+  return locked.find((key) => isLocked([key], `permission.${permission}`))
+}
+
 /** The managed rules for locked permissions, in config shape. */
 export function lockedPermission(): Record_ {
   return permissionLock.rules

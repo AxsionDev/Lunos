@@ -873,7 +873,7 @@ export const RunCommand = effectCmd({
               const permission = event.properties
               if (!sessions.has(permission.sessionID)) continue
 
-              const lock = locked.find((key) => ConfigPolicy.isLocked([key], `permission.${permission.permission}`))
+              const lock = ConfigPolicy.permissionLockFor(locked, permission.permission)
               if (auto && lock && !refusedAuto.has(lock)) {
                 refusedAuto.add(lock)
                 await Effect.runPromise(ConfigPolicy.refused(lock, "--auto")).catch(() => undefined)
