@@ -58,6 +58,7 @@ import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogMode } from "./component/dialog-mode"
+import { DialogAgents } from "./component/dialog-agents"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
@@ -883,14 +884,18 @@ function App(props: {
         title: "Switch mode",
         category: "Mode",
         slashName: "modes",
-        // Deprecated alias (XCOD-40): "/agents" still resolves here via fuzzy
-        // slash matching (isVisiblePaletteCommand excludes hidden commands
-        // from the slash list, so a separate hidden alias command would
-        // never actually be reachable — this must be an alias on the visible
-        // command, not a second entry).
-        slashAliases: ["agents"],
         run: () => {
           dialog.replace(() => <DialogMode />)
+        },
+      },
+      {
+        // XCOD-210: /agents edits agents. It used to be a deprecated alias of /modes (XCOD-40).
+        name: "agent.edit",
+        title: "Edit agents",
+        category: "Mode",
+        slashName: "agents",
+        run: () => {
+          dialog.replace(() => <DialogAgents />)
         },
       },
       {

@@ -1,8 +1,31 @@
-# Sharing agents
+# Editing and sharing agents
 
 Package an agent once and use it on another machine, or hand it to a colleague: `lunos agent export` writes the agent, the MCP servers it uses and the skills it names into one bundle file, and `lunos agent import` adds it on the other side after showing exactly what it will be allowed to do.
 
-This page covers **exporting and importing (XCOD-209, unreleased)**. Editing agents and running them on a schedule are separate, later work (XCOD-210, XCOD-211).
+This page covers **editing (XCOD-210), exporting and importing (XCOD-209)**, all unreleased. Running agents on a schedule is separate, later work (XCOD-211).
+
+## Editing
+
+```sh
+lunos agent edit reviewer                                    # opens the agent's file in $EDITOR
+lunos agent edit reviewer --prompt-file prompt.md --model mistral/mistral-large-latest
+lunos agent edit reviewer --permission bash=ask,webfetch=deny --steps 20
+lunos agent edit reviewer --skill code-review --mcp github   # may load the skill, may use github's tools
+```
+
+In the TUI, `/agents` lists every agent. Enter opens the selected agent's file in `$VISUAL` or `$EDITOR`.
+
+**Every save is checked before it's written:**
+
+- the model must be one that's available here (`provider/model`);
+- every permission must name a tool, or an MCP server's tools, that exists here (a wildcard must match at least one);
+- every skill the agent names must be installed.
+
+If anything is wrong, every problem is listed and the file isn't touched. In `$EDITOR` you edit a copy, so a save that's refused leaves the agent exactly as it was.
+
+- **What can be edited:** agents defined in markdown files, in your global config or a project's `.opencode/agents/`.
+- **What can't:** built-in agents (`lunos agent create` makes your own), agents defined in JSON config (edit them there), and Claude Code files under `.claude/agents/` (import one to get a Lunos copy).
+- **Rule order:** a rule set with `--permission`, `--skill` or `--mcp` goes after the agent's existing rules. Rules match last-wins, so the new rule takes effect even after a wildcard such as `"*": "allow"`.
 
 ## Exporting
 
