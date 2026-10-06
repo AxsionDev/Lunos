@@ -165,7 +165,11 @@ export async function run(input: {
   if (windDownTimer) clearTimeout(windDownTimer)
   if (killTimer) clearTimeout(killTimer)
 
-  if (stuck) error = `didn't stop within ${Math.round(windDown / 1000)}s of reaching its ${reason} limit`
+  if (stuck) {
+    // With the end of its output, which says how far it got.
+    const tail = stderr.trim().split("\n").slice(-5).join("\n")
+    error = `didn't stop within ${Math.round(windDown / 1000)}s of reaching its ${reason} limit${tail ? `:\n${tail}` : ""}`
+  }
   // A limit reached is a success if the child then ended cleanly (results handed back); the reason
   // still says which limit. A child that had to be killed, or failed to hand back, failed.
   const ok = exitCode === 0 && !stuck && (reason !== undefined || !error)

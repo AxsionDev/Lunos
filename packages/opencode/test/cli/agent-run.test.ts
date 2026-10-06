@@ -163,7 +163,8 @@ describe("lunos agent run (subprocess)", () => {
         yield* llm.hang
         const started = Date.now()
         const result = yield* opencode.spawn(run(["--max-time", "3s"]))
-        expect(result.exitCode).toBe(0)
+        // The output says which stage it got to if it doesn't end (XCOD-211: it hung on Windows CI).
+        expect(result.exitCode, (result.stdout + result.stderr).slice(-3000)).toBe(0)
         const r = yield* Effect.promise(() => report(result.stdout + result.stderr))
         expect(r).toMatchObject({ status: "ok", reason: "time" })
         expect(r.error).toBeUndefined()
