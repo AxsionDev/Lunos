@@ -9,8 +9,20 @@ import * as fuzzysort from "fuzzysort"
 import { useConnected } from "./use-connected"
 import { useSync } from "../context/sync"
 
-/** `onPick` (XCOD-128, /settings) receives the choice instead of it becoming the session's model. */
-export function DialogModel(props: { providerID?: string; onPick?: (providerID: string, modelID: string) => void }) {
+/** A choice listed before the models, e.g. "Inherit from main agent" (XCOD-214). */
+export type DialogModelChoice = { title: string; description?: string; onSelect: () => void }
+
+/**
+ * `onPick` (XCOD-128, /settings) receives the choice instead of it becoming the session's model.
+ * `choices`, `title` and `current` (XCOD-214) let /settings pick a subagent's model with it.
+ */
+export function DialogModel(props: {
+  providerID?: string
+  onPick?: (providerID: string, modelID: string) => void
+  choices?: DialogModelChoice[]
+  title?: string
+  current?: { providerID: string; modelID: string }
+}) {
   const local = useLocal()
   const sync = useSync()
   const dialog = useDialog()
@@ -117,8 +129,19 @@ export function DialogModel(props: { providerID?: string; onPick?: (providerID: 
         )
       : []
 
+    const choiceOptions = (props.choices ?? [])
+      .filter((choice) => !needle || fuzzysort.single(needle, choice.title))
+      .map((choice, index) => ({
+        value: { providerID: "", modelID: `choice:${index}` },
+        title: choice.title,
+        description: choice.description,
+        category: needle ? undefined : "Choices",
+        onSelect: choice.onSelect,
+      }))
+
     if (needle) {
       return [
+        ...choiceOptions,
         ...sortModelOptions(
           fuzzysort.go(needle, providerOptions, { keys: ["title", "category"] }).map((x) => x.obj),
           false,
@@ -127,7 +150,7 @@ export function DialogModel(props: { providerID?: string; onPick?: (providerID: 
       ]
     }
 
-    return [...favoriteOptions, ...recentOptions, ...providerOptions, ...popularProviders]
+    return [...choiceOptions, ...favoriteOptions, ...recentOptions, ...providerOptions, ...popularProviders]
   })
 
   const provider = createMemo(() =>
@@ -136,6 +159,7 @@ export function DialogModel(props: { providerID?: string; onPick?: (providerID: 
 
   const title = createMemo(() => {
     const value = provider()
+    if (props.title) return props.title
     if (!value) return "Select model"
     return value.name
   })
@@ -180,7 +204,7 @@ export function DialogModel(props: { providerID?: string; onPick?: (providerID: 
       flat={true}
       skipFilter={true}
       title={title()}
-      current={local.model.current()}
+      current={props.current ?? local.model.current()}
     />
   )
 }

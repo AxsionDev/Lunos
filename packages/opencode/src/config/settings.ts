@@ -17,6 +17,7 @@ import { ConfigVariable } from "./variable"
 import { ConfigV2Compat } from "./v2-compat"
 import { MemorySwitch } from "@/memory/switch"
 import { normalizeLoadedConfig } from "./config"
+import fuzzysort from "fuzzysort"
 
 // XCOD-128: every configuration option in one place, for the TUI's /settings screen and for
 // `lunos settings list|get|set`. The list is generated from the live schemas (ConfigV1.Info for
@@ -98,6 +99,8 @@ export type Dialog = "models" | "themes" | "mcps" | "providers" | "modes"
 const DIALOG: Record<string, Dialog> = {
   model: "models",
   small_model: "models",
+  "subagent.model": "models",
+  "subagent.dynamic.allow": "models",
   mcp: "mcps",
   provider: "providers",
   "tui.theme": "themes",
@@ -693,6 +696,40 @@ function stable(value: unknown): string {
   return JSON.stringify(value)
 }
 
+/**
+ * XCOD-214: settings whose value names a model, checked against the models available here when
+ * the caller knows them. `subagent.model` also takes "inherit" and "small"; `subagent.dynamic.allow`
+ * is a list.
+ */
+const MODEL_KEYS: Record<string, "one" | "subagent" | "list"> = {
+  model: "one",
+  small_model: "one",
+  "subagent.model": "subagent",
+  "subagent.dynamic.allow": "list",
+}
+
+/** Why `value` isn't a usable model for `key`, with the closest matches; undefined when it is. */
+export function modelProblem(key: string, value: unknown, models: ReadonlySet<string>): string | undefined {
+  const kind = MODEL_KEYS[key]
+  if (!kind) return
+  const ids = kind === "list" ? (Array.isArray(value) ? value : [value]) : [value]
+  for (const id of ids) {
+    if (typeof id !== "string") return `${key} takes "provider/model" names`
+    if (kind === "subagent" && (id === "inherit" || id === "small")) continue
+    if (models.has(id)) continue
+    const close = fuzzysort.go(id, [...models], { limit: 3, threshold: 0.3 }).map((match) => match.target)
+    const extra = kind === "subagent" ? ', or "inherit" or "small"' : ""
+    return (
+      `"${id}" isn't a model available here (see \`lunos models\`)` +
+      (close.length
+        ? `. Did you mean ${close.map((name) => `"${name}"`).join(", ")}${extra}?`
+        : extra
+          ? `. Use provider/model${extra}.`
+          : "")
+    )
+  }
+}
+
 export type SetResult = { key: string; value: unknown; file: string; scope: Scope; restart: boolean; changed: boolean }
 
 /**
@@ -735,6 +772,8 @@ export async function set(input: {
   ctx: Context
   locked?: ReadonlyArray<string>
   via?: string
+  /** The models available here, as "provider/model", to check model-valued settings against. */
+  models?: ReadonlySet<string>
 }): Promise<SetResult> {
   const item = find(input.key)
   if (!item)
@@ -755,6 +794,8 @@ export async function set(input: {
     throw new SettingError(ConfigPolicy.message(lockedKey), "locked")
   }
   const value = coerce(item, input.value)
+  const problem = input.models ? modelProblem(item.key, value, input.models) : undefined
+  if (problem) throw new SettingError(`${item.key}: ${problem}. Nothing was written.`, "invalid")
   const refusal = input.scope === "project" ? projectRefusal(item.key, value) : undefined
   if (refusal) throw new SettingError(refusal, "invalid")
   const file = targetFile(item.target, input.scope, input.ctx)
