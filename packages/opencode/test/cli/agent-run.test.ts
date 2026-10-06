@@ -116,6 +116,8 @@ describe("lunos agent run (subprocess)", () => {
         const r = yield* Effect.promise(() => report(result.stdout + result.stderr))
         expect(r).toMatchObject({ status: "stopped", reason: "steps" })
         expect(r.steps).toBe(2)
+        // No step starts past the limit: the 2 steps plus the session title, at most.
+        expect(yield* llm.calls).toBeLessThanOrEqual(3)
       }),
     120_000,
   )
@@ -185,6 +187,8 @@ describe("lunos agent run (subprocess)", () => {
         const r = yield* Effect.promise(() => report(result.stdout + result.stderr))
         expect(r).toMatchObject({ status: "stopped", reason: "steps" })
         expect(r.steps).toBe(3)
+        // The steps are taken from the same budget, so no subagent step starts past it either.
+        expect(yield* llm.calls).toBeLessThanOrEqual(4)
       }),
     120_000,
   )

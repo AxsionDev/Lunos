@@ -26,7 +26,7 @@ To let a scheduled agent do something, allow it in the agent's own permissions (
 | `--max-cost`  | `2`     | model spend passes this, in the provider's currency                   |
 | `--max-steps` | `50`    | the agent and its subagents together have taken this many model steps |
 
-Spend and steps are counted when a step finishes, so a run stops at the first step boundary past the limit; one step can take it a little over. A stopped run is interrupted the way Ctrl+C would (SIGINT), then killed if it hasn't exited after 10 seconds.
+The step limit is exact: no model step starts once the run has used it up. Spend is counted when a step finishes, so a run stops at the first step boundary past the spend limit; one step can take it a little over. A stopped run is interrupted the way Ctrl+C would (SIGINT), then killed if it hasn't exited after 10 seconds.
 
 ## Sandbox
 

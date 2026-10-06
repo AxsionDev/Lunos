@@ -14,6 +14,7 @@ import type { SandboxEgress } from "./egress"
 import { SandboxGit } from "./git"
 import { SandboxMount } from "./mount"
 import { SandboxDevcontainer } from "./devcontainer"
+import { StepBudget } from "@/agent/step-budget"
 
 // XCOD-144 slice 1: the lifecycle of one sandbox. `create` copies the repo into a container volume
 // and creates (but doesn't start) the container; `start` runs the Lunos server in it; `handoff`
@@ -463,6 +464,8 @@ function runtime(info: Meta, secrets: Record<string, string>) {
     ...providerEnv(),
     ...secrets,
     OPENCODE_SERVER_PASSWORD: info.password,
+    // XCOD-211: an unattended run's step limit applies to the server inside, which runs the steps.
+    ...(process.env[StepBudget.ENV] ? { [StepBudget.ENV]: process.env[StepBudget.ENV] } : {}),
     OPENCODE_CONFIG_CONTENT: JSON.stringify(
       SandboxConfig.mergeDocs([
         auditInside(isDoc(content) ? content : {}),
