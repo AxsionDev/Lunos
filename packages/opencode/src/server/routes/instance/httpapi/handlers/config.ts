@@ -6,6 +6,9 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { markInstanceForDisposal } from "../lifecycle"
 import { ConfigSettings } from "@/config/settings"
+import { Agent } from "@/agent/agent"
+import { AgentEditHere } from "@/agent/edit-here"
+import fs from "node:fs/promises"
 import { Database } from "@opencode-ai/core/database/database"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { gte } from "drizzle-orm"
@@ -101,6 +104,39 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
       return result
     })
 
+    // XCOD-210: the /agents screen.
+    const agents = Effect.fn("ConfigHttpApi.agents")(function* () {
+      const list = yield* Agent.Service.use((svc) => svc.list())
+      return yield* Effect.forEach(list, (agent) =>
+        Effect.gen(function* () {
+          const file = yield* AgentEditHere.file(agent.name)
+          const text = file ? yield* Effect.promise(() => fs.readFile(file, "utf8").catch(() => undefined)) : undefined
+          return {
+            name: agent.name,
+            mode: agent.mode,
+            ...(agent.description ? { description: agent.description } : {}),
+            ...(agent.hidden ? { hidden: true } : {}),
+            native: agent.native === true,
+            ...(file && text !== undefined ? { file, text } : {}),
+          }
+        }),
+      )
+    })
+
+    const agentSave = Effect.fn("ConfigHttpApi.agentSave")(function* (ctx: {
+      payload: Schema.Schema.Type<typeof AgentEditHere.SaveInput>
+    }) {
+      const file = yield* AgentEditHere.file(ctx.payload.name)
+      if (!file) return { ok: false as const, problems: [`"${ctx.payload.name}" has no agent file Lunos can edit`] }
+      const saved = yield* AgentEditHere.saveText(file, ctx.payload.text)
+      if (saved.ok) {
+        // Agents load with the config; reload it so the change applies to new sessions.
+        yield* configSvc.invalidate()
+        yield* markInstanceForDisposal(yield* InstanceState.context)
+      }
+      return saved
+    })
+
     const providers = Effect.fn("ConfigHttpApi.providers")(function* () {
       const providers = yield* providerSvc.list()
       return {
@@ -114,6 +150,8 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
       .handle("update", update)
       .handle("settings", settings)
       .handle("settingsSet", settingsSet)
+      .handle("agents", agents)
+      .handle("agentSave", agentSave)
       .handle("providers", providers)
   }),
 )

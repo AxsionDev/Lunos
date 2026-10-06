@@ -2262,6 +2262,33 @@ export type SettingsSetResult =
       code: string
     }
 
+export type AgentFileEntry = {
+  name: string
+  mode: string
+  description?: string
+  hidden?: boolean
+  native: boolean
+  file?: string
+  text?: string
+}
+
+export type AgentFileList = Array<AgentFileEntry>
+
+export type AgentSaveInput = {
+  name: string
+  text: string
+}
+
+export type AgentSaveOutput =
+  | {
+      ok: true
+      file: string
+    }
+  | {
+      ok: false
+      problems: Array<string>
+    }
+
 export type Model = {
   id: string
   providerID: string
@@ -7986,6 +8013,62 @@ export type ConfigSettingsSetResponses = {
 }
 
 export type ConfigSettingsSetResponse = ConfigSettingsSetResponses[keyof ConfigSettingsSetResponses]
+
+export type ConfigAgentsData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/agents"
+}
+
+export type ConfigAgentsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigAgentsError = ConfigAgentsErrors[keyof ConfigAgentsErrors]
+
+export type ConfigAgentsResponses = {
+  /**
+   * Every agent, with its file when it can be edited
+   */
+  200: AgentFileList
+}
+
+export type ConfigAgentsResponse = ConfigAgentsResponses[keyof ConfigAgentsResponses]
+
+export type ConfigAgentSaveData = {
+  body?: AgentSaveInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/agents"
+}
+
+export type ConfigAgentSaveErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigAgentSaveError = ConfigAgentSaveErrors[keyof ConfigAgentSaveErrors]
+
+export type ConfigAgentSaveResponses = {
+  /**
+   * Saved, or every problem that stopped the save
+   */
+  200: AgentSaveOutput
+}
+
+export type ConfigAgentSaveResponse = ConfigAgentSaveResponses[keyof ConfigAgentSaveResponses]
 
 export type ConfigProvidersData = {
   body?: never

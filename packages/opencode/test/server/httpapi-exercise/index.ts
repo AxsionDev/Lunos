@@ -194,6 +194,49 @@ const scenarios: Scenario[] = [
       object(body)
       check(body.ok === true, "a valid project setting should be written")
     }),
+  // XCOD-210: the /agents screen lists agents and saves an edited agent file, validated first.
+  http.protected.get("/config/agents", "config.agents").json(200, (body) => {
+    array(body)
+    const build = (body as { name: string; native: boolean; file?: string }[]).find((agent) => agent.name === "build")
+    check(build?.native === true, "the built-in build agent should be listed")
+    check(build?.file === undefined, "a built-in agent has no file to edit")
+  }),
+  http.protected
+    .put("/config/agents", "config.agentSave.unknown")
+    .at((ctx) => ({ path: "/config/agents", headers: ctx.headers(), body: { name: "no-such-agent", text: "x" } }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === false, "an agent without a file should be refused")
+    }),
+  http.protected
+    .put("/config/agents", "config.agentSave.invalid")
+    .seeded((ctx) => ctx.file(".opencode/agents/exercise.md", "---\ndescription: Exercise\nmode: all\n---\nPrompt.\n"))
+    .at((ctx) => ({
+      path: "/config/agents",
+      headers: ctx.headers(),
+      body: {
+        name: "exercise",
+        text: "---\ndescription: Exercise\npermission:\n  no_such_tool: allow\n---\nPrompt.\n",
+      },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === false, "a save naming an unknown tool should be refused")
+      check(String(body.problems).includes("no_such_tool"), "the refusal should name the unknown tool")
+    }),
+  http.protected
+    .put("/config/agents", "config.agentSave")
+    .mutating()
+    .seeded((ctx) => ctx.file(".opencode/agents/exercise.md", "---\ndescription: Exercise\nmode: all\n---\nPrompt.\n"))
+    .at((ctx) => ({
+      path: "/config/agents",
+      headers: ctx.headers(),
+      body: { name: "exercise", text: "---\ndescription: Edited\nmode: all\n---\nNew prompt.\n" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === true, "a valid agent file should be saved")
+    }),
   http.protected.get("/project", "project.list").json(200, array, "status"),
   http.protected.get("/project/current", "project.current").json(
     200,

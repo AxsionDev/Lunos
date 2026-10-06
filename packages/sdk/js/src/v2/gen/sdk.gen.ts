@@ -4,6 +4,7 @@ import { client } from "./client.gen.js"
 import { buildClientParams, type Client, type Options as Options2, type TDataShape } from "./client/index.js"
 import type {
   AgentPartInput,
+  AgentSaveInput,
   AppAgentsErrors,
   AppAgentsResponses,
   AppLogErrors,
@@ -18,6 +19,10 @@ import type {
   CommandListErrors,
   CommandListResponses,
   Config as Config3,
+  ConfigAgentSaveErrors,
+  ConfigAgentSaveResponses,
+  ConfigAgentsErrors,
+  ConfigAgentsResponses,
   ConfigGetErrors,
   ConfigGetResponses,
   ConfigProvidersErrors,
@@ -1692,6 +1697,73 @@ export class Config2 extends HeyApiClient {
     )
     return (options?.client ?? this.client).patch<ConfigSettingsSetResponses, ConfigSettingsSetErrors, ThrowOnError>({
       url: "/config/settings",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * List agents for editing
+   *
+   * Every agent, built-ins included, with the markdown file that defines it and that file's text when Lunos can edit it (XCOD-210).
+   */
+  public agents<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ConfigAgentsResponses, ConfigAgentsErrors, ThrowOnError>({
+      url: "/config/agents",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Save an agent's file
+   *
+   * Validate an edited agent file against the models, tools, skills and MCP servers available here and write it. Nothing is written if anything is wrong.
+   */
+  public agentSave<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      agentSaveInput?: AgentSaveInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "agentSaveInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).put<ConfigAgentSaveResponses, ConfigAgentSaveErrors, ThrowOnError>({
+      url: "/config/agents",
       ...options,
       ...params,
       headers: {
