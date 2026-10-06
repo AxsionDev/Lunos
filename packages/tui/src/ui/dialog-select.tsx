@@ -36,6 +36,8 @@ export interface DialogSelectProps<T> {
   renderFilter?: boolean
   locked?: boolean
   preserveSelection?: boolean
+  /** Whether the mouse wheel scrolls the list (default true). The keyboard always does. */
+  wheel?: boolean
   actions?: {
     command: string
     title: string
@@ -88,7 +90,11 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const dialog = useDialog()
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
-  const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
+  // The scrollbox multiplies each wheel step by tick(); 0 turns the wheel off without touching the
+  // scrolling the list does itself (keyboard, keeping the selection in view).
+  const scrollAcceleration = createMemo(() =>
+    props.wheel === false ? { tick: () => 0, reset() {} } : getScrollAcceleration(tuiConfig),
+  )
 
   const [store, setStore] = createStore({
     selected: 0,

@@ -324,6 +324,9 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               placeholder="Type to filter by name, key or description"
               skipFilter
               preserveSelection
+              // XCOD-206: wheel scrolling here was still reported to run away after #152, so it's off
+              // (PO, 2026-10-06). Arrow keys, page keys and the filter move through the list.
+              wheel={false}
               current={highlighted()}
               options={options()}
               emptyView={

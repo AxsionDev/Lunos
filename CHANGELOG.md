@@ -55,6 +55,9 @@ reasoning behind a change are published separately as **Lunos Notes**.
 - **Ctrl+C stops a sandboxed run at once.** The agent inside the sandbox used to keep working, and
   spending, for about 10 seconds after an interrupt, until the container was killed. It now stops
   within a second, and the run exits with 130 (XCOD-211).
+- **`/settings` no longer runs away when scrolled with the mouse wheel or trackpad.** Scrolling
+  there could make the list jump up and down without stopping. The wheel now does nothing in
+  `/settings`; use the arrow keys, page keys or the filter. Other lists are unchanged (XCOD-206).
 
 ## [1.18.44] - 2026-10-05
 
