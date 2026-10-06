@@ -26,6 +26,10 @@ import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { RunBudget } from "@/agent/run-budget"
+
+const isAbort = (error: unknown) =>
+  !!error && typeof error === "object" && (error as { name?: unknown }).name === "MessageAbortedError"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
@@ -737,6 +741,7 @@ export const RunCommand = effectCmd({
           process.exit(1)
         }
         const sessionID = sess.id
+        let timeUp = false
 
         function emit(type: string, data: Record<string, unknown>) {
           if (args.format === "json") {
@@ -758,6 +763,8 @@ export const RunCommand = effectCmd({
         // whether JSON mode handled it (as emit does), so text mode is unchanged.
         let errorRecorded = false
         function emitError(error: unknown) {
+          // XCOD-211: aborting at the deadline is how an unattended run ends on time, not an error.
+          if (timeUp && isAbort(error)) return true
           if (args.format !== "json") return false
           if (errorRecorded) return true
           errorRecorded = true
@@ -861,6 +868,7 @@ export const RunCommand = effectCmd({
             if (event.type === "session.error") {
               const props = event.properties
               if (props.sessionID !== sessionID || !props.error) continue
+              if (timeUp && isAbort(props.error)) continue
               let err = String(props.error.name)
               if ("data" in props.error && props.error.data && "message" in props.error.data) {
                 err = String(props.error.data.message)
@@ -916,6 +924,18 @@ export const RunCommand = effectCmd({
         const cwd = args.attach ? (directory ?? sess.directory ?? (await current(sdk))) : (directory ?? root)
         const client = args.attach ? attachSDK(cwd) : sdk
 
+        // XCOD-211: an unattended run's time limit. At the deadline the session is aborted, the step
+        // in progress included, and the run ends the normal way: a sandboxed run hands back its results.
+        const deadline = args.unattended ? Number(process.env[RunBudget.DEADLINE]) : NaN
+        if (deadline > 0)
+          setTimeout(
+            () => {
+              timeUp = true
+              void client.session.abort({ sessionID }).catch(() => {})
+            },
+            Math.max(0, deadline - Date.now()),
+          ).unref()
+
         // Validate agent if specified
         const agent = await pickAgent(client)
 
@@ -942,7 +962,7 @@ export const RunCommand = effectCmd({
               arguments: message,
               variant: args.variant,
             })
-            if (result.error) {
+            if (result.error && !(timeUp && isAbort(result.error))) {
               if (!emitError(result.error)) UI.error(formatRunError(result.error))
               process.exitCode = 1
               return
@@ -959,7 +979,7 @@ export const RunCommand = effectCmd({
             variant: args.variant,
             parts: [...files, { type: "text", text: message }],
           })
-          if (result.error) {
+          if (result.error && !(timeUp && isAbort(result.error))) {
             if (!emitError(result.error)) UI.error(formatRunError(result.error))
             process.exitCode = 1
             return

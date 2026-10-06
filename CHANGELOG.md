@@ -28,7 +28,8 @@ reasoning behind a change are published separately as **Lunos Notes**.
   [Editing and sharing agents](docs/sharing-agents.md) (XCOD-210, part of XCOD-203).
 - **Run agents unattended, now or on a schedule.** `lunos agent run <name> --prompt …` runs an
   agent with hard limits on time, spend and steps (subagents included), in the Docker sandbox by
-  default. Nobody approves anything: every permission prompt is refused and reported, and the agent
+  default. A run that reaches a limit stops there and counts as a success: what the agent did so
+  far comes back as the sandbox's results branch. Nobody approves anything: every permission prompt is refused and reported, and the agent
   is told why. `--schedule "<cron>"` installs a launchd, systemd or Task Scheduler job;
   `lunos agent schedule list|remove` manages them. Each run writes a report and an `agent.run`
   audit event, and `--notify` can POST the outcome to a webhook. See

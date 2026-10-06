@@ -16,6 +16,7 @@ type Report = {
   cost: number
   denied: { permission: string }[]
   edited: string[]
+  error?: string
 }
 
 const AGENT = "---\ndescription: Night shift\nmode: all\npermission:\n  bash: ask\n  read: allow\n---\nDo the job.\n"
@@ -112,9 +113,10 @@ describe("lunos agent run (subprocess)", () => {
         yield* setup(home)
         for (let i = 0; i < 6; i++) yield* llm.push(reply().tool("read", { filePath: path.join(home, "notes.txt") }))
         const result = yield* opencode.spawn(run(["--max-steps", "2"]))
-        expect(result.exitCode).not.toBe(0)
+        // Reaching a limit is a success (PO decision, 2026-10-06): the work done so far is kept.
+        expect(result.exitCode).toBe(0)
         const r = yield* Effect.promise(() => report(result.stdout + result.stderr))
-        expect(r).toMatchObject({ status: "stopped", reason: "steps" })
+        expect(r).toMatchObject({ status: "ok", reason: "steps" })
         expect(r.steps).toBe(2)
         // No step starts past the limit: the 2 steps plus the session title, at most.
         expect(yield* llm.calls).toBeLessThanOrEqual(3)
@@ -139,9 +141,9 @@ describe("lunos agent run (subprocess)", () => {
         const result = yield* opencode.spawn(run(["--max-cost", "0.003"]), {
           env: { OPENCODE_CONFIG_CONTENT: JSON.stringify(config) },
         })
-        expect(result.exitCode).not.toBe(0)
+        expect(result.exitCode).toBe(0)
         const r = yield* Effect.promise(() => report(result.stdout + result.stderr))
-        expect(r).toMatchObject({ status: "stopped", reason: "cost" })
+        expect(r).toMatchObject({ status: "ok", reason: "cost" })
         expect(r.cost).toBeGreaterThan(0.003)
         // It stops at the first step past the limit: the steps before it cost less than the limit.
         const perStep = r.cost / r.steps
@@ -161,11 +163,12 @@ describe("lunos agent run (subprocess)", () => {
         yield* llm.hang
         const started = Date.now()
         const result = yield* opencode.spawn(run(["--max-time", "3s"]))
-        expect(result.exitCode).not.toBe(0)
+        expect(result.exitCode).toBe(0)
         const r = yield* Effect.promise(() => report(result.stdout + result.stderr))
-        expect(r).toMatchObject({ status: "stopped", reason: "time" })
-        // SIGINT, then SIGKILL after the grace period at the latest.
-        expect(Date.now() - started).toBeLessThan(60_000)
+        expect(r).toMatchObject({ status: "ok", reason: "time" })
+        expect(r.error).toBeUndefined()
+        // The run aborts its own session at the deadline; it isn't waited out or killed.
+        expect(Date.now() - started).toBeLessThan(30_000)
       }),
     120_000,
   )
@@ -187,7 +190,7 @@ describe("lunos agent run (subprocess)", () => {
         for (let i = 0; i < 6; i++) yield* llm.push(reply().tool("read", { filePath: path.join(home, "notes.txt") }))
         const result = yield* opencode.spawn(run(["--max-steps", "3"]))
         const r = yield* Effect.promise(() => report(result.stdout + result.stderr))
-        expect(r).toMatchObject({ status: "stopped", reason: "steps" })
+        expect(r).toMatchObject({ status: "ok", reason: "steps" })
         expect(r.steps).toBe(3)
         // The steps are taken from the same budget, so no subagent step starts past it either.
         expect(yield* llm.calls).toBeLessThanOrEqual(4)

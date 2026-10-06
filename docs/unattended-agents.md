@@ -26,7 +26,9 @@ To let a scheduled agent do something, allow it in the agent's own permissions (
 | `--max-cost`  | `2`     | model spend passes this, in the provider's currency                   |
 | `--max-steps` | `50`    | the agent and its subagents together have taken this many model steps |
 
-The step limit is exact: no model step starts once the run has used it up. Spend is counted when a step finishes, so a run stops at the first step boundary past the spend limit; one step can take it a little over. A stopped run is interrupted the way Ctrl+C would (SIGINT), then killed if it hasn't exited after 10 seconds. In the sandbox, the agent stops at once, and the sandbox is kept (stopped) like any interrupted run: `lunos sandbox list` shows it, `lunos sandbox destroy <id>` removes it, and `sandbox.retain_for` removes kept sandboxes after a while, which a schedule will want.
+The step limit is exact: no model step starts once the run has used it up. Spend is counted when a step finishes, so no step starts once spend has passed the limit, but the step that crosses it can take it a little over. At the time limit the run stops the step in progress, a running command included.
+
+**Reaching a limit is a success.** The run ends the normal way: in the sandbox, what the agent did up to then comes back as a branch (or a patch) like any finished run, the report's status is `ok` with the limit as its reason, and `lunos agent run` exits 0. A run that doesn't stop by itself within 2 minutes of reaching a limit is interrupted, then killed, and counts as failed.
 
 ## Sandbox
 
@@ -35,12 +37,13 @@ Runs use the [Docker sandbox](sandboxed-runs.md) by default, so the agent works 
 ## Reports, audit and notifications
 
 - **Report.** Each run writes a JSON report under Lunos's data directory (`agents/runs/<job or agent>/`) with:
-  - status (`ok`, `stopped`, `failed`) and reason (`completed`, `failed`, `time`, `cost`, `steps`);
+  - status (`ok`, `failed`) and reason (`completed`, `failed`, or the limit it reached: `time`, `cost`, `steps`);
   - duration, steps and spend;
+  - with the sandbox, where the results were handed back (`results`: the branch or patch);
   - each refused permission, and the files changed by the agent's edit tools. Changes made through bash aren't in this list; with the sandbox, the results branch has everything.
 - **Audit log.** With the audit log on, the run is recorded as an `agent.run` event (see [the audit log](audit-log.md)). The event never contains the prompt or the output.
 - **Notifications.**
-  - `--notify https://…` POSTs the outcome to that URL when the run ends. It sends metadata only: agent, job, status, reason, steps, spend, seconds, refused permissions and the report's path. With `LUNOS_OFFLINE` set, no notification is sent.
+  - `--notify https://…` POSTs the outcome to that URL when the run ends. It sends metadata only: agent, job, status, reason, steps, spend, seconds, refused permissions, where the results are and the report's path. With `LUNOS_OFFLINE` set, no notification is sent.
   - A run that doesn't finish cleanly also shows a desktop notification on macOS and Linux.
 
 ## Schedules

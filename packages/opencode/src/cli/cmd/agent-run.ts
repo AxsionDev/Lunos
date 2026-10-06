@@ -51,6 +51,7 @@ async function notify(url: string, report: AgentUnattended.Report, file: string)
       cost: report.cost,
       seconds: report.seconds,
       denied: report.denied.map((item) => item.permission),
+      ...(report.results ? { results: report.results } : {}),
       report: file,
     }),
     signal: AbortSignal.timeout(10_000),
