@@ -467,7 +467,70 @@ try {
     )
   }
 
-  // 7. on_finish "destroy" (the default) leaves nothing behind.
+  // 7. Interrupted (Ctrl+C, or `lunos agent run` stopping at a limit, XCOD-211): the agent stops at
+  // once and the sandbox is kept, stopped. The server is PID 1 in its container, so before it handled
+  // SIGTERM, `docker stop` waited its full timeout while the agent kept going.
+  {
+    const proj = await project("interrupt", {})
+    script = Array.from({ length: 40 }, (_, i) => ({
+      tool: "bash",
+      args: { command: `sleep 1; echo tick${i}`, description: "tick" },
+    }))
+    const { env } = await sandboxEnv("interrupt")
+    const proc = Bun.spawn(
+      ["bun", "run", path.join(dir, "src", "index.ts"), "run", "--sandbox", "--format", "json", "go"],
+      {
+        cwd: proj,
+        env,
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 300_000,
+      },
+    )
+    const stderr = new Response(proc.stderr).text()
+    let steps = 0
+    let stepsAtInterrupt = 0
+    let interruptedAt = 0
+    let buffer = ""
+    const reader = proc.stdout.pipeThrough(new TextDecoderStream()).getReader()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += value
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+      steps += lines.filter((line) => line.includes('"type":"step_finish"')).length
+      if (steps >= 1 && !interruptedAt) {
+        stepsAtInterrupt = steps
+        interruptedAt = Date.now()
+        proc.kill("SIGINT")
+      }
+    }
+    const code = await proc.exited
+    const seconds = interruptedAt ? (Date.now() - interruptedAt) / 1000 : -1
+    const output = await stderr
+    check("interrupt: the run exits 130", code === 130, `exit ${code}\n${output.slice(-1500)}`)
+    check("interrupt: it stops within 5s", seconds >= 0 && seconds < 5, `${seconds}s`)
+    check("interrupt: at most one step more", steps - stepsAtInterrupt <= 1, `${stepsAtInterrupt} then ${steps}`)
+    const id = output.match(/keeping (\w+) \(stopped\)/)?.[1]
+    check("interrupt: the sandbox is kept", !!id, output.slice(-1000))
+    if (id) {
+      const inspect = await $`${runtime} inspect -f ${"{{.State.ExitCode}}"} ${SandboxDocker.containerName(id)}`
+        .nothrow()
+        .quiet()
+        .text()
+      check("interrupt: the container stopped on SIGTERM, not SIGKILL", inspect.trim() === "143", inspect.trim())
+      const destroyed = await Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "sandbox", "destroy", id], {
+        cwd: proj,
+        env,
+        stdout: "pipe",
+        stderr: "pipe",
+      }).exited
+      check("interrupt: `lunos sandbox destroy` removes it", destroyed === 0)
+    }
+  }
+
+  // 8. on_finish "destroy" (the default) leaves nothing behind.
   const after = await leftovers()
   for (const kind of KINDS) {
     const left = after[kind].filter((id) => !before[kind].includes(id))

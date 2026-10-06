@@ -271,6 +271,13 @@ export const RunCommand = effectCmd({
         type: "boolean",
         describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
       })
+      .option("unattended", {
+        // XCOD-211: set by `lunos agent run`. Nobody can answer a permission prompt, so each one is
+        // refused with a message saying why, which lets the agent carry on without that action.
+        type: "boolean",
+        default: false,
+        hidden: true,
+      })
       .option("keep", {
         type: "boolean",
         describe: "with --sandbox: keep the sandbox when done, whatever sandbox.on_finish says",
@@ -786,6 +793,12 @@ export const RunCommand = effectCmd({
 
             if (event.type === "message.part.updated") {
               const part = event.properties.part
+              // XCOD-211: a subagent's steps count against an unattended run's limits too. A separate
+              // event type, so readers of `step_finish` don't count the subagent's cost twice.
+              if (part.sessionID !== sessionID && sessions.has(part.sessionID) && part.type === "step-finish") {
+                emit("subagent_step_finish", { part })
+                continue
+              }
               if (part.sessionID !== sessionID) continue
 
               if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
@@ -875,6 +888,12 @@ export const RunCommand = effectCmd({
                   reply: "once",
                 })
               } else {
+                // XCOD-211: every refusal is in the JSON stream, so an unattended run can report it.
+                emit("permission_rejected", {
+                  permission: permission.permission,
+                  patterns: permission.patterns,
+                  childSession: permission.sessionID !== sessionID,
+                })
                 UI.println(
                   UI.Style.TEXT_WARNING_BOLD + "!",
                   UI.Style.TEXT_NORMAL +
@@ -883,6 +902,11 @@ export const RunCommand = effectCmd({
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "reject",
+                  ...(args.unattended
+                    ? {
+                        message: `This is an unattended run, so nobody can approve "${permission.permission}". It was refused; carry on without it if you can, or stop and say what you needed.`,
+                      }
+                    : {}),
                 })
               }
             }
@@ -1084,6 +1108,7 @@ export async function runMini(input: MiniCommandInput) {
     dangerouslySkipPermissions: false,
     demo: input.demo ?? false,
     sandbox: undefined,
+    unattended: false,
     keep: undefined,
     rm: undefined,
   })

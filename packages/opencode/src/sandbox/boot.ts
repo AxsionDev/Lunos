@@ -63,5 +63,17 @@ export function load(file: string, wait = WAIT_MS) {
   for (const key of SNAPSHOTTED) Flag[key] = process.env[key]
 }
 
+/**
+ * XCOD-211: the server is PID 1 in its container, and the kernel ignores SIGTERM for PID 1 unless
+ * it has a handler. Without one, `docker stop` (an interrupted or limit-stopped run) waited its full
+ * timeout before SIGKILL, and the agent kept taking steps, and spending, the whole time.
+ */
+export function exitOnStop() {
+  process.once("SIGTERM", () => process.exit(143))
+}
+
 const file = process.env.LUNOS_SANDBOX_RUNTIME
-if (file) load(file)
+if (file) {
+  load(file)
+  exitOnStop()
+}

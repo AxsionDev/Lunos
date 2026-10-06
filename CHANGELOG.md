@@ -26,6 +26,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
   of `/modes`). Each save is checked against the models, tools, skills and MCP servers available
   here, and nothing is written if anything is wrong. See
   [Editing and sharing agents](docs/sharing-agents.md) (XCOD-210, part of XCOD-203).
+- **Run agents unattended, now or on a schedule.** `lunos agent run <name> --prompt …` runs an
+  agent with hard limits on time, spend and steps (subagents included), in the Docker sandbox by
+  default. Nobody approves anything: every permission prompt is refused and reported, and the agent
+  is told why. `--schedule "<cron>"` installs a launchd, systemd or Task Scheduler job;
+  `lunos agent schedule list|remove` manages them. Each run writes a report and an `agent.run`
+  audit event, and `--notify` can POST the outcome to a webhook. See
+  [Running agents unattended](docs/unattended-agents.md) (XCOD-211, part of XCOD-203).
 
 - **Share an agent as one file.** `lunos agent export <name>` writes the agent, the MCP servers it
   uses and the skills it names into a `.lunos-agent` bundle, with MCP environment variables and
@@ -41,6 +48,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 - **Stricter front-matter parsing.** Agent, mode and command files must use YAML (or JSON) front
   matter; a file using any other front-matter language is now refused with an error naming the
   file, and skipped (XCOD-208).
+
+### Fixed
+
+- **Ctrl+C stops a sandboxed run at once.** The agent inside the sandbox used to keep working, and
+  spending, for about 10 seconds after an interrupt, until the container was killed. It now stops
+  within a second, and the run exits with 130 (XCOD-211).
 
 ## [1.18.44] - 2026-10-05
 

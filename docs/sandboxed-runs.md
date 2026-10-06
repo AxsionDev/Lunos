@@ -40,7 +40,7 @@ With `OPENCODE_EXPERIMENTAL_WORKSPACES=1`, `/sandbox` in the TUI moves the sessi
    - creates the branch **`lunos/sandbox/<id>`** on your repository, starting at the commit you were on. If you had uncommitted changes, they become the first commit on the branch, so the second commit holds exactly the agent's changes. Your working tree, index and current branch are not touched.
 4. **Finish.** Then `sandbox.on_finish` applies (below). **Nothing is destroyed until the hand-back has succeeded.** If it fails — the repository is read-only, the branch already exists, the disk is full — the container is kept (stopped) whatever the policy says, and the reason is shown.
 
-If you interrupt a run (Ctrl-C), there are no results to hand back, so the sandbox is kept, stopped. `lunos sandbox destroy <id>` removes it.
+If you interrupt a run (Ctrl-C), the agent stops at once; there are no results to hand back, so the sandbox is kept, stopped. `lunos sandbox destroy <id>` removes it.
 
 A task counts as **failed** when `lunos run` exits with an error, or when any session's last reply ended in an error (a provider error, for example). That is what `destroy_on_success` looks at.
 
