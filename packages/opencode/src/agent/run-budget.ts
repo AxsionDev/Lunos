@@ -12,6 +12,11 @@ export * as RunBudget from "./run-budget"
 export const STEPS = "LUNOS_MAX_STEPS"
 export const COST = "LUNOS_MAX_COST"
 export const KEYS = [STEPS, COST] as const
+/**
+ * When an unattended run's time is up, in epoch milliseconds. `lunos run --unattended` reads it on
+ * the host and aborts the session then, so a step in progress stops too and the run ends normally.
+ */
+export const DEADLINE = "LUNOS_RUN_DEADLINE"
 
 let steps = 0
 let spent = 0

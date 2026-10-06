@@ -467,9 +467,63 @@ try {
     )
   }
 
-  // 7. Interrupted (Ctrl+C, or `lunos agent run` stopping at a limit, XCOD-211): the agent stops at
-  // once and the sandbox is kept, stopped. The server is PID 1 in its container, so before it handled
-  // SIGTERM, `docker stop` waited its full timeout while the agent kept going.
+  // 7. `lunos agent run` reaching a limit (XCOD-211): the run stops by itself, hands back what the
+  // agent did, and counts as a success. Steps: the budget ends the session loop. Time: the run aborts
+  // its session at the deadline, a tool in progress included.
+  for (const [name, limit, steps] of [
+    [
+      "agent-steps",
+      ["--max-steps", "2"],
+      [edit(), { tool: "bash", args: { command: "echo two", description: "two" } }],
+    ],
+    [
+      "agent-time",
+      ["--max-time", "25s"],
+      [edit(), { tool: "bash", args: { command: "sleep 120", description: "wait", timeout: 600_000 } }],
+    ],
+  ] as const) {
+    const proj = await project(name, {})
+    script = [
+      ...steps,
+      ...Array.from({ length: 8 }, () => ({ tool: "bash", args: { command: "true", description: "more" } })),
+    ]
+    const { env, home } = await sandboxEnv(name)
+    await fs.mkdir(path.join(home, "cfg", "opencode", "agents"), { recursive: true })
+    await Bun.write(
+      path.join(home, "cfg", "opencode", "agents", "nightly.md"),
+      "---\ndescription: Night shift\nmode: all\npermission:\n  bash: allow\n---\nDo the job.\n",
+    )
+    const started = Date.now()
+    const proc = Bun.spawn(
+      ["bun", "run", path.join(dir, "src", "index.ts"), "agent", "run", "nightly", "--prompt", "go", ...limit],
+      { cwd: proj, env, stdout: "pipe", stderr: "pipe", timeout: 300_000 },
+    )
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ])
+    const output = stdout + stderr
+    const seconds = (Date.now() - started) / 1000
+    const file = output.match(/report: (\S+\.json)/)?.[1]
+    const report = file ? ((await Bun.file(file).json()) as Record<string, any>) : undefined
+    const reason = name === "agent-steps" ? "steps" : "time"
+    check(`${name}: the run succeeds`, code === 0, output.slice(-2000))
+    check(
+      `${name}: the report says ok, ${reason}`,
+      report?.status === "ok" && report?.reason === reason,
+      JSON.stringify(report),
+    )
+    const branch = report?.results as string | undefined
+    check(`${name}: the report names the results branch`, !!branch?.startsWith("lunos/sandbox/"), String(branch))
+    const edited = branch ? await $`git show ${branch}:a.txt`.cwd(proj).nothrow().quiet().text() : ""
+    check(`${name}: the agent's edit is on the branch`, edited === "one\nedited\n", edited)
+    if (name === "agent-time") check(`${name}: it ends soon after the limit`, seconds < 60, `${seconds}s`)
+  }
+
+  // 8. Interrupted (Ctrl+C): the agent stops at once and the sandbox is kept, stopped. The server is
+  // PID 1 in its container, so before it handled SIGTERM, `docker stop` waited its full timeout while
+  // the agent kept going.
   {
     const proj = await project("interrupt", {})
     script = Array.from({ length: 40 }, (_, i) => ({
@@ -530,7 +584,7 @@ try {
     }
   }
 
-  // 8. on_finish "destroy" (the default) leaves nothing behind.
+  // 9. on_finish "destroy" (the default) leaves nothing behind.
   const after = await leftovers()
   for (const kind of KINDS) {
     const left = after[kind].filter((id) => !before[kind].includes(id))
