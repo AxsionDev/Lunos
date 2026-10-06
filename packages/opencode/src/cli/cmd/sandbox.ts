@@ -160,9 +160,10 @@ export async function runSandboxed(
   }
   say(`server ${conn.url}, workspace ${conn.directory}`)
   // Interrupted: there are no results to hand back, so keep the sandbox (stopped) rather than lose it.
+  let stopping: Promise<unknown> | undefined
   const interrupted = () => {
     say(`interrupted; keeping ${info.id} (stopped): \`lunos sandbox destroy ${info.id}\` removes it`)
-    void Sandbox.retain(info, "interrupted")
+    stopping = Sandbox.retain(info, "interrupted")
       .catch(() => {})
       .then(() => Promise.race([AuditLog.flush(), Bun.sleep(3000)]))
       .finally(() => process.exit(130))
@@ -174,6 +175,8 @@ export async function runSandboxed(
   try {
     await client(conn)
   } finally {
+    // The stopped container closes the client's connection; that's not a result to hand back.
+    if (stopping) await stopping
     process.off("SIGINT", interrupted)
     process.off("SIGTERM", interrupted)
     const failed = process.exitCode !== undefined && process.exitCode !== 0

@@ -49,6 +49,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
   matter; a file using any other front-matter language is now refused with an error naming the
   file, and skipped (XCOD-208).
 
+### Fixed
+
+- **Ctrl+C stops a sandboxed run at once.** The agent inside the sandbox used to keep working, and
+  spending, for about 10 seconds after an interrupt, until the container was killed. It now stops
+  within a second, and the run exits with 130 (XCOD-211).
+
 ## [1.18.44] - 2026-10-05
 
 ### Fixed
