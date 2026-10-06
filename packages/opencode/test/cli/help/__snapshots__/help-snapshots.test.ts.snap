@@ -168,6 +168,8 @@ manage agents
 Commands:
   lunos agent create           create a new agent
   lunos agent list             list all available agents
+  lunos agent edit <name>      change an agent: its prompt, model, permissions, skills, MCP servers
+                               and limits
   lunos agent export <name>    export an agent, with the MCP servers and skills it uses, as a bundle
                                to share
   lunos agent import <source>  import an agent from a bundle (file or https URL) or a Claude Code
@@ -675,6 +677,31 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent edit --help 1`] = `
+"lunos agent edit <name>
+
+change an agent: its prompt, model, permissions, skills, MCP servers and limits
+
+Positionals:
+  name  agent to edit                                                            [string] [required]
+
+Options:
+  -h, --help         show help                                                             [boolean]
+  -v, --version      show version number                                                   [boolean]
+      --print-logs   print logs to stderr                                                  [boolean]
+      --log-level    log level                  [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure         run without external plugins                                          [boolean]
+      --description  when to use the agent                                                  [string]
+      --prompt-file  file whose text becomes the agent's prompt                             [string]
+      --model        provider/model, or "" to use the default model                         [string]
+      --mode         where the agent can be used    [string] [choices: "primary", "subagent", "all"]
+      --steps        step limit (0 removes it)                                              [number]
+      --hidden       hide a subagent from the @ menu                                       [boolean]
+      --permission   permission rules, e.g. bash=ask,webfetch=deny                          [string]
+      --skill        skills it may load, e.g. code-review or code-review=deny               [string]
+      --mcp          MCP servers whose tools it may use, e.g. github or github=ask          [string]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent run --help 1`] = `

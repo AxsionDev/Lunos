@@ -3,7 +3,6 @@ export * as AgentImport from "./import"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { isDeepStrictEqual } from "node:util"
-import matter from "gray-matter"
 import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
 import { ConfigMarkdown } from "@opencode-ai/core/config/markdown"
 import { fromClaudeCode } from "../config/agent"
@@ -11,6 +10,7 @@ import { mcpConfigFromEntry } from "../mcp/discover"
 import { addMcpToConfig } from "../marketplace/install"
 import { headerEnvName } from "../marketplace/guard"
 import { AgentBundle } from "./bundle"
+import { AgentFile } from "./file"
 
 /**
  * Importing an agent (XCOD-209): a bundle, or a Claude Code subagent file, becomes a plan the
@@ -196,8 +196,7 @@ export async function plan(bundle: AgentBundle.Bundle, ctx: Context): Promise<Pl
   if (unset.length)
     preview.push(`not set here: ${unset.map((v) => `$${v}`).join(", ")} (set them before using the agent)`)
 
-  const { prompt, ...frontmatter } = agent
-  const content = matter.stringify(typeof prompt === "string" ? prompt : "", frontmatter)
+  const content = AgentFile.render(agent)
 
   return {
     name,

@@ -2,6 +2,7 @@ import { Config } from "@/config/config"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { Provider } from "@/provider/provider"
 import { ConfigSettings } from "@/config/settings"
+import { AgentEditHere } from "@/agent/edit-here"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
@@ -57,6 +58,29 @@ export const ConfigApi = HttpApi.make("config")
             summary: "Change one setting",
             description:
               "Validate one setting against the config schema and write it to the user or project config, keeping comments. Refuses keys locked by organisation policy.",
+          }),
+        ),
+        HttpApiEndpoint.get("agents", `${root}/agents`, {
+          query: WorkspaceRoutingQuery,
+          success: described(AgentEditHere.AgentList, "Every agent, with its file when it can be edited"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.agents",
+            summary: "List agents for editing",
+            description:
+              "Every agent, built-ins included, with the markdown file that defines it and that file's text when Lunos can edit it (XCOD-210).",
+          }),
+        ),
+        HttpApiEndpoint.put("agentSave", `${root}/agents`, {
+          query: WorkspaceRoutingQuery,
+          payload: AgentEditHere.SaveInput,
+          success: described(AgentEditHere.SaveOutput, "Saved, or every problem that stopped the save"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.agentSave",
+            summary: "Save an agent's file",
+            description:
+              "Validate an edited agent file against the models, tools, skills and MCP servers available here and write it. Nothing is written if anything is wrong.",
           }),
         ),
         HttpApiEndpoint.get("providers", `${root}/providers`, {

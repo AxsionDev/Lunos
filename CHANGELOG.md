@@ -20,6 +20,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Edit agents.** `lunos agent edit <name>` changes an agent's prompt, model, permissions, the
+  skills it may load, the MCP servers it may use, and its step limit, from flags or in `$EDITOR`.
+  In the TUI, `/agents` lists every agent and opens one in `$EDITOR` (`/agents` used to be an alias
+  of `/modes`). Each save is checked against the models, tools, skills and MCP servers available
+  here, and nothing is written if anything is wrong. See
+  [Editing and sharing agents](docs/sharing-agents.md) (XCOD-210, part of XCOD-203).
 - **Run agents unattended, now or on a schedule.** `lunos agent run <name> --prompt …` runs an
   agent with hard limits on time, spend and steps (subagents included), in the Docker sandbox by
   default. Nobody approves anything: every permission prompt is refused and reported, and the agent
@@ -34,7 +40,7 @@ reasoning behind a change are published separately as **Lunos Notes**.
   do, what it adds and where its model runs before writing anything. Imported agents ask before
   bash, edits and subagents unless you pass `--trust`, and Claude Code subagent files import with
   a report of the fields that didn't carry over. An organisation can turn imports off with a
-  locked `agent_import: false`. See [Sharing agents](docs/sharing-agents.md) (XCOD-209, part of
+  locked `agent_import: false`. See [Editing and sharing agents](docs/sharing-agents.md) (XCOD-209, part of
   XCOD-203).
 
 ### Changed

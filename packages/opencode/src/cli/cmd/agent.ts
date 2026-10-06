@@ -11,6 +11,7 @@ import type { Argv } from "yargs"
 import { Effect } from "effect"
 import { effectCmd } from "../effect-cmd"
 import { AgentExportCommand, AgentImportCommand } from "./agent-bundle"
+import { AgentEditCommand } from "./agent-edit"
 import { AgentRunCommand, AgentScheduleCommand } from "./agent-run"
 
 type AgentMode = "all" | "primary" | "subagent"
@@ -343,6 +344,7 @@ export const AgentCommand = cmd({
     yargs
       .command(AgentCreateCommand)
       .command(AgentListCommand)
+      .command(AgentEditCommand)
       .command(AgentExportCommand)
       .command(AgentImportCommand)
       .command(AgentRunCommand)
