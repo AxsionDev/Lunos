@@ -147,6 +147,8 @@ describe("lunos agent run (subprocess)", () => {
         const perStep = r.cost / r.steps
         expect(perStep * (r.steps - 1)).toBeLessThanOrEqual(0.003)
         expect(r.steps).toBeLessThan(6)
+        // And no step started after it: the crossing step, plus the session title at most.
+        expect(yield* llm.calls).toBeLessThanOrEqual(r.steps + 1)
       }),
     120_000,
   )

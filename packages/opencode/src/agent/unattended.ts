@@ -2,7 +2,7 @@ export * as AgentUnattended from "./unattended"
 
 import { spawn } from "node:child_process"
 import type { AgentJobs } from "./jobs"
-import { StepBudget } from "./step-budget"
+import { RunBudget } from "./run-budget"
 
 /**
  * XCOD-211: one unattended run of an agent. It runs `lunos run --format json --unattended` as a
@@ -14,7 +14,7 @@ import { StepBudget } from "./step-budget"
  * - **Hard limits.** Wall time, model spend and steps, the subagents' steps included. Spend and
  *   steps are counted when a step finishes, so a run stops at the first step boundary past the
  *   limit. Stopping sends SIGINT (the normal abort path), then SIGKILL if it doesn't exit. The
- *   child also refuses to start a step past the step limit (see StepBudget).
+ *   child also refuses to start a step past the step or spend limit (see RunBudget).
  */
 
 export type Reason = "completed" | "failed" | "time" | "cost" | "steps"
@@ -76,8 +76,14 @@ export async function run(input: {
   // stdin must not be an open pipe: `lunos run` would wait to read it.
   const child = spawn(input.command.file, args, {
     cwd: input.cwd,
-    // The child enforces the step limit too: by the time we see a step finish, more may have begun.
-    env: { ...process.env, ...input.env, [StepBudget.ENV]: String(input.limits.steps) },
+    // The child enforces the step and spend limits too: by the time we see a step finish, more may
+    // have begun.
+    env: {
+      ...process.env,
+      ...input.env,
+      [RunBudget.STEPS]: String(input.limits.steps),
+      [RunBudget.COST]: String(input.limits.cost),
+    },
     stdio: ["ignore", "pipe", "pipe"],
   })
 

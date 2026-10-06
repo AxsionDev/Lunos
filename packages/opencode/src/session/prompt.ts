@@ -58,7 +58,7 @@ import { Memory } from "@/memory"
 import { MemorySources } from "@/memory/sources"
 import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
-import { StepBudget } from "@/agent/step-budget"
+import { RunBudget } from "@/agent/run-budget"
 import { LLMEvent } from "@opencode-ai/llm"
 
 // @ts-ignore
@@ -1181,9 +1181,10 @@ const layer = Layer.effect(
             yield* events.publish(Session.Event.Error, { sessionID, error: error.toObject() })
             throw error
           }
-          // XCOD-211: an unattended run's step limit, subagents included, checked before the model call.
-          if (!StepBudget.take()) {
-            yield* Effect.logInfo("unattended step limit reached", { "session.id": sessionID })
+          // XCOD-211: an unattended run's step and spend limits, subagents included, checked before the
+          // model call.
+          if (!RunBudget.take()) {
+            yield* Effect.logInfo("unattended run limit reached", { "session.id": sessionID })
             break
           }
           const maxSteps = agent.steps ?? Infinity
