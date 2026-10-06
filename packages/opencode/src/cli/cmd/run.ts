@@ -926,15 +926,29 @@ export const RunCommand = effectCmd({
 
         // XCOD-211: an unattended run's time limit. At the deadline the session is aborted, the step
         // in progress included, and the run ends the normal way: a sandboxed run hands back its results.
+        // If the session doesn't end after the abort (seen on Windows CI: the run outlived its limit
+        // by 30s and more), the run stops waiting for it 10s later and ends anyway; a local run, with
+        // nothing to hand back, then exits 10s after that whatever is still holding it.
         const deadline = args.unattended ? Number(process.env[RunBudget.DEADLINE]) : NaN
+        let stopWaiting = () => {}
+        const stopped = new Promise<void>((resolve) => (stopWaiting = resolve))
         if (deadline > 0)
           setTimeout(
             () => {
               timeUp = true
+              process.stderr.write(`time limit reached: stopping session ${sessionID}${EOL}`)
               void client.session.abort({ sessionID }).catch(() => {})
+              setTimeout(() => {
+                process.stderr.write(`session ${sessionID} didn't stop within 10s of the abort; ending the run${EOL}`)
+                stopWaiting()
+                if (!args.attach) setTimeout(() => process.exit(0), 10_000).unref()
+              }, 10_000).unref()
             },
             Math.max(0, deadline - Date.now()),
           ).unref()
+        // The prompt call returns when the session ends; after the deadline, not later than `stopped`.
+        const untilStopped = <T>(call: Promise<T>) =>
+          Promise.race([call, stopped.then(() => ({ error: undefined }) as T)])
 
         // Validate agent if specified
         const agent = await pickAgent(client)
@@ -949,19 +963,21 @@ export const RunCommand = effectCmd({
           })
           async function finish() {
             if (args.attach) return
-            const error = await completed
+            const error = await Promise.race([completed, stopped.then(() => undefined)])
             if (error) process.exitCode = 1
           }
 
           if (args.command) {
-            const result = await client.session.command({
-              sessionID,
-              agent,
-              model: args.model,
-              command: args.command,
-              arguments: message,
-              variant: args.variant,
-            })
+            const result = await untilStopped(
+              client.session.command({
+                sessionID,
+                agent,
+                model: args.model,
+                command: args.command,
+                arguments: message,
+                variant: args.variant,
+              }),
+            )
             if (result.error && !(timeUp && isAbort(result.error))) {
               if (!emitError(result.error)) UI.error(formatRunError(result.error))
               process.exitCode = 1
@@ -972,13 +988,15 @@ export const RunCommand = effectCmd({
           }
 
           const model = pick(args.model)
-          const result = await client.session.prompt({
-            sessionID,
-            agent,
-            model,
-            variant: args.variant,
-            parts: [...files, { type: "text", text: message }],
-          })
+          const result = await untilStopped(
+            client.session.prompt({
+              sessionID,
+              agent,
+              model,
+              variant: args.variant,
+              parts: [...files, { type: "text", text: message }],
+            }),
+          )
           if (result.error && !(timeUp && isAbort(result.error))) {
             if (!emitError(result.error)) UI.error(formatRunError(result.error))
             process.exitCode = 1
