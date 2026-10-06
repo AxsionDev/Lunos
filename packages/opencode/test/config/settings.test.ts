@@ -271,3 +271,58 @@ describe("settings list", () => {
     expect(rows.find((item) => item.key === "enterprise.url")!.value).toBe("{env:ENT}")
   })
 })
+
+// XCOD-214: model-valued settings are checked against the models available here, with suggestions.
+describe("model settings", () => {
+  const models = new Set(["anthropic/claude-sonnet-4-5", "anthropic/claude-haiku-4-5", "mistral/mistral-large"])
+
+  test("a known model, inherit and small are accepted; an unknown one gets the closest matches", () => {
+    expect(ConfigSettings.modelProblem("subagent.model", "anthropic/claude-haiku-4-5", models)).toBeUndefined()
+    expect(ConfigSettings.modelProblem("subagent.model", "inherit", models)).toBeUndefined()
+    expect(ConfigSettings.modelProblem("subagent.model", "small", models)).toBeUndefined()
+    expect(ConfigSettings.modelProblem("model", "inherit", models)).toContain(`"inherit" isn't a model`)
+    const problem = ConfigSettings.modelProblem("subagent.model", "anthropic/claude-haiku-45", models)
+    expect(problem).toContain(`Did you mean "anthropic/claude-haiku-4-5"`)
+    // A key that doesn't name a model isn't checked.
+    expect(ConfigSettings.modelProblem("share", "anything", models)).toBeUndefined()
+  })
+
+  test("every entry of subagent.dynamic.allow is checked", () => {
+    expect(ConfigSettings.modelProblem("subagent.dynamic.allow", [...models], models)).toBeUndefined()
+    expect(ConfigSettings.modelProblem("subagent.dynamic.allow", ["mistral/mistral-large", "x/y"], models)).toContain(
+      `"x/y" isn't a model`,
+    )
+  })
+
+  test("set refuses an unknown model and writes nothing; a known one is saved", async () => {
+    await expect(
+      ConfigSettings.set({
+        key: "subagent.model",
+        value: "anthropic/claude-haiku-45",
+        scope: "user",
+        ctx: ctx(),
+        locked: [],
+        models,
+      }),
+    ).rejects.toThrow("Nothing was written")
+    expect(existsSync(userFile())).toBe(false)
+    await ConfigSettings.set({
+      key: "subagent.dynamic.allow",
+      value: JSON.stringify(["anthropic/claude-haiku-4-5", "mistral/mistral-large"]),
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+      models,
+    })
+    expect(JSON.parse(await read(userFile())).subagent.dynamic.allow).toEqual([
+      "anthropic/claude-haiku-4-5",
+      "mistral/mistral-large",
+    ])
+  })
+
+  test("the subagent model settings open the model picker", () => {
+    const entries = ConfigSettings.entries()
+    expect(entries.find((item) => item.key === "subagent.model")?.dialog).toBe("models")
+    expect(entries.find((item) => item.key === "subagent.dynamic.allow")?.dialog).toBe("models")
+  })
+})

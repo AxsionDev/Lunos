@@ -1191,6 +1191,15 @@ export function defaultModelIDs<T extends { models: Record<string, { id: string 
   return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
 }
 
+/** Every model available here, as "provider/model" (XCOD-214: what model-valued settings accept). */
+export function modelIDs(providers: Record<string, { models: Record<string, unknown> }>) {
+  return new Set(
+    Object.entries(providers).flatMap(([providerID, provider]) =>
+      Object.keys(provider.models).map((modelID) => `${providerID}/${modelID}`),
+    ),
+  )
+}
+
 export class ModelNotFoundError extends Schema.TaggedErrorClass<ModelNotFoundError>()("ProviderModelNotFoundError", {
   providerID: ProviderV2.ID,
   modelID: ModelV2.ID,

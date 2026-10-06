@@ -181,8 +181,31 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       return
     }
     if (row.dialog === "models") {
+      if (row.key === "subagent.dynamic.allow")
+        return editModelList(row, Array.isArray(row.value) ? row.value.map(String) : [])
+      const value = typeof row.value === "string" ? row.value : ""
+      const slash = value.indexOf("/")
+      // XCOD-214: a subagent's model is picked like the main agent's, with its two special values first.
+      const choices =
+        row.key === "subagent.model"
+          ? [
+              {
+                title: "Inherit from main agent",
+                description: "the default",
+                onSelect: () => void save(row, "inherit", { reopen: true }),
+              },
+              {
+                title: "Small model",
+                description: "small_model",
+                onSelect: () => void save(row, "small", { reopen: true }),
+              },
+            ]
+          : undefined
       dialog.replace(() => (
         <DialogModel
+          title={row.label}
+          choices={choices}
+          current={slash > 0 ? { providerID: value.slice(0, slash), modelID: value.slice(slash + 1) } : undefined}
           onPick={(providerID, modelID) => {
             void save(row, `${providerID}/${modelID}`, { reopen: true })
           }}
@@ -214,6 +237,52 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     })
     if (value === null) return reopen(row.key)
     await save(row, value, { reopen: true })
+  }
+
+  // XCOD-214: subagent.dynamic.allow, a list of models. Add one from the model picker, or by ID
+  // (checked against the models available here when saved); enter on a model removes it.
+  // The list is carried along: this screen's own state stops updating while the list replaces it.
+  function editModelList(row: SettingRow, list: string[]) {
+    const write = async (next: string[]) => {
+      const saved = await save(row, JSON.stringify(next))
+      editModelList(row, saved ? next : list)
+    }
+    dialog.replace(() => (
+      <DialogSelect<string>
+        title={`${row.label} (${list.length})`}
+        placeholder="enter adds, or removes the highlighted model"
+        skipFilter
+        options={[
+          { title: "Add a model…", value: "+model", category: "Add" },
+          { title: "Add a custom model ID…", value: "+custom", category: "Add" },
+          ...list.map((id) => ({ title: id, value: id, category: "Allowed models", footer: "enter removes" })),
+        ]}
+        onSelect={async (option) => {
+          if (option.value === "+model")
+            return dialog.replace(() => (
+              <DialogModel
+                title="Add a model"
+                onPick={(providerID, modelID) => {
+                  const id = `${providerID}/${modelID}`
+                  void write(list.includes(id) ? list : [...list, id])
+                }}
+              />
+            ))
+          if (option.value === "+custom") {
+            const value = await DialogPrompt.show(dialog, "Custom model ID", {
+              placeholder: "provider/model",
+              description: () => (
+                <text fg={theme.textMuted}>For a model the picker doesn't list; it must be available here</text>
+              ),
+            })
+            const id = value?.trim()
+            if (!id) return editModelList(row, list)
+            return write(list.includes(id) ? list : [...list, id])
+          }
+          return write(list.filter((id) => id !== option.value))
+        }}
+      />
+    ))
   }
 
   function toggle(row: SettingRow | undefined) {

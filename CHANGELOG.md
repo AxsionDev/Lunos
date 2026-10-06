@@ -20,6 +20,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Pick a subagent's model from the model picker.** In `/settings`, "Subagent model" opens the
+  same picker as the main agent's model, with "Inherit from main agent" and "Small model" first.
+  "Subagent dynamic allow" lists its models: add one from the picker or by ID, and enter removes
+  one. A model setting saved from `/settings` or `lunos settings set` must name a model available
+  here; otherwise nothing is written and the closest matches are suggested (XCOD-214).
 - **Edit agents.** `lunos agent edit <name>` changes an agent's prompt, model, permissions, the
   skills it may load, the MCP servers it may use, and its step limit, from flags or in `$EDITOR`.
   In the TUI, `/agents` lists every agent and opens one in `$EDITOR` (`/agents` used to be an alias
