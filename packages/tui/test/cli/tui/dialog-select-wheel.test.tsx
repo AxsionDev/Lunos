@@ -30,7 +30,7 @@ function findScrollBox(node: Renderable): ScrollBoxRenderable | undefined {
   }
 }
 
-async function mountList(root: string, moves: string[]) {
+async function mountList(root: string, moves: string[], wheel?: boolean) {
   const state = path.join(root, "state")
   await mkdir(state, { recursive: true })
   await Bun.write(path.join(state, "kv.json"), "{}")
@@ -65,6 +65,7 @@ async function mountList(root: string, moves: string[]) {
         preserveSelection
         current={highlighted()}
         options={options}
+        wheel={wheel}
         onMove={(option) => {
           moves.push(option.value)
           setHighlighted(option.value)
@@ -172,6 +173,38 @@ test("arrow keys after wheel scrolling move on from the hovered row and stay put
     await frames(app, 30)
     expect(scroll.scrollTop).toBe(top)
     expect(moves.length).toBe(count)
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
+// XCOD-206 follow-up (PO, 2026-10-06): the runaway was still reported after the fix above, so
+// /settings turns the wheel off. The list must ignore it, and the keyboard must still scroll.
+test("with the wheel off, wheel events leave the list alone and the keyboard still scrolls", async () => {
+  await using tmp = await tmpdir()
+  const moves: string[] = []
+  const app = await mountList(tmp.path, moves, false)
+
+  try {
+    await frames(app, 5)
+    await wait(() => findScrollBox(app.renderer.root) !== undefined)
+    const scroll = findScrollBox(app.renderer.root)!
+    const x = scroll.x + 6
+    const y = scroll.y + 2
+
+    await app.mockMouse.moveTo(x, y)
+    await frames(app, 5)
+    const top = scroll.scrollTop
+    for (let i = 0; i < 10; i++) {
+      await app.mockMouse.scroll(x, y, "down")
+      await frames(app, 2)
+    }
+    await frames(app, 20)
+    expect(scroll.scrollTop).toBe(top)
+
+    for (let i = 0; i < 30; i++) app.mockInput.pressArrow("down")
+    await frames(app, 20)
+    expect(scroll.scrollTop).toBeGreaterThan(top)
   } finally {
     app.renderer.destroy()
   }
