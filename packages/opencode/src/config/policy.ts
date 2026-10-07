@@ -31,6 +31,8 @@ export const KNOWN = [
   // XCOD-157: an organisation can require sandboxed runs.
   "sandbox",
   "sandbox.required",
+  // XCOD-213: an organisation's curated Recommended model list.
+  "recommended",
   // XCOD-202: every permission, or one tool's (`permission.webfetch`, `permission.bash`, …).
   "permission",
 ] as const

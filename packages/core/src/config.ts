@@ -112,6 +112,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   experimental: ConfigExperimental.Experimental.pipe(Schema.optional),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(Schema.optional),
+  recommended: Schema.Record(Schema.String, Schema.String).pipe(Schema.optional).annotate({
+    description:
+      'Curated models the model pickers list under Recommended, as "provider/model": "why". Replaces Lunos\'s built-in list; lock it with $locked to set it for an organisation',
+  }),
   subagent: ConfigSubagent.Info.pipe(Schema.optional).annotate({
     description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
   }),

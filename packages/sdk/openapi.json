@@ -22808,6 +22808,12 @@
           "small_model": {
             "type": "string"
           },
+          "recommended": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
           "default_agent": {
             "type": "string"
           },
@@ -23809,6 +23815,13 @@
             },
             "required": ["policy", "region", "reason"],
             "additionalProperties": false
+          },
+          "size": {
+            "type": "string",
+            "enum": ["large", "medium", "small"]
+          },
+          "recommended": {
+            "type": "string"
           }
         },
         "required": [
