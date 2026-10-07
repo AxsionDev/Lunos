@@ -1,9 +1,9 @@
 <p align="center">
   <a href="https://github.com/AxsionDev/Lunos">
     <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="Lunos logo">
+      <source srcset="assets/brand/lunos-logo-dark.svg" media="(prefers-color-scheme: dark)">
+      <source srcset="assets/brand/lunos-logo-light.svg" media="(prefers-color-scheme: light)">
+      <img src="assets/brand/lunos-logo-light.png" alt="Lunos logo" width="232">
     </picture>
   </a>
 </p>
