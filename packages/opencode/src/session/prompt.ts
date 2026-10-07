@@ -48,6 +48,7 @@ import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { TuiEvent } from "@/server/tui-event"
 import { Database } from "@opencode-ai/core/database/database"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -605,6 +606,26 @@ const layer = Layer.effect(
       const exit = yield* provider.getModel(providerID, modelID).pipe(Effect.exit)
       if (Exit.isSuccess(exit)) return exit.value
       const err = Cause.squash(exit.cause)
+      // XCOD-214 (PO, 2026-10-07): a model from config or --model that isn't available here is a
+      // warning: the next best one is used instead of failing the prompt.
+      if (Provider.ModelNotFoundError.isInstance(err)) {
+        const resolved = yield* provider.resolve(providerID, modelID).pipe(Effect.option)
+        if (Option.isSome(resolved) && resolved.value.warning) {
+          const next = yield* provider.getModel(resolved.value.providerID, resolved.value.modelID).pipe(Effect.option)
+          if (Option.isSome(next)) {
+            yield* Effect.logWarning(resolved.value.warning)
+            yield* events
+              .publish(TuiEvent.ToastShow, {
+                title: "Model not available",
+                message: resolved.value.warning,
+                variant: "warning",
+                duration: 8000,
+              })
+              .pipe(Effect.ignore)
+            return next.value
+          }
+        }
+      }
       if (Provider.ModelNotFoundError.isInstance(err)) {
         const hint = err.suggestions?.length ? ` Did you mean: ${err.suggestions.join(", ")}?` : ""
         yield* events.publish(Session.Event.Error, {

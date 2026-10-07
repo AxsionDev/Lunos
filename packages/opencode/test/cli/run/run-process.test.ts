@@ -8,6 +8,7 @@ import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
+import { testProviderConfig } from "../../lib/test-provider"
 
 // Concurrent tests share a capped pool of CLI child slots (see cli-process.ts),
 // so a test may wait for a slot before its child starts. The per-child kill
@@ -68,22 +69,42 @@ describe("opencode run (non-interactive subprocess)", () => {
     CONCURRENT_TIMEOUT,
   )
 
-  // Regression for #27371: an unknown model used to hang the process forever
-  // waiting on a session.status === idle event that never arrived. The fix
-  // makes the SDK call surface an error promptly so the process exits nonzero.
-  // We assert nonzero exit AND wall-clock under the harness timeout — a hang
-  // would expire the timeout and produce a different (signal-killed) failure.
+  // Regression for #27371: an unknown model used to hang the process forever waiting on a
+  // session.status === idle event that never arrived. XCOD-214 (PO, 2026-10-07): an unknown model is
+  // now a warning, and the next best one is used, so the run succeeds, promptly, and says so.
   // Keep competing CLI startups out of this wall-clock assertion on busy CI runners.
   cliIt.live(
-    "exits nonzero promptly when the model is unknown (regression for #27371)",
-    ({ opencode }) =>
+    "an unknown --model is replaced by the next best one, with a warning (XCOD-214, #27371)",
+    ({ llm, opencode }) =>
       Effect.gen(function* () {
+        yield* llm.text("hi")
         const result = yield* opencode.run("say hi", {
           model: "test/nonexistent-model",
           timeoutMs: 15_000,
         })
-        expect(result.exitCode).not.toBe(0)
+        opencode.expectExit(result, 0)
         expect(result.durationMs).toBeLessThan(15_000)
+        expect(result.stdout).toBe("hi\n")
+        expect(result.stderr).toContain(`"test/nonexistent-model" isn't available here, so test/test-model is used`)
+        expect(yield* llm.calls).toBeGreaterThanOrEqual(1)
+      }),
+    CONCURRENT_TIMEOUT,
+  )
+
+  cliIt.live(
+    "an unknown model in config is replaced by the next best one, with a warning (XCOD-214)",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("hi")
+        const result = yield* opencode.spawn(["run", "say hi"], {
+          timeoutMs: 15_000,
+          env: {
+            OPENCODE_CONFIG_CONTENT: JSON.stringify({ ...testProviderConfig(llm.url), model: "test/test-modle" }),
+          },
+        })
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toContain("hi")
+        expect(result.stderr).toContain(`"test/test-modle" isn't available here, so test/test-model is used`)
       }),
     CONCURRENT_TIMEOUT,
   )
@@ -178,8 +199,10 @@ describe("opencode run (non-interactive subprocess)", () => {
     "--format json emits a pure error record for a rejected prompt request",
     ({ opencode }) =>
       Effect.gen(function* () {
-        const result = yield* opencode.run("use an unknown model", {
-          model: "test/nonexistent-model",
+        // An unknown model is no longer rejected (XCOD-214: replaced with a warning); an unknown
+        // command still is.
+        const result = yield* opencode.run("args", {
+          command: "no-such-command",
           format: "json",
         })
 
