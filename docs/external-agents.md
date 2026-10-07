@@ -2,7 +2,7 @@
 
 If you also use Claude Code or Codex CLI, Lunos can start their sessions, send them prompts and their own commands, stream their output, pass their approval requests to you, and record what each session cost. Lunos uses **your own install and your own login**. It never stores, copies or proxies your Anthropic or OpenAI credentials, and it doesn't offer these tools through Lunos Cloud.
 
-> **Status:** Claude Code is supported from the command line. Codex CLI, the TUI tab and delegation from a Lunos agent are in progress (XCOD-204).
+> **Status:** Claude Code is supported from the command line and as a tool for Lunos agents. Codex CLI and the TUI tab are in progress (XCOD-204).
 
 ## Setup
 
@@ -32,6 +32,16 @@ lunos external stop <session-id>                       # end a running session
 Commands and skills that Claude Code runs headless work as the prompt, for example `/review` or one of your own skills. Commands that only work in its interactive terminal, such as `/login`, don't. Claude Code then reports an error, and Lunos shows it.
 
 The cost shown after each session is the figure the tool reports (Claude Code's `total_cost_usd`). On a subscription plan this is an estimate, not a bill.
+
+## Handing a task from a Lunos agent
+
+To let Lunos agents hand a task to Claude Code, turn on the `external_agent` tool:
+
+```json
+{ "external": { "delegate": true } }
+```
+
+It's off by default, and never offered in offline mode. When an agent uses it, you approve the delegation itself first. Then each edit or command Claude Code wants to make comes to Lunos's own approval prompt as `external` → `claude:<Tool>` (for example `claude:Write`), which you can allow once or always, like any other permission. The agent gets back Claude Code's answer, the files that changed (from `git status`), the cost Claude Code reported and its session id, which you can continue with `lunos external resume`.
 
 ## Approvals
 

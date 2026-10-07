@@ -1,0 +1,3 @@
+Hand a self-contained coding task to the user's own Claude Code installation and get back its answer, the files it changed and the cost it reported.
+
+Use this only when the user asked for Claude Code to do the work, or when a task is clearly better done there. Write the task so it can be done without this conversation: include file paths, what to change and how to check it. Claude Code works in the current project directory. Every edit or command it wants to make needs the user's approval, which they give in Lunos.

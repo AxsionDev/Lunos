@@ -13,6 +13,14 @@ if (process.argv.includes("--version")) {
   console.log("2.1.292 (Claude Code)")
   process.exit(0)
 }
+if (process.argv.includes("--help")) {
+  console.log("--input-format <format>\n--output-format <format>\n--permission-prompts <target>")
+  process.exit(0)
+}
+if (process.argv[2] === "auth" && process.argv[3] === "status") {
+  console.log(JSON.stringify({ loggedIn: true, authMethod: "claude.ai" }))
+  process.exit(0)
+}
 const lines = readFileSync(path.join(import.meta.dir, "claude-stream.jsonl"), "utf8")
   .trim()
   .split("\n")
@@ -39,6 +47,14 @@ for (const line of lines) {
     if (answer.response?.request_id !== message.request_id) {
       console.error("control_response for the wrong request")
       process.exit(3)
+    }
+    // Act on an approved Write the way Claude Code would, inside the working directory.
+    if (answer.response.response?.behavior === "allow" && message.request.tool_name === "Write") {
+      const { writeFileSync } = await import("fs")
+      writeFileSync(
+        path.join(process.cwd(), path.basename(message.request.input.file_path)),
+        message.request.input.content,
+      )
     }
   }
 }

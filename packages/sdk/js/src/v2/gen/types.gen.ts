@@ -1715,6 +1715,7 @@ export type MemoryConfig = {
 
 export type ExternalConfig = {
   enabled?: boolean
+  delegate?: boolean
   claude?: {
     path?: string
     permission_mode?: string

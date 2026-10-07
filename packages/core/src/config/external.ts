@@ -21,6 +21,10 @@ export const Info = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.optional).annotate({
     description: "Allow Lunos to start Claude Code and Codex CLI sessions (default true). Lock it to turn it off",
   }),
+  delegate: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      "Give Lunos agents the external_agent tool, so they can hand a task to Claude Code (off by default). Every approval the tool asks for comes to you",
+  }),
   claude: Tool.pipe(Schema.optional).annotate({ description: "Claude Code" }),
   codex: Tool.pipe(Schema.optional).annotate({ description: "Codex CLI" }),
 }).annotate({ identifier: "ExternalConfig" })

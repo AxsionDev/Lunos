@@ -21848,6 +21848,9 @@
           "enabled": {
             "type": "boolean"
           },
+          "delegate": {
+            "type": "boolean"
+          },
           "claude": {
             "type": "object",
             "properties": {
