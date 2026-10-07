@@ -291,6 +291,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} မော်ဒယ်များကို မရနိုင်တော့ပါ။",
   "model.tag.free": "အခမဲ့",
   "model.tag.latest": "နောက်ဆုံးထွက်",
+  "model.tag.blocked": "မူဝါဒဖြင့် ပိတ်ထားသည်",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

@@ -331,6 +331,7 @@ export const dict = {
 
   "model.tag.free": "免费",
   "model.tag.latest": "最新",
+  "model.tag.blocked": "已被策略阻止",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

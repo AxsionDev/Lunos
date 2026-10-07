@@ -289,6 +289,7 @@ export const dict: Record<string, string> = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} मोडेलहरू अब उपलब्ध छैनन्।",
   "model.tag.free": "नि:शुल्क",
   "model.tag.latest": "पछिल्लो",
+  "model.tag.blocked": "नीतिद्वारा अवरुद्ध",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

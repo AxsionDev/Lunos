@@ -288,6 +288,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} модели више нису доступни.",
   "model.tag.free": "Бесплатно",
   "model.tag.latest": "Најновије",
+  "model.tag.blocked": "Блокирано политиком",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

@@ -287,6 +287,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "ម៉ូដែល {{provider}} លែងមានទៀតហើយ។",
   "model.tag.free": "ឥតគិតថ្លៃ",
   "model.tag.latest": "ចុងក្រោយ",
+  "model.tag.blocked": "ត្រូវបានរារាំងដោយគោលការណ៍",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

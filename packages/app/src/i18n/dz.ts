@@ -292,6 +292,7 @@ export const dict: Record<string, string> = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} དཔེ་ཚད་ཚུ་ད་ལས་ཕར་འཐོབ་མི་ཚུགས།",
   "model.tag.free": "རིན་མེད་སྟོང་པ",
   "model.tag.latest": "ད༌རེས༌ནངས༌པ",
+  "model.tag.blocked": "སྲིད་བྱུས་ཀྱིས་བཀག་ཡོདཔ",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

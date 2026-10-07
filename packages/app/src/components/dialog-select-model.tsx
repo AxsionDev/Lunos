@@ -22,6 +22,7 @@ import { handleDocumentSearchKeydown } from "@/utils/search-keydown"
 import { createMenuDismissController } from "@/utils/menu-dismiss-controller"
 import { createEventListener } from "@solid-primitives/event-listener"
 import { matchesModelSearch } from "./dialog-select-model-search"
+import { showToast } from "@/utils/toast"
 
 const isFree = (provider: string, cost: { input: number } | undefined) =>
   provider === "opencode" && (!cost || cost.input === 0)
@@ -30,9 +31,25 @@ type ModelState = ReturnType<typeof useLocal>["model"]
 type ModelItem = ReturnType<ModelState["list"]>[number]
 
 const modelKey = (model: ModelItem) => `${model.provider.id}:${model.id}`
+
+/**
+ * XCOD-212: a model the residency policy would refuse can't be chosen. Says why instead, and
+ * returns false. Residency is decided per provider, so groups with blocked models are listed last.
+ */
+const allowSelect = (item: ModelItem | undefined, blockedLabel: string) => {
+  if (!item?.blocked) return true
+  showToast({
+    variant: "error",
+    title: `${item.provider.name} ${item.name}: ${blockedLabel}`,
+    description: `Data-residency policy: ${item.blocked.reason}`,
+  })
+  return false
+}
+const hasBlocked = (items: ModelItem[]) => items.some((item) => item.blocked)
 const manageKey = "action:manage"
 
 const sortModelGroups = (a: { category: string; items: ModelItem[] }, b: { category: string; items: ModelItem[] }) => {
+  if (hasBlocked(a.items) !== hasBlocked(b.items)) return hasBlocked(a.items) ? 1 : -1
   const aIndex = popularProviders.indexOf(a.category)
   const bIndex = popularProviders.indexOf(b.category)
   const aPopular = aIndex >= 0
@@ -73,6 +90,7 @@ const ModelList: Component<{
       sortBy={(a, b) => a.name.localeCompare(b.name)}
       groupBy={(x) => x.provider.name}
       sortGroupsBy={(a, b) => {
+        if (hasBlocked(a.items) !== hasBlocked(b.items)) return hasBlocked(a.items) ? 1 : -1
         const aProvider = a.items[0].provider.id
         const bProvider = b.items[0].provider.id
         if (popularProviders.includes(aProvider) && !popularProviders.includes(bProvider)) return -1
@@ -91,6 +109,7 @@ const ModelList: Component<{
         </Tooltip>
       )}
       onSelect={(x) => {
+        if (!allowSelect(x, language.t("model.tag.blocked"))) return
         model.set(x ? { modelID: x.id, providerID: x.provider.id } : undefined, {
           recent: true,
         })
@@ -105,6 +124,9 @@ const ModelList: Component<{
           </Show>
           <Show when={i.latest}>
             <Tag>{language.t("model.tag.latest")}</Tag>
+          </Show>
+          <Show when={i.blocked}>
+            <Tag>{language.t("model.tag.blocked")}</Tag>
           </Show>
         </div>
       )}
@@ -258,6 +280,7 @@ function createModelSelectorController(input: {
   onSelect: () => void
 }) {
   const model = input.model ?? useLocal().model
+  const language = useLanguage()
   const allModels = createMemo(() =>
     model
       .list()
@@ -285,6 +308,7 @@ function createModelSelectorController(input: {
       return value ? modelKey(value) : undefined
     },
     select: (item: ModelItem) => {
+      if (!allowSelect(item, language.t("model.tag.blocked"))) return
       model.set({ modelID: item.id, providerID: item.provider.id }, { recent: true })
       input.onSelect()
     },
@@ -488,6 +512,9 @@ function ModelSelectorPopoverV2View(props: {
                                 </Show>
                                 <Show when={item.latest}>
                                   <TagV2 class="shrink-0">{language.t("model.tag.latest")}</TagV2>
+                                </Show>
+                                <Show when={item.blocked}>
+                                  <TagV2 class="shrink-0">{language.t("model.tag.blocked")}</TagV2>
                                 </Show>
                               </MenuV2.RadioItem>
                             </TooltipV2>

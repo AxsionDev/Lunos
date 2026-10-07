@@ -23792,6 +23792,23 @@
             "additionalProperties": {
               "type": "object"
             }
+          },
+          "blocked": {
+            "type": "object",
+            "properties": {
+              "policy": {
+                "type": "string",
+                "enum": ["residency"]
+              },
+              "region": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": ["policy", "region", "reason"],
+            "additionalProperties": false
           }
         },
         "required": [

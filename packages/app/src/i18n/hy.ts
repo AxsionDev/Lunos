@@ -290,6 +290,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} մոդելներն այլևս հասանելի չեն:",
   "model.tag.free": "Անվճար",
   "model.tag.latest": "Վերջին",
+  "model.tag.blocked": "Արգելափակված է քաղաքականությամբ",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

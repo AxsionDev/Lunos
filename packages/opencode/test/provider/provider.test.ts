@@ -2116,3 +2116,33 @@ it.effect("opencode loader keeps paid models when auth exists", () =>
     expect(keyedCount).toBeGreaterThan(0)
   }).pipe(provideMultiInstance),
 )
+
+// XCOD-212: pickers read the tag from the provider list, so it must be there and survive toPublicInfo.
+it.instance(
+  "an EU-only residency policy tags US models as blocked, and EU models not",
+  Effect.gen(function* () {
+    yield* setProcessEnv("ANTHROPIC_API_KEY", "test-api-key")
+    yield* setProcessEnv("MISTRAL_API_KEY", "test-api-key")
+    const providers = yield* list
+    const anthropic = Object.values(providers[ProviderV2.ID.anthropic].models)
+    expect(anthropic.length).toBeGreaterThan(0)
+    for (const model of anthropic) expect(model.blocked).toMatchObject({ policy: "residency", region: "us" })
+    for (const model of Object.values(providers[ProviderV2.ID.make("mistral")].models))
+      expect(model.blocked).toBeUndefined()
+    const pub = Provider.toPublicInfo(providers[ProviderV2.ID.anthropic])
+    expect(Object.keys(pub.models)).toEqual(anthropic.map((model) => model.id))
+    expect(Object.values(pub.models)[0].blocked?.reason).toContain("does not allow")
+    expect(Provider.blockedModels(providers).has(`anthropic/${anthropic[0].id}`)).toBe(true)
+  }),
+  { config: { residency: { allow: ["eu"] } } },
+)
+
+it.instance(
+  "audit without a residency policy blocks nothing",
+  Effect.gen(function* () {
+    yield* setProcessEnv("ANTHROPIC_API_KEY", "test-api-key")
+    const providers = yield* list
+    expect(Provider.blockedModels(providers).size).toBe(0)
+  }),
+  { config: { audit: { enabled: true } } },
+)
