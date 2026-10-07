@@ -902,3 +902,16 @@ it.instance("build asks before memory_remember and guards memory files from edit
     expect(Permission.disabled(["memory_remember", "memory_search"], build!.permission).size).toBe(0)
   }),
 )
+
+// XCOD-204: "*": "allow" mustn't approve handing work to Claude Code, or what it does there.
+it.instance("external tool use asks in build, and is denied in read-only agents", () =>
+  Effect.gen(function* () {
+    const build = yield* load((svc) => svc.get("build"))
+    for (const pattern of ["claude", "claude:Write /p/a.ts", "claude:Bash git push"])
+      expect(Permission.evaluate("external", pattern, build!.permission).action).toBe("ask")
+    for (const name of ["plan", "research", "explore"]) {
+      const agent = yield* load((svc) => svc.get(name))
+      expect(Permission.evaluate("external", "claude", agent!.permission).action).toBe("deny")
+    }
+  }),
+)

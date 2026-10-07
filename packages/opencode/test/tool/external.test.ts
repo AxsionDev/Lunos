@@ -53,7 +53,11 @@ describe("tool.external_agent (XCOD-204)", () => {
         process.env.FAKE_CLAUDE_LOG = path.join(dir, "..", "fake.log")
         const result = yield* tool.execute({ tool: "claude", task: "Create hello.txt containing hi" }, ctx as any)
         delete process.env.FAKE_CLAUDE_LOG
-        expect(asked).toEqual(["claude", "claude:Write", "claude:Write"])
+        expect(asked.map((item) => item.replace(/ .*\//, " …/"))).toEqual([
+          "claude",
+          "claude:Write …/hello.txt",
+          "claude:Write …/hello.txt",
+        ])
         expect(result.output).toContain("Files changed: hello.txt")
         expect(result.output).toContain("Cost: $")
         expect(result.output).toContain("Refused by the user: Write")

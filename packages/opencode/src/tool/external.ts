@@ -8,6 +8,7 @@ import { ExternalDetect } from "@/external/detect"
 import { ExternalPolicy } from "@/external/policy"
 import { ExternalClaude } from "@/external/claude"
 import { ExternalRegistry } from "@/external/registry"
+import { EffectBridge } from "@/effect/bridge"
 
 // XCOD-204: delegation to the user's own Claude Code. Registered only with `external.delegate`.
 // Each approval Claude Code asks for becomes a Lunos permission request ("external", pattern
@@ -58,25 +59,45 @@ export const ExternalAgentTool = Tool.define(
             metadata: { tool: params.tool, task: params.task },
           })
           yield* ctx.metadata({ title: `Claude Code: ${params.task.slice(0, 60)}` })
+          // Claude Code's callbacks run outside this fiber; the bridge keeps its services (permission, session).
+          const bridge = yield* EffectBridge.make()
           const before = changed(cwd)
+          const title = `Claude Code: ${params.task.slice(0, 60)}`
+          let last = ""
           const running = ExternalClaude.start({
             cwd,
             prompt: params.task,
             permissionMode: cfg.external?.claude?.permission_mode,
             executable: status.path,
+            // Progress in the tool part, so the TUI and apps show what Claude Code is doing.
+            onEvent: (event) => {
+              const step =
+                event.type === "tool"
+                  ? `→ ${event.name}`
+                  : event.type === "text"
+                    ? event.text.split("\n").at(-1)
+                    : undefined
+              if (!step) return
+              last = step
+              bridge.fork(ctx.metadata({ title, metadata: { progress: last } }))
+            },
             ask: async (request) => {
-              const exit = await Effect.runPromiseExit(
-                ctx.ask({
-                  permission: "external",
-                  patterns: [`${params.tool}:${request.tool}`],
-                  always: [`${params.tool}:${request.tool}`],
-                  metadata: {
-                    tool: params.tool,
-                    action: request.tool,
-                    description: request.description,
-                    input: request.input,
-                  },
-                }),
+              // The target goes in the pattern, so "always" on claude:Bash covers one command, not all.
+              const target = String(request.input.command ?? request.input.file_path ?? request.input.path ?? "*")
+              const exit = await bridge.promise(
+                Effect.exit(
+                  ctx.ask({
+                    permission: "external",
+                    patterns: [`${params.tool}:${request.tool} ${target}`],
+                    always: [`${params.tool}:${request.tool} ${request.tool === "Bash" ? target : "*"}`],
+                    metadata: {
+                      tool: params.tool,
+                      action: request.tool,
+                      description: request.description,
+                      input: request.input,
+                    },
+                  }),
+                ),
               )
               return Exit.isSuccess(exit)
                 ? { allow: true }

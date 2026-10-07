@@ -41,14 +41,16 @@ To let Lunos agents hand a task to Claude Code, turn on the `external_agent` too
 { "external": { "delegate": true } }
 ```
 
-It's off by default, and never offered in offline mode. When an agent uses it, you approve the delegation itself first. Then each edit or command Claude Code wants to make comes to Lunos's own approval prompt as `external` → `claude:<Tool>` (for example `claude:Write`), which you can allow once or always, like any other permission. The agent gets back Claude Code's answer, the files that changed (from `git status`), the cost Claude Code reported and its session id, which you can continue with `lunos external resume`.
+It's off by default, and never offered in offline mode. When an agent uses it, you approve the delegation itself first. Then each edit or command Claude Code asks approval for comes to Lunos's own approval prompt as `external` → `claude:<Tool> <target>` (for example `claude:Write src/app.ts` or `claude:Bash npm test`). You can allow it once or always, like any other permission. "Always" covers one command for `Bash`, and the tool for file edits. Agents that can't edit (`plan`, `research`, `explore`) can't delegate either. The agent gets back Claude Code's answer, the files that changed (from `git status`), the cost Claude Code reported and its session id, which you can continue with `lunos external resume`.
 
 ## Approvals
 
-Claude Code starts in its safe mode (`default`), where every edit and command needs approval. Each approval request comes to Lunos:
+Claude Code starts in its safe mode (`default`). Each approval request it makes comes to Lunos:
 
 - **on a terminal:** Lunos asks you, and passes your answer back;
 - **not on a terminal** (CI, scripts): the request is refused, the same rule as `lunos run`. `--auto` approves every request instead. Use it with care.
+
+**What doesn't come to Lunos:** anything Claude Code's own configuration already allows never asks, so Lunos never sees it. That covers reads, and anything allowed by the rules in your `~/.claude/settings.json` or the project's `.claude/settings.json`, or by its hooks. Review those rules if you rely on Lunos to see every edit.
 
 Modes that skip approval altogether (`bypassPermissions`) are refused unless you ask for one explicitly for that run: `--permission-mode bypassPermissions --unsafe`. They can't be set in config.
 
