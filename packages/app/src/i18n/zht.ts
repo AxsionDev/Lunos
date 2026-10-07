@@ -309,6 +309,11 @@ export const dict = {
   "model.tag.free": "免費",
   "model.tag.latest": "最新",
   "model.tag.blocked": "已被政策封鎖",
+  "model.filter.all": "全部",
+  "model.filter.recommended": "推薦",
+  "model.filter.large": "大",
+  "model.filter.medium": "中",
+  "model.filter.small": "小",
 
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",

@@ -9,9 +9,27 @@ import * as fuzzysort from "fuzzysort"
 import { useConnected } from "./use-connected"
 import { useSync } from "../context/sync"
 import { useToast } from "../ui/toast"
+import { useKV } from "../context/kv"
 
 /** XCOD-212: shown on models the residency policy would refuse. */
 const BLOCKED = "blocked by policy"
+
+/** XCOD-213: picker filters, cycled with ctrl+l and remembered across restarts. */
+export const MODEL_FILTERS = ["all", "recommended", "large", "small"] as const
+export type ModelFilter = (typeof MODEL_FILTERS)[number]
+const FILTER_LABEL: Record<ModelFilter, string> = {
+  all: "All",
+  recommended: "Recommended",
+  large: "Large",
+  small: "Small",
+}
+const SIZE_LABEL = { large: "Large", medium: "Medium", small: "Small" } as const
+
+export function matchesFilter(model: { size?: string; recommended?: string }, filter: ModelFilter) {
+  if (filter === "recommended") return model.recommended !== undefined
+  if (filter === "large" || filter === "small") return model.size === filter
+  return true
+}
 
 /** A choice listed before the models, e.g. "Inherit from main agent" (XCOD-214). */
 export type DialogModelChoice = { title: string; description?: string; onSelect: () => void }
@@ -31,6 +49,11 @@ export function DialogModel(props: {
   const sync = useSync()
   const dialog = useDialog()
   const toast = useToast()
+  const kv = useKV()
+  const activeFilter = (): ModelFilter => {
+    const value = kv.get("model_filter", "all")
+    return MODEL_FILTERS.includes(value) ? value : "all"
+  }
   const [query, setQuery] = createSignal("")
 
   const connected = useConnected()
@@ -50,13 +73,15 @@ export function DialogModel(props: {
         const provider = sync.data.provider.find((provider) => provider.id === item.providerID)
         if (!provider) return []
         const model = provider.models[item.modelID]
-        if (!model) return []
+        if (!model || !matchesFilter(model, activeFilter())) return []
         return [
           {
             key: item,
             value: { providerID: provider.id, modelID: model.id },
             title: model.name ?? item.modelID,
-            description: model.blocked ? `${provider.name} · ${BLOCKED}` : provider.name,
+            description: [provider.name, model.size && SIZE_LABEL[model.size], model.blocked && BLOCKED]
+              .filter(Boolean)
+              .join(" · "),
             blocked: model.blocked !== undefined,
             category,
             disabled: provider.id === "opencode" && model.id.includes("-nano"),
@@ -94,6 +119,7 @@ export function DialogModel(props: {
           entries(),
           filter(([_, info]) => info.status !== "deprecated"),
           filter(([_, info]) => (props.providerID ? info.providerID === props.providerID : true)),
+          filter(([_, info]) => matchesFilter(info, activeFilter())),
           map(([model, info]) => ({
             value: { providerID: provider.id, modelID: model },
             title: info.name ?? model,
@@ -103,11 +129,14 @@ export function DialogModel(props: {
                 favorites.some((item) => item.providerID === provider.id && item.modelID === model)
                   ? "(Favorite)"
                   : undefined,
+                info.size ? `(${SIZE_LABEL[info.size]})` : undefined,
                 info.blocked ? `(${BLOCKED})` : undefined,
               ]
                 .filter(Boolean)
                 .join(" ") || undefined,
             blocked: info.blocked !== undefined,
+            // XCOD-213: why it's recommended, on its own line under the Recommended filter.
+            details: activeFilter() === "recommended" && info.recommended ? [info.recommended] : undefined,
             category: connected() ? provider.name : undefined,
             disabled: provider.id === "opencode" && model.includes("-nano"),
             footer: info.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
@@ -177,9 +206,10 @@ export function DialogModel(props: {
 
   const title = createMemo(() => {
     const value = provider()
-    if (props.title) return props.title
-    if (!value) return "Select model"
-    return value.name
+    const suffix = activeFilter() === "all" ? "" : ` · ${FILTER_LABEL[activeFilter()]}`
+    if (props.title) return props.title + suffix
+    if (!value) return "Select model" + suffix
+    return value.name + suffix
   })
 
   function onSelect(providerID: string, modelID: string) {
@@ -218,6 +248,15 @@ export function DialogModel(props: {
           title: connected() ? "Add provider" : "View all providers",
           onTrigger() {
             dialog.replace(() => <DialogProvider />)
+          },
+        },
+        {
+          command: "model.dialog.filter",
+          title: `Filter: ${FILTER_LABEL[activeFilter()]}`,
+          withoutSelection: true,
+          onTrigger() {
+            const next = MODEL_FILTERS[(MODEL_FILTERS.indexOf(activeFilter()) + 1) % MODEL_FILTERS.length]
+            kv.set("model_filter", next)
           },
         },
         {
