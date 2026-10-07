@@ -21,12 +21,12 @@ export const LARGE_MIN_B = 70
  * `recommended` config key (lockable with `$locked`).
  */
 export const RECOMMENDED: Readonly<Record<string, string>> = {
-  "mistral/mistral-medium-latest": "EU-hosted (France); a balanced default for coding",
-  "mistral/mistral-large-latest": "EU-hosted (France); flagship for hard reasoning",
-  "mistral/codestral-latest": "EU-hosted (France); fast for completion and edits",
-  "mistral/mistral-small-latest": "EU-hosted (France); cheap, fast for simple tasks",
+  "mistral/mistral-medium-latest": "EU-hosted; a balanced default for coding",
+  "mistral/mistral-large-latest": "EU-hosted; flagship for hard reasoning",
+  "mistral/codestral-latest": "EU-hosted; fast for completion and small edits",
+  "mistral/mistral-small-latest": "EU-hosted; cheap and fast for simple tasks",
   "scaleway/qwen3-coder-30b-a3b-instruct": "EU-hosted (Scaleway, France); open-weight coder",
-  "ovhcloud/qwen3-coder-30b-a3b-instruct": "EU-hosted (OVHcloud, France); open-weight coder",
+  "ovhcloud/qwen3-coder-30b-a3b-instruct": "EU-hosted (OVHcloud); open-weight coding model",
   "ollama/qwen3:4b": "Runs on your machine, offline; for simple edits",
 }
 

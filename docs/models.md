@@ -14,17 +14,17 @@ Filters don't override [data residency](data-residency.md). A model your policy 
 
 Recommended is a **curated list**, maintained by Lunos and shipped with each release. It is **not an evaluation or a benchmark**. No eval results for these models have been published yet. When they exist, the list will be updated from them and this page will link the results.
 
-The built-in list has only EU-hosted and local models, to match the residency defaults Lunos is built around. Each entry comes with a one-line reason. In the TUI it shows under the model's name, and in desktop and web it shows in the tooltip.
+The built-in list has only EU-hosted and local models, to match the residency defaults Lunos is built around. "EU-hosted" means what [model provider jurisdictions](provider-jurisdictions.md) records for that provider. Each entry comes with a one-line reason. In the TUI it shows under the model's name, and in desktop and web it shows in the tooltip.
 
-| Model                                   | Why                                               |
-| --------------------------------------- | ------------------------------------------------- |
-| `mistral/mistral-medium-latest`         | EU-hosted (France); a balanced default for coding |
-| `mistral/mistral-large-latest`          | EU-hosted (France); flagship for hard reasoning   |
-| `mistral/codestral-latest`              | EU-hosted (France); fast for completion and edits |
-| `mistral/mistral-small-latest`          | EU-hosted (France); cheap, fast for simple tasks  |
-| `scaleway/qwen3-coder-30b-a3b-instruct` | EU-hosted (Scaleway, France); open-weight coder   |
-| `ovhcloud/qwen3-coder-30b-a3b-instruct` | EU-hosted (OVHcloud, France); open-weight coder   |
-| `ollama/qwen3:4b`                       | Runs on your machine, offline; for simple edits   |
+| Model                                   | Why                                             |
+| --------------------------------------- | ----------------------------------------------- |
+| `mistral/mistral-medium-latest`         | EU-hosted; a balanced default for coding        |
+| `mistral/mistral-large-latest`          | EU-hosted; flagship for hard reasoning          |
+| `mistral/codestral-latest`              | EU-hosted; fast for completion and small edits  |
+| `mistral/mistral-small-latest`          | EU-hosted; cheap and fast for simple tasks      |
+| `scaleway/qwen3-coder-30b-a3b-instruct` | EU-hosted (Scaleway, France); open-weight coder |
+| `ovhcloud/qwen3-coder-30b-a3b-instruct` | EU-hosted (OVHcloud); open-weight coding model  |
+| `ollama/qwen3:4b`                       | Runs on your machine, offline; for simple edits |
 
 A model shows up only if you have its provider set up.
 
