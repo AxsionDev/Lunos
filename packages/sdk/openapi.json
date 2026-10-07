@@ -21842,6 +21842,42 @@
         },
         "additionalProperties": false
       },
+      "ExternalConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "delegate": {
+            "type": "boolean"
+          },
+          "claude": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "permission_mode": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "codex": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "permission_mode": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
       "SubagentConfig": {
         "type": "object",
         "properties": {
@@ -22816,6 +22852,9 @@
           },
           "default_agent": {
             "type": "string"
+          },
+          "external": {
+            "$ref": "#/components/schemas/ExternalConfig"
           },
           "subagent": {
             "$ref": "#/components/schemas/SubagentConfig"

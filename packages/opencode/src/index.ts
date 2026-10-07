@@ -13,6 +13,7 @@ import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
+import { ExternalCommand } from "./cli/cmd/external"
 import { UI } from "./cli/ui"
 import { InstallationVersion, versionVerbose } from "@opencode-ai/core/installation/version"
 import { Offline } from "@opencode-ai/core/offline"
@@ -163,6 +164,7 @@ const cli = yargs(args)
   .command(ServeCommand)
   .command(WebCommand)
   .command(ModelsCommand)
+  .command(ExternalCommand)
   .command(StatsCommand)
   .command(ExportCommand)
   .command(ImportCommand)

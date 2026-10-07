@@ -24,6 +24,7 @@ import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
 import { ConfigResidency } from "./config/residency"
 import { ConfigSubagent } from "./config/subagent"
+import { ConfigExternal } from "./config/external"
 import { ConfigMemory } from "./config/memory"
 import { ConfigSandbox } from "./config/sandbox"
 import { ConfigToolOutput } from "./config/tool-output"
@@ -115,6 +116,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   recommended: Schema.Record(Schema.String, Schema.String).pipe(Schema.optional).annotate({
     description:
       'Curated models the model pickers list under Recommended, as "provider/model": "why". Replaces Lunos\'s built-in list; lock it with $locked to set it for an organisation',
+  }),
+  external: ConfigExternal.Info.pipe(Schema.optional).annotate({
+    description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
   }),
   subagent: ConfigSubagent.Info.pipe(Schema.optional).annotate({
     description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",

@@ -1713,6 +1713,19 @@ export type MemoryConfig = {
   backend?: MemoryBackendConfig
 }
 
+export type ExternalConfig = {
+  enabled?: boolean
+  delegate?: boolean
+  claude?: {
+    path?: string
+    permission_mode?: string
+  }
+  codex?: {
+    path?: string
+    permission_mode?: string
+  }
+}
+
 export type SubagentConfig = {
   background?: boolean
   model?: string
@@ -2061,6 +2074,7 @@ export type Config = {
     [key: string]: string
   }
   default_agent?: string
+  external?: ExternalConfig
   subagent?: SubagentConfig
   subagent_depth?: number
   username?: string

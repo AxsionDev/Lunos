@@ -33,6 +33,9 @@ export const KNOWN = [
   "sandbox.required",
   // XCOD-213: an organisation's curated Recommended model list.
   "recommended",
+  // XCOD-204: an organisation can turn off driving Claude Code / Codex CLI.
+  "external",
+  "external.enabled",
   // XCOD-202: every permission, or one tool's (`permission.webfetch`, `permission.bash`, …).
   "permission",
 ] as const
