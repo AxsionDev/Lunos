@@ -286,13 +286,17 @@ Positionals:
   provider  provider ID to filter models by                                                 [string]
 
 Options:
-  -h, --help        show help                                                              [boolean]
-  -v, --version     show version number                                                    [boolean]
-      --print-logs  print logs to stderr                                                   [boolean]
-      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
-      --pure        run without external plugins                                           [boolean]
-      --verbose     use more verbose model output (includes metadata like costs)           [boolean]
-      --refresh     refresh the models cache from models.dev                               [boolean]"
+  -h, --help         show help                                                             [boolean]
+  -v, --version      show version number                                                   [boolean]
+      --print-logs   print logs to stderr                                                  [boolean]
+      --log-level    log level                  [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure         run without external plugins                                          [boolean]
+      --verbose      use more verbose model output (includes metadata like costs)          [boolean]
+      --refresh      refresh the models cache from models.dev                              [boolean]
+      --recommended  only the curated Recommended models, each with why (a curated choice, not a
+                     benchmark)                                                            [boolean]
+      --size         only models of this size (see the size rules in docs/models.md)
+                                                               [choices: "large", "medium", "small"]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode stats --help 1`] = `
