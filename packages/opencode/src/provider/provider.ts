@@ -1267,6 +1267,15 @@ export interface Interface {
   ) => Effect.Effect<{ providerID: ProviderV2.ID; modelID: string } | undefined>
   readonly getSmallModel: (providerID: ProviderV2.ID) => Effect.Effect<Model | undefined>
   readonly defaultModel: () => Effect.Effect<{ providerID: ProviderV2.ID; modelID: ModelV2.ID }, DefaultModelError>
+  /**
+   * XCOD-214 (PO, 2026-10-07): a model named in config or on the command line that isn't available
+   * here is a warning, not an error. Returns it if it's available; otherwise the next best one (the
+   * closest model of the same provider, else the default) and a warning saying what was replaced.
+   */
+  readonly resolve: (
+    providerID: ProviderV2.ID,
+    modelID: ModelV2.ID,
+  ) => Effect.Effect<{ providerID: ProviderV2.ID; modelID: ModelV2.ID; warning?: string }, DefaultModelError>
 }
 
 interface State {
@@ -1989,7 +1998,11 @@ const layer = Layer.effect(
       if (cfg.small_model) {
         const parsed = parseModel(cfg.small_model)
         return yield* getModel(parsed.providerID, parsed.modelID).pipe(
-          Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
+          Effect.catchTag("ProviderModelNotFoundError", () =>
+            Effect.logWarning(`small_model "${cfg.small_model}" from config isn't available here; not using it`).pipe(
+              Effect.as(undefined),
+            ),
+          ),
         )
       }
 
@@ -2052,11 +2065,44 @@ const layer = Layer.effect(
       return undefined
     })
 
+    /** The closest available model of the same provider, if it has any. */
+    const nearest = (s: State, providerID: ProviderV2.ID, modelID: ModelV2.ID) => {
+      const provider = s.providers[providerID]
+      if (!provider) return undefined
+      const [match] = modelSuggestions(provider, modelID, runtimeFlags.enableExperimentalModels).filter(
+        (id) => provider.models[id],
+      )
+      return match ? { providerID, modelID: ModelV2.ID.make(match) } : undefined
+    }
+
     const defaultModel = Effect.fn("Provider.defaultModel")(function* () {
       const cfg = yield* config.get()
-      if (cfg.model) return parseModel(cfg.model)
-
       const s = yield* InstanceState.get(state)
+      // Returned even if it isn't available here: the session replaces it then, with a warning.
+      if (cfg.model) return parseModel(cfg.model)
+      return yield* fallbackModel(s, cfg)
+    })
+
+    const resolve = Effect.fn("Provider.resolve")(function* (providerID: ProviderV2.ID, modelID: ModelV2.ID) {
+      const s = yield* InstanceState.get(state)
+      if (s.providers[providerID]?.models[modelID]) return { providerID, modelID }
+      const cfg = yield* config.get()
+      const configured = cfg.model ? parseModel(cfg.model) : undefined
+      const fallback =
+        nearest(s, providerID, modelID) ??
+        (configured && s.providers[configured.providerID]?.models[configured.modelID]
+          ? configured
+          : yield* fallbackModel(s, cfg))
+      return {
+        ...fallback,
+        warning: `Model "${providerID}/${modelID}" isn't available here, so ${fallback.providerID}/${fallback.modelID} is used instead. See \`lunos models\`.`,
+      }
+    })
+
+    const fallbackModel = Effect.fn("Provider.fallbackModel")(function* (
+      s: State,
+      cfg: { provider?: Record<string, unknown> },
+    ) {
       const recent = yield* fs.readJson(path.join(Global.Path.state, "model.json")).pipe(
         Effect.map((x): { providerID: ProviderV2.ID; modelID: ModelV2.ID }[] => {
           if (!isRecord(x) || !Array.isArray(x.recent)) return []
@@ -2087,7 +2133,7 @@ const layer = Layer.effect(
       }
     })
 
-    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
+    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel, resolve })
   }),
 )
 

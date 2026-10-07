@@ -51,6 +51,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **An unknown model is a warning, not an error.** A model named in config (`model`, an agent's
+  or subagent's model) or with `--model` that isn't available here no longer fails the prompt: the
+  closest model of the same provider is used, or else your default one, and a warning says which
+  (a toast in the TUI, a line on stderr for `lunos run`). An unavailable `small_model` is logged
+  (XCOD-214).
 - **Stricter front-matter parsing.** Agent, mode and command files must use YAML (or JSON) front
   matter; a file using any other front-matter language is now refused with an error naming the
   file, and skipped (XCOD-208).

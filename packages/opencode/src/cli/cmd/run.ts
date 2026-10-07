@@ -865,6 +865,14 @@ export const RunCommand = effectCmd({
               }
             }
 
+            // XCOD-214: warnings the TUI would show as a toast, e.g. a --model that isn't available here
+            // and was replaced by the next best one.
+            if (event.type === "tui.toast.show" && event.properties.variant === "warning") {
+              if (emit("warning", { message: event.properties.message })) continue
+              UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL + event.properties.message)
+              continue
+            }
+
             if (event.type === "session.error") {
               const props = event.properties
               if (props.sessionID !== sessionID || !props.error) continue

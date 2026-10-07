@@ -1018,13 +1018,16 @@ it.instance("failed subtask preserves metadata on error tool state", () =>
       prompt: "look into the cache key path",
       subagent_type: "general",
     })
+    // XCOD-214: the subagent's missing model is replaced by the next best one, so the subtask's own
+    // model call is what fails here.
+    yield* llm.error(400, { error: { message: "subtask failed" } })
     yield* llm.text("done")
     const msg = yield* user(chat.id, "hello")
     yield* addSubtask(chat.id, msg.id)
 
     const result = yield* prompt.loop({ sessionID: chat.id })
     expect(result.info.role).toBe("assistant")
-    expect(yield* llm.calls).toBe(2)
+    expect(yield* llm.calls).toBe(3)
 
     const msgs = yield* MessageV2.filterCompactedEffect(chat.id)
     const taskMsg = msgs.find((item) => item.info.role === "assistant" && item.info.agent === "general")
