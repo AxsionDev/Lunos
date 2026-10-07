@@ -2,7 +2,7 @@
 
 If you also use Claude Code or Codex CLI, Lunos can start their sessions, send them prompts and their own commands, stream their output, pass their approval requests to you, and record what each session cost. Lunos uses **your own install and your own login**. It never stores, copies or proxies your Anthropic or OpenAI credentials, and it doesn't offer these tools through Lunos Cloud.
 
-> **Status:** Claude Code is supported from the command line and as a tool for Lunos agents. Codex CLI and the TUI tab are in progress (XCOD-204).
+> **Status:** Claude Code and Codex CLI both work from the command line and as a tool for Lunos agents. A dedicated TUI tab for these sessions is planned (XCOD-218).
 
 ## Setup
 
@@ -25,34 +25,50 @@ If a tool isn't on your `PATH`, set its location with `external.claude.path` or 
 lunos external run claude "Fix the failing test in src/parse.ts"
 lunos external run claude "/review"                    # the tool's own commands and skills
 lunos external resume claude <session-id> "Now add a test for it"
+lunos external run codex "Add input validation to parse.ts" --model gpt-5.5
 lunos external sessions                                # what Lunos started, with status and cost
 lunos external stop <session-id>                       # end a running session
 ```
 
 Commands and skills that Claude Code runs headless work as the prompt, for example `/review` or one of your own skills. Commands that only work in its interactive terminal, such as `/login`, don't. Claude Code then reports an error, and Lunos shows it.
 
-The cost shown after each session is the figure the tool reports (Claude Code's `total_cost_usd`). On a subscription plan this is an estimate, not a bill.
+`--model` picks the tool's model for one run; otherwise the tool's own default applies. If your Codex config names a model your account can't use, Codex reports that error and Lunos shows it. `--model` gets round it without editing the config.
+
+After each session Lunos shows what the tool reports:
+
+- **Claude Code** reports a cost (`total_cost_usd`). On a subscription plan this is an estimate, not a bill.
+- **Codex CLI** reports tokens, not money, so Lunos shows the token count.
 
 ## Handing a task from a Lunos agent
 
-To let Lunos agents hand a task to Claude Code, turn on the `external_agent` tool:
+To let Lunos agents hand a task to Claude Code or Codex CLI, turn on the `external_agent` tool:
 
 ```json
 { "external": { "delegate": true } }
 ```
 
-It's off by default, and never offered in offline mode. When an agent uses it, you approve the delegation itself first. Then each edit or command Claude Code asks approval for comes to Lunos's own approval prompt as `external` → `claude:<Tool> <target>` (for example `claude:Write src/app.ts` or `claude:Bash npm test`). You can allow it once or always, like any other permission. "Always" covers one command for `Bash`, and the tool for file edits. Agents that can't edit (`plan`, `research`, `explore`) can't delegate either. The agent gets back Claude Code's answer, the files that changed (from `git status`), the cost Claude Code reported and its session id, which you can continue with `lunos external resume`.
+It's off by default, and never offered in offline mode. When an agent uses it, you approve the delegation itself first. Then each edit or command the tool asks approval for comes to Lunos's own approval prompt as `external` → `<tool>:<Action> <target>`. For example: `claude:Write src/app.ts`, `claude:Bash npm test`, `codex:FileChange src/app.ts` or `codex:Bash npm test`. You can allow it once or always, like any other permission. "Always" covers one command for `Bash`, and the tool for file edits. Agents that can't edit (`plan`, `research`, `explore`) can't delegate either. The agent gets back the tool's answer, the files that changed (from `git status`), the cost or tokens the tool reported, and its session id, which you can continue with `lunos external resume`.
 
 ## Approvals
 
-Claude Code starts in its safe mode (`default`). Each approval request it makes comes to Lunos:
+Both tools start in their safe settings:
+
+- **Claude Code:** permission mode `default`.
+- **Codex CLI:** sandbox `read-only` with approval policy `untrusted`, so every edit and command asks. Lunos drives Codex through `codex app-server`, the protocol that hands approvals to a client. OpenAI marks it experimental.
+
+Each approval request a tool makes comes to Lunos:
 
 - **on a terminal:** Lunos asks you, and passes your answer back;
 - **not on a terminal** (CI, scripts): the request is refused, the same rule as `lunos run`. `--auto` approves every request instead. Use it with care.
 
-**What doesn't come to Lunos:** anything Claude Code's own configuration already allows never asks, so Lunos never sees it. That covers reads, and anything allowed by the rules in your `~/.claude/settings.json` or the project's `.claude/settings.json`, or by its hooks. Review those rules if you rely on Lunos to see every edit.
+**What doesn't come to Lunos:** anything a tool's own configuration already allows never asks, so Lunos never sees it.
 
-Modes that skip approval altogether (`bypassPermissions`) are refused unless you ask for one explicitly for that run: `--permission-mode bypassPermissions --unsafe`. They can't be set in config.
+- **Claude Code:** reads, and anything allowed by rules in `~/.claude/settings.json`, the project's `.claude/settings.json`, or hooks.
+- **Codex CLI:** commands its own exec-policy rules mark as safe.
+
+Review those rules if you rely on Lunos to see every edit.
+
+Settings that skip approval or the sandbox are refused unless you ask for one explicitly for that run, for example `--permission-mode bypassPermissions --unsafe`. That covers Claude Code's `bypassPermissions`, and Codex's `danger-full-access` and `never`. They can't be set in config. For Codex, `--permission-mode` takes either a sandbox (`read-only`, `workspace-write`) or an approval policy (`untrusted`, `on-request`).
 
 ## Data residency and policy
 
