@@ -45,6 +45,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   small_model: "Models & agents",
   default_agent: "Models & agents",
   subagent: "Models & agents",
+  external: "Models & agents",
   subagent_depth: "Models & agents",
   agent: "Models & agents",
   mode: "Models & agents",

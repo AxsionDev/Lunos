@@ -145,6 +145,9 @@ const layer = Layer.effect(
         const defaults = Permission.fromConfig({
           "*": "allow",
           doom_loop: "ask",
+          // XCOD-204: handing work to Claude Code / Codex, and every edit or command they make, is
+          // asked. The tools act outside Lunos's own edit and shell rules, so "*" mustn't cover them.
+          external: "ask",
           external_directory: {
             "*": "ask",
             ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
@@ -210,6 +213,8 @@ const layer = Layer.effect(
                 task: {
                   general: "deny",
                 },
+                // XCOD-204: read-only, so no delegating edits to an external tool either.
+                external: "deny",
                 external_directory: {
                   [path.join(Global.Path.data, "plans", "*")]: "allow",
                 },
@@ -235,6 +240,7 @@ const layer = Layer.effect(
                 question: "allow",
                 // Unlike `plan`, no `task: { general: "deny" }` — this mode
                 // must be able to delegate research legwork to subagents.
+                external: "deny",
                 external_directory: {
                   [path.join(Global.Path.data, "research", "*")]: "allow",
                 },

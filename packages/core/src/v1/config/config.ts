@@ -19,6 +19,7 @@ import { ConfigSkillsV1 } from "./skills"
 import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
 import { ConfigSubagent } from "../../config/subagent"
+import { ConfigExternal } from "../../config/external"
 import { ConfigMemory } from "../../config/memory"
 import { ConfigSandbox } from "../../config/sandbox"
 
@@ -140,6 +141,9 @@ export const Info = Schema.Struct({
   default_agent: Schema.optional(Schema.String).annotate({
     description:
       "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",
+  }),
+  external: Schema.optional(ConfigExternal.Info).annotate({
+    description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
   }),
   subagent: Schema.optional(ConfigSubagent.Info).annotate({
     description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
