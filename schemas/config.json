@@ -393,6 +393,46 @@
       "required": ["path"],
       "additionalProperties": false
     },
+    "ExternalConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Allow Lunos to start Claude Code and Codex CLI sessions (default true). Lock it to turn it off"
+        },
+        "claude": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "The tool's executable, when it isn't on PATH"
+            },
+            "permission_mode": {
+              "type": "string",
+              "description": "Permission mode passed to the tool on every run. Unset means its safe default (every edit and command is approved in Lunos). Unsafe modes (bypassPermissions, danger-full-access) are refused here; pass them per run only"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Claude Code"
+        },
+        "codex": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "The tool's executable, when it isn't on PATH"
+            },
+            "permission_mode": {
+              "type": "string",
+              "description": "Permission mode passed to the tool on every run. Unset means its safe default (every edit and command is approved in Lunos). Unsafe modes (bypassPermissions, danger-full-access) are refused here; pass them per run only"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Codex CLI"
+        }
+      },
+      "additionalProperties": false
+    },
     "SubagentConfig": {
       "type": "object",
       "properties": {
@@ -1485,6 +1525,10 @@
         "default_agent": {
           "type": "string",
           "description": "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid."
+        },
+        "external": {
+          "$ref": "#/$defs/ExternalConfig",
+          "description": "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)"
         },
         "subagent": {
           "$ref": "#/$defs/SubagentConfig",
