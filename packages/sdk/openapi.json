@@ -21941,6 +21941,18 @@
         },
         "additionalProperties": false
       },
+      "CloudConfig": {
+        "type": "object",
+        "properties": {
+          "issuer": {
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "SubagentConfig": {
         "type": "object",
         "properties": {
@@ -22912,6 +22924,9 @@
           },
           "external": {
             "$ref": "#/components/schemas/ExternalConfig"
+          },
+          "cloud": {
+            "$ref": "#/components/schemas/CloudConfig"
           },
           "subagent": {
             "$ref": "#/components/schemas/SubagentConfig"

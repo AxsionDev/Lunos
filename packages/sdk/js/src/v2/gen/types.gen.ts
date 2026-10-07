@@ -1726,6 +1726,11 @@ export type ExternalConfig = {
   }
 }
 
+export type CloudConfig = {
+  issuer?: string
+  client_id?: string
+}
+
 export type SubagentConfig = {
   background?: boolean
   model?: string
@@ -2072,6 +2077,7 @@ export type Config = {
   small_model?: string
   default_agent?: string
   external?: ExternalConfig
+  cloud?: CloudConfig
   subagent?: SubagentConfig
   subagent_depth?: number
   username?: string

@@ -34,6 +34,8 @@ export const KNOWN = [
   // XCOD-204: an organisation can turn off driving Claude Code / Codex CLI.
   "external",
   "external.enabled",
+  // XCOD-185: an organisation can pin the identity provider lunos login signs in to.
+  "cloud",
   // XCOD-202: every permission, or one tool's (`permission.webfetch`, `permission.bash`, …).
   "permission",
 ] as const
