@@ -106,10 +106,44 @@ export const SettingsSetCommand = effectCmd({
   }),
 })
 
+export const SettingsUnsetCommand = effectCmd({
+  command: "unset <key>",
+  describe: "remove one setting from your user config (or the project's, with --project), back to its default",
+  builder: (yargs) =>
+    yargs
+      .positional("key", { type: "string", demandOption: true, describe: "setting key, e.g. agent.build.steps" })
+      .option("project", {
+        type: "boolean",
+        default: false,
+        describe: "remove it from .opencode/opencode.json in this project instead of your user config",
+      }),
+  handler: Effect.fn("Cli.settings.unset")(function* (args) {
+    const ctx = yield* InstanceRef
+    const result = yield* Effect.tryPromise({
+      try: () =>
+        ConfigSettings.unset({
+          key: args.key,
+          scope: args.project ? "project" : "user",
+          ctx: { directory: ctx?.directory ?? process.cwd(), worktree: ctx?.worktree },
+          via: "lunos settings unset",
+        }),
+      catch: (error) => error,
+    }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
+    yield* writeStdoutEffect(
+      `${result.key} ${result.changed ? "removed" : "wasn't set"} (${result.scope}: ${result.file})` + EOL,
+    )
+  }),
+})
+
 export const SettingsCommand = cmd({
   command: "settings",
   describe: "view and change settings (opens the settings screen)",
-  builder: (yargs) => yargs.command(SettingsListCommand).command(SettingsGetCommand).command(SettingsSetCommand),
+  builder: (yargs) =>
+    yargs
+      .command(SettingsListCommand)
+      .command(SettingsGetCommand)
+      .command(SettingsSetCommand)
+      .command(SettingsUnsetCommand),
   async handler() {
     const { TuiThreadCommand } = await import("./tui")
     await TuiThreadCommand.handler({ _: [], $0: "", settings: "settings" } as never)

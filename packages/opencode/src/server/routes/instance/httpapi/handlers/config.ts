@@ -83,16 +83,20 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
       // XCOD-214: model-valued settings are checked against the models available here.
       const providers = yield* providerSvc.list()
       const models = Provider.modelIDs(providers)
+      const where = { directory: instance.directory, worktree: instance.worktree }
       const result = yield* Effect.promise(() =>
-        ConfigSettings.set({
-          key: ctx.payload.key,
-          value: ctx.payload.value,
-          scope: ctx.payload.scope,
-          ctx: { directory: instance.directory, worktree: instance.worktree },
-          via: "settings screen",
-          models,
-          blocked: Provider.blockedModels(providers),
-        }).then(
+        (ctx.payload.unset
+          ? ConfigSettings.unset({ key: ctx.payload.key, scope: ctx.payload.scope, ctx: where, via: "settings screen" })
+          : ConfigSettings.set({
+              key: ctx.payload.key,
+              value: ctx.payload.value,
+              scope: ctx.payload.scope,
+              ctx: where,
+              via: "settings screen",
+              models,
+              blocked: Provider.blockedModels(providers),
+            })
+        ).then(
           (ok) => ({ ok: true as const, ...ok, value: ok.value as Schema.Json }),
           (error: unknown) => ({
             ok: false as const,
@@ -109,10 +113,22 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
       return result
     })
 
-    // XCOD-210: the /agents screen.
+    // XCOD-210: the /agents screen. XCOD-215: also what /settings → Agents shows and edits, including
+    // agents turned off with `disable` (they aren't in Agent.list, so they come from config).
     const agents = Effect.fn("ConfigHttpApi.agents")(function* () {
+      const instance = yield* InstanceState.context
       const list = yield* Agent.Service.use((svc) => svc.list())
-      return yield* Effect.forEach(list, (agent) =>
+      const cfg = yield* configSvc.get()
+      const overrides = yield* Effect.promise(() =>
+        ConfigSettings.agentOverrides({ directory: instance.directory, worktree: instance.worktree }),
+      )
+      const scoped = (name: string) => {
+        const user = overrides.user.agent[name]
+        const project = overrides.project.agent[name]
+        if (!user && !project) return {}
+        return { overrides: { ...(user ? { user } : {}), ...(project ? { project } : {}) } }
+      }
+      const listed = yield* Effect.forEach(list, (agent) =>
         Effect.gen(function* () {
           const file = yield* AgentEditHere.file(agent.name)
           const text = file ? yield* Effect.promise(() => fs.readFile(file, "utf8").catch(() => undefined)) : undefined
@@ -123,9 +139,62 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
             ...(agent.hidden ? { hidden: true } : {}),
             native: agent.native === true,
             ...(file && text !== undefined ? { file, text } : {}),
+            kind:
+              agent.mode === "subagent"
+                ? ("subagent" as const)
+                : agent.native && agent.hidden
+                  ? ("helper" as const)
+                  : ("main" as const),
+            ...(agent.modelSpec ? { model: agent.modelSpec } : {}),
+            ...(agent.variant ? { variant: agent.variant } : {}),
+            ...(agent.steps !== undefined ? { steps: agent.steps } : {}),
+            ...(agent.temperature !== undefined ? { temperature: agent.temperature } : {}),
+            ...(agent.topP !== undefined ? { topP: agent.topP } : {}),
+            ...(agent.color ? { color: agent.color } : {}),
+            ...(agent.prompt ? { prompt: agent.prompt } : {}),
+            ...scoped(agent.name),
           }
         }),
       )
+      const off = Object.entries(cfg.agent ?? {})
+        .filter(([name, value]) => value?.disable && !listed.some((item) => item.name === name))
+        .map(([name, value]) => ({
+          name,
+          mode: value.mode ?? "all",
+          ...(value.description ? { description: value.description } : {}),
+          native: AgentEditHere.builtIn(name),
+          kind:
+            value.mode === "subagent"
+              ? ("subagent" as const)
+              : AgentEditHere.helper(name)
+                ? ("helper" as const)
+                : ("main" as const),
+          disabled: true,
+          ...(value.model ? { model: value.model } : {}),
+          ...scoped(name),
+        }))
+      return [...listed, ...off]
+    })
+
+    const agentsMigrate = Effect.fn("ConfigHttpApi.agentsMigrate")(function* (ctx: {
+      payload: Schema.Schema.Type<typeof ConfigSettings.MigrateInput>
+    }) {
+      const instance = yield* InstanceState.context
+      const result = yield* Effect.promise(() =>
+        ConfigSettings.migrateAgents({
+          scope: ctx.payload.scope,
+          ctx: { directory: instance.directory, worktree: instance.worktree },
+          via: "settings screen",
+        }).then(
+          (ok) => ({ ok: true as const, ...ok }),
+          (error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : String(error) }),
+        ),
+      )
+      if (result.ok && result.migrated.length) {
+        yield* configSvc.invalidate()
+        yield* markInstanceForDisposal(instance)
+      }
+      return result
     })
 
     const agentSave = Effect.fn("ConfigHttpApi.agentSave")(function* (ctx: {
@@ -157,6 +226,7 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
       .handle("settingsSet", settingsSet)
       .handle("agents", agents)
       .handle("agentSave", agentSave)
+      .handle("agentsMigrate", agentsMigrate)
       .handle("providers", providers)
   }),
 )

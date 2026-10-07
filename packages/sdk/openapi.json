@@ -969,6 +969,69 @@
         ]
       }
     },
+    "/config/agents/migrate": {
+      "post": {
+        "tags": ["config"],
+        "operationId": "config.agentsMigrate",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The deprecated keys that were migrated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentsMigrateOutput"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Rewrite one scope's deprecated agent config without losing values: top-level `mode` moves under `agent`, `tools` becomes `permission` and `maxSteps` becomes `steps` (XCOD-215).",
+        "summary": "Migrate deprecated agent keys",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentsMigrateInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.config.agentsMigrate({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/config/providers": {
       "get": {
         "tags": ["config"],
@@ -23444,6 +23507,9 @@
           "scope": {
             "type": "string",
             "enum": ["user", "project"]
+          },
+          "unset": {
+            "type": "boolean"
           }
         },
         "required": ["key", "value", "scope"],
@@ -23521,6 +23587,46 @@
           },
           "text": {
             "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["main", "subagent", "helper"]
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "number"
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "topP": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "overrides": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "type": "object"
+              },
+              "project": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
           }
         },
         "required": ["name", "mode", "native"],
@@ -23576,6 +23682,55 @@
               }
             },
             "required": ["ok", "problems"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "AgentsMigrateInput": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": ["user", "project"]
+          }
+        },
+        "required": ["scope"],
+        "additionalProperties": false
+      },
+      "AgentsMigrateOutput": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "enum": [true]
+              },
+              "file": {
+                "type": "string"
+              },
+              "migrated": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["ok", "file", "migrated"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "enum": [false]
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": ["ok", "error"],
             "additionalProperties": false
           }
         ]

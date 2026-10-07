@@ -6,6 +6,7 @@ import fs from "fs/promises"
 import { Schema, SchemaAST } from "effect"
 import { applyEdits, modify, parse as parseJsonc } from "jsonc-parser"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
+import { ConfigAgentV1 } from "@opencode-ai/core/v1/config/agent"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Global } from "@opencode-ai/core/global"
 import * as TuiConfig from "@opencode-ai/tui/config/schema"
@@ -356,9 +357,50 @@ export function entries(): Entry[] {
 
 const ALIASES: Record<string, string> = { theme: "tui.theme" }
 
+/**
+ * XCOD-215: the fields of one agent that /settings → Agents edits one at a time, as
+ * `agent.<name>.<field>`. `agent` is a record, so the schema walk has no entries for them; they
+ * are made on demand from the agent schema, and saved with the same checks as any other key.
+ * `tools` and `maxSteps` are deprecated and only ever removed (by migration), never written.
+ */
+export const AGENT_FIELDS = [
+  "model",
+  "variant",
+  "disable",
+  "mode",
+  "hidden",
+  "steps",
+  "temperature",
+  "top_p",
+  "description",
+  "prompt",
+  "color",
+  "permission",
+  "options",
+] as const
+export type AgentField = (typeof AGENT_FIELDS)[number]
+
+/** Sensible ranges, checked on save; the schema only says "a number". */
+const AGENT_RANGES: Partial<Record<AgentField, [number, number]>> = { temperature: [0, 2], top_p: [0, 1] }
+
+const AGENT_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+
+function agentEntry(key: string): Entry | undefined {
+  const parts = key.split(".")
+  if (parts[0] !== "agent" || parts.length < 2 || parts.length > 3 || !AGENT_NAME.test(parts[1])) return
+  if (parts.length === 2)
+    return { ...entry(key, "config", "Models & agents", ConfigV1.Info.fields.agent.ast, false), kind: "object" }
+  const field = parts[2] as AgentField
+  if (!AGENT_FIELDS.includes(field)) return
+  const result = entry(key, "config", "Models & agents", ConfigAgentV1.Fields[field].ast, false)
+  if (field === "model") result.dialog = "models"
+  if (field === "steps") result.kind = "number"
+  return result
+}
+
 export function find(key: string) {
   const name = ALIASES[key] ?? key
-  return entries().find((item) => item.key === name)
+  return entries().find((item) => item.key === name) ?? agentEntry(name)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -719,7 +761,8 @@ export function modelProblem(
   models: ReadonlySet<string>,
   blocked?: ReadonlyMap<string, string>,
 ): string | undefined {
-  const kind = MODEL_KEYS[key]
+  // XCOD-215: an agent's model takes the same values as subagent.model (XCOD-82).
+  const kind = MODEL_KEYS[key] ?? (/^agent\.[^.]+\.model$/.test(key) ? "subagent" : undefined)
   if (!kind) return
   const ids = kind === "list" ? (Array.isArray(value) ? value : [value]) : [value]
   for (const id of ids) {
@@ -776,18 +819,8 @@ export function projectRefusal(key: string, value: unknown) {
  * the live schema wouldn't load (listing the allowed values), and edits the file in place with
  * jsonc-parser so comments and formatting survive. Nothing is written unless every check passes.
  */
-export async function set(input: {
-  key: string
-  value: unknown
-  scope: Scope
-  ctx: Context
-  locked?: ReadonlyArray<string>
-  via?: string
-  /** The models available here, as "provider/model", to check model-valued settings against. */
-  models?: ReadonlySet<string>
-  /** Models the residency policy blocks, with the reason (XCOD-212). */
-  blocked?: ReadonlyMap<string, string>
-}): Promise<SetResult> {
+/** The entry for `key`, if it exists and this caller may change it; otherwise why not. */
+async function writable(input: { key: string; locked?: ReadonlyArray<string>; via?: string }) {
   const item = find(input.key)
   if (!item)
     throw new SettingError(`Unknown setting "${input.key}". Run \`lunos settings list\` to see them all.`, "unknown")
@@ -806,9 +839,28 @@ export async function set(input: {
     ConfigPolicy.notifyRefused(lockedKey, input.via ?? "settings")
     throw new SettingError(ConfigPolicy.message(lockedKey), "locked")
   }
+  return item
+}
+
+export async function set(input: {
+  key: string
+  value: unknown
+  scope: Scope
+  ctx: Context
+  locked?: ReadonlyArray<string>
+  via?: string
+  /** The models available here, as "provider/model", to check model-valued settings against. */
+  models?: ReadonlySet<string>
+  /** Models the residency policy blocks, with the reason (XCOD-212). */
+  blocked?: ReadonlyMap<string, string>
+}): Promise<SetResult> {
+  const item = await writable(input)
   const value = coerce(item, input.value)
   const problem = input.models ? modelProblem(item.key, value, input.models, input.blocked) : undefined
-  if (problem) throw new SettingError(`${item.key}: ${problem}. Nothing was written.`, "invalid")
+  if (problem) throw new SettingError(`${item.key}: ${problem.replace(/\.$/, "")}. Nothing was written.`, "invalid")
+  const range = AGENT_RANGES[item.key.split(".")[2] as AgentField]
+  if (range && item.key.startsWith("agent.") && typeof value === "number" && (value < range[0] || value > range[1]))
+    throw new SettingError(`${item.key} must be between ${range[0]} and ${range[1]}. Nothing was written.`, "invalid")
   const refusal = input.scope === "project" ? projectRefusal(item.key, value) : undefined
   if (refusal) throw new SettingError(refusal, "invalid")
   const file = targetFile(item.target, input.scope, input.ctx)
@@ -850,6 +902,141 @@ export async function set(input: {
     await fs.writeFile(file, updated)
   }
   return { key: item.key, value, file, scope: input.scope, restart: item.restart, changed }
+}
+
+/**
+ * XCOD-215: removes `key` from one scope's file, so the value falls back to the next layer or the
+ * default ("Reset to default", and migrating deprecated keys). An object left empty by the removal
+ * goes too, so resetting an agent's last override leaves no `"build": {}` behind.
+ */
+export async function unset(input: {
+  key: string
+  scope: Scope
+  ctx: Context
+  locked?: ReadonlyArray<string>
+  via?: string
+}): Promise<SetResult> {
+  const item = await writable(input)
+  const file = targetFile(item.target, input.scope, input.ctx)
+  const before = await readText(file)
+  const jsonPath = item.key.split(".").slice(item.target === "tui" ? 1 : 0)
+  if (!before || ConfigPolicy.get(rawDoc(before), jsonPath.join(".")) === undefined)
+    return { key: item.key, value: undefined, file, scope: input.scope, restart: item.restart, changed: false }
+  let updated = applyEdits(before, modify(before, jsonPath, undefined, {}))
+  for (let depth = jsonPath.length - 1; depth >= 1; depth--) {
+    const parent = ConfigPolicy.get(rawDoc(updated), jsonPath.slice(0, depth).join("."))
+    if (!parent || typeof parent !== "object" || Object.keys(parent).length > 0) break
+    updated = applyEdits(updated, modify(updated, jsonPath.slice(0, depth), undefined, {}))
+  }
+  try {
+    await decode(item.target, updated, file)
+  } catch (error) {
+    throw new SettingError(`Removing ${item.key} would leave ${file} invalid: ${issues(error)}`, "invalid")
+  }
+  await fs.writeFile(file, updated)
+  return { key: item.key, value: undefined, file, scope: input.scope, restart: item.restart, changed: true }
+}
+
+/** XCOD-215: the deprecated agent keys in one scope's file, as dotted paths. */
+export function deprecatedAgentKeys(doc: unknown): string[] {
+  if (!doc || typeof doc !== "object") return []
+  const record = doc as Record<string, unknown>
+  const found: string[] = []
+  if (record.mode && typeof record.mode === "object") found.push("mode")
+  for (const [name, agent] of Object.entries((record.agent as Record<string, unknown>) ?? {})) {
+    if (!agent || typeof agent !== "object") continue
+    for (const key of ["tools", "maxSteps"]) if (key in agent) found.push(`agent.${name}.${key}`)
+  }
+  return found
+}
+
+/** `tools: { bash: false }` as permission rules, the way the agent schema reads it. */
+function toolsToPermission(tools: Record<string, unknown>) {
+  const permission: Record<string, string> = {}
+  for (const [tool, enabled] of Object.entries(tools)) {
+    const action = enabled ? "allow" : "deny"
+    permission[tool === "write" || tool === "edit" || tool === "patch" ? "edit" : tool] = action
+  }
+  return permission
+}
+
+/**
+ * XCOD-215: rewrites one scope's deprecated agent keys without losing values. Top-level `mode.<name>`
+ * moves under `agent.<name>`, `tools` becomes `permission` and `maxSteps` becomes `steps`. A value
+ * already set on the new key wins, as it does when the config loads, so nothing changes meaning.
+ */
+export async function migrateAgents(input: {
+  scope: Scope
+  ctx: Context
+  locked?: ReadonlyArray<string>
+  via?: string
+}) {
+  await writable({ key: "agent", locked: input.locked, via: input.via })
+  // Every file of the scope that can hold agents, not only the one /settings writes to: a project's
+  // root opencode.json is as much project config as .opencode/opencode.json.
+  const root = projectRoot(input.ctx)
+  const files =
+    input.scope === "user"
+      ? ["opencode.jsonc", "opencode.json", "config.json"].map((f) => path.join(Global.Path.config, f))
+      : [
+          ...["opencode.jsonc", "opencode.json"].map((f) => path.join(root, f)),
+          ...["opencode.jsonc", "opencode.json"].map((f) => path.join(root, ".opencode", f)),
+        ]
+  const migrated: string[] = []
+  const touched: string[] = []
+  for (const file of files.filter((f) => existsSync(f))) {
+    const found = await migrateFile(file)
+    if (found.length) {
+      migrated.push(...found)
+      touched.push(file)
+    }
+  }
+  return { file: touched.join(", ") || targetFile("config", input.scope, input.ctx), migrated }
+}
+
+async function migrateFile(file: string) {
+  const before = await readText(file)
+  const doc = rawDoc(before) as Record<string, any> | undefined
+  const found = deprecatedAgentKeys(doc)
+  if (!before || !doc || found.length === 0) return []
+  const agent: Record<string, any> = structuredClone(doc.agent ?? {})
+  if (doc.mode && typeof doc.mode === "object")
+    for (const [name, value] of Object.entries(doc.mode as Record<string, any>))
+      agent[name] = { ...(value ?? {}), ...(agent[name] ?? {}) }
+  for (const value of Object.values(agent)) {
+    if (!value || typeof value !== "object") continue
+    if (value.tools && typeof value.tools === "object") {
+      value.permission = { ...toolsToPermission(value.tools), ...(value.permission ?? {}) }
+      delete value.tools
+    }
+    if ("maxSteps" in value) {
+      value.steps ??= value.maxSteps
+      delete value.maxSteps
+    }
+  }
+  const format = { formattingOptions: { insertSpaces: true, tabSize: 2 } }
+  let updated = applyEdits(before, modify(before, ["agent"], agent, format))
+  if ("mode" in doc) updated = applyEdits(updated, modify(updated, ["mode"], undefined, format))
+  try {
+    await decode("config", updated, file)
+  } catch (error) {
+    throw new SettingError(`Migrating would leave ${file} invalid: ${issues(error)}. Nothing was written.`, "invalid")
+  }
+  await fs.writeFile(file, updated)
+  return found
+}
+
+/** XCOD-215: each scope's own `agent` block (not merged), and the deprecated keys in it. */
+export async function agentOverrides(ctx: Context) {
+  const read = async (scope: Scope) => {
+    const doc = rawDoc(await readText(targetFile("config", scope, ctx))) as Record<string, any> | undefined
+    return {
+      agent: (doc?.agent ?? {}) as Record<string, Record<string, Schema.Json>>,
+      deprecated: deprecatedAgentKeys(doc),
+    }
+  }
+  const [user, project] = await Promise.all([read("user"), read("project")])
+  return { user, project }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -942,10 +1129,21 @@ export const SnapshotSchema = Schema.Struct({
 
 export const SetInput = Schema.Struct({
   key: Schema.String,
-  /** As typed: `true`, `notify`, `eu,us`, or JSON for objects. */
+  /** As typed: `true`, `notify`, `eu,us`, or JSON for objects. Ignored when `unset`. */
   value: Schema.String,
   scope: Schema.Literals(["user", "project"]),
+  /** XCOD-215: remove the key from this scope instead ("Reset to default"). */
+  unset: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: "SettingsSetInput" })
+
+export const MigrateInput = Schema.Struct({ scope: Schema.Literals(["user", "project"]) }).annotate({
+  identifier: "AgentsMigrateInput",
+})
+
+export const MigrateOutput = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), file: Schema.String, migrated: Schema.Array(Schema.String) }),
+  Schema.Struct({ ok: Schema.Literal(false), error: Schema.String }),
+]).annotate({ identifier: "AgentsMigrateOutput" })
 
 export const SetOutput = Schema.Union([
   Schema.Struct({

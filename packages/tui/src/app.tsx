@@ -58,7 +58,7 @@ import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogMode } from "./component/dialog-mode"
-import { DialogAgents } from "./component/dialog-agents"
+import { DialogAgentList } from "./component/dialog-agent-settings"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
@@ -895,7 +895,7 @@ function App(props: {
         category: "Mode",
         slashName: "agents",
         run: () => {
-          dialog.replace(() => <DialogAgents />)
+          dialog.replace(() => <DialogAgentList />)
         },
       },
       {

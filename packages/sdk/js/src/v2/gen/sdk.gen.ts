@@ -5,6 +5,7 @@ import { buildClientParams, type Client, type Options as Options2, type TDataSha
 import type {
   AgentPartInput,
   AgentSaveInput,
+  AgentsMigrateInput,
   AppAgentsErrors,
   AppAgentsResponses,
   AppLogErrors,
@@ -22,6 +23,8 @@ import type {
   ConfigAgentSaveErrors,
   ConfigAgentSaveResponses,
   ConfigAgentsErrors,
+  ConfigAgentsMigrateErrors,
+  ConfigAgentsMigrateResponses,
   ConfigAgentsResponses,
   ConfigGetErrors,
   ConfigGetResponses,
@@ -1772,6 +1775,45 @@ export class Config2 extends HeyApiClient {
         ...params.headers,
       },
     })
+  }
+
+  /**
+   * Migrate deprecated agent keys
+   *
+   * Rewrite one scope's deprecated agent config without losing values: top-level `mode` moves under `agent`, `tools` becomes `permission` and `maxSteps` becomes `steps` (XCOD-215).
+   */
+  public agentsMigrate<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      agentsMigrateInput?: AgentsMigrateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "agentsMigrateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ConfigAgentsMigrateResponses, ConfigAgentsMigrateErrors, ThrowOnError>(
+      {
+        url: "/config/agents/migrate",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
   }
 
   /**

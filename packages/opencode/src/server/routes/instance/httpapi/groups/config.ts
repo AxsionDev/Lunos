@@ -83,6 +83,18 @@ export const ConfigApi = HttpApi.make("config")
               "Validate an edited agent file against the models, tools, skills and MCP servers available here and write it. Nothing is written if anything is wrong.",
           }),
         ),
+        HttpApiEndpoint.post("agentsMigrate", `${root}/agents/migrate`, {
+          query: WorkspaceRoutingQuery,
+          payload: ConfigSettings.MigrateInput,
+          success: described(ConfigSettings.MigrateOutput, "The deprecated keys that were migrated"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.agentsMigrate",
+            summary: "Migrate deprecated agent keys",
+            description:
+              "Rewrite one scope's deprecated agent config without losing values: top-level `mode` moves under `agent`, `tools` becomes `permission` and `maxSteps` becomes `steps` (XCOD-215).",
+          }),
+        ),
         HttpApiEndpoint.get("providers", `${root}/providers`, {
           query: WorkspaceRoutingQuery,
           success: described(Provider.ConfigProvidersResult, "List of providers"),

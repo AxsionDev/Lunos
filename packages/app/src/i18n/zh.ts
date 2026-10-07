@@ -1050,6 +1050,53 @@ export const dict = {
   "settings.providers.tag.other": "其他",
 
   "settings.models.title": "模型",
+
+  "settings.agents.help":
+    "智能体是可选的。不在此处做任何更改，Lunos 也能正常工作。可在此为智能体指定其他模型、限制或权限。",
+
+  "settings.agents.scope": "保存到",
+
+  "settings.agents.scope.user": "用户配置",
+
+  "settings.agents.scope.project": "项目配置",
+
+  "settings.agents.back": "返回智能体列表",
+
+  "settings.agents.inherit": "继承",
+
+  "settings.agents.new": "新建智能体",
+
+  "settings.agents.migrate": "迁移已弃用的键",
+
+  "settings.agents.saved": "已将 {{key}} 保存到 {{file}}",
+
+  "settings.agents.inFile": "权限和高级选项需在配置文件中编辑：{{file}}",
+
+  "settings.agents.kind.main": "主智能体",
+
+  "settings.agents.kind.subagent": "子智能体",
+
+  "settings.agents.kind.helper": "辅助智能体",
+
+  "settings.agents.field.model": "模型",
+
+  "settings.agents.field.enabled": "开启",
+
+  "settings.agents.field.type": "类型",
+
+  "settings.agents.field.hidden": "在 @ 菜单中隐藏",
+
+  "settings.agents.field.steps": "最大步数",
+
+  "settings.agents.field.temperature": "温度",
+
+  "settings.agents.field.topP": "Top P",
+
+  "settings.agents.field.color": "颜色",
+
+  "settings.agents.field.description": "描述",
+
+  "settings.agents.field.prompt": "提示词",
   "settings.models.description": "可在此处配置模型设置。",
 
   "settings.agents.title": "智能体",
