@@ -326,3 +326,91 @@ describe("model settings", () => {
     expect(entries.find((item) => item.key === "subagent.dynamic.allow")?.dialog).toBe("models")
   })
 })
+
+describe("agent settings (XCOD-215)", () => {
+  const models = new Set(["mistral/mistral-large"])
+  const write = (doc: unknown) =>
+    fs
+      .mkdir(path.dirname(userFile()), { recursive: true })
+      .then(() => fs.writeFile(userFile(), JSON.stringify(doc, null, 2)))
+
+  test("agent.<name>.<field> keys exist for the editable fields, and not for anything else", () => {
+    expect(ConfigSettings.find("agent.build.steps")?.kind).toBe("number")
+    expect(ConfigSettings.find("agent.build.disable")?.kind).toBe("boolean")
+    expect(ConfigSettings.find("agent.build.mode")?.values).toEqual(["subagent", "primary", "all"])
+    expect(ConfigSettings.find("agent.build.model")?.dialog).toBe("models")
+    expect(ConfigSettings.find("agent.build.maxSteps")).toBeUndefined()
+    expect(ConfigSettings.find("agent.build.nonsense")).toBeUndefined()
+    expect(ConfigSettings.find("agent.bad name.steps")).toBeUndefined()
+  })
+
+  test("set writes agent.<name>.<field>, checks the model and the ranges", async () => {
+    await ConfigSettings.set({ key: "agent.build.steps", value: "20", scope: "user", ctx: ctx(), locked: [], models })
+    await ConfigSettings.set({ key: "agent.qa.model", value: "small", scope: "user", ctx: ctx(), locked: [], models })
+    expect(JSON.parse(await read(userFile())).agent).toEqual({ build: { steps: 20 }, qa: { model: "small" } })
+    await expect(
+      ConfigSettings.set({
+        key: "agent.build.temperature",
+        value: "2.5",
+        scope: "user",
+        ctx: ctx(),
+        locked: [],
+        models,
+      }),
+    ).rejects.toThrow("between 0 and 2")
+    await expect(
+      ConfigSettings.set({ key: "agent.build.model", value: "x/y", scope: "user", ctx: ctx(), locked: [], models }),
+    ).rejects.toThrow(`"x/y" isn't a model`)
+  })
+
+  test("a locked agent key is refused with the policy message (existing rule)", async () => {
+    await expect(
+      ConfigSettings.set({
+        key: "agent.build.model",
+        value: "inherit",
+        scope: "user",
+        ctx: ctx(),
+        locked: ["agent.build"],
+      }),
+    ).rejects.toThrow()
+  })
+
+  test("unset removes the key, and an object it leaves empty", async () => {
+    await write({ agent: { build: { steps: 20 }, plan: { steps: 5, disable: true } } })
+    const result = await ConfigSettings.unset({ key: "agent.build.steps", scope: "user", ctx: ctx(), locked: [] })
+    expect(result.changed).toBe(true)
+    await ConfigSettings.unset({ key: "agent.plan.steps", scope: "user", ctx: ctx(), locked: [] })
+    expect(JSON.parse(await read(userFile())).agent).toEqual({ plan: { disable: true } })
+    const again = await ConfigSettings.unset({ key: "agent.build.steps", scope: "user", ctx: ctx(), locked: [] })
+    expect(again.changed).toBe(false)
+    await ConfigSettings.unset({ key: "agent.plan", scope: "user", ctx: ctx(), locked: [] })
+    expect(JSON.parse(await read(userFile())).agent).toBeUndefined()
+  })
+
+  test("migrating deprecated keys keeps every value, and a value already on the new key wins", async () => {
+    await write({
+      mode: { build: { temperature: 0.2 }, review: { description: "Reviews" } },
+      agent: {
+        build: { steps: 9, maxSteps: 30, tools: { bash: false, write: true } },
+        plan: { maxSteps: 12, tools: { webfetch: false }, permission: { webfetch: "allow" } },
+      },
+    })
+    expect(ConfigSettings.deprecatedAgentKeys(JSON.parse(await read(userFile())))).toEqual([
+      "mode",
+      "agent.build.tools",
+      "agent.build.maxSteps",
+      "agent.plan.tools",
+      "agent.plan.maxSteps",
+    ])
+    const result = await ConfigSettings.migrateAgents({ scope: "user", ctx: ctx(), locked: [] })
+    expect(result.migrated.length).toBe(5)
+    const doc = JSON.parse(await read(userFile()))
+    expect(doc.mode).toBeUndefined()
+    expect(doc.agent).toEqual({
+      build: { temperature: 0.2, steps: 9, permission: { bash: "deny", edit: "allow" } },
+      plan: { steps: 12, permission: { webfetch: "allow" } },
+      review: { description: "Reviews" },
+    })
+    expect((await ConfigSettings.migrateAgents({ scope: "user", ctx: ctx(), locked: [] })).migrated).toEqual([])
+  })
+})

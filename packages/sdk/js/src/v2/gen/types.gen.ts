@@ -2244,6 +2244,7 @@ export type SettingsSetInput = {
   key: string
   value: string
   scope: "user" | "project"
+  unset?: boolean
 }
 
 export type SettingsSetResult =
@@ -2270,6 +2271,23 @@ export type AgentFileEntry = {
   native: boolean
   file?: string
   text?: string
+  kind?: "main" | "subagent" | "helper"
+  disabled?: boolean
+  model?: string
+  variant?: string
+  steps?: number
+  temperature?: number
+  topP?: number
+  color?: string
+  prompt?: string
+  overrides?: {
+    user?: {
+      [key: string]: unknown
+    }
+    project?: {
+      [key: string]: unknown
+    }
+  }
 }
 
 export type AgentFileList = Array<AgentFileEntry>
@@ -2287,6 +2305,21 @@ export type AgentSaveOutput =
   | {
       ok: false
       problems: Array<string>
+    }
+
+export type AgentsMigrateInput = {
+  scope: "user" | "project"
+}
+
+export type AgentsMigrateOutput =
+  | {
+      ok: true
+      file: string
+      migrated: Array<string>
+    }
+  | {
+      ok: false
+      error: string
     }
 
 export type Model = {
@@ -8069,6 +8102,34 @@ export type ConfigAgentSaveResponses = {
 }
 
 export type ConfigAgentSaveResponse = ConfigAgentSaveResponses[keyof ConfigAgentSaveResponses]
+
+export type ConfigAgentsMigrateData = {
+  body?: AgentsMigrateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/agents/migrate"
+}
+
+export type ConfigAgentsMigrateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigAgentsMigrateError = ConfigAgentsMigrateErrors[keyof ConfigAgentsMigrateErrors]
+
+export type ConfigAgentsMigrateResponses = {
+  /**
+   * The deprecated keys that were migrated
+   */
+  200: AgentsMigrateOutput
+}
+
+export type ConfigAgentsMigrateResponse = ConfigAgentsMigrateResponses[keyof ConfigAgentsMigrateResponses]
 
 export type ConfigProvidersData = {
   body?: never

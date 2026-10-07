@@ -9,36 +9,35 @@ const Color = Schema.Union([
   Schema.Literals(["primary", "secondary", "accent", "success", "warning", "error", "info"]),
 ])
 
-const AgentSchema = Schema.StructWithRest(
-  Schema.Struct({
-    model: Schema.optional(Schema.String),
-    variant: Schema.optional(Schema.String).annotate({
-      description: "Default model variant for this agent (applies only when using the agent's configured model).",
-    }),
-    temperature: Schema.optional(Schema.Finite),
-    top_p: Schema.optional(Schema.Finite),
-    prompt: Schema.optional(Schema.String),
-    tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)).annotate({
-      description: "@deprecated Use 'permission' field instead",
-    }),
-    disable: Schema.optional(Schema.Boolean),
-    description: Schema.optional(Schema.String).annotate({ description: "Description of when to use the agent" }),
-    mode: Schema.optional(Schema.Literals(["subagent", "primary", "all"])),
-    hidden: Schema.optional(Schema.Boolean).annotate({
-      description: "Hide this subagent from the @ autocomplete menu (default: false, only applies to mode: subagent)",
-    }),
-    options: Schema.optional(Schema.Record(Schema.String, Schema.Any)),
-    color: Schema.optional(Color).annotate({
-      description: "Hex color code (e.g., #FF5733) or theme color (e.g., primary)",
-    }),
-    steps: Schema.optional(PositiveInt).annotate({
-      description: "Maximum number of agentic iterations before forcing text-only response",
-    }),
-    maxSteps: Schema.optional(PositiveInt).annotate({ description: "@deprecated Use 'steps' field instead." }),
-    permission: Schema.optional(ConfigPermissionV1.Info),
+const AgentFields = Schema.Struct({
+  model: Schema.optional(Schema.String),
+  variant: Schema.optional(Schema.String).annotate({
+    description: "Default model variant for this agent (applies only when using the agent's configured model).",
   }),
-  [Schema.Record(Schema.String, Schema.Any)],
-)
+  temperature: Schema.optional(Schema.Finite),
+  top_p: Schema.optional(Schema.Finite),
+  prompt: Schema.optional(Schema.String),
+  tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)).annotate({
+    description: "@deprecated Use 'permission' field instead",
+  }),
+  disable: Schema.optional(Schema.Boolean),
+  description: Schema.optional(Schema.String).annotate({ description: "Description of when to use the agent" }),
+  mode: Schema.optional(Schema.Literals(["subagent", "primary", "all"])),
+  hidden: Schema.optional(Schema.Boolean).annotate({
+    description: "Hide this subagent from the @ autocomplete menu (default: false, only applies to mode: subagent)",
+  }),
+  options: Schema.optional(Schema.Record(Schema.String, Schema.Any)),
+  color: Schema.optional(Color).annotate({
+    description: "Hex color code (e.g., #FF5733) or theme color (e.g., primary)",
+  }),
+  steps: Schema.optional(PositiveInt).annotate({
+    description: "Maximum number of agentic iterations before forcing text-only response",
+  }),
+  maxSteps: Schema.optional(PositiveInt).annotate({ description: "@deprecated Use 'steps' field instead." }),
+  permission: Schema.optional(ConfigPermissionV1.Info),
+})
+
+const AgentSchema = Schema.StructWithRest(AgentFields, [Schema.Record(Schema.String, Schema.Any)])
 
 const KNOWN_KEYS = new Set([
   "name",
@@ -79,6 +78,9 @@ const normalize = (agent: Schema.Schema.Type<typeof AgentSchema>): Schema.Schema
   const steps = agent.steps ?? agent.maxSteps
   return { ...agent, options, permission, ...(steps !== undefined ? { steps } : {}) }
 }
+
+/** The fields one agent's config accepts, by name (XCOD-215: /settings edits them one at a time). */
+export const Fields = AgentFields.fields
 
 export const Info = AgentSchema.pipe(
   Schema.decodeTo(AgentSchema, {

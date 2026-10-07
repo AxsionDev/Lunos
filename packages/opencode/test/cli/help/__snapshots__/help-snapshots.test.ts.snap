@@ -463,6 +463,8 @@ Commands:
   lunos settings get <key>          print one setting's current value
   lunos settings set <key> <value>  change one setting in your user config (or the project's, with
                                     --project)
+  lunos settings unset <key>        remove one setting from your user config (or the project's, with
+                                    --project), back to its default
 
 Options:
   -h, --help        show help                                                              [boolean]

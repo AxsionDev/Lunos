@@ -17,6 +17,7 @@ import { DialogConfirm } from "../ui/dialog-confirm"
 import { useBindings, useOpencodeKeymap } from "../keymap"
 import { openFileInEditor } from "../editor"
 import { DialogModel } from "./dialog-model"
+import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
 import { DialogThemeList } from "./dialog-theme-list"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogProviders } from "./dialog-provider"
@@ -77,7 +78,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   })
 
   const rows = createMemo(() => {
-    const list = snapshot()?.rows ?? []
+    // XCOD-215: the deprecated top-level `mode` is listed only while it's still set (Agents migrates it).
+    const list = (snapshot()?.rows ?? []).filter((row) => row.key !== "mode" || row.source !== "default")
     // tui.json is read by this process: show the theme actually in use.
     return list.map((row) =>
       row.key === "tui.theme" && row.source === "default"
@@ -213,6 +215,9 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       ))
       return
     }
+    // XCOD-215: agents get their own screen instead of the raw JSON.
+    if (row.key === "agent" || row.key === "mode")
+      return dialog.replace(() => <DialogAgentList scope={scope()} onBack={() => reopen(row.key)} />)
     if (row.dialog === "mcps") return dialog.replace(() => <DialogMcp />)
     if (row.dialog === "providers") return dialog.replace(() => <DialogProviders />)
     if (row.kind === "boolean") return void save(row, cycle(row)!)
@@ -358,6 +363,10 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     else if (row.override) lines.push({ text: row.override, color: theme.warning })
     else if (row.secret)
       lines.push({ text: "Secrets are never shown here: manage keys in /providers", color: theme.textMuted })
+    else if (row.key === "agent")
+      lines.push({ text: `Enter lists every agent. ${AGENTS_HELP}`, color: theme.textMuted })
+    else if (row.key === "mode")
+      lines.push({ text: "Deprecated: Agents → Migrate moves it under agent", color: theme.warning })
     else if (row.kind === "object" && !row.dialog)
       lines.push({ text: "Enter opens the config file in your editor", color: theme.textMuted })
     if (row.from) lines.push({ text: `from ${home(row.from)}`, color: theme.textMuted })

@@ -87,6 +87,14 @@ export const saveText = Effect.fn("AgentEditHere.saveText")(function* (target: s
   return yield* save(target, doc)
 })
 
+/** XCOD-215: Lunos's own agents, for ones turned off with `disable` (they're no longer listed). */
+const BUILT_IN = new Set(["build", "plan", "research", "dev-cycle", "general", "explore", "architect", "planner", "qa"])
+/** Hidden helpers that name sessions, summarise and compact long context. */
+const HELPERS = new Set(["compaction", "title", "summary"])
+
+export const helper = (name: string) => HELPERS.has(name)
+export const builtIn = (name: string) => BUILT_IN.has(name) || HELPERS.has(name)
+
 // The config API's shapes for the TUI's /agents screen.
 
 export const AgentEntry = Schema.Struct({
@@ -98,6 +106,24 @@ export const AgentEntry = Schema.Struct({
   /** The agent's file, when Lunos can edit it; with its current text. */
   file: Schema.optional(Schema.String),
   text: Schema.optional(Schema.String),
+  /** XCOD-215: what /settings → Agents shows. main = primary, helper = a hidden built-in primary. */
+  kind: Schema.optional(Schema.Literals(["main", "subagent", "helper"])),
+  disabled: Schema.optional(Schema.Boolean),
+  /** Raw `agent.<name>.model`: "inherit", "small" or "provider/model"; absent means it inherits. */
+  model: Schema.optional(Schema.String),
+  variant: Schema.optional(Schema.String),
+  steps: Schema.optional(Schema.Finite),
+  temperature: Schema.optional(Schema.Finite),
+  topP: Schema.optional(Schema.Finite),
+  color: Schema.optional(Schema.String),
+  prompt: Schema.optional(Schema.String),
+  /** Each scope's own overrides for this agent (`agent.<name>` in that file), and its deprecated keys. */
+  overrides: Schema.optional(
+    Schema.Struct({
+      user: Schema.optional(Schema.Record(Schema.String, Schema.Json)),
+      project: Schema.optional(Schema.Record(Schema.String, Schema.Json)),
+    }),
+  ),
 }).annotate({ identifier: "AgentFileEntry" })
 
 export const AgentList = Schema.Array(AgentEntry).annotate({ identifier: "AgentFileList" })
