@@ -40,6 +40,12 @@ describe("ExternalClaude (XCOD-204)", () => {
     expect(ExternalClaude.args({ resume: "abc" }).join(" ")).toContain("--resume abc")
   })
 
+  // On Windows, npm's claude.cmd shim runs through a shell: nothing user-typed may reach the command line.
+  test("only id-shaped values reach the command line", () => {
+    expect(() => ExternalClaude.args({ resume: "abc & del *" })).toThrow(/session id/)
+    expect(() => ExternalClaude.args({ permissionMode: "default; rm -rf" })).toThrow(/permission mode/)
+  })
+
   test("each approval is asked of Lunos and the answer goes back: deny, then allow", async () => {
     const asked: string[] = []
     let calls = 0

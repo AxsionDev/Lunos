@@ -71,10 +71,14 @@ export class UnsafeModeError extends Error {
 
 export function args(options: Pick<Options, "resume" | "permissionMode" | "allowUnsafe" | "maxBudgetUSD">) {
   const mode = options.permissionMode ?? SAFE_DEFAULT
+  if (!/^[A-Za-z]+$/.test(mode)) throw new Error(`"${mode}" isn't a Claude Code permission mode`)
   if (UNSAFE_MODES.has(mode) && !options.allowUnsafe)
     throw new UnsafeModeError(
       `Permission mode "${mode}" skips every approval. Pass it explicitly for this run (--permission-mode ${mode} --unsafe) if you mean it.`,
     )
+  // Passed on the command line (through a shell on Windows), so only an id-shaped value.
+  if (options.resume !== undefined && !/^[A-Za-z0-9_-]+$/.test(options.resume))
+    throw new Error(`"${options.resume}" isn't a Claude Code session id`)
   return [
     "-p",
     "--input-format",
@@ -175,8 +179,10 @@ export interface Running {
 export function start(options: Options): Running {
   const executable = options.executable ?? ExternalDetect.locate("claude")
   if (!executable) throw new Error(`Claude Code isn't installed. ${ExternalDetect.TOOLS.claude.install}`)
-  const child = spawn(executable, args(options), {
+  const cmd = ExternalDetect.command(executable, args(options))
+  const child = spawn(cmd.file, cmd.args, {
     cwd: options.cwd,
+    shell: cmd.shell,
     env: ExternalDetect.environment(),
     stdio: ["pipe", "pipe", "pipe"],
   })

@@ -58,6 +58,15 @@ describe("ExternalDetect (XCOD-204)", () => {
     expect(status.hint).toContain("didn't run")
   })
 
+  test("scripts run with Bun, and a Windows .cmd shim through a shell", () => {
+    expect(ExternalDetect.command("/x/fake.ts", ["--version"])).toEqual({
+      file: process.execPath,
+      args: ["/x/fake.ts", "--version"],
+      shell: false,
+    })
+    expect(ExternalDetect.command("/usr/bin/claude", ["-p"]).shell).toBe(false)
+  })
+
   test("the tool's environment drops what a parent Claude Code session injects", () => {
     const env = ExternalDetect.environment({
       PATH: "/bin",

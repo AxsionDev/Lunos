@@ -50,9 +50,21 @@ export function environment(base: NodeJS.ProcessEnv = process.env) {
   return env
 }
 
+/**
+ * How to start `file` on this platform. A script (.js/.ts, like the tests' fake tool) runs with
+ * this Bun; a Windows .cmd/.bat (npm's shim for a global install) needs a shell, so every argument
+ * passed to it must be a fixed flag or a validated id, never user text (prompts go over stdin).
+ */
+export function command(file: string, args: string[]) {
+  if (/\.(m?[jt]s)$/i.test(file)) return { file: process.execPath, args: [file, ...args], shell: false }
+  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(file)) return { file, args, shell: true }
+  return { file, args, shell: false }
+}
+
 export function run(file: string, args: string[], timeoutMs = 15_000) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve) => {
-    const child = spawn(file, args, { env: environment(), stdio: ["ignore", "pipe", "pipe"] })
+    const cmd = command(file, args)
+    const child = spawn(cmd.file, cmd.args, { env: environment(), shell: cmd.shell, stdio: ["ignore", "pipe", "pipe"] })
     let stdout = ""
     let stderr = ""
     child.stdout.on("data", (chunk) => (stdout += chunk))
