@@ -12,6 +12,9 @@ import { testProviderConfig } from "../../lib/test-provider"
 
 const FAKE = path.join(import.meta.dir, "..", "..", "external", "fixtures", "fake-claude.ts")
 const TIMEOUT = 120_000
+// Each run starts lunos plus the fake claude several times (version, help, auth, session); on
+// Windows CI that alone can pass the harness's 30 s default child timeout.
+const CHILD_TIMEOUT = 90_000
 
 const config = (llmUrl: string, extra: Record<string, unknown> = {}) =>
   JSON.stringify({
@@ -31,6 +34,7 @@ describe("lunos run with external_agent (XCOD-204)", () => {
         yield* llm.tool("external_agent", { tool: "claude", task: "Create hello.txt containing hi" })
         yield* llm.text("delegated")
         const result = yield* opencode.run("hand it to claude", {
+          timeoutMs: CHILD_TIMEOUT,
           env: { OPENCODE_CONFIG_CONTENT: config(llm.url) },
         })
         opencode.expectExit(result, 0)
@@ -52,6 +56,7 @@ describe("lunos run with external_agent (XCOD-204)", () => {
         yield* llm.tool("external_agent", { tool: "claude", task: "Create hello.txt containing hi" })
         yield* llm.text("done")
         const result = yield* opencode.run("hand it to claude", {
+          timeoutMs: CHILD_TIMEOUT,
           env: { OPENCODE_CONFIG_CONTENT: config(llm.url, { permission: {} }) },
         })
         expect(fs.existsSync(path.join(home, "hello.txt"))).toBe(false)
@@ -65,7 +70,7 @@ describe("lunos run with external_agent (XCOD-204)", () => {
     ({ llm, opencode }) =>
       Effect.gen(function* () {
         yield* llm.text("ok")
-        const result = yield* opencode.run("hi")
+        const result = yield* opencode.run("hi", { timeoutMs: CHILD_TIMEOUT })
         opencode.expectExit(result, 0)
         const inputs = yield* llm.inputs
         expect(JSON.stringify(inputs[0])).not.toContain("external_agent")
