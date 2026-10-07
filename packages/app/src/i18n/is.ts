@@ -292,6 +292,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} gerðir eru ekki lengur fáanlegar.",
   "model.tag.free": "Ókeypis",
   "model.tag.latest": "Nýjasta",
+  "model.tag.blocked": "Lokað af stefnu",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

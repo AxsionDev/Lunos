@@ -293,6 +293,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} modeliai nebepasiekiami.",
   "model.tag.free": "Nemokama",
   "model.tag.latest": "Naujausias",
+  "model.tag.blocked": "Užblokuota politikos",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

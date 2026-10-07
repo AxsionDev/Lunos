@@ -297,6 +297,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} ماڈلز اب دستیاب نہیں ہیں۔",
   "model.tag.free": "مفت",
   "model.tag.latest": "تازہ ترین",
+  "model.tag.blocked": "پالیسی کے تحت مسدود",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

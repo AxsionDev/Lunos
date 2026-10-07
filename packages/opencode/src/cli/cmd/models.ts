@@ -38,6 +38,9 @@ export const ModelsCommand = effectCmd({
       const sorted = Object.entries(p.models).sort(([a], [b]) => a.localeCompare(b))
       for (const [modelID, model] of sorted) {
         process.stdout.write(`${providerID}/${modelID}`)
+        // XCOD-212: only blocked rows get a second column, so scripts reading names are unaffected.
+        if (model.blocked)
+          process.stdout.write(`\tblocked by policy (${model.blocked.policy}: ${model.blocked.region})`)
         process.stdout.write(EOL)
         if (verbose) {
           process.stdout.write(JSON.stringify(model, null, 2))
@@ -53,7 +56,10 @@ export const ModelsCommand = effectCmd({
       return
     }
 
+    // Residency decides per provider (and endpoint), so providers with blocked models are listed last.
+    const blocked = (id: string) => Object.values(providers[id as ProviderV2.ID].models).some((model) => model.blocked)
     const ids = Object.keys(providers).sort((a, b) => {
+      if (blocked(a) !== blocked(b)) return blocked(a) ? 1 : -1
       const aIsOpencode = a.startsWith("opencode")
       const bIsOpencode = b.startsWith("opencode")
       if (aIsOpencode && !bIsOpencode) return -1

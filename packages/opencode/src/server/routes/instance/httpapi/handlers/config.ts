@@ -81,7 +81,8 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
     }) {
       const instance = yield* InstanceState.context
       // XCOD-214: model-valued settings are checked against the models available here.
-      const models = Provider.modelIDs(yield* providerSvc.list())
+      const providers = yield* providerSvc.list()
+      const models = Provider.modelIDs(providers)
       const where = { directory: instance.directory, worktree: instance.worktree }
       const result = yield* Effect.promise(() =>
         (ctx.payload.unset
@@ -93,6 +94,7 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
               ctx: where,
               via: "settings screen",
               models,
+              blocked: Provider.blockedModels(providers),
             })
         ).then(
           (ok) => ({ ok: true as const, ...ok, value: ok.value as Schema.Json }),

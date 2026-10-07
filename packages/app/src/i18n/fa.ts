@@ -288,6 +288,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "مدل های {{provider}} دیگر در دسترس نیستند.",
   "model.tag.free": "رایگان",
   "model.tag.latest": "آخرین",
+  "model.tag.blocked": "مسدود‌شده توسط سیاست",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

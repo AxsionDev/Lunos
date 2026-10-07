@@ -1142,6 +1142,14 @@ export const Model = Schema.Struct({
   headers: Schema.Record(Schema.String, Schema.String),
   release_date: Schema.String,
   variants: optional(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Any))),
+  /** Set when the residency policy would refuse this model's requests (XCOD-212). Pickers tag it and don't select it. */
+  blocked: optional(
+    Schema.Struct({
+      policy: Schema.Literal("residency"),
+      region: Schema.String,
+      reason: Schema.String,
+    }),
+  ),
 }).annotate({ identifier: "Model" })
 export type Model = Types.DeepMutable<Schema.Schema.Type<typeof Model>>
 
@@ -1189,6 +1197,17 @@ export function toPublicInfo(provider: Info): Info {
 
 export function defaultModelIDs<T extends { models: Record<string, { id: string }> }>(providers: Record<string, T>) {
   return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
+}
+
+/** Models the residency policy blocks, as "provider/model" → the policy's reason (XCOD-212). */
+export function blockedModels(providers: Record<string, { models: Record<string, { blocked?: { reason: string } }> }>) {
+  return new Map(
+    Object.entries(providers).flatMap(([providerID, provider]) =>
+      Object.entries(provider.models).flatMap(([modelID, model]) =>
+        model.blocked ? [[`${providerID}/${modelID}`, model.blocked.reason] as const] : [],
+      ),
+    ),
+  )
 }
 
 /** Every model available here, as "provider/model" (XCOD-214: what model-valued settings accept). */
@@ -1742,6 +1761,7 @@ const layer = Layer.effect(
           })
         }
 
+        const residency = AuditLog.residency(cfg)
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
           if (!isProviderAllowed(providerID)) {
@@ -1750,6 +1770,10 @@ const layer = Layer.effect(
           }
 
           const configProvider = cfg.provider?.[providerID]
+          const configuredURL =
+            typeof provider.options?.["baseURL"] === "string" && provider.options["baseURL"] !== ""
+              ? provider.options["baseURL"]
+              : undefined
 
           for (const [modelID, model] of Object.entries(provider.models)) {
             model.api.id = model.api.id ?? model.id ?? modelID
@@ -1784,6 +1808,11 @@ const layer = Layer.effect(
                 (v) => omit(v, ["disabled"]),
               )
             }
+
+            // The endpoint `resolveSDK` would use, so the tag matches what `Residency.enforce` decides.
+            const denied = Residency.blocked(providerID, configuredURL ?? model.api.url, residency)
+            if (denied) model.blocked = { policy: "residency", region: denied.region, reason: denied.reason }
+            else delete model.blocked
           }
 
           if (Object.keys(provider.models).length === 0) {
@@ -1799,7 +1828,7 @@ const layer = Layer.effect(
           sdk,
           modelLoaders,
           varsLoaders,
-          residency: AuditLog.residency(cfg),
+          residency,
         }
       }),
     )

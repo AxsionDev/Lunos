@@ -287,6 +287,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "ໂມເດວ {{provider}} ບໍ່ມີແລ້ວ.",
   "model.tag.free": "ຟຣີ",
   "model.tag.latest": "ຫຼ້າສຸດ",
+  "model.tag.blocked": "ຖືກບລັອກໂດຍນະໂຍບາຍ",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

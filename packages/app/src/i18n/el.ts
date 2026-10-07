@@ -289,6 +289,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} μοντέλα δεν είναι πλέον διαθέσιμα.",
   "model.tag.free": "Δωρεάν",
   "model.tag.latest": "Τελευταία",
+  "model.tag.blocked": "Αποκλείστηκε από πολιτική",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

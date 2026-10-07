@@ -8,6 +8,10 @@ import { DialogVariant } from "./dialog-variant"
 import * as fuzzysort from "fuzzysort"
 import { useConnected } from "./use-connected"
 import { useSync } from "../context/sync"
+import { useToast } from "../ui/toast"
+
+/** XCOD-212: shown on models the residency policy would refuse. */
+const BLOCKED = "blocked by policy"
 
 /** A choice listed before the models, e.g. "Inherit from main agent" (XCOD-214). */
 export type DialogModelChoice = { title: string; description?: string; onSelect: () => void }
@@ -26,6 +30,7 @@ export function DialogModel(props: {
   const local = useLocal()
   const sync = useSync()
   const dialog = useDialog()
+  const toast = useToast()
   const [query, setQuery] = createSignal("")
 
   const connected = useConnected()
@@ -51,7 +56,8 @@ export function DialogModel(props: {
             key: item,
             value: { providerID: provider.id, modelID: model.id },
             title: model.name ?? item.modelID,
-            description: provider.name,
+            description: model.blocked ? `${provider.name} · ${BLOCKED}` : provider.name,
+            blocked: model.blocked !== undefined,
             category,
             disabled: provider.id === "opencode" && model.id.includes("-nano"),
             footer: model.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
@@ -63,17 +69,22 @@ export function DialogModel(props: {
       })
     }
 
-    const favoriteOptions = toOptions(favorites, "Favorites")
-    const recentOptions = toOptions(
-      recents.filter(
-        (item) => !favorites.some((fav) => fav.providerID === item.providerID && fav.modelID === item.modelID),
+    const blockedLast = <T extends { blocked: boolean }>(items: T[]) => sortBy(items, (item) => item.blocked)
+    const favoriteOptions = blockedLast(toOptions(favorites, "Favorites"))
+    const recentOptions = blockedLast(
+      toOptions(
+        recents.filter(
+          (item) => !favorites.some((fav) => fav.providerID === item.providerID && fav.modelID === item.modelID),
+        ),
+        "Recent",
       ),
-      "Recent",
     )
 
     const providerOptions = pipe(
       sync.data.provider,
       sortBy(
+        // Residency is decided per provider, so providers with blocked models go last.
+        (provider) => Object.values(provider.models).some((model) => model.blocked),
         (provider) => provider.id !== "opencode",
         (provider) => provider.name,
       ),
@@ -87,9 +98,16 @@ export function DialogModel(props: {
             value: { providerID: provider.id, modelID: model },
             title: info.name ?? model,
             releaseDate: info.release_date,
-            description: favorites.some((item) => item.providerID === provider.id && item.modelID === model)
-              ? "(Favorite)"
-              : undefined,
+            description:
+              [
+                favorites.some((item) => item.providerID === provider.id && item.modelID === model)
+                  ? "(Favorite)"
+                  : undefined,
+                info.blocked ? `(${BLOCKED})` : undefined,
+              ]
+                .filter(Boolean)
+                .join(" ") || undefined,
+            blocked: info.blocked !== undefined,
             category: connected() ? provider.name : undefined,
             disabled: provider.id === "opencode" && model.includes("-nano"),
             footer: info.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
@@ -165,6 +183,17 @@ export function DialogModel(props: {
   })
 
   function onSelect(providerID: string, modelID: string) {
+    // Before `onPick`, so /settings' main, small and subagent model pickers refuse it too.
+    const blocked = sync.data.provider.find((item) => item.id === providerID)?.models[modelID]?.blocked
+    if (blocked) {
+      toast.show({
+        variant: "warning",
+        title: `${providerID}/${modelID} is ${BLOCKED}`,
+        message: `Data-residency policy: ${blocked.reason}`,
+        duration: 8000,
+      })
+      return
+    }
     if (props.onPick) return props.onPick(providerID, modelID)
     local.model.set({ providerID, modelID }, { recent: true })
     const list = local.model.variant.list()
@@ -209,13 +238,19 @@ export function DialogModel(props: {
   )
 }
 
-export function sortModelOptions<T extends { footer?: string; releaseDate: string | number; title: string }>(
-  options: T[],
-  newestFirst: boolean,
-) {
-  if (newestFirst) return sortBy(options, [(option) => option.releaseDate, "desc"], (option) => option.title)
+export function sortModelOptions<
+  T extends { footer?: string; releaseDate: string | number; title: string; blocked?: boolean },
+>(options: T[], newestFirst: boolean) {
+  if (newestFirst)
+    return sortBy(
+      options,
+      (option) => option.blocked === true,
+      [(option) => option.releaseDate, "desc"],
+      (option) => option.title,
+    )
   return sortBy(
     options,
+    (option) => option.blocked === true,
     (option) => option.footer !== "Free",
     [(option) => option.releaseDate, "desc"],
     (option) => option.title,

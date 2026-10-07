@@ -316,6 +316,7 @@ export const dict = {
 
   "model.tag.free": "Ücretsiz",
   "model.tag.latest": "En yeni",
+  "model.tag.blocked": "Politika tarafından engellendi",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

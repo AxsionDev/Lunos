@@ -293,6 +293,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}}のモデルは利用できなくなりました。",
   "model.tag.free": "無料",
   "model.tag.latest": "最新",
+  "model.tag.blocked": "ポリシーによりブロック",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

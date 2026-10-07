@@ -287,6 +287,23 @@ describe("model settings", () => {
     expect(ConfigSettings.modelProblem("share", "anything", models)).toBeUndefined()
   })
 
+  test("a model the residency policy blocks is refused with the policy's reason (XCOD-212)", () => {
+    const blocked = new Map([["anthropic/claude-haiku-4-5", 'Provider "anthropic" processes in "us".']])
+    for (const key of ["model", "small_model", "subagent.model"])
+      expect(ConfigSettings.modelProblem(key, "anthropic/claude-haiku-4-5", models, blocked)).toBe(
+        `"anthropic/claude-haiku-4-5" is blocked by the data-residency policy. Provider "anthropic" processes in "us"`,
+      )
+    expect(
+      ConfigSettings.modelProblem(
+        "subagent.dynamic.allow",
+        ["mistral/mistral-large", "anthropic/claude-haiku-4-5"],
+        models,
+        blocked,
+      ),
+    ).toContain("blocked by the data-residency policy")
+    expect(ConfigSettings.modelProblem("subagent.model", "inherit", models, blocked)).toBeUndefined()
+  })
+
   test("every entry of subagent.dynamic.allow is checked", () => {
     expect(ConfigSettings.modelProblem("subagent.dynamic.allow", [...models], models)).toBeUndefined()
     expect(ConfigSettings.modelProblem("subagent.dynamic.allow", ["mistral/mistral-large", "x/y"], models)).toContain(
@@ -361,6 +378,16 @@ describe("agent settings (XCOD-215)", () => {
     await expect(
       ConfigSettings.set({ key: "agent.build.model", value: "x/y", scope: "user", ctx: ctx(), locked: [], models }),
     ).rejects.toThrow(`"x/y" isn't a model`)
+  })
+
+  test("an agent's model blocked by the residency policy is refused (XCOD-212 + XCOD-215)", () => {
+    const blocked = new Map([["anthropic/claude-haiku-4-5", 'Provider "anthropic" processes in "us".']])
+    const all = new Set(["anthropic/claude-haiku-4-5", "mistral/mistral-large"])
+    expect(ConfigSettings.modelProblem("agent.build.model", "anthropic/claude-haiku-4-5", all, blocked)).toContain(
+      "blocked by the data-residency policy",
+    )
+    expect(ConfigSettings.modelProblem("agent.build.model", "mistral/mistral-large", all, blocked)).toBeUndefined()
+    expect(ConfigSettings.modelProblem("agent.build.model", "inherit", all, blocked)).toBeUndefined()
   })
 
   test("a locked agent key is refused with the policy message (existing rule)", async () => {

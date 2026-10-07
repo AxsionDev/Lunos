@@ -46,6 +46,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   small_model: "Models & agents",
   default_agent: "Models & agents",
   subagent: "Models & agents",
+  external: "Models & agents",
   subagent_depth: "Models & agents",
   agent: "Models & agents",
   mode: "Models & agents",
@@ -750,8 +751,16 @@ const MODEL_KEYS: Record<string, "one" | "subagent" | "list"> = {
   "subagent.dynamic.allow": "list",
 }
 
-/** Why `value` isn't a usable model for `key`, with the closest matches; undefined when it is. */
-export function modelProblem(key: string, value: unknown, models: ReadonlySet<string>): string | undefined {
+/**
+ * Why `value` isn't a usable model for `key`, with the closest matches; undefined when it is.
+ * `blocked` (XCOD-212) maps models the residency policy refuses to the policy's reason.
+ */
+export function modelProblem(
+  key: string,
+  value: unknown,
+  models: ReadonlySet<string>,
+  blocked?: ReadonlyMap<string, string>,
+): string | undefined {
   // XCOD-215: an agent's model takes the same values as subagent.model (XCOD-82).
   const kind = MODEL_KEYS[key] ?? (/^agent\.[^.]+\.model$/.test(key) ? "subagent" : undefined)
   if (!kind) return
@@ -759,6 +768,8 @@ export function modelProblem(key: string, value: unknown, models: ReadonlySet<st
   for (const id of ids) {
     if (typeof id !== "string") return `${key} takes "provider/model" names`
     if (kind === "subagent" && (id === "inherit" || id === "small")) continue
+    const reason = blocked?.get(id)
+    if (reason) return `"${id}" is blocked by the data-residency policy. ${reason.replace(/\.$/, "")}`
     if (models.has(id)) continue
     const close = fuzzysort.go(id, [...models], { limit: 3, threshold: 0.3 }).map((match) => match.target)
     const extra = kind === "subagent" ? ', or "inherit" or "small"' : ""
@@ -840,10 +851,12 @@ export async function set(input: {
   via?: string
   /** The models available here, as "provider/model", to check model-valued settings against. */
   models?: ReadonlySet<string>
+  /** Models the residency policy blocks, with the reason (XCOD-212). */
+  blocked?: ReadonlyMap<string, string>
 }): Promise<SetResult> {
   const item = await writable(input)
   const value = coerce(item, input.value)
-  const problem = input.models ? modelProblem(item.key, value, input.models) : undefined
+  const problem = input.models ? modelProblem(item.key, value, input.models, input.blocked) : undefined
   if (problem) throw new SettingError(`${item.key}: ${problem.replace(/\.$/, "")}. Nothing was written.`, "invalid")
   const range = AGENT_RANGES[item.key.split(".")[2] as AgentField]
   if (range && item.key.startsWith("agent.") && typeof value === "number" && (value < range[0] || value > range[1]))

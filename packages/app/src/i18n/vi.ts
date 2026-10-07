@@ -295,6 +295,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "Các mô hình {{provider}} không còn khả dụng.",
   "model.tag.free": "Miễn phí",
   "model.tag.latest": "Mới nhất",
+  "model.tag.blocked": "Bị chặn bởi chính sách",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

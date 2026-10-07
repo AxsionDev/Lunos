@@ -308,6 +308,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} 模型已不再可用。",
   "model.tag.free": "免費",
   "model.tag.latest": "最新",
+  "model.tag.blocked": "已被政策封鎖",
 
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",

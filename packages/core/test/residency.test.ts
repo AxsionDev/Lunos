@@ -228,3 +228,29 @@ describe("share hosts (XCOD-80)", () => {
     expect(Jurisdiction.isTagged("share:opncd")).toBe(true)
   })
 })
+
+describe("Residency.blocked (XCOD-212)", () => {
+  const euOnly = Residency.resolve({ allow: ["eu"] })
+
+  test("no policy blocks nothing", () => {
+    expect(Residency.blocked("anthropic", undefined, undefined)).toBeUndefined()
+  })
+
+  // observe() has an empty allow list; evaluating against it would deny every provider.
+  test("audit-only mode blocks nothing", () => {
+    expect(Residency.blocked("anthropic", undefined, Residency.observe(undefined))).toBeUndefined()
+  })
+
+  test("an EU-only policy blocks a US provider and says why", () => {
+    const decision = Residency.blocked("anthropic", undefined, euOnly)
+    expect(decision?.region).toBe("us")
+    expect(decision?.reason).toContain("does not allow")
+    expect(Residency.blocked("mistral", undefined, euOnly)).toBeUndefined()
+  })
+
+  test("a declared endpoint is allowed", () => {
+    const resolved = Residency.resolve({ allow: ["eu"], endpoints: { "my-vllm": { region: "eu" } } })
+    expect(Residency.blocked("my-vllm", "https://llm.example.eu/v1", resolved)).toBeUndefined()
+    expect(Residency.blocked("my-vllm", "https://llm.example.eu/v1", euOnly)).toBeDefined()
+  })
+})

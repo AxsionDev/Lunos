@@ -281,6 +281,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} ሞዴሎች ከአሁን በኋላ አይገኙም።",
   "model.tag.free": "ነጻ",
   "model.tag.latest": "የቅርብ",
+  "model.tag.blocked": "በፖሊሲ የታገደ",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

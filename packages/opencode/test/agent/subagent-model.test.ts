@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { SubagentModel } from "../../src/agent/subagent-model"
+import { Residency } from "@opencode-ai/core/residency"
 import { withModelParameter } from "../../src/tool/task"
 
 const parent = { providerID: "mistral", modelID: "mistral-large-latest", variant: "high" }
@@ -75,6 +76,15 @@ describe("SubagentModel.resolve (XCOD-82)", () => {
       "mistral/codestral-latest",
     ])
     expect(SubagentModel.allowed({})).toEqual([])
+  })
+
+  // XCOD-212: audit without a residency policy refuses nothing, so it must not empty the list.
+  test("audit-only mode keeps the whole dynamic allow list", () => {
+    const config = { subagent: { dynamic: { enabled: true, allow: ["mistral/codestral-latest", "openai/gpt-x"] } } }
+    expect(SubagentModel.allowed(config, Residency.observe(undefined))).toEqual([
+      "mistral/codestral-latest",
+      "openai/gpt-x",
+    ])
   })
 })
 

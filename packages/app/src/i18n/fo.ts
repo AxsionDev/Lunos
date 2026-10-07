@@ -287,6 +287,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} modellir eru ikki tøkir longur.",
   "model.tag.free": "Ókeypis",
   "model.tag.latest": "Nýggjasta",
+  "model.tag.blocked": "Forðað av politikki",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",
