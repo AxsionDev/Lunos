@@ -74,8 +74,7 @@ export function allowed(config: Input["config"], residency?: Residency.Resolved)
   const dynamic = config.subagent?.dynamic
   if (!dynamic?.enabled) return []
   const list = [...new Set(dynamic.allow ?? [])]
-  if (!residency) return list
-  return list.filter((spec) => Residency.evaluate(parse(spec).providerID, residency.policy).allowed)
+  return list.filter((spec) => !Residency.blocked(parse(spec).providerID, undefined, residency))
 }
 
 export function resolve(input: Input): Resolved {

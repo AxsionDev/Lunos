@@ -93,6 +93,18 @@ export function evaluate(providerID: string, policy: Policy, baseURL?: string): 
   }
 }
 
+/**
+ * The denial a request to this provider would get, or `undefined` if it would be allowed
+ * (XCOD-212). Same rules as `enforce()`, without auditing or throwing, so model pickers and
+ * saves can refuse a model before the first request instead of when it is sent. Audit-only
+ * mode (`enforce: false`) refuses nothing, so nothing is blocked.
+ */
+export function blocked(providerID: string, baseURL: string | undefined, resolved: Resolved | undefined) {
+  if (!resolved || resolved.enforce === false) return undefined
+  const decision = evaluate(providerID, resolved.policy, baseURL)
+  return decision.allowed ? undefined : decision
+}
+
 /** Thrown when a provider is denied. Message is the decision's reason, so users see why. */
 export class DeniedError extends Error {
   readonly decision: Decision

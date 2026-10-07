@@ -312,6 +312,7 @@ export const dict = {
 
   "model.tag.free": "Безкоштовно",
   "model.tag.latest": "Остання",
+  "model.tag.blocked": "Заблоковано політикою",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

@@ -708,14 +708,24 @@ const MODEL_KEYS: Record<string, "one" | "subagent" | "list"> = {
   "subagent.dynamic.allow": "list",
 }
 
-/** Why `value` isn't a usable model for `key`, with the closest matches; undefined when it is. */
-export function modelProblem(key: string, value: unknown, models: ReadonlySet<string>): string | undefined {
+/**
+ * Why `value` isn't a usable model for `key`, with the closest matches; undefined when it is.
+ * `blocked` (XCOD-212) maps models the residency policy refuses to the policy's reason.
+ */
+export function modelProblem(
+  key: string,
+  value: unknown,
+  models: ReadonlySet<string>,
+  blocked?: ReadonlyMap<string, string>,
+): string | undefined {
   const kind = MODEL_KEYS[key]
   if (!kind) return
   const ids = kind === "list" ? (Array.isArray(value) ? value : [value]) : [value]
   for (const id of ids) {
     if (typeof id !== "string") return `${key} takes "provider/model" names`
     if (kind === "subagent" && (id === "inherit" || id === "small")) continue
+    const reason = blocked?.get(id)
+    if (reason) return `"${id}" is blocked by the data-residency policy. ${reason.replace(/\.$/, "")}`
     if (models.has(id)) continue
     const close = fuzzysort.go(id, [...models], { limit: 3, threshold: 0.3 }).map((match) => match.target)
     const extra = kind === "subagent" ? ', or "inherit" or "small"' : ""
@@ -774,6 +784,8 @@ export async function set(input: {
   via?: string
   /** The models available here, as "provider/model", to check model-valued settings against. */
   models?: ReadonlySet<string>
+  /** Models the residency policy blocks, with the reason (XCOD-212). */
+  blocked?: ReadonlyMap<string, string>
 }): Promise<SetResult> {
   const item = find(input.key)
   if (!item)
@@ -794,7 +806,7 @@ export async function set(input: {
     throw new SettingError(ConfigPolicy.message(lockedKey), "locked")
   }
   const value = coerce(item, input.value)
-  const problem = input.models ? modelProblem(item.key, value, input.models) : undefined
+  const problem = input.models ? modelProblem(item.key, value, input.models, input.blocked) : undefined
   if (problem) throw new SettingError(`${item.key}: ${problem}. Nothing was written.`, "invalid")
   const refusal = input.scope === "project" ? projectRefusal(item.key, value) : undefined
   if (refusal) throw new SettingError(refusal, "invalid")

@@ -197,6 +197,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "I modelli {{provider}} non sono più disponibili.",
   "model.tag.free": "Gratuito",
   "model.tag.latest": "Più recente",
+  "model.tag.blocked": "Bloccato dai criteri",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

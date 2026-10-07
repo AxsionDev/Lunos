@@ -195,6 +195,7 @@ export const dict = {
   "provider.disconnect.toast.disconnected.description": "{{provider}}-mallit eivät ole enää saatavilla.",
   "model.tag.free": "Ilmainen",
   "model.tag.latest": "Uusin",
+  "model.tag.blocked": "Käytännön estämä",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

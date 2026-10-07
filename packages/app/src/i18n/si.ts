@@ -287,6 +287,7 @@ export const dict: Record<string, string> = {
   "provider.disconnect.toast.disconnected.description": "{{provider}} මාදිලි තවදුරටත් නොමැත.",
   "model.tag.free": "නොමිලේ",
   "model.tag.latest": "නවතම",
+  "model.tag.blocked": "ප්‍රතිපත්තිය මගින් අවහිර කර ඇත",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",

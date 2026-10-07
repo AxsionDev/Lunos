@@ -38,6 +38,10 @@ Enforcement happens when a model is resolved, before any connection to the provi
 | An EU provider with a changed `baseURL` (not its own API host)                              | **Blocked**             | The EU claim is for the provider's own API, not wherever it's pointed      |
 | An endpoint you declared in `residency.endpoints` as `"eu"`                                 | **Allowed**             | Your declaration, recorded in the audit log as `declared`                  |
 
+### Blocked models in the pickers
+
+You don't have to send a request to find out. The model pickers in the TUI, desktop and web apply the same rules: a blocked model has a grey **blocked by policy** tag, its provider is listed last, and choosing it shows the policy's reason instead of selecting it. `lunos models` adds a `blocked by policy (residency: <region>)` column to those rows. Rows that aren't blocked are printed as before. Saving a blocked model as `model`, `small_model`, `subagent.model` or in `subagent.dynamic.allow` is refused, from `/settings` and from `lunos settings set`. Audit without a residency policy blocks nothing.
+
 ### Why configurable providers are blocked by default
 
 Azure, AWS Bedrock, Google Vertex and SAP AI Core can all run in the EU. The software cannot verify that _this_ deployment pointed them at an EU region — that lives in your cloud account, not in configuration Lunos can read.

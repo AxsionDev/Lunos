@@ -2370,6 +2370,11 @@ export type Model = {
       [key: string]: unknown
     }
   }
+  blocked?: {
+    policy: "residency"
+    region: string
+    reason: string
+  }
 }
 
 export type Provider = {
