@@ -17,6 +17,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
 import { Residency } from "@opencode-ai/core/residency"
+import { ModelCuration } from "./curation"
 import { AuditLog } from "@/audit/log"
 import path from "path"
 import { pathToFileURL } from "url"
@@ -1150,6 +1151,10 @@ export const Model = Schema.Struct({
       reason: Schema.String,
     }),
   ),
+  /** XCOD-213: from the documented size rules; absent when the size isn't known. */
+  size: optional(Schema.Literals(["large", "medium", "small"])),
+  /** XCOD-213: why this model is on the curated Recommended list, when it is. */
+  recommended: optional(Schema.String),
 }).annotate({ identifier: "Model" })
 export type Model = Types.DeepMutable<Schema.Schema.Type<typeof Model>>
 
@@ -1762,6 +1767,7 @@ const layer = Layer.effect(
         }
 
         const residency = AuditLog.residency(cfg)
+        const recommended = ModelCuration.recommended(cfg.recommended)
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
           if (!isProviderAllowed(providerID)) {
@@ -1813,6 +1819,13 @@ const layer = Layer.effect(
             const denied = Residency.blocked(providerID, configuredURL ?? model.api.url, residency)
             if (denied) model.blocked = { policy: "residency", region: denied.region, reason: denied.reason }
             else delete model.blocked
+
+            const size = ModelCuration.size(providerID, modelID, model.name)
+            if (size) model.size = size
+            else delete model.size
+            const why = recommended[`${providerID}/${modelID}`]
+            if (why) model.recommended = why
+            else delete model.recommended
           }
 
           if (Object.keys(provider.models).length === 0) {

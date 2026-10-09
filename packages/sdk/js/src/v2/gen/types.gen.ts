@@ -2070,6 +2070,9 @@ export type Config = {
   enabled_providers?: Array<string>
   model?: string
   small_model?: string
+  recommended?: {
+    [key: string]: string
+  }
   default_agent?: string
   external?: ExternalConfig
   subagent?: SubagentConfig
@@ -2422,6 +2425,8 @@ export type Model = {
     region: string
     reason: string
   }
+  size?: "large" | "medium" | "small"
+  recommended?: string
 }
 
 export type Provider = {

@@ -2146,3 +2146,20 @@ it.instance(
   }),
   { config: { audit: { enabled: true } } },
 )
+
+// XCOD-213: size and the curated reason ride on the provider list; an org's list replaces Lunos's.
+it.instance(
+  "models carry their size, and the configured recommended list replaces the built-in one",
+  Effect.gen(function* () {
+    yield* setProcessEnv("MISTRAL_API_KEY", "test-api-key")
+    const providers = yield* list
+    const mistral = providers[ProviderV2.ID.make("mistral")].models
+    expect(mistral["mistral-large-latest"].size).toBe("large")
+    expect(mistral["mistral-small-latest"].recommended).toBe("Our default")
+    expect(mistral["mistral-large-latest"].recommended).toBeUndefined()
+    expect(Provider.toPublicInfo(providers[ProviderV2.ID.make("mistral")]).models["mistral-small-latest"].size).toBe(
+      "small",
+    )
+  }),
+  { config: { recommended: { "mistral/mistral-small-latest": "Our default" } } },
+)

@@ -44,6 +44,7 @@ export type Category = (typeof CATEGORIES)[number]
 export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   model: "Models & agents",
   small_model: "Models & agents",
+  recommended: "Models & agents",
   default_agent: "Models & agents",
   subagent: "Models & agents",
   external: "Models & agents",

@@ -113,6 +113,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   experimental: ConfigExperimental.Experimental.pipe(Schema.optional),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(Schema.optional),
+  recommended: Schema.Record(Schema.String, Schema.String).pipe(Schema.optional).annotate({
+    description:
+      'Curated models the model pickers list under Recommended, as "provider/model": "why". Replaces Lunos\'s built-in list; lock it with $locked to set it for an organisation',
+  }),
   external: ConfigExternal.Info.pipe(Schema.optional).annotate({
     description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
   }),
