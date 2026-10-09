@@ -1,7 +1,7 @@
 export * as ExternalDetect from "./detect"
 
 import { spawn } from "child_process"
-import { which } from "bun"
+import { which } from "@opencode-ai/core/util/which"
 
 /**
  * XCOD-204: which external coding CLIs are installed here, their versions and login state.
