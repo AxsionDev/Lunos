@@ -19,6 +19,7 @@ import { ConfigSkillsV1 } from "./skills"
 import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
 import { ConfigSubagent } from "../../config/subagent"
+import { ConfigCloud } from "../../config/cloud"
 import { ConfigExternal } from "../../config/external"
 import { ConfigMemory } from "../../config/memory"
 import { ConfigSandbox } from "../../config/sandbox"
@@ -148,6 +149,9 @@ export const Info = Schema.Struct({
   }),
   external: Schema.optional(ConfigExternal.Info).annotate({
     description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
+  }),
+  cloud: Schema.optional(ConfigCloud.Info).annotate({
+    description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",
   }),
   subagent: Schema.optional(ConfigSubagent.Info).annotate({
     description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",

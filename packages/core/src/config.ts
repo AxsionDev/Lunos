@@ -24,6 +24,7 @@ import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
 import { ConfigResidency } from "./config/residency"
 import { ConfigSubagent } from "./config/subagent"
+import { ConfigCloud } from "./config/cloud"
 import { ConfigExternal } from "./config/external"
 import { ConfigMemory } from "./config/memory"
 import { ConfigSandbox } from "./config/sandbox"
@@ -119,6 +120,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   external: ConfigExternal.Info.pipe(Schema.optional).annotate({
     description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
+  }),
+  cloud: ConfigCloud.Info.pipe(Schema.optional).annotate({
+    description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",
   }),
   subagent: ConfigSubagent.Info.pipe(Schema.optional).annotate({
     description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",

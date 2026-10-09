@@ -437,6 +437,20 @@
       },
       "additionalProperties": false
     },
+    "CloudConfig": {
+      "type": "object",
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "description": "OpenID Connect issuer URL that lunos login signs in to, e.g. https://id.example.eu/realms/lunos"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "OAuth client id registered for the Lunos CLI at that issuer (default \"lunos-cli\")"
+        }
+      },
+      "additionalProperties": false
+    },
     "SubagentConfig": {
       "type": "object",
       "properties": {
@@ -1540,6 +1554,10 @@
         "external": {
           "$ref": "#/$defs/ExternalConfig",
           "description": "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)"
+        },
+        "cloud": {
+          "$ref": "#/$defs/CloudConfig",
+          "description": "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)"
         },
         "subagent": {
           "$ref": "#/$defs/SubagentConfig",
