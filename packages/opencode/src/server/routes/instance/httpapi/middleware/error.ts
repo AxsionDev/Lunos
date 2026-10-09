@@ -46,6 +46,16 @@ export const errorLayer = HttpRouter.middleware<{ handles: unknown }>()((effect)
         )
       }
 
+      // XCOD-221: no provider set up is something the user fixes, so say how instead of a 500.
+      if (Provider.NoProvidersError.isInstance(error)) {
+        return Effect.succeed(
+          HttpServerResponse.jsonUnsafe(
+            { name: "ProviderNoProvidersError", data: { message: error.message } },
+            { status: 400 },
+          ),
+        )
+      }
+
       const ref = `err_${crypto.randomUUID().slice(0, 8)}`
 
       return Effect.logError("failed", { ref, error, cause: Cause.pretty(cause) }).pipe(

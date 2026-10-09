@@ -146,6 +146,26 @@ describe("HttpApi error middleware", () => {
     }),
   )
 
+  // XCOD-221: with no provider set up, `lunos run` printed "Unexpected server error" instead of the next step.
+  it.live("returns no provider set up as a client error the CLI can format", () =>
+    Effect.gen(function* () {
+      const none = new Provider.NoProvidersError()
+      yield* HttpRouter.add("GET", "/no-providers", Effect.die(none)).pipe(
+        Layer.provide(errorLayer),
+        HttpRouter.serve,
+        Layer.build,
+      )
+
+      const response = yield* HttpClientRequest.get("/no-providers").pipe(HttpClient.execute)
+      const body = yield* response.json
+
+      expect(response.status).toBe(400)
+      expect(body).toEqual({ name: "ProviderNoProvidersError", data: { message: none.message } })
+      const { FormatError } = yield* Effect.promise(() => import("../../src/cli/error"))
+      expect(FormatError(body)).toBe(none.message)
+    }),
+  )
+
   it.live("does not map storage not-found defects to 404", () =>
     Effect.gen(function* () {
       yield* HttpRouter.add(

@@ -69,6 +69,12 @@ export function FormatError(input: unknown): string | undefined {
     ].join("\n")
   }
 
+  // ProviderNoProvidersError: { message: string }
+  const noProviders = configData(input, "ProviderNoProvidersError")
+  if (noProviders) {
+    return stringField(noProviders, "message") ?? ""
+  }
+
   // ProviderInitError: { providerID: string }
   const providerInit = configData(input, "ProviderInitError")
   if (providerInit) {

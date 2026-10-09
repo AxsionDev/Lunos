@@ -2064,6 +2064,19 @@ it.instance(
   }),
 )
 
+// XCOD-221: a keyless first run must not fall back to upstream opencode's hosted free tier.
+it.instance(
+  "with no provider key, nothing is loaded and defaultModel says how to add a provider",
+  Effect.gen(function* () {
+    const providers = yield* list
+    expect(providers[ProviderV2.ID.make("opencode")]).toBeUndefined()
+    expect(Object.keys(providers)).toEqual([])
+    const error = yield* Provider.use.defaultModel().pipe(Effect.flip)
+    expect(error).toBeInstanceOf(Provider.NoProvidersError)
+    expect(error.message).toMatch(/lunos auth login/)
+  }),
+)
+
 it.effect("opencode loader keeps paid models when config apiKey is present", () =>
   Effect.gen(function* () {
     const noneDir = yield* tmpdirScoped()
@@ -2077,10 +2090,11 @@ it.effect("opencode loader keeps paid models when config apiKey is present", () 
         .pipe(provideInstanceEffect(directory))
         .pipe(Effect.provide(instanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
 
-    const none = paid(yield* listIn(noneDir))
+    // XCOD-221: without a key the provider isn't loaded at all, free models included.
+    const none = (yield* listIn(noneDir))[ProviderV2.ID.make("opencode")]
     const keyedCount = paid(yield* listIn(keyedDir))
 
-    expect(none).toBe(0)
+    expect(none).toBeUndefined()
     expect(keyedCount).toBeGreaterThan(0)
   }).pipe(provideMultiInstance),
 )
@@ -2096,7 +2110,8 @@ it.effect("opencode loader keeps paid models when auth exists", () =>
         .pipe(provideInstanceEffect(directory))
         .pipe(Effect.provide(instanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
 
-    const none = paid(yield* listIn(noneDir))
+    // XCOD-221: without a key the provider isn't loaded at all, free models included.
+    const none = (yield* listIn(noneDir))[ProviderV2.ID.make("opencode")]
 
     const authPath = path.join(Global.Path.data, "auth.json")
     const original = yield* Effect.promise(() => Filesystem.readText(authPath).catch(() => undefined))
@@ -2112,7 +2127,7 @@ it.effect("opencode loader keeps paid models when auth exists", () =>
 
     const keyedCount = paid(yield* listIn(keyedDir))
 
-    expect(none).toBe(0)
+    expect(none).toBeUndefined()
     expect(keyedCount).toBeGreaterThan(0)
   }).pipe(provideMultiInstance),
 )
