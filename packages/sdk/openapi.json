@@ -21949,6 +21949,9 @@
           },
           "client_id": {
             "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
           }
         },
         "additionalProperties": false

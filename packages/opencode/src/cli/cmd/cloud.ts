@@ -2,6 +2,7 @@ import { EOL } from "os"
 import { Effect } from "effect"
 import { openUrl } from "@opencode-ai/core/open"
 import { Config } from "@/config/config"
+import { CloudAuth } from "@/cloud/auth"
 import { CloudOidc } from "@/cloud/oidc"
 import { CloudStore } from "@/cloud/store"
 import { effectCmd, fail } from "../effect-cmd"
@@ -107,13 +108,8 @@ export const WhoamiCommand = effectCmd({
     if (!session) return yield* fail("Not signed in. Run lunos login.")
     const user = yield* Effect.tryPromise({
       try: async () => {
-        const discovery = await CloudOidc.discover(session.issuer)
-        let tokens = session.tokens
-        if (tokens.expires_at !== undefined && tokens.expires_at * 1000 < Date.now() + 30_000) {
-          tokens = await CloudOidc.refresh(discovery, session.clientID, tokens)
-          await CloudStore.save({ ...session, tokens, savedAt: new Date().toISOString() })
-        }
-        return CloudOidc.user(discovery, tokens)
+        const fresh = await CloudAuth.session()
+        return CloudOidc.user(fresh.discovery, fresh.tokens)
       },
       catch: (error) => error,
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
