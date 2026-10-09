@@ -231,17 +231,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         Boolean(yield* dep.auth(input.id)) ||
         Boolean((yield* dep.config()).provider?.["opencode"]?.options?.apiKey)
 
-      if (!ok) {
-        for (const [key, value] of Object.entries(input.models)) {
-          if (value.cost.input === 0) continue
-          delete input.models[key]
-        }
-      }
-
-      return {
-        autoload: Object.keys(input.models).length > 0,
-        options: ok ? {} : { apiKey: "public" },
-      }
+      // XCOD-221: upstream loads the free models here with apiKey "public", which sends a keyless
+      // user's first prompt to upstream opencode's hosted gateway (a non-EU third party that then
+      // refuses it). Lunos loads this provider only for someone who gave it a key.
+      return { autoload: ok }
     }),
     openai: () =>
       Effect.succeed({
@@ -1257,7 +1250,7 @@ export class InitError extends Schema.TaggedErrorClass<InitError>()("ProviderIni
 
 export class NoProvidersError extends Schema.TaggedErrorClass<NoProvidersError>()("ProviderNoProvidersError", {}) {
   override get message() {
-    return "No providers are available"
+    return "No model provider is set up. Run `lunos auth login`, or set a provider's API key (for example MISTRAL_API_KEY)."
   }
 
   static isInstance(input: unknown): input is NoProvidersError {
