@@ -11,13 +11,13 @@ The sign-in service behind `lunos login` (XCOD-185). It's Keycloak 26 with Postg
 
 ## What the realm sets up
 
-| Setting                                                | Covers                                                                                    |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `lunos-cli`: public client, device flow only           | `lunos login` / `whoami` / `logout` (AC3), and revocation on logout (AC4)                 |
-| Self-registration, e-mail as username, verified e-mail | Sign-up with a verified e-mail (AC1). Needs SMTP.                                         |
-| `organizationsEnabled`, `organization` scope           | Organisations and invites by e-mail (AC2). `lunos whoami` shows the user's organisations. |
-| Realm roles `org-owner`, `org-admin`, `org-member`     | Roles for AC2                                                                             |
-| Brute-force protection, `sslRequired: external`        | Basic hardening                                                                           |
+| Setting                                                | Covers                                                                                                                                                                           |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lunos-cli`: public client, device flow only           | `lunos login` / `whoami` / `logout` (AC3), and revocation on logout (AC4)                                                                                                        |
+| Self-registration, e-mail as username, verified e-mail | Sign-up with a verified e-mail (AC1). Needs SMTP.                                                                                                                                |
+| `organizationsEnabled`, `organization` scope           | Organisations and invites by e-mail (AC2). `lunos whoami` shows the user's organisations.                                                                                        |
+| Realm roles `org-owner`, `org-admin`, `org-member`     | Placeholders only. Realm roles apply in every organisation a user belongs to, so "admin of A, member of B" can't be expressed. Per-organisation roles (AC2) still need a design. |
+| Brute-force protection, `sslRequired: external`        | Basic hardening                                                                                                                                                                  |
 
 **Not in the file, configured in the admin console once secrets exist:**
 
