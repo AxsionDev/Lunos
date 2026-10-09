@@ -37,6 +37,8 @@ export type Event =
       text: string
       sessionID: string
       costUSD?: number
+      /** Tokens the tool reported, when it reports tokens rather than money (Codex). */
+      tokens?: number
       turns?: number
       denied: { tool: string; id: string }[]
     }
@@ -56,6 +58,7 @@ export interface Options {
   cwd: string
   prompt: string
   resume?: string
+  model?: string
   permissionMode?: string
   /** Allow an approval-skipping mode for this run. Without it, such a mode is refused. */
   allowUnsafe?: boolean
@@ -69,7 +72,7 @@ export class UnsafeModeError extends Error {
   override name = "ExternalUnsafeMode"
 }
 
-export function args(options: Pick<Options, "resume" | "permissionMode" | "allowUnsafe" | "maxBudgetUSD">) {
+export function args(options: Pick<Options, "resume" | "model" | "permissionMode" | "allowUnsafe" | "maxBudgetUSD">) {
   const mode = options.permissionMode ?? SAFE_DEFAULT
   if (!/^[A-Za-z]+$/.test(mode)) throw new Error(`"${mode}" isn't a Claude Code permission mode`)
   if (UNSAFE_MODES.has(mode) && !options.allowUnsafe)
@@ -77,6 +80,8 @@ export function args(options: Pick<Options, "resume" | "permissionMode" | "allow
       `Permission mode "${mode}" skips every approval. Pass it explicitly for this run (--permission-mode ${mode} --unsafe) if you mean it.`,
     )
   // Passed on the command line (through a shell on Windows), so only an id-shaped value.
+  if (options.model !== undefined && !/^[A-Za-z0-9._:\[\]/-]+$/.test(options.model))
+    throw new Error(`"${options.model}" isn't a model name`)
   if (options.resume !== undefined && !/^[A-Za-z0-9_-]+$/.test(options.resume))
     throw new Error(`"${options.resume}" isn't a Claude Code session id`)
   return [
@@ -91,6 +96,7 @@ export function args(options: Pick<Options, "resume" | "permissionMode" | "allow
     "--permission-prompt-tool",
     "stdio",
     ...(options.resume ? ["--resume", options.resume] : []),
+    ...(options.model ? ["--model", options.model] : []),
     ...(options.maxBudgetUSD !== undefined ? ["--max-budget-usd", String(options.maxBudgetUSD)] : []),
   ]
 }

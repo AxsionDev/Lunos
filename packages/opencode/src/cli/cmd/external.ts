@@ -10,6 +10,7 @@ import { ExternalDetect } from "@/external/detect"
 import { ExternalPolicy } from "@/external/policy"
 import { ExternalClaude } from "@/external/claude"
 import { ExternalRegistry } from "@/external/registry"
+import { ExternalRun } from "@/external/run"
 
 // XCOD-204: `lunos external` drives the user's own Claude Code (and, once wired, Codex CLI).
 // Approvals follow `lunos run`'s rule: asked on a terminal, refused when not attached to one
@@ -64,6 +65,7 @@ const runBuilder = (yargs: Argv) =>
     .option("permission-mode", { type: "string", describe: "the tool's permission mode (default: its safe mode)" })
     .option("unsafe", { type: "boolean", default: false, describe: "allow an approval-skipping mode for this run" })
     .option("auto", { type: "boolean", default: false, describe: "approve every request the tool makes (dangerous!)" })
+    .option("model", { type: "string", describe: "the tool's model for this run (otherwise its own default)" })
     .option("max-budget-usd", { type: "number", describe: "stop the tool past this spend" })
     .option("json", { type: "boolean", default: false, describe: "print events as JSON lines" })
 
@@ -79,11 +81,9 @@ function runHandler(resume: boolean) {
       }
     })
     if (refused) return yield* fail(refused)
-    if (tool === "codex")
-      return yield* fail("Codex CLI isn't supported yet from `lunos external` (XCOD-204 in progress).")
-    const status = yield* Effect.promise(() => ExternalDetect.detect(tool, config.external?.claude?.path))
+    const status = yield* Effect.promise(() => ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, config)))
     if (!status.installed || status.outdated || status.loggedIn === false)
-      return yield* fail(status.hint ?? "Claude Code isn't usable")
+      return yield* fail(status.hint ?? `${status.label} isn't usable`)
     const previous = resume ? yield* Effect.promise(() => ExternalRegistry.get(args.session)) : undefined
     if (resume && !previous) out(`No record of ${args.session} in Lunos; resuming it in Claude Code anyway.`)
     const cwd = previous?.cwd ?? process.cwd()
@@ -91,11 +91,13 @@ function runHandler(resume: boolean) {
     let lastText = ""
     const running = yield* Effect.try({
       try: () =>
-        ExternalClaude.start({
+        ExternalRun.start({
+          tool,
           cwd,
           prompt: args.prompt,
           resume: resume ? args.session : undefined,
-          permissionMode: args.permissionMode ?? config.external?.claude?.permission_mode,
+          model: args.model,
+          permissionMode: args.permissionMode ?? (config.external as any)?.[tool]?.permission_mode,
           allowUnsafe: args.unsafe,
           maxBudgetUSD: args.maxBudgetUsd,
           executable: status.path,
@@ -105,7 +107,7 @@ function runHandler(resume: boolean) {
             if (event.type === "init") {
               out(
                 UI.Style.TEXT_DIM +
-                  `Claude Code session ${event.sessionID}${event.model ? ` · ${event.model}` : ""}` +
+                  `${ExternalDetect.TOOLS[tool].label} session ${event.sessionID}${event.model ? ` · ${event.model}` : ""}` +
                   UI.Style.TEXT_NORMAL,
               )
               void ExternalRegistry.save({
@@ -131,15 +133,20 @@ function runHandler(resume: boolean) {
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
     const result = yield* Effect.promise(() => running.done)
     if (result.type === "error") {
-      ExternalPolicy.record(config, "external.session", { tool, provider: "anthropic", outcome: "error" })
+      ExternalPolicy.record(config, "external.session", {
+        tool,
+        provider: ExternalDetect.TOOLS[tool].provider,
+        outcome: "error",
+      })
       return yield* fail(result.message)
     }
     ExternalPolicy.record(config, "external.session", {
       tool,
-      provider: "anthropic",
+      provider: ExternalDetect.TOOLS[tool].provider,
       session: result.sessionID,
       outcome: result.ok ? "success" : result.subtype,
       cost_usd: result.costUSD,
+      tokens: result.tokens,
       turns: result.turns,
       denied: result.denied.length,
       resumed: resume,
@@ -162,7 +169,7 @@ function runHandler(resume: boolean) {
       out(
         UI.Style.TEXT_DIM +
           `${result.ok ? "done" : result.subtype} · session ${result.sessionID} · ${result.turns ?? "?"} turns` +
-          (result.costUSD !== undefined ? ` · $${result.costUSD.toFixed(4)} (as reported by Claude Code)` : "") +
+          ` · ${ExternalRun.cost(tool, result)}` +
           (result.denied.length ? ` · ${result.denied.length} refused` : "") +
           UI.Style.TEXT_NORMAL,
       )

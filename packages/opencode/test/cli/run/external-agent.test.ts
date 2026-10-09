@@ -11,6 +11,7 @@ import { cliIt } from "../../lib/cli-process"
 import { testProviderConfig } from "../../lib/test-provider"
 
 const FAKE = path.join(import.meta.dir, "..", "..", "external", "fixtures", "fake-claude.ts")
+const FAKE_CODEX = path.join(import.meta.dir, "..", "..", "external", "fixtures", "fake-codex.ts")
 const TIMEOUT = 120_000
 // Each run starts lunos plus the fake claude several times (version, help, auth, session); on
 // Windows CI that alone can pass the harness's 30 s default child timeout.
@@ -19,7 +20,7 @@ const CHILD_TIMEOUT = 90_000
 const config = (llmUrl: string, extra: Record<string, unknown> = {}) =>
   JSON.stringify({
     ...testProviderConfig(llmUrl),
-    external: { delegate: true, claude: { path: FAKE } },
+    external: { delegate: true, claude: { path: FAKE }, codex: { path: FAKE_CODEX } },
     // Lunos's own rule for the delegation and for Claude Code's approvals, as a user would set it.
     permission: { external: "allow" },
     ...extra,
@@ -44,6 +45,27 @@ describe("lunos run with external_agent (XCOD-204)", () => {
         expect(toolResult).toContain("Files changed: hello.txt")
         expect(toolResult).toContain("Cost: $")
         expect(toolResult).toContain("a6fd116c-92e4-4731-a522-99679ab93931")
+      }),
+    TIMEOUT,
+  )
+
+  cliIt.concurrent(
+    "the agent delegates to Codex the same way, and gets back the answer, changed files and tokens",
+    ({ llm, opencode, home }) =>
+      Effect.gen(function* () {
+        spawnSync("git", ["init", "-q"], { cwd: home })
+        yield* llm.tool("external_agent", { tool: "codex", task: "Create note.txt containing from codex" })
+        yield* llm.text("delegated")
+        const result = yield* opencode.run("hand it to codex", {
+          timeoutMs: CHILD_TIMEOUT,
+          env: { OPENCODE_CONFIG_CONTENT: config(llm.url) },
+        })
+        opencode.expectExit(result, 0)
+        expect(fs.readFileSync(path.join(home, "note.txt"), "utf8")).toBe("from codex")
+        const toolResult = JSON.stringify((yield* llm.inputs).at(-1))
+        expect(toolResult).toContain("Files changed: note.txt")
+        expect(toolResult).toContain("tokens (Codex CLI reports tokens, not money)")
+        expect(toolResult).toContain("lunos external resume codex")
       }),
     TIMEOUT,
   )
