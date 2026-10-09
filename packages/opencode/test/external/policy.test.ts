@@ -58,6 +58,14 @@ describe("ExternalDetect (XCOD-204)", () => {
     expect(status.hint).toContain("didn't run")
   })
 
+  test("the version is the number, whichever word comes first", async () => {
+    const fixtures = path.join(import.meta.dir, "fixtures")
+    expect((await ExternalDetect.detect("codex", path.join(fixtures, "fake-codex.ts"))).version).toBe("0.160.1")
+    expect((await ExternalDetect.detect("claude", path.join(fixtures, "fake-claude.ts"))).version).toMatch(
+      /^\d+\.\d+\.\d+$/,
+    )
+  })
+
   test("scripts run with Bun, and a Windows .cmd shim through a shell", () => {
     expect(ExternalDetect.command("/x/fake.ts", ["--version"])).toEqual({
       file: process.execPath,
