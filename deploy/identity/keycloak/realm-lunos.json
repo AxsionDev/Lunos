@@ -1,0 +1,57 @@
+{
+  "realm": "lunos",
+  "displayName": "Lunos",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": true,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "bruteForceProtected": true,
+  "organizationsEnabled": true,
+  "oauth2DeviceCodeLifespan": 600,
+  "oauth2DevicePollingInterval": 5,
+  "offlineSessionIdleTimeout": 2592000,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "de", "fr", "es", "it", "nl", "pl", "pt-BR", "bg"],
+  "defaultLocale": "en",
+  "smtpServer": {
+    "host": "${SMTP_HOST}",
+    "port": "${SMTP_PORT}",
+    "from": "${SMTP_FROM}",
+    "fromDisplayName": "Lunos",
+    "auth": "true",
+    "user": "${SMTP_USER}",
+    "password": "${SMTP_PASSWORD}",
+    "starttls": "true"
+  },
+  "clients": [
+    {
+      "clientId": "lunos-cli",
+      "name": "Lunos CLI, IDE and desktop",
+      "description": "Public client for `lunos login` (OAuth 2.0 device authorization grant, RFC 8628). XCOD-185.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "basic", "email", "organization"],
+      "optionalClientScopes": ["offline_access"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "org-owner", "description": "Owns an organisation: billing, deletion, all admin rights" },
+      { "name": "org-admin", "description": "Manages an organisation's members and settings" },
+      { "name": "org-member", "description": "Member of an organisation" }
+    ]
+  }
+}
