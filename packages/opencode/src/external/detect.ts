@@ -105,7 +105,8 @@ export async function detect(tool: Tool, configured?: string): Promise<Status> {
     ...base,
     installed: true,
     path: file,
-    version: version.stdout.trim().split(/\s+/)[0],
+    // "2.1.295 (Claude Code)" and "codex-cli 0.160.1": the number isn't always first.
+    version: /\d+\.\d+\.\d+\S*/.exec(version.stdout)?.[0] ?? version.stdout.trim().split(/\s+/)[0],
     ...(missing.length
       ? { outdated: `missing ${missing.join(", ")}`, hint: `Update ${spec.label}: ${spec.install}` }
       : {}),

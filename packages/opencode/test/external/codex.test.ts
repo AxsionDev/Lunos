@@ -67,6 +67,58 @@ describe("ExternalCodex (XCOD-204)", () => {
     expect(events.some((event) => event.type === "tool_result" && event.isError)).toBe(true)
   })
 
+  test("Codex's own commands: /review and /compact go to their methods; others are refused before Codex starts", () => {
+    const review = (prompt: string) => {
+      const turn = ExternalCodex.command(prompt, false)
+      return turn.method === "review/start" ? turn.params.target : turn.method
+    }
+    expect(review("/review")).toEqual({ type: "uncommittedChanges" })
+    expect(review("/review base dev")).toEqual({ type: "baseBranch", branch: "dev" })
+    expect(review("/review commit 1593d4e")).toEqual({ type: "commit", sha: "1593d4e" })
+    expect(review("/review only the error handling")).toEqual({
+      type: "custom",
+      instructions: "only the error handling",
+    })
+    // Not commands: plain prompts, and a path that happens to start with "/".
+    expect(review("Create note.txt")).toBe("turn/start")
+    expect(review("/usr/bin/env is what?")).toBe("turn/start")
+    expect(ExternalCodex.command("/compact", true).method).toBe("thread/compact/start")
+    expect(() => ExternalCodex.command("/compact", false)).toThrow(/existing Codex session/)
+    expect(() => ExternalCodex.command("/init", false)).toThrow(ExternalCodex.UnsupportedCommandError)
+    expect(() => ExternalCodex.command("/init", false)).toThrow(/\/review, \/compact/)
+    // Refused before anything is spawned.
+    expect(() =>
+      ExternalCodex.start({
+        cwd: "/",
+        prompt: "/init",
+        executable: "/nonexistent",
+        ask: async () => ({ allow: true }),
+      }),
+    ).toThrow(/can't run \/init/)
+  })
+
+  test("/review runs Codex's review and returns its findings", async () => {
+    const { result, sent } = await run(async () => ({ allow: true }), { prompt: "/review base dev" })
+    expect(sent.find((m) => m.method === "review/start").params).toMatchObject({
+      target: { type: "baseBranch", branch: "dev" },
+      delivery: "inline",
+    })
+    expect(sent.some((m) => m.method === "turn/start")).toBe(false)
+    expect(result).toMatchObject({ type: "result", ok: true })
+    if (result.type === "result") expect(result.text).toContain("Restore add to perform addition")
+  })
+
+  test("/compact on a resumed session compacts it and says so", async () => {
+    const { result, sent } = await run(async () => ({ allow: true }), {
+      prompt: "/compact",
+      resume: "01a116f2-5e88-79d3-afb9-db1da07c9fcd",
+    })
+    expect(sent.find((m) => m.method === "thread/compact/start").params).toEqual({
+      threadId: "01a116f2-5e88-79d3-afb9-db1da07c9fcd",
+    })
+    expect(result).toMatchObject({ type: "result", ok: true, text: "Codex compacted the session." })
+  })
+
   test("resume continues the thread by id", async () => {
     const { sent } = await run(async () => ({ allow: true }), { resume: "01a116f2-5e88-79d3-afb9-db1da07c9fcd" })
     expect(sent.find((m) => m.method === "thread/resume").params.threadId).toBe("01a116f2-5e88-79d3-afb9-db1da07c9fcd")
