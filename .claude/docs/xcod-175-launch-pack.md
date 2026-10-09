@@ -51,8 +51,9 @@ Checked against the wording rules in `.claude/docs/xcod-55-infrastructure-sovere
 **Text:**
 
 > I'm Petar. [PETAR: one sentence on your own work, in your words, e.g. who you build software
+>
 > > for.] In European organisations, the question that stops an AI coding agent is rarely "is it
-> good?" but "where does our code go, and can you prove it?"
+> > good?" but "where does our code go, and can you prove it?"
 >
 > Lunos is a fork of opencode (MIT, like upstream) that adds controls for that question:
 >
@@ -115,6 +116,7 @@ Don't argue about upstream.
 ## 3. LinkedIn, Petar's own post
 
 > [PETAR: your own opening, a real moment when an AI coding tool was blocked or questioned
+>
 > > because of where the code would go. Don't post an anecdote that didn't happen. If there isn't one,
 > > open with the question instead:]
 >
