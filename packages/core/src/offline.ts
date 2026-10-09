@@ -208,6 +208,14 @@ export const CALLS: Call[] = [
     when: "only when you run that command",
     offline: "command",
   },
+  {
+    // XCOD-186: sends the repository's remote URL and commit (never the working tree) to a worker.
+    id: "cloud-run",
+    what: "`lunos run --cloud` and `lunos-cloud` workspaces (Lunos Cloud workers)",
+    hosts: "`cloud.endpoint`, and the `cloud.issuer` you signed in to",
+    when: "only with --cloud, signed in, with cloud.endpoint set",
+    offline: "blocked",
+  },
 ]
 
 /** One line per blocked call, for `lunos --version --verbose`. */

@@ -70,6 +70,12 @@ export const EVENTS = [
   // cost), or one refused before it started (residency or policy). Never the prompt or output.
   "external.session",
   "external.denied",
+  // XCOD-186: a run dispatched to a Lunos Cloud worker (worker id, endpoint, region, repo, size,
+  // the secret names sent), its end (outcome, results branch, active seconds), or a dispatch refused
+  // before any code left the machine (offline, residency, unpushed commit). Never secret values.
+  "cloud.dispatch",
+  "cloud.finish",
+  "cloud.denied",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

@@ -15,5 +15,10 @@ export const Info = Schema.Struct({
   client_id: Schema.String.pipe(Schema.optional).annotate({
     description: 'OAuth client id registered for the Lunos CLI at that issuer (default "lunos-cli")',
   }),
+  // XCOD-186: no default until Lunos Cloud's control plane is live; `lunos run --cloud` needs it.
+  endpoint: Schema.String.pipe(Schema.optional).annotate({
+    description:
+      "Lunos Cloud control plane that lunos run --cloud dispatches runs to (https, or localhost for testing), e.g. https://cloud.lunos.tech",
+  }),
 }).annotate({ identifier: "CloudConfig" })
 export type Info = Schema.Schema.Type<typeof Info>

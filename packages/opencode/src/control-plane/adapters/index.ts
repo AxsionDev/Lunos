@@ -2,10 +2,12 @@ import type { ProjectV2 } from "@opencode-ai/core/project"
 import type { WorkspaceAdapter, WorkspaceAdapterEntry } from "../types"
 import { WorktreeAdapter } from "./worktree"
 import { DockerAdapter } from "./docker"
+import { CloudAdapter } from "./cloud"
 
 const BUILTIN: Record<string, WorkspaceAdapter> = {
   worktree: WorktreeAdapter,
   docker: DockerAdapter,
+  "lunos-cloud": CloudAdapter,
 }
 
 const state = new Map<ProjectV2.ID, Map<string, WorkspaceAdapter>>()

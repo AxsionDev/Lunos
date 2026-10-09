@@ -447,6 +447,10 @@
         "client_id": {
           "type": "string",
           "description": "OAuth client id registered for the Lunos CLI at that issuer (default \"lunos-cli\")"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Lunos Cloud control plane that lunos run --cloud dispatches runs to (https, or localhost for testing), e.g. https://cloud.lunos.tech"
         }
       },
       "additionalProperties": false

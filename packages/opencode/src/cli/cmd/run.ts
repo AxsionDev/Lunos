@@ -289,6 +289,22 @@ export const RunCommand = effectCmd({
       .option("rm", {
         type: "boolean",
         describe: "with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says",
+      })
+      .option("cloud", {
+        type: "boolean",
+        describe:
+          "run on a Lunos Cloud worker (needs lunos login and cloud.endpoint); results come back as branch lunos/cloud/<id>",
+      })
+      .option("cloud-size", {
+        type: "string",
+        choices: ["standard", "large"],
+        describe: "with --cloud: worker size (large counts double)",
+      })
+      .option("cloud-secret", {
+        type: "string",
+        array: true,
+        describe:
+          "with --cloud: send this environment variable to the worker for this run (repeatable); nothing else is sent",
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
     if (args.sandbox === false && !args.attach) {
@@ -317,6 +333,34 @@ export const RunCommand = effectCmd({
               } as never)
             },
             { keep: args.keep, rm: args.rm },
+          ),
+        catch: (error) => error,
+      }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
+    }
+    if (args.cloud) {
+      if (args.attach) return yield* fail("--cloud cannot be used with --attach")
+      if (args.mini) return yield* fail("--cloud cannot be used with --mini yet")
+      const { runCloud } = yield* Effect.promise(() => import("./cloud-run"))
+      const { Config } = yield* Effect.promise(() => import("@/config/config"))
+      const config = yield* (yield* Config.Service).get()
+      const here = Filesystem.resolve(process.env.PWD ?? process.cwd())
+      const directory = args.dir ? path.resolve(here, args.dir) : here
+      return yield* Effect.tryPromise({
+        try: () =>
+          runCloud(
+            directory,
+            config,
+            { size: args["cloud-size"] as "standard" | "large" | undefined, secrets: args["cloud-secret"] },
+            async (conn) => {
+              await RunCommand.handler!({
+                ...args,
+                cloud: false,
+                attach: conn.url,
+                dir: conn.directory,
+                password: conn.password,
+                username: conn.username,
+              } as never)
+            },
           ),
         catch: (error) => error,
       }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
@@ -1157,5 +1201,10 @@ export async function runMini(input: MiniCommandInput) {
     unattended: false,
     keep: undefined,
     rm: undefined,
+    cloud: undefined,
+    "cloud-size": undefined,
+    cloudSize: undefined,
+    "cloud-secret": undefined,
+    cloudSecret: undefined,
   })
 }
