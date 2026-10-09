@@ -54,7 +54,7 @@ async function serve(entry: string, dir: string, password: string, secrets: Reco
       ...secrets,
     },
     stdout: "pipe",
-    stderr: "pipe",
+    stderr: "ignore",
   })
   const reader = (proc.stdout as ReadableStream<Uint8Array>).getReader()
   const decoder = new TextDecoder()
@@ -64,7 +64,13 @@ async function serve(entry: string, dir: string, password: string, secrets: Reco
     if (done) throw new Error(`lunos serve exited without a URL: ${seen}`)
     seen += decoder.decode(value)
     const url = /https?:\/\/127\.0\.0\.1:\d+/.exec(seen)?.[0]
-    if (url) return { proc, url }
+    if (url) {
+      // Keep reading, or the server blocks on a full pipe the next time it logs.
+      void (async () => {
+        while (!(await reader.read()).done);
+      })().catch(() => {})
+      return { proc, url }
+    }
   }
 }
 
