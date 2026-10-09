@@ -1,0 +1,52 @@
+# XCOD-185: the Lunos Cloud identity provider. Keycloak 26 + Postgres, realm imported at boot.
+# Run on the server with: docker compose --env-file .env up -d   (see README.md)
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:?set KC_DB_PASSWORD in .env}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # --import-realm skips a realm that already exists, so restarts never overwrite changes made in the console.
+    command: ["start", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      # The public URL users and `lunos login` see. Lunos only accepts https issuers (localhost excepted).
+      KC_HOSTNAME: ${KC_HOSTNAME:?set KC_HOSTNAME in .env, e.g. https://id.lunos.tech}
+      # TLS ends at the reverse proxy (IIS/ARR, nginx, Caddy) in front of port 8080.
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?set KC_ADMIN_PASSWORD in .env}
+      # Read by the realm file's ${...} placeholders.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    volumes:
+      - ./realm-lunos.json:/opt/keycloak/data/import/realm-lunos.json:ro
+    ports:
+      # Only the reverse proxy on this host should reach it.
+      - "127.0.0.1:${KC_PORT:-8080}:8080"
+
+volumes:
+  db:
