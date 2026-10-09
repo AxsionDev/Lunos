@@ -183,5 +183,46 @@ describe("CloudWorkers (XCOD-186)", () => {
     const config = { cloud: { endpoint: fake.url } }
     const found = await CloudWorkers.repo(work, config)
     await expect(CloudWorkers.create({ config, repo: found.repo })).rejects.toThrow(/would push to "main"/)
+    // The refused worker was ended, not left running.
+    expect(fake.workers.size).toBe(0)
+    expect(fake.requests.some((r) => r.method === "DELETE")).toBe(true)
+  })
+
+  test("a token in the remote URL is never sent or audited", async () => {
+    fake = await Fake.start()
+    await signIn(fake.issuer)
+    const { root, work } = await repository()
+    await $`git -C ${work} remote set-url origin https://ada:ghp_SECRET123@example.invalid/acme/app.git`.quiet()
+    const auditPath = path.join(root, "audit.log")
+    const config = { cloud: { endpoint: fake.url }, residency: { allow: ["eu"] as const, auditPath } }
+    const found = await CloudWorkers.repo(work, config)
+    expect(found.strippedCredentials).toBe(true)
+    expect(found.repo.url).toBe("https://example.invalid/acme/app.git")
+    expect(CloudWorkers.publicRemote("git@github.com:acme/app.git")).toEqual({
+      url: "git@github.com:acme/app.git",
+      stripped: false,
+    })
+    // The fake can't clone example.invalid, so the start fails; that path must not leak it either.
+    await expect(CloudWorkers.create({ config, repo: found.repo })).rejects.toThrow()
+    await Bun.sleep(100)
+    expect(JSON.stringify(fake.requests)).not.toContain("ghp_SECRET123")
+    expect(await fs.readFile(auditPath, "utf8")).not.toContain("ghp_SECRET123")
+    const events = (await audit(auditPath)).map((e) => [e.event, e.outcome])
+    expect(events).toContainEqual(["cloud.finish", "not started"])
+  })
+
+  test("the worker's password only goes to an https (or localhost) server", () => {
+    const worker = {
+      id: "abcdef123456",
+      status: "running" as const,
+      region: "eu" as const,
+      auth: { username: "opencode", password: "pw" },
+      branch: "lunos/cloud/abcdef123456",
+      activeSeconds: 0,
+    }
+    expect(() => CloudWorkers.connection({ ...worker, url: "http://worker.example.com" })).toThrow(/must be https/)
+    expect(CloudWorkers.connection({ ...worker, url: "https://w1.cloud.lunos.tech" }).url).toBe(
+      "https://w1.cloud.lunos.tech",
+    )
   })
 })

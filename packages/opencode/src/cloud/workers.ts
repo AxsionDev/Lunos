@@ -57,15 +57,34 @@ export function record(
   if (file) void Audit.write({ file }, event, fields)
 }
 
-/** The control plane's URL, checked: https, or localhost for testing (as `cloud.issuer`). */
-export function endpoint(config: Config) {
-  const raw = config.cloud?.endpoint
-  if (!raw) throw new RefusedError(NO_ENDPOINT)
+/** https, or http to localhost for testing (as `cloud.issuer`). */
+function secure(raw: string, what: string) {
   const url = new URL(raw)
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
   if (url.protocol !== "https:" && !(local && url.protocol === "http:"))
-    throw new RefusedError(`cloud.endpoint must be https (localhost excepted): ${raw}`)
+    throw new RefusedError(`${what} must be https (localhost excepted): ${raw}`)
   return url.toString().replace(/\/$/, "")
+}
+
+/** The control plane's URL, checked. */
+export function endpoint(config: Config) {
+  const raw = config.cloud?.endpoint
+  if (!raw) throw new RefusedError(NO_ENDPOINT)
+  return secure(raw, "cloud.endpoint")
+}
+
+/**
+ * A remote URL with any user name or token removed (`https://user:ghp_…@github.com/…`), so it can
+ * be sent and audited. The control plane reaches the repository with the token the user gave it.
+ * scp-style remotes (`git@host:path`) carry no secret and are kept as they are.
+ */
+export function publicRemote(raw: string) {
+  if (!/^https?:\/\//i.test(raw)) return { url: raw, stripped: false }
+  const url = new URL(raw)
+  if (!url.username && !url.password) return { url: raw, stripped: false }
+  url.username = ""
+  url.password = ""
+  return { url: url.toString(), stripped: true }
 }
 
 export function newID() {
@@ -170,22 +189,37 @@ export async function create(input: Dispatch, id = newID()): Promise<Started> {
     size: body.size,
     secrets: Object.keys(body.secrets).join(",") || undefined,
   })
-  let worker = await call(base, token, "PUT", `/v1/workers/${id}`, CloudContract.Worker, body, input.fetcher)
-  const deadline = Date.now() + 5 * 60_000
-  while (worker.status === "starting") {
-    if (Date.now() > deadline) throw new ServiceError(0, "timeout", `Worker ${id} didn't start within 5 minutes`)
-    await Bun.sleep(1000)
-    worker = await call(base, token, "GET", `/v1/workers/${id}`, CloudContract.Worker, undefined, input.fetcher)
-  }
-  if (worker.status !== "running" || !worker.url)
-    throw new ServiceError(0, "failed", `Worker ${id} didn't start (status ${worker.status})`)
-  if (worker.branch !== CloudContract.branch(id))
-    throw new ServiceError(
-      0,
-      "contract",
-      `Worker ${id} would push to "${worker.branch}", not ${CloudContract.branch(id)}`,
+  try {
+    let worker = await call(base, token, "PUT", `/v1/workers/${id}`, CloudContract.Worker, body, input.fetcher)
+    const deadline = Date.now() + 5 * 60_000
+    while (worker.status === "starting") {
+      if (Date.now() > deadline) throw new ServiceError(0, "timeout", `Worker ${id} didn't start within 5 minutes`)
+      await Bun.sleep(1000)
+      worker = await call(base, token, "GET", `/v1/workers/${id}`, CloudContract.Worker, undefined, input.fetcher)
+    }
+    if (worker.status !== "running" || !worker.url)
+      throw new ServiceError(0, "failed", `Worker ${id} didn't start (status ${worker.status})`)
+    if (worker.branch !== CloudContract.branch(id))
+      throw new ServiceError(
+        0,
+        "contract",
+        `Worker ${id} would push to "${worker.branch}", not ${CloudContract.branch(id)}`,
+      )
+    connection(worker)
+    return { base, token, worker }
+  } catch (error) {
+    // Whatever went wrong after the request, a worker may exist: end it rather than leave it
+    // running (and metered). It may not exist (402, 429), so a failed DELETE is expected.
+    await call(base, token, "DELETE", `/v1/workers/${id}`, CloudContract.Finished, undefined, input.fetcher).catch(
+      () => undefined,
     )
-  return { base, token, worker }
+    record(config, "cloud.finish", {
+      worker: id,
+      outcome: "not started",
+      reason: error instanceof ServiceError ? error.code : "error",
+    })
+    throw error
+  }
 }
 
 export async function get(base: string, id: string, fetcher?: typeof fetch) {
@@ -218,8 +252,10 @@ export async function finish(config: Config, base: string, id: string, outcome: 
 /** The worker's server, as a workspace target or for `lunos run --attach`. */
 export function connection(worker: CloudContract.Worker) {
   if (!worker.url || !worker.auth) throw new ServiceError(0, "contract", `Worker ${worker.id} has no server address`)
+  // The worker's password goes to this URL, so the same rule as the endpoint.
+  const url = secure(worker.url, `Worker ${worker.id}'s server address`)
   return {
-    url: worker.url,
+    url,
     username: worker.auth.username,
     password: worker.auth.password,
     directory: worker.directory,
@@ -262,5 +298,12 @@ export async function repo(directory: string, config: Config) {
     )
   const status = await git(directory, "status", "--porcelain")
   const uncommitted = status.out ? status.out.split("\n").map((line) => line.slice(3)) : []
-  return { repo: { url: url.out, commit, branch }, root: top.out, uncommitted }
+  const remoteURL = publicRemote(url.out)
+  return {
+    repo: { url: remoteURL.url, commit, branch },
+    root: top.out,
+    uncommitted,
+    /** The remote URL had a user name or token in it, which isn't sent. */
+    strippedCredentials: remoteURL.stripped,
+  }
 }

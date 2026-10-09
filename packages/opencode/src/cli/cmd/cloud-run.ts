@@ -24,17 +24,17 @@ export async function runCloud(
   client: (conn: ReturnType<typeof CloudWorkers.connection>) => Promise<void>,
 ) {
   const found = await CloudWorkers.repo(directory, config)
+  if (found.strippedCredentials) say("the remote URL has a user name or token in it; it isn't sent")
   if (found.uncommitted.length)
     say(
       `${found.uncommitted.length} uncommitted change(s) stay here; the worker starts from ${found.repo.commit.slice(0, 10)}`,
     )
   const named = secrets(options.secrets ?? [])
-  say(`starting a ${options.size ?? "standard"} worker`)
-  const started = await CloudWorkers.create({ config, repo: found.repo, size: options.size, secrets: named })
-  const { worker } = started
-  say(`${worker.id} running in ${worker.region}; results go to ${worker.branch}`)
+  const base = CloudWorkers.endpoint(config)
+  // The id is known before the request, so Ctrl+C while the worker starts can still end it.
+  const id = CloudWorkers.newID()
   const end = async (outcome: string) => {
-    const done = await CloudWorkers.finish(config, started.base, worker.id, outcome)
+    const done = await CloudWorkers.finish(config, base, id, outcome)
     say(
       done.pushed
         ? `${outcome}: results on ${done.branch}. Fetch them with: git fetch origin ${done.branch}`
@@ -44,13 +44,23 @@ export async function runCloud(
   }
   let stopping: Promise<unknown> | undefined
   const interrupted = () => {
-    say(`interrupted; ending ${worker.id}`)
+    say(`interrupted; ending ${id}`)
     stopping = end("interrupted")
-      .catch((error) => say(`couldn't end ${worker.id}: ${error instanceof Error ? error.message : String(error)}`))
+      .catch((error) => say(`couldn't end ${id}: ${error instanceof Error ? error.message : String(error)}`))
       .finally(() => process.exit(130))
   }
   process.once("SIGINT", interrupted)
   process.once("SIGTERM", interrupted)
+  say(`starting a ${options.size ?? "standard"} worker`)
+  const started = await CloudWorkers.create({ config, repo: found.repo, size: options.size, secrets: named }, id).catch(
+    (error) => {
+      process.off("SIGINT", interrupted)
+      process.off("SIGTERM", interrupted)
+      throw error
+    },
+  )
+  const { worker } = started
+  say(`${worker.id} running in ${worker.region}; results go to ${worker.branch}`)
   const before = process.exitCode
   process.exitCode = undefined
   try {

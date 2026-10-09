@@ -37,10 +37,22 @@ type Worker = {
   server?: { proc: Subprocess; url: string }
 }
 
-async function serve(entry: string, dir: string, password: string) {
+// The worker's server sees none of this machine's environment or stored logins: only PATH, its own
+// home, the password and the secrets the client named, as a real worker would.
+async function serve(entry: string, dir: string, password: string, secrets: Record<string, string>) {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-worker-home-"))
   const proc = Bun.spawn(["bun", entry, "serve", "--port", "0", "--hostname", "127.0.0.1"], {
     cwd: dir,
-    env: { ...process.env, OPENCODE_SERVER_PASSWORD: password },
+    env: {
+      PATH: process.env.PATH ?? "",
+      HOME: home,
+      XDG_DATA_HOME: path.join(home, "data"),
+      XDG_CONFIG_HOME: path.join(home, "config"),
+      XDG_STATE_HOME: path.join(home, "state"),
+      XDG_CACHE_HOME: path.join(home, "cache"),
+      OPENCODE_SERVER_PASSWORD: password,
+      ...secrets,
+    },
     stdout: "pipe",
     stderr: "pipe",
   })
@@ -100,10 +112,14 @@ export async function start(options: Options = {}) {
         const existing = workers.get(id)
         if (existing) return Response.json(view(existing))
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-worker-"))
-        await $`git clone -q ${body.repo.url} ${dir}`.quiet()
+        const cloned = await $`git clone -q ${body.repo.url} ${dir}`.quiet().nothrow()
+        if (cloned.exitCode !== 0) {
+          await fs.rm(dir, { recursive: true, force: true })
+          return error(502, "repo_unreachable", `The worker couldn't clone ${body.repo.url}`)
+        }
         await $`git -C ${dir} checkout -q ${body.repo.commit}`.quiet()
         const worker: Worker = { id, dir, commit: body.repo.commit, polls: 0, started: Date.now() }
-        if (options.serve) worker.server = await serve(options.serve, dir, `pw-${id}`)
+        if (options.serve) worker.server = await serve(options.serve, dir, `pw-${id}`, body.secrets ?? {})
         workers.set(id, worker)
         return Response.json(view(worker), { status: 201 })
       }
