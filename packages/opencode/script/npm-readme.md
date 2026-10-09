@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AxsionDev/Lunos/dev/assets/brand/lunos-logo-light.png" alt="Lunos logo" width="232">
+</p>
+
 # Lunos
 
 **EU-sovereign, open-source AI coding agent for the terminal.**
