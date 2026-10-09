@@ -66,6 +66,57 @@ export function settings(options: Pick<Options, "sandbox" | "approvalPolicy" | "
   return { sandbox, approvalPolicy }
 }
 
+export class UnsupportedCommandError extends Error {
+  override name = "ExternalUnsupportedCommand"
+}
+
+/**
+ * Codex's own slash commands belong to its TUI; the app server has no prompt-level `/` parsing.
+ * The ones it can run headless have their own methods, so Lunos maps them (recorded from 0.160.1):
+ *
+ *   /review                  → review/start { target: uncommittedChanges }
+ *   /review base <branch>    → review/start { target: baseBranch }
+ *   /review commit <sha>     → review/start { target: commit }
+ *   /review <instructions>   → review/start { target: custom }
+ *   /compact                 → thread/compact/start (a resumed session only)
+ *
+ * Any other `/name` is refused before Codex starts, rather than sent to the model as text.
+ */
+export const COMMANDS = ["/review", "/compact"]
+
+export type Turn =
+  | { method: "turn/start"; params: { input: { type: "text"; text: string }[] } }
+  | { method: "review/start"; params: { target: Record<string, string>; delivery: "inline" } }
+  | { method: "thread/compact/start"; params: {} }
+
+export function command(prompt: string, resuming: boolean): Turn {
+  const match = /^\/([a-z][\w:-]*)(?:\s+([\s\S]*))?$/.exec(prompt.trim())
+  if (!match) return { method: "turn/start", params: { input: [{ type: "text", text: prompt }] } }
+  const [, name, rest = ""] = match
+  const arg = rest.trim()
+  if (name === "review") {
+    const [kind, value, ...more] = arg.split(/\s+/)
+    const target: Record<string, string> = !arg
+      ? { type: "uncommittedChanges" }
+      : kind === "base" && value && !more.length
+        ? { type: "baseBranch", branch: value }
+        : kind === "commit" && value && !more.length
+          ? { type: "commit", sha: value }
+          : { type: "custom", instructions: arg }
+    return { method: "review/start", params: { target, delivery: "inline" } }
+  }
+  if (name === "compact") {
+    if (!resuming)
+      throw new UnsupportedCommandError(
+        "/compact compacts an existing Codex session: lunos external resume codex <session> /compact",
+      )
+    return { method: "thread/compact/start", params: {} }
+  }
+  throw new UnsupportedCommandError(
+    `Codex can't run /${name} without its TUI. Supported here: ${COMMANDS.join(", ")}. Anything else, ask in words.`,
+  )
+}
+
 const APPROVAL_METHODS: Record<string, string> = {
   "item/fileChange/requestApproval": "FileChange",
   "item/commandExecution/requestApproval": "Bash",
@@ -84,6 +135,7 @@ export function start(options: Options): Running {
   const thread = settings(options)
   if (options.resume !== undefined && !/^[A-Za-z0-9_-]+$/.test(options.resume))
     throw new Error(`"${options.resume}" isn't a Codex thread id`)
+  const first = command(options.prompt, options.resume !== undefined)
   const cmd = ExternalDetect.command(executable, ["app-server"])
   const child = spawn(cmd.file, cmd.args, {
     cwd: options.cwd,
@@ -170,6 +222,10 @@ export function start(options: Options): Running {
         return
       }
       switch (message.method) {
+        // Every way of starting a turn announces it here; /compact's response doesn't carry its id.
+        case "turn/started":
+          turnID = params.turn?.id ?? turnID
+          return
         case "item/started": {
           const item = params.item ?? {}
           items.set(item.id, item)
@@ -186,6 +242,8 @@ export function start(options: Options): Running {
             lastText = item.text
             options.onEvent?.({ type: "text", text: item.text })
           }
+          // Compaction says nothing itself, so the result would otherwise be empty.
+          if (item.type === "contextCompaction" && !lastText) lastText = "Codex compacted the session."
           if (item.type === "commandExecution" || item.type === "fileChange")
             options.onEvent?.({
               type: "tool_result",
@@ -233,11 +291,8 @@ export function start(options: Options): Running {
           : await request("thread/start", common)
         threadID = started?.thread?.id ?? threadID
         options.onEvent?.({ type: "init", sessionID: threadID, model: started?.model, tools: [], commands: [] })
-        const turn = await request("turn/start", {
-          threadId: threadID,
-          input: [{ type: "text", text: options.prompt }],
-        })
-        turnID = turn?.turn?.id ?? ""
+        const turn = await request(first.method, { threadId: threadID, ...first.params })
+        turnID = turn?.turn?.id ?? turnID
       } catch (error) {
         finish({
           type: "error",

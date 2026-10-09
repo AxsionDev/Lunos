@@ -32,6 +32,17 @@ lunos external stop <session-id>                       # end a running session
 
 Commands and skills that Claude Code runs headless work as the prompt, for example `/review` or one of your own skills. Commands that only work in its interactive terminal, such as `/login`, don't. Claude Code then reports an error, and Lunos shows it.
 
+Codex CLI's own commands belong to its interactive terminal, so Lunos runs the two that Codex can do headless itself:
+
+| Command                                               | What it does                                                     |
+| ----------------------------------------------------- | ---------------------------------------------------------------- |
+| `/review`                                             | Codex reviews your uncommitted changes and returns its findings. |
+| `/review base <branch>`, `/review commit <sha>`       | Reviews the changes against a branch, or one commit.             |
+| `/review <instructions>`                              | A review that follows your instructions.                         |
+| `lunos external resume codex <session-id> "/compact"` | Compacts that session's context. It needs an existing session.   |
+
+Any other Codex command, such as `/init`, is refused before Codex starts, with the list above. Ask for it in words instead.
+
 `--model` picks the tool's model for one run; otherwise the tool's own default applies. If your Codex config names a model your account can't use, Codex reports that error and Lunos shows it. `--model` gets round it without editing the config.
 
 After each session Lunos shows what the tool reports:
