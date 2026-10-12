@@ -156,10 +156,11 @@ export function SessionsPage() {
       refresh()
     },
     toggle: async (group: SessionGroup) => {
-      setData("groups", (item) => item.id === group.id, "collapsed", !group.collapsed)
-      await client()
-        ?.experimental.sessionGroup.update({ groupID: group.id, collapsed: !group.collapsed }, { throwOnError: true })
-        .catch(fail)
+      // Read before the optimistic write: `group` is a store proxy and sees the new value afterwards.
+      const collapsed = !group.collapsed
+      const groupID = group.id
+      setData("groups", (item) => item.id === groupID, "collapsed", collapsed)
+      await client()?.experimental.sessionGroup.update({ groupID, collapsed }, { throwOnError: true }).catch(fail)
       refresh()
     },
     remove: async (group: SessionGroup) => {
@@ -244,10 +245,10 @@ export function SessionsPage() {
         <span
           class="inline-block size-2 shrink-0 rounded-full"
           classList={{
-            "bg-amber-500": item().state === "waiting",
-            "bg-emerald-500": item().state === "running",
-            "bg-red-500": item().state === "failed",
-            "bg-gray-400": item().state === "idle" || item().state === "finished",
+            "bg-v2-state-fg-warning": item().state === "waiting",
+            "bg-v2-state-fg-success": item().state === "running",
+            "bg-v2-state-fg-danger": item().state === "failed",
+            "bg-v2-border-border-base": item().state === "idle" || item().state === "finished",
           }}
           aria-hidden="true"
         />
@@ -285,9 +286,9 @@ export function SessionsPage() {
         <span
           class="text-12-medium"
           classList={{
-            "text-amber-600": item().state === "waiting",
-            "text-emerald-600": item().state === "running",
-            "text-red-600": item().state === "failed",
+            "text-v2-state-fg-warning": item().state === "waiting",
+            "text-v2-state-fg-success": item().state === "running",
+            "text-v2-state-fg-danger": item().state === "failed",
             "text-v2-text-text-weak": item().state === "idle" || item().state === "finished",
           }}
         >
@@ -299,7 +300,7 @@ export function SessionsPage() {
           <Show when={item().state === "waiting"}>
             <button
               type="button"
-              class="rounded bg-amber-500 px-2 py-1 text-12-medium text-white"
+              class="rounded border border-v2-state-border-warning bg-v2-state-bg-warning px-2 py-1 text-12-medium text-v2-state-fg-warning"
               onClick={() => sessionActions.open(item())}
             >
               {language.t("sessions.action.answer")}
@@ -321,7 +322,7 @@ export function SessionsPage() {
             <Show when={(item().state === "running" && !item().elsewhere) || item().state === "waiting"}>
               <button
                 type="button"
-                class="rounded px-2 py-1 text-12-medium text-red-600"
+                class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
                 onClick={() => void sessionActions.stop(item())}
               >
                 {language.t("sessions.action.stop")}
@@ -369,7 +370,7 @@ export function SessionsPage() {
     return (
       <section
         class="rounded-lg border border-v2-border-border-base"
-        classList={{ "ring-2 ring-blue-500": ui.dropTarget === key() }}
+        classList={{ "border-v2-state-border-info bg-v2-state-bg-info": ui.dropTarget === key() }}
         data-group-id={key()}
         aria-label={name()}
         onDragOver={(event) => {
@@ -451,7 +452,7 @@ export function SessionsPage() {
                 </button>
                 <button
                   type="button"
-                  class="rounded px-2 py-0.5 text-12-medium text-red-600"
+                  class="rounded px-2 py-0.5 text-12-medium text-v2-state-fg-danger"
                   onClick={() => void groupActions.remove(current())}
                 >
                   {language.t("sessions.group.delete")}
@@ -480,7 +481,10 @@ export function SessionsPage() {
         <header class="flex flex-wrap items-center gap-3">
           <h1 class="text-18-medium text-v2-text-text-strong">{language.t("sessions.title")}</h1>
           <Show when={waitingCount() > 0}>
-            <span class="rounded bg-amber-500 px-2 py-0.5 text-12-medium text-white" role="status">
+            <span
+              class="rounded border border-v2-state-border-warning bg-v2-state-bg-warning px-2 py-0.5 text-12-medium text-v2-state-fg-warning"
+              role="status"
+            >
               {language.t("sessions.waiting", { count: waitingCount() })}
             </span>
           </Show>
@@ -535,7 +539,7 @@ export function SessionsPage() {
           </form>
         </div>
         <Show when={error()}>
-          <p class="text-12-regular text-red-600" role="alert">
+          <p class="text-12-regular text-v2-state-fg-danger" role="alert">
             {error()}
           </p>
         </Show>

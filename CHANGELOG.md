@@ -20,6 +20,15 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **See and organise all your sessions in one place.** The desktop app's `Window → Sessions`
+  (Cmd+Option+S / Ctrl+Alt+S) opens a separate window, and the web UI has a `/sessions` page,
+  listing every session on this machine across projects: state (running, waiting for approval,
+  idle, finished, failed), project, agent, model, last activity and cost, updating live. Put
+  sessions in your own groups (create, rename, colour, collapse, delete; deleting a group never
+  touches its sessions), move them by drag-and-drop or "Move to group", search and filter, and
+  open, rename, stop or answer a waiting session from the list. Subagents sit under their parent;
+  scheduled runs and external sessions are labelled. Groups are stored on this machine only
+  (XCOD-205).
 - **Pick a subagent's model from the model picker.** In `/settings`, "Subagent model" opens the
   same picker as the main agent's model, with "Inherit from main agent" and "Small model" first.
   "Subagent dynamic allow" lists its models: add one from the picker or by ID, and enter removes
