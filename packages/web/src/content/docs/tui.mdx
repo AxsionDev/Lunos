@@ -266,10 +266,29 @@ memory, keys locked by your organisation, and MCP servers, LSP servers, formatte
 
 ### sessions
 
-List and switch between sessions. _Aliases_: `/resume`, `/continue`
+Every session on this machine, across all your projects: its state (running, waiting for approval,
+idle, finished, failed), project, agent, model, last activity and cost, in your own groups. The
+groups are the same ones the desktop app's Sessions window and the web UI's `/sessions` page show.
 
 ```bash frame="none"
 /sessions
+```
+
+Type to search by name, project, state or group. **Enter** opens the selected session (a session
+waiting for approval opens at its prompt) or collapses and expands a group. `ctrl+o` moves a session
+to a group, `ctrl+g` creates a group, `ctrl+r` renames a session or group, `ctrl+d` (twice) deletes
+a group without touching its sessions, `ctrl+s` stops a running session and `ctrl+f` cycles the
+state filter.
+
+---
+
+### resume
+
+List and switch between this project's sessions, pin them and use the quick-switch slots.
+_Aliases_: `/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **Keybind:** `ctrl+x l`

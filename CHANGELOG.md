@@ -34,8 +34,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
   sessions in your own groups (create, rename, colour, collapse, delete; deleting a group never
   touches its sessions), move them by drag-and-drop or "Move to group", search and filter, and
   open, rename, stop or answer a waiting session from the list. Subagents sit under their parent;
-  scheduled runs and external sessions are labelled. Groups are stored on this machine only
-  (XCOD-205).
+  scheduled runs and external sessions are labelled. In the TUI, `/sessions` opens the same view,
+  keyboard-only: Enter opens a session (or collapses a group), with keys to move it to a group,
+  rename, stop, create or delete groups and filter by state; this project's session switcher stays
+  on `ctrl+x l`, `/resume` and `/continue`. Groups are stored on this machine only and changes made
+  in any of them show up in the others straight away (XCOD-205).
 
 ### Changed
 

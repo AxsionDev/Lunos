@@ -207,5 +207,9 @@ describe("SessionOverview.state (XCOD-205)", () => {
     expect(SessionOverview.kind({ parentID: "ses_p" as never })).toBe("subagent")
     expect(SessionOverview.kind({ metadata: { unattended: true } })).toBe("scheduled")
     expect(SessionOverview.kind({})).toBe("session")
+    // XCOD-218: a Claude Code / Codex session run inside Lunos is labelled external, with its tool.
+    expect(SessionOverview.kind({ metadata: { external: { tool: "claude", session: "abc" } } })).toBe("external")
+    expect(SessionOverview.externalOf({ metadata: { external: { tool: "codex" } } })).toEqual({ tool: "codex" })
+    expect(SessionOverview.externalOf({ metadata: { external: { tool: "other" } } })).toBeUndefined()
   })
 })
