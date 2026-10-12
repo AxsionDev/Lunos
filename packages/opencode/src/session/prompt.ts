@@ -61,6 +61,7 @@ import { MemorySources } from "@/memory/sources"
 import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
+import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
 // @ts-ignore
@@ -675,8 +676,11 @@ const layer = Layer.effect(
       // model. Asking for another one is refused with the policy message and audited; a model that
       // only came from an agent's own config or the session's history is replaced. Subagent sessions
       // follow the subagent locks, checked by the task tool.
+      // XCOD-218: no Lunos model answers in an external session, whatever the client sent, so the
+      // model lock doesn't apply there; the external tool's own policy gate does.
       const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
-      const lock = current.parentID ? undefined : ConfigPolicy.lockedModel(yield* config.get(), ag.name)
+      const external = ExternalSession.of(current)
+      const lock = external || current.parentID ? undefined : ConfigPolicy.lockedModel(yield* config.get(), ag.name)
       if (lock && input.model && `${input.model.providerID}/${input.model.modelID}` !== lock.model) {
         yield* ConfigPolicy.refused(lock.key, `session model ${input.model.providerID}/${input.model.modelID}`)
         const reason = ConfigPolicy.modelLockReason(lock)
@@ -684,9 +688,11 @@ const layer = Layer.effect(
         yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
         throw new ConfigPolicy.LockedError(lock.key, "session model", reason)
       }
-      const model = lock
-        ? Provider.parseModel(lock.model)
-        : (input.model ?? ag.model ?? (yield* currentModel(input.sessionID)))
+      const model = external
+        ? ExternalSession.model(external.tool)
+        : lock
+          ? Provider.parseModel(lock.model)
+          : (input.model ?? ag.model ?? (yield* currentModel(input.sessionID)))
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
@@ -1420,6 +1426,14 @@ const layer = Layer.effect(
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
       input: LoopInput,
     ) {
+      // XCOD-218: an external session's reply comes from Claude Code / Codex, not a Lunos model.
+      const info = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      if (ExternalSession.of(info))
+        return yield* state.ensureRunning(
+          input.sessionID,
+          lastAssistant(input.sessionID),
+          ExternalSession.turn({ sessions, permission, agents, config, events, status }, input.sessionID),
+        )
       return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
     })
 

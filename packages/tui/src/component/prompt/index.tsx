@@ -61,6 +61,8 @@ import { readLocalAttachment } from "./local-attachment"
 import { useLocation } from "../../context/location"
 import { parseRestartSlash } from "../../util/restart"
 import { parseSettingsSlash } from "../../util/settings"
+import { externalOf, parseExternalSlash } from "../../util/external"
+import { DialogExternal, useStartExternal } from "../dialog-external"
 
 registerOpencodeSpinner()
 
@@ -164,6 +166,7 @@ export function Prompt(props: PromptProps) {
   const tuiConfig = useTuiConfig()
   const dialog = useDialog()
   const toast = useToast()
+  const startExternal = useStartExternal()
   const status = createMemo(() => sync.data.session_status?.[props.sessionID ?? ""] ?? { type: "idle" })
   const history = usePromptHistory()
   const stash = usePromptStash()
@@ -329,7 +332,8 @@ export function Prompt(props: PromptProps) {
       if (msg.agent && isPrimaryAgent) {
         // Keep command line --mode if specified.
         if (!args.mode) local.mode.set(msg.agent)
-        if (msg.model) {
+        // XCOD-218: an external session's messages name the tool, not a model to switch to.
+        if (msg.model && msg.model.providerID !== "external") {
           local.model.set(msg.model)
           local.model.variant.set(msg.model.variant)
         }
@@ -1040,11 +1044,43 @@ export function Prompt(props: PromptProps) {
         })
       return false
     }
+    // XCOD-218: `/external claude|codex` or `/external resume <tool> <id>` opens an external session.
+    const externalSlash = parseExternalSlash(store.prompt.input)
+    if (externalSlash) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      if ("error" in externalSlash) toast.show({ variant: "warning", message: externalSlash.error })
+      else if ("pick" in externalSlash) dialog.replace(() => <DialogExternal />)
+      else void startExternal(externalSlash.tool, externalSlash.session)
+      return false
+    }
     const agent = local.mode.current()
     if (!agent) return false
     const trimmed = store.prompt.input.trim()
     if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
       void exit()
+      return true
+    }
+    // XCOD-218: in an external session the text goes to Claude Code / Codex as typed, its own
+    // /commands included; no Lunos model is involved.
+    const external = props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined
+    if (props.sessionID && external) {
+      const text = store.prompt.input
+      sdk.client.session
+        .prompt(
+          // No agent: the current mode (plan, say) mustn't refuse every approval the tool asks for.
+          { sessionID: props.sessionID, parts: [{ type: "text", text }] },
+          { throwOnError: true },
+        )
+        .catch((error) =>
+          toast.show({ title: "Failed to send prompt", message: errorMessage(error), variant: "error" }),
+        )
+      history.append({ ...store.prompt, mode: store.mode })
+      input.extmarks.clear()
+      setStore("prompt", { input: "", parts: [] })
+      setStore("extmarkToPartIndex", new Map())
+      props.onSubmit?.()
+      input.clear()
       return true
     }
     const selectedModel = local.model.current()

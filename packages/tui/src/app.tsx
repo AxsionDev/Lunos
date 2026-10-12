@@ -2,6 +2,7 @@ import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@op
 import { animationsEnabled } from "./util/motion"
 import { DialogArtifacts } from "./component/dialog-artifacts"
 import { DialogBackground } from "./component/dialog-background"
+import { DialogExternal } from "./component/dialog-external"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
@@ -795,6 +796,16 @@ function App(props: {
             type: "home",
           })
           dialog.clear()
+        },
+      },
+      {
+        // XCOD-218: a Claude Code / Codex session in its own session view ("/external claude" etc. from the prompt).
+        name: "external.start",
+        title: "Start Claude Code or Codex session",
+        category: "Session",
+        slashName: "external",
+        run: () => {
+          dialog.replace(() => <DialogExternal />)
         },
       },
       {
