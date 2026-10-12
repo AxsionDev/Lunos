@@ -19,6 +19,7 @@ import { ConfigV2Compat } from "./v2-compat"
 import { MemorySwitch } from "@/memory/switch"
 import { normalizeLoadedConfig } from "./config"
 import fuzzysort from "fuzzysort"
+import { VariantModel } from "@opencode-ai/core/config/variant-model"
 
 // XCOD-128: every configuration option in one place, for the TUI's /settings screen and for
 // `lunos settings list|get|set`. The list is generated from the live schemas (ConfigV1.Info for
@@ -818,6 +819,39 @@ export function modelProblem(
   }
 }
 
+/** XCOD-232: the model a variant key applies to and that model's reasoning variants. */
+export type VariantLookup = (key: string) => { model: string; variants: string[] } | undefined
+
+/**
+ * XCOD-232: builds the lookup from what the server knows: the merged config, the main model when
+ * `model` is unset, each agent's model and mode, and each available model's variant names.
+ */
+export function variantLookup(input: {
+  config: VariantModel.Config & { agent?: Record<string, { model?: string; mode?: string } | undefined> }
+  main?: string
+  agents: ReadonlyArray<{ name: string; modelSpec?: string; mode?: string }>
+  variants: (model: string) => string[] | undefined
+}): VariantLookup {
+  return (key) => {
+    const name = key.startsWith("agent.") ? key.split(".")[1] : undefined
+    const listed = name ? input.agents.find((agent) => agent.name === name) : undefined
+    const configured = name ? input.config.agent?.[name] : undefined
+    const model = VariantModel.applicable({
+      key,
+      config: input.config,
+      main: input.main,
+      agent: name
+        ? {
+            model: listed?.modelSpec ?? configured?.model,
+            subagent: (listed?.mode ?? configured?.mode) === "subagent",
+          }
+        : undefined,
+    })
+    const variants = model ? input.variants(model) : undefined
+    return model && variants ? { model, variants } : undefined
+  }
+}
+
 export type SetResult = { key: string; value: unknown; file: string; scope: Scope; restart: boolean; changed: boolean }
 
 /**
@@ -887,11 +921,17 @@ export async function set(input: {
   models?: ReadonlySet<string>
   /** Models the residency policy blocks, with the reason (XCOD-212). */
   blocked?: ReadonlyMap<string, string>
+  /** XCOD-232: checks a reasoning variant against the model it applies to. */
+  variants?: VariantLookup
 }): Promise<SetResult> {
   const item = await writable(input)
   const value = coerce(item, input.value)
   const problem = input.models ? modelProblem(item.key, value, input.models, input.blocked) : undefined
   if (problem) throw new SettingError(`${item.key}: ${problem.replace(/\.$/, "")}. Nothing was written.`, "invalid")
+  const found = input.variants && VariantModel.isVariantKey(item.key) ? input.variants(item.key) : undefined
+  const variant =
+    found && typeof value === "string" ? VariantModel.problem(item.key, value, found.model, found.variants) : undefined
+  if (variant) throw new SettingError(`${variant}. Nothing was written.`, "invalid")
   const range = AGENT_RANGES[item.key.split(".")[2] as AgentField]
   if (range && item.key.startsWith("agent.") && typeof value === "number" && (value < range[0] || value > range[1]))
     throw new SettingError(`${item.key} must be between ${range[0]} and ${range[1]}. Nothing was written.`, "invalid")

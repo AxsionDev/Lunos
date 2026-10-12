@@ -414,6 +414,10 @@ How Enter changes a setting depends on its type:
 - **On/off:** toggles.
 - **A fixed set of values** (`share`, `autoupdate`, `logLevel`…): pick from a list.
 - **Model and theme:** open the usual model and theme pickers; the choice is saved to the config.
+- **Reasoning variant** (`subagent.variant`, an agent's Variant): pick from the variants of the
+  model it applies to (the subagent's or agent's model, or the main model it inherits), or Inherit;
+  Clear removes the key. A saved variant that model doesn't have is marked "not available for
+  <model>", and requests use the model's default effort.
 - **Text, numbers and lists:** an inline prompt. Lists are comma-separated (`eu, us`).
 - **MCP servers and providers:** open the `/mcps` and `/providers` dialogs.
 - **Structured settings made of simple fields** (`subagent`, `compaction`, `sandbox`, `memory`…):

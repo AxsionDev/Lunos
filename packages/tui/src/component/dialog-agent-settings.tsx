@@ -11,6 +11,7 @@ import { DialogConfirm } from "../ui/dialog-confirm"
 import { openEditor, openFileInEditor } from "../editor"
 import { useOpencodeKeymap } from "../keymap"
 import { DialogModel } from "./dialog-model"
+import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 
 // XCOD-215: /settings → Agents and /agents, one screen (XCOD-210 built /agents; this replaces it).
 // The list shows every agent with what it does; an agent's screen edits its `agent.<name>.*` keys
@@ -310,6 +311,31 @@ export function DialogAgentDetail(props: {
   const save = (field: string) => (value: string | undefined) => write(key(field), value)
 
   const fileFor = (target: "config") => snapshot()?.files?.[props.scope]?.[target]
+  const variantFor = useVariantModel()
+  /** XCOD-232: the model this agent's variant applies to, and its variants. */
+  const variantApplies = () => {
+    const item = agent()
+    return item ? variantFor(key("variant"), { model: item.model, subagent: item.kind === "subagent" }) : undefined
+  }
+
+  function variant() {
+    const value = own("variant") as string | undefined
+    dialog.replace(
+      () => (
+        <DialogVariantSetting
+          title={`${props.name}: variant`}
+          settingKey={key("variant")}
+          scope={props.scope}
+          current={value ?? agent()?.variant}
+          applies={variantApplies()}
+          onPick={(picked) => void save("variant")(picked)}
+          onClear={() => void save("variant")(undefined)}
+        />
+      ),
+      undefined,
+      navTo("variant"),
+    )
+  }
 
   async function editInFile(field: string, label: string) {
     const file = fileFor("config")
@@ -444,7 +470,15 @@ export function DialogAgentDetail(props: {
               footer: show("temperature", item.temperature, "model default"),
             },
             { value: "top_p", title: "Top P", footer: show("top_p", item.topP, "model default") },
-            { value: "variant", title: "Variant", footer: show("variant", item.variant, "default") },
+            {
+              value: "variant",
+              title: "Variant",
+              footer:
+                show("variant", item.variant, "default") +
+                (variantWarning(item.variant, variantApplies())
+                  ? ` ⚠ ${variantWarning(item.variant, variantApplies())}`
+                  : ""),
+            },
             { value: "description", title: "Description", footer: set("description") ? "set" : "default" },
             { value: "prompt", title: "Prompt", footer: set("prompt") ? "set" : "default" },
             { value: "permission", title: "Permissions", footer: set("permission") ? "set (config file)" : "default" },
@@ -520,7 +554,7 @@ export function DialogAgentDetail(props: {
       case "top_p":
         return void number("top_p", "top P", "0 to 1")
       case "variant":
-        return void text("variant", "variant", false)
+        return variant()
       case "description":
         return void text("description", "description", false)
       case "prompt":

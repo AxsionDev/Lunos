@@ -17,6 +17,7 @@ import { DialogConfirm } from "../ui/dialog-confirm"
 import { useBindings, useOpencodeKeymap } from "../keymap"
 import { openFileInEditor } from "../editor"
 import { DialogModel } from "./dialog-model"
+import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
 import { DialogThemeList } from "./dialog-theme-list"
 import { DialogMcp } from "./dialog-mcp"
@@ -138,12 +139,20 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     )
   }
 
+  const variantFor = useVariantModel()
+  /** XCOD-232: a saved variant the model it applies to doesn't have. */
+  const variantProblem = (row: SettingRow) =>
+    row.key === "subagent.variant" ? variantWarning(row.value, variantFor(row.key)) : undefined
+
   /** XCOD-233: a screen opened from row `key`; ← comes back to the list with that row highlighted. */
   const backTo = (key: string) => ({ back: () => reopen(key), generation })
 
-  async function save(row: SettingRow, value: string, options: { reopen?: boolean } = {}) {
+  /** `unset` (XCOD-232's Clear) removes the key from the scope's file instead of setting it. */
+  async function save(row: SettingRow, value: string, options: { reopen?: boolean; unset?: boolean } = {}) {
     const result = await sdk.client.config
-      .settingsSet({ settingsSetInput: { key: row.key, value, scope: scope() } })
+      .settingsSet({
+        settingsSetInput: { key: row.key, value, scope: scope(), ...(options.unset ? { unset: true } : {}) },
+      })
       .catch((cause: unknown) => ({ data: undefined, error: cause }))
     const data = result.data
     if (!data || !data.ok) {
@@ -159,7 +168,9 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     if (row.key === "tui.theme" && typeof data.value === "string") themeState.set(data.value)
     toast.show({
       variant: "success",
-      message: `${row.label} = ${typeof data.value === "string" ? data.value : JSON.stringify(data.value)} (saved to ${data.scope} config: ${home(data.file)})`,
+      message: options.unset
+        ? `${row.label} ${data.changed ? "removed" : "wasn't set"} (${data.scope} config: ${home(data.file)})`
+        : `${row.label} = ${typeof data.value === "string" ? data.value : JSON.stringify(data.value)} (saved to ${data.scope} config: ${home(data.file)})`,
       duration: 5000,
     })
     if (options.reopen) reopen(row.key)
@@ -235,6 +246,22 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       )
       return
     }
+    if (row.key === "subagent.variant")
+      return dialog.replace(
+        () => (
+          <DialogVariantSetting
+            title={row.label}
+            settingKey={row.key}
+            scope={scope()}
+            current={typeof row.value === "string" ? row.value : undefined}
+            applies={variantFor(row.key)}
+            onPick={(value) => void save(row, value, { reopen: true })}
+            onClear={() => void save(row, "", { reopen: true, unset: true })}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
     if (row.dialog === "models") {
       if (row.key === "subagent.dynamic.allow")
         return editModelList(row, Array.isArray(row.value) ? row.value.map(String) : [])
@@ -425,7 +452,9 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
 
   const options = createMemo(() =>
     visible().map((row) => {
-      const value = row.secret && row.kind !== "object" ? "••• (see /providers)" : row.display
+      const value =
+        (row.secret && row.kind !== "object" ? "••• (see /providers)" : row.display) +
+        (variantProblem(row) ? " ⚠" : "")
       const flags = [row.restart ? "↻" : "", row.source === "env" ? "env" : ""].filter(Boolean).join(" ")
       const right = `${value.length > 22 ? value.slice(0, 21) + "…" : value}  ${badge(row)}${flags ? " " + flags : ""}`
       return {
@@ -452,6 +481,11 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
         color: theme.warning,
       })
     else if (row.override) lines.push({ text: row.override, color: theme.warning })
+    else if (variantProblem(row))
+      lines.push({
+        text: `⚠ "${row.display}" is ${variantProblem(row)}: requests use the model's default effort`,
+        color: theme.warning,
+      })
     else if (row.secret)
       lines.push({ text: "Secrets are never shown here: manage keys in /providers", color: theme.textMuted })
     else if (row.key === "agent")

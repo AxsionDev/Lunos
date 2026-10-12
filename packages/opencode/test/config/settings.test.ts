@@ -466,3 +466,79 @@ describe("agent settings (XCOD-215)", () => {
     expect((await ConfigSettings.migrateAgents({ scope: "user", ctx: ctx(), locked: [] })).migrated).toEqual([])
   })
 })
+
+describe("reasoning variants (XCOD-232)", () => {
+  const variants = (model: string) =>
+    ({ "stub/a": ["low", "high"], "stub/b": [] as string[], "stub/small": ["minimal"] })[model]
+  const lookup = (
+    config: Record<string, unknown>,
+    agents: { name: string; modelSpec?: string; mode?: string }[] = [],
+  ) => ConfigSettings.variantLookup({ config, main: "stub/a", agents, variants })
+
+  test("the model a variant applies to follows the run's rule", () => {
+    expect(lookup({})("subagent.variant")).toEqual({ model: "stub/a", variants: ["low", "high"] })
+    expect(lookup({ subagent: { model: "small" }, small_model: "stub/small" })("subagent.variant")?.model).toBe(
+      "stub/small",
+    )
+    expect(lookup({ subagent: { model: "stub/b" } })("subagent.variant")).toEqual({ model: "stub/b", variants: [] })
+    // `model` wins over the server's default.
+    expect(lookup({ model: "stub/b" })("subagent.variant")?.model).toBe("stub/b")
+    // An agent: its own model; a subagent without one: subagent.model; a primary agent: the main model.
+    expect(lookup({}, [{ name: "plan", modelSpec: "stub/b", mode: "primary" }])("agent.plan.variant")?.model).toBe(
+      "stub/b",
+    )
+    expect(
+      lookup({ subagent: { model: "stub/small" } }, [{ name: "explore", mode: "subagent" }])("agent.explore.variant")
+        ?.model,
+    ).toBe("stub/small")
+    expect(
+      lookup({ subagent: { model: "stub/b" } }, [{ name: "build", mode: "primary" }])("agent.build.variant")?.model,
+    ).toBe("stub/a")
+    // A model that isn't available here: nothing to check against.
+    expect(lookup({ subagent: { model: "gone/x" } })("subagent.variant")).toBeUndefined()
+  })
+
+  test("set rejects an unknown variant, listing the valid ones; inherit and a known one are saved", async () => {
+    const variantsFor = lookup({})
+    await expect(
+      ConfigSettings.set({
+        key: "subagent.variant",
+        value: "max",
+        scope: "user",
+        ctx: ctx(),
+        locked: [],
+        variants: variantsFor,
+      }),
+    ).rejects.toThrow('subagent.variant: "max" isn\'t a reasoning variant of stub/a. Valid: low, high, or "inherit"')
+    expect(existsSync(userFile())).toBe(false)
+    await ConfigSettings.set({
+      key: "subagent.variant",
+      value: "high",
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+      variants: variantsFor,
+    })
+    await ConfigSettings.set({
+      key: "agent.build.variant",
+      value: "inherit",
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+      variants: variantsFor,
+    })
+    const doc = JSON.parse(await read(userFile()))
+    expect(doc.subagent.variant).toBe("high")
+    expect(doc.agent.build.variant).toBe("inherit")
+    await expect(
+      ConfigSettings.set({
+        key: "agent.build.variant",
+        value: "low",
+        scope: "user",
+        ctx: ctx(),
+        locked: [],
+        variants: lookup({ model: "stub/b" }),
+      }),
+    ).rejects.toThrow('stub/b has no reasoning variants, so "low" can\'t be used')
+  })
+})

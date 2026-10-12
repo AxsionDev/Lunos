@@ -20,6 +20,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Pick a subagent's or agent's reasoning variant from a list.** In /settings, Variant shows Inherit
+  and the variants of the model it applies to (the same names as the session's variant switcher),
+  or says the model has none; Clear removes it. A saved variant that model doesn't have is marked
+  "not available for <model>" and requests fall back to the model's default.
+  `lunos settings set subagent.variant <name>` (and `agent.<name>.variant`) refuses an unknown
+  variant and lists the valid ones (XCOD-232).
 - **A Subagent screen in /settings.** Enter on Subagent lists its settings with proper controls:
   run in background, the model picker (with "Inherit from main agent" and "Small model"), variant,
   "Let the main agent choose a model per task" and the allowed-models list. Every other setting made
