@@ -291,6 +291,7 @@ export const dict = {
   "model.tag.free": "Անվճար",
   "model.tag.latest": "Վերջին",
   "model.tag.blocked": "Արգելափակված է քաղաքականությամբ",
+  "model.tag.locked": "Կողպված է ձեր կազմակերպության կողմից",
   "model.filter.all": "Բոլորը",
   "model.filter.recommended": "Առաջարկվող",
   "model.filter.large": "Մեծ",

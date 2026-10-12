@@ -296,6 +296,7 @@ export const dict = {
   "model.tag.free": "Miễn phí",
   "model.tag.latest": "Mới nhất",
   "model.tag.blocked": "Bị chặn bởi chính sách",
+  "model.tag.locked": "Bị tổ chức của bạn khóa",
   "model.filter.all": "Tất cả",
   "model.filter.recommended": "Đề xuất",
   "model.filter.large": "Lớn",

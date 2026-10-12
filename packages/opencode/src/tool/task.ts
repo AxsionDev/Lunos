@@ -21,6 +21,7 @@ import { AuditLog } from "@/audit/log"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { SubagentModel } from "../agent/subagent-model"
+import { ConfigPolicy } from "@/config/policy"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -218,18 +219,29 @@ export const TaskTool = Tool.define(
       // XCOD-82: per-call → per-type → global → inherit. Resuming a task keeps the model of its
       // original run unless this call explicitly (and allowably) overrides it.
       const previous = session ? yield* lastAssistant(nextSession.id) : undefined
+      // XCOD-219: a locked subagent model also outranks a resumed task's earlier model.
+      const lock = ConfigPolicy.lockedSubagentModel(cfg, next.name)
       const resolved = yield* Effect.try({
         try: () => {
-          const out = SubagentModel.resolve({
-            subagentType: next.name,
-            parent: { ...parentModel, variant },
-            perCall: params.model,
-            typeModel: next.modelSpec,
-            typeVariant: next.modelSpec ? next.variant : undefined,
-            config: cfg,
-          })
+          const out = (() => {
+            try {
+              return SubagentModel.resolve({
+                subagentType: next.name,
+                parent: { ...parentModel, variant },
+                perCall: params.model,
+                typeModel: next.modelSpec,
+                typeVariant: next.modelSpec ? next.variant : undefined,
+                lock,
+                config: cfg,
+              })
+            } catch (error) {
+              if (error instanceof SubagentModel.RefusedError && error.lockedKey)
+                ConfigPolicy.notifyRefused(error.lockedKey, `task model ${params.model}`)
+              throw error
+            }
+          })()
           const final =
-            previous && params.model === undefined
+            previous && params.model === undefined && !lock
               ? {
                   ...out,
                   model: { providerID: previous.providerID, modelID: previous.modelID },

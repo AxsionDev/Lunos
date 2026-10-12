@@ -75,6 +75,12 @@ export function FormatError(input: unknown): string | undefined {
     return stringField(noProviders, "message") ?? ""
   }
 
+  // PolicyLockedError (XCOD-219): { key: string, message: string }
+  const locked = configData(input, "PolicyLockedError")
+  if (locked) {
+    return stringField(locked, "message") ?? ""
+  }
+
   // ProviderInitError: { providerID: string }
   const providerInit = configData(input, "ProviderInitError")
   if (providerInit) {

@@ -293,6 +293,7 @@ export const dict = {
   "model.tag.free": "Ókeypis",
   "model.tag.latest": "Nýjasta",
   "model.tag.blocked": "Lokað af stefnu",
+  "model.tag.locked": "Læst af fyrirtækinu þínu",
   "model.filter.all": "Allt",
   "model.filter.recommended": "Mælt með",
   "model.filter.large": "Stór",

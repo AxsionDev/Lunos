@@ -196,6 +196,7 @@ export const dict = {
   "model.tag.free": "Ilmainen",
   "model.tag.latest": "Uusin",
   "model.tag.blocked": "Käytännön estämä",
+  "model.tag.locked": "Organisaatiosi lukitsema",
   "model.filter.all": "Kaikki",
   "model.filter.recommended": "Suositellut",
   "model.filter.large": "Suuret",

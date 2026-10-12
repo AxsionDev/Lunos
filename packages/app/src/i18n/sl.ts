@@ -288,6 +288,7 @@ export const dict = {
   "model.tag.free": "Brezplačno",
   "model.tag.latest": "Zadnje",
   "model.tag.blocked": "Blokirano s pravilnikom",
+  "model.tag.locked": "Zaklenila vaša organizacija",
   "model.filter.all": "Vse",
   "model.filter.recommended": "Priporočeno",
   "model.filter.large": "Veliki",

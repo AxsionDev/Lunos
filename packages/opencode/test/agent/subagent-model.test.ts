@@ -88,6 +88,46 @@ describe("SubagentModel.resolve (XCOD-82)", () => {
   })
 })
 
+describe("SubagentModel.resolve under a lock (XCOD-219)", () => {
+  const lock = { key: "subagent.model", model: "mistral/codestral-latest" }
+  const config = {
+    subagent: { model: "mistral/codestral-latest", dynamic: { enabled: true, allow: ["openai/gpt-x"] } },
+  }
+
+  test("the locked model outranks an agent's own unlocked model", () => {
+    const resolved = SubagentModel.resolve({ subagentType: "general", parent, typeModel: "openai/gpt-x", lock, config })
+    expect(resolved.model).toEqual({ providerID: "mistral", modelID: "codestral-latest" })
+    expect(resolved.source).toBe("subagent.model")
+  })
+
+  test("a per-call model other than the locked one is refused with the policy message, even if allowed", () => {
+    let error: unknown
+    try {
+      SubagentModel.resolve({ subagentType: "general", parent, perCall: "openai/gpt-x", lock, config })
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeInstanceOf(SubagentModel.RefusedError)
+    expect((error as SubagentModel.RefusedError).lockedKey).toBe("subagent.model")
+    expect((error as Error).message).toContain("subagent.model is set by your organisation's policy")
+    // Asking for the locked model itself is fine.
+    expect(
+      SubagentModel.resolve({ subagentType: "general", parent, perCall: "mistral/codestral-latest", lock, config })
+        .model.modelID,
+    ).toBe("codestral-latest")
+  })
+
+  test("a locked inherit keeps the main agent's model", () => {
+    const resolved = SubagentModel.resolve({
+      subagentType: "general",
+      parent,
+      lock: { key: "subagent.model", model: "inherit" },
+      config: {},
+    })
+    expect(resolved.model).toEqual({ providerID: parent.providerID, modelID: parent.modelID })
+  })
+})
+
 describe("task tool model parameter", () => {
   const schema = {
     type: "object" as const,

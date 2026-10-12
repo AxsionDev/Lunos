@@ -289,6 +289,7 @@ export const dict = {
   "model.tag.free": "Percuma",
   "model.tag.latest": "Terkini",
   "model.tag.blocked": "Disekat oleh dasar",
+  "model.tag.locked": "Dikunci oleh organisasi anda",
   "model.filter.all": "Semua",
   "model.filter.recommended": "Disyorkan",
   "model.filter.large": "Besar",

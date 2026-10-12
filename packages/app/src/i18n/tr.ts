@@ -317,6 +317,7 @@ export const dict = {
   "model.tag.free": "Ücretsiz",
   "model.tag.latest": "En yeni",
   "model.tag.blocked": "Politika tarafından engellendi",
+  "model.tag.locked": "Kuruluşunuz tarafından kilitlendi",
   "model.filter.all": "Tümü",
   "model.filter.recommended": "Önerilen",
   "model.filter.large": "Büyük",

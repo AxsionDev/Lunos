@@ -289,6 +289,7 @@ export const dict = {
   "model.tag.free": "Zdarma",
   "model.tag.latest": "Nejnovější",
   "model.tag.blocked": "Blokováno zásadami",
+  "model.tag.locked": "Uzamčeno vaší organizací",
   "model.filter.all": "Vše",
   "model.filter.recommended": "Doporučené",
   "model.filter.large": "Velké",

@@ -289,6 +289,7 @@ export const dict = {
   "model.tag.free": "უფასო",
   "model.tag.latest": "უახლესი",
   "model.tag.blocked": "დაბლოკილია პოლიტიკით",
+  "model.tag.locked": "ჩაკეტილია თქვენი ორგანიზაციის მიერ",
   "model.filter.all": "ყველა",
   "model.filter.recommended": "რეკომენდებული",
   "model.filter.large": "დიდი",

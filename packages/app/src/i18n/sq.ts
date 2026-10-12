@@ -289,6 +289,7 @@ export const dict = {
   "model.tag.free": "Falas",
   "model.tag.latest": "E fundit",
   "model.tag.blocked": "Bllokuar nga politika",
+  "model.tag.locked": "I kyçur nga organizata juaj",
   "model.filter.all": "Të gjitha",
   "model.filter.recommended": "Të rekomanduara",
   "model.filter.large": "Të mëdha",

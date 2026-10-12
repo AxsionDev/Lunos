@@ -290,6 +290,7 @@ export const dict = {
   "model.tag.free": "Δωρεάν",
   "model.tag.latest": "Τελευταία",
   "model.tag.blocked": "Αποκλείστηκε από πολιτική",
+  "model.tag.locked": "Κλειδωμένο από τον οργανισμό σας",
   "model.filter.all": "Όλα",
   "model.filter.recommended": "Προτεινόμενα",
   "model.filter.large": "Μεγάλα",

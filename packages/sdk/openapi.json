@@ -24022,21 +24022,42 @@
             }
           },
           "blocked": {
-            "type": "object",
-            "properties": {
-              "policy": {
-                "type": "string",
-                "enum": ["residency"]
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "policy": {
+                    "type": "string",
+                    "enum": ["residency"]
+                  },
+                  "region": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["policy", "region", "reason"],
+                "additionalProperties": false
               },
-              "region": {
-                "type": "string"
-              },
-              "reason": {
-                "type": "string"
+              {
+                "type": "object",
+                "properties": {
+                  "policy": {
+                    "type": "string",
+                    "enum": ["locked"]
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["policy", "key", "reason"],
+                "additionalProperties": false
               }
-            },
-            "required": ["policy", "region", "reason"],
-            "additionalProperties": false
+            ]
           },
           "size": {
             "type": "string",

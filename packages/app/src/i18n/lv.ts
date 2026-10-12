@@ -289,6 +289,7 @@ export const dict = {
   "model.tag.free": "Bezmaksas",
   "model.tag.latest": "Jaunākais",
   "model.tag.blocked": "Bloķēts ar politiku",
+  "model.tag.locked": "Bloķējusi jūsu organizācija",
   "model.filter.all": "Visi",
   "model.filter.recommended": "Ieteicamie",
   "model.filter.large": "Lielie",

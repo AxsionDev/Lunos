@@ -98,9 +98,12 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       last: undefined,
     })
 
+    // XCOD-219: a model a locked `model` rules out isn't valid here, so a pick saved before the lock
+    // falls through to the configured (locked) model instead of every prompt being refused.
     const validModel = (model: ModelKey) => {
       const provider = providers.all().get(model.providerID)
-      return !!provider?.models[model.modelID] && connected().has(model.providerID)
+      const info = provider?.models[model.modelID]
+      return !!info && info.blocked?.policy !== "locked" && connected().has(model.providerID)
     }
 
     const firstModel = (...items: Array<() => ModelKey | undefined>) => {

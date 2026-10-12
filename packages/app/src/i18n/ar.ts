@@ -294,6 +294,7 @@ export const dict = {
   "model.tag.free": "مجاني",
   "model.tag.latest": "الأحدث",
   "model.tag.blocked": "محظور بموجب السياسة",
+  "model.tag.locked": "مقفل من قبل مؤسستك",
   "model.filter.all": "الكل",
   "model.filter.recommended": "موصى به",
   "model.filter.large": "كبير",
