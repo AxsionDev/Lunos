@@ -418,6 +418,11 @@ How Enter changes a setting depends on its type:
   becomes the default once both its name and description are entered), or Clear to use Lunos's
   default. New sessions start with it. A default that names a subagent, a hidden agent or one that's
   turned off is marked ⚠.
+- **Recommended:** the models the pickers list under Recommended (ctrl+l), each with why. Unset,
+  it's Lunos's curated list, marked "Lunos default". Add model… opens the model picker and asks for
+  an optional reason (up to 50 characters); Enter on a model edits its reason or removes it; Reset
+  to Lunos defaults removes the key from the scope you're saving to. The first change writes the
+  whole list to that scope. The pickers show the new list at once, without a restart.
 - **Reasoning variant** (`subagent.variant`, an agent's Variant): pick from the variants of the
   model it applies to (the subagent's or agent's model, or the main model it inherits), or Inherit;
   Clear removes the key. A saved variant that model doesn't have is marked "not available for

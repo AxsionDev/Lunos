@@ -107,6 +107,15 @@ export function defaultAgentWarning(name: unknown, agents: ReadonlyArray<AgentLi
   if (found.hidden) return `"${name}" is hidden`
 }
 
+/** XCOD-229: a Recommended reason fits the model picker's detail line. */
+export const RECOMMENDED_REASON_MAX = 50
+
+export function recommendedReasonProblem(reason: string) {
+  const length = reason.trim().length
+  if (length > RECOMMENDED_REASON_MAX)
+    return `Keep the reason to ${RECOMMENDED_REASON_MAX} characters (it's ${length}) so it fits under the model`
+}
+
 export function badge(row: Pick<SettingRowLike, "source" | "locked">) {
   return row.locked ? "🔒 managed" : row.source
 }

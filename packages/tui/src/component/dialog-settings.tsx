@@ -17,6 +17,7 @@ import { DialogConfirm } from "../ui/dialog-confirm"
 import { useBindings, useOpencodeKeymap } from "../keymap"
 import { openFileInEditor } from "../editor"
 import { DialogModel } from "./dialog-model"
+import { DialogRecommended } from "./dialog-recommended"
 import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
 import { DialogThemeList } from "./dialog-theme-list"
@@ -343,6 +344,13 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   async function edit(row: SettingRow) {
     // Before refuse(): a parent reads as locked when any one field is, and the others can still change.
     if (row.kind === "object" && hasSection(row, rows())) return openSection(row)
+    // XCOD-229: its own screen; a locked list can still be looked at, every change is refused there.
+    if (row.key === "recommended")
+      return dialog.replace(
+        () => <DialogRecommended scope={scope()} onBack={() => reopen(row.key)} />,
+        undefined,
+        backTo(row.key),
+      )
     if (refuse(row)) return
     if (row.dialog === "themes") {
       dialog.replace(
@@ -610,6 +618,11 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       lines.push({ text: `Enter lists every agent. ${AGENTS_HELP}`, color: theme.textMuted })
     else if (row.key === "mode")
       lines.push({ text: "Deprecated: Agents → Migrate moves it under agent", color: theme.warning })
+    else if (row.key === "recommended")
+      lines.push({
+        text: `Enter lists the models the pickers recommend${row.source === "default" ? " (Lunos's curated list)" : ""}`,
+        color: theme.textMuted,
+      })
     else if (row.kind === "object" && hasSection(row, rows()))
       lines.push({ text: "Enter lists its settings", color: theme.textMuted })
     else if (row.kind === "object" && !row.dialog)

@@ -1842,7 +1842,8 @@ const layer = Layer.effect(
             if (size) model.size = size
             else delete model.size
             const why = recommended[`${providerID}/${modelID}`]
-            if (why) model.recommended = why
+            // XCOD-229: a reason is optional; a model listed without one is still recommended.
+            if (why !== undefined) model.recommended = why
             else delete model.recommended
           }
 

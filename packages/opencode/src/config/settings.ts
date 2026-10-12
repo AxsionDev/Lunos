@@ -20,6 +20,7 @@ import { MemorySwitch } from "@/memory/switch"
 import { normalizeLoadedConfig } from "./config"
 import fuzzysort from "fuzzysort"
 import { VariantModel } from "@opencode-ai/core/config/variant-model"
+import { ModelCuration } from "@/provider/curation"
 
 // XCOD-128: every configuration option in one place, for the TUI's /settings screen and for
 // `lunos settings list|get|set`. The list is generated from the live schemas (ConfigV1.Info for
@@ -155,6 +156,8 @@ const DEFAULTS: Record<string, unknown> = {
   "tool_output.max_bytes": 51200,
   "tui.theme": "catppuccin",
   "tui.mouse": true,
+  // XCOD-229: the curated list the pickers use while `recommended` isn't set.
+  recommended: ModelCuration.RECOMMENDED,
 }
 
 /** Environment variables that win over whatever the files say. */
@@ -779,11 +782,13 @@ function stable(value: unknown): string {
  * the caller knows them. `subagent.model` also takes "inherit" and "small"; `subagent.dynamic.allow`
  * is a list.
  */
-const MODEL_KEYS: Record<string, "one" | "subagent" | "list"> = {
+const MODEL_KEYS: Record<string, "one" | "subagent" | "list" | "record"> = {
   model: "one",
   small_model: "one",
   "subagent.model": "subagent",
   "subagent.dynamic.allow": "list",
+  // XCOD-229: "provider/model" → why; the keys are the models.
+  recommended: "record",
 }
 
 /**
@@ -799,7 +804,14 @@ export function modelProblem(
   // XCOD-215: an agent's model takes the same values as subagent.model (XCOD-82).
   const kind = MODEL_KEYS[key] ?? (/^agent\.[^.]+\.model$/.test(key) ? "subagent" : undefined)
   if (!kind) return
-  const ids = kind === "list" ? (Array.isArray(value) ? value : [value]) : [value]
+  const ids =
+    kind === "record" && value && typeof value === "object" && !Array.isArray(value)
+      ? Object.keys(value)
+      : kind === "list" || kind === "record"
+        ? Array.isArray(value)
+          ? value
+          : [value]
+        : [value]
   for (const id of ids) {
     if (typeof id !== "string") return `${key} takes "provider/model" names`
     if (kind === "subagent" && (id === "inherit" || id === "small")) continue
@@ -869,6 +881,40 @@ export function variantLookup(input: {
     const variants = model ? input.variants(model) : undefined
     return model && variants ? { model, variants } : undefined
   }
+}
+
+/**
+ * XCOD-229: the models in a `recommended` value that need checking: the ones not already in this
+ * file and not on Lunos's curated list. Editing a reason or starting from the curated defaults
+ * shouldn't fail because a listed model isn't set up on this machine.
+ */
+function newModels(key: string, value: unknown, before: string | undefined) {
+  if (key !== "recommended" || !value || typeof value !== "object" || Array.isArray(value)) return value
+  const existing = ConfigPolicy.get(rawDoc(before), "recommended")
+  const known = existing && typeof existing === "object" ? Object.keys(existing) : []
+  return Object.fromEntries(
+    Object.entries(value).filter(([id]) => !known.includes(id) && !(id in ModelCuration.RECOMMENDED)),
+  )
+}
+
+/**
+ * Sets `jsonPath` to `value` in the file's text. `perEntry` (XCOD-229, `recommended`) edits only the
+ * entries that changed, so comments next to the other entries stay where they are.
+ */
+function edit(text: string, jsonPath: string[], value: unknown, perEntry: boolean) {
+  const format = { formattingOptions: { insertSpaces: true, tabSize: 2 } }
+  const current = ConfigPolicy.get(rawDoc(text), jsonPath.join("."))
+  const plain = (item: unknown): item is Record<string, unknown> =>
+    !!item && typeof item === "object" && !Array.isArray(item)
+  if (!perEntry || !plain(current) || !plain(value) || Object.keys(value).length === 0)
+    return applyEdits(text, modify(text, jsonPath, value, format))
+  let updated = text
+  for (const key of Object.keys(current))
+    if (!(key in value)) updated = applyEdits(updated, modify(updated, [...jsonPath, key], undefined, format))
+  for (const [key, item] of Object.entries(value))
+    if (stable(current[key]) !== stable(item))
+      updated = applyEdits(updated, modify(updated, [...jsonPath, key], item, format))
+  return updated
 }
 
 export type SetResult = { key: string; value: unknown; file: string; scope: Scope; restart: boolean; changed: boolean }
@@ -947,7 +993,11 @@ export async function set(input: {
 }): Promise<SetResult> {
   const item = await writable(input)
   const value = coerce(item, input.value)
-  const problem = input.models ? modelProblem(item.key, value, input.models, input.blocked) : undefined
+  const file = targetFile(item.target, input.scope, input.ctx)
+  const before = await readText(file)
+  const problem = input.models
+    ? modelProblem(item.key, newModels(item.key, value, before), input.models, input.blocked)
+    : undefined
   if (problem) throw new SettingError(`${item.key}: ${problem.replace(/\.$/, "")}. Nothing was written.`, "invalid")
   const found = input.variants && VariantModel.isVariantKey(item.key) ? input.variants(item.key) : undefined
   const variant =
@@ -963,8 +1013,6 @@ export async function set(input: {
     throw new SettingError(`${item.key} must be between ${range[0]} and ${range[1]}. Nothing was written.`, "invalid")
   const refusal = input.scope === "project" ? projectRefusal(item.key, value) : undefined
   if (refusal) throw new SettingError(refusal, "invalid")
-  const file = targetFile(item.target, input.scope, input.ctx)
-  const before = await readText(file)
   const schema = item.target === "config" ? "https://lunos.tech/config.json" : "https://lunos.tech/tui.json"
   const base = before && before.trim() ? before : `{\n  "$schema": "${schema}"\n}\n`
   const jsonPath = item.key.split(".").slice(item.target === "tui" ? 1 : 0)
@@ -978,10 +1026,7 @@ export async function set(input: {
         "invalid",
       )
   }
-  const updated = applyEdits(
-    base,
-    modify(base, jsonPath, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
-  )
+  const updated = edit(base, jsonPath, value, item.key === "recommended")
   let decoded: unknown
   try {
     decoded = await decode(item.target, updated, file)

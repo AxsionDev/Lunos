@@ -20,6 +20,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Edit the Recommended models in /settings.** Recommended opens a list of its models with why
+  each is recommended (Lunos's curated list, marked "Lunos default", until you change it). Add a
+  model from the picker with an optional reason, edit or remove one, or reset to Lunos's defaults;
+  the model picker's Recommended filter shows the change at once. The model must be available here,
+  an organisation lock refuses every change, and comments in the file are kept. A model listed
+  without a reason now still counts as recommended (XCOD-229).
 - **Choose the default agent from a list.** In /settings, Default agent lists your main agents with
   what they do, offers "New agent…" (set one up and make it the default) and "Clear (use Lunos's
   default)"; the next new session starts with it. A default that names a subagent, hidden or

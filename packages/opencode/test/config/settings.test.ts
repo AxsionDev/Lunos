@@ -9,6 +9,7 @@ import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { Global } from "@opencode-ai/core/global"
 import { ConfigSettings } from "@/config/settings"
 import { ConfigPolicy } from "@/config/policy"
+import { ModelCuration } from "@/provider/curation"
 
 let root: string
 let previous: string
@@ -564,5 +565,59 @@ describe("default_agent (XCOD-230)", () => {
     expect(existsSync(userFile())).toBe(false)
     await ConfigSettings.set({ key: "default_agent", value: "plan", scope: "user", ctx: ctx(), locked: [], agents })
     expect(JSON.parse(await read(userFile())).default_agent).toBe("plan")
+  })
+})
+
+describe("recommended (XCOD-229)", () => {
+  const models = new Set(["stub/a", "stub/b"])
+  const set = (value: unknown) =>
+    ConfigSettings.set({
+      key: "recommended",
+      value: JSON.stringify(value),
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+      models,
+    })
+
+  test("unset, the row shows Lunos's curated list as the default", async () => {
+    const rows = await ConfigSettings.list({ config: {}, origins: {}, locked: [], ctx: ctx(), env: {} })
+    const row = rows.find((item) => item.key === "recommended")!
+    expect(row.source).toBe("default")
+    expect(row.value).toEqual(ModelCuration.RECOMMENDED)
+  })
+
+  test("a model new to the list must be available here; curated and already-listed ones needn't be", async () => {
+    await expect(set({ "nope/x": "why" })).rejects.toThrow(`"nope/x" isn't a model available here`)
+    expect(existsSync(userFile())).toBe(false)
+    // Starting from the curated defaults (not set up here) plus a model that is.
+    await set({ ...ModelCuration.RECOMMENDED, "stub/a": "fast" })
+    // gone/x got into the file some other way; editing another entry doesn't trip over it.
+    const text = (await read(userFile())).replace('"stub/a": "fast"', '"stub/a": "fast",\n    "gone/x": "old"')
+    await fs.writeFile(userFile(), text)
+    await set({ "stub/a": "faster", "gone/x": "old" })
+    expect(JSON.parse(await read(userFile())).recommended).toEqual({ "stub/a": "faster", "gone/x": "old" })
+  })
+
+  test("only the entries that change are edited, so comments in the list are kept", async () => {
+    await fs.writeFile(
+      userFile(),
+      `{
+  "recommended": {
+    // our pick for coding
+    "stub/a": "fast",
+    "stub/b": "cheap" // keep this note
+  }
+}
+`,
+    )
+    await set({ "stub/a": "faster", "stub/b": "cheap" })
+    const text = await read(userFile())
+    expect(text).toContain("// our pick for coding")
+    expect(text).toContain("// keep this note")
+    expect(text).toContain('"stub/a": "faster"')
+    await set({ "stub/b": "cheap" })
+    expect(await read(userFile())).toContain("// keep this note")
+    expect(await read(userFile())).not.toContain("stub/a")
   })
 })
