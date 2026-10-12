@@ -54,6 +54,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Fixed
 
+- **Cloud runs report how they really ended.** `lunos run --cloud --cloud-secret NAME "message"`
+  works with the flag before the message (repeat it, or write `A,B`); the message was taken as a
+  secret name. A cloud or `--attach` run whose session ends in an error, such as a residency
+  refusal on the worker, now exits non-zero and says `failed`. `--model` on a cloud run stops with
+  a clear message when the worker can't run that model, instead of quietly using another one. Ctrl+C
+  prints the results line without a stack trace (XCOD-236).
 - **macOS binaries carry a valid signature.** The `lunos-darwin-*` binaries on npm and in the
   release archives failed `codesign --verify` because the release built them on Linux. They are
   now re-signed ad-hoc on a Mac before they are packed, checksummed and published. They are still

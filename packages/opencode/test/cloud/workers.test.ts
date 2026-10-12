@@ -7,6 +7,7 @@ import { Global } from "@opencode-ai/core/global"
 import { CloudStore } from "../../src/cloud/store"
 import { CloudWorkers } from "../../src/cloud/workers"
 import { secrets } from "../../src/cli/cmd/cloud-run"
+import { cloudSecretNames } from "../../src/cli/cmd/run"
 import * as Fake from "./fixtures/fake-control-plane"
 
 // XCOD-186: the client side of Lunos Cloud workers, against a fake control plane.
@@ -160,9 +161,14 @@ describe("CloudWorkers (XCOD-186)", () => {
     const conn = CloudWorkers.connection(worker)
     expect(conn.headers.Authorization).toStartWith("Basic ")
 
-    // The agent's work on the worker.
+    // XCOD-236: the directory is the project's path on the worker, not on this machine; the client
+    // only hands it to the worker's own server.
+    expect(worker.directory).toBe(Fake.WORKSPACE)
+    expect(conn.directory).toBe(Fake.WORKSPACE)
+
+    // The agent's work on the worker (the fake's clone, through its test-only side door).
     await fs.writeFile(
-      path.join(worker.directory!, "calc.py"),
+      path.join(fake.tree(worker.id), "calc.py"),
       "def add(a, b):\n    return a + b\n\ndef sub(a, b):\n    return a - b\n",
     )
     const done = await CloudWorkers.finish(config, started.base, worker.id, "finished")
@@ -224,5 +230,13 @@ describe("CloudWorkers (XCOD-186)", () => {
     expect(CloudWorkers.connection({ ...worker, url: "https://w1.cloud.lunos.tech" }).url).toBe(
       "https://w1.cloud.lunos.tech",
     )
+  })
+})
+
+describe("--cloud-secret names (XCOD-236)", () => {
+  test("repeated or comma-separated, one name per flag; absent stays absent", () => {
+    expect(cloudSecretNames(undefined)).toBeUndefined()
+    expect(cloudSecretNames("A")).toEqual(["A"])
+    expect(cloudSecretNames(["A", "B,C", " D , "])).toEqual(["A", "B", "C", "D"])
   })
 })
