@@ -56,6 +56,8 @@ export interface DialogSelectProps<T> {
   }[]
   bindings?: readonly Binding<Renderable, KeyEvent>[]
   current?: T
+  /** Let the list use the rest of the terminal's height instead of half of it (XCOD-205's /sessions). */
+  fill?: boolean
 }
 
 export interface DialogSelectOption<T = any> {
@@ -221,7 +223,15 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   })
 
   const dimensions = useTerminalDimensions()
-  const height = createMemo(() => Math.min(rows(), Math.floor(dimensions().height / 2) - 6))
+  const height = createMemo(() =>
+    Math.min(
+      rows(),
+      props.fill
+        ? // Below the dialog's top margin (a quarter of the height), its title, filter and footer.
+          dimensions().height - Math.floor(dimensions().height / 4) - 10
+        : Math.floor(dimensions().height / 2) - 6,
+    ),
+  )
 
   const selected = createMemo(() => flat()[store.selected])
 

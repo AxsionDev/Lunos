@@ -78,7 +78,16 @@ export function state(input: { activity: SessionLive.Activity; last?: Last; upda
 export function kind(session: Pick<Session.Info, "parentID" | "metadata">): Kind {
   if (session.parentID) return "subagent"
   if (session.metadata?.unattended === true) return "scheduled"
+  if (externalOf(session)) return "external"
   return "session"
+}
+
+/** XCOD-218: a Lunos session whose replies come from Claude Code or Codex (`metadata.external`). */
+export function externalOf(session: Pick<Session.Info, "metadata">): { tool: string; session?: string } | undefined {
+  const value = session.metadata?.external
+  if (!value || typeof value !== "object") return undefined
+  if (value.tool !== "claude" && value.tool !== "codex") return undefined
+  return { tool: value.tool, ...(typeof value.session === "string" ? { session: value.session } : {}) }
 }
 
 const lastMessages = Effect.fn("SessionOverview.lastMessages")(function* (ids: string[]) {
@@ -119,7 +128,11 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
   const all = [...recent, ...older.filter((item): item is Session.GlobalInfo => !!item)]
   const last = yield* lastMessages(all.map((item) => item.id))
 
+  // Tool sessions that already have a Lunos session (XCOD-218), so the registry doesn't list them twice.
+  const linked = new Set<string>()
   const items: Item[] = all.map((session) => {
+    const external = externalOf(session)
+    if (external?.session) linked.add(external.session)
     const message = last.get(session.id)
     const activity = SessionLive.get(session.id)
     const derived = state({ activity, last: message, updated: session.time.updated, now })
@@ -139,6 +152,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       ...(session.parentID ? { parentID: session.parentID } : {}),
       ...(agent ? { agent } : {}),
       ...(model ? { model } : {}),
+      ...(external ? { tool: external.tool } : {}),
       cost: session.cost ?? 0,
       created: session.time.created,
       updated: session.time.updated,
@@ -155,6 +169,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
   for (const entry of external) {
     const updated = Date.parse(entry.updated) || 0
     if (entry.status !== "running" && now - updated > WINDOW) continue
+    if (linked.has(entry.sessionID)) continue
     const id = `external:${entry.sessionID}`
     const group = groups.assignments[id]
     items.push({

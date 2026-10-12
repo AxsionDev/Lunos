@@ -61,6 +61,7 @@ import { DialogHelp } from "./ui/dialog-help"
 import { DialogMode } from "./component/dialog-mode"
 import { DialogAgentList } from "./component/dialog-agent-settings"
 import { DialogSessionList } from "./component/dialog-session-list"
+import { DialogSessions } from "./component/dialog-sessions"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
 import { ThemeProvider, useTheme } from "./context/theme"
@@ -758,10 +759,22 @@ function App(props: {
         title: "Switch session",
         category: "Session",
         suggested: sync.data.session.length > 0,
-        slashName: "sessions",
-        slashAliases: ["resume", "continue"],
+        // XCOD-205: /sessions is the all-projects view below; this project's switcher (pins, quick
+        // slots, delete) keeps its keybinding and /resume, /continue.
+        slashName: "resume",
+        slashAliases: ["continue"],
         run: () => {
           dialog.replace(() => <DialogSessionList />)
+        },
+      },
+      {
+        // XCOD-205: every session on this machine, across projects, in the groups shared with desktop/web.
+        name: "session.overview",
+        title: "Sessions in all projects and groups",
+        category: "Session",
+        slashName: "sessions",
+        run: () => {
+          dialog.replace(() => <DialogSessions />)
         },
       },
       {

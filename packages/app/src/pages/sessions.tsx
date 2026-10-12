@@ -180,7 +180,8 @@ export function SessionsPage() {
     open: (item: SessionOverviewItem) => {
       const conn = server.current
       const current = ctx()
-      if (!conn || !current || item.kind === "external") return
+      // An "external:" row is a tool session with no Lunos session to open (XCOD-218 ones have one).
+      if (!conn || !current || item.id.startsWith("external:")) return
       const directory = item.project?.worktree ?? item.directory
       current.projects.open(directory)
       current.projects.touch(directory)
@@ -229,7 +230,7 @@ export function SessionsPage() {
 
   const SessionRow = (props: { item: SessionOverviewItem; child?: boolean }) => {
     const item = () => props.item
-    const external = () => item().kind === "external"
+    const external = () => item().id.startsWith("external:")
     return (
       <li
         class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-3 py-2 hover:bg-v2-background-bg-raised"
