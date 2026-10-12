@@ -1777,7 +1777,7 @@ const layer = Layer.effect(
         }
 
         const residency = AuditLog.residency(cfg)
-        const lock = ConfigPolicy.lockedModel(cfg)
+        const locked = ConfigPolicy.sessionModels(cfg)
         const recommended = ModelCuration.recommended(cfg.recommended)
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
@@ -1830,8 +1830,12 @@ const layer = Layer.effect(
             const denied = Residency.blocked(providerID, configuredURL ?? model.api.url, residency)
             if (denied) model.blocked = { policy: "residency", region: denied.region, reason: denied.reason }
             // XCOD-219: a locked `model` rules out every other model for the session.
-            else if (lock && `${providerID}/${modelID}` !== lock.model)
-              model.blocked = { policy: "locked", key: lock.key, reason: ConfigPolicy.modelLockReason(lock) }
+            else if (locked && !locked.allowed.has(`${providerID}/${modelID}`))
+              model.blocked = {
+                policy: "locked",
+                key: locked.lock.key,
+                reason: ConfigPolicy.modelLockReason(locked.lock),
+              }
             else delete model.blocked
 
             const size = ModelCuration.size(providerID, modelID, model.name)

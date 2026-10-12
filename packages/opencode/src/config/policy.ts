@@ -79,6 +79,19 @@ export function lockedModel(config: ModelConfig, agent?: string): ModelLock | un
 }
 
 /**
+ * XCOD-219: what the session pickers may offer under a locked `model`: the locked model, plus each
+ * locked `agent.<name>.model` (that agent's mode runs on it). Undefined without a `model` lock.
+ */
+export function sessionModels(config: ModelConfig) {
+  const lock = lockedModel(config)
+  if (!lock) return
+  const allowed = new Set([lock.model])
+  for (const [name, agent] of Object.entries(config.agent ?? {}))
+    if (agent?.model && isLocked(config.$locked, `agent.${name}.model`)) allowed.add(agent.model)
+  return { lock, allowed }
+}
+
+/**
  * XCOD-219: the same for a subagent of type `agent`: `agent.<name>.model`, else `subagent.model`.
  * The value may be `"inherit"` or `"small"`, as those keys allow.
  */

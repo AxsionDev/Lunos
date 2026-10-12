@@ -1514,7 +1514,11 @@ const layer = Layer.effect(
       }
       template = template.trim()
 
+      // XCOD-219: under a locked model a command's own `model` (or its agent's) is ignored, like an
+      // agent's own model is. A model the caller asked for still goes through, to be refused.
+      const commandLock = ConfigPolicy.lockedModel(yield* config.get(), agentName)
       const taskModel = yield* Effect.gen(function* () {
+        if (commandLock) return Provider.parseModel(input.model ?? commandLock.model)
         if (cmd.model) return Provider.parseModel(cmd.model)
         if (cmd.agent) {
           const cmdAgent = yield* agents.get(cmd.agent)

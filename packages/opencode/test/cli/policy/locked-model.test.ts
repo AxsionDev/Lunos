@@ -28,7 +28,7 @@ const other = {
   },
 }
 
-const setup = (home: string, managed: object | undefined) =>
+const setup = (home: string, managed: object | undefined, user: object = {}) =>
   Effect.promise(async () => {
     const managedDir = path.join(home, "managed")
     const log = path.join(home, "audit", "audit.log")
@@ -38,7 +38,7 @@ const setup = (home: string, managed: object | undefined) =>
     await fs.mkdir(userDir, { recursive: true })
     await fs.writeFile(
       path.join(userDir, "opencode.json"),
-      JSON.stringify({ ...other, audit: { enabled: true, path: log } }),
+      JSON.stringify({ ...other, ...user, audit: { enabled: true, path: log } }),
     )
     return { env: { OPENCODE_TEST_MANAGED_CONFIG_DIR: managedDir }, log }
   })
@@ -98,6 +98,51 @@ describe("organisation policy: locked model (subprocess)", () => {
         expect(row("test/test-model")).toBe("test/test-model")
       }),
     60_000,
+  )
+
+  cliIt.live(
+    "a locked agent model is offered and works in that agent's mode, and only there",
+    ({ llm, opencode, home }) =>
+      Effect.gen(function* () {
+        const { env, log } = yield* setup(home, {
+          $locked: ["model", "agent.plan.model"],
+          model: "test/test-model",
+          agent: { plan: { model: "test/other-model" } },
+        })
+        const models = yield* opencode.spawn(["models", "test"], { env })
+        expect(models.stdout).not.toContain("locked by your organisation")
+
+        yield* llm.text("hello")
+        const plan = yield* opencode.run("hi", { agent: "plan", model: "test/other-model", env })
+        opencode.expectExit(plan, 0, "plan on its locked model")
+        expect(plan.stdout + plan.stderr).toContain("hello")
+
+        const build = yield* opencode.run("hi", { model: "test/other-model", env })
+        expect(build.exitCode).not.toBe(0)
+        expect(build.stdout + build.stderr).toContain("it is set to test/test-model")
+        expect(yield* events(log)).toContainEqual(
+          expect.objectContaining({ event: "policy.override_refused", key: "model" }),
+        )
+      }),
+    90_000,
+  )
+
+  cliIt.live(
+    "a command's own model is ignored under the lock, not refused",
+    ({ llm, opencode, home }) =>
+      Effect.gen(function* () {
+        const { env, log } = yield* setup(
+          home,
+          { $locked: ["model"], model: "test/test-model" },
+          { command: { greet: { template: "say hi", model: "test/other-model" } } },
+        )
+        yield* llm.text("hello")
+        const result = yield* opencode.run("", { command: "greet", env })
+        opencode.expectExit(result, 0, "command with its own model")
+        expect(result.stdout + result.stderr).toContain("hello")
+        expect((yield* events(log)).some((line) => line.event === "policy.override_refused")).toBe(false)
+      }),
+    90_000,
   )
 
   cliIt.live(

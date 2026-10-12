@@ -103,6 +103,15 @@ describe("locked models (XCOD-219)", () => {
     expect(ConfigPolicy.lockedModel({ $locked: ["model"] })).toBeUndefined()
   })
 
+  // An agent's own locked model must not be tagged, or its mode falls back to `model` and is refused.
+  test("the session pickers offer the locked model and every locked agent model", () => {
+    expect([...ConfigPolicy.sessionModels(config)!.allowed]).toEqual([
+      "mistral/mistral-large-latest",
+      "mistral/magistral-medium",
+    ])
+    expect(ConfigPolicy.sessionModels({ ...config, $locked: ["agent.review.model"] })).toBeUndefined()
+  })
+
   test("the reason is the policy message and names the locked model", () => {
     expect(ConfigPolicy.modelLockReason({ key: "model", model: "mistral/mistral-large-latest" })).toBe(
       "model is set by your organisation's policy and can't be changed here (it is set to mistral/mistral-large-latest)",
