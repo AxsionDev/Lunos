@@ -19,7 +19,44 @@ import { Effect, Option } from "effect"
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { ConsoleSwitchPayload, SessionListQuery, ToolListQuery, WorktreeApiError } from "../groups/experimental"
+import {
+  ConsoleSwitchPayload,
+  SessionGroupCreatePayload,
+  SessionGroupMovePayload,
+  SessionGroupUpdatePayload,
+  SessionListQuery,
+  ToolListQuery,
+  WorktreeApiError,
+} from "../groups/experimental"
+import { InvalidRequestError, notFound } from "../errors"
+import { SessionGroups } from "@/session/groups"
+import { SessionLive } from "@/session/live"
+import { SessionOverview } from "@/session/overview"
+import { GlobalBus } from "@/bus/global"
+import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
+
+// XCOD-205: group store errors become the endpoint's declared errors.
+function groupErrors<A>(run: () => Promise<A>) {
+  return Effect.tryPromise({
+    try: run,
+    catch: (error) => {
+      if (error instanceof SessionGroups.NotFoundError) return notFound(error.message)
+      if (error instanceof SessionGroups.InvalidError) return new InvalidRequestError({ message: error.message })
+      throw error
+    },
+  })
+}
+
+let groupEvents: (() => void) | undefined
+// Every surface (this process's and other processes' changes alike) hears about it on the global stream.
+function publishGroupChanges() {
+  groupEvents ??= SessionGroups.subscribe(() =>
+    GlobalBus.emit("event", {
+      directory: "global",
+      payload: { type: SessionGroupEvent.Updated.type, properties: {} },
+    }),
+  )
+}
 
 function mapWorktreeError<A, R>(self: Effect.Effect<A, Worktree.Error, R>) {
   return self.pipe(
@@ -40,6 +77,8 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const background = yield* BackgroundJob.Service
     const runState = yield* SessionRunState.Service
     const flags = yield* RuntimeFlags.Service
+    SessionLive.start()
+    publishGroupChanges()
 
     const capabilities = Effect.fn("ExperimentalHttpApi.capabilities")(function* () {
       return { backgroundSubagents: backgroundEnabled(flags.experimentalBackgroundSubagents, yield* config.get()) }
@@ -200,6 +239,39 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return true
     })
 
+    const sessionOverview = Effect.fn("ExperimentalHttpApi.sessionOverview")(function* () {
+      return yield* SessionOverview.build().pipe(Effect.provideService(Session.Service, sessions))
+    })
+
+    const sessionGroupList = Effect.fn("ExperimentalHttpApi.sessionGroupList")(function* () {
+      return (yield* Effect.promise(() => SessionGroups.read())).groups
+    })
+
+    const sessionGroupCreate = Effect.fn("ExperimentalHttpApi.sessionGroupCreate")(function* (ctx: {
+      payload: typeof SessionGroupCreatePayload.Type
+    }) {
+      return yield* groupErrors(() => SessionGroups.create(ctx.payload))
+    })
+
+    const sessionGroupUpdate = Effect.fn("ExperimentalHttpApi.sessionGroupUpdate")(function* (ctx: {
+      params: { groupID: string }
+      payload: typeof SessionGroupUpdatePayload.Type
+    }) {
+      return yield* groupErrors(() => SessionGroups.patch(ctx.params.groupID, ctx.payload))
+    })
+
+    const sessionGroupDelete = Effect.fn("ExperimentalHttpApi.sessionGroupDelete")(function* (ctx: {
+      params: { groupID: string }
+    }) {
+      return yield* groupErrors(() => SessionGroups.remove(ctx.params.groupID))
+    })
+
+    const sessionGroupMove = Effect.fn("ExperimentalHttpApi.sessionGroupMove")(function* (ctx: {
+      payload: typeof SessionGroupMovePayload.Type
+    }) {
+      return yield* groupErrors(() => SessionGroups.move(ctx.payload.sessionIDs, ctx.payload.groupID))
+    })
+
     const resource = Effect.fn("ExperimentalHttpApi.resource")(function* () {
       return yield* mcp.resources()
     })
@@ -220,6 +292,12 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("backgroundJobs", backgroundJobs)
       .handle("artifacts", artifacts)
       .handle("backgroundJobCancel", backgroundJobCancel)
+      .handle("sessionOverview", sessionOverview)
+      .handle("sessionGroupList", sessionGroupList)
+      .handle("sessionGroupCreate", sessionGroupCreate)
+      .handle("sessionGroupUpdate", sessionGroupUpdate)
+      .handle("sessionGroupDelete", sessionGroupDelete)
+      .handle("sessionGroupMove", sessionGroupMove)
       .handle("resource", resource)
   }),
 )

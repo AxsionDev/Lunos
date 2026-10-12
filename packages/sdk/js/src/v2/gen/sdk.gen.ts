@@ -62,8 +62,20 @@ import type {
   ExperimentalResourceListResponses,
   ExperimentalSessionBackgroundErrors,
   ExperimentalSessionBackgroundResponses,
+  ExperimentalSessionGroupCreateErrors,
+  ExperimentalSessionGroupCreateResponses,
+  ExperimentalSessionGroupDeleteErrors,
+  ExperimentalSessionGroupDeleteResponses,
+  ExperimentalSessionGroupListErrors,
+  ExperimentalSessionGroupListResponses,
+  ExperimentalSessionGroupMoveErrors,
+  ExperimentalSessionGroupMoveResponses,
+  ExperimentalSessionGroupUpdateErrors,
+  ExperimentalSessionGroupUpdateResponses,
   ExperimentalSessionListErrors,
   ExperimentalSessionListResponses,
+  ExperimentalSessionOverviewErrors,
+  ExperimentalSessionOverviewResponses,
   ExperimentalWorkspaceAdapterListErrors,
   ExperimentalWorkspaceAdapterListResponses,
   ExperimentalWorkspaceCreateErrors,
@@ -923,6 +935,40 @@ export class Session extends HeyApiClient {
       ...params,
     })
   }
+
+  /**
+   * Sessions overview
+   *
+   * Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups.
+   */
+  public overview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalSessionOverviewResponses,
+      ExperimentalSessionOverviewErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-overview",
+      ...options,
+      ...params,
+    })
+  }
 }
 
 export class Artifact extends HeyApiClient {
@@ -1033,6 +1079,211 @@ export class Background extends HeyApiClient {
       url: "/experimental/background/{jobID}/cancel",
       ...options,
       ...params,
+    })
+  }
+}
+
+export class SessionGroup extends HeyApiClient {
+  /**
+   * List session groups
+   *
+   * List the session groups on this machine.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalSessionGroupListResponses,
+      ExperimentalSessionGroupListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create session group
+   *
+   * Create a session group, with an optional colour (#rrggbb).
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      name?: string
+      color?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "color" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionGroupCreateResponses,
+      ExperimentalSessionGroupCreateErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Move sessions to a group
+   *
+   * Put sessions in a group, taking them out of any other group. A null groupID moves them back to Ungrouped.
+   */
+  public move<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      groupID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "groupID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionGroupMoveResponses,
+      ExperimentalSessionGroupMoveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group/move",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete session group
+   *
+   * Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      ExperimentalSessionGroupDeleteResponses,
+      ExperimentalSessionGroupDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group/{groupID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update session group
+   *
+   * Rename, recolour (null clears the colour), collapse or expand a session group.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+      name?: string
+      color?: string
+      collapsed?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "color" },
+            { in: "body", key: "collapsed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<
+      ExperimentalSessionGroupUpdateResponses,
+      ExperimentalSessionGroupUpdateErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group/{groupID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }
@@ -1420,6 +1671,11 @@ export class Experimental extends HeyApiClient {
   private _background?: Background
   get background(): Background {
     return (this._background ??= new Background({ client: this.client }))
+  }
+
+  private _sessionGroup?: SessionGroup
+  get sessionGroup(): SessionGroup {
+    return (this._sessionGroup ??= new SessionGroup({ client: this.client }))
   }
 
   private _resource?: Resource

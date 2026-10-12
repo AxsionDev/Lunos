@@ -15,6 +15,7 @@ import {
   WorkspaceRoutingQueryFields,
 } from "../middleware/workspace-routing"
 import { described } from "./metadata"
+import { ApiNotFoundError, InvalidRequestError } from "../errors"
 import { QueryBoolean } from "./query"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -111,6 +112,58 @@ export const SessionListQuery = Schema.Struct({
   archived: Schema.optional(QueryBoolean),
 })
 
+// XCOD-205: a user-defined group of sessions, kept on this machine only.
+export const SessionGroupInfo = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  color: Schema.optional(Schema.String),
+  collapsed: Schema.Boolean,
+  created: Schema.Number,
+  updated: Schema.Number,
+}).annotate({ identifier: "SessionGroup" })
+
+// XCOD-205: one row of the Sessions window.
+export const SessionOverviewItem = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.Literals(["session", "subagent", "scheduled", "external"]),
+  title: Schema.String,
+  directory: Schema.String,
+  project: Schema.NullOr(Session.ProjectInfo),
+  parentID: Schema.optional(Schema.String),
+  agent: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  tool: Schema.optional(Schema.String),
+  cost: Schema.Number,
+  created: Schema.Number,
+  updated: Schema.Number,
+  state: Schema.Literals(["running", "waiting", "idle", "finished", "failed"]),
+  elsewhere: Schema.optional(Schema.Boolean),
+  permissions: Schema.Number,
+  questions: Schema.Number,
+  groupID: Schema.optional(Schema.String),
+}).annotate({ identifier: "SessionOverviewItem" })
+
+export const SessionOverviewResponse = Schema.Struct({
+  groups: Schema.mutable(Schema.Array(SessionGroupInfo)),
+  sessions: Schema.mutable(Schema.Array(SessionOverviewItem)),
+}).annotate({ identifier: "SessionOverview" })
+
+export const SessionGroupCreatePayload = Schema.Struct({
+  name: Schema.String,
+  color: Schema.optional(Schema.NullOr(Schema.String)),
+})
+
+export const SessionGroupUpdatePayload = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  color: Schema.optional(Schema.NullOr(Schema.String)),
+  collapsed: Schema.optional(Schema.Boolean),
+})
+
+export const SessionGroupMovePayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  groupID: Schema.NullOr(Schema.String),
+})
+
 export const ExperimentalPaths = {
   capabilities: "/experimental/capabilities",
   console: "/experimental/console",
@@ -126,6 +179,10 @@ export const ExperimentalPaths = {
   artifacts: "/experimental/artifact",
   backgroundJobCancel: "/experimental/background/:jobID/cancel",
   resource: "/experimental/resource",
+  sessionOverview: "/experimental/session-overview",
+  sessionGroups: "/experimental/session-group",
+  sessionGroup: "/experimental/session-group/:groupID",
+  sessionGroupMove: "/experimental/session-group/move",
 } as const
 
 export const ExperimentalApi = HttpApi.make("experimental")
@@ -306,6 +363,77 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.background.cancel",
             summary: "Cancel a background subagent",
             description: "Cancel a running background subagent job and its child session.",
+          }),
+        ),
+        HttpApiEndpoint.get("sessionOverview", ExperimentalPaths.sessionOverview, {
+          query: WorkspaceRoutingQuery,
+          success: described(SessionOverviewResponse, "Sessions on this machine, with their groups"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.overview",
+            summary: "Sessions overview",
+            description:
+              "Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups.",
+          }),
+        ),
+        HttpApiEndpoint.get("sessionGroupList", ExperimentalPaths.sessionGroups, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.mutable(Schema.Array(SessionGroupInfo)), "Session groups"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.list",
+            summary: "List session groups",
+            description: "List the session groups on this machine.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionGroupCreate", ExperimentalPaths.sessionGroups, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionGroupCreatePayload,
+          success: described(SessionGroupInfo, "Created session group"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.create",
+            summary: "Create session group",
+            description: "Create a session group, with an optional colour (#rrggbb).",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionGroupMove", ExperimentalPaths.sessionGroupMove, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionGroupMovePayload,
+          success: described(Schema.Boolean, "Sessions moved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.move",
+            summary: "Move sessions to a group",
+            description:
+              "Put sessions in a group, taking them out of any other group. A null groupID moves them back to Ungrouped.",
+          }),
+        ),
+        HttpApiEndpoint.patch("sessionGroupUpdate", ExperimentalPaths.sessionGroup, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionGroupUpdatePayload,
+          success: described(SessionGroupInfo, "Updated session group"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.update",
+            summary: "Update session group",
+            description: "Rename, recolour (null clears the colour), collapse or expand a session group.",
+          }),
+        ),
+        HttpApiEndpoint.delete("sessionGroupDelete", ExperimentalPaths.sessionGroup, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Session group deleted"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.delete",
+            summary: "Delete session group",
+            description: "Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.",
           }),
         ),
         HttpApiEndpoint.get("resource", ExperimentalPaths.resource, {

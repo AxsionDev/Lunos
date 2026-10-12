@@ -37,6 +37,9 @@ import { disposeApps } from "./backend"
 import { runtime } from "./runtime"
 import { type Scenario } from "./types"
 
+// Loaded lazily so the store resolves its data directory after the exercise environment is set up.
+const groups = () => import("../../../src/session/groups").then((module) => module.SessionGroups)
+
 function cursor(input: Record<string, unknown>) {
   return Buffer.from(JSON.stringify(input)).toString("base64url")
 }
@@ -699,6 +702,69 @@ const scenarios: Scenario[] = [
   http.protected.get("/experimental/artifact", "experimental.artifact.list").json(200, (body) => {
     array(body)
   }),
+  // XCOD-205: the Sessions window's overview and session groups.
+  http.protected
+    .get("/experimental/session-overview", "experimental.session.overview")
+    .seeded((ctx) => ctx.session({ title: "Overview session" }))
+    .json(200, (body, ctx) => {
+      object(body)
+      array(body.groups)
+      array(body.sessions)
+      const item = body.sessions.find((entry) => isRecord(entry) && entry.id === ctx.state.id)
+      check(isRecord(item), "overview should list the seeded session")
+      check(item.kind === "session" && item.state === "idle", "a fresh session should be an idle plain session")
+    }),
+  http.protected.get("/experimental/session-group", "experimental.sessionGroup.list").json(200, array),
+  http.protected
+    .post("/experimental/session-group", "experimental.sessionGroup.create")
+    .mutating()
+    .at((ctx) => ({ path: "/experimental/session-group", headers: ctx.headers(), body: { name: "Client A" } }))
+    .json(200, (body) => {
+      object(body)
+      check(body.name === "Client A" && typeof body.id === "string", "create should return the new group")
+    }),
+  http.protected
+    .patch("/experimental/session-group/{groupID}", "experimental.sessionGroup.update")
+    .mutating()
+    .seeded(() => Effect.promise(() => groups().then((store) => store.create({ name: "Before" }))))
+    .at((ctx) => ({
+      path: route("/experimental/session-group/{groupID}", { groupID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { name: "After", color: "#3B82F6" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.name === "After" && body.color === "#3b82f6", "update should rename and recolour")
+    }),
+  http.protected
+    .delete("/experimental/session-group/{groupID}", "experimental.sessionGroup.delete")
+    .mutating()
+    .seeded(() => Effect.promise(() => groups().then((store) => store.create({ name: "Doomed" }))))
+    .at((ctx) => ({
+      path: route("/experimental/session-group/{groupID}", { groupID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      check(body === true, "delete should return true")
+    }),
+  http.protected
+    .post("/experimental/session-group/move", "experimental.sessionGroup.move")
+    .mutating()
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        const session = yield* ctx.session({ title: "Movable" })
+        const group = yield* Effect.promise(() => groups().then((store) => store.create({ name: "Target" })))
+        return { session, group }
+      }),
+    )
+    .at((ctx) => ({
+      path: "/experimental/session-group/move",
+      headers: ctx.headers(),
+      body: { sessionIDs: [ctx.state.session.id], groupID: ctx.state.group.id },
+    }))
+    .json(200, (body) => {
+      check(body === true, "move should return true")
+    }),
   http.protected.get("/experimental/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")

@@ -81,6 +81,7 @@ export type Event =
   | EventProjectUpdated
   | EventSessionStatus
   | EventSessionIdle
+  | EventSessionGroupUpdated
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
@@ -1508,6 +1509,13 @@ export type GlobalEvent = {
       }
     | {
         id: string
+        type: "session.group.updated"
+        properties: {
+          [key: string]: unknown
+        }
+      }
+    | {
+        id: string
         type: "question.asked"
         properties: {
           id: string
@@ -2592,6 +2600,47 @@ export type BackgroundJobItem = {
   error?: string
 }
 
+export type SessionGroup = {
+  id: string
+  name: string
+  color?: string
+  collapsed: boolean
+  created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  updated: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
+export type SessionOverviewItem = {
+  id: string
+  kind: "session" | "subagent" | "scheduled" | "external"
+  title: string
+  directory: string
+  project: ProjectSummary
+  parentID?: string
+  agent?: string
+  model?: string
+  tool?: string
+  cost: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  updated: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  state: "running" | "waiting" | "idle" | "finished" | "failed"
+  elsewhere?: boolean
+  permissions: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  questions: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  groupID?: string
+}
+
+export type SessionOverview = {
+  groups: Array<SessionGroup>
+  sessions: Array<SessionOverviewItem>
+}
+
+export type NotFoundError = {
+  name: "NotFoundError"
+  data: {
+    message: string
+  }
+}
+
 export type McpResource = {
   name: string
   uri: string
@@ -3053,13 +3102,6 @@ export type ProviderAuthError1 = {
   }
 }
 
-export type NotFoundError = {
-  name: "NotFoundError"
-  data: {
-    message: string
-  }
-}
-
 export type ShareDisabledError = {
   _tag: "ShareDisabledError"
   message: string
@@ -3448,6 +3490,7 @@ export type V2Event =
   | ProjectUpdated
   | SessionStatus2
   | SessionIdle
+  | SessionGroupUpdated
   | QuestionAsked
   | QuestionReplied2
   | QuestionRejected2
@@ -6488,6 +6531,23 @@ export type SessionIdle = {
   }
 }
 
+export type SessionGroupUpdated = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "session.group.updated"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    [key: string]: unknown
+  }
+}
+
 export type QuestionAsked = {
   id: string
   metadata?: {
@@ -7503,6 +7563,14 @@ export type EventSessionIdle = {
   type: "session.idle"
   properties: {
     sessionID: string
+  }
+}
+
+export type EventSessionGroupUpdated = {
+  id: string
+  type: "session.group.updated"
+  properties: {
+    [key: string]: unknown
   }
 }
 
@@ -8650,6 +8718,216 @@ export type ExperimentalBackgroundCancelResponses = {
 
 export type ExperimentalBackgroundCancelResponse =
   ExperimentalBackgroundCancelResponses[keyof ExperimentalBackgroundCancelResponses]
+
+export type ExperimentalSessionOverviewData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-overview"
+}
+
+export type ExperimentalSessionOverviewErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionOverviewError =
+  ExperimentalSessionOverviewErrors[keyof ExperimentalSessionOverviewErrors]
+
+export type ExperimentalSessionOverviewResponses = {
+  /**
+   * Sessions on this machine, with their groups
+   */
+  200: SessionOverview
+}
+
+export type ExperimentalSessionOverviewResponse =
+  ExperimentalSessionOverviewResponses[keyof ExperimentalSessionOverviewResponses]
+
+export type ExperimentalSessionGroupListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-group"
+}
+
+export type ExperimentalSessionGroupListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionGroupListError =
+  ExperimentalSessionGroupListErrors[keyof ExperimentalSessionGroupListErrors]
+
+export type ExperimentalSessionGroupListResponses = {
+  /**
+   * Session groups
+   */
+  200: Array<SessionGroup>
+}
+
+export type ExperimentalSessionGroupListResponse =
+  ExperimentalSessionGroupListResponses[keyof ExperimentalSessionGroupListResponses]
+
+export type ExperimentalSessionGroupCreateData = {
+  body?: {
+    name: string
+    color?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-group"
+}
+
+export type ExperimentalSessionGroupCreateErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionGroupCreateError =
+  ExperimentalSessionGroupCreateErrors[keyof ExperimentalSessionGroupCreateErrors]
+
+export type ExperimentalSessionGroupCreateResponses = {
+  /**
+   * Created session group
+   */
+  200: SessionGroup
+}
+
+export type ExperimentalSessionGroupCreateResponse =
+  ExperimentalSessionGroupCreateResponses[keyof ExperimentalSessionGroupCreateResponses]
+
+export type ExperimentalSessionGroupMoveData = {
+  body?: {
+    sessionIDs: Array<string>
+    groupID: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-group/move"
+}
+
+export type ExperimentalSessionGroupMoveErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionGroupMoveError =
+  ExperimentalSessionGroupMoveErrors[keyof ExperimentalSessionGroupMoveErrors]
+
+export type ExperimentalSessionGroupMoveResponses = {
+  /**
+   * Sessions moved
+   */
+  200: boolean
+}
+
+export type ExperimentalSessionGroupMoveResponse =
+  ExperimentalSessionGroupMoveResponses[keyof ExperimentalSessionGroupMoveResponses]
+
+export type ExperimentalSessionGroupDeleteData = {
+  body?: never
+  path: {
+    groupID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-group/{groupID}"
+}
+
+export type ExperimentalSessionGroupDeleteErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionGroupDeleteError =
+  ExperimentalSessionGroupDeleteErrors[keyof ExperimentalSessionGroupDeleteErrors]
+
+export type ExperimentalSessionGroupDeleteResponses = {
+  /**
+   * Session group deleted
+   */
+  200: boolean
+}
+
+export type ExperimentalSessionGroupDeleteResponse =
+  ExperimentalSessionGroupDeleteResponses[keyof ExperimentalSessionGroupDeleteResponses]
+
+export type ExperimentalSessionGroupUpdateData = {
+  body?: {
+    name?: string
+    color?: string
+    collapsed?: boolean
+  }
+  path: {
+    groupID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-group/{groupID}"
+}
+
+export type ExperimentalSessionGroupUpdateErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionGroupUpdateError =
+  ExperimentalSessionGroupUpdateErrors[keyof ExperimentalSessionGroupUpdateErrors]
+
+export type ExperimentalSessionGroupUpdateResponses = {
+  /**
+   * Updated session group
+   */
+  200: SessionGroup
+}
+
+export type ExperimentalSessionGroupUpdateResponse =
+  ExperimentalSessionGroupUpdateResponses[keyof ExperimentalSessionGroupUpdateResponses]
 
 export type ExperimentalResourceListData = {
   body?: never

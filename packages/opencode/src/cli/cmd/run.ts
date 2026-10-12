@@ -673,6 +673,8 @@ export const RunCommand = effectCmd({
               }
             : undefined,
           permission: [...rules],
+          // XCOD-205: the Sessions window labels unattended (scheduled) agent runs.
+          ...(args.unattended ? { metadata: { unattended: true } } : {}),
         })
         const id = result.data?.id
         if (!id) {
