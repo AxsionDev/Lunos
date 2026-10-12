@@ -393,6 +393,32 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
               }
             }
 
+            // XCOD-204 / XCOD-218: Claude Code or Codex asking to use one of its tools, or Lunos asking
+            // to hand a task to it. The pattern ("claude:Write <file>") is what "always" would allow.
+            if (permission === "external") {
+              const meta = props.request.metadata ?? {}
+              const label =
+                typeof meta["label"] === "string"
+                  ? meta["label"]
+                  : meta["tool"] === "codex"
+                    ? "Codex CLI"
+                    : "Claude Code"
+              const action = typeof meta["action"] === "string" ? meta["action"] : undefined
+              const task = typeof meta["task"] === "string" ? meta["task"] : undefined
+              const pattern = props.request.patterns?.[0] ?? ""
+              const target = action ? pattern.slice(pattern.indexOf(" ") + 1) : ""
+              const description = typeof meta["description"] === "string" ? meta["description"] : undefined
+              return {
+                icon: "⇄",
+                title: action ? `${label}: ${action} ${target}` : `Hand a task to ${label}`,
+                body: (
+                  <box paddingLeft={1}>
+                    <text fg={theme.textMuted}>{task ?? description ?? pattern}</text>
+                  </box>
+                ),
+              }
+            }
+
             if (permission === "doom_loop") {
               return {
                 icon: "⟳",

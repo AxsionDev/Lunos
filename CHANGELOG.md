@@ -29,6 +29,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Claude Code and Codex in their own session in the TUI.** `/external claude` (or the command
+  palette) opens a session labelled "Claude Code" with its session id. You send it prompts and its
+  own `/commands`, answer its approvals in Lunos's approval prompt, and see the cost it reports for
+  each turn and in total. Find it in `/sessions` after a restart, or continue one by id with
+  `/external resume claude <id>`. Press esc twice to stop it. Codex CLI works the same way. Under an
+  EU-only residency policy it isn't started; the reason is shown and the refusal is audited
+  (`external.denied`) (XCOD-218).
 - **Claude Code and Codex CLI from Lunos.** If you also use either tool, `lunos external run`,
   `resume`, `sessions` and `stop` start and continue their sessions, with your own install and
   login: Lunos never stores, copies or proxies your Anthropic or OpenAI credentials. Each approval

@@ -50,6 +50,18 @@ After each session Lunos shows what the tool reports:
 - **Claude Code** reports a cost (`total_cost_usd`). On a subscription plan this is an estimate, not a bill.
 - **Codex CLI** reports tokens, not money, so Lunos shows the token count.
 
+## In the TUI
+
+`/external claude` (or `/external codex`) opens a Claude Code (or Codex CLI) session in its own session view, next to your Lunos sessions. It's in the command palette too, as "Start Claude Code or Codex session". The session is listed as `Claude Code · <session id>`, so `/sessions` finds it again after a restart.
+
+- What you type goes to the tool as typed, its own `/commands` included. The prompt suggests the commands the tool reported.
+- Each approval the tool asks for appears in that view, through Lunos's approval prompt (`external` → `claude:Write src/app.ts`). "Reject" refuses the request and ends the tool's turn. Rejecting with a message passes the message on, and the tool carries on.
+- Each reply shows the cost the tool reported for that turn, and the session's total so far. For Codex, it shows tokens.
+- Press `esc` twice to stop the tool's turn, as in any session. A pending approval is refused.
+- `/external resume claude <session-id>` continues a session started elsewhere, for example with `lunos external run`.
+
+It's gated like `lunos external run`: under a residency policy that doesn't allow the vendor's region, it isn't started, the reason is shown, and the refusal is written to the audit log.
+
 ## Handing a task from a Lunos agent
 
 To let Lunos agents hand a task to Claude Code or Codex CLI, turn on the `external_agent` tool:
@@ -92,5 +104,6 @@ Every session Lunos starts is written to the [audit log](audit-log.md) as `exter
 ## What Lunos stores
 
 - **Stored:** for each session, the session id, tool, working directory, start and end time, status, and the cost and turn count the tool reported. This lives under Lunos's data directory, on this machine only, so that `sessions`, `resume` and `stop` work.
-- **Not stored:** your prompts, the tool's output and the transcript. The transcript is kept by the tool itself (Claude Code keeps it under `~/.claude`).
+- **Not stored** (`lunos external run` and the `external_agent` tool): your prompts, the tool's output and the transcript. The transcript is kept by the tool itself (Claude Code keeps it under `~/.claude`).
+- **A session in the TUI** is a Lunos session, so its prompts and the tool's replies are stored like any other session's, in Lunos's local database, and can be deleted like one.
 - **Never touched:** your credentials. The tool runs with your own environment and login.
