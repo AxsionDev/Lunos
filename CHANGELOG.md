@@ -47,6 +47,9 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **/settings keys work the same on every screen.** Esc closes the whole settings window from any
+  depth without saving what you were typing; ← goes back one level to the row you came from (in a
+  text field, from the start of the field). Every screen shows `← back · esc close` (XCOD-233).
 - **Every release has its changelog entry.** A release now stops before anything is built or a
   draft release is created when this file has no section for the version being released, and a
   pull request that changes Lunos's code without a line here gets a warning (label `no-changelog`

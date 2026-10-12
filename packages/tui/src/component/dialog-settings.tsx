@@ -58,6 +58,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   const [highlighted, setHighlighted] = createSignal<string | undefined>(props.focus)
 
   let list: DialogSelectRef<string> | undefined
+  // XCOD-233: a save still running when Esc closed the window must not reopen it.
+  const generation = dialog.generation
 
   async function load() {
     const result = await sdk.client.config.settings().catch((cause: unknown) => ({ error: cause, data: undefined }))
@@ -74,6 +76,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
 
   onMount(() => {
     dialog.setSize("large")
+    // XCOD-233: this is the top of the /settings window, however it was opened.
+    dialog.markNav()
     void load()
   })
 
@@ -92,8 +96,14 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
 
   // Reopens this dialog where the user left it, after a picker or prompt replaced it.
   function reopen(key?: string) {
-    dialog.replace(() => <DialogSettings tab="settings" focus={key ?? highlighted()} scope={scope()} />)
+    dialog.replace(() => <DialogSettings tab="settings" focus={key ?? highlighted()} scope={scope()} />, undefined, {
+      nav: true,
+      generation,
+    })
   }
+
+  /** XCOD-233: a screen opened from row `key`; ← comes back to the list with that row highlighted. */
+  const backTo = (key: string) => ({ back: () => reopen(key), generation })
 
   async function save(row: SettingRow, value: string, options: { reopen?: boolean } = {}) {
     const result = await sdk.client.config
@@ -124,6 +134,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
         "Restart required",
         `${row.label} takes effect after a restart. Restart Lunos now?`,
         "later",
+        backTo(row.key),
       )
       if (restart === true) {
         dialog.clear()
@@ -149,7 +160,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     }
     if (row.secret) {
       toast.show({ variant: "info", message: "API keys and tokens are managed in /providers" })
-      dialog.replace(() => <DialogProviders />)
+      dialog.replace(() => <DialogProviders />, undefined, backTo(row.key))
       return true
     }
     return false
@@ -173,13 +184,17 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   async function edit(row: SettingRow) {
     if (refuse(row)) return
     if (row.dialog === "themes") {
-      dialog.replace(() => (
-        <DialogThemeList
-          onPick={(name) => {
-            void save(row, name, { reopen: true })
-          }}
-        />
-      ))
+      dialog.replace(
+        () => (
+          <DialogThemeList
+            onPick={(name) => {
+              void save(row, name, { reopen: true })
+            }}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
       return
     }
     if (row.dialog === "models") {
@@ -203,35 +218,47 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               },
             ]
           : undefined
-      dialog.replace(() => (
-        <DialogModel
-          title={row.label}
-          choices={choices}
-          current={slash > 0 ? { providerID: value.slice(0, slash), modelID: value.slice(slash + 1) } : undefined}
-          onPick={(providerID, modelID) => {
-            void save(row, `${providerID}/${modelID}`, { reopen: true })
-          }}
-        />
-      ))
+      dialog.replace(
+        () => (
+          <DialogModel
+            title={row.label}
+            choices={choices}
+            current={slash > 0 ? { providerID: value.slice(0, slash), modelID: value.slice(slash + 1) } : undefined}
+            onPick={(providerID, modelID) => {
+              void save(row, `${providerID}/${modelID}`, { reopen: true })
+            }}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
       return
     }
     // XCOD-215: agents get their own screen instead of the raw JSON.
     if (row.key === "agent" || row.key === "mode")
-      return dialog.replace(() => <DialogAgentList scope={scope()} onBack={() => reopen(row.key)} />)
-    if (row.dialog === "mcps") return dialog.replace(() => <DialogMcp />)
-    if (row.dialog === "providers") return dialog.replace(() => <DialogProviders />)
+      return dialog.replace(
+        () => <DialogAgentList scope={scope()} onBack={() => reopen(row.key)} />,
+        undefined,
+        backTo(row.key),
+      )
+    if (row.dialog === "mcps") return dialog.replace(() => <DialogMcp />, undefined, backTo(row.key))
+    if (row.dialog === "providers") return dialog.replace(() => <DialogProviders />, undefined, backTo(row.key))
     if (row.kind === "boolean") return void save(row, cycle(row)!)
     if (row.kind === "enum") {
-      dialog.replace(() => (
-        <DialogSelect
-          title={row.label}
-          placeholder={row.key}
-          skipFilter
-          current={String(row.value)}
-          options={(row.values ?? []).map((value) => ({ title: String(value), value: String(value) }))}
-          onSelect={(option) => void save(row, option.value, { reopen: true })}
-        />
-      ))
+      dialog.replace(
+        () => (
+          <DialogSelect
+            title={row.label}
+            placeholder={row.key}
+            skipFilter
+            current={String(row.value)}
+            options={(row.values ?? []).map((value) => ({ title: String(value), value: String(value) }))}
+            onSelect={(option) => void save(row, option.value, { reopen: true })}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
       return
     }
     if (row.kind === "object") return openInEditor(row)
@@ -239,6 +266,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       value: editText(row),
       placeholder: row.kind === "list" ? "comma-separated, e.g. eu, us" : row.key,
       description: () => <text fg={theme.textMuted}>{row.description || row.key}</text>,
+      nav: backTo(row.key),
     })
     if (value === null) return reopen(row.key)
     await save(row, value, { reopen: true })
@@ -247,47 +275,62 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   // XCOD-214: subagent.dynamic.allow, a list of models. Add one from the model picker, or by ID
   // (checked against the models available here when saved); enter on a model removes it.
   // The list is carried along: this screen's own state stops updating while the list replaces it.
-  function editModelList(row: SettingRow, list: string[]) {
-    const write = async (next: string[]) => {
+  function editModelList(row: SettingRow, list: string[], focus?: string) {
+    const write = async (next: string[], at?: string) => {
       const saved = await save(row, JSON.stringify(next))
-      editModelList(row, saved ? next : list)
+      editModelList(row, saved ? next : list, at)
     }
-    dialog.replace(() => (
-      <DialogSelect<string>
-        title={`${row.label} (${list.length})`}
-        placeholder="enter adds, or removes the highlighted model"
-        skipFilter
-        options={[
-          { title: "Add a model…", value: "+model", category: "Add" },
-          { title: "Add a custom model ID…", value: "+custom", category: "Add" },
-          ...list.map((id) => ({ title: id, value: id, category: "Allowed models", footer: "enter removes" })),
-        ]}
-        onSelect={async (option) => {
-          if (option.value === "+model")
-            return dialog.replace(() => (
-              <DialogModel
-                title="Add a model"
-                onPick={(providerID, modelID) => {
-                  const id = `${providerID}/${modelID}`
-                  void write(list.includes(id) ? list : [...list, id])
-                }}
-              />
-            ))
-          if (option.value === "+custom") {
-            const value = await DialogPrompt.show(dialog, "Custom model ID", {
-              placeholder: "provider/model",
-              description: () => (
-                <text fg={theme.textMuted}>For a model the picker doesn't list; it must be available here</text>
-              ),
-            })
-            const id = value?.trim()
-            if (!id) return editModelList(row, list)
-            return write(list.includes(id) ? list : [...list, id])
-          }
-          return write(list.filter((id) => id !== option.value))
-        }}
-      />
-    ))
+    // ← from a picker this list opened comes back here, on the row that opened it.
+    const here = (at: string) => ({ back: () => editModelList(row, list, at), generation })
+    dialog.replace(
+      () => (
+        <DialogSelect<string>
+          title={`${row.label} (${list.length})`}
+          placeholder="enter adds, or removes the highlighted model"
+          skipFilter
+          current={focus}
+          options={[
+            { title: "Add a model…", value: "+model", category: "Add" },
+            { title: "Add a custom model ID…", value: "+custom", category: "Add" },
+            ...list.map((id) => ({ title: id, value: id, category: "Allowed models", footer: "enter removes" })),
+          ]}
+          onSelect={async (option) => {
+            if (option.value === "+model")
+              return dialog.replace(
+                () => (
+                  <DialogModel
+                    title="Add a model"
+                    onPick={(providerID, modelID) => {
+                      const id = `${providerID}/${modelID}`
+                      void write(list.includes(id) ? list : [...list, id], id)
+                    }}
+                  />
+                ),
+                undefined,
+                here("+model"),
+              )
+            if (option.value === "+custom") {
+              const value = await DialogPrompt.show(dialog, "Custom model ID", {
+                placeholder: "provider/model",
+                description: () => (
+                  <text fg={theme.textMuted}>For a model the picker doesn't list; it must be available here</text>
+                ),
+                nav: here("+custom"),
+              })
+              const id = value?.trim()
+              if (!id) return editModelList(row, list, "+custom")
+              return write(list.includes(id) ? list : [...list, id], id)
+            }
+            return write(
+              list.filter((id) => id !== option.value),
+              "+model",
+            )
+          }}
+        />
+      ),
+      undefined,
+      backTo(row.key),
+    )
   }
 
   function toggle(row: SettingRow | undefined) {
@@ -456,7 +499,7 @@ function OtherTab(props: {
     <box paddingLeft={4} paddingRight={4} paddingBottom={1} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         {props.tabs()}
-        <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
+        <text fg={theme.textMuted} onMouseUp={() => dialog.dismiss()}>
           esc
         </text>
       </box>
@@ -474,7 +517,7 @@ function OtherTab(props: {
           </Match>
         </Switch>
       </scrollbox>
-      <text fg={theme.textMuted}>tab switches tabs · esc closes</text>
+      <text fg={theme.textMuted}>tab switches tabs</text>
     </box>
   )
 }

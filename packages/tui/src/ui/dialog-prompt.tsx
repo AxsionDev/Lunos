@@ -1,6 +1,6 @@
 import { TextareaRenderable, TextAttributes } from "@opentui/core"
 import { useTheme } from "../context/theme"
-import { useDialog, type DialogContext } from "./dialog"
+import { useDialog, type DialogContext, type DialogNav } from "./dialog"
 import { Show, createEffect, createSignal, onMount, type JSX } from "solid-js"
 import { Spinner } from "../component/spinner"
 import { useTuiConfig } from "../config"
@@ -78,7 +78,7 @@ export function DialogPrompt(props: DialogPromptProps) {
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {props.title}
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
+        <text fg={theme.textMuted} onMouseUp={() => dialog.dismiss()}>
           esc
         </text>
       </box>
@@ -115,13 +115,27 @@ export function DialogPrompt(props: DialogPromptProps) {
   )
 }
 
-DialogPrompt.show = (dialog: DialogContext, title: string, options?: Omit<DialogPromptProps, "title">) => {
+/**
+ * Resolves with the text, or null when cancelled. `nav` (XCOD-233) makes it a /settings window
+ * screen: ← at the start of the field calls `nav.back`, and Esc closes the window, in which case
+ * the promise never resolves (the flow that opened it is over).
+ */
+DialogPrompt.show = (
+  dialog: DialogContext,
+  title: string,
+  options?: Omit<DialogPromptProps, "title"> & { nav?: DialogNav },
+) => {
+  const { nav, ...rest } = options ?? {}
+  const generation = dialog.generation
   return new Promise<string | null>((resolve) => {
     dialog.replace(
       () => (
-        <DialogPrompt title={title} {...options} onConfirm={(value) => resolve(value)} onCancel={() => resolve(null)} />
+        <DialogPrompt title={title} {...rest} onConfirm={(value) => resolve(value)} onCancel={() => resolve(null)} />
       ),
-      () => resolve(null),
+      () => {
+        if (dialog.generation === generation) resolve(null)
+      },
+      nav,
     )
   })
 }
