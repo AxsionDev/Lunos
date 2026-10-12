@@ -7087,6 +7087,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenError"
+                }
+              }
+            }
           }
         },
         "description": "Create a new OpenCode session for interacting with AI assistants and managing conversations.",
@@ -26785,6 +26795,20 @@
         "required": ["name", "data"],
         "additionalProperties": false
       },
+      "ForbiddenError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["ForbiddenError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
       "ShareDisabledError": {
         "type": "object",
         "properties": {
@@ -27995,20 +28019,6 @@
           "$ref": "#/components/schemas/V2Event"
         },
         "contentMediaType": "application/json"
-      },
-      "ForbiddenError": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": ["ForbiddenError"]
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": ["_tag", "message"],
-        "additionalProperties": false
       },
       "ProjectCopyError": {
         "type": "object",

@@ -37,6 +37,7 @@ import type {
   SessionStatus,
 } from "@opencode-ai/sdk/v2"
 import { useLocal } from "../../context/local"
+import { externalCost, externalOf } from "../../util/external"
 import { Locale } from "../../util/locale"
 import { webSearchProviderLabel } from "../../util/tool-display"
 import { Dynamic, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -1640,9 +1641,27 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                 ▣{" "}
               </span>{" "}
               <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
+              <Show
+                when={
+                  props.message.providerID === "external" &&
+                  externalOf(sync.session.get(props.message.sessionID))?.session
+                }
+              >
+                {(id) => <span style={{ fg: theme.textMuted }}> {id().slice(0, 8)}</span>}
+              </Show>
               <span style={{ fg: theme.textMuted }}> · {model()}</span>
               <Show when={duration()}>
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
+              </Show>
+              <Show when={props.message.providerID === "external" && props.message.time.completed}>
+                {/* XCOD-218: the cost Claude Code reports for this turn, and the session's total so far. */}
+                <span style={{ fg: theme.textMuted }}>
+                  {" · "}
+                  {props.message.cost > 0 || !props.message.tokens.total
+                    ? `${externalCost(props.message.cost)} this turn`
+                    : `${Locale.number(props.message.tokens.total ?? 0)} tokens (cost not reported)`}
+                  {props.last ? ` · ${externalCost(sync.session.get(props.message.sessionID)?.cost ?? 0)} total` : ""}
+                </span>
               </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>
                 <span style={{ fg: theme.textMuted }}> · interrupted</span>

@@ -3102,6 +3102,11 @@ export type ProviderAuthError1 = {
   }
 }
 
+export type ForbiddenError = {
+  _tag: "ForbiddenError"
+  message: string
+}
+
 export type ShareDisabledError = {
   _tag: "ShareDisabledError"
   message: string
@@ -3505,11 +3510,6 @@ export type V2Event =
   | GlobalDisposed
 
 export type V2EventStream = string
-
-export type ForbiddenError = {
-  _tag: "ForbiddenError"
-  message: string
-}
 
 export type ProjectCopyError = {
   name: "ProjectCopyError"
@@ -10852,6 +10852,10 @@ export type SessionCreateErrors = {
    * BadRequest | InvalidRequestError
    */
   400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * ForbiddenError
+   */
+  403: ForbiddenError
 }
 
 export type SessionCreateError = SessionCreateErrors[keyof SessionCreateErrors]

@@ -1,4 +1,5 @@
 import type { BoxRenderable, TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
+import { EXTERNAL_LABEL, externalOf } from "../../util/external"
 import { pathToFileURL } from "bun"
 import fuzzysort from "fuzzysort"
 import path from "path"
@@ -448,9 +449,27 @@ export function Autocomplete(props: {
   )
 
   const commands = createMemo((): AutocompleteOption[] => {
-    const results: AutocompleteOption[] = [...slashes()]
+    // XCOD-218: in an external session, the tool's own /commands replace Lunos's prompt commands
+    // (they're sent to Claude Code / Codex as typed); Lunos's app commands stay unless a name clashes.
+    const external = props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined
+    const own = external?.commands ?? []
+    const results: AutocompleteOption[] = external
+      ? slashes().filter((item) => !own.includes(item.display.slice(1).trim()))
+      : [...slashes()]
+    for (const name of own)
+      results.push({
+        display: "/" + name,
+        description: `${EXTERNAL_LABEL[external!.tool]} command`,
+        onSelect: () => {
+          const newText = "/" + name + " "
+          const cursor = props.input().logicalCursor
+          props.input().deleteRange(0, 0, cursor.row, cursor.col)
+          props.input().insertText(newText)
+          props.input().cursorOffset = Bun.stringWidth(newText)
+        },
+      })
 
-    for (const serverCommand of sync.data.command) {
+    for (const serverCommand of external ? [] : sync.data.command) {
       if (serverCommand.source === "skill") continue
       const label = serverCommand.source === "mcp" ? ":mcp" : ""
       results.push({

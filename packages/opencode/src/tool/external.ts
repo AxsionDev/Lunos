@@ -99,7 +99,8 @@ export const ExternalAgentTool = Tool.define(
                     metadata: {
                       tool: params.tool,
                       action: request.tool,
-                      description: request.description,
+                      // XCOD-218: no undefined fields (Codex sends no description); clients get it as JSON.
+                      ...(request.description ? { description: request.description } : {}),
                       input: request.input,
                     },
                   }),

@@ -60,6 +60,7 @@ import { MemorySources } from "@/memory/sources"
 import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
+import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
 // @ts-ignore
@@ -670,7 +671,11 @@ const layer = Layer.effect(
         throw error
       }
 
-      const model = input.model ?? ag.model ?? (yield* currentModel(input.sessionID))
+      // XCOD-218: no Lunos model answers in an external session, whatever the client sent.
+      const external = ExternalSession.of(yield* sessions.get(input.sessionID).pipe(Effect.orDie))
+      const model = external
+        ? ExternalSession.model(external.tool)
+        : (input.model ?? ag.model ?? (yield* currentModel(input.sessionID)))
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
@@ -1405,6 +1410,14 @@ const layer = Layer.effect(
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
       input: LoopInput,
     ) {
+      // XCOD-218: an external session's reply comes from Claude Code / Codex, not a Lunos model.
+      const info = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      if (ExternalSession.of(info))
+        return yield* state.ensureRunning(
+          input.sessionID,
+          lastAssistant(input.sessionID),
+          ExternalSession.turn({ sessions, permission, agents, config, events, status }, input.sessionID),
+        )
       return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
     })
 
