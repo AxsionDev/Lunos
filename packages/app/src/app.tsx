@@ -66,6 +66,7 @@ import { legacySessionHref, legacySessionServer, requireServerKey, sessionHref }
 import { createSessionLineage } from "@/pages/session/session-lineage"
 
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
+import { SessionsPage } from "@/pages/sessions"
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
 
@@ -326,6 +327,24 @@ function DesktopCommands() {
   const command = useCommand()
   const language = useLanguage()
   const platform = usePlatform()
+  const navigate = useNavigate()
+
+  // XCOD-205: the Sessions view. The desktop app opens it in its own window; the web UI navigates.
+  command.register("sessions", () => [
+    {
+      id: "sessions.open",
+      title: language.t("command.sessions.open"),
+      category: language.t("command.category.session"),
+      keybind: "mod+alt+s",
+      onSelect: () => {
+        if (platform.openSessionsWindow) {
+          void platform.openSessionsWindow()
+          return
+        }
+        navigate("/sessions")
+      },
+    },
+  ])
 
   command.register("desktop", () => {
     const commands: CommandOption[] = []
@@ -641,6 +660,7 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
+      <Route path="/sessions" component={SessionsPage} />
     </>
   )
 }

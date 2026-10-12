@@ -235,6 +235,7 @@ export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.menu.restart": "Restart",
   "desktop.menu.exportLogs": "Export Logs...",
   "desktop.menu.licenses": "Third-Party Licences",
+  "desktop.menu.sessions": "Sessions",
   "desktop.menu.newSession": "New Session",
   "desktop.menu.openProject": "Open Project...",
   "desktop.menu.newWindow": "New Window",

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, shell } from "electron"
 import path from "node:path"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
-import { createMainWindow, updateTitlebar } from "./windows"
+import { createMainWindow, openSessionsWindow, updateTitlebar } from "./windows"
 
 export type DesktopMenuActionHandlers = Partial<{
   checkForUpdates: () => void
@@ -37,6 +37,9 @@ export function runDesktopMenuAction(
       return
     case "window.new":
       createMainWindow()
+      return
+    case "window.sessions":
+      openSessionsWindow()
       return
     case "window.close":
       win?.close()

@@ -269,7 +269,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const sessionGroupMove = Effect.fn("ExperimentalHttpApi.sessionGroupMove")(function* (ctx: {
       payload: typeof SessionGroupMovePayload.Type
     }) {
-      return yield* groupErrors(() => SessionGroups.move(ctx.payload.sessionIDs, ctx.payload.groupID))
+      return yield* groupErrors(() => SessionGroups.move(ctx.payload.sessionIDs, ctx.payload.groupID ?? null))
     })
 
     const resource = Effect.fn("ExperimentalHttpApi.resource")(function* () {

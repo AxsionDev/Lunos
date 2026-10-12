@@ -118,8 +118,8 @@ export const SessionGroupInfo = Schema.Struct({
   name: Schema.String,
   color: Schema.optional(Schema.String),
   collapsed: Schema.Boolean,
-  created: Schema.Number,
-  updated: Schema.Number,
+  created: Schema.Finite,
+  updated: Schema.Finite,
 }).annotate({ identifier: "SessionGroup" })
 
 // XCOD-205: one row of the Sessions window.
@@ -128,18 +128,18 @@ export const SessionOverviewItem = Schema.Struct({
   kind: Schema.Literals(["session", "subagent", "scheduled", "external"]),
   title: Schema.String,
   directory: Schema.String,
-  project: Schema.NullOr(Session.ProjectInfo),
+  project: Schema.optional(Session.ProjectInfo),
   parentID: Schema.optional(Schema.String),
   agent: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
   tool: Schema.optional(Schema.String),
-  cost: Schema.Number,
-  created: Schema.Number,
-  updated: Schema.Number,
+  cost: Schema.Finite,
+  created: Schema.Finite,
+  updated: Schema.Finite,
   state: Schema.Literals(["running", "waiting", "idle", "finished", "failed"]),
   elsewhere: Schema.optional(Schema.Boolean),
-  permissions: Schema.Number,
-  questions: Schema.Number,
+  permissions: NonNegativeInt,
+  questions: NonNegativeInt,
   groupID: Schema.optional(Schema.String),
 }).annotate({ identifier: "SessionOverviewItem" })
 
@@ -150,18 +150,20 @@ export const SessionOverviewResponse = Schema.Struct({
 
 export const SessionGroupCreatePayload = Schema.Struct({
   name: Schema.String,
-  color: Schema.optional(Schema.NullOr(Schema.String)),
+  color: Schema.optional(Schema.String),
 })
 
 export const SessionGroupUpdatePayload = Schema.Struct({
   name: Schema.optional(Schema.String),
-  color: Schema.optional(Schema.NullOr(Schema.String)),
+  /** An empty string clears the colour. */
+  color: Schema.optional(Schema.String),
   collapsed: Schema.optional(Schema.Boolean),
 })
 
 export const SessionGroupMovePayload = Schema.Struct({
   sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
-  groupID: Schema.NullOr(Schema.String),
+  /** Omitted moves the sessions back to Ungrouped. */
+  groupID: Schema.optional(Schema.String),
 })
 
 export const ExperimentalPaths = {
@@ -408,7 +410,7 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.sessionGroup.move",
             summary: "Move sessions to a group",
             description:
-              "Put sessions in a group, taking them out of any other group. A null groupID moves them back to Ungrouped.",
+              "Put sessions in a group, taking them out of any other group. Without a groupID they go back to Ungrouped.",
           }),
         ),
         HttpApiEndpoint.patch("sessionGroupUpdate", ExperimentalPaths.sessionGroup, {
@@ -421,7 +423,7 @@ export const ExperimentalApi = HttpApi.make("experimental")
           OpenApi.annotations({
             identifier: "experimental.sessionGroup.update",
             summary: "Update session group",
-            description: "Rename, recolour (null clears the colour), collapse or expand a session group.",
+            description: "Rename, recolour (an empty colour clears it), collapse or expand a session group.",
           }),
         ),
         HttpApiEndpoint.delete("sessionGroupDelete", ExperimentalPaths.sessionGroup, {

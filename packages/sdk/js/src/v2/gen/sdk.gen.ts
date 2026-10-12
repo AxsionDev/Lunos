@@ -1164,7 +1164,7 @@ export class SessionGroup extends HeyApiClient {
   /**
    * Move sessions to a group
    *
-   * Put sessions in a group, taking them out of any other group. A null groupID moves them back to Ungrouped.
+   * Put sessions in a group, taking them out of any other group. Without a groupID they go back to Ungrouped.
    */
   public move<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1243,7 +1243,7 @@ export class SessionGroup extends HeyApiClient {
   /**
    * Update session group
    *
-   * Rename, recolour (null clears the colour), collapse or expand a session group.
+   * Rename, recolour (an empty colour clears it), collapse or expand a session group.
    */
   public update<ThrowOnError extends boolean = false>(
     parameters: {

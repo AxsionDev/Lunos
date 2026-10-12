@@ -121,6 +121,9 @@ type PlatformBase = {
 
   /** Record a fatal renderer error in platform logs (desktop only) */
   recordFatalRendererError?(error: FatalRendererErrorLog): Promise<void>
+
+  /** XCOD-205: open or focus the separate Sessions window (desktop only) */
+  openSessionsWindow?(): Promise<void>
 }
 
 export type Platform = PlatformBase &

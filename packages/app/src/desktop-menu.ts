@@ -20,6 +20,7 @@ export type DesktopMenuAction =
   | "view.zoomOut"
   | "view.toggleFullscreen"
   | "window.new"
+  | "window.sessions"
   | "window.close"
   | "window.minimize"
   | "window.toggleMaximize"
@@ -274,6 +275,14 @@ export const DESKTOP_MENU: DesktopMenu[] = [
     items: [
       { type: "item", labelKey: "desktop.menu.minimize", action: "window.minimize" },
       { type: "item", labelKey: "desktop.menu.maximize", action: "window.toggleMaximize" },
+      { type: "separator" },
+      // XCOD-205: every session on this machine, in its own window that can sit next to this one.
+      {
+        type: "item",
+        labelKey: "desktop.menu.sessions",
+        action: "window.sessions",
+        accelerator: { macos: "Cmd+Option+S", windows: "Ctrl+Alt+S" },
+      },
       { type: "separator" },
       { type: "item", labelKey: "desktop.menu.closeWindow", action: "window.close" },
     ],

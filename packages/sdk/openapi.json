@@ -2444,7 +2444,7 @@
             }
           }
         },
-        "description": "Put sessions in a group, taking them out of any other group. A null groupID moves them back to Ungrouped.",
+        "description": "Put sessions in a group, taking them out of any other group. Without a groupID they go back to Ungrouped.",
         "summary": "Move sessions to a group",
         "requestBody": {
           "content": {
@@ -2462,7 +2462,7 @@
                     "type": "string"
                   }
                 },
-                "required": ["sessionIDs", "groupID"],
+                "required": ["sessionIDs"],
                 "additionalProperties": false
               }
             }
@@ -2545,7 +2545,7 @@
             }
           }
         },
-        "description": "Rename, recolour (null clears the colour), collapse or expand a session group.",
+        "description": "Rename, recolour (an empty colour clears it), collapse or expand a session group.",
         "summary": "Update session group",
         "requestBody": {
           "content": {
@@ -25080,50 +25080,10 @@
             "type": "boolean"
           },
           "created": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["NaN"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["-Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
+            "type": "number"
           },
           "updated": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["NaN"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["-Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
+            "type": "number"
           }
         },
         "required": ["id", "name", "collapsed", "created", "updated"],
@@ -25161,73 +25121,13 @@
             "type": "string"
           },
           "cost": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["NaN"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["-Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
+            "type": "number"
           },
           "created": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["NaN"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["-Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
+            "type": "number"
           },
           "updated": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["NaN"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["-Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
+            "type": "number"
           },
           "state": {
             "type": "string",
@@ -25237,50 +25137,12 @@
             "type": "boolean"
           },
           "permissions": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["NaN"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["-Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
+            "type": "integer",
+            "minimum": 0
           },
           "questions": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "enum": ["NaN"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["-Infinity"]
-              },
-              {
-                "type": "string",
-                "enum": ["Infinity", "-Infinity", "NaN"]
-              }
-            ]
+            "type": "integer",
+            "minimum": 0
           },
           "groupID": {
             "type": "string"
@@ -25291,7 +25153,6 @@
           "kind",
           "title",
           "directory",
-          "project",
           "cost",
           "created",
           "updated",

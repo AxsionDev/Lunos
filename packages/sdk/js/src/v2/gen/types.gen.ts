@@ -2605,8 +2605,8 @@ export type SessionGroup = {
   name: string
   color?: string
   collapsed: boolean
-  created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-  updated: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  created: number
+  updated: number
 }
 
 export type SessionOverviewItem = {
@@ -2614,18 +2614,18 @@ export type SessionOverviewItem = {
   kind: "session" | "subagent" | "scheduled" | "external"
   title: string
   directory: string
-  project: ProjectSummary
+  project?: ProjectSummary
   parentID?: string
   agent?: string
   model?: string
   tool?: string
-  cost: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-  created: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-  updated: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  cost: number
+  created: number
+  updated: number
   state: "running" | "waiting" | "idle" | "finished" | "failed"
   elsewhere?: boolean
-  permissions: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
-  questions: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  permissions: number
+  questions: number
   groupID?: string
 }
 
@@ -8819,7 +8819,7 @@ export type ExperimentalSessionGroupCreateResponse =
 export type ExperimentalSessionGroupMoveData = {
   body?: {
     sessionIDs: Array<string>
-    groupID: string
+    groupID?: string
   }
   path?: never
   query?: {

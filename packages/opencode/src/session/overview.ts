@@ -24,7 +24,7 @@ export interface Item {
   kind: Kind
   title: string
   directory: string
-  project: Session.ProjectInfo | null
+  project?: Session.ProjectInfo
   parentID?: string
   agent?: string
   model?: string
@@ -135,7 +135,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       kind: kind(session),
       title: session.title,
       directory: session.directory,
-      project: session.project,
+      ...(session.project ? { project: session.project } : {}),
       ...(session.parentID ? { parentID: session.parentID } : {}),
       ...(agent ? { agent } : {}),
       ...(model ? { model } : {}),
@@ -162,7 +162,6 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       kind: "external",
       title: entry.sessionID,
       directory: entry.cwd,
-      project: null,
       tool: entry.tool,
       cost: entry.costUSD ?? 0,
       created: Date.parse(entry.started) || updated,
