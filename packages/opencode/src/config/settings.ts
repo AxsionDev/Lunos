@@ -819,6 +819,25 @@ export function modelProblem(
   }
 }
 
+/** An agent as `default_agent` sees it (XCOD-230): only main agents can start a session. */
+export type AgentChoice = { name: string; mode?: string; hidden?: boolean }
+
+/**
+ * XCOD-230: why `name` can't be `default_agent`, listing the agents that can; undefined when it can.
+ * A main agent is one with mode primary or all that isn't hidden (disabled agents aren't listed).
+ */
+export function defaultAgentProblem(name: string, agents: ReadonlyArray<AgentChoice>) {
+  const main = agents.filter((agent) => agent.mode !== "subagent" && !agent.hidden).map((agent) => agent.name)
+  if (main.includes(name)) return
+  const found = agents.find((agent) => agent.name === name)
+  const why = !found
+    ? "isn't an agent here (or it's turned off)"
+    : found.mode === "subagent"
+      ? "is a subagent, which can't start a session"
+      : "is hidden"
+  return `default_agent: "${name}" ${why}. Valid: ${main.join(", ") || "none"}`
+}
+
 /** XCOD-232: the model a variant key applies to and that model's reasoning variants. */
 export type VariantLookup = (key: string) => { model: string; variants: string[] } | undefined
 
@@ -923,6 +942,8 @@ export async function set(input: {
   blocked?: ReadonlyMap<string, string>
   /** XCOD-232: checks a reasoning variant against the model it applies to. */
   variants?: VariantLookup
+  /** XCOD-230: the agents here, to check `default_agent` against. */
+  agents?: ReadonlyArray<AgentChoice>
 }): Promise<SetResult> {
   const item = await writable(input)
   const value = coerce(item, input.value)
@@ -932,6 +953,11 @@ export async function set(input: {
   const variant =
     found && typeof value === "string" ? VariantModel.problem(item.key, value, found.model, found.variants) : undefined
   if (variant) throw new SettingError(`${variant}. Nothing was written.`, "invalid")
+  const agent =
+    item.key === "default_agent" && input.agents && typeof value === "string"
+      ? defaultAgentProblem(value, input.agents)
+      : undefined
+  if (agent) throw new SettingError(`${agent}. Nothing was written.`, "invalid")
   const range = AGENT_RANGES[item.key.split(".")[2] as AgentField]
   if (range && item.key.startsWith("agent.") && typeof value === "number" && (value < range[0] || value > range[1]))
     throw new SettingError(`${item.key} must be between ${range[0]} and ${range[1]}. Nothing was written.`, "invalid")

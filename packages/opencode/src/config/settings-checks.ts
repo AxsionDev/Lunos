@@ -7,7 +7,8 @@ import { ConfigSettings } from "./settings"
 /**
  * What `ConfigSettings.set` checks a value against, read from the running instance: the models
  * available here (XCOD-214), the ones residency blocks (XCOD-212) and each model's reasoning
- * variants (XCOD-232). The same for /settings and `lunos settings set`.
+ * variants (XCOD-232), and the agents `default_agent` may name (XCOD-230). The same for /settings
+ * and `lunos settings set`.
  */
 export const settingsChecks = Effect.fn("ConfigSettings.checks")(function* () {
   const providers = yield* Provider.Service.use((svc) => svc.list())
@@ -19,6 +20,7 @@ export const settingsChecks = Effect.fn("ConfigSettings.checks")(function* () {
   )
   const byID = providers as Record<string, { models: Record<string, { variants?: Record<string, unknown> }> }>
   return {
+    agents: agents.map((agent) => ({ name: agent.name, mode: agent.mode, hidden: agent.hidden })),
     models: Provider.modelIDs(providers),
     blocked: Provider.blockedModels(providers),
     variants: ConfigSettings.variantLookup({

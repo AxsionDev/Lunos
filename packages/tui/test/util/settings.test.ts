@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test"
 import {
   badge,
   cycle,
+  defaultAgentWarning,
   editText,
   filterRows,
   hasSection,
+  mainAgents,
   nextTab,
   parseSettingsSlash,
   sectionLabel,
@@ -97,5 +99,28 @@ describe("section screens (XCOD-231)", () => {
     expect(sectionLabel(rows[2], rows[0])).toBe("Allowed models")
     expect(sectionLabel(rows[4], rows[3])).toBe("Auto")
     expect(sectionLabel(row("x.y", "Other"), rows[3])).toBe("Other")
+  })
+})
+
+describe("default_agent (XCOD-230)", () => {
+  const agents = [
+    { name: "build", mode: "primary", description: "the default" },
+    { name: "reviewer", mode: "all" },
+    { name: "explore", mode: "subagent" },
+    { name: "title", mode: "primary", hidden: true },
+    { name: "old", mode: "primary", disabled: true },
+  ]
+  test("only main agents that are on and not hidden are offered", () => {
+    expect(mainAgents(agents).map((agent) => agent.name)).toEqual(["build", "reviewer"])
+  })
+  test("a configured default that can't start a session gets a warning", () => {
+    expect(defaultAgentWarning("build", agents)).toBeUndefined()
+    expect(defaultAgentWarning(undefined, agents)).toBeUndefined()
+    expect(defaultAgentWarning("explore", agents)).toBe('"explore" is a subagent')
+    expect(defaultAgentWarning("title", agents)).toBe('"title" is hidden')
+    expect(defaultAgentWarning("old", agents)).toBe('"old" is turned off')
+    expect(defaultAgentWarning("gone", agents)).toBe(`"gone" isn't an agent here`)
+    // Not known until the agents load.
+    expect(defaultAgentWarning("explore", undefined)).toBeUndefined()
   })
 })

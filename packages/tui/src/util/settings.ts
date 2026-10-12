@@ -87,6 +87,26 @@ export function sectionLabel(
   return rest.charAt(0).toUpperCase() + rest.slice(1)
 }
 
+/** An agent's name as config keys take it (XCOD-215). */
+export const AGENT_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+
+export type AgentLike = { name: string; mode: string; hidden?: boolean; disabled?: boolean; description?: string }
+
+/** XCOD-230: the agents `default_agent` can name: mode primary or all, not hidden, not turned off. */
+export function mainAgents<T extends AgentLike>(agents: ReadonlyArray<T>) {
+  return agents.filter((agent) => agent.mode !== "subagent" && !agent.hidden && !agent.disabled)
+}
+
+/** XCOD-230: why the configured `default_agent` can't start a session; undefined when it can. */
+export function defaultAgentWarning(name: unknown, agents: ReadonlyArray<AgentLike> | undefined) {
+  if (typeof name !== "string" || !agents) return
+  const found = agents.find((agent) => agent.name === name)
+  if (!found) return `"${name}" isn't an agent here`
+  if (found.disabled) return `"${name}" is turned off`
+  if (found.mode === "subagent") return `"${name}" is a subagent`
+  if (found.hidden) return `"${name}" is hidden`
+}
+
 export function badge(row: Pick<SettingRowLike, "source" | "locked">) {
   return row.locked ? "🔒 managed" : row.source
 }

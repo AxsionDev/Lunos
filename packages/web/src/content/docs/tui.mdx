@@ -414,6 +414,10 @@ How Enter changes a setting depends on its type:
 - **On/off:** toggles.
 - **A fixed set of values** (`share`, `autoupdate`, `logLevel`…): pick from a list.
 - **Model and theme:** open the usual model and theme pickers; the choice is saved to the config.
+- **Default agent:** pick one of the main agents (shown with what they do), make a new one (it
+  becomes the default once both its name and description are entered), or Clear to use Lunos's
+  default. New sessions start with it. A default that names a subagent, a hidden agent or one that's
+  turned off is marked ⚠.
 - **Reasoning variant** (`subagent.variant`, an agent's Variant): pick from the variants of the
   model it applies to (the subagent's or agent's model, or the main model it inherits), or Inherit;
   Clear removes the key. A saved variant that model doesn't have is marked "not available for

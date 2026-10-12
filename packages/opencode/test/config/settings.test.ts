@@ -542,3 +542,27 @@ describe("reasoning variants (XCOD-232)", () => {
     ).rejects.toThrow('stub/b has no reasoning variants, so "low" can\'t be used')
   })
 })
+
+describe("default_agent (XCOD-230)", () => {
+  const agents = [
+    { name: "build", mode: "primary" },
+    { name: "plan", mode: "primary" },
+    { name: "reviewer", mode: "all" },
+    { name: "explore", mode: "subagent" },
+    { name: "title", mode: "primary", hidden: true },
+  ]
+  test("only a main agent is accepted; the others are refused with the valid names", async () => {
+    expect(ConfigSettings.defaultAgentProblem("reviewer", agents)).toBeUndefined()
+    expect(ConfigSettings.defaultAgentProblem("explore", agents)).toBe(
+      'default_agent: "explore" is a subagent, which can\'t start a session. Valid: build, plan, reviewer',
+    )
+    expect(ConfigSettings.defaultAgentProblem("title", agents)).toContain('"title" is hidden')
+    expect(ConfigSettings.defaultAgentProblem("nope", agents)).toContain("isn't an agent here")
+    await expect(
+      ConfigSettings.set({ key: "default_agent", value: "explore", scope: "user", ctx: ctx(), locked: [], agents }),
+    ).rejects.toThrow("Nothing was written")
+    expect(existsSync(userFile())).toBe(false)
+    await ConfigSettings.set({ key: "default_agent", value: "plan", scope: "user", ctx: ctx(), locked: [], agents })
+    expect(JSON.parse(await read(userFile())).default_agent).toBe("plan")
+  })
+})

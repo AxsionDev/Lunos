@@ -20,6 +20,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Choose the default agent from a list.** In /settings, Default agent lists your main agents with
+  what they do, offers "New agent…" (set one up and make it the default) and "Clear (use Lunos's
+  default)"; the next new session starts with it. A default that names a subagent, hidden or
+  turned-off agent is flagged, and `lunos settings set default_agent <name>` refuses one that isn't
+  a main agent and lists the valid names (XCOD-230).
 - **Pick a subagent's or agent's reasoning variant from a list.** In /settings, Variant shows Inherit
   and the variants of the model it applies to (the same names as the session's variant switcher),
   or says the model has none; Clear removes it. A saved variant that model doesn't have is marked

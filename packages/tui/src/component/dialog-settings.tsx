@@ -1,6 +1,6 @@
 import { TextAttributes } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
-import { For, Match, Show, Switch, createMemo, createSignal, onMount } from "solid-js"
+import { For, Match, Show, Switch, createMemo, createResource, createSignal, onMount } from "solid-js"
 import type { SettingRow, SettingsSnapshot } from "@opencode-ai/sdk/v2"
 import { versionDetail } from "@opencode-ai/core/installation/version"
 import { useTheme } from "../context/theme"
@@ -24,8 +24,11 @@ import { DialogMcp } from "./dialog-mcp"
 import { DialogProviders } from "./dialog-provider"
 import { StatusServers } from "./dialog-status"
 import {
+  AGENT_NAME,
   TABS,
   badge,
+  defaultAgentWarning,
+  mainAgents,
   cycle,
   editText,
   filterRows,
@@ -139,6 +142,115 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     )
   }
 
+  const local = useLocal()
+  const sync = useSync()
+  // XCOD-230: the agents default_agent can name, and whether the configured one still can.
+  const [agents] = createResource(async () => (await sdk.client.config.agents().catch(() => undefined))?.data)
+  const agentProblem = (row: SettingRow) =>
+    row.key === "default_agent" ? defaultAgentWarning(row.value, agents()) : undefined
+
+  /** XCOD-230: new sessions start with the new default; the agent list may still be reloading. */
+  function startWith(name: string, tries = 40) {
+    if (sync.data.agent.some((agent) => agent.name === name)) return local.mode.set(name)
+    if (tries > 0) setTimeout(() => startWith(name, tries - 1), 100)
+  }
+
+  /**
+   * XCOD-230: after Clear, new sessions start with whatever the server now puts first (its default,
+   * from another config layer or Lunos's own), once the reloaded agent list arrives.
+   */
+  function startWithDefault(before: string, tries = 40) {
+    const first = local.mode.list()[0]
+    // The list is reconciled in place: its order (the default first) is what shows the reload.
+    const order = sync.data.agent.map((agent) => agent.name).join()
+    if (first && (order !== before || tries === 0)) return local.mode.set(first.name)
+    if (tries > 0) setTimeout(() => startWithDefault(before, tries - 1), 100)
+  }
+
+  /** XCOD-230: default_agent is picked from the main agents, or a new one made on the spot. */
+  function pickDefaultAgent(row: SettingRow, focus?: string) {
+    const current = typeof row.value === "string" ? row.value : undefined
+    const choose = async (name: string | undefined) => {
+      const before = sync.data.agent.map((agent) => agent.name).join()
+      const ok = await save(row, name ?? "", { reopen: true, unset: name === undefined })
+      if (!ok) return
+      if (name) return startWith(name)
+      startWithDefault(before)
+    }
+    dialog.replace(
+      () => (
+        <DialogSelect<string>
+          title={row.label}
+          placeholder="The agent new sessions start with"
+          skipFilter
+          current={focus ?? current ?? "+clear"}
+          options={[
+            ...mainAgents(agents() ?? []).map((agent) => ({
+              title: agent.name,
+              value: agent.name,
+              description: agent.description,
+              category: "Main agents",
+            })),
+            {
+              title: "New agent…",
+              value: "+new",
+              description: "set one up and make it the default",
+              category: "Actions",
+            },
+            { title: "Clear (use Lunos's default)", value: "+clear", category: "Actions" },
+          ]}
+          onSelect={(option) => {
+            if (option.value === "+new") return void newDefaultAgent(row)
+            void choose(option.value === "+clear" ? undefined : option.value)
+          }}
+        />
+      ),
+      undefined,
+      backTo(row.key),
+    )
+  }
+
+  /**
+   * XCOD-230: Agents' New agent flow (name, then what it does), and the new agent becomes the
+   * default. Nothing is written until both are answered; ← or Esc at either step changes nothing.
+   */
+  async function newDefaultAgent(row: SettingRow) {
+    const nav = { back: () => pickDefaultAgent(row, "+new"), generation }
+    const name = (await DialogPrompt.show(dialog, "New agent", { placeholder: "name, e.g. reviewer", nav }))?.trim()
+    if (!name) return pickDefaultAgent(row, "+new")
+    if (!AGENT_NAME.test(name) || agents()?.some((agent) => agent.name === name)) {
+      toast.show({
+        variant: "error",
+        message: AGENT_NAME.test(name)
+          ? `There's already an agent called ${name}: pick it from the list`
+          : "Use letters, digits, - and _ for the name",
+      })
+      return pickDefaultAgent(row, "+new")
+    }
+    const description = (
+      await DialogPrompt.show(dialog, `${name}: what it does`, {
+        placeholder: "one line, shown in the agent list",
+        nav,
+      })
+    )?.trim()
+    if (description === undefined) return pickDefaultAgent(row, "+new")
+    const created = await sdk.client.config
+      .settingsSet({
+        settingsSetInput: { key: `agent.${name}.description`, value: description || name, scope: scope() },
+      })
+      .catch(() => undefined)
+    if (!created?.data?.ok) {
+      toast.show({
+        variant: "error",
+        title: `${name} not created`,
+        message: created?.data && !created.data.ok ? created.data.error : "The server didn't answer",
+        duration: 8000,
+      })
+      return reopen(row.key)
+    }
+    if (await save(row, name, { reopen: true })) startWith(name)
+  }
+
   const variantFor = useVariantModel()
   /** XCOD-232: a saved variant the model it applies to doesn't have. */
   const variantProblem = (row: SettingRow) =>
@@ -246,6 +358,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       )
       return
     }
+    if (row.key === "default_agent") return pickDefaultAgent(row)
     if (row.key === "subagent.variant")
       return dialog.replace(
         () => (
@@ -454,7 +567,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     visible().map((row) => {
       const value =
         (row.secret && row.kind !== "object" ? "••• (see /providers)" : row.display) +
-        (variantProblem(row) ? " ⚠" : "")
+        (variantProblem(row) || agentProblem(row) ? " ⚠" : "")
       const flags = [row.restart ? "↻" : "", row.source === "env" ? "env" : ""].filter(Boolean).join(" ")
       const right = `${value.length > 22 ? value.slice(0, 21) + "…" : value}  ${badge(row)}${flags ? " " + flags : ""}`
       return {
@@ -481,6 +594,11 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
         color: theme.warning,
       })
     else if (row.override) lines.push({ text: row.override, color: theme.warning })
+    else if (agentProblem(row))
+      lines.push({
+        text: `⚠ ${agentProblem(row)}, so it can't start a session: pick a main agent`,
+        color: theme.warning,
+      })
     else if (variantProblem(row))
       lines.push({
         text: `⚠ "${row.display}" is ${variantProblem(row)}: requests use the model's default effort`,
