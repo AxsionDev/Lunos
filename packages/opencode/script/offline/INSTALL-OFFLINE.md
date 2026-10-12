@@ -71,8 +71,9 @@ sudo install -m 755 /opt/lunos/opencode /usr/local/bin/lunos
 sudo install -m 755 tools/rg /usr/local/bin/rg
 ```
 
-The binary isn't code-signed yet, so macOS Gatekeeper may block it. Allow it in
-System Settings → Privacy & Security.
+The binary isn't code-signed with an Apple Developer ID yet. If macOS kills it when you run it
+(exit 137), it was quarantined on download: clear the flag with
+`sudo xattr -d com.apple.quarantine /usr/local/bin/lunos`.
 
 **Windows (PowerShell):**
 

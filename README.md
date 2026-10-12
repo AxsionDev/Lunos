@@ -124,6 +124,8 @@ They are listed here as _absent_ rather than shown as commands that would fail.
 > [!NOTE]
 > **Binaries are not code-signed yet**, so macOS Gatekeeper and Windows SmartScreen will warn.
 > The npm package and building from source are unaffected.
+> On macOS, a `lunos-darwin-*.zip` downloaded through a browser is quarantined and gets killed
+> when run: install with npm or the install script, or run `xattr -d com.apple.quarantine <path>`.
 >
 > Deploying in a regulated or public-sector environment? See the
 > [self-hosted deployment guide](docs/deployment/self-hosted.md), which covers data flows,

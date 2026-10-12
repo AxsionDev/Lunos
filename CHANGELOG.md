@@ -62,6 +62,10 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Fixed
 
+- **macOS binaries carry a valid signature.** The `lunos-darwin-*` binaries on npm and in the
+  release archives failed `codesign --verify` because the release built them on Linux. They are
+  now re-signed ad-hoc on a Mac before they are packed, checksummed and published. They are still
+  not signed with an Apple Developer ID or notarised (XCOD-207).
 - **Ctrl+C stops a sandboxed run at once.** The agent inside the sandbox used to keep working, and
   spending, for about 10 seconds after an interrupt, until the container was killed. It now stops
   within a second, and the run exits with 130 (XCOD-211).
