@@ -18,6 +18,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **A locked model is the one actually used.** When your organisation locks `model` in managed
+  config, every other model shows as **locked by your organisation** in the TUI, desktop and web
+  pickers and can't be chosen; `lunos run --model` with another model is refused with the policy
+  message and audited as `policy.override_refused`. `agent.<name>.model` and `subagent.model` locks
+  pin subagents the same way (XCOD-219).
+
 ### Changed
 
 - **Every release has its changelog entry.** A release now stops before anything is built or a
