@@ -27,6 +27,7 @@ import * as Stream from "effect/Stream"
 import { Command } from "../command"
 import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { ConfigMarkdown } from "@/config/markdown"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/core/util/error"
@@ -670,7 +671,22 @@ const layer = Layer.effect(
         throw error
       }
 
-      const model = input.model ?? ag.model ?? (yield* currentModel(input.sessionID))
+      // XCOD-219: under a locked `model` (or `agent.<name>.model`) a main session runs on the locked
+      // model. Asking for another one is refused with the policy message and audited; a model that
+      // only came from an agent's own config or the session's history is replaced. Subagent sessions
+      // follow the subagent locks, checked by the task tool.
+      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const lock = current.parentID ? undefined : ConfigPolicy.lockedModel(yield* config.get(), ag.name)
+      if (lock && input.model && `${input.model.providerID}/${input.model.modelID}` !== lock.model) {
+        yield* ConfigPolicy.refused(lock.key, `session model ${input.model.providerID}/${input.model.modelID}`)
+        const reason = ConfigPolicy.modelLockReason(lock)
+        const error = new NamedError.Unknown({ message: reason })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw new ConfigPolicy.LockedError(lock.key, "session model", reason)
+      }
+      const model = lock
+        ? Provider.parseModel(lock.model)
+        : (input.model ?? ag.model ?? (yield* currentModel(input.sessionID)))
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
@@ -696,7 +712,6 @@ const layer = Layer.effect(
         format: input.format,
       }
 
-      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
       if (
         current.agent !== info.agent ||
         current.model?.providerID !== info.model.providerID ||

@@ -1,6 +1,7 @@
 import { NamedError } from "@opencode-ai/core/util/error"
 import { ConfigErrorV1 } from "@opencode-ai/core/v1/config/error"
 import { Provider } from "@/provider/provider"
+import { ConfigPolicy } from "@/config/policy"
 import { Cause, Effect } from "effect"
 import { HttpRouter, HttpServerError, HttpServerRespondable, HttpServerResponse } from "effect/unstable/http"
 
@@ -52,6 +53,16 @@ export const errorLayer = HttpRouter.middleware<{ handles: unknown }>()((effect)
           HttpServerResponse.jsonUnsafe(
             { name: "ProviderNoProvidersError", data: { message: error.message } },
             { status: 400 },
+          ),
+        )
+      }
+
+      // XCOD-219: a model the organisation's lock rules out, refused with the policy message.
+      if (error instanceof ConfigPolicy.LockedError) {
+        return Effect.succeed(
+          HttpServerResponse.jsonUnsafe(
+            { name: "PolicyLockedError", data: { key: error.key, message: error.message } },
+            { status: 403 },
           ),
         )
       }

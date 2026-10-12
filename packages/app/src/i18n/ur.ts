@@ -298,6 +298,7 @@ export const dict = {
   "model.tag.free": "مفت",
   "model.tag.latest": "تازہ ترین",
   "model.tag.blocked": "پالیسی کے تحت مسدود",
+  "model.tag.locked": "آپ کی تنظیم نے مقفل کیا",
   "model.filter.all": "سب",
   "model.filter.recommended": "تجویز کردہ",
   "model.filter.large": "بڑے",

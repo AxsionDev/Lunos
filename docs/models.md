@@ -42,6 +42,21 @@ The `recommended` key replaces the built-in list entirely. Its value maps `provi
 }
 ```
 
+## When your organisation locks the model
+
+An organisation can pin the model everyone uses by locking `model` in managed config:
+
+```json
+{
+  "model": "mistral/mistral-large-latest",
+  "$locked": ["model"]
+}
+```
+
+Every other model then has a grey **locked by your organisation** tag in the TUI, desktop and web pickers, and choosing one shows the policy message instead of switching. `lunos models` adds a `locked by your organisation (model)` column to those rows. The server refuses it too: `lunos run --model other/model` (or any client asking for another model) fails with the policy message, and the attempt is written to the audit log as `policy.override_refused`. A model picked before the lock falls back to the locked one.
+
+`agent.<name>.model` locks one agent's model the same way: for that agent as the main agent, and for it as a subagent. `subagent.model` locks the model of every subagent that has no locked model of its own; the main agent can't choose another one per task. Locking `model` alone doesn't pin subagents, or `small_model` (lock those keys too if you need them pinned). Without a lock nothing changes.
+
 ## How size is decided
 
 Every model gets a `Large`, `Medium` or `Small` tag, or no tag at all. Large and Small have filters. Medium models appear under **All** only. The first rule that applies decides:

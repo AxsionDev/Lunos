@@ -296,6 +296,7 @@ export const dict = {
   "model.tag.free": "निःशुल्क",
   "model.tag.latest": "नवीनतम",
   "model.tag.blocked": "नीति द्वारा अवरुद्ध",
+  "model.tag.locked": "आपके संगठन द्वारा लॉक किया गया",
   "model.filter.all": "सभी",
   "model.filter.recommended": "अनुशंसित",
   "model.filter.large": "बड़े",

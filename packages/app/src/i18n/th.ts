@@ -310,6 +310,7 @@ export const dict = {
   "model.tag.free": "ฟรี",
   "model.tag.latest": "ล่าสุด",
   "model.tag.blocked": "ถูกบล็อกโดยนโยบาย",
+  "model.tag.locked": "ถูกล็อกโดยองค์กรของคุณ",
   "model.filter.all": "ทั้งหมด",
   "model.filter.recommended": "แนะนำ",
   "model.filter.large": "ใหญ่",

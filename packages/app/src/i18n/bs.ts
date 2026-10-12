@@ -313,6 +313,7 @@ export const dict = {
   "model.tag.free": "Besplatno",
   "model.tag.latest": "Najnovije",
   "model.tag.blocked": "Blokirano politikom",
+  "model.tag.locked": "Zaključala vaša organizacija",
   "model.filter.all": "Sve",
   "model.filter.recommended": "Preporučeno",
   "model.filter.large": "Veliki",

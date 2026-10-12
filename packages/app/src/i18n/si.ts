@@ -288,6 +288,7 @@ export const dict: Record<string, string> = {
   "model.tag.free": "නොමිලේ",
   "model.tag.latest": "නවතම",
   "model.tag.blocked": "ප්‍රතිපත්තිය මගින් අවහිර කර ඇත",
+  "model.tag.locked": "ඔබේ සංවිධානය විසින් අගුළු දමා ඇත",
   "model.filter.all": "සියල්ල",
   "model.filter.recommended": "නිර්දේශිත",
   "model.filter.large": "විශාල",

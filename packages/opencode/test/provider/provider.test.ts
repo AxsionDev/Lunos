@@ -2178,3 +2178,12 @@ it.instance(
   }),
   { config: { recommended: { "mistral/mistral-small-latest": "Our default" } } },
 )
+
+// XCOD-219: a locked `model` tags other models too, but must not block saving small_model or a subagent model.
+test("blockedModels lists residency blocks only, not models a locked model rules out", () => {
+  const blocked = Provider.blockedModels({
+    mistral: { models: { a: { blocked: { policy: "locked", reason: "model is set by your organisation's policy" } } } },
+    anthropic: { models: { b: { blocked: { policy: "residency", reason: "not in eu" } } } },
+  })
+  expect([...blocked.keys()]).toEqual(["anthropic/b"])
+})

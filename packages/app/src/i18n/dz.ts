@@ -293,6 +293,7 @@ export const dict: Record<string, string> = {
   "model.tag.free": "རིན་མེད་སྟོང་པ",
   "model.tag.latest": "ད༌རེས༌ནངས༌པ",
   "model.tag.blocked": "སྲིད་བྱུས་ཀྱིས་བཀག་ཡོདཔ",
+  "model.tag.locked": "ཁྱོད་ཀྱི་ལས་འཛིན་གྱིས་ཟྭ་བརྒྱབ་ཡོདཔ",
   "model.filter.all": "ཆ་མཉམ",
   "model.filter.recommended": "གྲོས་འདེབས་བཏབ་མི",
   "model.filter.large": "ཆེ་བ",

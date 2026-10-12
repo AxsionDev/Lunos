@@ -33,16 +33,22 @@ type ModelItem = ReturnType<ModelState["list"]>[number]
 
 const modelKey = (model: ModelItem) => `${model.provider.id}:${model.id}`
 
+/** XCOD-219: "locked by your organisation" for a locked `model`, "blocked by policy" for residency. */
+const tagKey = (blocked: NonNullable<ModelItem["blocked"]>) =>
+  blocked.policy === "locked" ? ("model.tag.locked" as const) : ("model.tag.blocked" as const)
+
 /**
- * XCOD-212: a model the residency policy would refuse can't be chosen. Says why instead, and
- * returns false. Residency is decided per provider, so groups with blocked models are listed last.
+ * XCOD-212: a model the residency policy would refuse (or, XCOD-219, a locked `model` rules out)
+ * can't be chosen. Says why instead, and returns false. Residency is decided per provider, so
+ * groups with blocked models are listed last.
  */
-const allowSelect = (item: ModelItem | undefined, blockedLabel: string) => {
+const allowSelect = (item: ModelItem | undefined, t: (key: ReturnType<typeof tagKey>) => string) => {
   if (!item?.blocked) return true
   showToast({
     variant: "error",
-    title: `${item.provider.name} ${item.name}: ${blockedLabel}`,
-    description: `Data-residency policy: ${item.blocked.reason}`,
+    title: `${item.provider.name} ${item.name}: ${t(tagKey(item.blocked))}`,
+    description:
+      item.blocked.policy === "locked" ? item.blocked.reason : `Data-residency policy: ${item.blocked.reason}`,
   })
   return false
 }
@@ -133,7 +139,7 @@ const ModelList: Component<{
         </Tooltip>
       )}
       onSelect={(x) => {
-        if (!allowSelect(x, language.t("model.tag.blocked"))) return
+        if (!allowSelect(x, language.t)) return
         model.set(x ? { modelID: x.id, providerID: x.provider.id } : undefined, {
           recent: true,
         })
@@ -150,9 +156,7 @@ const ModelList: Component<{
             <Tag>{language.t("model.tag.latest")}</Tag>
           </Show>
           <Show when={i.size}>{(size) => <Tag>{sizeLabel(size())}</Tag>}</Show>
-          <Show when={i.blocked}>
-            <Tag>{language.t("model.tag.blocked")}</Tag>
-          </Show>
+          <Show when={i.blocked}>{(blocked) => <Tag>{language.t(tagKey(blocked()))}</Tag>}</Show>
         </div>
       )}
     </List>
@@ -335,7 +339,7 @@ function createModelSelectorController(input: {
       return value ? modelKey(value) : undefined
     },
     select: (item: ModelItem) => {
-      if (!allowSelect(item, language.t("model.tag.blocked"))) return
+      if (!allowSelect(item, language.t)) return
       model.set({ modelID: item.id, providerID: item.provider.id }, { recent: true })
       input.onSelect()
     },
@@ -547,7 +551,7 @@ function ModelSelectorPopoverV2View(props: {
                                   {(size) => <TagV2 class="shrink-0">{sizeLabel(size())}</TagV2>}
                                 </Show>
                                 <Show when={item.blocked}>
-                                  <TagV2 class="shrink-0">{language.t("model.tag.blocked")}</TagV2>
+                                  {(blocked) => <TagV2 class="shrink-0">{language.t(tagKey(blocked()))}</TagV2>}
                                 </Show>
                               </MenuV2.RadioItem>
                             </TooltipV2>

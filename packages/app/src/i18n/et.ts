@@ -288,6 +288,7 @@ export const dict = {
   "model.tag.free": "Tasuta",
   "model.tag.latest": "Viimased",
   "model.tag.blocked": "Poliitikaga blokeeritud",
+  "model.tag.locked": "Teie organisatsiooni poolt lukustatud",
   "model.filter.all": "Kõik",
   "model.filter.recommended": "Soovitatud",
   "model.filter.large": "Suured",

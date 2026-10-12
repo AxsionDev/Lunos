@@ -191,6 +191,7 @@ export const dict = {
   "model.tag.free": "무료",
   "model.tag.latest": "최신",
   "model.tag.blocked": "정책에 의해 차단됨",
+  "model.tag.locked": "조직에서 잠금",
   "model.filter.all": "전체",
   "model.filter.recommended": "추천",
   "model.filter.large": "대형",

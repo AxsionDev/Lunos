@@ -53,8 +53,11 @@ export const ModelsCommand = effectCmd({
         if (args.size) process.stdout.write(`\t${model.size}`)
         if (args.recommended) process.stdout.write(`\t${model.recommended}`)
         // XCOD-212: only blocked rows get a second column, so scripts reading names are unaffected.
-        if (model.blocked)
+        if (model.blocked?.policy === "residency")
           process.stdout.write(`\tblocked by policy (${model.blocked.policy}: ${model.blocked.region})`)
+        // XCOD-219
+        if (model.blocked?.policy === "locked")
+          process.stdout.write(`\tlocked by your organisation (${model.blocked.key})`)
         process.stdout.write(EOL)
         if (verbose) {
           process.stdout.write(JSON.stringify(model, null, 2))

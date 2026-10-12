@@ -290,6 +290,7 @@ export const dict = {
   "model.tag.free": "Озод",
   "model.tag.latest": "Охирин",
   "model.tag.blocked": "Аз ҷониби сиёсат манъ шудааст",
+  "model.tag.locked": "Аз ҷониби ташкилоти шумо қулф шудааст",
   "model.filter.all": "Ҳама",
   "model.filter.recommended": "Тавсияшуда",
   "model.filter.large": "Калон",

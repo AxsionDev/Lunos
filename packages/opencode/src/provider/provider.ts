@@ -3,6 +3,7 @@ import os from "os"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import fuzzysort from "fuzzysort"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { mapValues, mergeDeep, omit, pickBy, sortBy } from "remeda"
 import { NoSuchModelError, type Provider as SDK } from "ai"
 import { Npm } from "@opencode-ai/core/npm"
@@ -1136,13 +1137,24 @@ export const Model = Schema.Struct({
   headers: Schema.Record(Schema.String, Schema.String),
   release_date: Schema.String,
   variants: optional(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Any))),
-  /** Set when the residency policy would refuse this model's requests (XCOD-212). Pickers tag it and don't select it. */
+  /**
+   * Set when a policy rules this model out: the residency policy would refuse its requests (XCOD-212),
+   * or the organisation locks `model` to another one (XCOD-219, `key` is the locked key). Session
+   * pickers tag it and don't select it.
+   */
   blocked: optional(
-    Schema.Struct({
-      policy: Schema.Literal("residency"),
-      region: Schema.String,
-      reason: Schema.String,
-    }),
+    Schema.Union([
+      Schema.Struct({
+        policy: Schema.Literal("residency"),
+        region: Schema.String,
+        reason: Schema.String,
+      }),
+      Schema.Struct({
+        policy: Schema.Literal("locked"),
+        key: Schema.String,
+        reason: Schema.String,
+      }),
+    ]),
   ),
   /** XCOD-213: from the documented size rules; absent when the size isn't known. */
   size: optional(Schema.Literals(["large", "medium", "small"])),
@@ -1197,12 +1209,17 @@ export function defaultModelIDs<T extends { models: Record<string, { id: string 
   return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
 }
 
-/** Models the residency policy blocks, as "provider/model" → the policy's reason (XCOD-212). */
-export function blockedModels(providers: Record<string, { models: Record<string, { blocked?: { reason: string } }> }>) {
+/**
+ * Models the residency policy blocks, as "provider/model" → the policy's reason (XCOD-212). Only
+ * residency: a locked `model` (XCOD-219) doesn't stop `small_model` or a subagent using another one.
+ */
+export function blockedModels(
+  providers: Record<string, { models: Record<string, { blocked?: { policy: string; reason: string } }> }>,
+) {
   return new Map(
     Object.entries(providers).flatMap(([providerID, provider]) =>
       Object.entries(provider.models).flatMap(([modelID, model]) =>
-        model.blocked ? [[`${providerID}/${modelID}`, model.blocked.reason] as const] : [],
+        model.blocked?.policy === "residency" ? [[`${providerID}/${modelID}`, model.blocked.reason] as const] : [],
       ),
     ),
   )
@@ -1760,6 +1777,7 @@ const layer = Layer.effect(
         }
 
         const residency = AuditLog.residency(cfg)
+        const lock = ConfigPolicy.lockedModel(cfg)
         const recommended = ModelCuration.recommended(cfg.recommended)
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
@@ -1811,6 +1829,9 @@ const layer = Layer.effect(
             // The endpoint `resolveSDK` would use, so the tag matches what `Residency.enforce` decides.
             const denied = Residency.blocked(providerID, configuredURL ?? model.api.url, residency)
             if (denied) model.blocked = { policy: "residency", region: denied.region, reason: denied.reason }
+            // XCOD-219: a locked `model` rules out every other model for the session.
+            else if (lock && `${providerID}/${modelID}` !== lock.model)
+              model.blocked = { policy: "locked", key: lock.key, reason: ConfigPolicy.modelLockReason(lock) }
             else delete model.blocked
 
             const size = ModelCuration.size(providerID, modelID, model.name)

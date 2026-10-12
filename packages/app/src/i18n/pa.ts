@@ -295,6 +295,7 @@ export const dict = {
   "model.tag.free": "مفت",
   "model.tag.latest": "تازہ ترین",
   "model.tag.blocked": "پالیسی ولوں بلاک",
+  "model.tag.locked": "ਤੁਹਾਡੀ ਸੰਸਥਾ ਵੱਲੋਂ ਲੌਕ ਕੀਤਾ",
   "model.filter.all": "سارے",
   "model.filter.recommended": "تجویز کردہ",
   "model.filter.large": "وڈے",
