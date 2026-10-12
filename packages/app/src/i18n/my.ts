@@ -293,6 +293,7 @@ export const dict = {
   "model.tag.free": "အခမဲ့",
   "model.tag.latest": "နောက်ဆုံးထွက်",
   "model.tag.blocked": "မူဝါဒဖြင့် ပိတ်ထားသည်",
+  "model.tag.locked": "သင့်အဖွဲ့အစည်းမှ လော့ခ်ချထားသည်",
   "model.filter.all": "အားလုံး",
   "model.filter.recommended": "အကြံပြုထားသည်",
   "model.filter.large": "ကြီး",

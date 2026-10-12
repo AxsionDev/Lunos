@@ -291,6 +291,7 @@ export const dict = {
   "model.tag.free": "Gratis",
   "model.tag.latest": "Senaste",
   "model.tag.blocked": "Blockerad av policy",
+  "model.tag.locked": "Låst av din organisation",
   "model.filter.all": "Alla",
   "model.filter.recommended": "Rekommenderade",
   "model.filter.large": "Stora",

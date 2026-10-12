@@ -295,6 +295,7 @@ export const dict = {
   "model.tag.free": "ހިލޭ",
   "model.tag.latest": "އެންމެފަހުގެ",
   "model.tag.blocked": "ސިޔާސަތުން މަނާކޮށްފައި",
+  "model.tag.locked": "ތިބާގެ ޖަމާޢަތުން ލޮކްކޮށްފައި",
   "model.filter.all": "ހުރިހާ",
   "model.filter.recommended": "ލަފާދޭ",
   "model.filter.large": "ބޮޑު",

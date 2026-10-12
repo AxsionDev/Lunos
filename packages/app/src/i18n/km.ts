@@ -289,6 +289,7 @@ export const dict = {
   "model.tag.free": "ឥតគិតថ្លៃ",
   "model.tag.latest": "ចុងក្រោយ",
   "model.tag.blocked": "ត្រូវបានរារាំងដោយគោលការណ៍",
+  "model.tag.locked": "ចាក់សោដោយស្ថាប័នរបស់អ្នក",
   "model.filter.all": "ទាំងអស់",
   "model.filter.recommended": "បានណែនាំ",
   "model.filter.large": "ធំ",

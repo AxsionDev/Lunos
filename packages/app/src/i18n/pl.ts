@@ -298,6 +298,7 @@ export const dict = {
   "model.tag.free": "Darmowy",
   "model.tag.latest": "Najnowszy",
   "model.tag.blocked": "Zablokowany przez zasady",
+  "model.tag.locked": "Zablokowane przez Twoją organizację",
   "model.filter.all": "Wszystkie",
   "model.filter.recommended": "Polecane",
   "model.filter.large": "Duże",

@@ -36,6 +36,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
   open, rename, stop or answer a waiting session from the list. Subagents sit under their parent;
   scheduled runs and external sessions are labelled. Groups are stored on this machine only
   (XCOD-205).
+- **A locked model is the one actually used.** When your organisation locks `model` in managed
+  config, every other model shows as **locked by your organisation** in the TUI, desktop and web
+  pickers and can't be chosen; `lunos run --model` with another model is refused with the policy
+  message and audited as `policy.override_refused`. `agent.<name>.model` and `subagent.model` locks
+  pin subagents the same way (XCOD-219).
 
 ### Changed
 
@@ -43,6 +48,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
   draft release is created when this file has no section for the version being released, and a
   pull request that changes Lunos's code without a line here gets a warning (label `no-changelog`
   to skip it). v1.18.46 shipped without one; its section is now below (XCOD-227).
+
+### Fixed
+
+- **macOS binaries carry a valid signature.** The `lunos-darwin-*` binaries on npm and in the
+  release archives failed `codesign --verify` because the release built them on Linux. They are
+  now re-signed ad-hoc on a Mac before they are packed, checksummed and published. They are still
+  not signed with an Apple Developer ID or notarised (XCOD-207).
 
 ## [1.18.46] - 2026-10-09
 

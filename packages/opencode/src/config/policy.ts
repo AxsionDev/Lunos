@@ -40,11 +40,72 @@ export const KNOWN = [
   "cloud",
   // XCOD-202: every permission, or one tool's (`permission.webfetch`, `permission.bash`, …).
   "permission",
+  // XCOD-219: the models a session and its subagents run on (plus `agent.<name>.model`).
+  "model",
+  "small_model",
+  "subagent",
+  "subagent.model",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */
 export function isKnown(key: string) {
-  return (KNOWN as ReadonlyArray<string>).includes(key) || /^permission\.[^.]+$/.test(key)
+  return (
+    (KNOWN as ReadonlyArray<string>).includes(key) ||
+    /^permission\.[^.]+$/.test(key) ||
+    /^agent\.[^.]+\.model$/.test(key)
+  )
+}
+
+type ModelConfig = {
+  readonly $locked?: ReadonlyArray<string>
+  readonly model?: string
+  readonly subagent?: { readonly model?: string }
+  readonly agent?: Readonly<Record<string, { readonly model?: string } | undefined>>
+}
+export type ModelLock = { key: string; model: string }
+
+/**
+ * XCOD-219: the model the organisation pins a main agent to, and the locked key that pins it:
+ * `agent.<name>.model` when that is locked and set, else `model`. A lock managed config leaves unset
+ * pins nothing (the default model is used, as for any other locked key).
+ */
+export function lockedModel(config: ModelConfig, agent?: string): ModelLock | undefined {
+  if (agent) {
+    const own = `agent.${agent}.model`
+    const value = config.agent?.[agent]?.model
+    if (value && isLocked(config.$locked, own)) return { key: own, model: value }
+  }
+  if (config.model && isLocked(config.$locked, "model")) return { key: "model", model: config.model }
+}
+
+/**
+ * XCOD-219: what the session pickers may offer under a locked `model`: the locked model, plus each
+ * locked `agent.<name>.model` (that agent's mode runs on it). Undefined without a `model` lock.
+ */
+export function sessionModels(config: ModelConfig) {
+  const lock = lockedModel(config)
+  if (!lock) return
+  const allowed = new Set([lock.model])
+  for (const [name, agent] of Object.entries(config.agent ?? {}))
+    if (agent?.model && isLocked(config.$locked, `agent.${name}.model`)) allowed.add(agent.model)
+  return { lock, allowed }
+}
+
+/**
+ * XCOD-219: the same for a subagent of type `agent`: `agent.<name>.model`, else `subagent.model`.
+ * The value may be `"inherit"` or `"small"`, as those keys allow.
+ */
+export function lockedSubagentModel(config: ModelConfig, agent: string): ModelLock | undefined {
+  const own = `agent.${agent}.model`
+  const value = config.agent?.[agent]?.model
+  if (value && isLocked(config.$locked, own)) return { key: own, model: value }
+  const global = config.subagent?.model
+  if (global && isLocked(config.$locked, "subagent.model")) return { key: "subagent.model", model: global }
+}
+
+/** XCOD-219: why a model other than the locked one can't be used: the policy message, and what it is set to. */
+export function modelLockReason(lock: ModelLock) {
+  return `${message(lock.key)} (it is set to ${lock.model})`
 }
 
 type Record_ = Record<string, unknown>
@@ -238,8 +299,10 @@ export class LockedError extends Error {
   constructor(
     readonly key: string,
     readonly via: string,
+    /** XCOD-219: the full message, when it says more than `message(key)`. */
+    text?: string,
   ) {
-    super(message(key))
+    super(text ?? message(key))
     this.name = "PolicyLockedError"
   }
 }

@@ -2435,11 +2435,17 @@ export type Model = {
       [key: string]: unknown
     }
   }
-  blocked?: {
-    policy: "residency"
-    region: string
-    reason: string
-  }
+  blocked?:
+    | {
+        policy: "residency"
+        region: string
+        reason: string
+      }
+    | {
+        policy: "locked"
+        key: string
+        reason: string
+      }
   size?: "large" | "medium" | "small"
   recommended?: string
 }

@@ -295,6 +295,7 @@ export const dict = {
   "model.tag.free": "Ingyenes",
   "model.tag.latest": "Legújabb",
   "model.tag.blocked": "Szabályzat által tiltva",
+  "model.tag.locked": "A szervezete zárolta",
   "model.filter.all": "Összes",
   "model.filter.recommended": "Ajánlott",
   "model.filter.large": "Nagy",

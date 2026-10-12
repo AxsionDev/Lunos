@@ -64,3 +64,57 @@ describe("ConfigPolicy (XCOD-102)", () => {
     expect(pick([])).toEqual({ dir: "/etc/lunos", legacy: false })
   })
 })
+
+describe("locked models (XCOD-219)", () => {
+  const config = {
+    $locked: ["model", "agent.review.model", "subagent.model"],
+    model: "mistral/mistral-large-latest",
+    subagent: { model: "mistral/codestral-latest" },
+    agent: { review: { model: "mistral/magistral-medium" }, build: { model: "openai/gpt-x" } },
+  }
+
+  test("model, small_model, subagent.model and agent.<name>.model are known lock keys", () => {
+    expect(ConfigPolicy.unknownKeys(["model", "small_model", "subagent.model", "agent.review.model"])).toEqual([])
+    expect(ConfigPolicy.unknownKeys(["agent.review.prompt"])).toEqual(["agent.review.prompt"])
+  })
+
+  test("a main agent runs on its own locked model, else the locked model", () => {
+    expect(ConfigPolicy.lockedModel(config, "review")).toEqual({
+      key: "agent.review.model",
+      model: "mistral/magistral-medium",
+    })
+    // build sets its own model, but only `model` is locked for it.
+    expect(ConfigPolicy.lockedModel(config, "build")).toEqual({ key: "model", model: "mistral/mistral-large-latest" })
+    expect(ConfigPolicy.lockedModel(config)).toEqual({ key: "model", model: "mistral/mistral-large-latest" })
+  })
+
+  test("a subagent follows agent.<name>.model, else subagent.model; a model lock alone doesn't pin it", () => {
+    expect(ConfigPolicy.lockedSubagentModel(config, "review")?.key).toBe("agent.review.model")
+    expect(ConfigPolicy.lockedSubagentModel(config, "explore")).toEqual({
+      key: "subagent.model",
+      model: "mistral/codestral-latest",
+    })
+    expect(ConfigPolicy.lockedSubagentModel({ ...config, $locked: ["model"] }, "explore")).toBeUndefined()
+  })
+
+  test("nothing is locked without a lock, or when managed config leaves the key unset", () => {
+    expect(ConfigPolicy.lockedModel({ ...config, $locked: [] }, "review")).toBeUndefined()
+    expect(ConfigPolicy.lockedSubagentModel({ ...config, $locked: [] }, "review")).toBeUndefined()
+    expect(ConfigPolicy.lockedModel({ $locked: ["model"] })).toBeUndefined()
+  })
+
+  // An agent's own locked model must not be tagged, or its mode falls back to `model` and is refused.
+  test("the session pickers offer the locked model and every locked agent model", () => {
+    expect([...ConfigPolicy.sessionModels(config)!.allowed]).toEqual([
+      "mistral/mistral-large-latest",
+      "mistral/magistral-medium",
+    ])
+    expect(ConfigPolicy.sessionModels({ ...config, $locked: ["agent.review.model"] })).toBeUndefined()
+  })
+
+  test("the reason is the policy message and names the locked model", () => {
+    expect(ConfigPolicy.modelLockReason({ key: "model", model: "mistral/mistral-large-latest" })).toBe(
+      "model is set by your organisation's policy and can't be changed here (it is set to mistral/mistral-large-latest)",
+    )
+  })
+})

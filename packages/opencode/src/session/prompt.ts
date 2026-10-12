@@ -27,6 +27,7 @@ import * as Stream from "effect/Stream"
 import { Command } from "../command"
 import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { ConfigMarkdown } from "@/config/markdown"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/core/util/error"
@@ -671,11 +672,27 @@ const layer = Layer.effect(
         throw error
       }
 
-      // XCOD-218: no Lunos model answers in an external session, whatever the client sent.
-      const external = ExternalSession.of(yield* sessions.get(input.sessionID).pipe(Effect.orDie))
+      // XCOD-219: under a locked `model` (or `agent.<name>.model`) a main session runs on the locked
+      // model. Asking for another one is refused with the policy message and audited; a model that
+      // only came from an agent's own config or the session's history is replaced. Subagent sessions
+      // follow the subagent locks, checked by the task tool.
+      // XCOD-218: no Lunos model answers in an external session, whatever the client sent, so the
+      // model lock doesn't apply there; the external tool's own policy gate does.
+      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const external = ExternalSession.of(current)
+      const lock = external || current.parentID ? undefined : ConfigPolicy.lockedModel(yield* config.get(), ag.name)
+      if (lock && input.model && `${input.model.providerID}/${input.model.modelID}` !== lock.model) {
+        yield* ConfigPolicy.refused(lock.key, `session model ${input.model.providerID}/${input.model.modelID}`)
+        const reason = ConfigPolicy.modelLockReason(lock)
+        const error = new NamedError.Unknown({ message: reason })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw new ConfigPolicy.LockedError(lock.key, "session model", reason)
+      }
       const model = external
         ? ExternalSession.model(external.tool)
-        : (input.model ?? ag.model ?? (yield* currentModel(input.sessionID)))
+        : lock
+          ? Provider.parseModel(lock.model)
+          : (input.model ?? ag.model ?? (yield* currentModel(input.sessionID)))
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
@@ -701,7 +718,6 @@ const layer = Layer.effect(
         format: input.format,
       }
 
-      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
       if (
         current.agent !== info.agent ||
         current.model?.providerID !== info.model.providerID ||
@@ -1512,7 +1528,11 @@ const layer = Layer.effect(
       }
       template = template.trim()
 
+      // XCOD-219: under a locked model a command's own `model` (or its agent's) is ignored, like an
+      // agent's own model is. A model the caller asked for still goes through, to be refused.
+      const commandLock = ConfigPolicy.lockedModel(yield* config.get(), agentName)
       const taskModel = yield* Effect.gen(function* () {
+        if (commandLock) return Provider.parseModel(input.model ?? commandLock.model)
         if (cmd.model) return Provider.parseModel(cmd.model)
         if (cmd.agent) {
           const cmdAgent = yield* agents.get(cmd.agent)

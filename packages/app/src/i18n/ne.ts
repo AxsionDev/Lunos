@@ -291,6 +291,7 @@ export const dict: Record<string, string> = {
   "model.tag.free": "नि:शुल्क",
   "model.tag.latest": "पछिल्लो",
   "model.tag.blocked": "नीतिद्वारा अवरुद्ध",
+  "model.tag.locked": "तपाईंको संस्थाद्वारा लक गरिएको",
   "model.filter.all": "सबै",
   "model.filter.recommended": "सिफारिस गरिएको",
   "model.filter.large": "ठूलो",

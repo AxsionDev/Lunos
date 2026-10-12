@@ -283,6 +283,7 @@ export const dict = {
   "model.tag.free": "ነጻ",
   "model.tag.latest": "የቅርብ",
   "model.tag.blocked": "በፖሊሲ የታገደ",
+  "model.tag.locked": "በድርጅትዎ የተቆለፈ",
   "model.filter.all": "ሁሉም",
   "model.filter.recommended": "የሚመከር",
   "model.filter.large": "ትልቅ",

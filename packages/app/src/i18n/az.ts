@@ -293,6 +293,7 @@ export const dict = {
   "model.tag.free": "Pulsuz",
   "model.tag.latest": "Ən son",
   "model.tag.blocked": "Siyasət tərəfindən bloklanıb",
+  "model.tag.locked": "Təşkilatınız tərəfindən kilidlənib",
   "model.filter.all": "Hamısı",
   "model.filter.recommended": "Tövsiyə olunan",
   "model.filter.large": "Böyük",

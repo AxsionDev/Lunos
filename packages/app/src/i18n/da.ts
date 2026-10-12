@@ -210,6 +210,7 @@ export const dict = {
   "model.tag.free": "Gratis",
   "model.tag.latest": "Nyeste",
   "model.tag.blocked": "Blokeret af politik",
+  "model.tag.locked": "Låst af din organisation",
   "model.filter.all": "Alle",
   "model.filter.recommended": "Anbefalede",
   "model.filter.large": "Store",
