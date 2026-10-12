@@ -1,6 +1,6 @@
 # Running agents unattended
 
-`lunos agent run` runs one of your agents with nobody at the keyboard, now or on a schedule, with hard limits on time, spend and steps (XCOD-211, unreleased).
+`lunos agent run` runs one of your agents with nobody at the keyboard, now or on a schedule, with hard limits on time, spend and steps (XCOD-211, since v1.18.46).
 
 ```sh
 lunos agent run nightly --prompt "update the dependency report"            # now

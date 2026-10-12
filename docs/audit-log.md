@@ -164,7 +164,7 @@ policy it counts as `unknown`, so an EU-only policy refuses it unless `"unknown"
 Loopback (`127.0.0.1`, `localhost`) never leaves the machine and is always allowed. A refused
 destination is recorded as `audit.forward_refused`, with the region it was checked as.
 
-**Declaring the destination's region** (XCOD-201, unreleased). To forward off the machine under an
+**Declaring the destination's region** (XCOD-201, since v1.18.46). To forward off the machine under an
 EU-only policy without allowing `"unknown"` (which would also allow model providers in unknown
 regions), declare where the destinations process data:
 
