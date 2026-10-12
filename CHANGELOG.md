@@ -25,6 +25,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
   pull request that changes Lunos's code without a line here gets a warning (label `no-changelog`
   to skip it). v1.18.46 shipped without one; its section is now below (XCOD-227).
 
+### Fixed
+
+- **macOS binaries carry a valid signature.** The `lunos-darwin-*` binaries on npm and in the
+  release archives failed `codesign --verify` because the release built them on Linux. They are
+  now re-signed ad-hoc on a Mac before they are packed, checksummed and published. They are still
+  not signed with an Apple Developer ID or notarised (XCOD-207).
+
 ## [1.18.46] - 2026-10-09
 
 ### Added
