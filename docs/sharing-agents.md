@@ -2,7 +2,7 @@
 
 Package an agent once and use it on another machine, or hand it to a colleague: `lunos agent export` writes the agent, the MCP servers it uses and the skills it names into one bundle file, and `lunos agent import` adds it on the other side after showing exactly what it will be allowed to do.
 
-This page covers **editing (XCOD-210), exporting and importing (XCOD-209)**, all unreleased. Running agents on a schedule is separate, later work (XCOD-211).
+This page covers **editing (XCOD-210), exporting and importing (XCOD-209)**, since v1.18.46. Running agents unattended or on a schedule is covered in [Running agents unattended](unattended-agents.md) (XCOD-211).
 
 ## Editing
 
