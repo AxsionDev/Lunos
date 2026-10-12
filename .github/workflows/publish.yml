@@ -76,6 +76,16 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
 
+      # XCOD-227: v1.18.46 shipped with no CHANGELOG.md section. Fail before ./script/version.ts,
+      # which creates the draft release, so a refused dispatch leaves no draft behind. The script
+      # computes the version the same way version.ts does, and skips preview/beta builds.
+      - name: Check CHANGELOG.md has a section for this version
+        timeout-minutes: 3
+        run: bun script/check-changelog.ts
+        env:
+          OPENCODE_BUMP: ${{ inputs.bump }}
+          OPENCODE_VERSION: ${{ inputs.version }}
+
       - name: Setup git committer
         id: committer
         uses: ./.github/actions/setup-git-committer

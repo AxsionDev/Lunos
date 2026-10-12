@@ -37,7 +37,9 @@ import {
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
-import { PermissionNotFoundError, ShareDisabledApiError } from "../errors"
+import { ForbiddenError, PermissionNotFoundError, ShareDisabledApiError } from "../errors"
+import { ExternalSession } from "@/external/session"
+import { Config } from "@/config/config"
 import * as SessionError from "./session-errors"
 
 const tryParseJson = (text: string) =>
@@ -60,6 +62,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const todoSvc = yield* Todo.Service
     const summary = yield* SessionSummary.Service
     const events = yield* EventV2Bridge.Service
+    const configSvc = yield* Config.Service
     const scope = yield* Scope.Scope
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
@@ -154,6 +157,21 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload?: Session.CreateInput }) {
+      // XCOD-218: an external session (Claude Code / Codex) passes the same gate as `lunos external run`;
+      // a refusal is audited (external.denied) and comes back with its reason.
+      const external = ctx.payload?.metadata ? ExternalSession.of(ctx.payload) : undefined
+      if (external) {
+        const refused = ExternalSession.refused(external.tool, yield* configSvc.get())
+        if (refused) return yield* new ForbiddenError({ message: refused })
+        return yield* shareSvc.create({
+          ...ctx.payload,
+          title: ctx.payload?.title ?? ExternalSession.title(external.tool, external.session),
+          model: {
+            providerID: ExternalSession.model(external.tool).providerID,
+            id: ExternalSession.model(external.tool).modelID,
+          },
+        })
+      }
       return yield* shareSvc.create(ctx.payload)
     })
 

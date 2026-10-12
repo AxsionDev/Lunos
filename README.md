@@ -9,9 +9,8 @@
 </p>
 
 <p align="center">
-  <b>Lunos is the EU-sovereign, self-hostable AI coding agent</b> — opencode's infrastructure plus
-  Claude Code's platform features, built so a public-sector procurement officer can actually
-  approve it.
+  <b>Lunos is the EU-sovereign, self-hostable AI coding agent</b> — MIT-licensed,
+  provider-agnostic, and built so a public-sector procurement officer can actually approve it.
 </p>
 
 > **Lunos** is a fork of [opencode](https://github.com/anomalyco/opencode). It is not built by,
@@ -197,7 +196,8 @@ Invoke one explicitly by mentioning it in a message, e.g. `@general`.
 
 ### Documentation
 
-**Lunos has no documentation site yet.** What exists lives in this repository:
+**The documentation is at [docs.lunos.tech](https://docs.lunos.tech).** These pages also live in
+this repository:
 
 - [Self-hosted deployment guide](docs/deployment/self-hosted.md) — deployment, data flows, and what
   the EU-sovereignty claim covers
@@ -209,7 +209,7 @@ Invoke one explicitly by mentioning it in a message, e.g. `@general`.
 - [`SECURITY.md`](SECURITY.md) — threat model and vulnerability reporting
 - Decision records in [`.claude/docs/`](.claude/docs/)
 
-For configuration options not covered above, upstream opencode's documentation still largely
+For configuration options not covered there, upstream opencode's documentation still largely
 applies, since Lunos inherits its configuration format — but it describes _opencode_, and the two
 have begun to diverge. Treat it as a reference, not as Lunos documentation.
 
