@@ -18,13 +18,41 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Changed
+
+- **Every release has its changelog entry.** A release now stops before anything is built or a
+  draft release is created when this file has no section for the version being released, and a
+  pull request that changes Lunos's code without a line here gets a warning (label `no-changelog`
+  to skip it). v1.18.46 shipped without one; its section is now below (XCOD-227).
+
+## [1.18.46] - 2026-10-09
+
 ### Added
 
-- **A locked model is the one actually used.** When your organisation locks `model` in managed
-  config, every other model shows as **locked by your organisation** in the TUI, desktop and web
-  pickers and can't be chosen; `lunos run --model` with another model is refused with the policy
-  message and audited as `policy.override_refused`. `agent.<name>.model` and `subagent.model` locks
-  pin subagents the same way (XCOD-219).
+- **Claude Code and Codex CLI from Lunos.** If you also use either tool, `lunos external run`,
+  `resume`, `sessions` and `stop` start and continue their sessions, with your own install and
+  login: Lunos never stores, copies or proxies your Anthropic or OpenAI credentials. Each approval
+  the tool asks for comes to you, and each session's reported cost (Claude Code) or tokens (Codex)
+  is shown. Codex's `/review` and `/compact` work; its other commands are refused with the list of
+  what does. With `"external": { "delegate": true }` a Lunos agent can hand a task to either tool
+  through the `external_agent` tool, approved through Lunos's own permission prompts. A residency
+  policy that doesn't allow the vendor's region refuses to start them, every session is in the
+  audit log, and an organisation can turn the feature off. See
+  [Claude Code and Codex CLI from Lunos](docs/external-agents.md) (XCOD-204).
+- **Models your residency policy blocks are tagged "blocked by policy"** in the TUI, desktop and
+  web model pickers, with their providers listed last, and can't be chosen: picking one shows the policy's reason.
+  `lunos models` marks them too, and saving a blocked model as `model`, `small_model`,
+  `subagent.model` or a `subagent.dynamic` entry is refused (XCOD-212).
+- **Recommended and size filters in the model picker.** All, Recommended, Large and Small (`ctrl+l`
+  cycles them in the TUI; buttons in desktop and web), remembered across restarts, and
+  `lunos models --recommended` / `--size`. Recommended is a curated list of EU-hosted and local
+  models, each with a one-line reason; it is not a benchmark. An organisation can replace it with
+  the lockable `recommended` key. See [Choosing a model](docs/models.md) (XCOD-213).
+- **`/settings` → Agents.** In the TUI (`/agents` opens it too), desktop and web: every agent
+  grouped as main, subagent or helper, and for each one its model, on/off, steps, temperature and
+  the rest, with Reset, New agent and a migration for deprecated keys. Each change is checked like
+  any other setting, including organisation locks. `lunos settings unset` removes a value. See
+  [Agents](docs/agents.md) (XCOD-215).
 - **Pick a subagent's model from the model picker.** In `/settings`, "Subagent model" opens the
   same picker as the main agent's model, with "Inherit from main agent" and "Small model" first.
   "Subagent dynamic allow" lists its models: add one from the picker or by ID, and enter removes
@@ -53,6 +81,26 @@ reasoning behind a change are published separately as **Lunos Notes**.
   a report of the fields that didn't carry over. An organisation can turn imports off with a
   locked `agent_import: false`. See [Editing and sharing agents](docs/sharing-agents.md) (XCOD-209, part of
   XCOD-203).
+- **An EU-only policy can forward the audit log off the machine.** `audit.forward.region` (`eu`,
+  `us` or `other`) declares where your forwarding destination processes data, and it is checked
+  against `residency.allow`. Before, any destination other than loopback counted as `unknown`, so
+  forwarding under `"allow": ["eu"]` meant also allowing model providers in unknown regions. With
+  no region declared, forwarding is refused as before. See [Audit log](docs/audit-log.md)
+  (XCOD-201).
+- **An organisation can lock permissions.** `permission`, or one tool's `permission.<tool>`, can now
+  go in `$locked`. The managed rule then wins over any later `"*": "allow"`, an agent's own
+  permissions, `OPENCODE_PERMISSION` and project config; a config that sets a locked permission
+  differently is refused and the refusal is audited. A lock never loosens a deny: a locked "allow"
+  doesn't lift an agent's or the project's "deny". Where the locked rule is "ask", your "always
+  allow" answers and `--auto` still work; a locked "deny" wins over both. "Always allow" lasts for
+  that project until Lunos restarts, as before (XCOD-202).
+- **Groundwork for Lunos Cloud, which isn't live yet.** There is no Lunos-hosted service, and
+  nothing in Lunos needs an account. `lunos login`, `whoami` and `logout` sign in with the OAuth
+  device flow to an OpenID Connect provider you name with `cloud.issuer`, such as your
+  organisation's Keycloak, Zitadel or Authentik; a Keycloak setup is in `deploy/identity/keycloak/`.
+  `lunos run --cloud` is the client side of cloud workers; `cloud.endpoint` has no default, so until
+  a control plane exists `--cloud` says so and stops. See [Signing in](docs/cloud-login.md) and
+  [Cloud workers](docs/cloud-workers.md) (XCOD-185, XCOD-186).
 
 ### Changed
 
@@ -64,9 +112,19 @@ reasoning behind a change are published separately as **Lunos Notes**.
 - **Stricter front-matter parsing.** Agent, mode and command files must use YAML (or JSON) front
   matter; a file using any other front-matter language is now refused with an error naming the
   file, and skipped (XCOD-208).
+- Merged upstream opencode up to 1.18.34 (`/status` shows `based on opencode 1.18.34`).
+
+### Security
+
+- **No keyless fallback to upstream opencode's hosted free tier.** Up to v1.18.44, with no provider
+  key set, a first `lunos run` could send your prompt to opencode.ai, a non-EU third party, which
+  then refused it. The `opencode` provider now loads only when you've given it a key (XCOD-221).
 
 ### Fixed
 
+- **With no provider set up, Lunos says what to do.** `lunos run` printed
+  `Unexpected server error`; it now says to run `lunos auth login` or set a provider API key
+  (XCOD-221).
 - **Ctrl+C stops a sandboxed run at once.** The agent inside the sandbox used to keep working, and
   spending, for about 10 seconds after an interrupt, until the container was killed. It now stops
   within a second, and the run exits with 130 (XCOD-211).
@@ -509,7 +567,8 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.44...dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.46...dev
+[1.18.46]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.46
 [1.18.44]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.44
 [1.18.43]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.43
 [1.18.41]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.41
