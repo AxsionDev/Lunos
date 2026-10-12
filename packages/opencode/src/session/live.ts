@@ -28,8 +28,13 @@ export function handle(event: GlobalEvent) {
       const sessionID = props.sessionID
       const type = props.status?.type
       if (typeof sessionID !== "string") return
-      if (type === "busy" || type === "retry") status.set(sessionID, { type, directory: event.directory })
-      else status.delete(sessionID)
+      if (type === "busy" || type === "retry") {
+        status.set(sessionID, { type, directory: event.directory })
+        return
+      }
+      // An idle session can't be waiting on a prompt. Stopping a session drops its pending
+      // approvals without a "replied" event, so this is where they are forgotten.
+      drop((_, id) => id === sessionID)
       return
     }
     case "permission.asked":

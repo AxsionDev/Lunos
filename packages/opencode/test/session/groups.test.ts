@@ -153,6 +153,18 @@ describe("SessionLive (XCOD-205)", () => {
     SessionLive.handle({ directory: "global", payload: { type: "global.disposed", properties: {} } })
     expect(SessionLive.active().size).toBe(0)
   })
+
+  test("stopping a waiting session clears its pending approvals (no replied event is sent)", () => {
+    SessionLive.handle({
+      directory: "/b",
+      payload: { type: "permission.asked", properties: { id: "per_1", sessionID: "ses_b" } },
+    })
+    SessionLive.handle({
+      directory: "/b",
+      payload: { type: "session.status", properties: { sessionID: "ses_b", status: { type: "idle" } } },
+    })
+    expect(SessionLive.get("ses_b")).toEqual({ status: undefined, permissions: 0, questions: 0 })
+  })
 })
 
 describe("SessionOverview.state (XCOD-205)", () => {
