@@ -1068,7 +1068,8 @@ export function Prompt(props: PromptProps) {
       const text = store.prompt.input
       sdk.client.session
         .prompt(
-          { sessionID: props.sessionID, agent: agent.name, parts: [{ type: "text", text }] },
+          // No agent: the current mode (plan, say) mustn't refuse every approval the tool asks for.
+          { sessionID: props.sessionID, parts: [{ type: "text", text }] },
           { throwOnError: true },
         )
         .catch((error) =>

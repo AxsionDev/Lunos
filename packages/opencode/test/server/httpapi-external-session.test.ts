@@ -70,13 +70,13 @@ function call(directory: string, route: string, body?: unknown) {
 const pause = Effect.promise(() => Bun.sleep(25))
 
 /** Waits for the session's next pending approval and answers it. */
-const answer = (directory: string, sessionID: string, reply: "once" | "reject") =>
+const answer = (directory: string, sessionID: string, reply: "once" | "reject", message?: string) =>
   Effect.gen(function* () {
     for (let i = 0; i < 400; i++) {
       const all = (yield* call(directory, "/permission")).body as any[]
       const pending = all.filter((item) => item.sessionID === sessionID)
       if (pending.length) {
-        yield* call(directory, `/permission/${pending[0].id}/reply`, { reply })
+        yield* call(directory, `/permission/${pending[0].id}/reply`, { reply, ...(message ? { message } : {}) })
         return pending[0]
       }
       yield* pause
@@ -143,11 +143,11 @@ describe("external session (XCOD-218)", () => {
         expect(session.cost).toBeCloseTo(0.3210852, 6)
 
         // Turn 2: one of Claude Code's own /commands, sent as typed, in the same Claude Code session.
+        // Sent without an agent, as the TUI does; refused with feedback first, which the tool gets.
         const second = yield* call(directory, promptRoute, {
-          agent: "build",
           parts: [{ type: "text", text: "/review" }],
         }).pipe(Effect.forkChild)
-        yield* answer(directory, sessionID, "once")
+        yield* answer(directory, sessionID, "reject", "Call it greeting.txt")
         yield* answer(directory, sessionID, "once")
         expect((yield* Fiber.join(second)).status).toBe(200)
         session = (yield* call(directory, pathFor(SessionPaths.get, { sessionID }))).body
@@ -160,6 +160,14 @@ describe("external session (XCOD-218)", () => {
         expect(runs[1].argv.join(" ")).toContain(`--resume ${FIXTURE_SESSION}`)
         const prompts = sent.filter((line) => line.type === "user").map((line) => line.message.content)
         expect(prompts).toEqual(["Create hello.txt containing hi", "/review"])
+        // A plain Reject also ends Claude Code's turn, as in a Lunos session; feedback lets it carry on.
+        const replies = sent.filter((line) => line.type === "control_response").map((line) => line.response.response)
+        expect(replies.map((item) => [item.behavior, item.message, item.interrupt])).toEqual([
+          ["deny", "The user refused this in Lunos.", true],
+          ["allow", undefined, undefined],
+          ["deny", "Call it greeting.txt", undefined],
+          ["allow", undefined, undefined],
+        ])
 
         // Turn 3: stopped while Claude Code waits for an approval.
         const third = yield* call(directory, promptRoute, {

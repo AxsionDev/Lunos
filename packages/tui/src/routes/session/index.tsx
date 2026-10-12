@@ -37,7 +37,7 @@ import type {
   SessionStatus,
 } from "@opencode-ai/sdk/v2"
 import { useLocal } from "../../context/local"
-import { externalCost } from "../../util/external"
+import { externalCost, externalOf } from "../../util/external"
 import { Locale } from "../../util/locale"
 import { webSearchProviderLabel } from "../../util/tool-display"
 import { Dynamic, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -1641,6 +1641,14 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                 ▣{" "}
               </span>{" "}
               <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
+              <Show
+                when={
+                  props.message.providerID === "external" &&
+                  externalOf(sync.session.get(props.message.sessionID))?.session
+                }
+              >
+                {(id) => <span style={{ fg: theme.textMuted }}> {id().slice(0, 8)}</span>}
+              </Show>
               <span style={{ fg: theme.textMuted }}> · {model()}</span>
               <Show when={duration()}>
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
