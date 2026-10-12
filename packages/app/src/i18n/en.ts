@@ -214,6 +214,7 @@ export const dict = {
   "model.tag.free": "Free",
   "model.tag.latest": "Latest",
   "model.tag.blocked": "Blocked by policy",
+  "model.tag.locked": "Locked by your organisation",
   "model.filter.all": "All",
   "model.filter.recommended": "Recommended",
   "model.filter.large": "Large",

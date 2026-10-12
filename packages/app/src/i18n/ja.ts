@@ -295,6 +295,7 @@ export const dict = {
   "model.tag.free": "無料",
   "model.tag.latest": "最新",
   "model.tag.blocked": "ポリシーによりブロック",
+  "model.tag.locked": "組織によりロック",
   "model.filter.all": "すべて",
   "model.filter.recommended": "おすすめ",
   "model.filter.large": "大",

@@ -312,6 +312,7 @@ export const dict = {
   "model.tag.free": "Gratis",
   "model.tag.latest": "Nyeste",
   "model.tag.blocked": "Blokkert av policy",
+  "model.tag.locked": "Låst av organisasjonen din",
   "model.filter.all": "Alle",
   "model.filter.recommended": "Anbefalt",
   "model.filter.large": "Store",

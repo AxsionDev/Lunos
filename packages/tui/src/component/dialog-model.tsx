@@ -13,6 +13,11 @@ import { useKV } from "../context/kv"
 
 /** XCOD-212: shown on models the residency policy would refuse. */
 const BLOCKED = "blocked by policy"
+/** XCOD-219: shown on models a locked `model` rules out. */
+const LOCKED = "locked by your organisation"
+
+type Blocked = { policy: "residency"; reason: string } | { policy: "locked"; key: string; reason: string }
+const tag = (blocked: Blocked) => (blocked.policy === "locked" ? LOCKED : BLOCKED)
 
 /** XCOD-213: picker filters, cycled with ctrl+l and remembered across restarts. */
 export const MODEL_FILTERS = ["all", "recommended", "large", "small"] as const
@@ -55,6 +60,10 @@ export function DialogModel(props: {
     return MODEL_FILTERS.includes(value) ? value : "all"
   }
   const [query, setQuery] = createSignal("")
+  // XCOD-219: a locked `model` only limits the session's model. /settings' pickers (`onPick`) save
+  // other keys, which the settings writer checks against their own locks.
+  const ruledOut = (blocked: Blocked | undefined) =>
+    blocked && !(props.onPick && blocked.policy === "locked") ? blocked : undefined
 
   const connected = useConnected()
   const providers = createDialogProviderOptions()
@@ -74,15 +83,16 @@ export function DialogModel(props: {
         if (!provider) return []
         const model = provider.models[item.modelID]
         if (!model || !matchesFilter(model, activeFilter())) return []
+        const blocked = ruledOut(model.blocked)
         return [
           {
             key: item,
             value: { providerID: provider.id, modelID: model.id },
             title: model.name ?? item.modelID,
-            description: [provider.name, model.size && SIZE_LABEL[model.size], model.blocked && BLOCKED]
+            description: [provider.name, model.size && SIZE_LABEL[model.size], blocked && tag(blocked)]
               .filter(Boolean)
               .join(" · "),
-            blocked: model.blocked !== undefined,
+            blocked: blocked !== undefined,
             category,
             disabled: provider.id === "opencode" && model.id.includes("-nano"),
             footer: model.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
@@ -109,7 +119,7 @@ export function DialogModel(props: {
       sync.data.provider,
       sortBy(
         // Residency is decided per provider, so providers with blocked models go last.
-        (provider) => Object.values(provider.models).some((model) => model.blocked),
+        (provider) => Object.values(provider.models).some((model) => ruledOut(model.blocked)),
         (provider) => provider.id !== "opencode",
         (provider) => provider.name,
       ),
@@ -130,11 +140,11 @@ export function DialogModel(props: {
                   ? "(Favorite)"
                   : undefined,
                 info.size ? `(${SIZE_LABEL[info.size]})` : undefined,
-                info.blocked ? `(${BLOCKED})` : undefined,
+                ruledOut(info.blocked) ? `(${tag(info.blocked!)})` : undefined,
               ]
                 .filter(Boolean)
                 .join(" ") || undefined,
-            blocked: info.blocked !== undefined,
+            blocked: ruledOut(info.blocked) !== undefined,
             // XCOD-213: why it's recommended, on its own line under the Recommended filter.
             details: activeFilter() === "recommended" && info.recommended ? [info.recommended] : undefined,
             category: connected() ? provider.name : undefined,
@@ -214,12 +224,12 @@ export function DialogModel(props: {
 
   function onSelect(providerID: string, modelID: string) {
     // Before `onPick`, so /settings' main, small and subagent model pickers refuse it too.
-    const blocked = sync.data.provider.find((item) => item.id === providerID)?.models[modelID]?.blocked
+    const blocked = ruledOut(sync.data.provider.find((item) => item.id === providerID)?.models[modelID]?.blocked)
     if (blocked) {
       toast.show({
         variant: "warning",
-        title: `${providerID}/${modelID} is ${BLOCKED}`,
-        message: `Data-residency policy: ${blocked.reason}`,
+        title: `${providerID}/${modelID} is ${tag(blocked)}`,
+        message: blocked.policy === "locked" ? blocked.reason : `Data-residency policy: ${blocked.reason}`,
         duration: 8000,
       })
       return

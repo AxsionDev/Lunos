@@ -296,6 +296,7 @@ export const dict = {
   "model.tag.free": "Nemokama",
   "model.tag.latest": "Naujausias",
   "model.tag.blocked": "Užblokuota politikos",
+  "model.tag.locked": "Užrakinta jūsų organizacijos",
   "model.filter.all": "Visi",
   "model.filter.recommended": "Rekomenduojami",
   "model.filter.large": "Dideli",

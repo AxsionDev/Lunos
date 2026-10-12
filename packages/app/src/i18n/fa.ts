@@ -290,6 +290,7 @@ export const dict = {
   "model.tag.free": "رایگان",
   "model.tag.latest": "آخرین",
   "model.tag.blocked": "مسدود‌شده توسط سیاست",
+  "model.tag.locked": "قفل‌شده توسط سازمان شما",
   "model.filter.all": "همه",
   "model.filter.recommended": "پیشنهادی",
   "model.filter.large": "بزرگ",

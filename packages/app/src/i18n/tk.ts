@@ -290,6 +290,7 @@ export const dict = {
   "model.tag.free": "Mugt",
   "model.tag.latest": "Iň soňky",
   "model.tag.blocked": "Syýasat tarapyndan petiklenen",
+  "model.tag.locked": "Guramaňyz tarapyndan gulplanan",
   "model.filter.all": "Ählisi",
   "model.filter.recommended": "Maslahat berilýän",
   "model.filter.large": "Uly",

@@ -290,6 +290,7 @@ export const dict: Record<string, string> = {
   "model.tag.free": "বিনামূল্যে",
   "model.tag.latest": "সর্বশেষ",
   "model.tag.blocked": "নীতির কারণে অবরুদ্ধ",
+  "model.tag.locked": "আপনার প্রতিষ্ঠান দ্বারা লক করা",
   "model.filter.all": "সব",
   "model.filter.recommended": "প্রস্তাবিত",
   "model.filter.large": "বড়",

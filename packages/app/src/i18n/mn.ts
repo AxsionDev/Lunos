@@ -293,6 +293,7 @@ export const dict = {
   "model.tag.free": "Үнэгүй",
   "model.tag.latest": "Хамгийн сүүлийн үеийн",
   "model.tag.blocked": "Бодлогоор хаагдсан",
+  "model.tag.locked": "Таны байгууллага түгжсэн",
   "model.filter.all": "Бүгд",
   "model.filter.recommended": "Санал болгосон",
   "model.filter.large": "Том",

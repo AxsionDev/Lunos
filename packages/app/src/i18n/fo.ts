@@ -289,6 +289,7 @@ export const dict = {
   "model.tag.free": "Ókeypis",
   "model.tag.latest": "Nýggjasta",
   "model.tag.blocked": "Forðað av politikki",
+  "model.tag.locked": "Læst av tínum felagsskapi",
   "model.filter.all": "Øll",
   "model.filter.recommended": "Viðmælt",
   "model.filter.large": "Stór",

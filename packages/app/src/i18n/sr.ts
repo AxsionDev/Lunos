@@ -290,6 +290,7 @@ export const dict = {
   "model.tag.free": "Бесплатно",
   "model.tag.latest": "Најновије",
   "model.tag.blocked": "Блокирано политиком",
+  "model.tag.locked": "Закључала ваша организација",
   "model.filter.all": "Све",
   "model.filter.recommended": "Препоручено",
   "model.filter.large": "Велики",

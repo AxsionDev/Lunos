@@ -289,6 +289,7 @@ export const dict = {
   "model.tag.free": "Gratuit",
   "model.tag.latest": "Ultimul",
   "model.tag.blocked": "Blocat de politică",
+  "model.tag.locked": "Blocat de organizația ta",
   "model.filter.all": "Toate",
   "model.filter.recommended": "Recomandate",
   "model.filter.large": "Mari",

@@ -333,6 +333,7 @@ export const dict = {
   "model.tag.free": "免费",
   "model.tag.latest": "最新",
   "model.tag.blocked": "已被策略阻止",
+  "model.tag.locked": "已被你的组织锁定",
   "model.filter.all": "全部",
   "model.filter.recommended": "推荐",
   "model.filter.large": "大",

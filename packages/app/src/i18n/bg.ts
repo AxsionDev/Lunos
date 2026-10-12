@@ -293,6 +293,7 @@ export const dict = {
   "model.tag.free": "безплатно",
   "model.tag.latest": "Последни",
   "model.tag.blocked": "Блокиран от политиката",
+  "model.tag.locked": "Заключен от вашата организация",
   "model.filter.all": "Всички",
   "model.filter.recommended": "Препоръчани",
   "model.filter.large": "Големи",

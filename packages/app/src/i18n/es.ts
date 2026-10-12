@@ -314,6 +314,7 @@ export const dict = {
   "model.tag.free": "Gratis",
   "model.tag.latest": "Más reciente",
   "model.tag.blocked": "Bloqueado por la política",
+  "model.tag.locked": "Bloqueado por tu organización",
   "model.filter.all": "Todos",
   "model.filter.recommended": "Recomendados",
   "model.filter.large": "Grandes",

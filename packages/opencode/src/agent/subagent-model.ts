@@ -3,6 +3,7 @@ export * as SubagentModel from "./subagent-model"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import { Residency } from "@opencode-ai/core/residency"
+import { ConfigPolicy } from "@/config/policy"
 
 /**
  * Which model a subagent runs on, and which rule chose it (XCOD-82). First match wins:
@@ -32,6 +33,8 @@ export interface Input {
   /** Raw `agent.<type>.model` / `agent.<type>.variant` from config. */
   readonly typeModel?: string
   readonly typeVariant?: string
+  /** XCOD-219: the locked `agent.<type>.model` or `subagent.model`, from `ConfigPolicy.lockedSubagentModel`. */
+  readonly lock?: { readonly key: string; readonly model: string }
   readonly config: {
     readonly small_model?: string
     readonly subagent?: {
@@ -52,6 +55,13 @@ export interface Resolved {
 
 export class RefusedError extends Error {
   override name = "SubagentModelRefused"
+  /** XCOD-219: set when an organisation lock refused it, so the caller can audit the refusal. */
+  constructor(
+    message: string,
+    readonly lockedKey?: string,
+  ) {
+    super(message)
+  }
 }
 
 function parse(spec: string): Model {
@@ -88,6 +98,22 @@ export function resolve(input: Input): Resolved {
     // An inherited model keeps the main agent's reasoning effort unless a variant is configured.
     // An overridden model uses the configured variant, or the model's default.
     return { model, variant: variant ?? (inherited ? input.parent.variant : undefined), rule, source }
+  }
+
+  // XCOD-219: a locked model is the one the subagent runs on. A per-call model other than it is
+  // refused with the policy message; an unlocked `agent.<type>.model` doesn't outrank it.
+  if (input.lock) {
+    const rule: Rule = input.lock.key.startsWith("agent.") ? "per-type" : "global"
+    const locked = finish(input.lock.model, rule, input.lock.key, input.typeVariant)
+    if (input.perCall !== undefined) {
+      const asked = resolveValue(input.perCall, input).model
+      if (asked.providerID !== locked.model.providerID || asked.modelID !== locked.model.modelID)
+        throw new RefusedError(
+          `${ConfigPolicy.modelLockReason(input.lock)}. Model "${input.perCall}" was refused.`,
+          input.lock.key,
+        )
+    }
+    return locked
   }
 
   if (input.perCall !== undefined) {

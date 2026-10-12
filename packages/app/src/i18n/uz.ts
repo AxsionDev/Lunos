@@ -292,6 +292,7 @@ export const dict = {
   "model.tag.free": "Bepul",
   "model.tag.latest": "Oxirgi",
   "model.tag.blocked": "Siyosat tomonidan bloklangan",
+  "model.tag.locked": "Tashkilotingiz tomonidan qulflangan",
   "model.filter.all": "Hammasi",
   "model.filter.recommended": "Tavsiya etilgan",
   "model.filter.large": "Katta",

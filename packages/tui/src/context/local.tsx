@@ -66,11 +66,19 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       return !!provider?.models[model.modelID]
     }
 
+    // XCOD-219: a model a locked `model` rules out can't be the current one, so a pick saved before
+    // the lock falls through to the configured (locked) model instead of every prompt being refused.
+    function isModelUsable(model: { providerID: string; modelID: string }) {
+      const provider = sync.data.provider.find((item) => item.id === model.providerID)
+      const info = provider?.models[model.modelID]
+      return !!info && info.blocked?.policy !== "locked"
+    }
+
     function getFirstValidModel(...modelFns: (() => { providerID: string; modelID: string } | undefined)[]) {
       for (const modelFn of modelFns) {
         const model = modelFn()
         if (!model) continue
-        if (isModelValid(model)) return model
+        if (isModelUsable(model)) return model
       }
     }
 
@@ -197,7 +205,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const fallbackModel = createMemo(() => {
         if (args.model) {
           const { providerID, modelID } = parseModel(args.model)
-          if (isModelValid({ providerID, modelID })) {
+          if (isModelUsable({ providerID, modelID })) {
             return {
               providerID,
               modelID,
@@ -207,7 +215,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
         if (sync.data.config.model) {
           const { providerID, modelID } = parseModel(sync.data.config.model)
-          if (isModelValid({ providerID, modelID })) {
+          if (isModelUsable({ providerID, modelID })) {
             return {
               providerID,
               modelID,
@@ -216,7 +224,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         }
 
         for (const item of modelStore.recent) {
-          if (isModelValid(item)) {
+          if (isModelUsable(item)) {
             return item
           }
         }
@@ -288,7 +296,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           setModelStore("model", a.name, { ...val })
         },
         cycleFavorite(direction: 1 | -1) {
-          const favorites = modelStore.favorite.filter((item) => isModelValid(item))
+          const favorites = modelStore.favorite.filter((item) => isModelUsable(item))
           if (!favorites.length) {
             toast.show({
               variant: "info",
