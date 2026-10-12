@@ -119,18 +119,25 @@ async function call<A>(
       parsed._tag === "Some"
         ? parsed.value.error.code
         : (CloudContract.ERRORS[response.status as keyof typeof CloudContract.ERRORS] ?? "error")
-    const detail = parsed._tag === "Some" ? parsed.value.error.message : `HTTP ${response.status}`
+    const detail = parsed._tag === "Some" ? parsed.value.error.message.trim() || undefined : undefined
     throw new ServiceError(response.status, code, explain(response.status, detail))
   }
   return Schema.decodeUnknownSync(schema)(json)
 }
 
 /** The service's own message, with what to do about the cases a user can act on. */
-export function explain(status: number, message: string) {
-  if (status === 401) return `${message} Run lunos login.`
-  if (status === 402) return `${message} (spending cap reached; nothing was billed past it)`
-  if (status === 429) return `${message} (too many cloud runs at once for your plan; wait for one to finish)`
-  return message
+export function explain(status: number, message: string | undefined) {
+  // XCOD-237: a 402 is any billing refusal (no plan, payment failed, seats full, spending cap);
+  // the control plane's message says which, so it is shown as is. Only without one is it guessed.
+  if (status === 402)
+    return (
+      message ??
+      "Lunos Cloud refused the run for billing reasons (HTTP 402): check your plan, payment details and spending cap."
+    )
+  const text = message ?? `HTTP ${status}`
+  if (status === 401) return `${text} Run lunos login.`
+  if (status === 429) return `${text} (too many cloud runs at once for your plan; wait for one to finish)`
+  return text
 }
 
 export interface Dispatch {
@@ -228,7 +235,15 @@ export async function get(base: string, id: string, fetcher?: typeof fetch) {
 }
 
 /** Ends the worker; the control plane pushes the results branch before it answers. */
-export async function finish(config: Config, base: string, id: string, outcome: string, fetcher?: typeof fetch) {
+export async function finish(
+  config: Config,
+  base: string,
+  id: string,
+  outcome: string,
+  /** Why the control plane stopped the run, when it did (Worker `ended.reason`). */
+  reason?: string,
+  fetcher?: typeof fetch,
+) {
   const session = await CloudAuth.session("A cloud run")
   const done = await call(
     base,
@@ -242,6 +257,7 @@ export async function finish(config: Config, base: string, id: string, outcome: 
   record(config, "cloud.finish", {
     worker: id,
     outcome,
+    reason,
     branch: done.pushed ? done.branch : undefined,
     commit: done.commit,
     active_seconds: done.activeSeconds,
