@@ -39,7 +39,10 @@ const nextLine = () =>
 // initialize, then the user prompt
 await nextLine()
 await nextLine()
+// XCOD-218: FAKE_CLAUDE_DELAY_MS slows the replay, so a test can stop a turn while it runs.
+const delay = Number(process.env.FAKE_CLAUDE_DELAY_MS ?? 0)
 for (const line of lines) {
+  if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
   console.log(line)
   const message = JSON.parse(line)
   if (message.type === "control_request") {

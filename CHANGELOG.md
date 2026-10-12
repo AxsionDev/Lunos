@@ -20,6 +20,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Claude Code and Codex in their own session in the TUI.** `/external claude` (or the command
+  palette) opens a session labelled "Claude Code" with its session id. You send it prompts and its
+  own `/commands`, answer its approvals in Lunos's approval prompt, and see the cost it reports for
+  each turn and in total. Find it in `/sessions` after a restart, or continue one by id with
+  `/external resume claude <id>`. Press esc twice to stop it. Codex CLI works the same way. Under an
+  EU-only residency policy it isn't started; the reason is shown and the refusal is audited
+  (`external.denied`) (XCOD-218).
 - **Pick a subagent's model from the model picker.** In `/settings`, "Subagent model" opens the
   same picker as the main agent's model, with "Inherit from main agent" and "Small model" first.
   "Subagent dynamic allow" lists its models: add one from the picker or by ID, and enter removes
