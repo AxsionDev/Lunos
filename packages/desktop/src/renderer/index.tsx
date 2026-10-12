@@ -86,13 +86,17 @@ function windowLastActiveUrlKey(windowID: string) {
   return `opencode.desktop.window.${windowID}.last-active-url`
 }
 
+// XCOD-205: matches SESSIONS_WINDOW_ID in the main process; that window starts on the Sessions page.
+const SESSIONS_WINDOW_ID = "sessions"
+
 function getLastActiveUrl(windowID: string) {
-  if (typeof localStorage !== "object") return "/"
+  const fallback = windowID === SESSIONS_WINDOW_ID ? "/sessions" : "/"
+  if (typeof localStorage !== "object") return fallback
   try {
     const value = localStorage.getItem(windowLastActiveUrlKey(windowID))
     if (value?.startsWith("/") && !value.startsWith("//")) return value
   } catch {}
-  return "/"
+  return fallback
 }
 
 function setLastActiveUrl(windowID: string, value: string) {
@@ -136,6 +140,8 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     return window.api.runDesktopMenuAction(action)
   }
 
+  const openSessionsWindow: Platform["openSessionsWindow"] = () => window.api.runDesktopMenuAction("window.sessions")
+
   const storage = (() => {
     const cache = new Map<string, AsyncStorage>()
 
@@ -170,6 +176,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     os,
     version: pkg.version,
     windowID: windowState.id,
+    openSessionsWindow,
 
     async openDirectoryPickerDialog(opts) {
       return window.api.openDirectoryPicker({

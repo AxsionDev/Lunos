@@ -165,11 +165,29 @@ export function setDockIcon() {
   if (!icon.isEmpty()) app.dock?.setIcon(icon)
 }
 
-export function createMainWindow(id: string = randomUUID()) {
+// XCOD-205: the Sessions window is an ordinary app window with a fixed id, so it is restored
+// across launches like any other, and the renderer opens it on /sessions.
+export const SESSIONS_WINDOW_ID = "sessions"
+
+/** Focuses the Sessions window, opening it first if needed. */
+export function openSessionsWindow() {
+  const existing = BrowserWindow.getAllWindows().find(
+    (win) => !win.isDestroyed() && getWindowID(win) === SESSIONS_WINDOW_ID,
+  )
+  if (existing) {
+    if (existing.isMinimized()) existing.restore()
+    existing.show()
+    existing.focus()
+    return existing
+  }
+  return createMainWindow(SESSIONS_WINDOW_ID, { width: 760, height: 820 })
+}
+
+export function createMainWindow(id: string = randomUUID(), size?: { width: number; height: number }) {
   const state = windowState({
     file: windowStateFile(id),
-    defaultWidth: 1280,
-    defaultHeight: 800,
+    defaultWidth: size?.width ?? 1280,
+    defaultHeight: size?.height ?? 800,
   })
 
   const mode = tone()

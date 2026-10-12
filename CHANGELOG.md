@@ -20,6 +20,22 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Claude Code and Codex in their own session in the TUI.** `/external claude` (or the command
+  palette) opens a session labelled "Claude Code" with its session id. You send it prompts and its
+  own `/commands`, answer its approvals in Lunos's approval prompt, and see the cost it reports for
+  each turn and in total. Find it in `/sessions` after a restart, or continue one by id with
+  `/external resume claude <id>`. Press esc twice to stop it. Codex CLI works the same way. Under an
+  EU-only residency policy it isn't started; the reason is shown and the refusal is audited
+  (`external.denied`) (XCOD-218).
+- **See and organise all your sessions in one place.** The desktop app's `Window → Sessions`
+  (Cmd+Option+S / Ctrl+Alt+S) opens a separate window, and the web UI has a `/sessions` page,
+  listing every session on this machine across projects: state (running, waiting for approval,
+  idle, finished, failed), project, agent, model, last activity and cost, updating live. Put
+  sessions in your own groups (create, rename, colour, collapse, delete; deleting a group never
+  touches its sessions), move them by drag-and-drop or "Move to group", search and filter, and
+  open, rename, stop or answer a waiting session from the list. Subagents sit under their parent;
+  scheduled runs and external sessions are labelled. Groups are stored on this machine only
+  (XCOD-205).
 - **A locked model is the one actually used.** When your organisation locks `model` in managed
   config, every other model shows as **locked by your organisation** in the TUI, desktop and web
   pickers and can't be chosen; `lunos run --model` with another model is refused with the policy
@@ -44,13 +60,6 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
-- **Claude Code and Codex in their own session in the TUI.** `/external claude` (or the command
-  palette) opens a session labelled "Claude Code" with its session id. You send it prompts and its
-  own `/commands`, answer its approvals in Lunos's approval prompt, and see the cost it reports for
-  each turn and in total. Find it in `/sessions` after a restart, or continue one by id with
-  `/external resume claude <id>`. Press esc twice to stop it. Codex CLI works the same way. Under an
-  EU-only residency policy it isn't started; the reason is shown and the refusal is audited
-  (`external.denied`) (XCOD-218).
 - **Claude Code and Codex CLI from Lunos.** If you also use either tool, `lunos external run`,
   `resume`, `sessions` and `stop` start and continue their sessions, with your own install and
   login: Lunos never stores, copies or proxies your Anthropic or OpenAI credentials. Each approval
