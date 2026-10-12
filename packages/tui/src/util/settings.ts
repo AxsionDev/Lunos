@@ -55,6 +55,38 @@ export function cycle(row: SettingRowLike): string | undefined {
   return
 }
 
+/**
+ * XCOD-231: a structured setting gets its own screen when its fields are settings of their own
+ * (`subagent` → `subagent.model`, …). Records with free-form keys (`agent`, `lsp`) have none.
+ */
+export function hasSection(
+  row: Pick<SettingRowLike, "key" | "kind">,
+  rows: ReadonlyArray<Pick<SettingRowLike, "key">>,
+) {
+  return row.kind === "object" && rows.some((item) => item.key.startsWith(`${row.key}.`))
+}
+
+/** Plainer names on the Subagent screen than the generated "Subagent dynamic allow". */
+const SECTION_LABELS: Record<string, string> = {
+  "subagent.background": "Run in background",
+  "subagent.model": "Model",
+  "subagent.variant": "Variant",
+  "subagent.dynamic.enabled": "Let the main agent choose a model per task",
+  "subagent.dynamic.allow": "Allowed models",
+}
+
+/** A field's label on its section's screen, without the section's name in front ("Auto", not "Compaction auto"). */
+export function sectionLabel(
+  row: Pick<SettingRowLike, "key" | "label">,
+  section: Pick<SettingRowLike, "label"> | undefined,
+) {
+  if (SECTION_LABELS[row.key]) return SECTION_LABELS[row.key]
+  const prefix = section ? `${section.label} `.toLowerCase() : ""
+  if (!prefix || !row.label.toLowerCase().startsWith(prefix)) return row.label
+  const rest = row.label.slice(prefix.length)
+  return rest.charAt(0).toUpperCase() + rest.slice(1)
+}
+
 export function badge(row: Pick<SettingRowLike, "source" | "locked">) {
   return row.locked ? "🔒 managed" : row.source
 }

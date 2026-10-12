@@ -576,6 +576,33 @@ async function rawValue(key: string, entry: Entry, origin: Origin | undefined, c
   return undefined
 }
 
+/**
+ * XCOD-231: where a nested field really comes from. Origins are tracked per top-level key, so with
+ * `subagent.background` in managed config and `subagent.model` in yours, both would read "managed".
+ * When the winning layer's file doesn't hold the field, the files are searched, highest layer first.
+ */
+async function leafOrigin(key: string, ctx: Context): Promise<{ source: Source; file: string } | undefined> {
+  const managed = ConfigManaged.managedConfigLocation().dir
+  const root = projectRoot(ctx)
+  const layers: [Source, string[]][] = [
+    ["managed", ["managed.json", "opencode.json", "opencode.jsonc"].map((f) => path.join(managed, f))],
+    [
+      "project",
+      Flag.OPENCODE_DISABLE_PROJECT_CONFIG
+        ? []
+        : [
+            ...["opencode.jsonc", "opencode.json"].map((f) => path.join(root, ".opencode", f)),
+            ...["opencode.jsonc", "opencode.json"].map((f) => path.join(root, f)),
+          ],
+    ],
+    ["user", ["opencode.jsonc", "opencode.json", "config.json"].map((f) => path.join(Global.Path.config, f))],
+  ]
+  for (const [source, files] of layers)
+    for (const file of files) {
+      if (ConfigPolicy.get(rawDoc(await readText(file)), key) !== undefined) return { source, file }
+    }
+}
+
 function containsReference(value: unknown): boolean {
   if (isReference(value)) return true
   if (Array.isArray(value)) return value.some(containsReference)
@@ -598,9 +625,14 @@ export async function list(input: {
       const raw = await rawValue(item.key, item, origin, input.ctx)
       // tui.json is loaded by the TUI process; here the files are the resolved value.
       const resolved = item.target === "tui" ? raw?.value : ConfigPolicy.get(input.config, item.key)
+      const leaf =
+        item.target === "config" && !item.top && origin && !raw && resolved !== undefined
+          ? await leafOrigin(item.key, input.ctx)
+          : undefined
       let source: Source
       if (item.target === "tui")
         source = raw ? (raw.file.includes(`${path.sep}.opencode${path.sep}`) ? "project" : "user") : "default"
+      else if (leaf) source = leaf.source
       else source = resolved === undefined || (!item.top && !origin) ? "default" : sourceOf(origin)
       if (item.target === "config" && resolved === undefined && origin?.layer !== "managed") source = "default"
       const envName = ENV_OVERRIDES.find((o) => o.key === item.key)?.active(env)
@@ -618,7 +650,7 @@ export async function list(input: {
         value,
         display: display(value, item.kind),
         source,
-        from: locked ? origin?.source : (envName ?? raw?.file ?? origin?.source),
+        from: locked ? origin?.source : (envName ?? raw?.file ?? leaf?.file ?? origin?.source),
         locked,
         override: envName
           ? `${envName} is set, so it wins over the config files until it's removed from the environment`

@@ -416,7 +416,10 @@ How Enter changes a setting depends on its type:
 - **Model and theme:** open the usual model and theme pickers; the choice is saved to the config.
 - **Text, numbers and lists:** an inline prompt. Lists are comma-separated (`eu, us`).
 - **MCP servers and providers:** open the `/mcps` and `/providers` dialogs.
-- **Other structured settings** (`agent`, `permission`, `lsp`…): open the config file in `$EDITOR`,
+- **Structured settings made of simple fields** (`subagent`, `compaction`, `sandbox`, `memory`…):
+  open a screen of their own fields, with the same controls. The Subagent screen has Run in
+  background, Model, Variant, "Let the main agent choose a model per task" and Allowed models.
+- **Other structured settings** (`permission`, `lsp`, `hooks`…): open the config file in `$EDITOR`,
   or show its path when no editor is set.
 
 Every change is checked against the config schema before it's written, and an invalid value is

@@ -233,6 +233,31 @@ describe("settings list", () => {
     expect(row("snapshot")).toMatchObject({ source: "default", value: true })
   })
 
+  test("a nested field's badge is the file that holds it, not its parent's winning layer (XCOD-231)", async () => {
+    const managed = path.join(root, "managed")
+    await fs.mkdir(managed, { recursive: true })
+    await fs.writeFile(path.join(managed, "managed.json"), JSON.stringify({ subagent: { background: true } }))
+    await fs.writeFile(userFile(), JSON.stringify({ subagent: { model: "stub/stub-b" } }))
+    const before = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+    process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = managed
+    try {
+      const rows = await ConfigSettings.list({
+        config: { subagent: { background: true, model: "stub/stub-b" } },
+        origins: { subagent: { layer: "managed", source: path.join(managed, "managed.json") } },
+        locked: [],
+        ctx: ctx(),
+        env: {},
+      })
+      const row = (key: string) => rows.find((item) => item.key === key)!
+      expect(row("subagent.background")).toMatchObject({ source: "managed", value: true })
+      expect(row("subagent.model")).toMatchObject({ source: "user", value: "stub/stub-b", from: userFile() })
+      expect(row("subagent.variant")).toMatchObject({ source: "default" })
+    } finally {
+      if (before === undefined) delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+      else process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = before
+    }
+  })
+
   test("an environment override is shown and explained", async () => {
     const rows = await ConfigSettings.list({
       config: { memory: { enabled: true } },

@@ -22,7 +22,19 @@ import { DialogThemeList } from "./dialog-theme-list"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogProviders } from "./dialog-provider"
 import { StatusServers } from "./dialog-status"
-import { TABS, badge, cycle, editText, filterRows, formatCost, formatTokens, nextTab, type Tab } from "../util/settings"
+import {
+  TABS,
+  badge,
+  cycle,
+  editText,
+  filterRows,
+  formatCost,
+  formatTokens,
+  hasSection,
+  nextTab,
+  sectionLabel,
+  type Tab,
+} from "../util/settings"
 
 // XCOD-128: every configuration option in one place, after Claude Code's /config. One dialog with
 // three tabs (Status | Settings | Usage); /settings and /config open Settings, /status opens Status.
@@ -40,7 +52,11 @@ function home(file: string) {
 
 const LABEL: Record<Tab, string> = { status: "Status", settings: "Settings", usage: "Usage" }
 
-export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope }) {
+/**
+ * `section` (XCOD-231): one structured setting's own screen, e.g. `subagent`, listing its fields
+ * (`subagent.model`, …) with the same controls as the main list. ← goes back to its row there.
+ */
+export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope; section?: string }) {
   const sdk = useSDK()
   const dialog = useDialog()
   const toast = useToast()
@@ -83,7 +99,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
 
   const rows = createMemo(() => {
     // XCOD-215: the deprecated top-level `mode` is listed only while it's still set (Agents migrates it).
-    const list = (snapshot()?.rows ?? []).filter((row) => row.key !== "mode" || row.source !== "default")
+    const all = (snapshot()?.rows ?? []).filter((row) => row.key !== "mode" || row.source !== "default")
+    const list = props.section ? all.filter((row) => row.key.startsWith(`${props.section}.`)) : all
     // tui.json is read by this process: show the theme actually in use.
     return list.map((row) =>
       row.key === "tui.theme" && row.source === "default"
@@ -96,10 +113,29 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
 
   // Reopens this dialog where the user left it, after a picker or prompt replaced it.
   function reopen(key?: string) {
-    dialog.replace(() => <DialogSettings tab="settings" focus={key ?? highlighted()} scope={scope()} />, undefined, {
+    const section = props.section
+    dialog.replace(
+      () => <DialogSettings tab="settings" focus={key ?? highlighted()} scope={scope()} section={section} />,
+      undefined,
+      section ? { back: () => openTop(section), generation } : { nav: true, generation },
+    )
+  }
+
+  /** The main list, on row `key` (from a section screen, its own row). */
+  function openTop(key: string) {
+    dialog.replace(() => <DialogSettings tab="settings" focus={key} scope={scope()} />, undefined, {
       nav: true,
       generation,
     })
+  }
+
+  /** XCOD-231: a structured setting whose fields are settings of their own gets a screen of them. */
+  function openSection(row: SettingRow) {
+    dialog.replace(
+      () => <DialogSettings tab="settings" section={row.key} scope={scope()} />,
+      undefined,
+      backTo(row.key),
+    )
   }
 
   /** XCOD-233: a screen opened from row `key`; ← comes back to the list with that row highlighted. */
@@ -182,6 +218,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   }
 
   async function edit(row: SettingRow) {
+    // Before refuse(): a parent reads as locked when any one field is, and the others can still change.
+    if (row.kind === "object" && hasSection(row, rows())) return openSection(row)
     if (refuse(row)) return
     if (row.dialog === "themes") {
       dialog.replace(
@@ -341,8 +379,17 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   }
 
   const bindings = createMemo((): { key: string; desc: string; group: string; cmd: () => void }[] => [
-    { key: "tab", desc: "Next tab", group: "Settings", cmd: () => void setTab((t) => nextTab(t, 1)) },
-    { key: "shift+tab", desc: "Previous tab", group: "Settings", cmd: () => void setTab((t) => nextTab(t, -1)) },
+    ...(props.section
+      ? []
+      : [
+          { key: "tab", desc: "Next tab", group: "Settings", cmd: () => void setTab((t) => nextTab(t, 1)) },
+          {
+            key: "shift+tab",
+            desc: "Previous tab",
+            group: "Settings",
+            cmd: () => void setTab((t) => nextTab(t, -1)),
+          },
+        ]),
     {
       key: "ctrl+s",
       desc: "Switch between user and project config",
@@ -374,6 +421,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   )
 
   const width = createMemo(() => Math.min(88, dimensions().width - 2))
+  const sectionRow = createMemo(() => snapshot()?.rows.find((row) => row.key === props.section))
 
   const options = createMemo(() =>
     visible().map((row) => {
@@ -381,9 +429,9 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       const flags = [row.restart ? "↻" : "", row.source === "env" ? "env" : ""].filter(Boolean).join(" ")
       const right = `${value.length > 22 ? value.slice(0, 21) + "…" : value}  ${badge(row)}${flags ? " " + flags : ""}`
       return {
-        title: row.label,
+        title: props.section ? sectionLabel(row, sectionRow()) : row.label,
         value: row.key,
-        category: query() ? undefined : row.category,
+        category: query() || props.section ? undefined : row.category,
         titleWidth: Math.max(12, width() - right.length - 12),
         footer: right,
       }
@@ -410,6 +458,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       lines.push({ text: `Enter lists every agent. ${AGENTS_HELP}`, color: theme.textMuted })
     else if (row.key === "mode")
       lines.push({ text: "Deprecated: Agents → Migrate moves it under agent", color: theme.warning })
+    else if (row.kind === "object" && hasSection(row, rows()))
+      lines.push({ text: "Enter lists its settings", color: theme.textMuted })
     else if (row.kind === "object" && !row.dialog)
       lines.push({ text: "Enter opens the config file in your editor", color: theme.textMuted })
     if (row.from) lines.push({ text: `from ${home(row.from)}`, color: theme.textMuted })
@@ -436,7 +486,11 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               title="Settings"
               titleView={
                 <box flexDirection="row" gap={2}>
-                  {tabs()}
+                  <Show when={props.section} fallback={tabs()}>
+                    <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                      {sectionRow()?.label ?? props.section}
+                    </text>
+                  </Show>
                   <text fg={theme.textMuted}>
                     saving to <span style={{ fg: theme.text }}>{scope()}</span> config (ctrl+s)
                   </text>
@@ -468,7 +522,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               footerHints={[
                 { title: "change", label: "enter" },
                 { title: "toggle", label: "space" },
-                { title: "tabs", label: "tab", side: "right" },
+                ...(props.section ? [] : [{ title: "tabs", label: "tab", side: "right" as const }]),
               ]}
             />
             <box paddingLeft={4} paddingRight={4} paddingBottom={1}>

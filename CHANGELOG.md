@@ -20,6 +20,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **A Subagent screen in /settings.** Enter on Subagent lists its settings with proper controls:
+  run in background, the model picker (with "Inherit from main agent" and "Small model"), variant,
+  "Let the main agent choose a model per task" and the allowed-models list. Every other setting made
+  of simple fields (Compaction, Sandbox, Memory, Audit, Server…) gets the same screen instead of
+  opening the config file, and a nested field's badge now names the file it comes from (XCOD-231).
 - **Claude Code and Codex in their own session in the TUI.** `/external claude` (or the command
   palette) opens a session labelled "Claude Code" with its session id. You send it prompts and its
   own `/commands`, answer its approvals in Lunos's approval prompt, and see the cost it reports for
