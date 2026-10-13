@@ -20,6 +20,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Update machines without internet access from a mirror you control.** `lunos update` already
+  reads the npm registry from your npm configuration, so a private registry (Nexus, Artifactory,
+  Verdaccio) is all it needs; for archive and offline-bundle installs,
+  `script/release-mirror.ts` copies chosen releases into a directory you serve, keeping only files
+  that match the release's signed `SHA256SUMS`. `docs/lts.md` proposes a long-term support line
+  with backported security fixes; it is planned, not yet available (XCOD-193).
 - **Work as a team on your organisation's Lunos console.** With the Team plan or a self-hosted
   console: your organisation's private marketplace is listed first and installs with the usual
   commands; `lunos memory share <id>` offers one fact at a time to team memory, which an admin
