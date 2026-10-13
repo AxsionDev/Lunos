@@ -8,7 +8,7 @@ that have no internet access.
 for ITService EOOD's decision. What exists today: the standard support period (each release gets
 security fixes for 6 months from its release date, from v1.18.43; see
 [CRA readiness](trust/cra-readiness.md#security-support-period)), offline bundles for every release,
-the release mirror script, and `lunos update` from a private npm registry. Each is marked below.
+and `lunos update` from a private npm registry; the release mirror script is in the repository from the next release. Each is marked below.
 
 ## The LTS release line (Planned)
 
@@ -52,7 +52,7 @@ says so and names the mitigation.
 
 ## Offline update mirror
 
-Two ways to update machines in a network without internet access. Both are available now.
+Two ways to update machines in a network without internet access.
 
 ### A private npm registry (available)
 
@@ -74,7 +74,7 @@ its dist-tag as well.
 With `LUNOS_OFFLINE=1`, Lunos doesn't check for updates on its own; run `lunos update` without it
 to update from the mirror.
 
-### A mirror of release files (available)
+### A mirror of release files (from the next release)
 
 For machines installed from the release archives or offline bundles (no npm), copy the releases you
 want into a directory your web server or file share serves, on a machine that has internet access:

@@ -19,16 +19,16 @@ questions for counsel are listed in the assessment.
 
 ## What exists anyway, as readiness
 
-| Area                               | Status                                                                                       | Where                                                                                |
-| ---------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Software bill of materials         | Generated for every release; licence data from v1.18.40                                      | [Supply chain](supply-chain.md#software-bill-of-materials)                           |
-| Documented vulnerability handling  | Intake, assessment, remediation, release, disclosure; acknowledgement within 6 business days | [`SECURITY.md`](../../SECURITY.md#vulnerability-handling-process)                    |
-| Private vulnerability reporting    | Enabled (GitHub Security Advisories)                                                         | [Report a vulnerability](https://github.com/AxsionDev/Lunos/security/advisories/new) |
-| Dedicated security contact address | security@lunos.tech                                                                          | [`SECURITY.md`](../../SECURITY.md#reporting-security-issues)                         |
-| Verifiable releases                | npm provenance, and signed checksums from v1.18.40                                           | [Supply chain](supply-chain.md)                                                      |
-| Support periods                    | **6 months of security fixes** for each release from its release date, from v1.18.43 onward  | [Security support period](#security-support-period)                                  |
-| Long-term support line             | **Planned**: an LTS line with backported security fixes; the support period is not decided   | [LTS releases and offline updates](../lts.md)                                        |
-| Offline updates                    | A private npm registry for `lunos update`; a verified mirror of release files                | [Offline update mirror](../lts.md#offline-update-mirror)                             |
+| Area                               | Status                                                                                                         | Where                                                                                |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Software bill of materials         | Generated for every release; licence data from v1.18.40                                                        | [Supply chain](supply-chain.md#software-bill-of-materials)                           |
+| Documented vulnerability handling  | Intake, assessment, remediation, release, disclosure; acknowledgement within 6 business days                   | [`SECURITY.md`](../../SECURITY.md#vulnerability-handling-process)                    |
+| Private vulnerability reporting    | Enabled (GitHub Security Advisories)                                                                           | [Report a vulnerability](https://github.com/AxsionDev/Lunos/security/advisories/new) |
+| Dedicated security contact address | security@lunos.tech                                                                                            | [`SECURITY.md`](../../SECURITY.md#reporting-security-issues)                         |
+| Verifiable releases                | npm provenance, and signed checksums from v1.18.40                                                             | [Supply chain](supply-chain.md)                                                      |
+| Support periods                    | **6 months of security fixes** for each release from its release date, from v1.18.43 onward                    | [Security support period](#security-support-period)                                  |
+| Long-term support line             | **Planned**: an LTS line with backported security fixes; the support period is not decided                     | [LTS releases and offline updates](../lts.md)                                        |
+| Offline updates                    | A private npm registry for `lunos update` (now); a verified release-file mirror script (from the next release) | [Offline update mirror](../lts.md#offline-update-mirror)                             |
 
 ## Security support period
 
