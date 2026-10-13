@@ -95,7 +95,7 @@ The built-in EU claims hold only for these hosts: `api.mistral.ai` and `codestra
 
 ## Session sharing
 
-Share uploads are checked like model calls. `opncd.ai` (upstream's share service) counts as `us`. A self-hosted share server at `enterprise.url` counts as `unknown`, like any self-hosted endpoint, so you allow it with `"unknown"`. Refused and allowed share uploads both appear in the audit log with a `share:` provider id (`share:opncd`, `share:enterprise`). Sharing is off by default; see the deployment guide.
+Share uploads are checked like model calls. `opncd.ai` (upstream's share service) counts as `us`. A self-hosted share server at `enterprise.url` counts as `unknown`, like any self-hosted endpoint, so you allow it with `"unknown"`. Uploads to your organisation's Lunos console (`lunos share`, `lunos memory share`, XCOD-191) are `share:lunos-console`: `eu` on Lunos Cloud's `cloud.lunos.tech`, and on any other host (a self-hosted console) your own endpoint, `unknown` unless you declare it in `residency.endpoints`. Refused and allowed share uploads both appear in the audit log with a `share:` provider id (`share:opncd`, `share:enterprise`, `share:lunos-console`). Sharing is off by default; see the deployment guide and [Working as a team](team.md).
 
 ## The audit log
 

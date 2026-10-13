@@ -20,6 +20,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Work as a team on your organisation's Lunos console.** With the Team plan or a self-hosted
+  console: your organisation's private marketplace is listed first and installs with the usual
+  commands; `lunos memory share <id>` offers one fact at a time to team memory, which an admin
+  approves and members recall through an `org` memory source; `lunos share <session>` (or
+  `--artifact <file>`, `--link <hours>`) shares with your organisation, or with a signed link that
+  expires. Your own memory never leaves your machine. Sharing stays off by default: `"share":
+"cloud"` allows only these uploads, never another share service, and each one is checked against
+  the residency policy and audited (XCOD-191).
 - **Edit the Recommended models in /settings.** Recommended opens a list of its models with why
   each is recommended (Lunos's curated list, marked "Lunos default", until you change it). Add a
   model from the picker with an optional reason, edit or remove one, or reset to Lunos's defaults;
