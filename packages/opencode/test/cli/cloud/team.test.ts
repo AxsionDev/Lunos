@@ -12,7 +12,7 @@ function fakeConsole() {
   const server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
-    async fetch(req) {
+    async fetch(req): Promise<Response> {
       const url = new URL(req.url)
       const body = req.method === "POST" ? await req.json().catch(() => undefined) : undefined
       received.push({ method: req.method, path: url.pathname, auth: req.headers.get("authorization"), body })
