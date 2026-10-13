@@ -1,6 +1,6 @@
 import { TextAttributes } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
-import { For, Match, Show, Switch, createMemo, createSignal, onMount } from "solid-js"
+import { For, Match, Show, Switch, createMemo, createResource, createSignal, onMount } from "solid-js"
 import type { SettingRow, SettingsSnapshot } from "@opencode-ai/sdk/v2"
 import { versionDetail } from "@opencode-ai/core/installation/version"
 import { useTheme } from "../context/theme"
@@ -17,12 +17,29 @@ import { DialogConfirm } from "../ui/dialog-confirm"
 import { useBindings, useOpencodeKeymap } from "../keymap"
 import { openFileInEditor } from "../editor"
 import { DialogModel } from "./dialog-model"
+import { DialogRecommended } from "./dialog-recommended"
+import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
 import { DialogThemeList } from "./dialog-theme-list"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogProviders } from "./dialog-provider"
 import { StatusServers } from "./dialog-status"
-import { TABS, badge, cycle, editText, filterRows, formatCost, formatTokens, nextTab, type Tab } from "../util/settings"
+import {
+  AGENT_NAME,
+  TABS,
+  badge,
+  defaultAgentWarning,
+  mainAgents,
+  cycle,
+  editText,
+  filterRows,
+  formatCost,
+  formatTokens,
+  hasSection,
+  nextTab,
+  sectionLabel,
+  type Tab,
+} from "../util/settings"
 
 // XCOD-128: every configuration option in one place, after Claude Code's /config. One dialog with
 // three tabs (Status | Settings | Usage); /settings and /config open Settings, /status opens Status.
@@ -40,7 +57,11 @@ function home(file: string) {
 
 const LABEL: Record<Tab, string> = { status: "Status", settings: "Settings", usage: "Usage" }
 
-export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope }) {
+/**
+ * `section` (XCOD-231): one structured setting's own screen, e.g. `subagent`, listing its fields
+ * (`subagent.model`, …) with the same controls as the main list. ← goes back to its row there.
+ */
+export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope; section?: string }) {
   const sdk = useSDK()
   const dialog = useDialog()
   const toast = useToast()
@@ -58,6 +79,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   const [highlighted, setHighlighted] = createSignal<string | undefined>(props.focus)
 
   let list: DialogSelectRef<string> | undefined
+  // XCOD-233: a save still running when Esc closed the window must not reopen it.
+  const generation = dialog.generation
 
   async function load() {
     const result = await sdk.client.config.settings().catch((cause: unknown) => ({ error: cause, data: undefined }))
@@ -74,12 +97,15 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
 
   onMount(() => {
     dialog.setSize("large")
+    // XCOD-233: this is the top of the /settings window, however it was opened.
+    dialog.markNav()
     void load()
   })
 
   const rows = createMemo(() => {
     // XCOD-215: the deprecated top-level `mode` is listed only while it's still set (Agents migrates it).
-    const list = (snapshot()?.rows ?? []).filter((row) => row.key !== "mode" || row.source !== "default")
+    const all = (snapshot()?.rows ?? []).filter((row) => row.key !== "mode" || row.source !== "default")
+    const list = props.section ? all.filter((row) => row.key.startsWith(`${props.section}.`)) : all
     // tui.json is read by this process: show the theme actually in use.
     return list.map((row) =>
       row.key === "tui.theme" && row.source === "default"
@@ -92,12 +118,154 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
 
   // Reopens this dialog where the user left it, after a picker or prompt replaced it.
   function reopen(key?: string) {
-    dialog.replace(() => <DialogSettings tab="settings" focus={key ?? highlighted()} scope={scope()} />)
+    const section = props.section
+    dialog.replace(
+      () => <DialogSettings tab="settings" focus={key ?? highlighted()} scope={scope()} section={section} />,
+      undefined,
+      section ? { back: () => openTop(section), generation } : { nav: true, generation },
+    )
   }
 
-  async function save(row: SettingRow, value: string, options: { reopen?: boolean } = {}) {
+  /** The main list, on row `key` (from a section screen, its own row). */
+  function openTop(key: string) {
+    dialog.replace(() => <DialogSettings tab="settings" focus={key} scope={scope()} />, undefined, {
+      nav: true,
+      generation,
+    })
+  }
+
+  /** XCOD-231: a structured setting whose fields are settings of their own gets a screen of them. */
+  function openSection(row: SettingRow) {
+    dialog.replace(
+      () => <DialogSettings tab="settings" section={row.key} scope={scope()} />,
+      undefined,
+      backTo(row.key),
+    )
+  }
+
+  const local = useLocal()
+  const sync = useSync()
+  // XCOD-230: the agents default_agent can name, and whether the configured one still can.
+  const [agents] = createResource(async () => (await sdk.client.config.agents().catch(() => undefined))?.data)
+  const agentProblem = (row: SettingRow) =>
+    row.key === "default_agent" ? defaultAgentWarning(row.value, agents()) : undefined
+
+  /** XCOD-230: new sessions start with the new default; the agent list may still be reloading. */
+  function startWith(name: string, tries = 40) {
+    if (sync.data.agent.some((agent) => agent.name === name)) return local.mode.set(name)
+    if (tries > 0) setTimeout(() => startWith(name, tries - 1), 100)
+  }
+
+  /**
+   * XCOD-230: after Clear, new sessions start with whatever the server now puts first (its default,
+   * from another config layer or Lunos's own), once the reloaded agent list arrives.
+   */
+  function startWithDefault(before: string, tries = 40) {
+    const first = local.mode.list()[0]
+    // The list is reconciled in place: its order (the default first) is what shows the reload.
+    const order = sync.data.agent.map((agent) => agent.name).join()
+    if (first && (order !== before || tries === 0)) return local.mode.set(first.name)
+    if (tries > 0) setTimeout(() => startWithDefault(before, tries - 1), 100)
+  }
+
+  /** XCOD-230: default_agent is picked from the main agents, or a new one made on the spot. */
+  function pickDefaultAgent(row: SettingRow, focus?: string) {
+    const current = typeof row.value === "string" ? row.value : undefined
+    const choose = async (name: string | undefined) => {
+      const before = sync.data.agent.map((agent) => agent.name).join()
+      const ok = await save(row, name ?? "", { reopen: true, unset: name === undefined })
+      if (!ok) return
+      if (name) return startWith(name)
+      startWithDefault(before)
+    }
+    dialog.replace(
+      () => (
+        <DialogSelect<string>
+          title={row.label}
+          placeholder="The agent new sessions start with"
+          skipFilter
+          current={focus ?? current ?? "+clear"}
+          options={[
+            ...mainAgents(agents() ?? []).map((agent) => ({
+              title: agent.name,
+              value: agent.name,
+              description: agent.description,
+              category: "Main agents",
+            })),
+            {
+              title: "New agent…",
+              value: "+new",
+              description: "set one up and make it the default",
+              category: "Actions",
+            },
+            { title: "Clear (use Lunos's default)", value: "+clear", category: "Actions" },
+          ]}
+          onSelect={(option) => {
+            if (option.value === "+new") return void newDefaultAgent(row)
+            void choose(option.value === "+clear" ? undefined : option.value)
+          }}
+        />
+      ),
+      undefined,
+      backTo(row.key),
+    )
+  }
+
+  /**
+   * XCOD-230: Agents' New agent flow (name, then what it does), and the new agent becomes the
+   * default. Nothing is written until both are answered; ← or Esc at either step changes nothing.
+   */
+  async function newDefaultAgent(row: SettingRow) {
+    const nav = { back: () => pickDefaultAgent(row, "+new"), generation }
+    const name = (await DialogPrompt.show(dialog, "New agent", { placeholder: "name, e.g. reviewer", nav }))?.trim()
+    if (!name) return pickDefaultAgent(row, "+new")
+    if (!AGENT_NAME.test(name) || agents()?.some((agent) => agent.name === name)) {
+      toast.show({
+        variant: "error",
+        message: AGENT_NAME.test(name)
+          ? `There's already an agent called ${name}: pick it from the list`
+          : "Use letters, digits, - and _ for the name",
+      })
+      return pickDefaultAgent(row, "+new")
+    }
+    const description = (
+      await DialogPrompt.show(dialog, `${name}: what it does`, {
+        placeholder: "one line, shown in the agent list",
+        nav,
+      })
+    )?.trim()
+    if (description === undefined) return pickDefaultAgent(row, "+new")
+    const created = await sdk.client.config
+      .settingsSet({
+        settingsSetInput: { key: `agent.${name}.description`, value: description || name, scope: scope() },
+      })
+      .catch(() => undefined)
+    if (!created?.data?.ok) {
+      toast.show({
+        variant: "error",
+        title: `${name} not created`,
+        message: created?.data && !created.data.ok ? created.data.error : "The server didn't answer",
+        duration: 8000,
+      })
+      return reopen(row.key)
+    }
+    if (await save(row, name, { reopen: true })) startWith(name)
+  }
+
+  const variantFor = useVariantModel()
+  /** XCOD-232: a saved variant the model it applies to doesn't have. */
+  const variantProblem = (row: SettingRow) =>
+    row.key === "subagent.variant" ? variantWarning(row.value, variantFor(row.key)) : undefined
+
+  /** XCOD-233: a screen opened from row `key`; ← comes back to the list with that row highlighted. */
+  const backTo = (key: string) => ({ back: () => reopen(key), generation })
+
+  /** `unset` (XCOD-232's Clear) removes the key from the scope's file instead of setting it. */
+  async function save(row: SettingRow, value: string, options: { reopen?: boolean; unset?: boolean } = {}) {
     const result = await sdk.client.config
-      .settingsSet({ settingsSetInput: { key: row.key, value, scope: scope() } })
+      .settingsSet({
+        settingsSetInput: { key: row.key, value, scope: scope(), ...(options.unset ? { unset: true } : {}) },
+      })
       .catch((cause: unknown) => ({ data: undefined, error: cause }))
     const data = result.data
     if (!data || !data.ok) {
@@ -113,7 +281,9 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     if (row.key === "tui.theme" && typeof data.value === "string") themeState.set(data.value)
     toast.show({
       variant: "success",
-      message: `${row.label} = ${typeof data.value === "string" ? data.value : JSON.stringify(data.value)} (saved to ${data.scope} config: ${home(data.file)})`,
+      message: options.unset
+        ? `${row.label} ${data.changed ? "removed" : "wasn't set"} (${data.scope} config: ${home(data.file)})`
+        : `${row.label} = ${typeof data.value === "string" ? data.value : JSON.stringify(data.value)} (saved to ${data.scope} config: ${home(data.file)})`,
       duration: 5000,
     })
     if (options.reopen) reopen(row.key)
@@ -124,6 +294,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
         "Restart required",
         `${row.label} takes effect after a restart. Restart Lunos now?`,
         "later",
+        backTo(row.key),
       )
       if (restart === true) {
         dialog.clear()
@@ -149,7 +320,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     }
     if (row.secret) {
       toast.show({ variant: "info", message: "API keys and tokens are managed in /providers" })
-      dialog.replace(() => <DialogProviders />)
+      dialog.replace(() => <DialogProviders />, undefined, backTo(row.key))
       return true
     }
     return false
@@ -171,17 +342,47 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   }
 
   async function edit(row: SettingRow) {
+    // Before refuse(): a parent reads as locked when any one field is, and the others can still change.
+    if (row.kind === "object" && hasSection(row, rows())) return openSection(row)
+    // XCOD-229: its own screen; a locked list can still be looked at, every change is refused there.
+    if (row.key === "recommended")
+      return dialog.replace(
+        () => <DialogRecommended scope={scope()} onBack={() => reopen(row.key)} />,
+        undefined,
+        backTo(row.key),
+      )
     if (refuse(row)) return
     if (row.dialog === "themes") {
-      dialog.replace(() => (
-        <DialogThemeList
-          onPick={(name) => {
-            void save(row, name, { reopen: true })
-          }}
-        />
-      ))
+      dialog.replace(
+        () => (
+          <DialogThemeList
+            onPick={(name) => {
+              void save(row, name, { reopen: true })
+            }}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
       return
     }
+    if (row.key === "default_agent") return pickDefaultAgent(row)
+    if (row.key === "subagent.variant")
+      return dialog.replace(
+        () => (
+          <DialogVariantSetting
+            title={row.label}
+            settingKey={row.key}
+            scope={scope()}
+            current={typeof row.value === "string" ? row.value : undefined}
+            applies={variantFor(row.key)}
+            onPick={(value) => void save(row, value, { reopen: true })}
+            onClear={() => void save(row, "", { reopen: true, unset: true })}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
     if (row.dialog === "models") {
       if (row.key === "subagent.dynamic.allow")
         return editModelList(row, Array.isArray(row.value) ? row.value.map(String) : [])
@@ -203,35 +404,47 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               },
             ]
           : undefined
-      dialog.replace(() => (
-        <DialogModel
-          title={row.label}
-          choices={choices}
-          current={slash > 0 ? { providerID: value.slice(0, slash), modelID: value.slice(slash + 1) } : undefined}
-          onPick={(providerID, modelID) => {
-            void save(row, `${providerID}/${modelID}`, { reopen: true })
-          }}
-        />
-      ))
+      dialog.replace(
+        () => (
+          <DialogModel
+            title={row.label}
+            choices={choices}
+            current={slash > 0 ? { providerID: value.slice(0, slash), modelID: value.slice(slash + 1) } : undefined}
+            onPick={(providerID, modelID) => {
+              void save(row, `${providerID}/${modelID}`, { reopen: true })
+            }}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
       return
     }
     // XCOD-215: agents get their own screen instead of the raw JSON.
     if (row.key === "agent" || row.key === "mode")
-      return dialog.replace(() => <DialogAgentList scope={scope()} onBack={() => reopen(row.key)} />)
-    if (row.dialog === "mcps") return dialog.replace(() => <DialogMcp />)
-    if (row.dialog === "providers") return dialog.replace(() => <DialogProviders />)
+      return dialog.replace(
+        () => <DialogAgentList scope={scope()} onBack={() => reopen(row.key)} />,
+        undefined,
+        backTo(row.key),
+      )
+    if (row.dialog === "mcps") return dialog.replace(() => <DialogMcp />, undefined, backTo(row.key))
+    if (row.dialog === "providers") return dialog.replace(() => <DialogProviders />, undefined, backTo(row.key))
     if (row.kind === "boolean") return void save(row, cycle(row)!)
     if (row.kind === "enum") {
-      dialog.replace(() => (
-        <DialogSelect
-          title={row.label}
-          placeholder={row.key}
-          skipFilter
-          current={String(row.value)}
-          options={(row.values ?? []).map((value) => ({ title: String(value), value: String(value) }))}
-          onSelect={(option) => void save(row, option.value, { reopen: true })}
-        />
-      ))
+      dialog.replace(
+        () => (
+          <DialogSelect
+            title={row.label}
+            placeholder={row.key}
+            skipFilter
+            current={String(row.value)}
+            options={(row.values ?? []).map((value) => ({ title: String(value), value: String(value) }))}
+            onSelect={(option) => void save(row, option.value, { reopen: true })}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
       return
     }
     if (row.kind === "object") return openInEditor(row)
@@ -239,6 +452,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       value: editText(row),
       placeholder: row.kind === "list" ? "comma-separated, e.g. eu, us" : row.key,
       description: () => <text fg={theme.textMuted}>{row.description || row.key}</text>,
+      nav: backTo(row.key),
     })
     if (value === null) return reopen(row.key)
     await save(row, value, { reopen: true })
@@ -247,47 +461,62 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   // XCOD-214: subagent.dynamic.allow, a list of models. Add one from the model picker, or by ID
   // (checked against the models available here when saved); enter on a model removes it.
   // The list is carried along: this screen's own state stops updating while the list replaces it.
-  function editModelList(row: SettingRow, list: string[]) {
-    const write = async (next: string[]) => {
+  function editModelList(row: SettingRow, list: string[], focus?: string) {
+    const write = async (next: string[], at?: string) => {
       const saved = await save(row, JSON.stringify(next))
-      editModelList(row, saved ? next : list)
+      editModelList(row, saved ? next : list, at)
     }
-    dialog.replace(() => (
-      <DialogSelect<string>
-        title={`${row.label} (${list.length})`}
-        placeholder="enter adds, or removes the highlighted model"
-        skipFilter
-        options={[
-          { title: "Add a model…", value: "+model", category: "Add" },
-          { title: "Add a custom model ID…", value: "+custom", category: "Add" },
-          ...list.map((id) => ({ title: id, value: id, category: "Allowed models", footer: "enter removes" })),
-        ]}
-        onSelect={async (option) => {
-          if (option.value === "+model")
-            return dialog.replace(() => (
-              <DialogModel
-                title="Add a model"
-                onPick={(providerID, modelID) => {
-                  const id = `${providerID}/${modelID}`
-                  void write(list.includes(id) ? list : [...list, id])
-                }}
-              />
-            ))
-          if (option.value === "+custom") {
-            const value = await DialogPrompt.show(dialog, "Custom model ID", {
-              placeholder: "provider/model",
-              description: () => (
-                <text fg={theme.textMuted}>For a model the picker doesn't list; it must be available here</text>
-              ),
-            })
-            const id = value?.trim()
-            if (!id) return editModelList(row, list)
-            return write(list.includes(id) ? list : [...list, id])
-          }
-          return write(list.filter((id) => id !== option.value))
-        }}
-      />
-    ))
+    // ← from a picker this list opened comes back here, on the row that opened it.
+    const here = (at: string) => ({ back: () => editModelList(row, list, at), generation })
+    dialog.replace(
+      () => (
+        <DialogSelect<string>
+          title={`${row.label} (${list.length})`}
+          placeholder="enter adds, or removes the highlighted model"
+          skipFilter
+          current={focus}
+          options={[
+            { title: "Add a model…", value: "+model", category: "Add" },
+            { title: "Add a custom model ID…", value: "+custom", category: "Add" },
+            ...list.map((id) => ({ title: id, value: id, category: "Allowed models", footer: "enter removes" })),
+          ]}
+          onSelect={async (option) => {
+            if (option.value === "+model")
+              return dialog.replace(
+                () => (
+                  <DialogModel
+                    title="Add a model"
+                    onPick={(providerID, modelID) => {
+                      const id = `${providerID}/${modelID}`
+                      void write(list.includes(id) ? list : [...list, id], id)
+                    }}
+                  />
+                ),
+                undefined,
+                here("+model"),
+              )
+            if (option.value === "+custom") {
+              const value = await DialogPrompt.show(dialog, "Custom model ID", {
+                placeholder: "provider/model",
+                description: () => (
+                  <text fg={theme.textMuted}>For a model the picker doesn't list; it must be available here</text>
+                ),
+                nav: here("+custom"),
+              })
+              const id = value?.trim()
+              if (!id) return editModelList(row, list, "+custom")
+              return write(list.includes(id) ? list : [...list, id], id)
+            }
+            return write(
+              list.filter((id) => id !== option.value),
+              "+model",
+            )
+          }}
+        />
+      ),
+      undefined,
+      backTo(row.key),
+    )
   }
 
   function toggle(row: SettingRow | undefined) {
@@ -298,8 +527,17 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   }
 
   const bindings = createMemo((): { key: string; desc: string; group: string; cmd: () => void }[] => [
-    { key: "tab", desc: "Next tab", group: "Settings", cmd: () => void setTab((t) => nextTab(t, 1)) },
-    { key: "shift+tab", desc: "Previous tab", group: "Settings", cmd: () => void setTab((t) => nextTab(t, -1)) },
+    ...(props.section
+      ? []
+      : [
+          { key: "tab", desc: "Next tab", group: "Settings", cmd: () => void setTab((t) => nextTab(t, 1)) },
+          {
+            key: "shift+tab",
+            desc: "Previous tab",
+            group: "Settings",
+            cmd: () => void setTab((t) => nextTab(t, -1)),
+          },
+        ]),
     {
       key: "ctrl+s",
       desc: "Switch between user and project config",
@@ -331,16 +569,19 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   )
 
   const width = createMemo(() => Math.min(88, dimensions().width - 2))
+  const sectionRow = createMemo(() => snapshot()?.rows.find((row) => row.key === props.section))
 
   const options = createMemo(() =>
     visible().map((row) => {
-      const value = row.secret && row.kind !== "object" ? "••• (see /providers)" : row.display
+      const value =
+        (row.secret && row.kind !== "object" ? "••• (see /providers)" : row.display) +
+        (variantProblem(row) || agentProblem(row) ? " ⚠" : "")
       const flags = [row.restart ? "↻" : "", row.source === "env" ? "env" : ""].filter(Boolean).join(" ")
       const right = `${value.length > 22 ? value.slice(0, 21) + "…" : value}  ${badge(row)}${flags ? " " + flags : ""}`
       return {
-        title: row.label,
+        title: props.section ? sectionLabel(row, sectionRow()) : row.label,
         value: row.key,
-        category: query() ? undefined : row.category,
+        category: query() || props.section ? undefined : row.category,
         titleWidth: Math.max(12, width() - right.length - 12),
         footer: right,
       }
@@ -361,12 +602,29 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
         color: theme.warning,
       })
     else if (row.override) lines.push({ text: row.override, color: theme.warning })
+    else if (agentProblem(row))
+      lines.push({
+        text: `⚠ ${agentProblem(row)}, so it can't start a session: pick a main agent`,
+        color: theme.warning,
+      })
+    else if (variantProblem(row))
+      lines.push({
+        text: `⚠ "${row.display}" is ${variantProblem(row)}: requests use the model's default effort`,
+        color: theme.warning,
+      })
     else if (row.secret)
       lines.push({ text: "Secrets are never shown here: manage keys in /providers", color: theme.textMuted })
     else if (row.key === "agent")
       lines.push({ text: `Enter lists every agent. ${AGENTS_HELP}`, color: theme.textMuted })
     else if (row.key === "mode")
       lines.push({ text: "Deprecated: Agents → Migrate moves it under agent", color: theme.warning })
+    else if (row.key === "recommended")
+      lines.push({
+        text: `Enter lists the models the pickers recommend${row.source === "default" ? " (Lunos's curated list)" : ""}`,
+        color: theme.textMuted,
+      })
+    else if (row.kind === "object" && hasSection(row, rows()))
+      lines.push({ text: "Enter lists its settings", color: theme.textMuted })
     else if (row.kind === "object" && !row.dialog)
       lines.push({ text: "Enter opens the config file in your editor", color: theme.textMuted })
     if (row.from) lines.push({ text: `from ${home(row.from)}`, color: theme.textMuted })
@@ -393,7 +651,11 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               title="Settings"
               titleView={
                 <box flexDirection="row" gap={2}>
-                  {tabs()}
+                  <Show when={props.section} fallback={tabs()}>
+                    <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                      {sectionRow()?.label ?? props.section}
+                    </text>
+                  </Show>
                   <text fg={theme.textMuted}>
                     saving to <span style={{ fg: theme.text }}>{scope()}</span> config (ctrl+s)
                   </text>
@@ -425,7 +687,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               footerHints={[
                 { title: "change", label: "enter" },
                 { title: "toggle", label: "space" },
-                { title: "tabs", label: "tab", side: "right" },
+                ...(props.section ? [] : [{ title: "tabs", label: "tab", side: "right" as const }]),
               ]}
             />
             <box paddingLeft={4} paddingRight={4} paddingBottom={1}>
@@ -456,7 +718,7 @@ function OtherTab(props: {
     <box paddingLeft={4} paddingRight={4} paddingBottom={1} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         {props.tabs()}
-        <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
+        <text fg={theme.textMuted} onMouseUp={() => dialog.dismiss()}>
           esc
         </text>
       </box>
@@ -474,7 +736,7 @@ function OtherTab(props: {
           </Match>
         </Switch>
       </scrollbox>
-      <text fg={theme.textMuted}>tab switches tabs · esc closes</text>
+      <text fg={theme.textMuted}>tab switches tabs</text>
     </box>
   )
 }

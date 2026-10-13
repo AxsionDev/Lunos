@@ -1,16 +1,17 @@
-import { createMemo, createResource } from "solid-js"
+import { createEffect, createMemo, createResource } from "solid-js"
 import { useRenderer } from "@opentui/solid"
 import type { AgentFileEntry, SettingsSnapshot } from "@opencode-ai/sdk/v2"
 import { useSDK } from "../context/sdk"
 import { useTheme } from "../context/theme"
-import { useDialog } from "../ui/dialog"
+import { useDialog, type DialogNav } from "../ui/dialog"
 import { useToast } from "../ui/toast"
-import { DialogSelect } from "../ui/dialog-select"
+import { DialogSelect, type DialogSelectRef } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogConfirm } from "../ui/dialog-confirm"
 import { openEditor, openFileInEditor } from "../editor"
 import { useOpencodeKeymap } from "../keymap"
 import { DialogModel } from "./dialog-model"
+import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 
 // XCOD-215: /settings → Agents and /agents, one screen (XCOD-210 built /agents; this replaces it).
 // The list shows every agent with what it does; an agent's screen edits its `agent.<name>.*` keys
@@ -50,8 +51,27 @@ function lockedKey(locked: readonly string[], key: string) {
   return locked.find((entry) => key === entry || key.startsWith(`${entry}.`))
 }
 
+/**
+ * Highlights the row a screen was reopened on (XCOD-233: ← comes back to the row that opened the
+ * screen). The rows load from the server after the list is drawn, so wait for them.
+ */
+function focusWhenLoaded<T>(list: DialogSelectRef<T>, options: () => { value: T }[], focus: T | undefined) {
+  if (focus === undefined) return
+  let done = false
+  createEffect(() => {
+    if (done || !options().some((option) => option.value === focus)) return
+    done = true
+    setTimeout(() => list.moveTo(focus), 0)
+  })
+}
+
 // Hooks: call at component setup, not from a handler (Solid's contexts resolve only during setup).
-function useAgentSave(scope: () => Scope, locked: () => readonly string[], after: (key: string) => void) {
+function useAgentSave(
+  scope: () => Scope,
+  locked: () => readonly string[],
+  after: (key: string) => void,
+  nav?: (key: string) => DialogNav | undefined,
+) {
   const sdk = useSDK()
   const toast = useToast()
   const dialog = useDialog()
@@ -94,6 +114,7 @@ function useAgentSave(scope: () => Scope, locked: () => readonly string[], after
         "Restart required",
         `${key} takes effect after a restart. Restart Lunos now?`,
         "later",
+        nav?.(key),
       )
       if (restart === true) {
         dialog.clear()
@@ -105,19 +126,36 @@ function useAgentSave(scope: () => Scope, locked: () => readonly string[], after
   }
 }
 
+/**
+ * `onBack` is set when /settings opened the list (XCOD-233): then these screens are part of the
+ * /settings window, ← goes back one level and Esc closes it all. /agents keeps Esc as it was.
+ */
 export function DialogAgentList(props: { scope?: Scope; focus?: string; onBack?: () => void }) {
   const sdk = useSDK()
   const dialog = useDialog()
   const toast = useToast()
   const scope = () => props.scope ?? "user"
+  const generation = dialog.generation
+  /** In the /settings window: how a screen opened from here comes back to `focus`. */
+  const navTo = (focus?: string): DialogNav | undefined =>
+    props.onBack ? { back: () => reopen(focus), generation } : undefined
   const [agents] = createResource(async () => (await sdk.client.config.agents()).data ?? [])
   const [snapshot] = createResource(
     async () => (await sdk.client.config.settings()).data as SettingsSnapshot | undefined,
   )
   const locked = () => snapshot()?.locked ?? []
   const reopen = (focus?: string) =>
-    dialog.replace(() => <DialogAgentList scope={scope()} focus={focus} onBack={props.onBack} />)
-  const save = useAgentSave(scope, locked, () => reopen())
+    dialog.replace(
+      () => <DialogAgentList scope={scope()} focus={focus} onBack={props.onBack} />,
+      undefined,
+      props.onBack ? { back: props.onBack, generation } : undefined,
+    )
+  const save = useAgentSave(
+    scope,
+    locked,
+    () => reopen(),
+    () => navTo(),
+  )
 
   const deprecated = createMemo(() => {
     const rows = snapshot()?.rows ?? []
@@ -165,18 +203,31 @@ export function DialogAgentList(props: { scope?: Scope; focus?: string; onBack?:
   })
 
   async function create() {
-    const name = (await DialogPrompt.show(dialog, "New agent", { placeholder: "name, e.g. reviewer" }))?.trim()
-    if (!name) return reopen()
+    const name = (
+      await DialogPrompt.show(dialog, "New agent", { placeholder: "name, e.g. reviewer", nav: navTo("+new") })
+    )?.trim()
+    if (!name) return reopen("+new")
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) {
       toast.show({ variant: "error", message: "Use letters, digits, - and _ for the name" })
       return reopen()
     }
     const description = (
-      await DialogPrompt.show(dialog, `${name}: what it does`, { placeholder: "one line, shown in the agent list" })
+      await DialogPrompt.show(dialog, `${name}: what it does`, {
+        placeholder: "one line, shown in the agent list",
+        nav: navTo("+new"),
+      })
     )?.trim()
-    if (description === undefined) return reopen()
+    if (description === undefined) return reopen("+new")
     await save(`agent.${name}.description`, description || name)
-    dialog.replace(() => <DialogAgentDetail name={name} scope={scope()} onBack={() => reopen(name)} />)
+    detail(name)
+  }
+
+  function detail(name: string) {
+    dialog.replace(
+      () => <DialogAgentDetail name={name} scope={scope()} nav={!!props.onBack} onBack={() => reopen(name)} />,
+      undefined,
+      navTo(name),
+    )
   }
 
   // Deprecated keys can be in either scope's files; migrate both.
@@ -205,21 +256,26 @@ export function DialogAgentList(props: { scope?: Scope; focus?: string; onBack?:
       title={`Agents · ${scope()} config`}
       placeholder={AGENTS_HELP}
       current={props.focus}
-      ref={(list) => props.focus && setTimeout(() => list.moveTo(props.focus!), 0)}
+      ref={(list) => focusWhenLoaded(list, options, props.focus)}
       options={options()}
       footerHints={[{ title: "open", label: "enter" }]}
       onSelect={(option) => {
         if (option.value === "+new") return void create()
         if (option.value === "+migrate") return void migrate()
-        dialog.replace(() => (
-          <DialogAgentDetail name={option.value} scope={scope()} onBack={() => reopen(option.value)} />
-        ))
+        detail(option.value)
       }}
     />
   )
 }
 
-export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: string; onBack: () => void }) {
+export function DialogAgentDetail(props: {
+  name: string
+  scope: Scope
+  focus?: string
+  onBack: () => void
+  /** Part of the /settings window (XCOD-233): ← goes back one level, Esc closes it. */
+  nav?: boolean
+}) {
   const sdk = useSDK()
   const dialog = useDialog()
   const toast = useToast()
@@ -231,10 +287,18 @@ export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: s
   )
   const agent = createMemo(() => agents()?.find((item) => item.name === props.name))
   const locked = () => snapshot()?.locked ?? []
+  const generation = dialog.generation
   const reopen = (focus?: string) =>
-    dialog.replace(() => (
-      <DialogAgentDetail name={props.name} scope={props.scope} focus={focus} onBack={props.onBack} />
-    ))
+    dialog.replace(
+      () => (
+        <DialogAgentDetail name={props.name} scope={props.scope} focus={focus} onBack={props.onBack} nav={props.nav} />
+      ),
+      undefined,
+      props.nav ? { back: props.onBack, generation } : undefined,
+    )
+  /** A picker or prompt opened from field `field`; ← comes back to it. */
+  const navTo = (field: string): DialogNav | undefined =>
+    props.nav ? { back: () => reopen(field), generation } : undefined
   const key = (field: string) => `agent.${props.name}.${field}`
   const own = (field: string) => agent()?.overrides?.[props.scope]?.[field]
   // A whole-agent reset goes back to the list; a field change comes back to that field.
@@ -242,10 +306,36 @@ export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: s
     () => props.scope,
     locked,
     (saved) => (saved === `agent.${props.name}` ? props.onBack() : reopen(saved.split(".")[2])),
+    (saved) => navTo(saved.split(".")[2] ?? "+reset"),
   )
   const save = (field: string) => (value: string | undefined) => write(key(field), value)
 
   const fileFor = (target: "config") => snapshot()?.files?.[props.scope]?.[target]
+  const variantFor = useVariantModel()
+  /** XCOD-232: the model this agent's variant applies to, and its variants. */
+  const variantApplies = () => {
+    const item = agent()
+    return item ? variantFor(key("variant"), { model: item.model, subagent: item.kind === "subagent" }) : undefined
+  }
+
+  function variant() {
+    const value = own("variant") as string | undefined
+    dialog.replace(
+      () => (
+        <DialogVariantSetting
+          title={`${props.name}: variant`}
+          settingKey={key("variant")}
+          scope={props.scope}
+          current={value ?? agent()?.variant}
+          applies={variantApplies()}
+          onPick={(picked) => void save("variant")(picked)}
+          onClear={() => void save("variant")(undefined)}
+        />
+      ),
+      undefined,
+      navTo("variant"),
+    )
+  }
 
   async function editInFile(field: string, label: string) {
     const file = fileFor("config")
@@ -266,6 +356,7 @@ export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: s
     const value = await DialogPrompt.show(dialog, `${props.name}: ${label}`, {
       value: current === undefined ? "" : String(current),
       placeholder: `${hint}; empty = default`,
+      nav: navTo(field),
     })
     if (value === null) return reopen(field)
     return save(field)(value.trim() === "" ? undefined : value.trim())
@@ -287,49 +378,58 @@ export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: s
       description: () => (
         <text fg={theme.textMuted}>{multiline ? "Set $EDITOR to edit this in your editor" : key(field)}</text>
       ),
+      nav: navTo(field),
     })
     if (value === null) return reopen(field)
     return save(field)(value.trim() === "" ? undefined : value)
   }
 
   function choose(field: string, label: string, values: string[], current?: string) {
-    dialog.replace(() => (
-      <DialogSelect
-        title={`${props.name}: ${label}`}
-        skipFilter
-        current={current ?? "default"}
-        options={[
-          { title: "default", value: "default", description: "remove the override" },
-          ...values.map((value) => ({ title: value, value })),
-        ]}
-        onSelect={(option) => void save(field)(option.value === "default" ? undefined : option.value)}
-      />
-    ))
+    dialog.replace(
+      () => (
+        <DialogSelect
+          title={`${props.name}: ${label}`}
+          skipFilter
+          current={current ?? "default"}
+          options={[
+            { title: "default", value: "default", description: "remove the override" },
+            ...values.map((value) => ({ title: value, value })),
+          ]}
+          onSelect={(option) => void save(field)(option.value === "default" ? undefined : option.value)}
+        />
+      ),
+      undefined,
+      navTo(field),
+    )
   }
 
   function model() {
     const value = own("model") as string | undefined
     const slash = value?.indexOf("/") ?? -1
     const subagent = agent()?.kind === "subagent"
-    dialog.replace(() => (
-      <DialogModel
-        title={`${props.name}: model`}
-        choices={[
-          {
-            title: "Inherit",
-            description: subagent ? "the main agent's model (default)" : "the session's model (default)",
-            onSelect: () => void save("model")(undefined),
-          },
-          ...(subagent
-            ? [{ title: "Small model", description: "small_model", onSelect: () => void save("model")("small") }]
-            : []),
-        ]}
-        current={
-          value && slash > 0 ? { providerID: value.slice(0, slash), modelID: value.slice(slash + 1) } : undefined
-        }
-        onPick={(providerID, modelID) => void save("model")(`${providerID}/${modelID}`)}
-      />
-    ))
+    dialog.replace(
+      () => (
+        <DialogModel
+          title={`${props.name}: model`}
+          choices={[
+            {
+              title: "Inherit",
+              description: subagent ? "the main agent's model (default)" : "the session's model (default)",
+              onSelect: () => void save("model")(undefined),
+            },
+            ...(subagent
+              ? [{ title: "Small model", description: "small_model", onSelect: () => void save("model")("small") }]
+              : []),
+          ]}
+          current={
+            value && slash > 0 ? { providerID: value.slice(0, slash), modelID: value.slice(slash + 1) } : undefined
+          }
+          onPick={(providerID, modelID) => void save("model")(`${providerID}/${modelID}`)}
+        />
+      ),
+      undefined,
+      navTo("model"),
+    )
   }
 
   async function reset() {
@@ -337,6 +437,8 @@ export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: s
       dialog,
       `Reset ${props.name}`,
       `Remove every override for ${props.name} from ${props.scope} config?`,
+      undefined,
+      navTo("+reset"),
     )
     if (ok !== true) return reopen("+reset")
     await write(`agent.${props.name}`, undefined)
@@ -368,7 +470,15 @@ export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: s
               footer: show("temperature", item.temperature, "model default"),
             },
             { value: "top_p", title: "Top P", footer: show("top_p", item.topP, "model default") },
-            { value: "variant", title: "Variant", footer: show("variant", item.variant, "default") },
+            {
+              value: "variant",
+              title: "Variant",
+              footer:
+                show("variant", item.variant, "default") +
+                (variantWarning(item.variant, variantApplies())
+                  ? ` ⚠ ${variantWarning(item.variant, variantApplies())}`
+                  : ""),
+            },
             { value: "description", title: "Description", footer: set("description") ? "set" : "default" },
             { value: "prompt", title: "Prompt", footer: set("prompt") ? "set" : "default" },
             { value: "permission", title: "Permissions", footer: set("permission") ? "set (config file)" : "default" },
@@ -444,7 +554,7 @@ export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: s
       case "top_p":
         return void number("top_p", "top P", "0 to 1")
       case "variant":
-        return void text("variant", "variant", false)
+        return variant()
       case "description":
         return void text("description", "description", false)
       case "prompt":
@@ -468,7 +578,7 @@ export function DialogAgentDetail(props: { name: string; scope: Scope; focus?: s
       placeholder={describe(agent() ?? ({ name: props.name } as AgentFileEntry)) || AGENTS_HELP}
       skipFilter
       current={props.focus}
-      ref={(list) => props.focus && setTimeout(() => list.moveTo(props.focus!), 0)}
+      ref={(list) => focusWhenLoaded(list, options, props.focus)}
       options={options()}
       footerHints={[{ title: "change", label: "enter" }]}
       onSelect={(option) => select(option.value)}

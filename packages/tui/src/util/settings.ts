@@ -55,6 +55,67 @@ export function cycle(row: SettingRowLike): string | undefined {
   return
 }
 
+/**
+ * XCOD-231: a structured setting gets its own screen when its fields are settings of their own
+ * (`subagent` → `subagent.model`, …). Records with free-form keys (`agent`, `lsp`) have none.
+ */
+export function hasSection(
+  row: Pick<SettingRowLike, "key" | "kind">,
+  rows: ReadonlyArray<Pick<SettingRowLike, "key">>,
+) {
+  return row.kind === "object" && rows.some((item) => item.key.startsWith(`${row.key}.`))
+}
+
+/** Plainer names on the Subagent screen than the generated "Subagent dynamic allow". */
+const SECTION_LABELS: Record<string, string> = {
+  "subagent.background": "Run in background",
+  "subagent.model": "Model",
+  "subagent.variant": "Variant",
+  "subagent.dynamic.enabled": "Let the main agent choose a model per task",
+  "subagent.dynamic.allow": "Allowed models",
+}
+
+/** A field's label on its section's screen, without the section's name in front ("Auto", not "Compaction auto"). */
+export function sectionLabel(
+  row: Pick<SettingRowLike, "key" | "label">,
+  section: Pick<SettingRowLike, "label"> | undefined,
+) {
+  if (SECTION_LABELS[row.key]) return SECTION_LABELS[row.key]
+  const prefix = section ? `${section.label} `.toLowerCase() : ""
+  if (!prefix || !row.label.toLowerCase().startsWith(prefix)) return row.label
+  const rest = row.label.slice(prefix.length)
+  return rest.charAt(0).toUpperCase() + rest.slice(1)
+}
+
+/** An agent's name as config keys take it (XCOD-215). */
+export const AGENT_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+
+export type AgentLike = { name: string; mode: string; hidden?: boolean; disabled?: boolean; description?: string }
+
+/** XCOD-230: the agents `default_agent` can name: mode primary or all, not hidden, not turned off. */
+export function mainAgents<T extends AgentLike>(agents: ReadonlyArray<T>) {
+  return agents.filter((agent) => agent.mode !== "subagent" && !agent.hidden && !agent.disabled)
+}
+
+/** XCOD-230: why the configured `default_agent` can't start a session; undefined when it can. */
+export function defaultAgentWarning(name: unknown, agents: ReadonlyArray<AgentLike> | undefined) {
+  if (typeof name !== "string" || !agents) return
+  const found = agents.find((agent) => agent.name === name)
+  if (!found) return `"${name}" isn't an agent here`
+  if (found.disabled) return `"${name}" is turned off`
+  if (found.mode === "subagent") return `"${name}" is a subagent`
+  if (found.hidden) return `"${name}" is hidden`
+}
+
+/** XCOD-229: a Recommended reason fits the model picker's detail line. */
+export const RECOMMENDED_REASON_MAX = 50
+
+export function recommendedReasonProblem(reason: string) {
+  const length = reason.trim().length
+  if (length > RECOMMENDED_REASON_MAX)
+    return `Keep the reason to ${RECOMMENDED_REASON_MAX} characters (it's ${length}) so it fits under the model`
+}
+
 export function badge(row: Pick<SettingRowLike, "source" | "locked">) {
   return row.locked ? "🔒 managed" : row.source
 }

@@ -20,6 +20,28 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Edit the Recommended models in /settings.** Recommended opens a list of its models with why
+  each is recommended (Lunos's curated list, marked "Lunos default", until you change it). Add a
+  model from the picker with an optional reason, edit or remove one, or reset to Lunos's defaults;
+  the model picker's Recommended filter shows the change at once. The model must be available here,
+  an organisation lock refuses every change, and comments in the file are kept. A model listed
+  without a reason now still counts as recommended (XCOD-229).
+- **Choose the default agent from a list.** In /settings, Default agent lists your main agents with
+  what they do, offers "New agent…" (set one up and make it the default) and "Clear (use Lunos's
+  default)"; the next new session starts with it. A default that names a subagent, hidden or
+  turned-off agent is flagged, and `lunos settings set default_agent <name>` refuses one that isn't
+  a main agent and lists the valid names (XCOD-230).
+- **Pick a subagent's or agent's reasoning variant from a list.** In /settings, Variant shows Inherit
+  and the variants of the model it applies to (the same names as the session's variant switcher),
+  or says the model has none; Clear removes it. A saved variant that model doesn't have is marked
+  "not available for <model>" and requests fall back to the model's default.
+  `lunos settings set subagent.variant <name>` (and `agent.<name>.variant`) refuses an unknown
+  variant and lists the valid ones (XCOD-232).
+- **A Subagent screen in /settings.** Enter on Subagent lists its settings with proper controls:
+  run in background, the model picker (with "Inherit from main agent" and "Small model"), variant,
+  "Let the main agent choose a model per task" and the allowed-models list. Every other setting made
+  of simple fields (Compaction, Sandbox, Memory, Audit, Server…) gets the same screen instead of
+  opening the config file, and a nested field's badge now names the file it comes from (XCOD-231).
 - **Claude Code and Codex in their own session in the TUI.** `/external claude` (or the command
   palette) opens a session labelled "Claude Code" with its session id. You send it prompts and its
   own `/commands`, answer its approvals in Lunos's approval prompt, and see the cost it reports for
@@ -47,6 +69,9 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **/settings keys work the same on every screen.** Esc closes the whole settings window from any
+  depth without saving what you were typing; ← goes back one level to the row you came from (in a
+  text field, from the start of the field). Every screen shows `← back · esc close` (XCOD-233).
 - **Every release has its changelog entry.** A release now stops before anything is built or a
   draft release is created when this file has no section for the version being released, and a
   pull request that changes Lunos's code without a line here gets a warning (label `no-changelog`

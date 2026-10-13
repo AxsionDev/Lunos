@@ -406,16 +406,33 @@ restart note show below the list.
 | Space  | Toggle an on/off setting, or move an option setting to its next value                |
 | Ctrl+S | Switch where changes are saved: your **user** config (default) or this **project**'s |
 | Tab    | Next tab                                                                             |
-| Esc    | Close                                                                                |
+| ←      | Back one level, to the row you came from (in a text field: from the start of it)     |
+| Esc    | Close the whole settings window from any screen in it; what you were typing is lost  |
 
 How Enter changes a setting depends on its type:
 
 - **On/off:** toggles.
 - **A fixed set of values** (`share`, `autoupdate`, `logLevel`…): pick from a list.
 - **Model and theme:** open the usual model and theme pickers; the choice is saved to the config.
+- **Default agent:** pick one of the main agents (shown with what they do), make a new one (it
+  becomes the default once both its name and description are entered), or Clear to use Lunos's
+  default. New sessions start with it. A default that names a subagent, a hidden agent or one that's
+  turned off is marked ⚠.
+- **Recommended:** the models the pickers list under Recommended (ctrl+l), each with why. Unset,
+  it's Lunos's curated list, marked "Lunos default". Add model… opens the model picker and asks for
+  an optional reason (up to 50 characters); Enter on a model edits its reason or removes it; Reset
+  to Lunos defaults removes the key from the scope you're saving to. The first change writes the
+  whole list to that scope. The pickers show the new list at once, without a restart.
+- **Reasoning variant** (`subagent.variant`, an agent's Variant): pick from the variants of the
+  model it applies to (the subagent's or agent's model, or the main model it inherits), or Inherit;
+  Clear removes the key. A saved variant that model doesn't have is marked "not available for
+  <model>", and requests use the model's default effort.
 - **Text, numbers and lists:** an inline prompt. Lists are comma-separated (`eu, us`).
 - **MCP servers and providers:** open the `/mcps` and `/providers` dialogs.
-- **Other structured settings** (`agent`, `permission`, `lsp`…): open the config file in `$EDITOR`,
+- **Structured settings made of simple fields** (`subagent`, `compaction`, `sandbox`, `memory`…):
+  open a screen of their own fields, with the same controls. The Subagent screen has Run in
+  background, Model, Variant, "Let the main agent choose a model per task" and Allowed models.
+- **Other structured settings** (`permission`, `lsp`, `hooks`…): open the config file in `$EDITOR`,
   or show its path when no editor is set.
 
 Every change is checked against the config schema before it's written, and an invalid value is

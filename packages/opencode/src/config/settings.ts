@@ -19,6 +19,8 @@ import { ConfigV2Compat } from "./v2-compat"
 import { MemorySwitch } from "@/memory/switch"
 import { normalizeLoadedConfig } from "./config"
 import fuzzysort from "fuzzysort"
+import { VariantModel } from "@opencode-ai/core/config/variant-model"
+import { ModelCuration } from "@/provider/curation"
 
 // XCOD-128: every configuration option in one place, for the TUI's /settings screen and for
 // `lunos settings list|get|set`. The list is generated from the live schemas (ConfigV1.Info for
@@ -154,6 +156,8 @@ const DEFAULTS: Record<string, unknown> = {
   "tool_output.max_bytes": 51200,
   "tui.theme": "catppuccin",
   "tui.mouse": true,
+  // XCOD-229: the curated list the pickers use while `recommended` isn't set.
+  recommended: ModelCuration.RECOMMENDED,
 }
 
 /** Environment variables that win over whatever the files say. */
@@ -576,6 +580,33 @@ async function rawValue(key: string, entry: Entry, origin: Origin | undefined, c
   return undefined
 }
 
+/**
+ * XCOD-231: where a nested field really comes from. Origins are tracked per top-level key, so with
+ * `subagent.background` in managed config and `subagent.model` in yours, both would read "managed".
+ * When the winning layer's file doesn't hold the field, the files are searched, highest layer first.
+ */
+async function leafOrigin(key: string, ctx: Context): Promise<{ source: Source; file: string } | undefined> {
+  const managed = ConfigManaged.managedConfigLocation().dir
+  const root = projectRoot(ctx)
+  const layers: [Source, string[]][] = [
+    ["managed", ["managed.json", "opencode.json", "opencode.jsonc"].map((f) => path.join(managed, f))],
+    [
+      "project",
+      Flag.OPENCODE_DISABLE_PROJECT_CONFIG
+        ? []
+        : [
+            ...["opencode.jsonc", "opencode.json"].map((f) => path.join(root, ".opencode", f)),
+            ...["opencode.jsonc", "opencode.json"].map((f) => path.join(root, f)),
+          ],
+    ],
+    ["user", ["opencode.jsonc", "opencode.json", "config.json"].map((f) => path.join(Global.Path.config, f))],
+  ]
+  for (const [source, files] of layers)
+    for (const file of files) {
+      if (ConfigPolicy.get(rawDoc(await readText(file)), key) !== undefined) return { source, file }
+    }
+}
+
 function containsReference(value: unknown): boolean {
   if (isReference(value)) return true
   if (Array.isArray(value)) return value.some(containsReference)
@@ -598,9 +629,14 @@ export async function list(input: {
       const raw = await rawValue(item.key, item, origin, input.ctx)
       // tui.json is loaded by the TUI process; here the files are the resolved value.
       const resolved = item.target === "tui" ? raw?.value : ConfigPolicy.get(input.config, item.key)
+      const leaf =
+        item.target === "config" && !item.top && origin && !raw && resolved !== undefined
+          ? await leafOrigin(item.key, input.ctx)
+          : undefined
       let source: Source
       if (item.target === "tui")
         source = raw ? (raw.file.includes(`${path.sep}.opencode${path.sep}`) ? "project" : "user") : "default"
+      else if (leaf) source = leaf.source
       else source = resolved === undefined || (!item.top && !origin) ? "default" : sourceOf(origin)
       if (item.target === "config" && resolved === undefined && origin?.layer !== "managed") source = "default"
       const envName = ENV_OVERRIDES.find((o) => o.key === item.key)?.active(env)
@@ -618,7 +654,7 @@ export async function list(input: {
         value,
         display: display(value, item.kind),
         source,
-        from: locked ? origin?.source : (envName ?? raw?.file ?? origin?.source),
+        from: locked ? origin?.source : (envName ?? raw?.file ?? leaf?.file ?? origin?.source),
         locked,
         override: envName
           ? `${envName} is set, so it wins over the config files until it's removed from the environment`
@@ -746,11 +782,13 @@ function stable(value: unknown): string {
  * the caller knows them. `subagent.model` also takes "inherit" and "small"; `subagent.dynamic.allow`
  * is a list.
  */
-const MODEL_KEYS: Record<string, "one" | "subagent" | "list"> = {
+const MODEL_KEYS: Record<string, "one" | "subagent" | "list" | "record"> = {
   model: "one",
   small_model: "one",
   "subagent.model": "subagent",
   "subagent.dynamic.allow": "list",
+  // XCOD-229: "provider/model" → why; the keys are the models.
+  recommended: "record",
 }
 
 /**
@@ -766,7 +804,14 @@ export function modelProblem(
   // XCOD-215: an agent's model takes the same values as subagent.model (XCOD-82).
   const kind = MODEL_KEYS[key] ?? (/^agent\.[^.]+\.model$/.test(key) ? "subagent" : undefined)
   if (!kind) return
-  const ids = kind === "list" ? (Array.isArray(value) ? value : [value]) : [value]
+  const ids =
+    kind === "record" && value && typeof value === "object" && !Array.isArray(value)
+      ? Object.keys(value)
+      : kind === "list" || kind === "record"
+        ? Array.isArray(value)
+          ? value
+          : [value]
+        : [value]
   for (const id of ids) {
     if (typeof id !== "string") return `${key} takes "provider/model" names`
     if (kind === "subagent" && (id === "inherit" || id === "small")) continue
@@ -784,6 +829,92 @@ export function modelProblem(
           : "")
     )
   }
+}
+
+/** An agent as `default_agent` sees it (XCOD-230): only main agents can start a session. */
+export type AgentChoice = { name: string; mode?: string; hidden?: boolean }
+
+/**
+ * XCOD-230: why `name` can't be `default_agent`, listing the agents that can; undefined when it can.
+ * A main agent is one with mode primary or all that isn't hidden (disabled agents aren't listed).
+ */
+export function defaultAgentProblem(name: string, agents: ReadonlyArray<AgentChoice>) {
+  const main = agents.filter((agent) => agent.mode !== "subagent" && !agent.hidden).map((agent) => agent.name)
+  if (main.includes(name)) return
+  const found = agents.find((agent) => agent.name === name)
+  const why = !found
+    ? "isn't an agent here (or it's turned off)"
+    : found.mode === "subagent"
+      ? "is a subagent, which can't start a session"
+      : "is hidden"
+  return `default_agent: "${name}" ${why}. Valid: ${main.join(", ") || "none"}`
+}
+
+/** XCOD-232: the model a variant key applies to and that model's reasoning variants. */
+export type VariantLookup = (key: string) => { model: string; variants: string[] } | undefined
+
+/**
+ * XCOD-232: builds the lookup from what the server knows: the merged config, the main model when
+ * `model` is unset, each agent's model and mode, and each available model's variant names.
+ */
+export function variantLookup(input: {
+  config: VariantModel.Config & { agent?: Record<string, { model?: string; mode?: string } | undefined> }
+  main?: string
+  agents: ReadonlyArray<{ name: string; modelSpec?: string; mode?: string }>
+  variants: (model: string) => string[] | undefined
+}): VariantLookup {
+  return (key) => {
+    const name = key.startsWith("agent.") ? key.split(".")[1] : undefined
+    const listed = name ? input.agents.find((agent) => agent.name === name) : undefined
+    const configured = name ? input.config.agent?.[name] : undefined
+    const model = VariantModel.applicable({
+      key,
+      config: input.config,
+      main: input.main,
+      agent: name
+        ? {
+            model: listed?.modelSpec ?? configured?.model,
+            subagent: (listed?.mode ?? configured?.mode) === "subagent",
+          }
+        : undefined,
+    })
+    const variants = model ? input.variants(model) : undefined
+    return model && variants ? { model, variants } : undefined
+  }
+}
+
+/**
+ * XCOD-229: the models in a `recommended` value that need checking: the ones not already in this
+ * file and not on Lunos's curated list. Editing a reason or starting from the curated defaults
+ * shouldn't fail because a listed model isn't set up on this machine.
+ */
+function newModels(key: string, value: unknown, before: string | undefined) {
+  if (key !== "recommended" || !value || typeof value !== "object" || Array.isArray(value)) return value
+  const existing = ConfigPolicy.get(rawDoc(before), "recommended")
+  const known = existing && typeof existing === "object" ? Object.keys(existing) : []
+  return Object.fromEntries(
+    Object.entries(value).filter(([id]) => !known.includes(id) && !(id in ModelCuration.RECOMMENDED)),
+  )
+}
+
+/**
+ * Sets `jsonPath` to `value` in the file's text. `perEntry` (XCOD-229, `recommended`) edits only the
+ * entries that changed, so comments next to the other entries stay where they are.
+ */
+function edit(text: string, jsonPath: string[], value: unknown, perEntry: boolean) {
+  const format = { formattingOptions: { insertSpaces: true, tabSize: 2 } }
+  const current = ConfigPolicy.get(rawDoc(text), jsonPath.join("."))
+  const plain = (item: unknown): item is Record<string, unknown> =>
+    !!item && typeof item === "object" && !Array.isArray(item)
+  if (!perEntry || !plain(current) || !plain(value) || Object.keys(value).length === 0)
+    return applyEdits(text, modify(text, jsonPath, value, format))
+  let updated = text
+  for (const key of Object.keys(current))
+    if (!(key in value)) updated = applyEdits(updated, modify(updated, [...jsonPath, key], undefined, format))
+  for (const [key, item] of Object.entries(value))
+    if (stable(current[key]) !== stable(item))
+      updated = applyEdits(updated, modify(updated, [...jsonPath, key], item, format))
+  return updated
 }
 
 export type SetResult = { key: string; value: unknown; file: string; scope: Scope; restart: boolean; changed: boolean }
@@ -855,18 +986,33 @@ export async function set(input: {
   models?: ReadonlySet<string>
   /** Models the residency policy blocks, with the reason (XCOD-212). */
   blocked?: ReadonlyMap<string, string>
+  /** XCOD-232: checks a reasoning variant against the model it applies to. */
+  variants?: VariantLookup
+  /** XCOD-230: the agents here, to check `default_agent` against. */
+  agents?: ReadonlyArray<AgentChoice>
 }): Promise<SetResult> {
   const item = await writable(input)
   const value = coerce(item, input.value)
-  const problem = input.models ? modelProblem(item.key, value, input.models, input.blocked) : undefined
+  const file = targetFile(item.target, input.scope, input.ctx)
+  const before = await readText(file)
+  const problem = input.models
+    ? modelProblem(item.key, newModels(item.key, value, before), input.models, input.blocked)
+    : undefined
   if (problem) throw new SettingError(`${item.key}: ${problem.replace(/\.$/, "")}. Nothing was written.`, "invalid")
+  const found = input.variants && VariantModel.isVariantKey(item.key) ? input.variants(item.key) : undefined
+  const variant =
+    found && typeof value === "string" ? VariantModel.problem(item.key, value, found.model, found.variants) : undefined
+  if (variant) throw new SettingError(`${variant}. Nothing was written.`, "invalid")
+  const agent =
+    item.key === "default_agent" && input.agents && typeof value === "string"
+      ? defaultAgentProblem(value, input.agents)
+      : undefined
+  if (agent) throw new SettingError(`${agent}. Nothing was written.`, "invalid")
   const range = AGENT_RANGES[item.key.split(".")[2] as AgentField]
   if (range && item.key.startsWith("agent.") && typeof value === "number" && (value < range[0] || value > range[1]))
     throw new SettingError(`${item.key} must be between ${range[0]} and ${range[1]}. Nothing was written.`, "invalid")
   const refusal = input.scope === "project" ? projectRefusal(item.key, value) : undefined
   if (refusal) throw new SettingError(refusal, "invalid")
-  const file = targetFile(item.target, input.scope, input.ctx)
-  const before = await readText(file)
   const schema = item.target === "config" ? "https://lunos.tech/config.json" : "https://lunos.tech/tui.json"
   const base = before && before.trim() ? before : `{\n  "$schema": "${schema}"\n}\n`
   const jsonPath = item.key.split(".").slice(item.target === "tui" ? 1 : 0)
@@ -880,10 +1026,7 @@ export async function set(input: {
         "invalid",
       )
   }
-  const updated = applyEdits(
-    base,
-    modify(base, jsonPath, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
-  )
+  const updated = edit(base, jsonPath, value, item.key === "recommended")
   let decoded: unknown
   try {
     decoded = await decode(item.target, updated, file)

@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test"
-import { badge, cycle, editText, filterRows, nextTab, parseSettingsSlash } from "../../src/util/settings"
+import {
+  badge,
+  cycle,
+  defaultAgentWarning,
+  editText,
+  filterRows,
+  hasSection,
+  mainAgents,
+  nextTab,
+  parseSettingsSlash,
+  sectionLabel,
+} from "../../src/util/settings"
 
 const row = (key: string, label: string, description = "", extra: Record<string, unknown> = {}) => ({
   key,
@@ -63,5 +74,53 @@ describe("/settings (XCOD-128)", () => {
     expect(nextTab("status", -1)).toBe("usage")
     expect(editText({ ...row("residency.allow", "Residency allow"), value: ["eu", "us"] })).toBe("eu, us")
     expect(editText({ ...row("x", "X"), value: { a: 1 } })).toBe('{"a":1}')
+  })
+})
+
+describe("section screens (XCOD-231)", () => {
+  const rows = [
+    row("subagent", "Subagent", "", { kind: "object" }),
+    row("subagent.model", "Subagent model"),
+    row("subagent.dynamic.allow", "Subagent dynamic allow", "", { kind: "list" }),
+    row("compaction", "Compaction", "", { kind: "object" }),
+    row("compaction.auto", "Compaction auto", "", { kind: "boolean" }),
+    row("agent", "Agent", "", { kind: "object" }),
+    row("agent_import", "Agent import"),
+  ]
+  test("an object with fields of its own has a screen; a free-form record doesn't", () => {
+    expect(hasSection(rows[0], rows)).toBe(true)
+    expect(hasSection(rows[3], rows)).toBe(true)
+    // `agent_import` starts with "agent" but isn't one of its fields.
+    expect(hasSection(rows[5], rows)).toBe(false)
+    expect(hasSection(rows[1], rows)).toBe(false)
+  })
+  test("fields are named without the section in front, and the Subagent screen's in plain words", () => {
+    expect(sectionLabel(rows[1], rows[0])).toBe("Model")
+    expect(sectionLabel(rows[2], rows[0])).toBe("Allowed models")
+    expect(sectionLabel(rows[4], rows[3])).toBe("Auto")
+    expect(sectionLabel(row("x.y", "Other"), rows[3])).toBe("Other")
+  })
+})
+
+describe("default_agent (XCOD-230)", () => {
+  const agents = [
+    { name: "build", mode: "primary", description: "the default" },
+    { name: "reviewer", mode: "all" },
+    { name: "explore", mode: "subagent" },
+    { name: "title", mode: "primary", hidden: true },
+    { name: "old", mode: "primary", disabled: true },
+  ]
+  test("only main agents that are on and not hidden are offered", () => {
+    expect(mainAgents(agents).map((agent) => agent.name)).toEqual(["build", "reviewer"])
+  })
+  test("a configured default that can't start a session gets a warning", () => {
+    expect(defaultAgentWarning("build", agents)).toBeUndefined()
+    expect(defaultAgentWarning(undefined, agents)).toBeUndefined()
+    expect(defaultAgentWarning("explore", agents)).toBe('"explore" is a subagent')
+    expect(defaultAgentWarning("title", agents)).toBe('"title" is hidden')
+    expect(defaultAgentWarning("old", agents)).toBe('"old" is turned off')
+    expect(defaultAgentWarning("gone", agents)).toBe(`"gone" isn't an agent here`)
+    // Not known until the agents load.
+    expect(defaultAgentWarning("explore", undefined)).toBeUndefined()
   })
 })

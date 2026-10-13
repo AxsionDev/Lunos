@@ -6,6 +6,7 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { markInstanceForDisposal } from "../lifecycle"
 import { ConfigSettings } from "@/config/settings"
+import { settingsChecks } from "@/config/settings-checks"
 import { Agent } from "@/agent/agent"
 import { AgentEditHere } from "@/agent/edit-here"
 import fs from "node:fs/promises"
@@ -80,9 +81,9 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
       payload: Schema.Schema.Type<typeof ConfigSettings.SetInput>
     }) {
       const instance = yield* InstanceState.context
-      // XCOD-214: model-valued settings are checked against the models available here.
-      const providers = yield* providerSvc.list()
-      const models = Provider.modelIDs(providers)
+      // XCOD-214: model-valued settings are checked against the models available here (and, XCOD-232,
+      // a reasoning variant against the model it applies to).
+      const checks = yield* settingsChecks()
       const where = { directory: instance.directory, worktree: instance.worktree }
       const result = yield* Effect.promise(() =>
         (ctx.payload.unset
@@ -93,8 +94,7 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
               scope: ctx.payload.scope,
               ctx: where,
               via: "settings screen",
-              models,
-              blocked: Provider.blockedModels(providers),
+              ...checks,
             })
         ).then(
           (ok) => ({ ok: true as const, ...ok, value: ok.value as Schema.Json }),

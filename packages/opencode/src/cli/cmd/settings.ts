@@ -82,9 +82,8 @@ export const SettingsSetCommand = effectCmd({
       }),
   handler: Effect.fn("Cli.settings.set")(function* (args) {
     const ctx = yield* InstanceRef
-    const { Provider } = yield* Effect.promise(() => import("@/provider/provider"))
-    const providers = yield* Provider.Service.use((svc) => svc.list())
-    const models = Provider.modelIDs(providers)
+    const { settingsChecks } = yield* Effect.promise(() => import("@/config/settings-checks"))
+    const checks = yield* settingsChecks()
     const result = yield* Effect.tryPromise({
       try: () =>
         ConfigSettings.set({
@@ -93,8 +92,7 @@ export const SettingsSetCommand = effectCmd({
           scope: args.project ? "project" : "user",
           ctx: { directory: ctx?.directory ?? process.cwd(), worktree: ctx?.worktree },
           via: "lunos settings set",
-          models,
-          blocked: Provider.blockedModels(providers),
+          ...checks,
         }),
       catch: (error) => error,
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))

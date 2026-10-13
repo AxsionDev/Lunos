@@ -9,6 +9,7 @@ import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { Global } from "@opencode-ai/core/global"
 import { ConfigSettings } from "@/config/settings"
 import { ConfigPolicy } from "@/config/policy"
+import { ModelCuration } from "@/provider/curation"
 
 let root: string
 let previous: string
@@ -233,6 +234,31 @@ describe("settings list", () => {
     expect(row("snapshot")).toMatchObject({ source: "default", value: true })
   })
 
+  test("a nested field's badge is the file that holds it, not its parent's winning layer (XCOD-231)", async () => {
+    const managed = path.join(root, "managed")
+    await fs.mkdir(managed, { recursive: true })
+    await fs.writeFile(path.join(managed, "managed.json"), JSON.stringify({ subagent: { background: true } }))
+    await fs.writeFile(userFile(), JSON.stringify({ subagent: { model: "stub/stub-b" } }))
+    const before = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+    process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = managed
+    try {
+      const rows = await ConfigSettings.list({
+        config: { subagent: { background: true, model: "stub/stub-b" } },
+        origins: { subagent: { layer: "managed", source: path.join(managed, "managed.json") } },
+        locked: [],
+        ctx: ctx(),
+        env: {},
+      })
+      const row = (key: string) => rows.find((item) => item.key === key)!
+      expect(row("subagent.background")).toMatchObject({ source: "managed", value: true })
+      expect(row("subagent.model")).toMatchObject({ source: "user", value: "stub/stub-b", from: userFile() })
+      expect(row("subagent.variant")).toMatchObject({ source: "default" })
+    } finally {
+      if (before === undefined) delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+      else process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = before
+    }
+  })
+
   test("an environment override is shown and explained", async () => {
     const rows = await ConfigSettings.list({
       config: { memory: { enabled: true } },
@@ -439,5 +465,159 @@ describe("agent settings (XCOD-215)", () => {
       review: { description: "Reviews" },
     })
     expect((await ConfigSettings.migrateAgents({ scope: "user", ctx: ctx(), locked: [] })).migrated).toEqual([])
+  })
+})
+
+describe("reasoning variants (XCOD-232)", () => {
+  const variants = (model: string) =>
+    ({ "stub/a": ["low", "high"], "stub/b": [] as string[], "stub/small": ["minimal"] })[model]
+  const lookup = (
+    config: Record<string, unknown>,
+    agents: { name: string; modelSpec?: string; mode?: string }[] = [],
+  ) => ConfigSettings.variantLookup({ config, main: "stub/a", agents, variants })
+
+  test("the model a variant applies to follows the run's rule", () => {
+    expect(lookup({})("subagent.variant")).toEqual({ model: "stub/a", variants: ["low", "high"] })
+    expect(lookup({ subagent: { model: "small" }, small_model: "stub/small" })("subagent.variant")?.model).toBe(
+      "stub/small",
+    )
+    expect(lookup({ subagent: { model: "stub/b" } })("subagent.variant")).toEqual({ model: "stub/b", variants: [] })
+    // `model` wins over the server's default.
+    expect(lookup({ model: "stub/b" })("subagent.variant")?.model).toBe("stub/b")
+    // An agent: its own model; a subagent without one: subagent.model; a primary agent: the main model.
+    expect(lookup({}, [{ name: "plan", modelSpec: "stub/b", mode: "primary" }])("agent.plan.variant")?.model).toBe(
+      "stub/b",
+    )
+    expect(
+      lookup({ subagent: { model: "stub/small" } }, [{ name: "explore", mode: "subagent" }])("agent.explore.variant")
+        ?.model,
+    ).toBe("stub/small")
+    expect(
+      lookup({ subagent: { model: "stub/b" } }, [{ name: "build", mode: "primary" }])("agent.build.variant")?.model,
+    ).toBe("stub/a")
+    // A model that isn't available here: nothing to check against.
+    expect(lookup({ subagent: { model: "gone/x" } })("subagent.variant")).toBeUndefined()
+  })
+
+  test("set rejects an unknown variant, listing the valid ones; inherit and a known one are saved", async () => {
+    const variantsFor = lookup({})
+    await expect(
+      ConfigSettings.set({
+        key: "subagent.variant",
+        value: "max",
+        scope: "user",
+        ctx: ctx(),
+        locked: [],
+        variants: variantsFor,
+      }),
+    ).rejects.toThrow('subagent.variant: "max" isn\'t a reasoning variant of stub/a. Valid: low, high, or "inherit"')
+    expect(existsSync(userFile())).toBe(false)
+    await ConfigSettings.set({
+      key: "subagent.variant",
+      value: "high",
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+      variants: variantsFor,
+    })
+    await ConfigSettings.set({
+      key: "agent.build.variant",
+      value: "inherit",
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+      variants: variantsFor,
+    })
+    const doc = JSON.parse(await read(userFile()))
+    expect(doc.subagent.variant).toBe("high")
+    expect(doc.agent.build.variant).toBe("inherit")
+    await expect(
+      ConfigSettings.set({
+        key: "agent.build.variant",
+        value: "low",
+        scope: "user",
+        ctx: ctx(),
+        locked: [],
+        variants: lookup({ model: "stub/b" }),
+      }),
+    ).rejects.toThrow('stub/b has no reasoning variants, so "low" can\'t be used')
+  })
+})
+
+describe("default_agent (XCOD-230)", () => {
+  const agents = [
+    { name: "build", mode: "primary" },
+    { name: "plan", mode: "primary" },
+    { name: "reviewer", mode: "all" },
+    { name: "explore", mode: "subagent" },
+    { name: "title", mode: "primary", hidden: true },
+  ]
+  test("only a main agent is accepted; the others are refused with the valid names", async () => {
+    expect(ConfigSettings.defaultAgentProblem("reviewer", agents)).toBeUndefined()
+    expect(ConfigSettings.defaultAgentProblem("explore", agents)).toBe(
+      'default_agent: "explore" is a subagent, which can\'t start a session. Valid: build, plan, reviewer',
+    )
+    expect(ConfigSettings.defaultAgentProblem("title", agents)).toContain('"title" is hidden')
+    expect(ConfigSettings.defaultAgentProblem("nope", agents)).toContain("isn't an agent here")
+    await expect(
+      ConfigSettings.set({ key: "default_agent", value: "explore", scope: "user", ctx: ctx(), locked: [], agents }),
+    ).rejects.toThrow("Nothing was written")
+    expect(existsSync(userFile())).toBe(false)
+    await ConfigSettings.set({ key: "default_agent", value: "plan", scope: "user", ctx: ctx(), locked: [], agents })
+    expect(JSON.parse(await read(userFile())).default_agent).toBe("plan")
+  })
+})
+
+describe("recommended (XCOD-229)", () => {
+  const models = new Set(["stub/a", "stub/b"])
+  const set = (value: unknown) =>
+    ConfigSettings.set({
+      key: "recommended",
+      value: JSON.stringify(value),
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+      models,
+    })
+
+  test("unset, the row shows Lunos's curated list as the default", async () => {
+    const rows = await ConfigSettings.list({ config: {}, origins: {}, locked: [], ctx: ctx(), env: {} })
+    const row = rows.find((item) => item.key === "recommended")!
+    expect(row.source).toBe("default")
+    expect(row.value).toEqual(ModelCuration.RECOMMENDED)
+  })
+
+  test("a model new to the list must be available here; curated and already-listed ones needn't be", async () => {
+    await expect(set({ "nope/x": "why" })).rejects.toThrow(`"nope/x" isn't a model available here`)
+    expect(existsSync(userFile())).toBe(false)
+    // Starting from the curated defaults (not set up here) plus a model that is.
+    await set({ ...ModelCuration.RECOMMENDED, "stub/a": "fast" })
+    // gone/x got into the file some other way; editing another entry doesn't trip over it.
+    const text = (await read(userFile())).replace('"stub/a": "fast"', '"stub/a": "fast",\n    "gone/x": "old"')
+    await fs.writeFile(userFile(), text)
+    await set({ "stub/a": "faster", "gone/x": "old" })
+    expect(JSON.parse(await read(userFile())).recommended).toEqual({ "stub/a": "faster", "gone/x": "old" })
+  })
+
+  test("only the entries that change are edited, so comments in the list are kept", async () => {
+    await fs.writeFile(
+      userFile(),
+      `{
+  "recommended": {
+    // our pick for coding
+    "stub/a": "fast",
+    "stub/b": "cheap" // keep this note
+  }
+}
+`,
+    )
+    await set({ "stub/a": "faster", "stub/b": "cheap" })
+    const text = await read(userFile())
+    expect(text).toContain("// our pick for coding")
+    expect(text).toContain("// keep this note")
+    expect(text).toContain('"stub/a": "faster"')
+    await set({ "stub/b": "cheap" })
+    expect(await read(userFile())).toContain("// keep this note")
+    expect(await read(userFile())).not.toContain("stub/a")
   })
 })
