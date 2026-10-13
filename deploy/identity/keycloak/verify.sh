@@ -11,7 +11,7 @@ echo "$DISCOVERY" | grep -q '"issuer":"'"$ISSUER"'"' || fail "issuer in discover
 echo "$DISCOVERY" | grep -q '"device_authorization_endpoint"' || fail "no device authorization endpoint"
 echo "$DISCOVERY" | grep -q '"revocation_endpoint"' || fail "no revocation endpoint"
 echo "$DISCOVERY" | grep -q '"code_challenge_methods_supported":\[[^]]*"S256"' || fail "no PKCE S256"
-echo "ok   discovery: issuer, device and revocation endpoints"
+echo "ok   discovery: issuer, device and revocation endpoints, PKCE S256"
 
 DEVICE=$(curl -fsS -X POST "$ISSUER/protocol/openid-connect/auth/device" \
   -d client_id=lunos-cli -d "scope=openid profile email offline_access") || fail "lunos-cli can't start a device sign-in"
