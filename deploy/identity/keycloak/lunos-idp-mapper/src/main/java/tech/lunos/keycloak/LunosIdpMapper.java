@@ -1,6 +1,7 @@
-// XCOD-185: puts lunos_idp in Lunos's tokens (ID, access, userinfo). Keycloak records the brokered
-// identity provider of a sign-in as the user-session note "identity_provider"; the note lives with
-// the session, so a refreshed token carries the value of the original sign-in, as the contract asks.
+// XCOD-185: puts lunos_idp in Lunos's tokens (ID, access, userinfo). It names the identity provider of
+// the user session's latest authentication, which LunosIdpEventListener records as a user-session note;
+// the note lives with the session, so a refreshed token, or a cookie sign-in to another client, carries
+// the value of that authentication, as the contract asks.
 package tech.lunos.keycloak;
 
 import java.util.ArrayList;
@@ -24,9 +25,6 @@ public class LunosIdpMapper extends AbstractOIDCProtocolMapper
         TokenIntrospectionTokenMapper {
 
   public static final String PROVIDER_ID = "lunos-idp-mapper";
-  /** Keycloak's user-session note for the brokered identity provider (Details.IDENTITY_PROVIDER). */
-  static final String NOTE = "identity_provider";
-
   private static final List<ProviderConfigProperty> CONFIG = new ArrayList<>();
 
   static {
@@ -64,7 +62,7 @@ public class LunosIdpMapper extends AbstractOIDCProtocolMapper
       KeycloakSession keycloakSession, ClientSessionContext clientSessionCtx) {
     // Recomputed from the provider's current config on every issuance and refresh, so an admin changing
     // lunosIdp or deleting the provider changes the value, falling back safely to the alias.
-    String alias = userSession.getNote(NOTE);
+    String alias = userSession.getNote(LunosIdpEventListener.NOTE);
     String configured = null;
     if (alias != null && !alias.isEmpty()) {
       IdentityProviderModel idp = keycloakSession.identityProviders().getByAlias(alias);

@@ -2,6 +2,7 @@
 package tech.lunos.keycloak;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +31,24 @@ class LunosIdpTest {
         "org:acme:entra\n", "lunos", "google", "org:acme:" + "x".repeat(64), " org:acme:entra"}) {
       assertEquals("acme-entra", LunosIdp.resolve("acme-entra", bad), bad);
     }
+  }
+
+  @Test
+  void aCookieSignInKeepsTheSessionsProvider() {
+    assertEquals("acme-entra", LunosIdp.aliasAfterLogin(true, null, "acme-entra"));
+    assertNull(LunosIdp.aliasAfterLogin(true, null, null));
+  }
+
+  @Test
+  void aPasswordSignInClearsTheSessionsProvider() {
+    assertNull(LunosIdp.aliasAfterLogin(false, null, "acme-entra"));
+    assertNull(LunosIdp.aliasAfterLogin(false, "", "acme-entra"));
+  }
+
+  @Test
+  void aBrokeredSignInRecordsItsProvider() {
+    assertEquals("acme-entra", LunosIdp.aliasAfterLogin(false, "acme-entra", null));
+    assertEquals("acme-entra", LunosIdp.aliasAfterLogin(false, "acme-entra", "github"));
   }
 
   @Test

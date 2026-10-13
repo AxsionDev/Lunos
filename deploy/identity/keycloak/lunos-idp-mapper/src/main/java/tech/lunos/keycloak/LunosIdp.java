@@ -28,4 +28,21 @@ public final class LunosIdp {
     if (configured != null && ORG.matcher(configured).matches()) return configured;
     return alias.replace(':', '-');
   }
+
+  /**
+   * The identity provider alias a user session's tokens should name after a sign-in to it. Keycloak's
+   * own "identity_provider" note survives a later password re-authentication into the same session,
+   * so the claim follows the latest authentication instead: a cookie (SSO) sign-in to another client
+   * authenticates nothing and keeps the value; any other sign-in replaces it.
+   *
+   * @param sso the sign-in was by the session cookie alone
+   * @param brokeredAlias the identity provider this sign-in went through, or null/empty for the realm's
+   *     own credentials
+   * @param current the alias recorded for the session so far, or null
+   * @return the alias to record, or null for the realm's own credentials
+   */
+  public static String aliasAfterLogin(boolean sso, String brokeredAlias, String current) {
+    if (sso) return current;
+    return brokeredAlias == null || brokeredAlias.isEmpty() ? null : brokeredAlias;
+  }
 }

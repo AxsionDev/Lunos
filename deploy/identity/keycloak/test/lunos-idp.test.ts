@@ -21,6 +21,7 @@ import {
 setDefaultTimeout(30_000)
 
 const R = "/Lunos"
+const SECOND_CLIENT = "lunos-test-2"
 const PAT = { email: "pat@lunos.test", password: "pat-pass" }
 const UPSTREAM = { uma: ["uma", "uma-pass"], vic: ["vic", "vic-pass"], bea: ["bea", "bea-pass"] } as const
 
@@ -37,12 +38,20 @@ async function clientByClientId(kc: Kc, clientId: string) {
 
 describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   let kc: Kc
-  // Test 3's brokered sign-in: its browser and tokens, reused by the refresh, userinfo and re-authentication tests.
+  // Test 3's brokered sign-in: its browser and tokens, reused by the refresh, userinfo, SSO and re-authentication tests.
   let acmeJar: CookieJar
   let acme: Tokens
+  // The tokens after re-authenticating with a password (A) and through the organisation's provider (C).
+  let afterPassword: Tokens
+  let afterBroker: Tokens
 
-  async function brokered(alias: string, [username, password]: readonly [string, string], jar?: CookieJar) {
-    const { code, verifier, jar: used } = await browserLogin(kc, { username, password, idpHint: alias, jar })
+  async function brokered(
+    alias: string,
+    [username, password]: readonly [string, string],
+    jar?: CookieJar,
+    extra?: Record<string, string>,
+  ) {
+    const { code, verifier, jar: used } = await browserLogin(kc, { username, password, idpHint: alias, jar, extra })
     return { tokens: await exchange(kc, TEST_CLIENT, code, verifier), jar: used }
   }
 
@@ -57,17 +66,20 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
       const cli = await clientByClientId(kc, "lunos-cli")
       const scopes = (kind: string): Promise<string[]> =>
         kc.admin("GET", `${R}/clients/${cli.id}/${kind}`).then((list: { name: string }[]) => list.map((s) => s.name))
-      await kc.admin("POST", `${R}/clients`, {
-        clientId: TEST_CLIENT,
-        enabled: true,
-        publicClient: true,
-        standardFlowEnabled: true,
-        directAccessGrantsEnabled: true,
-        redirectUris: [TEST_REDIRECT],
-        attributes: { "pkce.code.challenge.method": "S256" },
-        defaultClientScopes: await scopes("default-client-scopes"),
-        optionalClientScopes: await scopes("optional-client-scopes"),
-      })
+      // A second client stands in for "the console after signing in to the app": cookie SSO between clients.
+      for (const clientId of [TEST_CLIENT, SECOND_CLIENT]) {
+        await kc.admin("POST", `${R}/clients`, {
+          clientId,
+          enabled: true,
+          publicClient: true,
+          standardFlowEnabled: true,
+          directAccessGrantsEnabled: clientId === TEST_CLIENT,
+          redirectUris: [TEST_REDIRECT],
+          attributes: { "pkce.code.challenge.method": "S256" },
+          defaultClientScopes: await scopes("default-client-scopes"),
+          optionalClientScopes: await scopes("optional-client-scopes"),
+        })
+      }
 
       await kc.admin("POST", `${R}/users`, {
         username: PAT.email,
@@ -163,6 +175,20 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     expect((await res.json()).lunos_idp).toBe("org:acme:entra")
   })
 
+  test("a cookie sign-in to another client keeps the brokered value", async () => {
+    // Signing in to the console after the app must not lose the org value, or enforce-SSO would lock the user out.
+    const { code, verifier, posted } = await browserLogin(kc, {
+      username: "unused",
+      password: "unused",
+      jar: acmeJar,
+      clientId: SECOND_CLIENT,
+    })
+    expect(posted).toEqual([])
+    const tokens = await exchange(kc, SECOND_CLIENT, code, verifier)
+    expect(claims(tokens.id_token).sid).toBe(claims(acme.id_token).sid)
+    expect(idp(tokens)).toEqual({ id: "org:acme:entra", access: "org:acme:entra" })
+  })
+
   test("re-authentication with a password in the same browser session", async () => {
     // uma, first signed in through acme-entra, now signs in with a Lunos password in the same browser.
     const [uma] = await kc.admin("GET", `${R}/users?email=${encodeURIComponent("uma@acme.test")}&exact=true`)
@@ -183,6 +209,29 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
       `lunos_idp ${JSON.stringify(idp(tokens))}; forms posted: ${JSON.stringify(posted)}`,
     )
     expect(idp(tokens)).toEqual({ id: "lunos", access: "lunos" })
+    afterPassword = tokens
+  })
+
+  test("refresh after a password re-authentication keeps lunos", async () => {
+    const tokens = await refresh(kc, TEST_CLIENT, afterPassword.refresh_token)
+    expect(idp(tokens)).toEqual({ id: "lunos", access: "lunos" })
+  })
+
+  test("re-authentication through the organisation's provider is its lunosIdp", async () => {
+    // uma (whose Lunos password the previous tests set) signs in with it in a new browser, then
+    // re-authenticates through acme-entra in the same browser.
+    const first = await browserLogin(kc, { username: "uma@acme.test", password: "uma-local" })
+    const password = await exchange(kc, TEST_CLIENT, first.code, first.verifier)
+    expect(idp(password)).toEqual({ id: "lunos", access: "lunos" })
+    const { tokens } = await brokered("acme-entra", UPSTREAM.uma, first.jar, { prompt: "login" })
+    console.log(`broker re-authentication: sid before ${claims(password.id_token).sid}, after ${claims(tokens.id_token).sid}`)
+    expect(idp(tokens)).toEqual({ id: "org:acme:entra", access: "org:acme:entra" })
+    afterBroker = tokens
+  })
+
+  test("refresh after re-authentication through the provider keeps it", async () => {
+    const tokens = await refresh(kc, TEST_CLIENT, afterBroker.refresh_token)
+    expect(idp(tokens)).toEqual({ id: "org:acme:entra", access: "org:acme:entra" })
   })
 
   test("the realm's clients are as specified", async () => {
