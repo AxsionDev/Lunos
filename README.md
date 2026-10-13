@@ -54,8 +54,8 @@ Decision records for the work so far live in [`.claude/docs/`](.claude/docs/) â€
 upstream sync policy, the CI workflow triage, and the product name freeze.
 
 [![Behind upstream opencode](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAxsionDev%2FLunos%2Fbadges%2Fupstream-lag.json)](https://github.com/AxsionDev/Lunos/actions/workflows/upstream-sync.yml)
-How far Lunos is behind upstream opencode: the age of the oldest upstream commit not yet merged,
-measured daily. Upstream changes arrive as a weekly merge PR; the target is no more than 14 days.
+How far Lunos is behind upstream opencode's newest v1 release: the age of the oldest commit in that
+release not yet merged, measured daily. Upstream changes arrive as a weekly merge PR; the target is no more than 14 days.
 
 <!-- XCOD-23: a feature-parity table was dropped from scope by the product owner (2026-09-18).
      The ticket sourced it from product-vision-roadmap.md, which is confirmed lost â€” no written

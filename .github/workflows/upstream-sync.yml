@@ -1,7 +1,13 @@
 name: upstream-sync
 
-# XCOD-118: merge anomalyco/opencode `dev` into Lunos as a reviewed PR every week (XCOD-16:
-# merge, never rebase), and measure how far behind upstream Lunos is.
+# XCOD-118: merge upstream opencode into Lunos as a reviewed PR every week (XCOD-16: merge, never
+# rebase), and measure how far behind upstream Lunos is.
+#
+# What "upstream" means: the newest anomalyco/opencode v1 release tag (vX.Y.Z with X = 1; no v2.x,
+# no pre-releases), not upstream `dev`. Upstream promoted v2 to `dev` on 2026-10-11 (5caf1f9f6f);
+# merging that is a v2 migration, evaluated in a separate spike, while upstream keeps releasing v1
+# from its own line. Tags are fetched into refs/upstream-tags/*, never refs/tags/*: Lunos's own
+# release tags are v1.x as well, and the two must not mix.
 #
 # - measure: daily and after every merge to dev. Publishes the lag to the workflow summary and to
 #   `upstream-lag.json` on the `badges` branch, which the README badge reads.
@@ -24,8 +30,8 @@ on:
         description: Lunos branch to merge upstream into (use a scratch branch to test conflicts)
         default: dev
       upstream_ref:
-        description: anomalyco/opencode branch to merge
-        default: dev
+        description: "anomalyco/opencode release tag to merge (e.g. v1.19.0), or latest-v1-tag for the newest v1 release"
+        default: latest-v1-tag
 
 permissions:
   contents: read
@@ -56,8 +62,10 @@ jobs:
         id: lag
         run: |
           git remote add upstream "$UPSTREAM_URL"
-          git fetch --no-tags --quiet upstream dev
-          bun script/upstream-sync.ts measure --base origin/dev --upstream upstream/dev > "$RUNNER_TEMP/lag.json"
+          tag=$(bun script/upstream-sync.ts latest-tag)
+          git fetch --no-tags --quiet upstream "+refs/tags/$tag:refs/upstream-tags/$tag"
+          bun script/upstream-sync.ts measure --base origin/dev --upstream "refs/upstream-tags/$tag" > "$RUNNER_TEMP/lag.json"
+          echo "Measured against upstream release tag \`$tag\`." >> "$GITHUB_STEP_SUMMARY"
           echo "### Lunos is $(jq -r .text "$RUNNER_TEMP/lag.json")" >> "$GITHUB_STEP_SUMMARY"
           echo "Oldest upstream commit not in dev: \`$(jq -r '.oldest // "none"' "$RUNNER_TEMP/lag.json")\`" >> "$GITHUB_STEP_SUMMARY"
 
@@ -86,7 +94,7 @@ jobs:
       cancel-in-progress: false
     env:
       BASE: ${{ inputs.base || 'dev' }}
-      UPSTREAM_REF: ${{ inputs.upstream_ref || 'dev' }}
+      UPSTREAM_REF: ${{ inputs.upstream_ref || 'latest-v1-tag' }}
       GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
     steps:
       - name: Check token
@@ -112,14 +120,34 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream "$UPSTREAM_URL"
-          git fetch --no-tags --quiet upstream "$UPSTREAM_REF"
+          tag="$UPSTREAM_REF"
+          if [ "$tag" = "latest-v1-tag" ]; then tag=$(bun script/upstream-sync.ts latest-tag); fi
+          if ! [[ "$tag" =~ ^v1\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::upstream_ref must be a v1 release tag like v1.19.0 (got '$tag'). Upstream dev is v2; see the header."
+            exit 1
+          fi
+          ref="refs/upstream-tags/$tag"
+          git fetch --no-tags --quiet upstream "+refs/tags/$tag:$ref"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-          branch="upstream-sync/$(date -u +%F)"
+          # Already merged: nothing to do.
+          if git merge-base --is-ancestor "$ref^{commit}" "origin/$BASE"; then
+            echo "Upstream $tag is already merged into $BASE." >> "$GITHUB_STEP_SUMMARY"
+            echo "behind=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # One branch per tag. If it exists, its PR is still open (or was closed unmerged): don't
+          # open a second one every week.
+          branch="upstream-sync/$tag"
           if [ "$BASE" != "dev" ]; then branch="$branch-$BASE"; fi
-          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then branch="$branch-${{ github.run_number }}"; fi
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            echo "Branch \`$branch\` already exists; review its PR (or delete the branch to re-run)." >> "$GITHUB_STEP_SUMMARY"
+            echo "behind=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
 
-          bun script/upstream-sync.ts merge --base "origin/$BASE" --upstream "upstream/$UPSTREAM_REF" \
+          bun script/upstream-sync.ts merge --base "origin/$BASE" --upstream "$ref" --name "$tag" \
             --branch "$branch" --out "$RUNNER_TEMP/sync"
           echo "status=$(jq -r .status "$RUNNER_TEMP/sync/result.json")" >> "$GITHUB_OUTPUT"
           echo "behind=$(jq -r .before.commits "$RUNNER_TEMP/sync/result.json")" >> "$GITHUB_OUTPUT"
@@ -129,9 +157,10 @@ jobs:
         env:
           BRANCH: ${{ steps.merge.outputs.branch }}
           STATUS: ${{ steps.merge.outputs.status }}
+          TAG: ${{ steps.merge.outputs.tag }}
         run: |
           git push --quiet origin "HEAD:refs/heads/$BRANCH"
-          title="Upstream sync: anomalyco/opencode $UPSTREAM_REF into $BASE ($(date -u +%F))"
+          title="Upstream sync: anomalyco/opencode $TAG into $BASE"
           if [ "$STATUS" = "conflict" ]; then
             url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" --head "$BRANCH" --draft \
               --label upstream-conflict --title "$title (conflicts)" --body-file "$RUNNER_TEMP/sync/body.md")
