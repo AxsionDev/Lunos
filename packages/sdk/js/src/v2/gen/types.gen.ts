@@ -1739,6 +1739,7 @@ export type CloudConfig = {
   client_id?: string
   endpoint?: string
   policy?: string
+  client_start?: boolean
 }
 
 export type SubagentConfig = {

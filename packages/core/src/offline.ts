@@ -160,12 +160,21 @@ export const CALLS: Call[] = [
     offline: "yours",
   },
   {
-    // XCOD-238: on even offline, or LUNOS_OFFLINE would be a way to skip the organisation's policy.
+    // XCOD-238. XCOD-241: off offline; the last fetched copy applies (it doesn't lift the policy).
     id: "org-policy",
     what: "Organisation policy from your Lunos console",
     hosts: "`cloud.policy` in managed config, and the `cloud.issuer` you signed in to (token refresh)",
-    when: "startup, only if managed config sets `cloud.policy` and you're signed in (`lunos login`)",
-    offline: "yours",
+    when: "startup, only if managed config sets `cloud.policy` and you're signed in (`lunos login`). Offline, the last fetched copy applies",
+    offline: "blocked",
+  },
+  {
+    // XCOD-241: version, OS, architecture, surface, a random install id and the policy digest.
+    id: "client-start",
+    what: "`client.start` to your Lunos console: version, OS, architecture, surface, install id, policy digest",
+    hosts: "the console in `cloud.policy` (`/v1/orgs/<org>/clients/start`)",
+    when: "startup, right after the console answered the policy fetch",
+    offline: "blocked",
+    alsoOffBy: '`"cloud": { "client_start": false }` in user config, unless your organisation locks it',
   },
   {
     // XCOD-191: the console managed config names; on even offline, like org-policy.

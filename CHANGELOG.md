@@ -20,6 +20,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **See on your Lunos console which Lunos versions run where, and which policy they enforce.** Each
+  start bound to your organisation's console tells it the version, OS, architecture, surface, a
+  random install id and the policy digest, nothing else; developers can turn it off with
+  `"cloud": { "client_start": false }` unless the organisation locks it. When the console can't be
+  reached, the TUI and `lunos run` now say which copy of the policy applies and when it was
+  fetched, and `LUNOS_OFFLINE=1` uses the last fetched policy without contacting the console
+  (XCOD-241).
+
 - **Update machines without internet access from a mirror you control.** `lunos update` already
   reads the npm registry from your npm configuration, so a private registry (Nexus, Artifactory,
   Verdaccio) is all it needs; for archive and offline-bundle installs,

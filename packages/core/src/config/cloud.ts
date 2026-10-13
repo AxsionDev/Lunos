@@ -26,5 +26,11 @@ export const Info = Schema.Struct({
     description:
       "Your organisation's policy on its Lunos console, fetched at start while you're signed in (lunos login), e.g. https://console.example.eu/v1/orgs/acme/policy. Only read from managed config",
   }),
+  // XCOD-241: read from managed and global (user) config, not a project's. An organisation keeps it
+  // on with `"$locked": ["cloud.client_start"]` (or a lock on all of `cloud`).
+  client_start: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      "Tell your organisation's Lunos console (cloud.policy) when Lunos starts: version, OS, architecture, surface, a random install id and the policy in effect (default true). Read from managed and user config only; your organisation can lock it on",
+  }),
 }).annotate({ identifier: "CloudConfig" })
 export type Info = Schema.Schema.Type<typeof Info>

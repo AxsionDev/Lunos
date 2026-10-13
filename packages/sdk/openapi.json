@@ -22551,6 +22551,9 @@
           },
           "policy": {
             "type": "string"
+          },
+          "client_start": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

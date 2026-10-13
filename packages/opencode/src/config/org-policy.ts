@@ -6,6 +6,7 @@ import fs from "fs/promises"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { Offline } from "@opencode-ai/core/offline"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { AuditLog } from "@/audit/log"
 import { CloudAuth } from "@/cloud/auth"
@@ -25,6 +26,9 @@ import { ConfigV2Compat } from "./v2-compat"
 // - Only a 200 whose policy hashes to the SHA-256 the console sent, and that this version's schema
 //   accepts, replaces the cache. Anything else (offline, signed out, 401, 404, 5xx, a timeout)
 //   keeps using the last cached copy, so signing out or blocking the console doesn't drop it.
+// - XCOD-241: with LUNOS_OFFLINE nothing is fetched (no token refresh either): the cached copy
+//   applies. Whenever the console's copy isn't confirmed at start, `notice()` says which copy
+//   applies and when it was fetched (a TUI toast, a `lunos run` stderr line).
 // - The cache sits under the user's data directory, so the user can edit it. A cached copy whose
 //   policy doesn't hash to its recorded SHA-256 is ignored, and the conditional request carries the
 //   cached SHA-256: an edited copy never matches the console's, so while the console is reachable
@@ -139,6 +143,8 @@ export type Fetch =
   | "failed"
   | "unreachable"
   | "invalid"
+  /** XCOD-241: LUNOS_OFFLINE is set; nothing was fetched. */
+  | "offline"
 
 export type Result = {
   url?: string
@@ -150,6 +156,8 @@ export type Result = {
   layer?: Doc
   sha256?: string
   version?: number
+  /** When the copy in use was fetched (ISO 8601). */
+  fetchedAt?: string
 }
 
 function fromCache(url: string, cache: Cache | undefined, onDisk: readonly unknown[], fetch: Fetch): Result {
@@ -162,11 +170,12 @@ function fromCache(url: string, cache: Cache | undefined, onDisk: readonly unkno
     layer: subtract(cache.policy, onDisk),
     sha256: cache.sha256,
     version: cache.version,
+    fetchedAt: cache.fetchedAt,
   }
 }
 
 /** The session's access token, refreshed (with discovery) only when it is about to expire. */
-async function accessToken() {
+export async function accessToken() {
   const stored = await CloudStore.load()
   if (!stored) return
   const expires = stored.tokens.expires_at
@@ -238,6 +247,7 @@ export async function fetchPolicy(url: string, onDisk: readonly unknown[], opts:
     layer: subtract(policy, onDisk),
     sha256: next.sha256,
     version: next.version,
+    fetchedAt: next.fetchedAt,
   }
 }
 
@@ -250,31 +260,115 @@ export function resolveSync(onDisk: readonly unknown[]): Result {
 
 let current: Promise<Result> | undefined
 let announce = true
+let started: { result: Result; fields: ReturnType<typeof startFields> } | undefined
 
 /** `lunos audit` reads, verifies and exports the trail; it doesn't add its own start to it. */
 export function quietStart() {
   announce = false
 }
 
+/** Whether this process announces its start (`client.start`); `lunos audit` doesn't. */
+export function announces() {
+  return announce
+}
+
+/**
+ * XCOD-241: which Lunos surface this process is. The CLI sets `LUNOS_SURFACE` from its command
+ * before anything loads config, so the TUI's worker (which copies the environment) sees it too.
+ */
+export const SURFACES = ["tui", "desktop", "ide", "run", "serve", "other"] as const
+export type Surface = (typeof SURFACES)[number]
+
+export function surfaceFor(command: string, env: NodeJS.ProcessEnv = process.env): Surface {
+  if (command === "acp") return "ide"
+  if (command === "run") return "run"
+  // The desktop app's WSL sidecar runs `lunos serve` with OPENCODE_CLIENT=desktop.
+  if (command === "serve" || command === "web") return env["OPENCODE_CLIENT"] === "desktop" ? "desktop" : "serve"
+  // The VS Code extension starts the TUI in its terminal with OPENCODE_CALLER=vscode.
+  if (command === "" || command === "attach") return env["OPENCODE_CALLER"]?.startsWith("vscode") ? "ide" : "tui"
+  return "other"
+}
+
+/** Set by the CLI; the desktop app's own sidecar loads the server without it, as OPENCODE_CLIENT=desktop. */
+export function surface(): Surface {
+  const value = process.env["LUNOS_SURFACE"]
+  if ((SURFACES as readonly string[]).includes(value ?? "")) return value as Surface
+  return process.env["OPENCODE_CLIENT"] === "desktop" ? "desktop" : "other"
+}
+
 /**
  * The policy for this process, fetched once, at the first config load. Also writes `client.start`
- * to the audit trail (held until the trail is activated with the resolved config).
+ * to the audit trail (held until the trail is activated with the resolved config). Offline
+ * (XCOD-241), only the cached copy: no request, not even a token refresh.
  */
-export function resolve(onDisk: readonly unknown[]): Promise<Result> {
+export function resolve(onDisk: readonly unknown[], opts: Options = {}): Promise<Result> {
   current ??= (async () => {
     const url = policyURL(onDisk)
-    const result = url
-      ? await fetchPolicy(url, onDisk).catch(() => fromCache(url, readCache(url), onDisk, "failed"))
-      : { source: "none" as const }
-    if (announce) AuditLog.emit("client.start", startFields(result, onDisk))
+    const result: Result = !url
+      ? { source: "none" }
+      : Offline.enabled()
+        ? fromCache(url, readCache(url), onDisk, "offline")
+        : await fetchPolicy(url, onDisk, opts).catch(() => fromCache(url, readCache(url), onDisk, "failed"))
+    const fields = startFields(result, onDisk)
+    started = { result, fields }
+    if (announce) AuditLog.emit("client.start", fields)
+    // `lunos run` says it on stderr; the TUI shows it as a toast once it is listening.
+    const text = notice(result)
+    if (text && announce && surface() === "run") process.stderr.write(`! ${text}\n`)
     return result
   })()
   return current
 }
 
+/** This process's policy result and its `client.start` fields, once resolved. */
+export function startInfo() {
+  return started
+}
+
+const REASONS: Partial<Record<Fetch, string>> = {
+  unauthorized: "the console refused your sign-in",
+  not_found: "the console has no policy at that address",
+  failed: "the console answered with an error",
+  unreachable: "the console couldn't be reached",
+  invalid: "the console sent a policy this version can't use",
+}
+
+/** `2026-10-13 06:34 UTC`: the same for everyone, whatever the machine's time zone. */
+function when(iso: string | undefined) {
+  const date = iso ? new Date(iso) : undefined
+  if (!date || Number.isNaN(date.getTime())) return "an unknown time"
+  return date.toISOString().slice(0, 16).replace("T", " ") + " UTC"
+}
+
+/**
+ * XCOD-241: what to tell the developer when the console's copy of the policy wasn't confirmed at
+ * this start: which copy applies, and when it was fetched. Undefined when it was confirmed, or
+ * when no `cloud.policy` is configured.
+ */
+export function notice(result: Result | undefined = started?.result): string | undefined {
+  if (!result?.url || result.source === "console") return
+  const host = (() => {
+    try {
+      return new URL(result.url!).host
+    } catch {
+      return result.url!
+    }
+  })()
+  const why =
+    result.fetch === "offline"
+      ? "Offline mode (LUNOS_OFFLINE)"
+      : result.fetch === "signed_out"
+        ? "You're not signed in (lunos login)"
+        : `Couldn't fetch your organisation's policy from ${host}: ${REASONS[result.fetch ?? "failed"] ?? REASONS.failed}`
+  if (result.source === "cache")
+    return `${why}. Using your organisation's policy as last fetched from ${host} at ${when(result.fetchedAt)}.`
+  return `${why}. No copy of your organisation's policy from ${host} has been fetched yet, so none applies: only managed config on this machine.`
+}
+
 /** Tests only: forget the fetched policy, so the next config load fetches again. */
 export function reset() {
   current = undefined
+  started = undefined
 }
 
 function canonical(value: unknown): unknown {

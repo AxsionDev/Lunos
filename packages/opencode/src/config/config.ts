@@ -30,6 +30,7 @@ import { ConfigAgent } from "./agent"
 import { ConfigCommand } from "./command"
 import { ConfigManaged } from "./managed"
 import { ConfigOrgPolicy } from "./org-policy"
+import { CloudClientStart } from "@/cloud/client-start"
 import { ConfigMemoryBackend } from "./memory-backend"
 import { ConfigParse } from "./parse"
 import { ConfigPaths } from "./paths"
@@ -319,6 +320,9 @@ const layer = Layer.effect(
         {} as Info,
       )
       const locked = ConfigPolicy.union(...layers.map((layer) => ConfigPolicy.lockList(layer.info)))
+      // XCOD-241: tell the organisation's console this client started (once per process; the
+      // switch is read from managed and global config, never a project's).
+      if (CloudClientStart.wanted()) CloudClientStart.send({ managed: doc, locked, global: yield* cachedGlobal })
       return { layers, doc, locked }
     })
 

@@ -33,6 +33,9 @@ On Lunos Cloud the console is `https://cloud.lunos.tech/v1/orgs/<org>/policy`. `
 read from managed config only: in user or project config it is ignored, so a repository can't send
 your sign-in to its own server. Signing in alone doesn't point Lunos at a console. Every request
 carries your `lunos login` access token to that one host only, and doesn't follow redirects.
+Each start also tells the console the Lunos version, OS, architecture, surface, a random install
+id and the policy digest; locking all of `cloud`, as above, keeps that on for everyone (see
+[what Lunos sends to the console](deployment/self-hosted.md#what-lunos-sends-to-the-console-at-start-clientstart)).
 
 ## Private marketplace
 

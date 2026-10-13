@@ -11,12 +11,14 @@ import { cliIt } from "../../lib/cli-process"
 const POLICY = { $locked: ["share"], share: "disabled" }
 
 function fakeConsole() {
-  const seen: { ifNoneMatch: string | null }[] = []
+  const seen: { method: string; ifNoneMatch: string | null }[] = []
   const server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
     fetch(req) {
-      seen.push({ ifNoneMatch: req.headers.get("if-none-match") })
+      seen.push({ method: req.method, ifNoneMatch: req.headers.get("if-none-match") })
+      // XCOD-241: client.start, sent after a successful policy fetch.
+      if (req.method === "POST") return new Response(null, { status: 204 })
       if (req.headers.get("authorization") !== "Bearer fake-token")
         return Response.json({ error: { code: "unauthenticated" } }, { status: 401 })
       const sha = ConfigOrgPolicy.sha256(POLICY)
@@ -107,7 +109,9 @@ describe("organisation policy from the console (subprocess)", () => {
         const row = sources.stdout.split("\n").find((line) => line.startsWith("share "))
         expect(row).toMatch(/managed\s+locked\s+.*v1\/orgs\/acme\/policy/)
         // The second start asked with the cached ETag.
-        expect(fake.seen.at(-1)?.ifNoneMatch).toBe(`"${ConfigOrgPolicy.sha256(POLICY)}"`)
+        expect(fake.seen.findLast((item) => item.method === "GET")?.ifNoneMatch).toBe(
+          `"${ConfigOrgPolicy.sha256(POLICY)}"`,
+        )
       }),
     90_000,
   )
