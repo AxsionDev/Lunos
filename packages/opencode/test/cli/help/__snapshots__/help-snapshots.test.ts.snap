@@ -433,7 +433,7 @@ Options:
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode memory --help 1`] = `
 "lunos memory
 
-review, search, export, import, migrate, outdate, verify and forget long-term memory
+review, search, export, import, migrate, outdate, verify, share and forget long-term memory
 
 Commands:
   lunos memory list            list remembered facts, with where each came from and their state
@@ -454,6 +454,8 @@ Commands:
                                / Claude Code memory notes; previews first
   lunos memory migrate         move embedded memory into the external database set in
                                memory.backend; previews first
+  lunos memory share <ids..>   share facts with your organisation's team memory (an admin approves
+                               each one)
 
 Options:
   -h, --help        show help                                                              [boolean]

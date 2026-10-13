@@ -154,6 +154,21 @@ describe("lunos share and lunos memory share (subprocess)", () => {
   )
 
   cliIt.live(
+    "a session that doesn't exist is refused before anything is sent",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const fake = fakeConsole()
+        yield* Effect.addFinalizer(() => Effect.sync(() => fake.server.stop(true)))
+        const { env } = yield* setup(home, fake.base, { share: "cloud" })
+        const missing = yield* opencode.spawn(["share", "ses_doesnotexist"], { env })
+        expect(missing.exitCode).not.toBe(0)
+        expect(missing.stderr).toContain("Session not found")
+        expect(uploads(fake.received)).toEqual([])
+      }),
+    120_000,
+  )
+
+  cliIt.live(
     "memory share: a preview sends nothing; --yes sends only the named fact; a fact with a secret never leaves",
     ({ opencode, home }) =>
       Effect.gen(function* () {
