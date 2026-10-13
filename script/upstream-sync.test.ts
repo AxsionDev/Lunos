@@ -4,6 +4,9 @@ import {
   badge,
   isPublishWorkflow,
   lag,
+  latestReleaseTag,
+  parseRemoteTags,
+  releaseVersion,
   newFailures,
   ownedHits,
   parseFailures,
@@ -120,6 +123,7 @@ describe("upstream sync", () => {
     expect(body).toContain("- `bun.lock`\n- `packages/core/package.json`")
     expect(body).toContain("git checkout upstream-sync/2026-09-27 && git merge origin/dev")
     expect(body).toContain("bun script/upstream-sync.ts stamp --upstream b471c2b4495747353af768fbf2e0790c9d820ce2")
+    expect(body).toContain("bun script/upstream-version.ts --upstream b471c2b4495747353af768fbf2e0790c9d820ce2")
   })
 
   test("the tests section can be replaced in place", () => {
@@ -179,5 +183,57 @@ describe("upstream sync", () => {
       "## Version lines kept automatically",
     )
     expect(prBody(base)).not.toContain("Version lines kept")
+  })
+
+  describe("v1 release tags (upstream dev is v2 since 2026-10-11)", () => {
+    // Shapes seen in `git ls-remote --tags https://github.com/anomalyco/opencode.git`.
+    const lsRemote = [
+      "63f7ceecbed2d7d9a627518d935dd963b9d4ac9f\trefs/tags/v2.0.0",
+      "b8cedc1a7a5e2916bbb65dc1d4b620729c261638\trefs/tags/v2.0.10",
+      "733b2c627e5aec39cb33cc22373bdce33053ef2c\trefs/tags/v1.19.0",
+      "1111111111111111111111111111111111111111\trefs/tags/v1.19.0^{}",
+      "2222222222222222222222222222222222222222\trefs/tags/v1.18.35",
+      "3333333333333333333333333333333333333333\trefs/tags/v1.9.0",
+      "4444444444444444444444444444444444444444\trefs/tags/v1.20.0-beta.1",
+      "5555555555555555555555555555555555555555\trefs/tags/github-v1.0.10",
+      "6666666666666666666666666666666666666666\trefs/tags/0.0.47",
+      "",
+    ].join("\n")
+
+    test("reads tag names from ls-remote, dropping peeled ^{} lines", () => {
+      expect(parseRemoteTags(lsRemote)).toEqual([
+        "v2.0.0",
+        "v2.0.10",
+        "v1.19.0",
+        "v1.18.35",
+        "v1.9.0",
+        "v1.20.0-beta.1",
+        "github-v1.0.10",
+        "0.0.47",
+      ])
+    })
+
+    test("only plain v1.X.Y tags count as releases to follow", () => {
+      expect(releaseVersion("v1.19.0")).toEqual([1, 19, 0])
+      for (const tag of ["v2.0.0", "v1.20.0-beta.1", "github-v1.0.10", "0.0.47", "1.19.0", "v1.19", "dev"])
+        expect(releaseVersion(tag)).toBeUndefined()
+    })
+
+    test("picks the newest v1 release by version, ignoring v2 and pre-releases", () => {
+      expect(latestReleaseTag(parseRemoteTags(lsRemote))).toBe("v1.19.0")
+      expect(latestReleaseTag(["v1.9.0", "v1.10.0", "v1.9.12"])).toBe("v1.10.0")
+      expect(latestReleaseTag(["v1.18.9", "v1.18.10"])).toBe("v1.18.10")
+      expect(latestReleaseTag(["v2.0.0", "v1.20.0-rc.1"])).toBeUndefined()
+      expect(latestReleaseTag([])).toBeUndefined()
+    })
+
+    test("the PR body names the upstream release tag", () => {
+      const body = prBody({ ...base, upstreamName: "v1.19.0", branch: "upstream-sync/v1.19.0" })
+      expect(body).toContain(
+        "Automated merge of `anomalyco/opencode` release tag [`v1.19.0`](https://github.com/anomalyco/opencode/releases/tag/v1.19.0)",
+      )
+      expect(body).toContain("upstream `dev` is now v2")
+      expect(prBody(base)).toContain("Automated merge of `anomalyco/opencode` `dev` @")
+    })
   })
 })

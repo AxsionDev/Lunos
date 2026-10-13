@@ -15,8 +15,9 @@
 1. **Remotes.** `origin` = the Lunos fork (`pminev1/Lunos`). `upstream` = `anomalyco/opencode`.
    The `upstream` remote was **missing entirely** and was added as part of this story.
 2. **Integration strategy — `merge`, not `rebase`.** Sync with
-   `git fetch upstream && git merge upstream/dev`. Never rebase the fork's accumulated history
-   onto upstream. Evidence in the rehearsal section below.
+   `git merge --no-ff refs/upstream-tags/<tag>` (the tracked upstream ref, see item 7; it was
+   `upstream/dev` until 2026-10-13). Never rebase the fork's accumulated history onto upstream.
+   Evidence in the rehearsal section below.
 3. **Cadence.** Weekly, not continuously. Unchanged from the draft.
 4. **Ownership.** The current maintainer owns conflict resolution until a second maintainer joins.
    Conflicts touching Lunos-only files (branding, EU provider config, compliance docs) always
@@ -25,18 +26,25 @@
    scattered edits inside upstream files. **This claim was tested and holds** — see below.
 6. **Upstreaming.** Anything generically useful is proposed as a PR to `anomalyco/opencode` first.
    Unchanged from the draft.
-7. **Branch tracking.** Track `dev`, not tagged releases, until upstream cuts a stable v2 tag.
-   Unchanged from the draft.
+7. **What to track: upstream's v1 release tags** (amended 2026-10-13). Originally "track `dev`,
+   not tagged releases, until upstream cuts a stable v2 tag". On 2026-10-11 upstream promoted v2
+   to `dev` (`5caf1f9f6f`): merging `dev` became a v2 migration (559 conflicting files; v2 deletes
+   files Lunos features are built on, and adds update-service, Zen and console routes). Upstream
+   keeps releasing v1 from a separate line (`v1.19.0` contains our last `dev` sync point
+   `907b3bc518`), so Lunos now merges the newest `vX.Y.Z` tag with X = 1 (no v2.x, no
+   pre-releases). Fetch it into `refs/upstream-tags/<tag>`, never `refs/tags/`: Lunos's own release
+   tags are `v1.x` too. Whether and when to move to v2 is evaluated in a separate spike.
 8. **Never sync directly on `dev`.** Do it on a throwaway branch, verify, then merge. The runbook
    below encodes this.
 
 ## Weekly sync runbook
 
 ```bash
-git fetch upstream
-git worktree add ../sync-$(date +%F) -b sync-$(date +%F) dev   # never sync on dev itself
-cd ../sync-$(date +%F)
-git merge upstream/dev                                          # merge, never rebase
+tag=$(bun script/upstream-sync.ts latest-tag)                   # newest upstream v1.X.Y release
+git fetch --no-tags upstream "+refs/tags/$tag:refs/upstream-tags/$tag"   # never into refs/tags
+git worktree add ../sync-$tag -b upstream-sync/$tag dev         # never sync on dev itself
+cd ../sync-$tag
+git merge --no-ff refs/upstream-tags/$tag                       # merge, never rebase
 bun install                                                     # bun.lock conflicts most often
 GITHUB_ACTIONS=false bun turbo test                             # NOT `bun test` — see note
 bun run typecheck

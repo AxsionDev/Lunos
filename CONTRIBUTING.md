@@ -38,8 +38,11 @@ data-residency policy refuses it. Run `bun ./script/jurisdictions.ts` afterwards
 
 ## Lunos and upstream opencode
 
-Lunos merges upstream opencode's `dev` branch every week, as a pull request opened by the
-`upstream-sync` workflow. **We merge, never rebase** (XCOD-16), so upstream history stays intact
+Lunos merges upstream opencode's newest **v1 release tag** (`v1.19.0`, …) every week, as a pull
+request opened by the `upstream-sync` workflow. Not upstream `dev`: upstream promoted v2 to `dev` on
+2026-10-11, and moving Lunos to v2 is a separate, deliberate evaluation, not a weekly sync. Upstream
+tags are fetched into `refs/upstream-tags/*`, never `refs/tags/*`, because Lunos's own release tags
+are `v1.x` too. **We merge, never rebase** (XCOD-16), so upstream history stays intact
 and each sync is reviewable. The workflow resolves exactly one kind of conflict by itself: a
 `package.json` whose only conflict is the `"version"` line keeps Lunos's version. Anything else
 opens a draft PR labelled `upstream-conflict` for a person to resolve. The README badge shows how far behind upstream Lunos is.

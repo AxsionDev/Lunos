@@ -3,9 +3,15 @@
 // XCOD-118: keeps Lunos current with upstream opencode, following XCOD-16's merge-not-rebase
 // policy. Used by .github/workflows/upstream-sync.yml; also runs locally for a dry look.
 //
-//   bun script/upstream-sync.ts measure [--base origin/dev] [--upstream upstream/dev]
-//   bun script/upstream-sync.ts merge --branch upstream-sync/2026-09-27 [--base ...] [--upstream ...]
-//   bun script/upstream-sync.ts stamp --upstream <sha>   (after resolving a conflicting sync by hand)
+// Lunos tracks upstream's v1 *release tags* (v1.19.0, ...), not upstream `dev`: on 2026-10-11
+// upstream promoted v2 to `dev` (5caf1f9f6f), and merging that is a v2 migration, evaluated in a
+// separate spike. Upstream keeps releasing v1 from its own line. Tags are fetched into
+// refs/upstream-tags/*, never refs/tags/*, because Lunos's own release tags are v1.x too.
+//
+//   bun script/upstream-sync.ts latest-tag [--remote upstream]   (newest upstream vMAJOR.MINOR.PATCH v1 tag)
+//   bun script/upstream-sync.ts measure [--base origin/dev] [--upstream refs/upstream-tags/v1.19.0]
+//   bun script/upstream-sync.ts merge --branch upstream-sync/v1.19.0 --upstream refs/upstream-tags/v1.19.0 [--base ...] [--name v1.19.0]
+//   bun script/upstream-sync.ts stamp --upstream <ref>   (after resolving a conflicting sync by hand)
 //   bun script/upstream-sync.ts report --pr <n> --run <test run id> --baseline <dev test run id> [--typecheck <run id>]
 //
 // "Days behind upstream" is the age of the oldest upstream commit that isn't in the base branch.
@@ -20,6 +26,45 @@ const OWNED_FILE = path.join(root, ".github/lunos-owned-paths")
 const PACKAGE_FILE = path.join(root, "packages/opencode/package.json")
 const UPSTREAM_REPO = "anomalyco/opencode"
 const DAY = 24 * 60 * 60
+/** Where upstream release tags are fetched to, so they can't clash with Lunos's own `v1.x` tags. */
+export const TAG_NAMESPACE = "refs/upstream-tags"
+/** The upstream major version Lunos follows (see the header). */
+const TRACKED_MAJOR = 1
+
+/** `v1.19.0` -> [1, 19, 0]; anything else (pre-releases, `github-v1.0.0`, `v2.x`, `0.0.47`) is undefined. */
+export function releaseVersion(tag: string, major = TRACKED_MAJOR) {
+  const match = tag.match(/^v(\d+)\.(\d+)\.(\d+)$/)
+  if (!match || Number(match[1]) !== major) return
+  return [Number(match[1]), Number(match[2]), Number(match[3])] as const
+}
+
+/** Tag names from `git ls-remote --tags` output, without `refs/tags/` and the peeled `^{}` lines. */
+export function parseRemoteTags(output: string) {
+  return output
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/)[1])
+    .filter((ref): ref is string => !!ref && ref.startsWith("refs/tags/") && !ref.endsWith("^{}"))
+    .map((ref) => ref.slice("refs/tags/".length))
+}
+
+/** The newest stable v1 release tag, by version number (so v1.10.0 beats v1.9.0). */
+export function latestReleaseTag(tags: string[], major = TRACKED_MAJOR) {
+  let best: { tag: string; version: readonly number[] } | undefined
+  for (const tag of tags) {
+    const version = releaseVersion(tag, major)
+    if (!version) continue
+    if (!best || compareVersions(version, best.version) > 0) best = { tag, version }
+  }
+  return best?.tag
+}
+
+function compareVersions(a: readonly number[], b: readonly number[]) {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0)
+    if (diff) return diff
+  }
+  return 0
+}
 
 export type Lag = { commits: number; days: number; oldest?: string }
 
@@ -91,6 +136,8 @@ export function describeLag(value: Lag) {
 
 export type Body = {
   status: "clean" | "conflict"
+  /** What was merged, as people know it: an upstream release tag (`v1.19.0`) or branch. */
+  upstreamName?: string
   /** package.json files whose only conflicts were the version line, settled to Lunos's version. */
   versionsKept?: string[]
   branch: string
@@ -104,12 +151,21 @@ export type Body = {
   conflicts: string[]
 }
 
+function describeUpstream(name = "dev") {
+  return releaseVersion(name)
+    ? `\`${UPSTREAM_REPO}\` release tag [\`${name}\`](https://github.com/${UPSTREAM_REPO}/releases/tag/${name})`
+    : `\`${UPSTREAM_REPO}\` \`${name}\``
+}
+
 export function prBody(input: Body) {
   const repo = `https://github.com/${UPSTREAM_REPO}`
   const flags = redFlags(input.changed)
   const lines = [
-    `Automated merge of \`${UPSTREAM_REPO}\` \`dev\` @ [\`${input.upstreamSha.slice(0, 10)}\`](${repo}/commit/${input.upstreamSha}) (XCOD-118).`,
+    `Automated merge of ${describeUpstream(input.upstreamName)} @ [\`${input.upstreamSha.slice(0, 10)}\`](${repo}/commit/${input.upstreamSha}) (XCOD-118).`,
     "",
+    ...(releaseVersion(input.upstreamName ?? "")
+      ? [`Lunos follows upstream's v1 release tags: upstream \`dev\` is now v2, which is evaluated separately.`, ""]
+      : []),
     `- **Before:** ${describeLag(input.before)}.`,
     `- **After merging:** ${describeLag(input.after)}.`,
     `- **Upstream commits:** ${input.commits.length}`,
@@ -126,7 +182,7 @@ export function prBody(input: Body) {
       "```sh",
       `git fetch origin && git checkout ${input.branch} && git merge origin/dev`,
       "# fix the files below, then record the upstream base and lag this build will report:",
-      `bun script/upstream-version.ts && bun script/upstream-sync.ts stamp --upstream ${input.upstreamSha}`,
+      `bun script/upstream-version.ts --upstream ${input.upstreamSha} && bun script/upstream-sync.ts stamp --upstream ${input.upstreamSha}`,
       "git add -A && git commit --no-edit && git push",
       "```",
       "",
@@ -254,7 +310,7 @@ async function measure(base: string, upstream: string) {
 
 /** Records the upstream base and lag in packages/opencode/package.json, for `--version --verbose`. */
 async function stamp(upstream: string) {
-  const sha = await git("rev-parse", upstream)
+  const sha = await git("rev-parse", `${upstream}^{commit}`)
   const value = await measure("HEAD", upstream)
   const text = await Bun.file(PACKAGE_FILE).text()
   const pkg = JSON.parse(text)
@@ -272,11 +328,13 @@ async function stamp(upstream: string) {
 
 async function merge(args: string[]) {
   const base = flag(args, "base", "origin/dev")
-  const upstream = flag(args, "upstream", "upstream/dev")
+  const upstream = flag(args, "upstream")
+  const name = flag(args, "name", upstream.replace(/^refs\/upstream-tags\//, ""))
   const branch = flag(args, "branch")
   const out = flag(args, "out", path.join(root, ".upstream-sync"))
 
-  const sha = await git("rev-parse", upstream)
+  // ^{commit}: a tag ref names the annotated tag object, not the commit it marks.
+  const sha = await git("rev-parse", `${upstream}^{commit}`)
   const before = await measure(base, upstream)
   const commits = (await git("log", "--format=%h %s", "--first-parent", `${base}..${upstream}`))
     .split("\n")
@@ -287,7 +345,7 @@ async function merge(args: string[]) {
 
   await git("checkout", "-B", branch, base)
   const result =
-    await $`git merge --no-ff --no-edit -m ${`Merge ${UPSTREAM_REPO} dev into Lunos (${branch})`} ${upstream}`
+    await $`git merge --no-ff --no-edit -m ${`Merge ${UPSTREAM_REPO} ${name} into Lunos (${branch})`} ${upstream}`
       .cwd(root)
       .quiet()
       .nothrow()
@@ -317,7 +375,7 @@ async function merge(args: string[]) {
     }
   }
   if (status === "clean" && before.commits) {
-    await $`bun ./script/upstream-version.ts`.cwd(root).quiet()
+    await $`bun ./script/upstream-version.ts --upstream ${upstream}`.cwd(root).quiet()
     await stamp(upstream)
     await git("add", PACKAGE_FILE)
     await git("commit", "-m", `chore(upstream-sync): record upstream lag after ${branch}`)
@@ -327,6 +385,7 @@ async function merge(args: string[]) {
 
   const body = prBody({
     status,
+    upstreamName: name,
     branch,
     upstreamSha: sha,
     before,
@@ -342,6 +401,7 @@ async function merge(args: string[]) {
   await Bun.write(path.join(out, "body.md"), body)
   const summary = {
     status,
+    upstreamName: name,
     upstreamSha: sha,
     before: { ...before, text: describeLag(before) },
     after: { ...after, text: describeLag(after) },
@@ -401,8 +461,13 @@ async function report(args: string[]) {
 
 if (import.meta.main) {
   const [command, ...args] = process.argv.slice(2)
-  if (command === "measure") {
-    const value = await measure(flag(args, "base", "origin/dev"), flag(args, "upstream", "upstream/dev"))
+  if (command === "latest-tag") {
+    const remote = flag(args, "remote", "upstream")
+    const tag = latestReleaseTag(parseRemoteTags(await git("ls-remote", "--tags", remote, `v${TRACKED_MAJOR}.*`)))
+    if (!tag) throw new Error(`upstream-sync: no v${TRACKED_MAJOR}.x.y release tag on ${remote}`)
+    console.log(tag)
+  } else if (command === "measure") {
+    const value = await measure(flag(args, "base", "origin/dev"), flag(args, "upstream"))
     console.log(JSON.stringify({ ...value, text: describeLag(value), badge: badge(value) }))
   } else if (command === "merge") await merge(args)
   else if (command === "stamp") {
@@ -410,7 +475,7 @@ if (import.meta.main) {
     console.log(JSON.stringify(JSON.parse(await Bun.file(PACKAGE_FILE).text()).lunos))
   } else if (command === "report") await report(args)
   else {
-    console.error("usage: upstream-sync.ts measure|merge|stamp|report [options]")
+    console.error("usage: upstream-sync.ts latest-tag|measure|merge|stamp|report [options]")
     process.exit(1)
   }
 }
