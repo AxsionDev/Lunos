@@ -38,8 +38,8 @@ const layer = Layer.effect(
 
     const share = Effect.fn("SessionShare.share")(function* (sessionID: SessionID) {
       const conf = yield* cfg.get()
-      // XCOD-191: "cloud" allows only `lunos share` to the organisation's Lunos console, never this
-      // (upstream's share service), so here it is "disabled".
+      // XCOD-191: "cloud" shares only with the organisation's Lunos console (the TUI's /share goes to
+      // session.shareConsole instead), never this (upstream's share service): here it is "disabled".
       if (conf.share === "disabled" || conf.share === "cloud") {
         const locked = ConfigPolicy.isLocked(conf.$locked, "share")
         // `/share`, `lunos run --share` and API clients all arrive here.

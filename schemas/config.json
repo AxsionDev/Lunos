@@ -1510,7 +1510,7 @@
         "share": {
           "type": "string",
           "enum": ["manual", "auto", "disabled", "cloud"],
-          "description": "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing, 'cloud' allows only lunos share to your organisation's Lunos console (never another share service)"
+          "description": "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing, 'cloud' shares only with your organisation's Lunos console (/share, lunos share, lunos memory share; never another share service)"
         },
         "autoshare": {
           "type": "boolean",

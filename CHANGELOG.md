@@ -28,6 +28,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
   fetched, and `LUNOS_OFFLINE=1` uses the last fetched policy without contacting the console
   (XCOD-241).
 
+- **Update machines without internet access from a mirror you control.** `lunos update` already
+  reads the npm registry from your npm configuration, so a private registry (Nexus, Artifactory,
+  Verdaccio) is all it needs; for archive and offline-bundle installs,
+  `script/release-mirror.ts` copies chosen releases into a directory you serve, keeping only files
+  that match the release's signed `SHA256SUMS`. `docs/lts.md` proposes a long-term support line
+  with backported security fixes; it is planned, not yet available (XCOD-193).
 - **Work as a team on your organisation's Lunos console.** With the Team plan or a self-hosted
   console: your organisation's private marketplace is listed first and installs with the usual
   commands; `lunos memory share <id>` offers one fact at a time to team memory, which an admin
@@ -36,6 +42,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
   expires. Your own memory never leaves your machine. Sharing stays off by default: `"share":
 "cloud"` allows only these uploads, never another share service, and each one is checked against
   the residency policy and audited (XCOD-191).
+- **Share with your organisation from the TUI, and take shares back.** With `"share": "cloud"`,
+  `/share` uploads the session you're in to your organisation's Lunos console (whole or redacted,
+  optionally with a link) and shows its URL, link and expiry. `lunos share list` shows your shares
+  with their link expiry and `lunos share revoke <id>` revokes one and its links. Before every
+  upload Lunos checks the region the console declares against your residency policy and refuses
+  (and audits) one it doesn't allow; `--link` alone means 30 days; `lunos memory share` previews
+  exactly what it would send (XCOD-191).
 - **Edit the Recommended models in /settings.** Recommended opens a list of its models with why
   each is recommended (Lunos's curated list, marked "Lunos default", until you change it). Add a
   model from the picker with an optional reason, edit or remove one, or reset to Lunos's defaults;

@@ -654,10 +654,14 @@ export const MemoryShareCommand = effectCmd({
     }
     const lines = found.map((fact) => `  ${fact.id}  [${fact.scope}] ${oneLine(fact.text)}`)
     if (!args.yes) {
+      // Exactly the body --yes sends, byte for byte: each fact's full text and everything that goes
+      // with it (provenance, dataset id, where an imported fact came from), not a summary of it.
       yield* writeStdoutEffect(
         [
           `These ${found.length} fact(s) would be shared with ${org.org}'s team memory on ${org.host}:`,
           ...lines,
+          `Exactly this would be sent (POST ${org.base}/memory):`,
+          CloudShare.factsBody(found),
           "An owner or admin approves each one before other members' Lunos recalls it.",
           "Nothing was uploaded. Run again with --yes to share them.",
         ].join(EOL) + EOL,

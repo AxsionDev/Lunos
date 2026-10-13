@@ -45,8 +45,16 @@ export interface Decision {
  *    US-region Azure resource through is worse than no policy, because it reports success.
  *    The deployer can still use it by widening `allow` — an explicit, auditable choice.
  */
-export function evaluate(providerID: string, policy: Policy, baseURL?: string): Decision {
-  const { claim, tagged } = Jurisdiction.resolve(providerID, baseURL, policy.endpoints)
+export function evaluate(
+  providerID: string,
+  policy: Policy,
+  baseURL?: string,
+  /** A claim decided elsewhere (XCOD-191: the region a Lunos console declares at `GET /v1`). */
+  override?: Jurisdiction.Claim,
+): Decision {
+  const { claim, tagged } = override
+    ? { claim: override, tagged: true }
+    : Jurisdiction.resolve(providerID, baseURL, policy.endpoints)
   const base = { providerID, region: claim.region }
   const allowed = policy.allow.join(", ")
 
@@ -211,9 +219,17 @@ function append(file: string, entry: EgressRecord) {
 }
 
 /** Record one call in the audit log, if auditing is on. For callers that don't go through a fetch wrapper. */
-export function audit(resolved: Resolved, defaultAuditPath: string, providerID: string, url: string, allowed: boolean) {
+export function audit(
+  resolved: Resolved,
+  defaultAuditPath: string,
+  providerID: string,
+  url: string,
+  allowed: boolean,
+  /** The claim that decided the call, when it isn't the provider's built-in one. */
+  claim?: Jurisdiction.Claim,
+) {
   if (!resolved.audit) return
-  append(resolved.auditPath ?? defaultAuditPath, record(providerID, url, allowed))
+  append(resolved.auditPath ?? defaultAuditPath, record(providerID, url, allowed, new Date(), claim))
 }
 
 type Fetch = (input: Parameters<typeof fetch>[0], init?: RequestInit) => Promise<Response>

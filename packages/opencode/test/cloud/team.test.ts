@@ -27,6 +27,8 @@ let previousManaged: string | undefined
 const seen: Array<{ url: string; auth: string | null; method: string; body?: string }> = []
 let server: ReturnType<typeof Bun.serve>
 let base: string
+/** What the fake console's `GET /v1` answers: a region, a status code, or nothing (404, an older console). */
+let consoleSelf: { region?: string } | number | undefined
 
 const manifest = {
   name: "acme",
@@ -57,6 +59,28 @@ beforeAll(async () => {
         return new Response(null, { status: 302, headers: { location: `http://127.0.0.1:${server.port}/elsewhere` } })
       if (req.headers.get("authorization") !== "Bearer fake-token")
         return Response.json({ error: { code: "unauthenticated", message: "Sign in first" } }, { status: 401 })
+      if (url.pathname === "/v1") {
+        if (consoleSelf === undefined) return Response.json({ error: { code: "not_found" } }, { status: 404 })
+        if (typeof consoleSelf === "number") return new Response("down", { status: consoleSelf })
+        return Response.json({ api: "1", name: "Acme console", ...consoleSelf })
+      }
+      if (url.pathname === "/v1/orgs/acme/shares" && req.method === "GET")
+        return Response.json({
+          org: "acme",
+          shares: [
+            {
+              id: "s1",
+              kind: "session",
+              title: "Mine",
+              createdBy: "tester",
+              createdAt: 1,
+              links: [{ id: "l1", expiresAt: "2099-01-01T00:00:00.000Z" }],
+            },
+            { id: "s2", kind: "artifact", title: "Theirs", createdBy: "other", createdAt: 2, links: 0 },
+          ],
+        })
+      if (url.pathname === "/v1/orgs/acme/shares/s1" && req.method === "DELETE")
+        return new Response(null, { status: 204 })
       if (url.pathname === "/v1/orgs/acme/marketplace.json") return Response.json(manifest)
       if (url.pathname === "/v1/orgs/acme/plan")
         return Response.json(
@@ -82,6 +106,7 @@ afterAll(async () => {
 
 afterEach(() => {
   seen.length = 0
+  consoleSelf = undefined
 })
 
 async function signIn() {
@@ -107,6 +132,7 @@ describe("CloudOrg: the organisation's console", () => {
       org: "acme",
       base: "https://console.acme.eu/v1/orgs/acme",
       host: "console.acme.eu",
+      api: "https://console.acme.eu/v1",
     })
     expect(CloudOrg.parse("https://cloud.lunos.tech/v1/orgs/acme/policy")?.base).toBe(
       "https://cloud.lunos.tech/v1/orgs/acme",
@@ -267,7 +293,8 @@ describe("uploads: off by default, residency-gated, audited", () => {
         content: "c",
       }),
     ).rejects.toThrow(/data-residency/)
-    expect(seen).toEqual([])
+    // Only the console's own description was asked for (GET /v1); nothing was uploaded.
+    expect(seen.filter((r) => r.method !== "GET")).toEqual([])
     const shared = await CloudShare.upload({ share: "cloud" }, local, {
       kind: "artifact",
       title: "t",
@@ -281,5 +308,132 @@ describe("uploads: off by default, residency-gated, audited", () => {
       content: "c",
       link: { expiresInHours: 2 },
     })
+  })
+})
+
+describe("the console's declared region decides (GET /v1)", () => {
+  const local = () => CloudOrg.parse(`${base}/v1/orgs/acme/policy`)!
+  const artifact = { kind: "artifact" as const, title: "t", content: "c" }
+  const events = async (file: string) => {
+    await Audit.flush()
+    await Bun.sleep(100)
+    return (await fs.readFile(file, "utf8").catch(() => ""))
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l))
+  }
+  const posts = () => seen.filter((r) => r.method === "POST")
+
+  test("region() reads it with the session's token; none declared (404 or absent) is undefined", async () => {
+    await signIn()
+    expect(await CloudOrg.region(local())).toBeUndefined()
+    consoleSelf = {}
+    expect(await CloudOrg.region(local())).toBeUndefined()
+    consoleSelf = { region: "eu" }
+    expect(await CloudOrg.region(local())).toBe("eu")
+    expect(seen.at(-1)).toMatchObject({ url: "/v1", method: "GET", auth: "Bearer fake-token" })
+    consoleSelf = { region: "mars" }
+    await expect(CloudOrg.region(local())).rejects.toBeInstanceOf(CloudOrg.ConsoleError)
+  })
+
+  test("a self-hosted console that declares eu is allowed under an EU-only policy, recorded as declared", async () => {
+    await signIn()
+    const audit = path.join(dir, "region-eu.log")
+    consoleSelf = { region: "eu" }
+    const config = { share: "cloud", residency: { allow: ["eu" as const] }, audit: { enabled: true, path: audit } }
+    expect((await CloudShare.upload(config, local(), artifact)).id).toBe("s1")
+    expect(posts()).toHaveLength(1)
+    const upload = (await events(audit)).find((e) => e.event === "share.upload")
+    expect(upload).toMatchObject({ providerID: "share:lunos-console", region: "eu", basis: "declared" })
+  })
+
+  test("a console that declares us is refused before anything is sent, and recorded as share.denied", async () => {
+    await signIn()
+    const audit = path.join(dir, "region-us.log")
+    consoleSelf = { region: "us" }
+    const config = { share: "cloud", residency: { allow: ["eu" as const] }, audit: { enabled: true, path: audit } }
+    await expect(CloudShare.upload(config, local(), artifact)).rejects.toThrow(/blocked by the data-residency policy/)
+    await expect(CloudShare.facts(config, local(), [{ id: "f" }])).rejects.toBeInstanceOf(CloudShare.RefusedError)
+    expect(posts()).toEqual([])
+    const denied = (await events(audit)).filter((e) => e.event === "share.denied")
+    expect(denied).toHaveLength(2)
+    expect(denied[0]).toMatchObject({ region: "us", basis: "declared" })
+  })
+
+  test("on cloud.lunos.tech too, the console's own declaration wins over the built-in claim", () => {
+    const hosted = CloudOrg.parse("https://cloud.lunos.tech/v1/orgs/acme/policy")!
+    const config = { residency: { allow: ["eu" as const], audit: false } }
+    expect(() => CloudShare.gate(config, hosted, `${hosted.base}/shares`, "us")).toThrow(/does not allow/)
+    CloudShare.gate(config, hosted, `${hosted.base}/shares`, "eu")
+    // No declaration: the built-in claim, EU on Lunos Cloud's own host only, as before.
+    CloudShare.gate(config, hosted, `${hosted.base}/shares`, undefined)
+  })
+
+  test("a residency.endpoints declaration that disagrees with the console is refused", () => {
+    const config = {
+      residency: {
+        allow: ["eu" as const, "us" as const],
+        audit: false,
+        endpoints: { [CloudShare.TARGET]: { region: "eu" as const } },
+      },
+    }
+    expect(() => CloudShare.gate(config, local(), `${local().base}/shares`, "us")).toThrow(/Correct whichever is wrong/)
+    CloudShare.gate(config, local(), `${local().base}/shares`, "eu")
+    // "other" is what a self-hosted console answers when nobody set its region: the declaration stands.
+    CloudShare.gate(
+      { residency: { ...config.residency, allow: ["eu" as const] } },
+      local(),
+      `${local().base}/shares`,
+      "other",
+    )
+    expect(() =>
+      CloudShare.gate(
+        { residency: { allow: ["eu" as const], audit: false } },
+        local(),
+        `${local().base}/shares`,
+        "other",
+      ),
+    ).toThrow(/does not allow/)
+  })
+
+  test("a console that can't be asked: an enforcing policy refuses (share.denied); audit-only goes on", async () => {
+    await signIn()
+    const audit = path.join(dir, "region-down.log")
+    consoleSelf = 500
+    const enforcing = { share: "cloud", residency: { allow: ["eu" as const] }, audit: { enabled: true, path: audit } }
+    await expect(CloudShare.upload(enforcing, local(), artifact)).rejects.toThrow(/couldn't ask/)
+    expect(posts()).toEqual([])
+    expect((await events(audit)).some((e) => e.event === "share.denied")).toBe(true)
+    const auditOnly = { share: "cloud", audit: { enabled: true, path: audit } }
+    expect((await CloudShare.upload(auditOnly, local(), artifact)).id).toBe("s1")
+  })
+
+  test("no residency policy and no audit log: the console isn't asked", async () => {
+    await signIn()
+    consoleSelf = { region: "us" }
+    await CloudShare.upload({ share: "cloud" }, local(), artifact)
+    expect(seen.map((r) => r.url)).toEqual(["/v1/orgs/acme/shares"])
+  })
+
+  test("--link with no hours sends none, so the console's default (30 days) and maximum apply", async () => {
+    await signIn()
+    await CloudShare.upload({ share: "cloud" }, local(), { ...artifact, linkHours: true })
+    expect(JSON.parse(seen.at(-1)!.body!).link).toEqual({})
+  })
+})
+
+describe("list and revoke", () => {
+  const local = () => CloudOrg.parse(`${base}/v1/orgs/acme/policy`)!
+
+  test("list reads the organisation's shares; revoke deletes one; neither is gated on share", async () => {
+    await signIn()
+    const { shares } = await CloudShare.list(local(), { all: true })
+    expect(shares.map((s) => s.id)).toEqual(["s1", "s2"])
+    await CloudShare.list(local())
+    expect(seen.at(-1)).toMatchObject({ url: "/v1/orgs/acme/shares?mine=1", method: "GET" })
+    await CloudShare.revoke(local(), "s1")
+    expect(seen.at(-1)).toMatchObject({ url: "/v1/orgs/acme/shares/s1", method: "DELETE", auth: "Bearer fake-token" })
+    const missing = await CloudShare.revoke(local(), "nope").catch((e) => e)
+    expect(missing).toBeInstanceOf(CloudOrg.ConsoleError)
   })
 })

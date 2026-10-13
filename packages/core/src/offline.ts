@@ -177,6 +177,15 @@ export const CALLS: Call[] = [
     alsoOffBy: '`"cloud": { "client_start": false }` in user config, unless your organisation locks it',
   },
   {
+    // XCOD-191: the console managed config names; on even offline, like org-policy.
+    id: "console-share",
+    what: 'Sharing with your organisation (`"share": "cloud"`): `/share`, `lunos share`, `lunos memory share`, and the region check before each (`GET <console>/v1`)',
+    hosts: "the console in `cloud.policy` (managed config)",
+    when: 'only when you share, with `"share": "cloud"` (off by default); `lunos share list` / `revoke` when you run them',
+    offline: "yours",
+    alsoOffBy: '`"share": "disabled"` (the default)',
+  },
+  {
     id: "remote-skills",
     what: "Remote skills and URL instructions",
     hosts: "URLs in `skills.urls` and `instructions`",

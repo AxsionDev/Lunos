@@ -8654,6 +8654,98 @@
         ]
       }
     },
+    "/session/{sessionID}/share/console": {
+      "post": {
+        "tags": ["session"],
+        "operationId": "session.shareConsole",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "^ses"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shared with the organisation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionShareConsoleResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ShareDisabledError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareDisabledError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Upload the session to your organisation's Lunos console (with \"share\": \"cloud\"), as lunos share does: the residency policy is checked first and the upload is recorded in the audit log.",
+        "summary": "Share session with your organisation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionShareConsoleInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.session.shareConsole({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/session/{sessionID}/summarize": {
       "post": {
         "tags": ["session"],
@@ -26848,6 +26940,74 @@
           }
         },
         "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "SessionShareConsoleInput": {
+        "type": "object",
+        "properties": {
+          "sanitize": {
+            "type": "boolean"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "Also make a link that works without signing in: true for the console's default (30 days, or the organisation's shorter maximum), or a number of hours"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SessionShareConsoleResult": {
+        "type": "object",
+        "properties": {
+          "org": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "link": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "string"
+              }
+            },
+            "required": ["url", "expiresAt"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["org", "host", "id", "url"],
         "additionalProperties": false
       },
       "TextPartInput": {

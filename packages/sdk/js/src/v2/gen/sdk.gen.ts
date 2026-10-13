@@ -257,6 +257,9 @@ import type {
   SessionPromptResponses,
   SessionRevertErrors,
   SessionRevertResponses,
+  SessionShareConsoleErrors,
+  SessionShareConsoleInput,
+  SessionShareConsoleResponses,
   SessionShareErrors,
   SessionShareResponses,
   SessionShellErrors,
@@ -4912,6 +4915,47 @@ export class Session2 extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  /**
+   * Share session with your organisation
+   *
+   * Upload the session to your organisation's Lunos console (with "share": "cloud"), as lunos share does: the residency policy is checked first and the upload is recorded in the audit log.
+   */
+  public shareConsole<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      sessionShareConsoleInput?: SessionShareConsoleInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "sessionShareConsoleInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionShareConsoleResponses, SessionShareConsoleErrors, ThrowOnError>(
+      {
+        url: "/session/{sessionID}/share/console",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
   }
 
   /**
