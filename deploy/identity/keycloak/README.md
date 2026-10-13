@@ -100,7 +100,7 @@ Put a reverse proxy with TLS in front of `127.0.0.1:8080` for the public name in
 5. On the control plane, set `LUNOSHQ_OIDC_ISSUER=https://auth.lunos.tech/realms/Lunos`, `LUNOSHQ_OIDC_AUDIENCE=lunos-api`, `LUNOSHQ_CONSOLE_CLIENT_ID=lunos-console` and `LUNOSHQ_CONSOLE_CLIENT_SECRET`.
 6. Check: `./verify.sh https://auth.lunos.tech`.
 
-`configure-realm.ts` refuses to run unless the server offers both the mapper and the listener (step 1 missing or Keycloak not restarted). It only adds and merges, never removes: URI lists are unioned with what the client already has, an existing client keeps its name and enabled flag, and a confidential client always ends up with a secret. It never prints a secret, only where to read it. Each step reads first and writes only what differs, so running it twice changes nothing.
+`configure-realm.ts` refuses to run unless the server offers both the mapper and the listener (step 1 missing or Keycloak not restarted). It only adds and merges, never removes: URI lists are unioned with what the client already has, an existing client keeps its name and enabled flag, and a confidential client always ends up with a secret. A `lunos-console-admin` it creates also gets Keycloak's built-in `service_account` default scope, which a fresh import of the realm file doesn't add; it is harmless. It never prints a secret, only where to read it. Each step reads first and writes only what differs, so running it twice changes nothing.
 
 ## Operating it
 
