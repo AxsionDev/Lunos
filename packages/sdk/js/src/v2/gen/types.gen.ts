@@ -3119,6 +3119,25 @@ export type ShareDisabledError = {
   message: string
 }
 
+export type SessionShareConsoleInput = {
+  sanitize?: boolean
+  /**
+   * Also make a link that works without signing in: true for the console's default (30 days, or the organisation's shorter maximum), or a number of hours
+   */
+  link?: boolean | number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
+export type SessionShareConsoleResult = {
+  org: string
+  host: string
+  id: string
+  url: string
+  link?: {
+    url: string
+    expiresAt: string
+  }
+}
+
 export type TextPartInput = {
   id?: string
   type: "text"
@@ -11467,6 +11486,44 @@ export type SessionShareResponses = {
 }
 
 export type SessionShareResponse = SessionShareResponses[keyof SessionShareResponses]
+
+export type SessionShareConsoleData = {
+  body?: SessionShareConsoleInput
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/share/console"
+}
+
+export type SessionShareConsoleErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * ShareDisabledError
+   */
+  403: ShareDisabledError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionShareConsoleError = SessionShareConsoleErrors[keyof SessionShareConsoleErrors]
+
+export type SessionShareConsoleResponses = {
+  /**
+   * Shared with the organisation
+   */
+  200: SessionShareConsoleResult
+}
+
+export type SessionShareConsoleResponse = SessionShareConsoleResponses[keyof SessionShareConsoleResponses]
 
 export type SessionSummarizeData = {
   body?: {

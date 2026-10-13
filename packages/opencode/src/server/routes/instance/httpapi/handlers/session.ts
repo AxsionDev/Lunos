@@ -6,6 +6,9 @@ import { Command } from "@/command"
 import { Permission } from "@/permission"
 import { SessionShare } from "@/share/session"
 import { ShareNext } from "@/share/share-next"
+import { CloudAuth } from "@/cloud/auth"
+import { CloudOrg } from "@/cloud/org"
+import { CloudShare } from "@/cloud/share"
 import { Session } from "@/session/session"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
@@ -31,6 +34,7 @@ import {
   ListQuery,
   MessagesQuery,
   PermissionResponsePayload,
+  ShareConsolePayload,
   PromptPayload,
   RevertPayload,
   ShellPayload,
@@ -289,6 +293,43 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return yield* requireSession(ctx.params.sessionID)
     })
 
+    // XCOD-191: the same rules as `lunos share <session>`, through the same code (CloudShare). Every
+    // refusal (sharing off, residency, signed out, no console, the console's own error) comes back
+    // as a 403 with a message to show, never a server fault.
+    const shareConsole = Effect.fn("SessionHttpApi.shareConsole")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof ShareConsolePayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      const refuse = (error: unknown) =>
+        new ShareDisabledApiError({
+          message:
+            error instanceof CloudShare.RefusedError || error instanceof CloudAuth.SignedOutError
+              ? error.message
+              : `Not shared: ${error instanceof Error ? error.message : String(error)}`,
+        })
+      const config = yield* configSvc.get()
+      const org = yield* Effect.promise(() => CloudOrg.resolve())
+      if (!org) return yield* new ShareDisabledApiError({ message: new CloudOrg.NotConfiguredError("/share").message })
+      const input = yield* CloudShare.sessionInput(ctx.params.sessionID, { sanitize: ctx.payload.sanitize }).pipe(
+        Effect.mapError(refuse),
+      )
+      const link = ctx.payload.link === false ? undefined : ctx.payload.link
+      if (typeof link === "number" && !(link > 0 && link <= 720))
+        return yield* new ShareDisabledApiError({ message: "A link works for more than 0 and at most 720 hours." })
+      const shared = yield* Effect.tryPromise({
+        try: () => CloudShare.upload(config, org, { ...input, linkHours: link }),
+        catch: refuse,
+      })
+      return {
+        org: org.org,
+        host: org.host,
+        id: shared.id,
+        url: shared.url,
+        ...(shared.link ? { link: { url: shared.link.url, expiresAt: shared.link.expiresAt } } : {}),
+      }
+    })
+
     const unshare = Effect.fn("SessionHttpApi.unshare")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
       yield* shareSvc
@@ -453,6 +494,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("abort", abort)
       .handle("init", init)
       .handle("share", share)
+      .handle("shareConsole", shareConsole)
       .handle("unshare", unshare)
       .handle("summarize", summarize)
       .handle("prompt", prompt)

@@ -80,6 +80,7 @@ import { getScrollAcceleration } from "../../util/scroll"
 import { collapseToolOutput } from "../../util/collapse-tool-output"
 import { usePluginRuntime } from "../../plugin/runtime"
 import { DialogRetryAction } from "../../component/dialog-retry-action"
+import { shareToConsole } from "../../component/dialog-share-console"
 import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
@@ -490,12 +491,13 @@ export function Session() {
     {
       title: session()?.share?.url
         ? "Copy share link"
-        : sync.data.config.share === "disabled" || sync.data.config.share === "cloud"
-          ? "Share session (disabled)"
-          : "Share session",
+        : sync.data.config.share === "cloud"
+          ? "Share session with your organisation"
+          : sync.data.config.share === "disabled"
+            ? "Share session (disabled)"
+            : "Share session",
       value: "session.share",
-      suggested:
-        route.type === "session" && sync.data.config.share !== "disabled" && sync.data.config.share !== "cloud",
+      suggested: route.type === "session" && sync.data.config.share !== "disabled",
       category: "Session",
       slash: {
         name: "share",
@@ -503,13 +505,10 @@ export function Session() {
       run: async () => {
         // Stay registered while disabled so a typed /share gets a plain answer
         // instead of being sent to the model as ordinary prompt text.
-        if (!session()?.share?.url && sync.data.config.share === "cloud") {
-          // XCOD-191: sessions go only to the organisation's Lunos console, with lunos share.
-          toast.show({
-            message: `Sessions are shared only with your organisation's Lunos console: run lunos share ${session()?.id ?? "<session id>"} in a terminal.`,
-            variant: "info",
-          })
-          dialog.clear()
+        if (sync.data.config.share === "cloud") {
+          // XCOD-191: only to the organisation's Lunos console, as lunos share does; never upstream's
+          // share service, and the session isn't marked shared (that would offer upstream's unshare).
+          await shareToConsole({ dialog, sdk, toast, clipboard, sessionID: route.sessionID })
           return
         }
         if (!session()?.share?.url && sync.data.config.share === "disabled") {

@@ -583,7 +583,7 @@ describe("an org source (team memory on the organisation's console)", () => {
       MemorySources.problem(
         { name: "team", type: "org" },
         {},
-        { org: "acme", base: "https://c/v1/orgs/acme", host: "c" },
+        { org: "acme", base: "https://c/v1/orgs/acme", host: "c", api: "https://c/v1" },
       ),
     ).toBeUndefined()
   })

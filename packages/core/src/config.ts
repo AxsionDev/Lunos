@@ -53,7 +53,7 @@ export class Info extends Schema.Class<Info>("Config.Info")({
     }),
   share: Schema.Literals(["manual", "auto", "disabled", "cloud"]).pipe(Schema.optional).annotate({
     description:
-      "Control whether sessions may be shared manually, automatically, or not at all; 'cloud' allows only lunos share to your organisation's Lunos console",
+      "Control whether sessions may be shared manually, automatically, or not at all; 'cloud' shares only with your organisation's Lunos console (/share, lunos share, lunos memory share)",
   }),
   enterprise: Schema.Struct({
     url: Schema.String.pipe(Schema.optional),
