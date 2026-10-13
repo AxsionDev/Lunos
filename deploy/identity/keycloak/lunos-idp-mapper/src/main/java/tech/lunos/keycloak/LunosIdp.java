@@ -38,11 +38,12 @@ public final class LunosIdp {
    * @param sso the sign-in was by the session cookie alone
    * @param brokeredAlias the identity provider this sign-in went through, or null/empty for the realm's
    *     own credentials
-   * @param current the alias recorded for the session so far, or null
-   * @return the alias to record, or null for the realm's own credentials
+   * @return the alias to record, "" for the realm's own credentials (recorded rather than removed,
+   *     because Keycloak copies a sign-in's notes onto an existing session but never removes any), or
+   *     null to keep what the session has
    */
-  public static String aliasAfterLogin(boolean sso, String brokeredAlias, String current) {
-    if (sso) return current;
-    return brokeredAlias == null || brokeredAlias.isEmpty() ? null : brokeredAlias;
+  public static String aliasAfterLogin(boolean sso, String brokeredAlias) {
+    if (sso) return null;
+    return brokeredAlias == null ? "" : brokeredAlias;
   }
 }

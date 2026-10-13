@@ -35,20 +35,21 @@ class LunosIdpTest {
 
   @Test
   void aCookieSignInKeepsTheSessionsProvider() {
-    assertEquals("acme-entra", LunosIdp.aliasAfterLogin(true, null, "acme-entra"));
-    assertNull(LunosIdp.aliasAfterLogin(true, null, null));
+    assertNull(LunosIdp.aliasAfterLogin(true, null));
+    assertNull(LunosIdp.aliasAfterLogin(true, "acme-entra"));
   }
 
   @Test
   void aPasswordSignInClearsTheSessionsProvider() {
-    assertNull(LunosIdp.aliasAfterLogin(false, null, "acme-entra"));
-    assertNull(LunosIdp.aliasAfterLogin(false, "", "acme-entra"));
+    assertEquals("", LunosIdp.aliasAfterLogin(false, null));
+    assertEquals("", LunosIdp.aliasAfterLogin(false, ""));
+    // "" reads as the realm's own sign-in.
+    assertEquals("lunos", LunosIdp.resolve("", null));
   }
 
   @Test
   void aBrokeredSignInRecordsItsProvider() {
-    assertEquals("acme-entra", LunosIdp.aliasAfterLogin(false, "acme-entra", null));
-    assertEquals("acme-entra", LunosIdp.aliasAfterLogin(false, "acme-entra", "github"));
+    assertEquals("acme-entra", LunosIdp.aliasAfterLogin(false, "acme-entra"));
   }
 
   @Test

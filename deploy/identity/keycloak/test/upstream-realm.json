@@ -46,6 +46,15 @@
       "lastName": "Bad",
       "enabled": true,
       "credentials": [{ "type": "password", "value": "bea-pass", "temporary": false }]
+    },
+    {
+      "username": "dee",
+      "email": "dee@acme.test",
+      "emailVerified": true,
+      "firstName": "Dee",
+      "lastName": "Acme",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "dee-pass", "temporary": false }]
     }
   ]
 }

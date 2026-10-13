@@ -7,6 +7,7 @@ import {
   browserLogin,
   claims,
   CookieJar,
+  deviceLogin,
   dockerAvailable,
   exchange,
   type Kc,
@@ -23,7 +24,13 @@ setDefaultTimeout(30_000)
 const R = "/Lunos"
 const SECOND_CLIENT = "lunos-test-2"
 const PAT = { email: "pat@lunos.test", password: "pat-pass" }
-const UPSTREAM = { uma: ["uma", "uma-pass"], vic: ["vic", "vic-pass"], bea: ["bea", "bea-pass"] } as const
+const UPSTREAM = {
+  uma: ["uma", "uma-pass"],
+  vic: ["vic", "vic-pass"],
+  bea: ["bea", "bea-pass"],
+  dee: ["dee", "dee-pass"],
+} as const
+const UMA_LOCAL = "uma-local"
 
 const idp = (tokens: Tokens) => ({
   id: claims(tokens.id_token).lunos_idp,
@@ -48,11 +55,10 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   async function brokered(
     alias: string,
     [username, password]: readonly [string, string],
-    jar?: CookieJar,
-    extra?: Record<string, string>,
+    opts: { jar?: CookieJar; extra?: Record<string, string>; scope?: string } = {},
   ) {
-    const { code, verifier, jar: used } = await browserLogin(kc, { username, password, idpHint: alias, jar, extra })
-    return { tokens: await exchange(kc, TEST_CLIENT, code, verifier), jar: used }
+    const { code, verifier, jar, posted } = await browserLogin(kc, { username, password, idpHint: alias, ...opts })
+    return { tokens: await exchange(kc, TEST_CLIENT, code, verifier), jar, posted }
   }
 
   beforeAll(async () => {
@@ -192,22 +198,17 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   test("re-authentication with a password in the same browser session", async () => {
     // uma, first signed in through acme-entra, now signs in with a Lunos password in the same browser.
     const [uma] = await kc.admin("GET", `${R}/users?email=${encodeURIComponent("uma@acme.test")}&exact=true`)
-    await kc.admin("PUT", `${R}/users/${uma.id}/reset-password`, { type: "password", value: "uma-local", temporary: false })
+    await kc.admin("PUT", `${R}/users/${uma.id}/reset-password`, { type: "password", value: UMA_LOCAL, temporary: false })
     const { code, verifier, posted } = await browserLogin(kc, {
       username: "uma@acme.test",
-      password: "uma-local",
+      password: UMA_LOCAL,
       jar: acmeJar,
       extra: { prompt: "login" },
     })
     // prompt=login made Keycloak ask again: the password went to Lunos's own login form, not upstream's.
     expect(posted.some((step) => step.startsWith("/realms/Lunos/login-actions/") && step.includes("password"))).toBe(true)
     const tokens = await exchange(kc, TEST_CLIENT, code, verifier)
-    const [before, after] = [claims(acme.id_token), claims(tokens.id_token)]
-    console.log(
-      `re-authentication: sid before ${before.sid}, after ${after.sid};`,
-      `auth_time before ${before.auth_time}, after ${after.auth_time};`,
-      `lunos_idp ${JSON.stringify(idp(tokens))}; forms posted: ${JSON.stringify(posted)}`,
-    )
+    expect(claims(tokens.id_token).sid).toBe(claims(acme.id_token).sid)
     expect(idp(tokens)).toEqual({ id: "lunos", access: "lunos" })
     afterPassword = tokens
   })
@@ -220,11 +221,13 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   test("re-authentication through the organisation's provider is its lunosIdp", async () => {
     // uma (whose Lunos password the previous tests set) signs in with it in a new browser, then
     // re-authenticates through acme-entra in the same browser.
-    const first = await browserLogin(kc, { username: "uma@acme.test", password: "uma-local" })
+    const first = await browserLogin(kc, { username: "uma@acme.test", password: UMA_LOCAL })
     const password = await exchange(kc, TEST_CLIENT, first.code, first.verifier)
     expect(idp(password)).toEqual({ id: "lunos", access: "lunos" })
-    const { tokens } = await brokered("acme-entra", UPSTREAM.uma, first.jar, { prompt: "login" })
-    console.log(`broker re-authentication: sid before ${claims(password.id_token).sid}, after ${claims(tokens.id_token).sid}`)
+    const { tokens, posted } = await brokered("acme-entra", UPSTREAM.uma, { jar: first.jar, extra: { prompt: "login" } })
+    // The re-authentication really went through the upstream realm's login form.
+    expect(posted.some((step) => step.startsWith("/realms/upstream/") && step.includes("password"))).toBe(true)
+    expect(claims(tokens.id_token).sid).toBe(claims(password.id_token).sid)
     expect(idp(tokens)).toEqual({ id: "org:acme:entra", access: "org:acme:entra" })
     afterBroker = tokens
   })
@@ -232,6 +235,67 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   test("refresh after re-authentication through the provider keeps it", async () => {
     const tokens = await refresh(kc, TEST_CLIENT, afterBroker.refresh_token)
     expect(idp(tokens)).toEqual({ id: "org:acme:entra", access: "org:acme:entra" })
+  })
+
+  // Keycloak removes an online session that was created for an offline token, so a later sign-in in that
+  // browser starts a new session. An offline session is reused only when the online session it was
+  // copied from lives on: sign in, take an offline token by cookie, then re-authenticate.
+  const ORG = { id: "org:acme:entra", access: "org:acme:entra" }
+  const OWN = { id: "lunos", access: "lunos" }
+  const offline = { scope: "openid offline_access" }
+
+  test("offline: a password re-authentication drops the org value from the offline session too", async () => {
+    const { tokens: viaBroker, jar } = await brokered("acme-entra", UPSTREAM.uma)
+    const sso = await browserLogin(kc, { username: "unused", password: "unused", jar, ...offline })
+    expect(sso.posted).toEqual([])
+    const first = await exchange(kc, TEST_CLIENT, sso.code, sso.verifier)
+    expect(claims(first.refresh_token).typ).toBe("Offline")
+    expect(idp(await refresh(kc, TEST_CLIENT, first.refresh_token))).toEqual(ORG)
+
+    const again = await browserLogin(kc, { username: "uma@acme.test", password: UMA_LOCAL, jar, extra: { prompt: "login" }, ...offline })
+    const viaPassword = await exchange(kc, TEST_CLIENT, again.code, again.verifier)
+    expect(claims(viaPassword.id_token).sid).toBe(claims(viaBroker.id_token).sid)
+    expect(idp(viaPassword)).toEqual(OWN)
+    expect(idp(await refresh(kc, TEST_CLIENT, viaPassword.refresh_token))).toEqual(OWN)
+    // The earlier offline token belongs to the same, reused offline session.
+    expect(idp(await refresh(kc, TEST_CLIENT, first.refresh_token))).toEqual(OWN)
+  })
+
+  test("offline: a re-authentication through the provider gives the offline session the org value", async () => {
+    const start = await browserLogin(kc, { username: "uma@acme.test", password: UMA_LOCAL })
+    const viaPassword = await exchange(kc, TEST_CLIENT, start.code, start.verifier)
+    const sso = await browserLogin(kc, { username: "unused", password: "unused", jar: start.jar, ...offline })
+    expect(sso.posted).toEqual([])
+    const first = await exchange(kc, TEST_CLIENT, sso.code, sso.verifier)
+    expect(idp(await refresh(kc, TEST_CLIENT, first.refresh_token))).toEqual(OWN)
+
+    const { tokens: viaBroker } = await brokered("acme-entra", UPSTREAM.uma, { jar: start.jar, extra: { prompt: "login" }, ...offline })
+    expect(claims(viaBroker.id_token).sid).toBe(claims(viaPassword.id_token).sid)
+    expect(idp(await refresh(kc, TEST_CLIENT, viaBroker.refresh_token))).toEqual(ORG)
+    expect(idp(await refresh(kc, TEST_CLIENT, first.refresh_token))).toEqual(ORG)
+  })
+
+  test("device sign-in (lunos login) through the organisation's provider is its lunosIdp", async () => {
+    // dee is new to Lunos: the first broker login creates her account during the device sign-in.
+    const { tokens, posted } = await deviceLogin(kc, {
+      username: UPSTREAM.dee[0],
+      password: UPSTREAM.dee[1],
+      idpLink: "acme-entra",
+      ...offline,
+    })
+    expect(posted.some((step) => step.startsWith("/realms/upstream/") && step.includes("password"))).toBe(true)
+    expect(claims(tokens.access_token).azp).toBe("lunos-cli")
+    expect(idp(tokens)).toEqual(ORG)
+    expect(idp(await refresh(kc, "lunos-cli", tokens.refresh_token))).toEqual(ORG)
+  })
+
+  test("device sign-in approved by the session cookie keeps the brokered value", async () => {
+    const { jar } = await brokered("acme-entra", UPSTREAM.uma)
+    const { tokens, posted } = await deviceLogin(kc, { username: "unused", password: "unused", jar, ...offline })
+    // No credentials asked for: only the device confirmation and consent pages.
+    expect(posted.filter((step) => /password|username/.test(step))).toEqual([])
+    expect(idp(tokens)).toEqual(ORG)
+    expect(idp(await refresh(kc, "lunos-cli", tokens.refresh_token))).toEqual(ORG)
   })
 
   test("the realm's clients are as specified", async () => {
@@ -290,5 +354,17 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     expect(clientRoles.map((r) => r.name)).toEqual(["manage-identity-providers"])
     const realmRoles: { name: string }[] = await kc.admin("GET", `${R}/users/${account.id}/role-mappings/realm`)
     expect(realmRoles.map((r) => r.name).filter((name) => name !== "default-roles-lunos")).toEqual([])
+  })
+
+  test("without the lunos-idp event listener a brokered sign-in says lunos (fails closed)", async () => {
+    const config = await kc.admin("GET", `${R}/events/config`)
+    expect(config.eventsListeners).toContain("lunos-idp")
+    await kc.admin("PUT", `${R}/events/config`, { ...config, eventsListeners: ["jboss-logging"] })
+    try {
+      const { tokens } = await brokered("acme-entra", UPSTREAM.uma)
+      expect(idp(tokens)).toEqual({ id: "lunos", access: "lunos" })
+    } finally {
+      await kc.admin("PUT", `${R}/events/config`, config)
+    }
   })
 })

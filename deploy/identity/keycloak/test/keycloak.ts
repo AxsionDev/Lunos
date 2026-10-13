@@ -39,7 +39,11 @@ function sh(cmd: string[], cwd = DIR) {
  * and outside the container, so an identity provider's URLs work from both the test and Keycloak.
  */
 export async function startKeycloak(opts?: { realmFiles?: string[] }): Promise<Kc> {
-  if (!(await Bun.file(path.join(DIR, "providers/lunos-idp-mapper.jar")).exists())) sh(["./build.sh"])
+  // Always rebuild: a stale jar from an earlier checkout would test old code.
+  sh(["./build.sh"])
+  // A run killed before its afterAll leaves its container holding the port.
+  const leftovers = sh(["docker", "ps", "-aq", "--filter", "name=^lunos-kc-test-"])
+  if (leftovers) sh(["docker", "rm", "-f", ...leftovers.split("\n")])
   const realmFiles = opts?.realmFiles ?? ["realm-lunos.json", "test/upstream-realm.json"]
   const name = `lunos-kc-test-${crypto.randomUUID().slice(0, 8)}`
   const stop = async () => {
@@ -158,19 +162,89 @@ const decode = (s: string) =>
 const attrsOf = (tag: string) =>
   Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*"([^"]*)"/g)].map((m) => [m[1].toLowerCase(), decode(m[2])]))
 
-/** The page's first form: its action and the values its inputs would submit as they stand. */
+/**
+ * The page's first form: its action and the values it would submit as it stands. Of its submit
+ * buttons only the first counts, as if clicked: a consent page's second button is "No".
+ */
 function firstForm(html: string) {
   const m = html.match(/<form\b[^>]*\baction="[^"]*"[^>]*>([\s\S]*?)<\/form>/i)
   if (!m) return undefined
   const action = attrsOf(m[0].slice(0, m[0].indexOf(">") + 1)).action
   const fields: Record<string, string> = {}
-  for (const input of m[1].matchAll(/<input\b[^>]*>/gi)) {
-    const a = attrsOf(input[0])
+  let clicked = false
+  for (const tag of m[1].matchAll(/<(input|button)\b[^>]*>/gi)) {
+    const a = attrsOf(tag[0])
     if (!a.name) continue
-    if ((a.type === "checkbox" || a.type === "radio") && !/\bchecked\b/i.test(input[0])) continue
+    const submit = tag[1].toLowerCase() === "button" ? (a.type ?? "submit") === "submit" : a.type === "submit"
+    if (submit) {
+      if (clicked) continue
+      clicked = true
+    } else if (tag[1].toLowerCase() === "button") continue
+    if ((a.type === "checkbox" || a.type === "radio") && !/\bchecked\b/i.test(tag[0])) continue
     fields[a.name] = a.value ?? ""
   }
   return { action, fields }
+}
+
+type BrowseOptions = {
+  username: string
+  password: string
+  jar: CookieJar
+  /** On a login page, follow the link to this identity provider instead of posting the form. */
+  idpLink?: string
+  /** A redirect to a URL starting with this ends the walk. */
+  stopAt?: string
+}
+
+/**
+ * Walks Keycloak's pages the way a browser would: follows redirects, and on each HTML page posts its
+ * first form with the inputs' current values (so Keycloak's prefilled profile pages pass through) plus
+ * username and password wherever the form asks for them. Ends at a redirect to `stopAt`, or at a page
+ * with nothing to submit.
+ */
+async function browse(start: string, opts: BrowseOptions) {
+  let url = start
+  let init: RequestInit = {}
+  let html = ""
+  let followedIdp = false
+  // Each form posted, as "<action path> <field names>", so a test can tell which pages the sign-in went through.
+  const posted: string[] = []
+  for (let hop = 0; hop <= 15; hop++) {
+    const res = await fetch(url, {
+      ...init,
+      redirect: "manual",
+      headers: { ...(init.headers as Record<string, string>), cookie: opts.jar.header(url) },
+    })
+    opts.jar.store(res)
+    const location = res.headers.get("location")
+    if (res.status >= 300 && res.status < 400 && location) {
+      url = new URL(location, url).toString()
+      init = {}
+      if (opts.stopAt && url.startsWith(opts.stopAt)) return { url, html, posted }
+      continue
+    }
+    html = await res.text()
+    const link = opts.idpLink && !followedIdp && html.match(new RegExp(`href="([^"]*/broker/${opts.idpLink}/login[^"]*)"`))
+    if (link) {
+      followedIdp = true
+      url = new URL(decode(link[1]), url).toString()
+      init = {}
+      continue
+    }
+    const form = firstForm(html)
+    if (!form?.action) return { url, html, posted }
+    const fields = { ...form.fields }
+    if ("username" in fields) fields.username = opts.username
+    if ("password" in fields) fields.password = opts.password
+    url = new URL(form.action, url).toString()
+    posted.push(`${new URL(url).pathname} ${Object.keys(fields).join(",")}`)
+    init = {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(fields).toString(),
+    }
+  }
+  throw new Error(`browser walk exceeded 15 hops; last page at ${url}:\n${html.slice(0, 2048)}`)
 }
 
 export type LoginParams = {
@@ -182,15 +256,13 @@ export type LoginParams = {
   jar?: CookieJar
   /** Extra authorization request parameters, e.g. { prompt: "login" }. */
   extra?: Record<string, string>
+  /** Default "openid". */
+  scope?: string
   clientId?: string
   redirectUri?: string
 }
 
-/**
- * Signs in through the browser flow the way a browser would: follows redirects, and on each HTML page
- * posts its first form with the inputs' current values (so Keycloak's prefilled profile pages pass
- * through) plus username and password wherever the form asks for them.
- */
+/** Signs in through the browser flow (authorization code + PKCE) and returns the code. */
 export async function browserLogin(kc: Kc, params: LoginParams) {
   const jar = params.jar ?? new CookieJar()
   const { verifier, challenge } = pkce()
@@ -198,53 +270,47 @@ export async function browserLogin(kc: Kc, params: LoginParams) {
   const query = new URLSearchParams({
     client_id: params.clientId ?? TEST_CLIENT,
     response_type: "code",
-    scope: "openid",
+    scope: params.scope ?? "openid",
     redirect_uri: redirectUri,
     code_challenge: challenge,
     code_challenge_method: "S256",
     ...(params.idpHint ? { kc_idp_hint: params.idpHint } : {}),
     ...params.extra,
   })
-  let url = `${kc.base}/realms/Lunos/protocol/openid-connect/auth?${query}`
-  let init: RequestInit = {}
-  let lastHtml = ""
-  // Each form posted, as "<action path> <field names>", so a test can tell which pages the sign-in went through.
-  const posted: string[] = []
-  for (let hop = 0; hop <= 15; hop++) {
-    const res = await fetch(url, {
-      ...init,
-      redirect: "manual",
-      headers: { ...(init.headers as Record<string, string>), cookie: jar.header(url) },
-    })
-    jar.store(res)
-    const location = res.headers.get("location")
-    if (res.status >= 300 && res.status < 400 && location) {
-      const next = new URL(location, url).toString()
-      if (next.startsWith(redirectUri)) {
-        const back = new URL(next).searchParams
-        const code = back.get("code")
-        if (!code) throw new Error(`sign-in ended without a code: ${next}`)
-        return { code, verifier, jar, posted }
-      }
-      url = next
-      init = {}
-      continue
-    }
-    lastHtml = await res.text()
-    const form = firstForm(lastHtml)
-    if (!form?.action) break
-    const fields = { ...form.fields }
-    if ("username" in fields) fields.username = params.username
-    if ("password" in fields) fields.password = params.password
-    url = new URL(form.action, url).toString()
-    posted.push(`${new URL(url).pathname} ${Object.keys(fields).join(",")}`)
-    init = {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(fields).toString(),
-    }
+  const start = `${kc.base}/realms/Lunos/protocol/openid-connect/auth?${query}`
+  const { url, html, posted } = await browse(start, { ...params, jar, stopAt: redirectUri })
+  if (!url.startsWith(redirectUri)) {
+    throw new Error(`browser sign-in didn't reach ${redirectUri}; last page at ${url}:\n${html.slice(0, 2048)}`)
   }
-  throw new Error(`browser sign-in didn't reach ${redirectUri}; last page at ${url}:\n${lastHtml.slice(0, 2048)}`)
+  const code = new URL(url).searchParams.get("code")
+  if (!code) throw new Error(`sign-in ended without a code: ${url}`)
+  return { code, verifier, jar, posted }
+}
+
+/**
+ * The CLI's sign-in (OAuth 2.0 device authorization grant): starts it as `lunos-cli`, approves it in
+ * the browser at verification_uri_complete, then fetches the tokens as the CLI's poll would.
+ */
+export async function deviceLogin(
+  kc: Kc,
+  params: { username: string; password: string; jar?: CookieJar; idpLink?: string; scope?: string },
+) {
+  const jar = params.jar ?? new CookieJar()
+  const res = await fetch(`${kc.base}/realms/Lunos/protocol/openid-connect/auth/device`, {
+    method: "POST",
+    body: new URLSearchParams({ client_id: "lunos-cli", scope: params.scope ?? "openid" }),
+  })
+  const device = (await res.json()) as { device_code: string; verification_uri_complete: string }
+  if (!res.ok) throw new Error(`device authorization: ${res.status} ${JSON.stringify(device)}`)
+  const { posted, html } = await browse(device.verification_uri_complete, { ...params, jar })
+  const tokens = await tokenRequest(kc, {
+    grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+    client_id: "lunos-cli",
+    device_code: device.device_code,
+  }).catch((err) => {
+    throw new Error(`${err.message}\nlast browser page:\n${html.slice(0, 2048)}`)
+  })
+  return { tokens, jar, posted }
 }
 
 async function tokenRequest(kc: Kc, form: Record<string, string>): Promise<Tokens> {

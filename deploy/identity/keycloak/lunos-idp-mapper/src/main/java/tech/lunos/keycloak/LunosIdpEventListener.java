@@ -41,26 +41,38 @@ public class LunosIdpEventListener implements EventListenerProvider, EventListen
 
   @Override
   public void onEvent(Event event) {
-    if (event.getType() != EventType.LOGIN || event.getSessionId() == null) return;
+    if (event.getType() != EventType.LOGIN) return;
     RealmModel realm = session.realms().getRealm(event.getRealmId());
-    UserSessionModel userSession = session.sessions().getUserSession(realm, event.getSessionId());
-    if (userSession == null) return;
-
     // LOGIN is sent in the request that finished the authentication, before Keycloak drops the
     // authentication session's SSO marker, so the session tells a cookie sign-in from a real one.
-    // Without it, the sign-in counts as a real one: losing an org value is safer than keeping a stale one.
     AuthenticationSessionModel authSession = session.getContext().getAuthenticationSession();
+    // On the consent path (every device sign-in, and clients that ask for consent) Keycloak sends LOGIN
+    // before it attaches the user session, so the event has no session id yet; the session it attaches
+    // is the one named after the authentication session's root.
+    String sessionId = event.getSessionId() != null ? event.getSessionId()
+        : authSession != null ? authSession.getParentSession().getId() : null;
+    if (sessionId == null) return;
+
+    // Without the authentication session, the sign-in counts as a real one: losing an org value is
+    // safer than keeping a stale one.
     boolean sso = authSession != null && AuthenticatorUtil.isSSOAuthentication(authSession);
     // The broker puts the provider in this authentication's notes; Keycloak only copies them onto the
     // user session, so a provider found here was used by this sign-in, not an earlier one.
     String brokered = authSession != null
         ? authSession.getUserSessionNotes().get(Details.IDENTITY_PROVIDER)
         : event.getDetails() == null ? null : event.getDetails().get(Details.IDENTITY_PROVIDER);
+    String alias = LunosIdp.aliasAfterLogin(sso, brokered);
+    LOG.debugf("lunos_idp: session %s sso=%s brokered=%s -> %s", sessionId, sso, brokered, alias);
+    if (alias == null) return;
 
-    String alias = LunosIdp.aliasAfterLogin(sso, brokered, userSession.getNote(NOTE));
-    LOG.debugf("lunos_idp: session %s sso=%s brokered=%s -> %s", userSession.getId(), sso, brokered, alias);
-    if (alias == null) userSession.removeNote(NOTE);
-    else userSession.setNote(NOTE, alias);
+    // A session not attached yet gets the note when Keycloak copies this sign-in's notes onto it.
+    if (authSession != null) authSession.setUserSessionNote(NOTE, alias);
+    UserSessionModel online = session.sessions().getUserSession(realm, sessionId);
+    if (online != null) online.setNote(NOTE, alias);
+    // An offline session copies the online session's notes only when it is first created; when a later
+    // sign-in with offline_access reuses it, its refresh tokens would keep the earlier value.
+    UserSessionModel offline = session.sessions().getOfflineUserSession(realm, sessionId);
+    if (offline != null) offline.setNote(NOTE, alias);
   }
 
   @Override
