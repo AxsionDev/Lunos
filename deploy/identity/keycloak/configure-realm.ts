@@ -137,8 +137,8 @@ export async function configure(
   if (!cli) throw new Error(`realm ${realm} has no lunos-cli client; this script doesn't create it (import realm-lunos.json into a new realm instead)`)
   const scopes: Json[] = await api.call("GET", `${r}/client-scopes`)
   let scopeId: string | undefined = scopes.find((s) => s.name === SCOPE)?.id
-  const mappersPath = `${r}/client-scopes/${scopeId}/protocol-mappers/models`
-  const haveMappers: Json[] = scopeId ? await api.call("GET", mappersPath) : []
+  const mappersPath = (id: string) => `${r}/client-scopes/${id}/protocol-mappers/models`
+  const haveMappers: Json[] = scopeId ? await api.call("GET", mappersPath(scopeId)) : []
   for (const want of wantScope.protocolMappers) {
     const mapper = haveMappers.find((m) => m.name === want.name)
     // Changing a mapper's type would mean replacing it, and this script never deletes.
@@ -152,16 +152,17 @@ export async function configure(
     const mappers = wantScope.protocolMappers.map((m: Json) => m.name).join(", ")
     scopeId = await change(`create client scope ${SCOPE} (mappers ${mappers})`, () => api.create(`${r}/client-scopes`, wantScope))
   } else {
+    const scopeMappers = mappersPath(scopeId)
     for (const want of wantScope.protocolMappers) {
       const mapper = haveMappers.find((m) => m.name === want.name)
       if (!mapper) {
-        await change(`add mapper ${want.name} to client scope ${SCOPE}`, () => api.call("POST", mappersPath, want))
+        await change(`add mapper ${want.name} to client scope ${SCOPE}`, () => api.call("POST", scopeMappers, want))
         continue
       }
       const keys = Object.keys(want.config).filter((k) => mapper.config?.[k] !== want.config[k])
       if (keys.length) {
         await change(`set ${keys.join(", ")} on client scope ${SCOPE}'s mapper ${want.name}`, () =>
-          api.call("PUT", `${mappersPath}/${mapper.id}`, { ...mapper, config: { ...mapper.config, ...want.config } }),
+          api.call("PUT", `${scopeMappers}/${mapper.id}`, { ...mapper, config: { ...mapper.config, ...want.config } }),
         )
       }
     }

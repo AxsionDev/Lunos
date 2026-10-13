@@ -45,10 +45,13 @@ const idp = (tokens: Tokens) => ({
 // The realm as it is live before XCOD-185: dev's realm file, renamed so it imports beside Lunos.
 const OLD = "OldLunos"
 const OLD_FILE = "test/.old-lunos.json"
-const OLD_APP_EXTRAS = {
-  redirectUris: ["http://localhost:3000/auth/callback"],
+// Entries an operator added by hand to a client before configure-realm.ts ran; they must survive it.
+type Extras = { redirectUris: string[]; webOrigins: string[]; postLogout: string[] }
+const NO_EXTRAS: Extras = { redirectUris: [], webOrigins: [], postLogout: [] }
+const OLD_CONSOLE_EXTRAS: Extras = {
+  redirectUris: ["http://localhost:3000/console/callback"],
   webOrigins: ["http://localhost:3000"],
-  postLogout: ["http://localhost:3000/"],
+  postLogout: ["http://localhost:3000/console/"],
 }
 const OLD_CONSOLE_SECRET = "old-console-secret"
 
@@ -67,15 +70,24 @@ async function clientByClientId(kc: Kc, clientId: string, realm = R) {
 
 const sorted = (xs: string[]) => [...xs].sort()
 
+/** A web client's URI lists are exactly `want`'s plus `extras`, in any order. */
+function expectUris(client: any, want: { redirect: string; origin: string; postLogout: string }, extras: Extras) {
+  expect(sorted(client.redirectUris)).toEqual(sorted([want.redirect, ...extras.redirectUris]))
+  expect(sorted(client.webOrigins)).toEqual(sorted([want.origin, ...extras.webOrigins]))
+  expect(sorted(client.attributes["post.logout.redirect.uris"].split("##"))).toEqual(sorted([want.postLogout, ...extras.postLogout]))
+}
+
+const APP_URIS = {
+  redirect: "https://app.lunos.tech/auth/callback",
+  origin: "https://app.lunos.tech",
+  postLogout: "https://app.lunos.tech/",
+}
+
 /**
- * Test 8's assertions on the clients, for any realm (path form, "/Lunos"). lunos-app's URI lists must be
- * exactly the bundle's plus `appExtras`, the entries an operator had added before configure-realm.ts ran.
+ * Test 8's assertions on the clients, for any realm (path form, "/Lunos"). A client's URI lists must be
+ * exactly the bundle's plus its `extras`.
  */
-async function expectClientsAsSpecified(
-  kc: Kc,
-  realm: string,
-  appExtras: { redirectUris: string[]; webOrigins: string[]; postLogout: string[] } = { redirectUris: [], webOrigins: [], postLogout: [] },
-) {
+async function expectClientsAsSpecified(kc: Kc, realm: string, extras: { app?: Extras; console?: Extras } = {}) {
   for (const clientId of ["lunos-cli", "lunos-app", "lunos-console"]) {
     const client = await clientByClientId(kc, clientId, realm)
     const scopes: { name: string }[] = await kc.admin("GET", `${realm}/clients/${client.id}/default-client-scopes`)
@@ -92,11 +104,7 @@ async function expectClientsAsSpecified(
   }
   const app = await clientByClientId(kc, "lunos-app", realm)
   expect(app).toMatchObject(webClient)
-  expect(sorted(app.redirectUris)).toEqual(sorted(["https://app.lunos.tech/auth/callback", ...appExtras.redirectUris]))
-  expect(sorted(app.webOrigins)).toEqual(sorted(["https://app.lunos.tech", ...appExtras.webOrigins]))
-  expect(sorted(app.attributes["post.logout.redirect.uris"].split("##"))).toEqual(
-    sorted(["https://app.lunos.tech/", ...appExtras.postLogout]),
-  )
+  expectUris(app, APP_URIS, extras.app ?? NO_EXTRAS)
   expect(app.attributes).toMatchObject({
     "pkce.code.challenge.method": "S256",
     "backchannel.logout.url": "https://app.lunos.tech/auth/backchannel-logout",
@@ -104,15 +112,13 @@ async function expectClientsAsSpecified(
   })
 
   const console_ = await clientByClientId(kc, "lunos-console", realm)
-  expect(console_).toMatchObject({
-    ...webClient,
-    redirectUris: ["https://cloud.lunos.tech/console/callback"],
-    webOrigins: ["https://cloud.lunos.tech"],
-  })
-  expect(console_.attributes).toMatchObject({
-    "pkce.code.challenge.method": "S256",
-    "post.logout.redirect.uris": "https://cloud.lunos.tech/console/",
-  })
+  expect(console_).toMatchObject(webClient)
+  expectUris(
+    console_,
+    { redirect: "https://cloud.lunos.tech/console/callback", origin: "https://cloud.lunos.tech", postLogout: "https://cloud.lunos.tech/console/" },
+    extras.console ?? NO_EXTRAS,
+  )
+  expect(console_.attributes).toMatchObject({ "pkce.code.challenge.method": "S256" })
 
   const consoleAdmin = await clientByClientId(kc, "lunos-console-admin", realm)
   expect(consoleAdmin).toMatchObject({
@@ -122,6 +128,12 @@ async function expectClientsAsSpecified(
     directAccessGrantsEnabled: false,
     serviceAccountsEnabled: true,
   })
+  const bundle = await Bun.file(path.resolve(import.meta.dir, "../realm-lunos.json")).json()
+  const wantAdminScopes: string[] = bundle.clients.find((c: any) => c.clientId === "lunos-console-admin").defaultClientScopes
+  const adminScopes: { name: string }[] = await kc.admin("GET", `${realm}/clients/${consoleAdmin.id}/default-client-scopes`)
+  // Keycloak attaches its built-in service_account scope to a client created with a service account
+  // through the admin API (configure-realm.ts's path), though not on import.
+  expect(sorted(adminScopes.map((s) => s.name).filter((name) => name !== "service_account"))).toEqual(sorted(wantAdminScopes))
   const account = await kc.admin("GET", `${realm}/clients/${consoleAdmin.id}/service-account-user`)
   const realmManagement = await clientByClientId(kc, "realm-management", realm)
   const clientRoles: { name: string }[] = await kc.admin(
@@ -158,23 +170,17 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     try {
       // Startup waits only for Lunos; a skipped import would otherwise surface as a 404 tests later.
       await kc.admin("GET", `/${OLD}`)
-      // OldLunos half-done by hand, so configure-realm.ts takes its update path: a public lunos-app with an
-      // operator's extras, and a confidential lunos-console whose secret must survive.
-      await kc.admin("POST", `/${OLD}/clients`, {
-        clientId: "lunos-app",
-        enabled: true,
-        publicClient: true,
-        standardFlowEnabled: true,
-        redirectUris: [OLD_APP_EXTRAS.redirectUris[0]],
-        webOrigins: OLD_APP_EXTRAS.webOrigins,
-        attributes: { "x.lunos.test": "keep", "post.logout.redirect.uris": OLD_APP_EXTRAS.postLogout[0] },
-      })
+      // OldLunos half-done by hand: lunos-console exists (configure-realm.ts updates it, keeping the
+      // operator's extras and secret); lunos-app and lunos-console-admin don't (it creates them, as live).
       await kc.admin("POST", `/${OLD}/clients`, {
         clientId: "lunos-console",
         enabled: true,
         publicClient: false,
         standardFlowEnabled: true,
         secret: OLD_CONSOLE_SECRET,
+        redirectUris: OLD_CONSOLE_EXTRAS.redirectUris,
+        webOrigins: OLD_CONSOLE_EXTRAS.webOrigins,
+        attributes: { "x.lunos.test": "keep", "post.logout.redirect.uris": OLD_CONSOLE_EXTRAS.postLogout.join("##") },
       })
       // Keycloak 26 drops attributes its user profile doesn't declare; allow them, or pat's lunos_idp
       // attribute would never be stored and test 2 would prove nothing.
@@ -449,7 +455,6 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     const cliScopes: { name: string }[] = await kc.admin("GET", `/${OLD}/clients/${cli.id}/default-client-scopes`)
     const console_ = await clientByClientId(kc, "lunos-console", `/${OLD}`)
     return {
-      app: await clientByClientId(kc, "lunos-app", `/${OLD}`),
       console: console_,
       consoleSecret: (await kc.admin("GET", `/${OLD}/clients/${console_.id}/client-secret`)).value,
       scopes: scopes.map((s) => s.name).sort(),
@@ -464,7 +469,7 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   test("configure refuses without the mapper or without the event listener", async () => {
     asImported = await oldRealmState()
     expect(asImported.scopes).not.toContain("lunos")
-    expect(asImported.app.publicClient).toBe(true)
+    expect(asImported.clients).not.toContain("lunos-app")
 
     const noMapper = serverinfoWithout((info) => {
       info.protocolMapperTypes["openid-connect"] = info.protocolMapperTypes["openid-connect"].filter(
@@ -504,6 +509,39 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     const before = await state()
     await expect(configure({ ...oldEnv(), KC_REALM: "BadScope" })).rejects.toThrow(/mapper lunos_idp is a oidc-hardcoded-claim-mapper/)
     expect(await state()).toEqual(before)
+    await kc.admin("DELETE", "/BadScope")
+  })
+
+  test("configure makes a public lunos-app confidential, with a secret, keeping its extras", async () => {
+    // A throwaway realm: OldLunos's lunos-app takes the create path, so the conversion is proven here.
+    const extras: Extras = {
+      redirectUris: ["http://localhost:3000/auth/callback"],
+      webOrigins: ["http://localhost:3000"],
+      postLogout: ["http://localhost:3000/"],
+    }
+    await kc.admin("POST", "", { realm: "ConvRealm", enabled: true })
+    try {
+      await kc.admin("POST", "/ConvRealm/clients", { clientId: "lunos-cli", publicClient: true })
+      await kc.admin("POST", "/ConvRealm/clients", {
+        clientId: "lunos-app",
+        enabled: true,
+        publicClient: true,
+        standardFlowEnabled: true,
+        redirectUris: extras.redirectUris,
+        webOrigins: extras.webOrigins,
+        attributes: { "x.lunos.test": "keep", "post.logout.redirect.uris": extras.postLogout[0] },
+      })
+      const changes = await configure({ ...oldEnv(), KC_REALM: "ConvRealm" })
+      expect(changes).toContain("create client scope lunos (mappers lunos_idp, lunos-api audience)")
+      const app = await clientByClientId(kc, "lunos-app", "/ConvRealm")
+      expect(app).toMatchObject({ publicClient: false, standardFlowEnabled: true, directAccessGrantsEnabled: false })
+      expectUris(app, APP_URIS, extras)
+      expect(app.attributes).toMatchObject({ "x.lunos.test": "keep", "pkce.code.challenge.method": "S256" })
+      expect((await kc.admin("GET", `/ConvRealm/clients/${app.id}/client-secret`)).value).toBeTruthy()
+      expect(await configure({ ...oldEnv(), KC_REALM: "ConvRealm" })).toEqual([])
+    } finally {
+      await kc.admin("DELETE", "/ConvRealm")
+    }
   })
 
   test("configure with DRY_RUN plans the changes and makes none", async () => {
@@ -515,13 +553,15 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
 
   test("configure brings an old realm to the new shape", async () => {
     const changes = await configure(oldEnv())
-    expect(changes.length).toBeGreaterThan(0)
+    expect(changes).toContain("create client lunos-app")
+    expect(changes).toContain("create client lunos-console-admin")
 
-    await expectClientsAsSpecified(kc, `/${OLD}`, OLD_APP_EXTRAS)
+    // lunos-app was created (exactly as specified, no extras); lunos-console was updated.
+    await expectClientsAsSpecified(kc, `/${OLD}`, { console: OLD_CONSOLE_EXTRAS })
     const app = await clientByClientId(kc, "lunos-app", `/${OLD}`)
-    expect(app.attributes["x.lunos.test"]).toBe("keep")
     expect((await kc.admin("GET", `/${OLD}/clients/${app.id}/client-secret`)).value).toBeTruthy()
     const console_ = await clientByClientId(kc, "lunos-console", `/${OLD}`)
+    expect(console_.attributes["x.lunos.test"]).toBe("keep")
     expect((await kc.admin("GET", `/${OLD}/clients/${console_.id}/client-secret`)).value).toBe(OLD_CONSOLE_SECRET)
     const config = await kc.admin("GET", `/${OLD}/events/config`)
     expect(config.eventsListeners).toContain("lunos-idp")
