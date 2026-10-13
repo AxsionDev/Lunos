@@ -2,7 +2,8 @@
 // Run from deploy/identity/keycloak: bun test test/lunos-idp.test.ts (skipped when Docker isn't running).
 // Everything the tests need beyond the two realm files (a test client, a user, the identity providers)
 // is created here through the admin API, so none of it can leak into the production realm file.
-// The last tests run configure-realm.ts against a third realm, OldLunos, imported from dev's realm file.
+// The last tests run configure-realm.ts against a third realm, OldLunos, imported from dev's realm file;
+// they need origin/dev locally (git fetch origin dev).
 import { rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
@@ -44,6 +45,12 @@ const idp = (tokens: Tokens) => ({
 // The realm as it is live before XCOD-185: dev's realm file, renamed so it imports beside Lunos.
 const OLD = "OldLunos"
 const OLD_FILE = "test/.old-lunos.json"
+const OLD_APP_EXTRAS = {
+  redirectUris: ["http://localhost:3000/auth/callback"],
+  webOrigins: ["http://localhost:3000"],
+  postLogout: ["http://localhost:3000/"],
+}
+const OLD_CONSOLE_SECRET = "old-console-secret"
 
 function writeOldRealm() {
   const dir = path.resolve(import.meta.dir, "..")
@@ -58,8 +65,17 @@ async function clientByClientId(kc: Kc, clientId: string, realm = R) {
   return client
 }
 
-/** Test 8's assertions on the clients, for any realm (path form, "/Lunos"). */
-async function expectClientsAsSpecified(kc: Kc, realm: string) {
+const sorted = (xs: string[]) => [...xs].sort()
+
+/**
+ * Test 8's assertions on the clients, for any realm (path form, "/Lunos"). lunos-app's URI lists must be
+ * exactly the bundle's plus `appExtras`, the entries an operator had added before configure-realm.ts ran.
+ */
+async function expectClientsAsSpecified(
+  kc: Kc,
+  realm: string,
+  appExtras: { redirectUris: string[]; webOrigins: string[]; postLogout: string[] } = { redirectUris: [], webOrigins: [], postLogout: [] },
+) {
   for (const clientId of ["lunos-cli", "lunos-app", "lunos-console"]) {
     const client = await clientByClientId(kc, clientId, realm)
     const scopes: { name: string }[] = await kc.admin("GET", `${realm}/clients/${client.id}/default-client-scopes`)
@@ -75,14 +91,14 @@ async function expectClientsAsSpecified(kc: Kc, realm: string) {
     frontchannelLogout: false,
   }
   const app = await clientByClientId(kc, "lunos-app", realm)
-  expect(app).toMatchObject({
-    ...webClient,
-    redirectUris: ["https://app.lunos.tech/auth/callback"],
-    webOrigins: ["https://app.lunos.tech"],
-  })
+  expect(app).toMatchObject(webClient)
+  expect(sorted(app.redirectUris)).toEqual(sorted(["https://app.lunos.tech/auth/callback", ...appExtras.redirectUris]))
+  expect(sorted(app.webOrigins)).toEqual(sorted(["https://app.lunos.tech", ...appExtras.webOrigins]))
+  expect(sorted(app.attributes["post.logout.redirect.uris"].split("##"))).toEqual(
+    sorted(["https://app.lunos.tech/", ...appExtras.postLogout]),
+  )
   expect(app.attributes).toMatchObject({
     "pkce.code.challenge.method": "S256",
-    "post.logout.redirect.uris": "https://app.lunos.tech/",
     "backchannel.logout.url": "https://app.lunos.tech/auth/backchannel-logout",
     "backchannel.logout.session.required": "true",
   })
@@ -142,6 +158,24 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     try {
       // Startup waits only for Lunos; a skipped import would otherwise surface as a 404 tests later.
       await kc.admin("GET", `/${OLD}`)
+      // OldLunos half-done by hand, so configure-realm.ts takes its update path: a public lunos-app with an
+      // operator's extras, and a confidential lunos-console whose secret must survive.
+      await kc.admin("POST", `/${OLD}/clients`, {
+        clientId: "lunos-app",
+        enabled: true,
+        publicClient: true,
+        standardFlowEnabled: true,
+        redirectUris: [OLD_APP_EXTRAS.redirectUris[0]],
+        webOrigins: OLD_APP_EXTRAS.webOrigins,
+        attributes: { "x.lunos.test": "keep", "post.logout.redirect.uris": OLD_APP_EXTRAS.postLogout[0] },
+      })
+      await kc.admin("POST", `/${OLD}/clients`, {
+        clientId: "lunos-console",
+        enabled: true,
+        publicClient: false,
+        standardFlowEnabled: true,
+        secret: OLD_CONSOLE_SECRET,
+      })
       // Keycloak 26 drops attributes its user profile doesn't declare; allow them, or pat's lunos_idp
       // attribute would never be stored and test 2 would prove nothing.
       const profile = await kc.admin("GET", `${R}/users/profile`)
@@ -413,7 +447,11 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     const defaults: { name: string }[] = await kc.admin("GET", `/${OLD}/default-default-client-scopes`)
     const cli = await clientByClientId(kc, "lunos-cli", `/${OLD}`)
     const cliScopes: { name: string }[] = await kc.admin("GET", `/${OLD}/clients/${cli.id}/default-client-scopes`)
+    const console_ = await clientByClientId(kc, "lunos-console", `/${OLD}`)
     return {
+      app: await clientByClientId(kc, "lunos-app", `/${OLD}`),
+      console: console_,
+      consoleSecret: (await kc.admin("GET", `/${OLD}/clients/${console_.id}/client-secret`)).value,
       scopes: scopes.map((s) => s.name).sort(),
       clients: clients.map((c) => c.clientId).sort(),
       defaults: defaults.map((s) => s.name).sort(),
@@ -426,20 +464,46 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   test("configure refuses without the mapper or without the event listener", async () => {
     asImported = await oldRealmState()
     expect(asImported.scopes).not.toContain("lunos")
-    expect(asImported.clients).not.toContain("lunos-app")
+    expect(asImported.app.publicClient).toBe(true)
 
     const noMapper = serverinfoWithout((info) => {
       info.protocolMapperTypes["openid-connect"] = info.protocolMapperTypes["openid-connect"].filter(
         (m: { id: string }) => m.id !== "lunos-idp-mapper",
       )
     })
-    await expect(configure(oldEnv(), noMapper)).rejects.toThrow(/lunos-idp-mapper[\s\S]*build\.sh/)
+    await expect(configure(oldEnv(), noMapper)).rejects.toThrow(/protocol mapper lunos-idp-mapper[\s\S]*build\.sh/)
 
     const noListener = serverinfoWithout((info) => {
       delete info.providers.eventsListener.providers["lunos-idp"]
     })
-    await expect(configure(oldEnv(), noListener)).rejects.toThrow(/lunos-idp[\s\S]*build\.sh/)
+    await expect(configure(oldEnv(), noListener)).rejects.toThrow(/event listener lunos-idp[\s\S]*build\.sh/)
     expect(await oldRealmState()).toEqual(asImported)
+  })
+
+  test("configure refuses a lunos scope whose mapper has another type, before changing anything", async () => {
+    // A throwaway realm: OldLunos must stay as imported for the tests after this one.
+    await kc.admin("POST", "", { realm: "BadScope", enabled: true })
+    await kc.admin("POST", "/BadScope/clients", { clientId: "lunos-cli", publicClient: true })
+    await kc.admin("POST", "/BadScope/client-scopes", {
+      name: "lunos",
+      protocol: "openid-connect",
+      protocolMappers: [
+        {
+          name: "lunos_idp",
+          protocol: "openid-connect",
+          protocolMapper: "oidc-hardcoded-claim-mapper",
+          config: { "claim.name": "lunos_idp", "claim.value": "lunos" },
+        },
+      ],
+    })
+    const state = async () => ({
+      clients: (await kc.admin("GET", "/BadScope/clients")).map((c: { clientId: string }) => c.clientId).sort(),
+      defaults: (await kc.admin("GET", "/BadScope/default-default-client-scopes")).map((s: { name: string }) => s.name).sort(),
+      listeners: (await kc.admin("GET", "/BadScope/events/config")).eventsListeners,
+    })
+    const before = await state()
+    await expect(configure({ ...oldEnv(), KC_REALM: "BadScope" })).rejects.toThrow(/mapper lunos_idp is a oidc-hardcoded-claim-mapper/)
+    expect(await state()).toEqual(before)
   })
 
   test("configure with DRY_RUN plans the changes and makes none", async () => {
@@ -453,7 +517,12 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     const changes = await configure(oldEnv())
     expect(changes.length).toBeGreaterThan(0)
 
-    await expectClientsAsSpecified(kc, `/${OLD}`)
+    await expectClientsAsSpecified(kc, `/${OLD}`, OLD_APP_EXTRAS)
+    const app = await clientByClientId(kc, "lunos-app", `/${OLD}`)
+    expect(app.attributes["x.lunos.test"]).toBe("keep")
+    expect((await kc.admin("GET", `/${OLD}/clients/${app.id}/client-secret`)).value).toBeTruthy()
+    const console_ = await clientByClientId(kc, "lunos-console", `/${OLD}`)
+    expect((await kc.admin("GET", `/${OLD}/clients/${console_.id}/client-secret`)).value).toBe(OLD_CONSOLE_SECRET)
     const config = await kc.admin("GET", `/${OLD}/events/config`)
     expect(config.eventsListeners).toContain("lunos-idp")
     expect(config.eventsListeners).toContain("jboss-logging")

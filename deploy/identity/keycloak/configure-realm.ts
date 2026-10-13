@@ -7,8 +7,9 @@
 //
 // Optional: KC_REALM (default Lunos), APP_SECRET / CONSOLE_SECRET / CONSOLE_ADMIN_SECRET (otherwise
 // Keycloak generates them), DRY_RUN=1 (print the plan, change nothing). Each step reads first and writes
-// only what differs, so a second run changes nothing. It never deletes, never touches a client it doesn't
-// own (beyond adding lunos to lunos-cli's default scopes) and never prints a secret.
+// only what differs, so a second run changes nothing. It never deletes (an owned client's URI lists gain
+// the bundle's entries and keep their own), never touches a client it doesn't own (beyond adding lunos to
+// lunos-cli's default scopes) and never prints a secret.
 import path from "node:path"
 
 type Env = Record<string, string | undefined>
@@ -32,16 +33,14 @@ const CLIENT_FIELDS = [
   "directAccessGrantsEnabled",
   "serviceAccountsEnabled",
   "frontchannelLogout",
-  "redirectUris",
-  "webOrigins",
 ]
+// URI lists on an owned client that already exists gain the bundle's entries and keep the operator's, so
+// a live realm's extra callback (a staging host, say) survives. The attribute is one ##-separated string.
+const LIST_FIELDS = ["redirectUris", "webOrigins"]
+const LIST_ATTRIBUTES = ["post.logout.redirect.uris"]
 const IDP_ROLE = "manage-identity-providers"
 
-// Keycloak returns lists in no promised order, so URI lists compare as sets.
-function same(a: unknown, b: unknown) {
-  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && b.every((x) => a.includes(x))
-  return a === b
-}
+const splitUris = (value: string | undefined) => (value ? value.split("##").filter(Boolean) : [])
 
 function adminApi(env: Env, fetchImpl: typeof fetch) {
   const base = env.KC_URL!.replace(/\/+$/, "")
@@ -92,7 +91,12 @@ function adminApi(env: Env, fetchImpl: typeof fetch) {
 }
 
 /** Brings the realm to realm-lunos.json's shape and returns the changes made (with DRY_RUN, the changes it would make). */
-export async function configure(env: Env, fetchImpl: typeof fetch = fetch): Promise<string[]> {
+export async function configure(
+  env: Env,
+  fetchImpl: typeof fetch = fetch,
+  /** Notes that aren't changes, such as a disabled client. */
+  log: (line: string) => void = console.log,
+): Promise<string[]> {
   for (const name of ["KC_URL", "KC_ADMIN_USER", "KC_ADMIN_PASSWORD"]) {
     if (!env[name]) throw new Error(`${name} is not set`)
   }
@@ -131,25 +135,28 @@ export async function configure(env: Env, fetchImpl: typeof fetch = fetch): Prom
   await api.call("GET", r)
   const cli = await clientByClientId("lunos-cli")
   if (!cli) throw new Error(`realm ${realm} has no lunos-cli client; this script doesn't create it (import realm-lunos.json into a new realm instead)`)
-
-  // The lunos client scope and both its mappers.
   const scopes: Json[] = await api.call("GET", `${r}/client-scopes`)
   let scopeId: string | undefined = scopes.find((s) => s.name === SCOPE)?.id
+  const mappersPath = `${r}/client-scopes/${scopeId}/protocol-mappers/models`
+  const haveMappers: Json[] = scopeId ? await api.call("GET", mappersPath) : []
+  for (const want of wantScope.protocolMappers) {
+    const mapper = haveMappers.find((m) => m.name === want.name)
+    // Changing a mapper's type would mean replacing it, and this script never deletes.
+    if (mapper && mapper.protocolMapper !== want.protocolMapper) {
+      throw new Error(`client scope ${SCOPE}'s mapper ${want.name} is a ${mapper.protocolMapper}, not a ${want.protocolMapper}; fix it by hand`)
+    }
+  }
+
+  // The lunos client scope and both its mappers.
   if (!scopeId) {
     const mappers = wantScope.protocolMappers.map((m: Json) => m.name).join(", ")
     scopeId = await change(`create client scope ${SCOPE} (mappers ${mappers})`, () => api.create(`${r}/client-scopes`, wantScope))
   } else {
-    const mappersPath = `${r}/client-scopes/${scopeId}/protocol-mappers/models`
-    const have: Json[] = await api.call("GET", mappersPath)
     for (const want of wantScope.protocolMappers) {
-      const mapper = have.find((m) => m.name === want.name)
+      const mapper = haveMappers.find((m) => m.name === want.name)
       if (!mapper) {
         await change(`add mapper ${want.name} to client scope ${SCOPE}`, () => api.call("POST", mappersPath, want))
         continue
-      }
-      // Changing a mapper's type would mean replacing it, and this script never deletes.
-      if (mapper.protocolMapper !== want.protocolMapper) {
-        throw new Error(`client scope ${SCOPE}'s mapper ${want.name} is a ${mapper.protocolMapper}, not a ${want.protocolMapper}; fix it by hand`)
       }
       const keys = Object.keys(want.config).filter((k) => mapper.config?.[k] !== want.config[k])
       if (keys.length) {
@@ -194,23 +201,44 @@ export async function configure(env: Env, fetchImpl: typeof fetch = fetch): Prom
     }
     ids.set(clientId, have.id)
     if (clientId === "lunos-console-admin") hadServiceAccount = have.serviceAccountsEnabled === true
+    if (have.enabled === false) log(`note: client ${clientId} is disabled; left so`)
 
-    const fields = CLIENT_FIELDS.filter((k) => k in want && !same(have[k], want[k]))
-    const attributes = Object.keys(want.attributes ?? {}).filter((k) => have.attributes?.[k] !== want.attributes[k])
+    const update: Json = {}
+    for (const k of CLIENT_FIELDS) if (k in want && have[k] !== want[k]) update[k] = want[k]
+    for (const k of LIST_FIELDS) {
+      const missing = (want[k] ?? []).filter((uri: string) => !(have[k] ?? []).includes(uri))
+      if (missing.length) update[k] = [...(have[k] ?? []), ...missing]
+    }
+    const attributes: Json = {}
+    for (const [k, value] of Object.entries<string>(want.attributes ?? {})) {
+      if (LIST_ATTRIBUTES.includes(k)) {
+        const haveUris = splitUris(have.attributes?.[k])
+        const missing = splitUris(value).filter((uri) => !haveUris.includes(uri))
+        if (missing.length) attributes[k] = [...haveUris, ...missing].join("##")
+      } else if (have.attributes?.[k] !== value) attributes[k] = value
+    }
     // A public client has no secret to compare yet; the update below makes it confidential.
-    const newSecret =
-      !!secret && (have.publicClient || (await api.call("GET", `${r}/clients/${have.id}/client-secret`))?.value !== secret)
-    const what = [...fields, ...attributes, ...(newSecret ? [`secret from ${secretEnv}`] : [])]
+    const confidential = want.publicClient === false
+    const currentSecret = async () => (await api.call("GET", `${r}/clients/${have.id}/client-secret`))?.value
+    const newSecret = !!secret && (have.publicClient || (await currentSecret()) !== secret)
+    const what = [...Object.keys(update), ...Object.keys(attributes), ...(newSecret ? [`secret from ${secretEnv}`] : [])]
     if (what.length) {
-      const update = Object.fromEntries(fields.map((k) => [k, want[k]]))
       await change(`set ${what.join(", ")} on client ${clientId}`, () =>
         api.call("PUT", `${r}/clients/${have.id}`, {
           ...have,
           ...update,
-          attributes: { ...have.attributes, ...want.attributes },
+          attributes: { ...have.attributes, ...attributes },
           ...(newSecret ? { secret } : {}),
         }),
       )
+    }
+    // A client made confidential without a secret from the env may have none; it then can't sign in at all.
+    if (confidential && !secret) {
+      const generate = (what: string) => change(what, () => api.call("POST", `${r}/clients/${have.id}/client-secret`))
+      // In a dry run a client still public has no secret to read. Keycloak 26.3 gives it one when it turns
+      // confidential, so the real run usually finds one and generates nothing.
+      if (dry && have.publicClient) await generate(`generate a secret for client ${clientId} if it has none once confidential`)
+      else if (!(await currentSecret())) await generate(`generate a secret for client ${clientId}`)
     }
   }
 
