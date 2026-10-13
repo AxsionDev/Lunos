@@ -77,6 +77,24 @@ export const PromptPayload = Schema.Struct(Struct.omit(SessionPrompt.PromptInput
 export const CommandPayload = Schema.Struct(Struct.omit(SessionPrompt.CommandInput.fields, ["sessionID"]))
 export const ShellPayload = Schema.Struct(Struct.omit(SessionPrompt.ShellInput.fields, ["sessionID"]))
 export const RevertPayload = Schema.Struct(Struct.omit(SessionRevert.RevertInput.fields, ["sessionID"]))
+// XCOD-191: the TUI's /share with "share": "cloud", to the organisation's Lunos console. The same
+// rules and code as `lunos share <session>`.
+export const ShareConsolePayload = Schema.Struct({
+  sanitize: Schema.optional(Schema.Boolean).annotate({
+    description: "Redact transcript and file data first, as lunos export --sanitize",
+  }),
+  link: Schema.optional(Schema.Union([Schema.Boolean, Schema.Number])).annotate({
+    description:
+      "Also make a link that works without signing in: true for the console's default (30 days, or the organisation's shorter maximum), or a number of hours",
+  }),
+}).annotate({ identifier: "SessionShareConsoleInput" })
+export const ShareConsoleResult = Schema.Struct({
+  org: Schema.String,
+  host: Schema.String,
+  id: Schema.String,
+  url: Schema.String,
+  link: Schema.optional(Schema.Struct({ url: Schema.String, expiresAt: Schema.String })),
+}).annotate({ identifier: "SessionShareConsoleResult" })
 export const PermissionResponsePayload = Schema.Struct({
   response: PermissionV1.Reply,
 })
@@ -96,6 +114,7 @@ export const SessionPaths = {
   fork: `${root}/:sessionID/fork`,
   abort: `${root}/:sessionID/abort`,
   share: `${root}/:sessionID/share`,
+  shareConsole: `${root}/:sessionID/share/console`,
   init: `${root}/:sessionID/init`,
   summarize: `${root}/:sessionID/summarize`,
   prompt: `${root}/:sessionID/message`,
@@ -293,6 +312,20 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.share",
             summary: "Share session",
             description: "Create a shareable link for a session, allowing others to view the conversation.",
+          }),
+        ),
+        HttpApiEndpoint.post("shareConsole", SessionPaths.shareConsole, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: ShareConsolePayload,
+          success: described(ShareConsoleResult, "Shared with the organisation"),
+          error: [ApiNotFoundError, ShareDisabledApiError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.shareConsole",
+            summary: "Share session with your organisation",
+            description:
+              'Upload the session to your organisation\'s Lunos console (with "share": "cloud"), as lunos share does: the residency policy is checked first and the upload is recorded in the audit log.',
           }),
         ),
         HttpApiEndpoint.delete("unshare", SessionPaths.share, {

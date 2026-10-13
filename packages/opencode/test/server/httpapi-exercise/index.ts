@@ -1842,6 +1842,25 @@ const scenarios: Scenario[] = [
       "status",
     ),
   http.protected
+    .post("/session/{sessionID}/share/console", "session.shareConsole")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Share session with the organisation" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/share/console", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { sanitize: true, link: true },
+    }))
+    .json(
+      403,
+      (body) => {
+        // XCOD-191: no console named in managed config here, so it is refused with a message, never a 500.
+        object(body)
+        check(body._tag === "ShareDisabledError", "share to the console should be refused here")
+        check(typeof body.message === "string" && body.message.length > 0, "refusal should say why")
+      },
+      "status",
+    ),
+  http.protected
     .delete("/session/{sessionID}/share", "session.unshare")
     .mutating()
     .seeded((ctx) => ctx.session({ title: "Unshare session" }))
