@@ -379,6 +379,21 @@ describe("the console's declared region decides (GET /v1)", () => {
     }
     expect(() => CloudShare.gate(config, local(), `${local().base}/shares`, "us")).toThrow(/Correct whichever is wrong/)
     CloudShare.gate(config, local(), `${local().base}/shares`, "eu")
+    // "other" is what a self-hosted console answers when nobody set its region: the declaration stands.
+    CloudShare.gate(
+      { residency: { ...config.residency, allow: ["eu" as const] } },
+      local(),
+      `${local().base}/shares`,
+      "other",
+    )
+    expect(() =>
+      CloudShare.gate(
+        { residency: { allow: ["eu" as const], audit: false } },
+        local(),
+        `${local().base}/shares`,
+        "other",
+      ),
+    ).toThrow(/does not allow/)
   })
 
   test("a console that can't be asked: an enforcing policy refuses (share.denied); audit-only goes on", async () => {
@@ -412,8 +427,10 @@ describe("list and revoke", () => {
 
   test("list reads the organisation's shares; revoke deletes one; neither is gated on share", async () => {
     await signIn()
-    const shares = await CloudShare.list(local())
+    const { shares } = await CloudShare.list(local(), { all: true })
     expect(shares.map((s) => s.id)).toEqual(["s1", "s2"])
+    await CloudShare.list(local())
+    expect(seen.at(-1)).toMatchObject({ url: "/v1/orgs/acme/shares?mine=1", method: "GET" })
     await CloudShare.revoke(local(), "s1")
     expect(seen.at(-1)).toMatchObject({ url: "/v1/orgs/acme/shares/s1", method: "DELETE", auth: "Bearer fake-token" })
     const missing = await CloudShare.revoke(local(), "nope").catch((e) => e)

@@ -47,7 +47,7 @@ export async function shareToConsole(input: {
     dialog.replace(
       () => (
         <DialogSelect
-          title="Share this session with your organisation's Lunos console"
+          title="Share with your organisation's console"
           options={CHOICES}
           onSelect={(option) => resolve(option.value)}
         />

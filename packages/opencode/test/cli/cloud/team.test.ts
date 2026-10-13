@@ -26,6 +26,7 @@ function fakeConsole(self?: { region?: string }) {
       if (url.pathname === "/v1/orgs/acme/shares" && req.method === "GET")
         return Response.json({
           org: "acme",
+          linkPolicy: { maxHours: 168, defaultHours: 168 },
           shares: [
             {
               id: "abc",
@@ -35,9 +36,19 @@ function fakeConsole(self?: { region?: string }) {
               createdAt: Date.parse("2026-10-13T08:00:00Z"),
               url: `http://127.0.0.1:${server.port}/orgs/acme/shares/abc`,
               ...(revoked.has("abc") ? { revokedAt: Date.parse("2026-10-13T09:00:00Z") } : {}),
-              links: [{ id: "l1", expiresAt: "2099-01-01T00:00:00.000Z" }],
+              links: 1,
+              activeLinks: revoked.has("abc") ? [] : [{ id: "l1", expiresAt: "2099-01-01T00:00:00.000Z" }],
             },
-            { id: "zzz", kind: "artifact", title: "Someone else's plan", createdBy: "other", createdAt: 1, links: 0 },
+            // A console that ignores ?mine=1 would list this too: the CLI keeps yours only.
+            {
+              id: "zzz",
+              kind: "artifact",
+              title: "Someone else's plan",
+              createdBy: "other",
+              createdAt: 1,
+              links: 0,
+              activeLinks: [],
+            },
           ],
         })
       if (url.pathname.startsWith("/v1/orgs/acme/shares/") && req.method === "DELETE") {
@@ -312,6 +323,8 @@ describe("lunos share and lunos memory share (subprocess)", () => {
           'abc  session  "Fix the login bug"  2026-10-13T08:00:00Z  link until 2099-01-01T00:00:00Z',
         )
         expect(list.stdout).not.toContain("zzz")
+        expect(list.stdout).toContain("Links in acme work for 7 days by default, at most 7 days.")
+        expect(fake.received.at(-1)).toMatchObject({ method: "GET", path: "/v1/orgs/acme/shares" })
         const all = yield* opencode.spawn(["share", "list", "--all"], { env })
         expect(all.stdout).toContain("zzz  artifact")
 

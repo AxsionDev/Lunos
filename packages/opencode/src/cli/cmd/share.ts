@@ -43,11 +43,15 @@ const when = (value: number | string | null | undefined) => {
   return Number.isNaN(date.getTime()) ? String(value) : date.toISOString().replace(/\.\d{3}Z$/, "Z")
 }
 
-/** The link column: the latest link still working, a count from an older console, or none. */
+/** The link column: the latest link still working, or a count from a console that doesn't say. */
 function links(share: CloudShare.Listed) {
-  if (typeof share.links === "number") return share.links ? `${share.links} link(s)` : "no link"
   const now = Date.now()
-  const live = (share.links ?? []).filter((l) => !l.revokedAt && new Date(l.expiresAt).getTime() > now)
+  const live =
+    share.activeLinks ??
+    (Array.isArray(share.links)
+      ? share.links.filter((l) => !l.revokedAt && new Date(l.expiresAt).getTime() > now)
+      : undefined)
+  if (!live) return typeof share.links === "number" && share.links ? `${share.links} link(s)` : "no link"
   if (!live.length) return "no link"
   const last = live.map((l) => new Date(l.expiresAt).getTime()).sort((a, b) => b - a)[0]!
   return `link until ${when(last)}${live.length > 1 ? ` (+${live.length - 1})` : ""}`
@@ -65,9 +69,11 @@ export const ShareListCommand = effectCmd({
     }),
   handler: Effect.fn("Cli.share.list")(function* (args) {
     const org = yield* resolveOrg("lunos share list")
-    const shares = yield* Effect.tryPromise({ try: () => CloudShare.list(org), catch: (e) => e }).pipe(
-      Effect.catch(notDone("Couldn't list shares")),
-    )
+    const { shares, linkPolicy } = yield* Effect.tryPromise({
+      try: () => CloudShare.list(org, { all: args.all }),
+      catch: (e) => e,
+    }).pipe(Effect.catch(notDone("Couldn't list shares")))
+    // A console that ignores ?mine=1 lists everyone's: keep yours only.
     const me = (yield* Effect.promise(() => CloudStore.load().catch(() => undefined)))?.sub
     const shown = args.all || !me ? shares : shares.filter((s) => s.createdBy === undefined || s.createdBy === me)
     if (!shown.length) {
@@ -82,8 +88,14 @@ export const ShareListCommand = effectCmd({
           .join("  "),
       )
     }
+    if (linkPolicy)
+      out(
+        `Links in ${org.org} work for ${hours(linkPolicy.defaultHours)} by default, at most ${hours(linkPolicy.maxHours)}.`,
+      )
   }),
 })
+
+const hours = (h: number) => (h % 24 ? `${h} hours` : `${h / 24} days`)
 
 export const ShareRevokeCommand = effectCmd({
   command: "revoke <id>",

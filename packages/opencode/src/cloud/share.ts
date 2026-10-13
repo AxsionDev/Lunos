@@ -53,14 +53,17 @@ export function allowed(config: Config, via: string) {
  * The claim an upload is decided on. The region the console declares at `GET <console>/v1` decides
  * when it declares one, even on cloud.lunos.tech; if `residency.endpoints` also declares
  * `share:lunos-console` and the two disagree, the upload is refused (neither can be verified from
- * here, so a conflict fails closed). With no declared region, the built-in claim (EU only on
- * cloud.lunos.tech) or the `residency.endpoints` declaration decides, as before.
+ * here, so a conflict fails closed). With no declared region (or "other", what a self-hosted console
+ * answers when nobody set its region, next to a `residency.endpoints` declaration), the built-in
+ * claim (EU only on cloud.lunos.tech) or the `residency.endpoints` declaration decides, as before.
  */
 export function claim(config: Config, org: CloudOrg.Org, url: string, region: CloudOrg.Region | undefined) {
   const endpoints = AuditLog.residency(config)?.policy.endpoints
   const resolved = Jurisdiction.resolve(TARGET, url, endpoints).claim
-  if (!region) return { claim: resolved }
   const declared = endpoints?.[TARGET]
+  // A self-hosted console that wasn't told its region answers "other": then an administrator's own
+  // residency.endpoints declaration stands, as before this check existed.
+  if (!region || (region === "other" && declared)) return { claim: resolved }
   const fromConsole: Jurisdiction.Claim = {
     region,
     basis: "declared",
@@ -205,15 +208,25 @@ export interface Listed {
   createdAt?: number | string
   revokedAt?: number | string | null
   url?: string
-  /** A count (older consoles), or each link with its expiry. */
+  /** How many links it has had (a count), or, from older consoles, each link. */
   links?: number | Array<{ id?: string; expiresAt: number | string; revokedAt?: number | string | null }>
+  /** The links still working, with their expiry. */
+  activeLinks?: Array<{ id?: string; expiresAt: number | string }>
 }
 
-/** The organisation's shares (`GET shares`). Nothing is uploaded, so neither `share` nor residency gates it. */
-export async function list(org: CloudOrg.Org, opts: CloudOrg.Options = {}) {
-  const response = await CloudOrg.request(org, "/shares", { method: "GET", what: "Listing shares" }, opts)
-  const body = (await response.json()) as { shares?: Listed[] }
-  return body.shares ?? []
+/**
+ * Your shares (`GET shares?mine=1`), or with `all` every share in the organisation. Nothing is
+ * uploaded, so neither `share` nor residency gates it: you can list and revoke after turning sharing off.
+ */
+export async function list(org: CloudOrg.Org, input: { all?: boolean } = {}, opts: CloudOrg.Options = {}) {
+  const response = await CloudOrg.request(
+    org,
+    input.all ? "/shares" : "/shares?mine=1",
+    { method: "GET", what: "Listing shares" },
+    opts,
+  )
+  const body = (await response.json()) as { shares?: Listed[]; linkPolicy?: { maxHours: number; defaultHours: number } }
+  return { shares: body.shares ?? [], linkPolicy: body.linkPolicy }
 }
 
 /** Revokes a share and its links (`DELETE shares/{id}`): its content is deleted on the console. */
