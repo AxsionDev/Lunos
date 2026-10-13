@@ -27,6 +27,8 @@ questions for counsel are listed in the assessment.
 | Dedicated security contact address | security@lunos.tech                                                                          | [`SECURITY.md`](../../SECURITY.md#reporting-security-issues)                         |
 | Verifiable releases                | npm provenance, and signed checksums from v1.18.40                                           | [Supply chain](supply-chain.md)                                                      |
 | Support periods                    | **6 months of security fixes** for each release from its release date, from v1.18.43 onward  | [Security support period](#security-support-period)                                  |
+| Long-term support line             | **Planned**: an LTS line with backported security fixes; the support period is not decided   | [LTS releases and offline updates](../lts.md)                                        |
+| Offline updates                    | A private npm registry for `lunos update`; a verified mirror of release files                | [Offline update mirror](../lts.md#offline-update-mirror)                             |
 
 ## Security support period
 

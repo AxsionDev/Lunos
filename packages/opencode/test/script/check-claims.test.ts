@@ -48,5 +48,9 @@ describe("claim-table consistency (XCOD-108)", () => {
     expect(forbidden("Lunos runs on EU-sovereign infrastructure.").map((hit) => hit.number)).toEqual([1])
     expect(forbidden('- ❌ "sovereign cloud" — not claimed')).toEqual([])
     expect(forbidden("Lunos is CRA-certified")).toHaveLength(1)
+    // XCOD-193: model calls follow the customer's policy; "inside your network" is the claim.
+    expect(forbidden("With Enterprise, your data never leaves the EU.")).toHaveLength(1)
+    expect(forbidden("Your code doesn't leave the EU")).toHaveLength(1)
+    expect(forbidden("Enterprise can keep code and execution inside your own network.")).toEqual([])
   })
 })

@@ -19,6 +19,8 @@ export const FORBIDDEN: readonly RegExp[] = [
   /EU-sovereign infrastructure/i,
   /sovereign cloud/i,
   /\b(CRA|EUCS|ISO ?27001|SOC ?2)[- ]certifi(ed|cation)\b/i,
+  // XCOD-193: model calls follow the customer's policy, so no deployment can promise this.
+  /\b(data|code|prompts?)\s+(never|doesn't|does not|won't|will not)\s+leaves?\s+the\s+EU\b/i,
 ]
 
 const normalise = (claim: string) => claim.replace(/[_*`]/g, "").replace(/\s+/g, " ").trim().toLowerCase()
