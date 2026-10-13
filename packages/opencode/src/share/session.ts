@@ -38,7 +38,9 @@ const layer = Layer.effect(
 
     const share = Effect.fn("SessionShare.share")(function* (sessionID: SessionID) {
       const conf = yield* cfg.get()
-      if (conf.share === "disabled") {
+      // XCOD-191: "cloud" allows only `lunos share` to the organisation's Lunos console, never this
+      // (upstream's share service), so here it is "disabled".
+      if (conf.share === "disabled" || conf.share === "cloud") {
         const locked = ConfigPolicy.isLocked(conf.$locked, "share")
         // `/share`, `lunos run --share` and API clients all arrive here.
         if (locked) yield* ConfigPolicy.refused("share", "share request")
@@ -59,7 +61,7 @@ const layer = Layer.effect(
       if (result.parentID) return result
       const conf = yield* cfg.get()
       // "disabled" wins over OPENCODE_AUTO_SHARE: the env flag only upgrades manual to auto.
-      if (conf.share === "disabled") return result
+      if (conf.share === "disabled" || conf.share === "cloud") return result
       // A locked `share` can't be upgraded to "auto" by the env flag either (XCOD-102).
       if (flags.autoShare && conf.share !== "auto" && ConfigPolicy.isLocked(conf.$locked, "share")) {
         yield* ConfigPolicy.refused("share", "OPENCODE_AUTO_SHARE")

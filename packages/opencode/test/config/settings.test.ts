@@ -56,7 +56,10 @@ describe("settings registry", () => {
   })
 
   test("types come from the schema", () => {
-    expect(ConfigSettings.find("share")).toMatchObject({ kind: "enum", values: ["manual", "auto", "disabled"] })
+    expect(ConfigSettings.find("share")).toMatchObject({
+      kind: "enum",
+      values: ["manual", "auto", "disabled", "cloud"],
+    })
     expect(ConfigSettings.find("autoupdate")).toMatchObject({ kind: "enum", values: [true, false, "notify"] })
     expect(ConfigSettings.find("snapshot")?.kind).toBe("boolean")
     expect(ConfigSettings.find("subagent_depth")?.kind).toBe("number")

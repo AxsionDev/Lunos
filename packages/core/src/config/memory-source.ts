@@ -11,9 +11,9 @@ export const Info = Schema.Struct({
   name: Schema.String.annotate({
     description: 'A unique name for the source, e.g. "platform-kg". Shown as the label on everything it returns',
   }),
-  type: Schema.Literals(["graph", "mcp"]).annotate({
+  type: Schema.Literals(["graph", "mcp", "org"]).annotate({
     description:
-      '"graph": a read-only query against a Neo4j knowledge graph. "mcp": a search tool on an MCP server configured under "mcp"',
+      '"graph": a read-only query against a Neo4j knowledge graph. "mcp": a search tool on an MCP server configured under "mcp". "org": your organisation\'s team memory on its Lunos console (the console named by cloud.policy in managed config; needs lunos login)',
   }),
   jurisdiction: Schema.String.pipe(Schema.optional).annotate({
     description:

@@ -13,6 +13,9 @@ import { MemoryGuard } from "../guard"
 import type { MemoryRecall } from "../recall"
 import { MemorySourceGraph } from "./graph"
 import { MemorySourceMcp } from "./mcp"
+import { MemorySourceOrg } from "./org"
+import { CloudOrg } from "@/cloud/org"
+import { ConfigOrgPolicy } from "@/config/org-policy"
 
 /**
  * External memory sources (XCOD-135, OWASP ASI06). A knowledge graph or an MCP memory server that
@@ -65,7 +68,8 @@ function loopback(host: string) {
 type McpEntry = ConfigMCPV1.Info | { enabled: boolean }
 
 /** Where a source runs, for the audit log: a host, or an MCP server's name. Never credentials. */
-function where(source: ConfigMemorySource.Info, mcp: Record<string, McpEntry> | undefined) {
+function where(source: ConfigMemorySource.Info, mcp: Record<string, McpEntry> | undefined, org?: CloudOrg.Org) {
+  if (source.type === "org") return org?.host ?? "org:not-configured"
   if (source.type === "graph") {
     try {
       return new URL(source.url ?? "").host
@@ -85,9 +89,17 @@ function where(source: ConfigMemorySource.Info, mcp: Record<string, McpEntry> | 
 }
 
 /** What is wrong with a source's settings, if anything. Such a source is never queried. */
-export function problem(source: ConfigMemorySource.Info, mcp: Record<string, McpEntry> | undefined) {
+export function problem(
+  source: ConfigMemorySource.Info,
+  mcp: Record<string, McpEntry> | undefined,
+  org?: CloudOrg.Org,
+) {
   if (!NAME.test(source.name))
     return `name "${source.name}" must be letters, digits, ".", "_" or "-" (it labels the source's results)`
+  if (source.type === "org")
+    return org
+      ? undefined
+      : `an org source reads your organisation's Lunos console, and managed config names none ("cloud": { "policy": ... }); ask your administrator`
   if (source.type === "graph") {
     if (!source.url) return "a graph source needs a url"
     let url: URL
@@ -125,6 +137,7 @@ export function managedTrust(source: ConfigMemorySource.Info, managed: readonly 
       if (!item || item.trusted !== true || item.name !== source.name || item.type !== source.type) continue
       if (source.type === "graph" && item.url === source.url) return true
       if (source.type === "mcp" && item.server === source.server && item.tool === source.tool) return true
+      if (source.type === "org") return true
     }
   }
   return false
@@ -140,7 +153,7 @@ export type State = "ok" | "empty" | "disabled" | "off" | "misconfigured" | "den
 
 export interface Status {
   name: string
-  type: "graph" | "mcp"
+  type: "graph" | "mcp" | "org"
   host: string
   jurisdiction?: string
   trusted: boolean
@@ -172,7 +185,10 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/MemorySources") {}
 
-type Connection = { kind: "graph"; client: MemorySourceGraph.Client } | { kind: "mcp"; client: MemorySourceMcp.Client }
+type Connection =
+  | { kind: "graph"; client: MemorySourceGraph.Client }
+  | { kind: "mcp"; client: MemorySourceMcp.Client }
+  | { kind: "org"; client: MemorySourceOrg.Client }
 
 interface InstanceData {
   directory: string
@@ -227,9 +243,13 @@ const layer = Layer.effect(
       const cfg = yield* config.get()
       const data = yield* InstanceState.get(state)
       const sources = cfg.memory?.sources ?? []
-      const managed = sources.some((source) => source.trusted === true)
+      const managed = sources.some((source) => source.trusted === true || source.type === "org")
         ? yield* Effect.promise(() => (data.managed ??= ConfigManaged.readManagedDocs().catch(() => [] as unknown[])))
         : []
+      // XCOD-191: an org source's console is the one managed config names (cloud.policy), never config's.
+      const org = sources.some((source) => source.type === "org")
+        ? CloudOrg.parse(ConfigOrgPolicy.policyURL(managed))
+        : undefined
       const seen = new Set<string>()
       const list = sources.map((source) => {
         const duplicate = seen.has(source.name)
@@ -239,11 +259,12 @@ const layer = Layer.effect(
           trusted: managedTrust(source, managed),
           problem: duplicate
             ? `another source is already named "${source.name}"`
-            : problem(source, cfg.mcp as Record<string, McpEntry> | undefined),
-          host: where(source, cfg.mcp as Record<string, McpEntry> | undefined),
+            : problem(source, cfg.mcp as Record<string, McpEntry> | undefined, org),
+          host: where(source, cfg.mcp as Record<string, McpEntry> | undefined, org),
         }
       })
       return {
+        org,
         list,
         mcp: cfg.mcp as Record<string, McpEntry> | undefined,
         residency: AuditLog.residency(cfg),
@@ -289,20 +310,23 @@ const layer = Layer.effect(
       data: InstanceData,
       source: ConfigMemorySource.Info,
       mcp: Record<string, McpEntry> | undefined,
+      org: CloudOrg.Org | undefined,
     ): Promise<Connection> => {
       const existing = data.clients.get(source.name)
       if (existing) return existing
       const opening: Promise<Connection> =
-        source.type === "graph"
-          ? MemorySourceGraph.connect(source as ConfigMemorySource.Info & { url: string }).then((client) => ({
-              kind: "graph" as const,
-              client,
-            }))
-          : MemorySourceMcp.connect({
-              source: source as ConfigMemorySource.Info & { server: string; tool: string },
-              server: mcp![source.server!] as ConfigMCPV1.Info,
-              directory: data.directory,
-            }).then((client) => ({ kind: "mcp" as const, client }))
+        source.type === "org"
+          ? Promise.resolve({ kind: "org" as const, client: MemorySourceOrg.connect(org!) })
+          : source.type === "graph"
+            ? MemorySourceGraph.connect(source as ConfigMemorySource.Info & { url: string }).then((client) => ({
+                kind: "graph" as const,
+                client,
+              }))
+            : MemorySourceMcp.connect({
+                source: source as ConfigMemorySource.Info & { server: string; tool: string },
+                server: mcp![source.server!] as ConfigMCPV1.Info,
+                directory: data.directory,
+              }).then((client) => ({ kind: "mcp" as const, client }))
       data.clients.set(source.name, opening)
       // A connection that fails is forgotten, so the next turn tries again.
       opening.catch(() => {
@@ -320,7 +344,7 @@ const layer = Layer.effect(
 
     const recall = Effect.fn("MemorySources.recall")(function* (input: { sessionID: string; query: string }) {
       const data = yield* InstanceState.get(state)
-      const { list, mcp, residency, maxFactChars } = yield* settings()
+      const { list, mcp, residency, maxFactChars, org } = yield* settings()
       const off = data.sessionOff.get(input.sessionID)
       const result: Result = { sections: [], notices: [], reserve: 0, labels: [] }
       const jobs: Promise<void>[] = []
@@ -344,13 +368,13 @@ const layer = Layer.effect(
         let connected = false
         jobs.push(
           race(
-            open(data, source, mcp)
+            open(data, source, mcp, org)
               .then((connection) => {
                 connected = true
                 return connection
               })
               .then((connection) =>
-                connection.kind === "graph"
+                connection.kind === "graph" || connection.kind === "org"
                   ? connection.client.search(input.query, LIMIT, timeout)
                   : connection.client.search(input.query, timeout),
               ),

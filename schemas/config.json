@@ -110,8 +110,8 @@
         },
         "type": {
           "type": "string",
-          "enum": ["graph", "mcp"],
-          "description": "\"graph\": a read-only query against a Neo4j knowledge graph. \"mcp\": a search tool on an MCP server configured under \"mcp\""
+          "enum": ["graph", "mcp", "org"],
+          "description": "\"graph\": a read-only query against a Neo4j knowledge graph. \"mcp\": a search tool on an MCP server configured under \"mcp\". \"org\": your organisation's team memory on its Lunos console (the console named by cloud.policy in managed config; needs lunos login)"
         },
         "jurisdiction": {
           "type": "string",
@@ -1505,8 +1505,8 @@
         },
         "share": {
           "type": "string",
-          "enum": ["manual", "auto", "disabled"],
-          "description": "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing"
+          "enum": ["manual", "auto", "disabled", "cloud"],
+          "description": "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing, 'cloud' allows only lunos share to your organisation's Lunos console (never another share service)"
         },
         "autoshare": {
           "type": "boolean",

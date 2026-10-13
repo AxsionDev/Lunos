@@ -71,12 +71,13 @@ The tool also fetches its model catalogue (a list of available models and their 
 
 `/share` publishes a session at a public link. **Lunos turns this off unless you enable it**, because a shared session contains the whole transcript: your prompts, the contents of every file the agent read, and tool output. That is more sensitive than any single model request.
 
-| Setting               | What happens                                                                                       |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| `share` unset         | Same as `"disabled"`. This differs from upstream opencode, where `/share` works out of the box     |
-| `"share": "disabled"` | `/share` is refused with a message saying how to enable it. Nothing is uploaded                    |
-| `"share": "manual"`   | `/share` uploads the session when a person runs it                                                 |
-| `"share": "auto"`     | Every new session is uploaded as it is created. The deprecated `"autoshare": true` also means this |
+| Setting               | What happens                                                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `share` unset         | Same as `"disabled"`. This differs from upstream opencode, where `/share` works out of the box                   |
+| `"share": "disabled"` | `/share` is refused with a message saying how to enable it. Nothing is uploaded                                  |
+| `"share": "manual"`   | `/share` uploads the session when a person runs it                                                               |
+| `"share": "auto"`     | Every new session is uploaded as it is created. The deprecated `"autoshare": true` also means this               |
+| `"share": "cloud"`    | Only `lunos share` and `lunos memory share`, to your organisation's Lunos console (XCOD-191). `/share` stays off |
 
 When sharing is on, uploads go to `enterprise.url` if you set one, and otherwise to **`https://opncd.ai`**, upstream opencode's hosted share service. That host is operated by a non-EU third party, not by Lunos.
 
@@ -85,7 +86,12 @@ When sharing is on, uploads go to `enterprise.url` if you set one, and otherwise
 - `opncd.ai`, and the opencode console's share service for signed-in orgs, count as non-EU (`us`). An EU-only policy refuses them: `/share` says "Session sharing to opncd.ai is blocked by the data-residency policy", and nothing is uploaded.
 - A self-hosted share server at `enterprise.url` is treated like any other self-hosted endpoint. Lunos can't verify where it runs, so its region is `unknown`, and you allow it explicitly with `"residency": { "allow": ["eu", "unknown"] }`. That is the supported way to share under an EU-only policy. The `OPENCODE_AUTO_SHARE` environment variable only turns `"manual"` into `"auto"`; it cannot re-enable sharing that is disabled.
 
-**Sharing without any upload (the supported path).** Lunos runs no share service. The way to share inside your perimeter is to share files you already control:
+**Sharing inside your organisation (XCOD-191, unreleased).** With the Team plan or a self-hosted
+Lunos console, `lunos share` uploads a session or an artifact to your organisation's console only,
+for its members or a signed link that expires; set `"share": "cloud"` to allow that and nothing else.
+See [Working as a team](../team.md).
+
+**Sharing without any upload.** Lunos runs no public share service. The way to share inside your perimeter is to share files you already control:
 
 - **A session:** `/export` in the TUI (or `lunos export <session-id>` for JSON, with `--sanitize` to redact file contents and tool output) writes the transcript to a local file. Send it through whatever channel your organisation already approves. Nothing is uploaded.
 - **Plans, research notes and dev-cycle records:** these are Markdown files in `.opencode/plans/`, `.opencode/research/` and `.opencode/dev-cycle/`. Commit them and review them like any other document. `/artifacts` in the TUI lists and opens them.

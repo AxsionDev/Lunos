@@ -51,8 +51,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
     .annotate({
       description: "Automatically update or notify when a new version is available",
     }),
-  share: Schema.Literals(["manual", "auto", "disabled"]).pipe(Schema.optional).annotate({
-    description: "Control whether sessions may be shared manually, automatically, or not at all",
+  share: Schema.Literals(["manual", "auto", "disabled", "cloud"]).pipe(Schema.optional).annotate({
+    description:
+      "Control whether sessions may be shared manually, automatically, or not at all; 'cloud' allows only lunos share to your organisation's Lunos console",
   }),
   enterprise: Schema.Struct({
     url: Schema.String.pipe(Schema.optional),

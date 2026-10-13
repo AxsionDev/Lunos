@@ -25,6 +25,7 @@ import { StatsCommand } from "./cli/cmd/stats"
 import { McpCommand } from "./cli/cmd/mcp"
 import { GithubCommand } from "./cli/cmd/github"
 import { ExportCommand } from "./cli/cmd/export"
+import { ShareCommand } from "./cli/cmd/share"
 import { ImportCommand } from "./cli/cmd/import"
 import { AttachCommand } from "./cli/cmd/attach"
 import { TuiThreadCommand } from "./cli/cmd/tui"
@@ -173,6 +174,7 @@ const cli = yargs(args)
   .command(ExternalCommand)
   .command(StatsCommand)
   .command(ExportCommand)
+  .command(ShareCommand)
   .command(ImportCommand)
   .command(GithubCommand)
   .command(PrCommand)
