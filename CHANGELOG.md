@@ -60,6 +60,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
   refusal on the worker, now exits non-zero and says `failed`. `--model` on a cloud run stops with
   a clear message when the worker can't run that model, instead of quietly using another one. Ctrl+C
   prints the results line without a stack trace (XCOD-236).
+- **Cloud runs say why billing stopped them.** When Lunos Cloud refuses a run (no plan, a failed
+  payment, Team seats full, the spending cap), you see its own reason, no longer always "spending
+  cap reached". When it stops a run part-way (cap reached, subscription suspended), `lunos run
+--cloud` prints the reason and exits non-zero; the worker is still ended and its results pushed
+  (XCOD-237).
 - **macOS binaries carry a valid signature.** The `lunos-darwin-*` binaries on npm and in the
   release archives failed `codesign --verify` because the release built them on Linux. They are
   now re-signed ad-hoc on a Mac before they are packed, checksummed and published. They are still

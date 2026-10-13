@@ -12,6 +12,11 @@
 // attach to it. That server is on this machine, so `directory` is the clone's path: still the
 // server's view of it, which is all the client may use it for. The worker gets the residency policy
 // the client sent as locked managed config, as the real one does, so the worker enforces it.
+//
+// XCOD-237: `end(id, reason, message)` stops a run the way the control plane does when billing
+// stops it mid-run (spending cap reached, subscription suspended): the Worker gains `ended`, then the
+// busy sessions on the worker's server are aborted. The worker itself stays up, so DELETE still
+// pushes the results.
 // Run standalone for a local end-to-end check (any bearer token is accepted):
 //
 //   bun test/cloud/fixtures/fake-control-plane.ts     # prints the endpoint to set as cloud.endpoint
@@ -21,13 +26,22 @@ import path from "path"
 import { $, type Subprocess } from "bun"
 
 export const TOKEN = "test-access-token"
+/**
+ * Present only in this fake. lunoshq's conformance shim replaces this module with the real control
+ * plane (exporting just TOKEN and start), so tests that need the fake's test-only hooks (`end`,
+ * `fail` without a message) check this and skip there.
+ */
+export const IS_FAKE = true
 /** Where a worker without a server says its project is: a path on the worker, not here. */
 export const WORKSPACE = "/workspace"
 
 export interface Options {
   region?: "eu" | "us" | "other"
-  /** Answer every request to this path prefix with this status and error code. */
-  fail?: { path: string; status: number; code: string; message: string }
+  /**
+   * Answer every request to this path prefix with this status and error code. Without `message`
+   * the body has none (`raw` sends a body that isn't the error shape at all).
+   */
+  fail?: { path: string; status: number; code: string; message?: string; raw?: boolean }
   /** Reports a different results branch, to check the client refuses it. */
   wrongBranch?: boolean
   /** Accept any bearer token, for standalone use with a real `lunos login`. */
@@ -46,6 +60,7 @@ type Worker = {
   polls: number
   started: number
   server?: { proc: Subprocess; url: string }
+  ended?: { reason: string; message: string }
 }
 
 // The worker's server sees none of this machine's environment or stored logins: only PATH, its own
@@ -117,6 +132,7 @@ export async function start(options: Options = {}) {
     directory: w.server ? w.dir : WORKSPACE,
     branch: options.wrongBranch ? "main" : `lunos/cloud/${w.id}`,
     activeSeconds: Math.round((Date.now() - w.started) / 1000),
+    ...(w.ended ? { ended: w.ended } : {}),
   })
 
   const server: Bun.Server<undefined> = Bun.serve({
@@ -132,8 +148,10 @@ export async function start(options: Options = {}) {
           device_authorization_endpoint: `${server.url.origin}/oidc/device`,
           token_endpoint: `${server.url.origin}/oidc/token`,
         })
-      if (options.fail && url.pathname.startsWith(options.fail.path))
-        return error(options.fail.status, options.fail.code, options.fail.message)
+      if (options.fail && url.pathname.startsWith(options.fail.path)) {
+        if (options.fail.raw) return new Response("Payment Required", { status: options.fail.status })
+        return error(options.fail.status, options.fail.code, options.fail.message ?? "")
+      }
       const auth = req.headers.get("authorization")
       if (options.anyToken ? !auth?.startsWith("Bearer ") : auth !== `Bearer ${TOKEN}`)
         return error(401, "unauthenticated", "Sign-in expired.")
@@ -202,6 +220,21 @@ export async function start(options: Options = {}) {
       const worker = workers.get(id)
       if (!worker) throw new Error(`No worker ${id}`)
       return worker.dir
+    },
+    /** Stops the run as billing does mid-run: `ended` first, then the busy sessions are aborted. */
+    end: async (id: string, reason: string, message: string) => {
+      const worker = workers.get(id)
+      if (!worker) throw new Error(`No worker ${id}`)
+      worker.ended = { reason, message }
+      if (!worker.server) return
+      const headers = { authorization: `Basic ${Buffer.from(`opencode:pw-${id}`).toString("base64")}` }
+      const at = (pathname: string) => `${worker.server!.url}${pathname}?directory=${encodeURIComponent(worker.dir)}`
+      const status = (await fetch(at("/session/status"), { headers }).then((r) => r.json())) as Record<
+        string,
+        { type: string }
+      >
+      for (const [sid, s] of Object.entries(status))
+        if (s.type !== "idle") await fetch(at(`/session/${encodeURIComponent(sid)}/abort`), { method: "POST", headers })
     },
     stop: () => {
       for (const worker of workers.values()) worker.server?.proc.kill()

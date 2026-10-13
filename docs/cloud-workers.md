@@ -24,6 +24,8 @@ git fetch origin lunos/cloud/<id>             # the results, when it's done
 
 A run whose session ends in an error (for example, refused by the residency policy on the worker) exits non-zero and reports `failed`.
 
+If Lunos Cloud stops the run part-way, for example because the spending cap was reached or the subscription was suspended after a failed payment, Lunos prints Lunos Cloud's reason (`Lunos Cloud stopped the run: …`), exits non-zero and reports `failed`. The worker is still ended, and anything it changed is pushed to its branch.
+
 Ctrl+C ends the worker, and anything it changed is still pushed to its branch.
 
 ## What leaves your machine, and what doesn't
@@ -99,24 +101,26 @@ Every request carries `Authorization: Bearer <access token>`. The token comes fr
   "auth": { "username": "…", "password": "…" },
   "directory": "…",
   "branch": "lunos/cloud/<id>",
-  "activeSeconds": 0
+  "activeSeconds": 0,
+  "ended": { "reason": "spending_cap", "message": "…" }
 }
 ```
 
 - `url` and `auth` give the worker's Lunos server. The client attaches to it as `lunos run --attach` does.
 - `directory` is the project directory on the worker (for example `/workspace`), not a path on your machine. The client only passes it to the worker's server.
 - `branch` must be `lunos/cloud/<id>`. The client refuses any other value.
+- `ended` (optional, added in XCOD-237) is set when the control plane itself stopped the run, for example for billing. `reason` is a code (`spending_cap`, `suspended`, `user_cap`, …; clients must accept codes they don't know) and `message` is shown to the user as is. The worker can still be `running`: `ended` is about the agent, and the worker stays up until `DELETE` pushes the results. The control plane sets `ended` **before** it aborts the worker's sessions, and keeps returning it for as long as `GET` answers for that worker, after it is destroyed too. Leave the key out when it isn't set (clients accept `null`, but don't rely on it). When an attached run ends, the client reads the Worker once (`GET`) and, if `ended` is set, prints the message and exits non-zero. Older clients ignore the field, and older control planes don't send it.
 
-**Errors** are `{ "error": { "code", "message" } }`. Lunos shows the message as is, and adds the next step:
+**Errors** are `{ "error": { "code", "message" } }`. Lunos shows the message as is. For a 401 and a 429 it adds the next step; a 402's message must say itself what happened and what to do, because one code covers several causes. Only a 402 without a message gets a generic billing explanation.
 
-| Status | Code                | Meaning                                                                  |
-| ------ | ------------------- | ------------------------------------------------------------------------ |
-| 401    | `unauthenticated`   | The token is missing or expired.                                         |
-| 402    | `spending_cap`      | The spending cap is reached. The agent stops; nothing is billed past it. |
-| 403    | `forbidden`         | Not allowed: the plan, the organisation's policy, or residency.          |
-| 404    | `not_found`         | No such worker.                                                          |
-| 409    | `conflict`          | The id is in use with a different request.                               |
-| 429    | `concurrency_limit` | Too many workers at once for the tier.                                   |
+| Status | Code                | Meaning                                                                                      |
+| ------ | ------------------- | -------------------------------------------------------------------------------------------- |
+| 401    | `unauthenticated`   | The token is missing or expired.                                                             |
+| 402    | `spending_cap`      | Billing refuses the run: no plan, a failed payment, seats full, or the spending cap reached. |
+| 403    | `forbidden`         | Not allowed: the plan, the organisation's policy, or residency.                              |
+| 404    | `not_found`         | No such worker.                                                                              |
+| 409    | `conflict`          | The id is in use with a different request.                                                   |
+| 429    | `concurrency_limit` | Too many workers at once for the tier.                                                       |
 
 ### Who does what (XCOD-186)
 
@@ -127,6 +131,6 @@ Every request carries `Authorization: Bearer <access token>`. The token comes fr
 | AC3: egress allow-list; secrets encrypted at rest           | Control plane. The client sends only the secrets the user names.                                                                  |
 | AC4: repo access with the user's token; results as a branch | Shared. The control plane holds the token. The client sends the remote and commit, and refuses any branch but `lunos/cloud/<id>`. |
 | AC5: metering of active time                                | Control plane. It reports `activeSeconds`, and the client shows it.                                                               |
-| AC6: concurrency limits and spending cap                    | Control plane. The client turns 429 and 402 into clear messages.                                                                  |
+| AC6: concurrency limits and spending cap                    | Control plane. The client shows a 402's reason as is, explains a 429, and reports a run stopped mid-way (`ended`).                |
 | AC7: residency applies on the worker                        | Shared. The client checks the region and sends the resolved policy; the worker enforces it.                                       |
 | AC8: workers only in the Phase 7 data centre                | Control plane. `GET /v1` reports the region.                                                                                      |

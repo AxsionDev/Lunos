@@ -16,7 +16,8 @@ import { Schema } from "effect"
  *   DELETE /v1/workers/{id}   → Finished  (the results branch is pushed before this answers)
  *
  * Errors are `{ "error": { "code", "message" } }` with the status below; the message is shown to
- * the user as is.
+ * the user as is. A 402 covers every billing refusal (no plan, suspended, seats, spending cap), so
+ * its message must say which.
  */
 export const VERSION = 1
 
@@ -71,6 +72,15 @@ export const Worker = Schema.Struct({
   branch: Schema.String,
   /** Agent-seconds metered so far: active time only; idle and waiting-for-approval excluded (AC5). */
   activeSeconds: Schema.Number,
+  /**
+   * XCOD-237: set when the control plane itself stopped the run (its agent), e.g. the spending cap
+   * was reached or the subscription was suspended mid-run. The worker may still be `running` (it
+   * stays up so DELETE can push the results). `reason` is a code (`spending_cap`, `suspended`, …;
+   * open-ended, so new reasons don't break older clients); `message` is shown to the user as is.
+   * Optional: older control planes don't send it, and older clients ignore it. Omit it when unset
+   * (null is accepted, so a control plane serialising an empty column doesn't break the client).
+   */
+  ended: Schema.optional(Schema.NullOr(Schema.Struct({ reason: Schema.String, message: Schema.String }))),
 })
 export type Worker = Schema.Schema.Type<typeof Worker>
 

@@ -173,4 +173,38 @@ describe("lunos run --cloud (XCOD-236)", () => {
       }),
     TIMEOUT,
   )
+
+  // XCOD-237: billing stops a run mid-way the way lunoshq does: the Worker gains `ended`, the busy
+  // session is aborted, the worker stays up. The attached client says why and exits non-zero, and
+  // the worker is still ended so its results are pushed.
+  for (const [reason, message] of [
+    ["spending_cap", "Your Pro plan has used its 40 included agent-hours for 2026-10. Raise the cap in the console."],
+    [
+      "suspended",
+      "Your last payment failed, so cloud runs are paused until the card is updated in the billing portal.",
+    ],
+  ] as const)
+    cliIt.live(
+      `a run the control plane stops for billing (${reason}) says why and exits non-zero`,
+      (input) =>
+        Effect.gen(function* () {
+          const { fake, work, env } = yield* setup(input)
+          yield* input.llm.hang
+          const run = yield* input.opencode.startRun("work until stopped", {
+            env,
+            extraArgs: ["--cloud", "--dir", work, "--cloud-secret", "OPENCODE_CONFIG_CONTENT"],
+          })
+          yield* input.llm.wait(1)
+          const id = [...fake.workers.keys()][0]
+          yield* Effect.promise(() => fake.end(id, reason, message))
+          const result = yield* run.result
+          expect(result.exitCode).toBe(1)
+          expect(result.stderr).toContain(`Lunos Cloud stopped the run: ${message}`)
+          expect(result.stderr).not.toContain('"name": "MessageAbortedError"')
+          expect(result.stderr).toMatch(/cloud: failed: (results on|nothing changed)/)
+          noTrace(result.stderr)
+          expect(fake.requests.some((r) => r.method === "DELETE")).toBe(true)
+        }),
+      TIMEOUT,
+    )
 })
