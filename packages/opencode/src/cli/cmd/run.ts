@@ -27,6 +27,7 @@ import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@openc
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
 import { RunBudget } from "@/agent/run-budget"
+import { RunEnding } from "./run/ending"
 
 const isAbort = (error: unknown) =>
   !!error && typeof error === "object" && (error as { name?: unknown }).name === "MessageAbortedError"
@@ -88,6 +89,16 @@ function block(info: Inline, output?: string) {
   UI.empty()
 }
 
+/** How long an attached run waits for the session's last events after the prompt returns. */
+const ATTACH_GRACE_MS = 5_000
+
+/** The error on the assistant message a prompt or command returned, if it ended in one. */
+function messageError(data: unknown) {
+  if (!data || typeof data !== "object" || !("info" in data)) return undefined
+  const info = (data as { info?: { error?: unknown } }).info
+  return info?.error ?? undefined
+}
+
 function formatRunError(error: unknown) {
   return FormatError(error) ?? FormatUnknownError(error)
 }
@@ -126,6 +137,16 @@ async function toolError(part: ToolPart) {
       title: `${part.tool} failed`,
     })
   }
+}
+
+/** `--cloud-secret A --cloud-secret B,C` → ["A", "B", "C"]. */
+export function cloudSecretNames(value: string | string[] | undefined): string[] | undefined {
+  if (value === undefined) return undefined
+  return [value]
+    .flat()
+    .flatMap((item) => String(item).split(","))
+    .map((name) => name.trim())
+    .filter(Boolean)
 }
 
 export const RunCommand = effectCmd({
@@ -301,10 +322,12 @@ export const RunCommand = effectCmd({
         describe: "with --cloud: worker size (large counts double)",
       })
       .option("cloud-secret", {
+        // XCOD-236: not `array: true`, which also swallowed the message after it ("--cloud-secret X
+        // "fix it"" sent a secret named "fix it"). Repeating the flag still gives a list.
         type: "string",
-        array: true,
+        coerce: cloudSecretNames,
         describe:
-          "with --cloud: send this environment variable to the worker for this run (repeatable); nothing else is sent",
+          "with --cloud: send this environment variable to the worker for this run (repeat it, or NAME,NAME); nothing else is sent",
       }),
   handler: Effect.fn("Cli.run")(function* (args) {
     if (args.sandbox === false && !args.attach) {
@@ -340,7 +363,7 @@ export const RunCommand = effectCmd({
     if (args.cloud) {
       if (args.attach) return yield* fail("--cloud cannot be used with --attach")
       if (args.mini) return yield* fail("--cloud cannot be used with --mini yet")
-      const { runCloud } = yield* Effect.promise(() => import("./cloud-run"))
+      const { runCloud, requireModel } = yield* Effect.promise(() => import("./cloud-run"))
       const { Config } = yield* Effect.promise(() => import("@/config/config"))
       const config = yield* (yield* Config.Service).get()
       const here = Filesystem.resolve(process.env.PWD ?? process.cwd())
@@ -352,6 +375,9 @@ export const RunCommand = effectCmd({
             config,
             { size: args["cloud-size"] as "standard" | "large" | undefined, secrets: args["cloud-secret"] },
             async (conn) => {
+              // XCOD-236: a model asked for by name must run on the worker. The local fallback to
+              // the next best model (XCOD-214) would silently run something else there.
+              if (args.model) await requireModel(conn, args.model)
               await RunCommand.handler!({
                 ...args,
                 cloud: false,
@@ -1014,13 +1040,30 @@ export const RunCommand = effectCmd({
         if (!interactive) {
           const events = await client.event.subscribe()
           const completed = loop(client, events).catch((e) => {
+            // XCOD-236: Ctrl+C on an attached run stops its server, which closes this stream.
+            if (RunEnding.interrupted) return
             console.error(e)
             process.exitCode = 1
           })
-          async function finish() {
-            if (args.attach) return
-            const error = await Promise.race([completed, stopped.then(() => undefined)])
-            if (error) process.exitCode = 1
+          // XCOD-236: an attached run (--attach, --cloud, --sandbox) ends in error as a local one
+          // does: non-zero. The session's error event normally arrives with the idle that ends the
+          // loop; if the stream lags, the assistant message the prompt returned says it too.
+          async function finish(info?: unknown) {
+            const error = await Promise.race([
+              completed,
+              stopped.then(() => undefined),
+              ...(args.attach
+                ? [new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ATTACH_GRACE_MS).unref())]
+                : []),
+            ])
+            if (error) {
+              process.exitCode = 1
+              return
+            }
+            const failed = args.attach ? messageError(info) : undefined
+            if (!failed || (timeUp && isAbort(failed))) return
+            if (!emitError(failed)) UI.error(formatRunError(failed))
+            process.exitCode = 1
           }
 
           if (args.command) {
@@ -1034,12 +1077,13 @@ export const RunCommand = effectCmd({
                 variant: args.variant,
               }),
             )
+            if (RunEnding.interrupted) return
             if (result.error && !(timeUp && isAbort(result.error))) {
               if (!emitError(result.error)) UI.error(formatRunError(result.error))
               process.exitCode = 1
               return
             }
-            await finish()
+            await finish(result.data)
             return
           }
 
@@ -1053,12 +1097,13 @@ export const RunCommand = effectCmd({
               parts: [...files, { type: "text", text: message }],
             }),
           )
+          if (RunEnding.interrupted) return
           if (result.error && !(timeUp && isAbort(result.error))) {
             if (!emitError(result.error)) UI.error(formatRunError(result.error))
             process.exitCode = 1
             return
           }
-          await finish()
+          await finish(result.data)
           return
         }
 

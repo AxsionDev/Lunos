@@ -14,11 +14,15 @@ lunos run --cloud "Add input validation to parse.ts"
 git fetch origin lunos/cloud/<id>             # the results, when it's done
 ```
 
-| Option                | What it does                                                                                       |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| `--cloud`             | Run on a worker. Output streams here, and approvals come to you here, as in a local run.           |
-| `--cloud-size large`  | A larger worker. It counts double toward your agent-hours.                                         |
-| `--cloud-secret NAME` | Send environment variable `NAME` to the worker for this run. Repeat it for more than one variable. |
+| Option                | What it does                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `--cloud`             | Run on a worker. Output streams here, and approvals come to you here, as in a local run.        |
+| `--cloud-size large`  | A larger worker. It counts double toward your agent-hours.                                      |
+| `--cloud-secret NAME` | Send environment variable `NAME` to the worker for this run. Repeat it, or list several: `A,B`. |
+
+`--model provider/model` must be a model the worker can run. If its provider isn't set up there (usually because its key wasn't sent with `--cloud-secret`), the run stops before it starts, rather than using another model.
+
+A run whose session ends in an error (for example, refused by the residency policy on the worker) exits non-zero and reports `failed`.
 
 Ctrl+C ends the worker, and anything it changed is still pushed to its branch.
 
@@ -100,6 +104,7 @@ Every request carries `Authorization: Bearer <access token>`. The token comes fr
 ```
 
 - `url` and `auth` give the worker's Lunos server. The client attaches to it as `lunos run --attach` does.
+- `directory` is the project directory on the worker (for example `/workspace`), not a path on your machine. The client only passes it to the worker's server.
 - `branch` must be `lunos/cloud/<id>`. The client refuses any other value.
 
 **Errors** are `{ "error": { "code", "message" } }`. Lunos shows the message as is, and adds the next step:

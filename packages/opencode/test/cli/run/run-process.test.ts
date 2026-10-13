@@ -362,6 +362,28 @@ describe("opencode run (non-interactive subprocess)", () => {
     60_000,
   )
 
+  // XCOD-236: an attached run whose session ends in an error exited 0, unlike a local one.
+  cliIt.live(
+    "attach mode exits non-zero when the session ends in an error, as a local run does",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("must never be asked")
+        const env = {
+          OPENCODE_CONFIG_CONTENT: JSON.stringify({ ...testProviderConfig(llm.url), residency: { allow: ["eu"] } }),
+        }
+        const local = yield* opencode.run("say hi", { env })
+        const server = yield* opencode.serve({ env })
+        const attached = yield* opencode.run("say hi", { env, extraArgs: ["--attach", server.url] })
+
+        for (const result of [local, attached]) {
+          expect(result.exitCode).toBe(1)
+          expect(result.stderr).toContain("Blocked by data-residency policy")
+        }
+        expect(yield* llm.calls).toBe(0)
+      }),
+    60_000,
+  )
+
   cliIt.concurrent(
     "attach mode rejects local directories before prompt admission",
     ({ home, opencode }) =>

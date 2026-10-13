@@ -7,6 +7,7 @@ import { writeStdoutEffect } from "../stdout"
 import { Sandbox } from "@/sandbox"
 import { SandboxConfig } from "@/sandbox/config"
 import { AuditLog } from "@/audit/log"
+import { RunEnding } from "./run/ending"
 
 // XCOD-144 slice 1: `--sandbox` on `lunos` and `lunos run`, and `lunos sandbox list|attach|destroy`.
 // The host side never loads a project instance for a sandboxed run (that would initialise the
@@ -162,6 +163,7 @@ export async function runSandboxed(
   // Interrupted: there are no results to hand back, so keep the sandbox (stopped) rather than lose it.
   let stopping: Promise<unknown> | undefined
   const interrupted = () => {
+    RunEnding.interrupted = true
     say(`interrupted; keeping ${info.id} (stopped): \`lunos sandbox destroy ${info.id}\` removes it`)
     stopping = Sandbox.retain(info, "interrupted")
       .catch(() => {})

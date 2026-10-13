@@ -1,11 +1,18 @@
 // XCOD-186: stands in for the Lunos Cloud control plane in tests. It speaks contract v1
 // (src/cloud/contract.ts) and also serves the OIDC discovery `CloudAuth.session()` reads. Its
-// "worker" is a git clone of the requested commit in a temp directory: a test writes files there as
-// an agent would, and DELETE commits them to lunos/cloud/<id> and pushes that branch, like the
-// real one. Not a control plane: no isolation, metering or limits, which are the commercial side's.
+// "worker" is a git clone of the requested commit in a temp directory, and DELETE commits what changed
+// there to lunos/cloud/<id> and pushes that branch, like the real one. Not a control plane: no
+// isolation, metering or limits, which are the commercial side's.
+//
+// XCOD-236: `directory` in the Worker is the project directory *on the worker* (contract.ts), not a
+// path on the client's machine: without `serve` it is "/workspace", as on the real control plane, and
+// a test that plays the agent writes into the clone through `tree(id)`, which only the fake has.
 //
 // With `serve`, each worker also runs a real `lunos serve` in its clone, so `lunos run --cloud` can
-// attach to it. Run standalone for a local end-to-end check (any bearer token is accepted):
+// attach to it. That server is on this machine, so `directory` is the clone's path: still the
+// server's view of it, which is all the client may use it for. The worker gets the residency policy
+// the client sent as locked managed config, as the real one does, so the worker enforces it.
+// Run standalone for a local end-to-end check (any bearer token is accepted):
 //
 //   bun test/cloud/fixtures/fake-control-plane.ts     # prints the endpoint to set as cloud.endpoint
 import fs from "fs/promises"
@@ -14,6 +21,8 @@ import path from "path"
 import { $, type Subprocess } from "bun"
 
 export const TOKEN = "test-access-token"
+/** Where a worker without a server says its project is: a path on the worker, not here. */
+export const WORKSPACE = "/workspace"
 
 export interface Options {
   region?: "eu" | "us" | "other"
@@ -25,6 +34,8 @@ export interface Options {
   anyToken?: boolean
   /** Path to Lunos's entry point: run a real `lunos serve` in each worker's clone. */
   serve?: string
+  /** Extra environment for each worker's `lunos serve` (tests: no network, no plugins). */
+  serveEnv?: Record<string, string>
   port?: number
 }
 
@@ -39,8 +50,22 @@ type Worker = {
 
 // The worker's server sees none of this machine's environment or stored logins: only PATH, its own
 // home, the password and the secrets the client named, as a real worker would.
-async function serve(entry: string, dir: string, password: string, secrets: Record<string, string>) {
+async function serve(
+  entry: string,
+  dir: string,
+  password: string,
+  secrets: Record<string, string>,
+  residency: { allow: string[] } | null | undefined,
+  extra: Record<string, string> = {},
+) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-worker-home-"))
+  const managed = path.join(home, "managed")
+  await fs.mkdir(managed)
+  if (residency)
+    await fs.writeFile(
+      path.join(managed, "managed.json"),
+      JSON.stringify({ residency: { allow: residency.allow }, $locked: ["residency"] }),
+    )
   const proc = Bun.spawn(["bun", entry, "serve", "--port", "0", "--hostname", "127.0.0.1"], {
     cwd: dir,
     env: {
@@ -50,7 +75,9 @@ async function serve(entry: string, dir: string, password: string, secrets: Reco
       XDG_CONFIG_HOME: path.join(home, "config"),
       XDG_STATE_HOME: path.join(home, "state"),
       XDG_CACHE_HOME: path.join(home, "cache"),
+      OPENCODE_TEST_MANAGED_CONFIG_DIR: managed,
       OPENCODE_SERVER_PASSWORD: password,
+      ...extra,
       ...secrets,
     },
     stdout: "pipe",
@@ -87,7 +114,7 @@ export async function start(options: Options = {}) {
     region,
     url: w.server?.url ?? `${server.url.origin}/worker/${w.id}`,
     auth: { username: "opencode", password: `pw-${w.id}` },
-    directory: w.dir,
+    directory: w.server ? w.dir : WORKSPACE,
     branch: options.wrongBranch ? "main" : `lunos/cloud/${w.id}`,
     activeSeconds: Math.round((Date.now() - w.started) / 1000),
   })
@@ -125,7 +152,15 @@ export async function start(options: Options = {}) {
         }
         await $`git -C ${dir} checkout -q ${body.repo.commit}`.quiet()
         const worker: Worker = { id, dir, commit: body.repo.commit, polls: 0, started: Date.now() }
-        if (options.serve) worker.server = await serve(options.serve, dir, `pw-${id}`, body.secrets ?? {})
+        if (options.serve)
+          worker.server = await serve(
+            options.serve,
+            dir,
+            `pw-${id}`,
+            body.secrets ?? {},
+            body.residency,
+            options.serveEnv,
+          )
         workers.set(id, worker)
         return Response.json(view(worker), { status: 201 })
       }
@@ -162,6 +197,12 @@ export async function start(options: Options = {}) {
     issuer: `${server.url.origin}/oidc`,
     requests,
     workers,
+    /** The worker's clone on this machine, for a test playing the agent. Not part of the contract. */
+    tree: (id: string) => {
+      const worker = workers.get(id)
+      if (!worker) throw new Error(`No worker ${id}`)
+      return worker.dir
+    },
     stop: () => {
       for (const worker of workers.values()) worker.server?.proc.kill()
       server.stop(true)
