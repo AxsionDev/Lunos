@@ -100,6 +100,9 @@ function messageError(data: unknown) {
 }
 
 function formatRunError(error: unknown) {
+  // XCOD-237: an attached run's session can be aborted from the server side (e.g. Lunos Cloud
+  // stopping it for billing, which then says why); a JSON dump of the abort helps no one.
+  if (isAbort(error)) return "The session was aborted."
   return FormatError(error) ?? FormatUnknownError(error)
 }
 

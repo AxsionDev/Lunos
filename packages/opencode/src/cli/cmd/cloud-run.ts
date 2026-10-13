@@ -35,8 +35,8 @@ export async function runCloud(
   const base = CloudWorkers.endpoint(config)
   // The id is known before the request, so Ctrl+C while the worker starts can still end it.
   const id = CloudWorkers.newID()
-  const end = async (outcome: string) => {
-    const done = await CloudWorkers.finish(config, base, id, outcome)
+  const end = async (outcome: string, reason?: string) => {
+    const done = await CloudWorkers.finish(config, base, id, outcome, reason)
     say(
       done.pushed
         ? `${outcome}: results on ${done.branch}. Fetch them with: git fetch origin ${done.branch}`
@@ -76,10 +76,22 @@ export async function runCloud(
     if (stopping) await stopping
     process.off("SIGINT", interrupted)
     process.off("SIGTERM", interrupted)
-    const failed = threw || (process.exitCode !== undefined && process.exitCode !== 0)
-    process.exitCode = failed ? (process.exitCode ?? 1) : before
-    await end(failed ? "failed" : "finished")
+    // XCOD-237: the control plane may have stopped the run itself (spending cap, suspended
+    // subscription). Here that only looks like an aborted session or a closed stream, so ask it why.
+    // A failed GET must never keep the worker from being ended and its results pushed.
+    const ended = stopping ? undefined : await stoppedBy(base, id)
+    if (ended) UI.error(`Lunos Cloud stopped the run: ${ended.message}`)
+    const failed = !!ended || threw || (process.exitCode !== undefined && process.exitCode !== 0)
+    process.exitCode = failed ? process.exitCode || 1 : before
+    await end(failed ? "failed" : "finished", ended?.reason)
   }
+}
+
+/** Why the control plane ended the run, if it did (worker API v1, optional `ended`). */
+export async function stoppedBy(base: string, id: string, fetcher?: typeof fetch) {
+  return CloudWorkers.get(base, id, fetcher)
+    .then((worker) => worker.ended ?? undefined)
+    .catch(() => undefined)
 }
 
 /**

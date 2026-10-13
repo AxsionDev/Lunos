@@ -12,6 +12,9 @@ import * as Fake from "./fixtures/fake-control-plane"
 
 // XCOD-186: the client side of Lunos Cloud workers, against a fake control plane.
 
+/** Needs the fake's test-only hooks; skipped when lunoshq's shim runs these tests against the real one. */
+const fakeOnly = test.skipIf(!("IS_FAKE" in Fake))
+
 let dir: string
 let previous: string
 let fake: Awaited<ReturnType<typeof Fake.start>> | undefined
@@ -107,7 +110,9 @@ describe("CloudWorkers (XCOD-186)", () => {
 
   test("the control plane's errors become messages a user can act on", async () => {
     for (const [status, code, expected] of [
-      [402, "spending_cap", /spending cap reached/],
+      // XCOD-237: a 402 is any billing refusal; the control plane's message is shown as is, with no
+      // "spending cap reached" added (any message: this test also runs against the real control plane).
+      [402, "spending_cap", /^(?![\s\S]*spending cap reached)[\s\S]+$/],
       [429, "concurrency_limit", /too many cloud runs at once/],
       [403, "forbidden", /Not on your plan/],
       [401, "unauthenticated", /Run lunos login/],
@@ -124,6 +129,71 @@ describe("CloudWorkers (XCOD-186)", () => {
       fake.stop()
     }
     fake = undefined
+  })
+
+  fakeOnly(
+    "a 402 shows the control plane's own reason, with no spending-cap suffix it didn't send (XCOD-237)",
+    async () => {
+      // lunoshq's refusals: no plan, payment failed, seats full. None of them is a reached cap.
+      for (const message of [
+        "Lunos Cloud needs a plan: start the 14-day Pro trial or subscribe at https://x.test.",
+        "Your last payment failed, so cloud runs are paused until the card is updated.",
+        "All 3 seats of acme's Team plan are in use this month.",
+      ]) {
+        fake = await Fake.start({ fail: { path: "/v1/workers", status: 402, code: "spending_cap", message } })
+        await signIn(fake.issuer)
+        const { work } = await repository()
+        const config = { cloud: { endpoint: fake.url } }
+        const found = await CloudWorkers.repo(work, config)
+        const error = await CloudWorkers.create({ config, repo: found.repo }).catch((e) => e)
+        expect(error).toBeInstanceOf(CloudWorkers.ServiceError)
+        expect(error.message).toBe(message)
+        expect(error.message).not.toContain("spending cap reached")
+        fake.stop()
+      }
+      // Without a message (empty, or not the error shape at all), a generic billing explanation.
+      for (const fail of [
+        { path: "/v1/workers", status: 402, code: "spending_cap", message: "" },
+        { path: "/v1/workers", status: 402, code: "spending_cap", raw: true },
+      ]) {
+        fake = await Fake.start({ fail })
+        await signIn(fake.issuer)
+        const { work } = await repository()
+        const config = { cloud: { endpoint: fake.url } }
+        const found = await CloudWorkers.repo(work, config)
+        const error = await CloudWorkers.create({ config, repo: found.repo }).catch((e) => e)
+        expect(error.code).toBe("spending_cap")
+        expect(error.message).toMatch(/refused the run for billing reasons \(HTTP 402\)/)
+        fake.stop()
+      }
+      fake = undefined
+    },
+  )
+
+  fakeOnly("a Worker's optional `ended` is read, and is optional both ways (XCOD-237)", async () => {
+    fake = await Fake.start()
+    await signIn(fake.issuer)
+    const { work } = await repository()
+    const config = { cloud: { endpoint: fake.url } }
+    const found = await CloudWorkers.repo(work, config)
+    const started = await CloudWorkers.create({ config, repo: found.repo })
+    expect(started.worker.ended).toBeUndefined()
+    await fake.end(started.worker.id, "spending_cap", "Your Pro plan has used its 40 included agent-hours.")
+    const after = await CloudWorkers.get(started.base, started.worker.id)
+    expect(after.status).toBe("running")
+    expect(after.ended).toEqual({
+      reason: "spending_cap",
+      message: "Your Pro plan has used its 40 included agent-hours.",
+    })
+    await CloudWorkers.finish(config, started.base, started.worker.id, "failed", "spending_cap")
+    // An older client's schema (no `ended`) still decodes a newer control plane's Worker.
+    const { Schema } = await import("effect")
+    const { CloudContract } = await import("../../src/cloud/contract")
+    const { ended: _, ...fields } = CloudContract.Worker.fields
+    const Old = Schema.Struct(fields)
+    expect(Schema.decodeUnknownSync(Old)({ ...after })).not.toHaveProperty("ended")
+    // A control plane that serialises an unset `ended` as null still works.
+    expect(Schema.decodeUnknownSync(CloudContract.Worker)({ ...after, ended: null }).ended).toBeNull()
   })
 
   test("only named secrets are sent; stored provider keys never leave the machine", async () => {
