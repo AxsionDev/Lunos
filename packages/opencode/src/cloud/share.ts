@@ -106,7 +106,8 @@ export async function check(config: Config, org: CloudOrg.Org, url: string, opts
   const region = await CloudOrg.region(org, opts).catch((error) => {
     if (error instanceof CloudAuth.SignedOutError) throw error
     if (residency.enforce === false) return undefined
-    Residency.audit(residency, path.join(Global.Path.log, "residency-egress.log"), TARGET, url, false)
+    const log = path.join(Global.Path.log, "residency-egress.log")
+    Residency.audit(residency, log, TARGET, url, false, claim(config, org, url, undefined).claim)
     throw new RefusedError(
       `Not shared: couldn't ask ${org.host} which region it runs in, so the data-residency policy can't be checked (${error instanceof Error ? error.message : String(error)}).`,
     )

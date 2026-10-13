@@ -177,13 +177,6 @@ export const CALLS: Call[] = [
     alsoOffBy: '`"share": "disabled"` (the default)',
   },
   {
-    id: "console-team",
-    what: "Your organisation's private marketplace and team memory (the `org` memory source)",
-    hosts: "the console in `cloud.policy` (managed config)",
-    when: "marketplace commands and Discover; recall, only with an `org` memory source",
-    offline: "yours",
-  },
-  {
     id: "remote-skills",
     what: "Remote skills and URL instructions",
     hosts: "URLs in `skills.urls` and `instructions`",

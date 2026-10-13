@@ -118,7 +118,7 @@ export const Info = Schema.Struct({
   plugin: Schema.optional(Schema.mutable(Schema.Array(ConfigPluginV1.Spec))),
   share: Schema.optional(Schema.Literals(["manual", "auto", "disabled", "cloud"])).annotate({
     description:
-      "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing, 'cloud' allows only lunos share to your organisation's Lunos console (never another share service)",
+      "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing, 'cloud' shares only with your organisation's Lunos console (/share, lunos share, lunos memory share; never another share service)",
   }),
   autoshare: Schema.optional(Schema.Boolean).annotate({
     description: "@deprecated Use 'share' field instead. Share newly created sessions automatically",
