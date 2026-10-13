@@ -48,7 +48,7 @@ function line(scope: MemoryStore.Scope, item: MemoryBackend.Recalled) {
 /** Results from one external memory source (XCOD-135), already screened and cut to size. */
 export interface Section {
   name: string
-  type: "graph" | "mcp"
+  type: "graph" | "mcp" | "org"
   /** Trusted by managed config. Still reference, never instructions. */
   trusted: boolean
   items: string[]

@@ -271,11 +271,23 @@ const CLAIMS: Record<string, Claim> = {
  */
 export const SHARE_OPNCD = "share:opncd"
 export const SHARE_ENTERPRISE = "share:enterprise"
+/**
+ * XCOD-191: uploads to your organisation's Lunos console (`lunos share`, `lunos memory share`). On
+ * Lunos Cloud's own host it is ITService's EU service; a self-hosted console is wherever you run it,
+ * so it is "unknown" until `residency.endpoints` declares `share:lunos-console`.
+ */
+export const SHARE_LUNOS_CONSOLE = "share:lunos-console"
 const SHARE_HOSTS: Record<string, Claim> = {
   [SHARE_OPNCD]: {
     region: "us",
     basis: "entity",
     note: "Upstream opencode's hosted share service (opncd.ai, and the opencode console's share API for signed-in orgs), operated by opencode's maintainers, a non-EU company. Not Lunos infrastructure.",
+  },
+  [SHARE_LUNOS_CONSOLE]: {
+    region: "eu",
+    basis: "entity",
+    hosts: ["cloud.lunos.tech"],
+    note: "Lunos Cloud's console, operated by ITService EOOD (Bulgaria) in its EU data centre. Holds only on cloud.lunos.tech: a self-hosted console is assessed as your own endpoint.",
   },
   [SHARE_ENTERPRISE]: {
     region: "unknown",

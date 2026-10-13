@@ -422,7 +422,8 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   }
 
   const shareCmds = () => {
-    if (sync().data.config.share === "disabled") return []
+    // XCOD-191: "cloud" shares only through lunos share, to the organisation's Lunos console.
+    if (sync().data.config.share === "disabled" || sync().data.config.share === "cloud") return []
     return [
       sessionCommand({
         id: "session.share",

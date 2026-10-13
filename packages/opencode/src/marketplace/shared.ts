@@ -11,6 +11,7 @@ import { patchDir } from "../plugin/install"
 import { errorMessage } from "../util/error"
 import { ConfigPolicy } from "@/config/policy"
 import { ConfigManaged } from "@/config/managed"
+import { CloudOrg } from "@/cloud/org"
 
 export type SourceKind = "github" | "url" | "path"
 
@@ -141,6 +142,9 @@ export async function resolveMarketplaceManifest(spec: string, dep: FetchDeps = 
 // Mirrors the disk-cache shape `@opencode-ai/core/models-dev` already uses: `Hash.fast(source)` under
 // `Global.Path.cache`, freshness read from file mtime, not a bespoke format.
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+// XCOD-191: an organisation's private marketplace changes when its admins publish, so it is
+// re-fetched after minutes, not a day. Offline or signed out, the cached copy is still served.
+const ORG_CACHE_TTL_MS = 5 * 60 * 1000
 
 export type MarketplaceCacheDeps = {
   dir: string
@@ -211,6 +215,34 @@ export type MarketplaceListDeps = {
   builtin?: string
   /** Organisation policy from managed config (XCOD-102). Unset means no policy. */
   policy?: () => Promise<MarketplacePolicy>
+  /**
+   * XCOD-191: the organisation's private marketplace on its Lunos console (from managed
+   * `cloud.policy`), fetched with the `lunos login` session. Unset, or undefined, means none.
+   */
+  org?: () => Promise<OrgMarketplace | undefined>
+}
+
+export type OrgMarketplace = { source: string; org: string; fetchText: (url: string) => Promise<string> }
+
+/** The organisation's private marketplace for this machine, if managed config points at a console. */
+export async function orgMarketplace(): Promise<OrgMarketplace | undefined> {
+  const org = await CloudOrg.resolve()
+  if (!org) return
+  const source = `${org.base}/marketplace.json`
+  return {
+    source,
+    org: org.org,
+    async fetchText(url) {
+      // Only ever the one URL managed config names: the session's token goes nowhere else.
+      if (url !== source) throw new Error(`Refusing to send your sign-in to ${url}`)
+      if (Offline.enabled()) throw new Offline.DisabledError(`Fetching ${url}`)
+      const response = await CloudOrg.request(org, "/marketplace.json", {
+        method: "GET",
+        what: `${org.org}'s private marketplace`,
+      })
+      return response.text()
+    },
+  }
 }
 
 // XCOD-102: what managed config says about marketplaces, and which of it is locked.
@@ -255,6 +287,7 @@ export const defaultMarketplaceListDeps: MarketplaceListDeps = {
   cache: defaultMarketplaceCacheDeps,
   builtin: DEFAULT_MARKETPLACE,
   policy: async () => marketplacePolicy(await ConfigManaged.readManagedDocs().catch(() => [])),
+  org: orgMarketplace,
 }
 
 async function readSources(dir: string, dep: MarketplaceListDeps): Promise<{ sources: string[]; disabled: boolean }> {
@@ -277,7 +310,7 @@ type ResolvedSource =
   | { source: string; ok: true; manifest: Marketplace.Manifest; fetchedAt: number; stale?: string }
   | { source: string; ok: false; error: string }
 
-export type ResolvedMarketplace = ResolvedSource & { scope: "local" | "global" | "builtin" }
+export type ResolvedMarketplace = ResolvedSource & { scope: "local" | "global" | "builtin" | "org" }
 
 // Fetches live and refreshes the cache; on failure, falls back to whatever is cached (even if
 // stale) so a source that's gone unreachable degrades to last-known-good instead of failing the
@@ -289,7 +322,12 @@ export type ResolvedMarketplace = ResolvedSource & { scope: "local" | "global" |
 // reads file-plugin paths straight off disk every time. A local directory/file has no network
 // round-trip to save (the ticket's stated motivation for this cache) and can't go "unreachable but
 // last-known-good" the way a URL or GitHub source can — it's just a file read.
-async function resolveWithCache(source: string, dep: MarketplaceListDeps, force: boolean): Promise<ResolvedSource> {
+async function resolveWithCache(
+  source: string,
+  dep: MarketplaceListDeps,
+  force: boolean,
+  ttl = CACHE_TTL_MS,
+): Promise<ResolvedSource> {
   if (sourceKind(source) === "path") {
     return resolveMarketplaceManifest(source, dep.resolve).then(
       (manifest) => ({ source, ok: true as const, manifest, fetchedAt: Date.now() }),
@@ -298,7 +336,7 @@ async function resolveWithCache(source: string, dep: MarketplaceListDeps, force:
   }
 
   const cached = await readCachedManifest(source, dep.cache)
-  if (!force && cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+  if (!force && cached && Date.now() - cached.fetchedAt < ttl) {
     return { source, ok: true, manifest: cached.manifest, fetchedAt: cached.fetchedAt }
   }
 
@@ -314,6 +352,11 @@ async function resolveWithCache(source: string, dep: MarketplaceListDeps, force:
   const error = errorMessage(fetched.error)
   if (cached) return { source, ok: true, manifest: cached.manifest, fetchedAt: cached.fetchedAt, stale: error }
   return { source, ok: false, error }
+}
+
+/** The list deps with the organisation's authenticated fetch for its one manifest URL. */
+function orgDeps(dep: MarketplaceListDeps, org: OrgMarketplace): MarketplaceListDeps {
+  return { ...dep, resolve: { ...dep.resolve, fetchText: org.fetchText } }
 }
 
 // Shared by the CLI's `marketplace list` (counts/names only), `plugin list`/`plugin search`
@@ -349,6 +392,20 @@ export async function resolveAddedMarketplaces(
 
   const entries: ResolvedMarketplace[] = []
   const seen = new Set<string>()
+  // XCOD-191: the organisation's private marketplace comes first, fetched with the session's token.
+  // It is subject to a locked allow list like any source: admins add its URL to marketplace_allow.
+  const org = await dep.org?.().catch(() => undefined)
+  if (org) {
+    seen.add(normalizeSource(org.source))
+    entries.push(
+      allowedSource(policy, org.source)
+        ? {
+            ...(await resolveWithCache(org.source, orgDeps(dep, org), false, ORG_CACHE_TTL_MS)),
+            scope: "org",
+          }
+        : { source: org.source, ok: false, error: NOT_ALLOWED, scope: "org" },
+    )
+  }
   let disabled = policy?.defaultOn === false
   // A locked `marketplace` list replaces the user's and project's sources entirely.
   const sourced: Array<{ scope: ResolvedMarketplace["scope"]; sources: string[] }> = locked(FIELD)
@@ -386,7 +443,8 @@ export async function refreshMarketplaceCache(
   source: string,
   dep: MarketplaceListDeps = defaultMarketplaceListDeps,
 ): Promise<RefreshMarketplaceResult> {
-  const resolved = await resolveWithCache(source, dep, true)
+  const org = await dep.org?.().catch(() => undefined)
+  const resolved = await resolveWithCache(source, org?.source === source ? orgDeps(dep, org) : dep, true)
   if (resolved.ok && !resolved.stale) return { ok: true, manifest: resolved.manifest, fetchedAt: resolved.fetchedAt }
   if (resolved.ok) return { ok: false, error: resolved.stale!, fetchedAt: resolved.fetchedAt }
   return { ok: false, error: resolved.error }

@@ -126,13 +126,20 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
       (entry) => entry.ok && entry.manifest.name === name && normalizeSource(entry.source) !== source,
     )
     if (clash) {
-      const where = clash.scope === "builtin" ? "the built-in marketplace" : `your ${clash.scope} config`
+      const where =
+        clash.scope === "builtin"
+          ? "the built-in marketplace"
+          : clash.scope === "org"
+            ? "your organisation's Lunos console"
+            : `your ${clash.scope} config`
       dep.log.error(`Not added: a marketplace named "${name}" is already added from ${clash.source} (${where}).`)
       dep.log.error(`Two marketplaces with one name would make every "${name}/<entry>" ambiguous.`)
       dep.log.info(
         clash.scope === "builtin"
           ? `To use ${source} instead, set "${DEFAULT_FIELD}": false in your config, then run this again.`
-          : `To use ${source} instead, remove ${clash.source} from "${FIELD}" in your ${clash.scope} config, then run this again.`,
+          : clash.scope === "org"
+            ? `Your organisation's marketplace is named "${name}"; ask the publisher of ${source} to use another name.`
+            : `To use ${source} instead, remove ${clash.source} from "${FIELD}" in your ${clash.scope} config, then run this again.`,
       )
       return false
     }
@@ -193,7 +200,7 @@ export function createMarketplaceAddTask(input: MarketplaceAddInput, dep: Market
 }
 
 export type MarketplaceListEntry = {
-  scope: "local" | "global" | "builtin"
+  scope: "local" | "global" | "builtin" | "org"
   source: string
   name?: string
   contents?: string

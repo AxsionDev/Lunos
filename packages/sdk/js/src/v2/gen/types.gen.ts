@@ -1669,9 +1669,9 @@ export type MemorySourceConfig = {
    */
   name: string
   /**
-   * "graph": a read-only query against a Neo4j knowledge graph. "mcp": a search tool on an MCP server configured under "mcp"
+   * "graph": a read-only query against a Neo4j knowledge graph. "mcp": a search tool on an MCP server configured under "mcp". "org": your organisation's team memory on its Lunos console (the console named by cloud.policy in managed config; needs lunos login)
    */
-  type: "graph" | "mcp"
+  type: "graph" | "mcp" | "org"
   jurisdiction?: string
   enabled?: boolean
   max_tokens?: number
@@ -2075,7 +2075,7 @@ export type Config = {
         },
       ]
   >
-  share?: "manual" | "auto" | "disabled"
+  share?: "manual" | "auto" | "disabled" | "cloud"
   autoshare?: boolean
   /**
    * Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications

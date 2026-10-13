@@ -17,6 +17,11 @@ import { MemoryLifecycle } from "@/memory/lifecycle"
 import { MemoryNotes } from "@/memory/notes"
 import { MemoryRecall } from "@/memory/recall"
 import { MemoryStore } from "@/memory/store"
+import { MemoryGuard } from "@/memory/guard"
+import { Config } from "@/config/config"
+import { CloudAuth } from "@/cloud/auth"
+import { CloudOrg } from "@/cloud/org"
+import { CloudShare } from "@/cloud/share"
 
 // XCOD-94: the review surface for long-term memory. `list`, `show`, `status`, `verify` and `export`
 // read the provenance ledger only, so reviewing memory never starts the engine or needs a model.
@@ -616,9 +621,76 @@ function nearCount(preview: MemoryImport.Preview) {
   return preview.rows.filter((row) => row.near).length
 }
 
+// XCOD-191: share facts from your own memory with your organisation's team memory, on its Lunos
+// console. Only the facts named, only with --yes (without it, a preview), and each one waits there
+// until an owner or admin approves it. Nothing else of your memory is ever uploaded.
+export const MemoryShareCommand = effectCmd({
+  command: "share <ids..>",
+  describe: "share facts with your organisation's team memory (an admin approves each one)",
+  builder: (yargs) =>
+    yargs
+      .positional("ids", { type: "string", array: true, demandOption: true, describe: "fact ids (lunos memory list)" })
+      .option("yes", { type: "boolean", default: false, describe: "upload them (without it, only preview)" }),
+  handler: Effect.fn("Cli.memory.share")(function* (args) {
+    const ids = [...new Set((args.ids as string[]).map(String))]
+    if (ids.length > 50) return yield* fail("Share at most 50 facts at a time.")
+    const org = yield* Effect.promise(() => CloudOrg.resolve())
+    if (!org) return yield* fail(new CloudOrg.NotConfiguredError("lunos memory share").message)
+    const found: MemoryBundle.Fact[] = []
+    for (const id of ids) {
+      let hit: MemoryBundle.Fact | undefined
+      for (const scope of SCOPES) {
+        const fact = (yield* factsOf(scope)).find((item) => item.id === id)
+        if (!fact) continue
+        if (fact.quarantined) return yield* fail(`Fact ${id} failed the ledger's integrity check; it can't be shared.`)
+        if (!MemoryStore.isActive(fact)) return yield* fail(`Fact ${id} is outdated; share the fact that replaced it.`)
+        // The same secret screen memory writes use: a secret never leaves this machine this way.
+        const secret = MemoryGuard.secret(fact.text)
+        if (secret) return yield* fail(`Fact ${id} isn't shared: ${secret}.`)
+        hit = MemoryBundle.fact(scope, fact)
+      }
+      if (!hit) return yield* fail(`No fact with id ${id}`)
+      found.push(hit)
+    }
+    const lines = found.map((fact) => `  ${fact.id}  [${fact.scope}] ${oneLine(fact.text)}`)
+    if (!args.yes) {
+      yield* writeStdoutEffect(
+        [
+          `These ${found.length} fact(s) would be shared with ${org.org}'s team memory on ${org.host}:`,
+          ...lines,
+          "An owner or admin approves each one before other members' Lunos recalls it.",
+          "Nothing was uploaded. Run again with --yes to share them.",
+        ].join(EOL) + EOL,
+      )
+      return
+    }
+    const config = yield* Config.Service.use((cfg) => cfg.get())
+    const result = yield* Effect.tryPromise({
+      try: () => CloudShare.facts(config, org, found),
+      catch: (error) => error,
+    }).pipe(
+      Effect.catch((error) =>
+        fail(
+          error instanceof CloudAuth.SignedOutError || error instanceof CloudShare.RefusedError
+            ? error.message
+            : `Not shared: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      ),
+    )
+    const fresh = result.facts.filter((fact) => !fact.duplicate).length
+    yield* writeStdoutEffect(
+      [
+        `Shared ${fresh} fact(s) with ${org.org} for review${result.facts.length > fresh ? ` (${result.facts.length - fresh} already there)` : ""}:`,
+        ...lines,
+        "They stay in your own memory too. An owner or admin approves them in the console.",
+      ].join(EOL) + EOL,
+    )
+  }),
+})
+
 export const MemoryCommand = cmd({
   command: "memory",
-  describe: "review, search, export, import, migrate, outdate, verify and forget long-term memory",
+  describe: "review, search, export, import, migrate, outdate, verify, share and forget long-term memory",
   builder: (yargs) =>
     yargs
       .command(MemoryListCommand)
@@ -632,6 +704,7 @@ export const MemoryCommand = cmd({
       .command(MemoryExportCommand)
       .command(MemoryImportCommand)
       .command(MemoryMigrateCommand)
+      .command(MemoryShareCommand)
       .demandCommand(),
   handler: () => {},
 })

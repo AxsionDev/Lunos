@@ -490,11 +490,12 @@ export function Session() {
     {
       title: session()?.share?.url
         ? "Copy share link"
-        : sync.data.config.share === "disabled"
+        : sync.data.config.share === "disabled" || sync.data.config.share === "cloud"
           ? "Share session (disabled)"
           : "Share session",
       value: "session.share",
-      suggested: route.type === "session" && sync.data.config.share !== "disabled",
+      suggested:
+        route.type === "session" && sync.data.config.share !== "disabled" && sync.data.config.share !== "cloud",
       category: "Session",
       slash: {
         name: "share",
@@ -502,6 +503,15 @@ export function Session() {
       run: async () => {
         // Stay registered while disabled so a typed /share gets a plain answer
         // instead of being sent to the model as ordinary prompt text.
+        if (!session()?.share?.url && sync.data.config.share === "cloud") {
+          // XCOD-191: sessions go only to the organisation's Lunos console, with lunos share.
+          toast.show({
+            message: `Sessions are shared only with your organisation's Lunos console: run lunos share ${session()?.id ?? "<session id>"} in a terminal.`,
+            variant: "info",
+          })
+          dialog.clear()
+          return
+        }
         if (!session()?.share?.url && sync.data.config.share === "disabled") {
           toast.show({
             message:
