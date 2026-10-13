@@ -20,6 +20,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **See on your Lunos console which Lunos versions run where, and which policy they enforce.** Each
+  start bound to your organisation's console tells it the version, OS, architecture, surface, a
+  random install id and the policy digest, nothing else; developers can turn it off with
+  `"cloud": { "client_start": false }` unless the organisation locks it. When the console can't be
+  reached, the TUI and `lunos run` now say which copy of the policy applies and when it was
+  fetched, and `LUNOS_OFFLINE=1` uses the last fetched policy without contacting the console
+  (XCOD-241).
+
 - **Work as a team on your organisation's Lunos console.** With the Team plan or a self-hosted
   console: your organisation's private marketplace is listed first and installs with the usual
   commands; `lunos memory share <id>` offers one fact at a time to team memory, which an admin

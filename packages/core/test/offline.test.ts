@@ -36,6 +36,11 @@ describe("Offline", () => {
     for (const id of ["models-catalogue", "update-check", "lsp-download", "share", "marketplace"])
       expect(Offline.CALLS.find((call) => call.id === id)?.offline).toBe("blocked")
     expect(Offline.CALLS.find((call) => call.id === "model-provider")?.offline).toBe("yours")
+    // XCOD-241: offline, the organisation policy is the cached copy and client.start isn't sent.
+    expect(Offline.CALLS.find((call) => call.id === "org-policy")?.offline).toBe("blocked")
+    const start = Offline.CALLS.find((call) => call.id === "client-start")
+    expect(start?.offline).toBe("blocked")
+    expect(start?.alsoOffBy).toContain("client_start")
   })
 
   test("the report lists what offline mode turned off", () => {

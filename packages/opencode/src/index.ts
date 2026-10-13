@@ -3,6 +3,7 @@ import "./sandbox/boot"
 import yargs from "yargs"
 import { ConfigPolicy } from "@/config/policy"
 import { ConfigOrgPolicy } from "@/config/org-policy"
+import { CloudClientStart } from "@/cloud/client-start"
 import { AuditLog } from "@/audit/log"
 import { AuditForward } from "@/audit/forward"
 import { hideBin } from "yargs/helpers"
@@ -137,6 +138,8 @@ const cli = yargs(args)
     // XCOD-157: with sandbox.required, these would run a server, and so agents and tools, on the host.
     const command = String(opts._[0] ?? "")
     if (command === "audit") ConfigOrgPolicy.quietStart()
+    // XCOD-241: the surface client.start reports; in the environment so the TUI's worker sees it.
+    process.env.LUNOS_SURFACE = ConfigOrgPolicy.surfaceFor(command)
     if (HOST_SERVER_COMMANDS.has(command)) {
       const [{ refuseHost }, { CliError }] = await Promise.all([
         import("./cli/cmd/sandbox"),
@@ -236,6 +239,8 @@ try {
   // Explicitly exit to avoid any hanging subprocesses. Audit events are flushed first, bounded, so
   // a short-lived command can't exit before its last events are written (XCOD-103).
   await Promise.race([AuditLog.flush(), Bun.sleep(3000)])
+  // XCOD-241: client.start to the organisation's console, if one is in flight (bounded).
+  await CloudClientStart.flush()
   // Forwarded lines are sent asynchronously; give them a moment to leave before exiting.
   if (AuditLog.current()?.enabled && AuditLog.current()?.forward) await Bun.sleep(200)
   process.exit()

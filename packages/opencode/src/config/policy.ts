@@ -38,6 +38,13 @@ export const KNOWN = [
   "external.enabled",
   // XCOD-185: an organisation can pin the identity provider lunos login signs in to.
   "cloud",
+  // XCOD-241: lock the start event on, or lock the sign-in and policy keys one by one so developers
+  // can still turn the start event off.
+  "cloud.issuer",
+  "cloud.client_id",
+  "cloud.endpoint",
+  "cloud.policy",
+  "cloud.client_start",
   // XCOD-202: every permission, or one tool's (`permission.webfetch`, `permission.bash`, …).
   "permission",
   // XCOD-219: the models a session and its subagents run on (plus `agent.<name>.model`).
