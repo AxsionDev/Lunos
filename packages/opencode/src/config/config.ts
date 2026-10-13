@@ -29,6 +29,7 @@ import { ConfigPluginV1 } from "@opencode-ai/core/v1/config/plugin"
 import { ConfigAgent } from "./agent"
 import { ConfigCommand } from "./command"
 import { ConfigManaged } from "./managed"
+import { ConfigOrgPolicy } from "./org-policy"
 import { ConfigMemoryBackend } from "./memory-backend"
 import { ConfigParse } from "./parse"
 import { ConfigPaths } from "./paths"
@@ -279,6 +280,17 @@ const layer = Layer.effect(
     // XCOD-102: the managed layers, in precedence order: the system directory, then the MDM profile.
     const loadManaged = Effect.fnUntraced(function* () {
       const layers: { source: string; info: Info }[] = []
+      // XCOD-238: the policy fetched from the organisation's console (or its last cached copy) comes
+      // first, without the keys on-disk managed config sets, so those win whole. It is data: no
+      // {file:}/{env:} substitution, and a copy this version can't decode is skipped, not fatal.
+      const onDisk = yield* Effect.promise(() => ConfigManaged.readOnDiskDocs().catch(() => [] as unknown[]))
+      const fetched = yield* Effect.promise(() => ConfigOrgPolicy.resolve(onDisk))
+      if (fetched.layer && fetched.url) {
+        const source = fetched.source === "console" ? fetched.url : `${fetched.url} (cached)`
+        const decoded = yield* Effect.exit(decodeConfig(fetched.layer, source))
+        if (Exit.isSuccess(decoded)) layers.push({ source, info: decoded.value })
+        else yield* Effect.logWarning("organisation policy from the console couldn't be loaded", { source })
+      }
       const location = ConfigManaged.managedConfigLocation()
       if (existsSync(location.dir)) {
         if (location.legacy)

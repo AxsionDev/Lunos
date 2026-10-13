@@ -44,6 +44,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
   pickers and can't be chosen; `lunos run --model` with another model is refused with the policy
   message and audited as `policy.override_refused`. `agent.<name>.model` and `subagent.model` locks
   pin subagents the same way (XCOD-219).
+- **Your organisation's policy follows you from its Lunos console.** Set `cloud.policy` in managed
+  config to the console's policy URL, and every start while signed in (`lunos login`) fetches it
+  within 3 seconds and enforces its `$locked` keys exactly like `managed.json`, refusals audited as
+  `policy.override_refused`. Offline or signed out, the last fetched copy applies; an edited copy
+  can't loosen it while the console is reachable. Each start is audited as `client.start` with the
+  version, OS, architecture and the digest and source of the policy in effect. The hidden
+  `lunos console` command group, which signed in to upstream's hosted console, is gone (XCOD-238).
 
 ### Changed
 

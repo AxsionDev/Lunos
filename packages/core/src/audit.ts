@@ -29,6 +29,9 @@ export const EVENTS = [
   "marketplace.install",
   "marketplace.refused",
   "policy.override_refused",
+  // XCOD-238: Lunos started with a policy: version, OS, architecture, the digest and source of the
+  // organisation policy in effect, and how fetching it from the console went.
+  "client.start",
   // Long-term memory (XCOD-94, XCOD-136). Ids, counts, hashes and where the operation came from;
   // never a fact's text or a recall query. `memory.remember` was `memory.write` before XCOD-136.
   "memory.remember",

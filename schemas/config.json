@@ -451,6 +451,10 @@
         "endpoint": {
           "type": "string",
           "description": "Lunos Cloud control plane that lunos run --cloud dispatches runs to (https, or localhost for testing), e.g. https://cloud.lunos.tech"
+        },
+        "policy": {
+          "type": "string",
+          "description": "Your organisation's policy on its Lunos console, fetched at start while you're signed in (lunos login), e.g. https://console.example.eu/v1/orgs/acme/policy. Only read from managed config"
         }
       },
       "additionalProperties": false

@@ -113,7 +113,7 @@ export const CALLS: Call[] = [
     id: "console-account",
     what: "Console account: organisation config and token refresh",
     hosts: "the console URL you logged in to (there is no default)",
-    when: "startup, only if you logged in with `lunos account login <url>`",
+    when: "startup, only if an older version signed in with `lunos console login <url>` (since removed)",
     offline: "blocked",
   },
   {
@@ -160,6 +160,14 @@ export const CALLS: Call[] = [
     offline: "yours",
   },
   {
+    // XCOD-238: on even offline, or LUNOS_OFFLINE would be a way to skip the organisation's policy.
+    id: "org-policy",
+    what: "Organisation policy from your Lunos console",
+    hosts: "`cloud.policy` in managed config, and the `cloud.issuer` you signed in to (token refresh)",
+    when: "startup, only if managed config sets `cloud.policy` and you're signed in (`lunos login`)",
+    offline: "yours",
+  },
+  {
     id: "remote-skills",
     what: "Remote skills and URL instructions",
     hosts: "URLs in `skills.urls` and `instructions`",
@@ -203,7 +211,7 @@ export const CALLS: Call[] = [
   },
   {
     id: "commands",
-    what: "`account login`, `providers login`, `import <url>`, `agent import <url>`, `github install` / `run`",
+    what: "`providers login`, `import <url>`, `agent import <url>`, `github install` / `run`",
     hosts: "api.github.com, the URL you pass",
     when: "only when you run that command",
     offline: "command",

@@ -1738,6 +1738,7 @@ export type CloudConfig = {
   issuer?: string
   client_id?: string
   endpoint?: string
+  policy?: string
 }
 
 export type SubagentConfig = {

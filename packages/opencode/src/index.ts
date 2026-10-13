@@ -2,12 +2,12 @@
 import "./sandbox/boot"
 import yargs from "yargs"
 import { ConfigPolicy } from "@/config/policy"
+import { ConfigOrgPolicy } from "@/config/org-policy"
 import { AuditLog } from "@/audit/log"
 import { AuditForward } from "@/audit/forward"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
-import { ConsoleCommand } from "./cli/cmd/account"
 import { ProvidersCommand } from "./cli/cmd/providers"
 import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
@@ -135,6 +135,7 @@ const cli = yargs(args)
 
     // XCOD-157: with sandbox.required, these would run a server, and so agents and tools, on the host.
     const command = String(opts._[0] ?? "")
+    if (command === "audit") ConfigOrgPolicy.quietStart()
     if (HOST_SERVER_COMMANDS.has(command)) {
       const [{ refuseHost }, { CliError }] = await Promise.all([
         import("./cli/cmd/sandbox"),
@@ -157,7 +158,8 @@ const cli = yargs(args)
   .command(RunCommand)
   .command(GenerateCommand)
   .command(DebugCommand)
-  .command(ConsoleCommand)
+  // XCOD-238: upstream's hidden `console` group (signing in to opencode's hosted console) isn't
+  // registered. Organisations use `lunos login` and `cloud.policy` instead. Keep it out on merges.
   .command(ProvidersCommand)
   .command(AgentCommand)
   .command(UpgradeCommand)
