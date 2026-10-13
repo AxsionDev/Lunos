@@ -31,7 +31,7 @@ The sign-in service behind `lunos login` (XCOD-185). It's Keycloak 26 with Postg
 
 ## The `lunos_idp` claim
 
-Access tokens and userinfo carry `lunos_idp`, which says which provider the session's latest sign-in used. The control plane's enforce-SSO rule compares it with an organisation's required connection (`docs/enforce-sso.md` in the lunoshq repo).
+ID and access tokens and userinfo carry `lunos_idp`, which says which provider the session's latest sign-in used. The control plane's enforce-SSO rule compares it with an organisation's required connection (`docs/enforce-sso.md` in the lunoshq repo).
 
 | Value                      | When                                                                                                                              |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -39,7 +39,7 @@ Access tokens and userinfo carry `lunos_idp`, which says which provider the sess
 | `org:<org id>:<connection>` | The brokered identity provider's `lunosIdp` config attribute, when it has that shape.                                            |
 | the provider's alias       | A brokered provider without a valid `lunosIdp`; any `:` in the alias becomes `-`, so an alias can't imitate the organisation form. |
 
-The value never comes from user attributes or request parameters. Never name an identity provider `lunos`: it would read as own credentials.
+The value never comes from user attributes or request parameters. Never name an identity provider `lunos`: it would read as own credentials. Give social identity providers lowercase aliases (`google`, `github`, `microsoft`): the claim carries the alias as it is, case included, and the control plane compares it exactly.
 
 **How it works.** The jar built from `lunos-idp-mapper/` provides two things: the protocol mapper `lunos-idp-mapper` (in the `lunos` scope) and the event listener `lunos-idp`. The listener records the provider of the session's latest authentication in the session note `lunos.idp.alias`; the mapper reads it. A cookie (SSO) sign-in to another client keeps the value, a brokered sign-in records the alias, and a sign-in with Lunos's own credentials records an empty one. That covers the device flow (including its consent step) and offline sessions. A step-up second factor on top of the session cookie (OTP, say) counts as a fresh non-brokered sign-in and clears the organisation value; that errs on the side of refusing. The same holds for the CLI: `lunos login` approves its device sign-in in the browser, so it shares that browser's user session. A password re-authentication or a step-up there also changes the value for CLI tokens approved from that session, offline tokens included, until the next sign-in through the organisation's provider.
 
@@ -96,7 +96,7 @@ Put a reverse proxy with TLS in front of `127.0.0.1:8080` for the public name in
    ```
 
 3. Run it for real (the same command without `DRY_RUN`).
-4. Read the client secrets in the admin console (_Clients → `lunos-app` / `lunos-console` / `lunos-console-admin` → Credentials_). To choose them yourself, set `APP_SECRET`, `CONSOLE_SECRET` and `CONSOLE_ADMIN_SECRET` before step 3.
+4. Read the client secrets in the admin console (_Clients → `lunos-app` / `lunos-console` / `lunos-console-admin` → Credentials_). To choose them yourself, set `APP_SECRET`, `CONSOLE_SECRET` and `CONSOLE_ADMIN_SECRET` before step 3. Re-running the script later with a different value rotates that client's live secret: update the control plane's config (`LUNOSHQ_CONSOLE_CLIENT_SECRET` and the others) in the same step, or sign-in breaks until you do.
 5. On the control plane, set `LUNOSHQ_OIDC_ISSUER=https://auth.lunos.tech/realms/Lunos`, `LUNOSHQ_OIDC_AUDIENCE=lunos-api`, `LUNOSHQ_CONSOLE_CLIENT_ID=lunos-console` and `LUNOSHQ_CONSOLE_CLIENT_SECRET`.
 6. Check: `./verify.sh https://auth.lunos.tech`.
 
@@ -114,7 +114,7 @@ Put a reverse proxy with TLS in front of `127.0.0.1:8080` for the public name in
 
 ## Tested
 
-Tested locally on 2026-10-13 with Keycloak 26.3 and Postgres 17. `./build.sh && bun test test/lunos-idp.test.ts` needs Docker and `git fetch origin dev` (one test realm is imported from dev's realm file); the tests always rebuild the jar. The 23 tests cover:
+Tested locally on 2026-10-13 with Keycloak 26.3 and Postgres 17. `./build.sh && bun test test/lunos-idp.test.ts` needs Docker and `git fetch origin dev` (one test realm is imported from dev's realm file); the tests always rebuild the jar. The 24 tests cover:
 
 - Password sign-in gives `lunos`; a user attribute named `lunos_idp` can't forge the claim.
 - A brokered sign-in gives the `org:` value, the alias fallback, or the alias when `lunosIdp` is malformed.

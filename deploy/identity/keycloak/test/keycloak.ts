@@ -41,7 +41,8 @@ function sh(cmd: string[], cwd = DIR) {
 export async function startKeycloak(opts?: { realmFiles?: string[] }): Promise<Kc> {
   // Always rebuild: a stale jar from an earlier checkout would test old code.
   sh(["./build.sh"])
-  // A run killed before its afterAll leaves its container holding the port.
+  // A run killed before its afterAll leaves its container holding the port. This removes every
+  // lunos-kc-test-* container, a concurrently running suite's included; the fixed port rules that out anyway.
   const leftovers = sh(["docker", "ps", "-aq", "--filter", "name=^lunos-kc-test-"])
   if (leftovers) sh(["docker", "rm", "-f", ...leftovers.split("\n")])
   const realmFiles = opts?.realmFiles ?? ["realm-lunos.json", "test/upstream-realm.json"]
