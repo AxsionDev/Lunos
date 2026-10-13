@@ -20,5 +20,11 @@ export const Info = Schema.Struct({
     description:
       "Lunos Cloud control plane that lunos run --cloud dispatches runs to (https, or localhost for testing), e.g. https://cloud.lunos.tech",
   }),
+  // XCOD-238: read from managed config only, so a repository can't send your sign-in to its host
+  // and you can't point Lunos away from your organisation's policy.
+  policy: Schema.String.pipe(Schema.optional).annotate({
+    description:
+      "Your organisation's policy on its Lunos console, fetched at start while you're signed in (lunos login), e.g. https://console.example.eu/v1/orgs/acme/policy. Only read from managed config",
+  }),
 }).annotate({ identifier: "CloudConfig" })
 export type Info = Schema.Schema.Type<typeof Info>

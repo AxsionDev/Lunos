@@ -22456,6 +22456,9 @@
           },
           "endpoint": {
             "type": "string"
+          },
+          "policy": {
+            "type": "string"
           }
         },
         "additionalProperties": false

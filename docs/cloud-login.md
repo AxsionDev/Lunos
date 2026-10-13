@@ -1,6 +1,6 @@
 # Signing in: `lunos login`
 
-`lunos login` signs you in to Lunos Cloud, or to your organisation's own identity provider. **You don't need it for anything in Lunos today.** Everything in the open-source harness works the same when you're signed out, and Lunos never asks you to sign in. Signing in is for the upcoming Lunos Cloud features (cloud workers, team billing), so your runs and usage belong to you or your organisation.
+`lunos login` signs you in to Lunos Cloud, or to your organisation's own identity provider. Everything in the open-source harness works the same when you're signed out, and Lunos never asks you to sign in. Signing in is for Lunos Cloud features (cloud workers, team billing), so your runs and usage belong to you or your organisation, and for organisations that serve their policy from the Lunos console: while you're signed in, Lunos fetches it at start (see [organisation policy from the Lunos console](deployment/self-hosted.md#organisation-policy-from-the-lunos-console)). Signing out doesn't lift that policy; the last fetched copy still applies.
 
 > **Status:** Lunos Cloud's own sign-in service isn't live yet. Until it is, `lunos login` works with any OpenID Connect provider your organisation runs that supports the device sign-in flow (Keycloak, Zitadel, Authentik and others).
 

@@ -5,6 +5,7 @@ import { parse as parseJsonc } from "jsonc-parser"
 import os from "os"
 import path from "path"
 import { Process } from "@/util/process"
+import { ConfigOrgPolicy } from "./org-policy"
 
 // XCOD-102: Lunos-branded locations. The upstream opencode ones are still read, with a
 // deprecation warning, but only when no Lunos location exists, so the two never mix.
@@ -49,8 +50,19 @@ export function managedConfigDir() {
   return managedConfigLocation().dir
 }
 
-/** Every managed document, raw, in precedence order: the system directory, then the MDM profile. */
+/**
+ * Every managed document, raw, in precedence order: the organisation policy fetched from its console
+ * (XCOD-238, with the keys on-disk documents set removed), the system directory, then the MDM
+ * profile.
+ */
 export async function readManagedDocs(): Promise<unknown[]> {
+  const onDisk = await readOnDiskDocs()
+  const fetched = await ConfigOrgPolicy.resolve(onDisk).catch(() => undefined)
+  return fetched?.layer ? [fetched.layer, ...onDisk] : onDisk
+}
+
+/** The managed documents on this machine only: the system directory, then the MDM profile. */
+export async function readOnDiskDocs(): Promise<unknown[]> {
   const { parse } = await import("jsonc-parser")
   const { readFile } = await import("fs/promises")
   const docs: unknown[] = []
@@ -70,6 +82,13 @@ export async function readManagedDocs(): Promise<unknown[]> {
  * synchronous plutil call, only when one is installed.
  */
 export function readManagedDocsSync(): unknown[] {
+  const onDisk = readOnDiskDocsSync()
+  // XCOD-238: no network here; the last fetched copy of the organisation policy, if intact.
+  const cached = ConfigOrgPolicy.resolveSync(onDisk)
+  return cached.layer ? [cached.layer, ...onDisk] : onDisk
+}
+
+function readOnDiskDocsSync(): unknown[] {
   const docs: unknown[] = []
   const { dir } = managedConfigLocation()
   for (const file of ["managed.json", "opencode.json", "opencode.jsonc"]) {
