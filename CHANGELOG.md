@@ -83,6 +83,9 @@ reasoning behind a change are published separately as **Lunos Notes**.
   draft release is created when this file has no section for the version being released, and a
   pull request that changes Lunos's code without a line here gets a warning (label `no-changelog`
   to skip it). v1.18.46 shipped without one; its section is now below (XCOD-227).
+- Merged upstream opencode up to 1.19.0 (`/status` shows `based on opencode 1.19.0`). Lunos keeps
+  its own update check and `/update`; upstream's new update dialog and `upgrade --major` (a switch
+  to OpenCode 2) are not included.
 
 ### Fixed
 
