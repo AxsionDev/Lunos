@@ -34,13 +34,13 @@ docker compose --env-file .env up -d
 ./verify.sh http://localhost:8080
 ```
 
-Put a reverse proxy with TLS in front of `127.0.0.1:8080` for the public name in `KC_HOSTNAME` (for example `https://id.lunos.tech`). Then check it from outside:
+Put a reverse proxy with TLS in front of `127.0.0.1:8080` for the public name in `KC_HOSTNAME` (for example `https://auth.lunos.tech`). Then check it from outside:
 
 ```sh
-./verify.sh https://id.lunos.tech
+./verify.sh https://auth.lunos.tech
 ```
 
-**Then make it the default:** set `cloud.issuer` to `https://id.lunos.tech/realms/lunos` in Lunos (the XCOD-185 follow-up), so `lunos login` works without `--issuer`.
+**Then make it the default:** set `cloud.issuer` to `https://auth.lunos.tech/realms/Lunos` in Lunos (the XCOD-185 follow-up), so `lunos login` works without `--issuer`.
 
 ## Operating it
 

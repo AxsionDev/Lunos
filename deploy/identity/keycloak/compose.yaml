@@ -29,7 +29,7 @@ services:
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: ${KC_DB_PASSWORD}
       # The public URL users and `lunos login` see. Lunos only accepts https issuers (localhost excepted).
-      KC_HOSTNAME: ${KC_HOSTNAME:?set KC_HOSTNAME in .env, e.g. https://id.lunos.tech}
+      KC_HOSTNAME: ${KC_HOSTNAME:?set KC_HOSTNAME in .env, e.g. https://auth.lunos.tech}
       # TLS ends at the reverse proxy (IIS/ARR, nginx, Caddy) in front of port 8080.
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
@@ -43,6 +43,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
     volumes:
+      # XCOD-185: the lunos_idp claim mapper; run ./build.sh first so providers/lunos-idp-mapper.jar exists.
+      - ./providers:/opt/keycloak/providers:ro
       - ./realm-lunos.json:/opt/keycloak/data/import/realm-lunos.json:ro
     ports:
       # Only the reverse proxy on this host should reach it.
