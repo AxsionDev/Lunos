@@ -34,8 +34,9 @@ class LunosIdpTest {
 
   @Test
   void anAliasThatLooksLikeAnOrgValueIsNeverTakenAsOne() {
-    // Only the config attribute may carry the org form; an alias is shown as is but the console's
-    // rule needs the exact org form, and an alias containing ':' is refused by Keycloak anyway.
+    // Only the config attribute may carry the org form, so ':' in a fallback alias is replaced.
     assertEquals("org-acme-entra", LunosIdp.resolve("org-acme-entra", null));
+    assertEquals("org-acme-entra", LunosIdp.resolve("org:acme:entra", null));
+    assertEquals("org:acme:entra", LunosIdp.resolve("org:acme:entra", "org:acme:entra"));
   }
 }

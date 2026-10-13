@@ -2,7 +2,7 @@
 // The console's enforce-SSO compares it with an organisation's rule (lunoshq docs/enforce-sso.md),
 // so the org form may only come from the identity provider's own config, which only realm admins
 // and the console's admin service account can write; an alias or anything malformed can never
-// produce it.
+// produce it (an alias containing ':' has them replaced by '-', so it cannot imitate the org form).
 package tech.lunos.keycloak;
 
 import java.util.regex.Pattern;
@@ -26,6 +26,6 @@ public final class LunosIdp {
   public static String resolve(String alias, String configured) {
     if (alias == null || alias.isEmpty()) return OWN;
     if (configured != null && ORG.matcher(configured).matches()) return configured;
-    return alias;
+    return alias.replace(':', '-');
   }
 }

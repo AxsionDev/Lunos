@@ -14,12 +14,14 @@ import org.keycloak.protocol.oidc.mappers.AbstractOIDCProtocolMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAccessTokenMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAttributeMapperHelper;
 import org.keycloak.protocol.oidc.mappers.OIDCIDTokenMapper;
+import org.keycloak.protocol.oidc.mappers.TokenIntrospectionTokenMapper;
 import org.keycloak.protocol.oidc.mappers.UserInfoTokenMapper;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.representations.IDToken;
 
 public class LunosIdpMapper extends AbstractOIDCProtocolMapper
-    implements OIDCAccessTokenMapper, OIDCIDTokenMapper, UserInfoTokenMapper {
+    implements OIDCAccessTokenMapper, OIDCIDTokenMapper, UserInfoTokenMapper,
+        TokenIntrospectionTokenMapper {
 
   public static final String PROVIDER_ID = "lunos-idp-mapper";
   /** Keycloak's user-session note for the brokered identity provider (Details.IDENTITY_PROVIDER). */
@@ -60,6 +62,8 @@ public class LunosIdpMapper extends AbstractOIDCProtocolMapper
   @Override
   protected void setClaim(IDToken token, ProtocolMapperModel mappingModel, UserSessionModel userSession,
       KeycloakSession keycloakSession, ClientSessionContext clientSessionCtx) {
+    // Recomputed from the provider's current config on every issuance and refresh, so an admin changing
+    // lunosIdp or deleting the provider changes the value, falling back safely to the alias.
     String alias = userSession.getNote(NOTE);
     String configured = null;
     if (alias != null && !alias.isEmpty()) {

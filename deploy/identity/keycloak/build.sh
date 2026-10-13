@@ -4,7 +4,7 @@
 set -eu
 cd "$(dirname "$0")"
 docker run --rm -v "$PWD/lunos-idp-mapper:/src" -v lunos-idp-m2:/root/.m2 -w /src \
-  maven:3.9-eclipse-temurin-21 mvn -q -B package
+  maven:3.9.9-eclipse-temurin-21 mvn -q -B package
 mkdir -p providers
 cp lunos-idp-mapper/target/lunos-idp-mapper.jar providers/lunos-idp-mapper.jar
 echo "built providers/lunos-idp-mapper.jar"
