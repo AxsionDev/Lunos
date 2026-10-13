@@ -2,6 +2,9 @@
 // Run from deploy/identity/keycloak: bun test test/lunos-idp.test.ts (skipped when Docker isn't running).
 // Everything the tests need beyond the two realm files (a test client, a user, the identity providers)
 // is created here through the admin API, so none of it can leak into the production realm file.
+// The last tests run configure-realm.ts against a third realm, OldLunos, imported from dev's realm file.
+import { rmSync, writeFileSync } from "node:fs"
+import path from "node:path"
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import {
   browserLogin,
@@ -18,6 +21,7 @@ import {
   TEST_REDIRECT,
   type Tokens,
 } from "./keycloak"
+import { configure } from "../configure-realm"
 
 setDefaultTimeout(30_000)
 
@@ -37,10 +41,80 @@ const idp = (tokens: Tokens) => ({
   access: claims(tokens.access_token).lunos_idp,
 })
 
-async function clientByClientId(kc: Kc, clientId: string) {
-  const [client] = await kc.admin("GET", `${R}/clients?clientId=${clientId}`)
+// The realm as it is live before XCOD-185: dev's realm file, renamed so it imports beside Lunos.
+const OLD = "OldLunos"
+const OLD_FILE = "test/.old-lunos.json"
+
+function writeOldRealm() {
+  const dir = path.resolve(import.meta.dir, "..")
+  const out = Bun.spawnSync(["git", "show", "origin/dev:deploy/identity/keycloak/realm-lunos.json"], { cwd: dir })
+  if (out.exitCode !== 0) throw new Error(`git show origin/dev's realm file: ${out.stderr.toString()}`)
+  writeFileSync(path.join(dir, OLD_FILE), JSON.stringify({ ...JSON.parse(out.stdout.toString()), realm: OLD }))
+}
+
+async function clientByClientId(kc: Kc, clientId: string, realm = R) {
+  const [client] = await kc.admin("GET", `${realm}/clients?clientId=${clientId}`)
   if (!client) throw new Error(`no client ${clientId}`)
   return client
+}
+
+/** Test 8's assertions on the clients, for any realm (path form, "/Lunos"). */
+async function expectClientsAsSpecified(kc: Kc, realm: string) {
+  for (const clientId of ["lunos-cli", "lunos-app", "lunos-console"]) {
+    const client = await clientByClientId(kc, clientId, realm)
+    const scopes: { name: string }[] = await kc.admin("GET", `${realm}/clients/${client.id}/default-client-scopes`)
+    expect(scopes.map((s) => s.name)).toContain("lunos")
+  }
+
+  const webClient = {
+    publicClient: false,
+    standardFlowEnabled: true,
+    implicitFlowEnabled: false,
+    directAccessGrantsEnabled: false,
+    serviceAccountsEnabled: false,
+    frontchannelLogout: false,
+  }
+  const app = await clientByClientId(kc, "lunos-app", realm)
+  expect(app).toMatchObject({
+    ...webClient,
+    redirectUris: ["https://app.lunos.tech/auth/callback"],
+    webOrigins: ["https://app.lunos.tech"],
+  })
+  expect(app.attributes).toMatchObject({
+    "pkce.code.challenge.method": "S256",
+    "post.logout.redirect.uris": "https://app.lunos.tech/",
+    "backchannel.logout.url": "https://app.lunos.tech/auth/backchannel-logout",
+    "backchannel.logout.session.required": "true",
+  })
+
+  const console_ = await clientByClientId(kc, "lunos-console", realm)
+  expect(console_).toMatchObject({
+    ...webClient,
+    redirectUris: ["https://cloud.lunos.tech/console/callback"],
+    webOrigins: ["https://cloud.lunos.tech"],
+  })
+  expect(console_.attributes).toMatchObject({
+    "pkce.code.challenge.method": "S256",
+    "post.logout.redirect.uris": "https://cloud.lunos.tech/console/",
+  })
+
+  const consoleAdmin = await clientByClientId(kc, "lunos-console-admin", realm)
+  expect(consoleAdmin).toMatchObject({
+    publicClient: false,
+    standardFlowEnabled: false,
+    implicitFlowEnabled: false,
+    directAccessGrantsEnabled: false,
+    serviceAccountsEnabled: true,
+  })
+  const account = await kc.admin("GET", `${realm}/clients/${consoleAdmin.id}/service-account-user`)
+  const realmManagement = await clientByClientId(kc, "realm-management", realm)
+  const clientRoles: { name: string }[] = await kc.admin(
+    "GET",
+    `${realm}/users/${account.id}/role-mappings/clients/${realmManagement.id}`,
+  )
+  expect(clientRoles.map((r) => r.name)).toEqual(["manage-identity-providers"])
+  const realmRoles: { name: string }[] = await kc.admin("GET", `${realm}/users/${account.id}/role-mappings/realm`)
+  expect(realmRoles.map((r) => r.name).filter((name) => name !== `default-roles-${realm.slice(1).toLowerCase()}`)).toEqual([])
 }
 
 describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
@@ -62,8 +136,12 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   }
 
   beforeAll(async () => {
-    kc = await startKeycloak()
+    // Written before Docker mounts it: a missing host file would become a root-owned directory.
+    writeOldRealm()
+    kc = await startKeycloak({ realmFiles: ["realm-lunos.json", "test/upstream-realm.json", OLD_FILE] })
     try {
+      // Startup waits only for Lunos; a skipped import would otherwise surface as a 404 tests later.
+      await kc.admin("GET", `/${OLD}`)
       // Keycloak 26 drops attributes its user profile doesn't declare; allow them, or pat's lunos_idp
       // attribute would never be stored and test 2 would prove nothing.
       const profile = await kc.admin("GET", `${R}/users/profile`)
@@ -132,6 +210,7 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
 
   afterAll(async () => {
     await kc?.stop()
+    rmSync(path.resolve(import.meta.dir, "..", OLD_FILE), { force: true })
   })
 
   test("password sign-in is lunos", async () => {
@@ -299,61 +378,7 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   })
 
   test("the realm's clients are as specified", async () => {
-    for (const clientId of ["lunos-cli", "lunos-app", "lunos-console"]) {
-      const client = await clientByClientId(kc, clientId)
-      const scopes: { name: string }[] = await kc.admin("GET", `${R}/clients/${client.id}/default-client-scopes`)
-      expect(scopes.map((s) => s.name)).toContain("lunos")
-    }
-
-    const webClient = {
-      publicClient: false,
-      standardFlowEnabled: true,
-      implicitFlowEnabled: false,
-      directAccessGrantsEnabled: false,
-      serviceAccountsEnabled: false,
-      frontchannelLogout: false,
-    }
-    const app = await clientByClientId(kc, "lunos-app")
-    expect(app).toMatchObject({
-      ...webClient,
-      redirectUris: ["https://app.lunos.tech/auth/callback"],
-      webOrigins: ["https://app.lunos.tech"],
-    })
-    expect(app.attributes).toMatchObject({
-      "pkce.code.challenge.method": "S256",
-      "post.logout.redirect.uris": "https://app.lunos.tech/",
-      "backchannel.logout.url": "https://app.lunos.tech/auth/backchannel-logout",
-      "backchannel.logout.session.required": "true",
-    })
-
-    const console_ = await clientByClientId(kc, "lunos-console")
-    expect(console_).toMatchObject({
-      ...webClient,
-      redirectUris: ["https://cloud.lunos.tech/console/callback"],
-      webOrigins: ["https://cloud.lunos.tech"],
-    })
-    expect(console_.attributes).toMatchObject({
-      "pkce.code.challenge.method": "S256",
-      "post.logout.redirect.uris": "https://cloud.lunos.tech/console/",
-    })
-
-    const consoleAdmin = await clientByClientId(kc, "lunos-console-admin")
-    expect(consoleAdmin).toMatchObject({
-      publicClient: false,
-      standardFlowEnabled: false,
-      implicitFlowEnabled: false,
-      directAccessGrantsEnabled: false,
-      serviceAccountsEnabled: true,
-    })
-    const account = await kc.admin("GET", `${R}/clients/${consoleAdmin.id}/service-account-user`)
-    const realmManagement = await clientByClientId(kc, "realm-management")
-    const clientRoles: { name: string }[] = await kc.admin(
-      "GET",
-      `${R}/users/${account.id}/role-mappings/clients/${realmManagement.id}`,
-    )
-    expect(clientRoles.map((r) => r.name)).toEqual(["manage-identity-providers"])
-    const realmRoles: { name: string }[] = await kc.admin("GET", `${R}/users/${account.id}/role-mappings/realm`)
-    expect(realmRoles.map((r) => r.name).filter((name) => name !== "default-roles-lunos")).toEqual([])
+    await expectClientsAsSpecified(kc, R)
   })
 
   test("without the lunos-idp event listener a brokered sign-in says lunos (fails closed)", async () => {
@@ -366,5 +391,96 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     } finally {
       await kc.admin("PUT", `${R}/events/config`, config)
     }
+  })
+
+  // configure-realm.ts against OldLunos. In order: the refusals and the dry run must leave the realm
+  // as imported, the real run changes it, and a second run finds nothing left to do.
+  const oldEnv = () => ({ KC_URL: kc.base, KC_REALM: OLD, KC_ADMIN_USER: "admin", KC_ADMIN_PASSWORD: "admin" })
+
+  /** A fetch whose serverinfo is the real one, edited; every other request goes to Keycloak unchanged. */
+  const serverinfoWithout = (edit: (info: any) => void): typeof fetch =>
+    (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const res = await fetch(input, init)
+      if (!String(input).endsWith("/admin/serverinfo")) return res
+      const info = await res.json()
+      edit(info)
+      return Response.json(info)
+    }) as typeof fetch
+
+  async function oldRealmState() {
+    const scopes: { name: string }[] = await kc.admin("GET", `/${OLD}/client-scopes`)
+    const clients: { clientId: string }[] = await kc.admin("GET", `/${OLD}/clients`)
+    const defaults: { name: string }[] = await kc.admin("GET", `/${OLD}/default-default-client-scopes`)
+    const cli = await clientByClientId(kc, "lunos-cli", `/${OLD}`)
+    const cliScopes: { name: string }[] = await kc.admin("GET", `/${OLD}/clients/${cli.id}/default-client-scopes`)
+    return {
+      scopes: scopes.map((s) => s.name).sort(),
+      clients: clients.map((c) => c.clientId).sort(),
+      defaults: defaults.map((s) => s.name).sort(),
+      cliScopes: cliScopes.map((s) => s.name).sort(),
+      listeners: (await kc.admin("GET", `/${OLD}/events/config`)).eventsListeners,
+    }
+  }
+  let asImported: Awaited<ReturnType<typeof oldRealmState>>
+
+  test("configure refuses without the mapper or without the event listener", async () => {
+    asImported = await oldRealmState()
+    expect(asImported.scopes).not.toContain("lunos")
+    expect(asImported.clients).not.toContain("lunos-app")
+
+    const noMapper = serverinfoWithout((info) => {
+      info.protocolMapperTypes["openid-connect"] = info.protocolMapperTypes["openid-connect"].filter(
+        (m: { id: string }) => m.id !== "lunos-idp-mapper",
+      )
+    })
+    await expect(configure(oldEnv(), noMapper)).rejects.toThrow(/lunos-idp-mapper[\s\S]*build\.sh/)
+
+    const noListener = serverinfoWithout((info) => {
+      delete info.providers.eventsListener.providers["lunos-idp"]
+    })
+    await expect(configure(oldEnv(), noListener)).rejects.toThrow(/lunos-idp[\s\S]*build\.sh/)
+    expect(await oldRealmState()).toEqual(asImported)
+  })
+
+  test("configure with DRY_RUN plans the changes and makes none", async () => {
+    const planned = await configure({ ...oldEnv(), DRY_RUN: "1" })
+    expect(planned.length).toBeGreaterThan(0)
+    expect(planned.join("\n")).toContain("lunos-console-admin")
+    expect(await oldRealmState()).toEqual(asImported)
+  })
+
+  test("configure brings an old realm to the new shape", async () => {
+    const changes = await configure(oldEnv())
+    expect(changes.length).toBeGreaterThan(0)
+
+    await expectClientsAsSpecified(kc, `/${OLD}`)
+    const config = await kc.admin("GET", `/${OLD}/events/config`)
+    expect(config.eventsListeners).toContain("lunos-idp")
+    expect(config.eventsListeners).toContain("jboss-logging")
+
+    // A client created afterwards takes the realm's default scopes, lunos among them.
+    await kc.admin("POST", `/${OLD}/clients`, {
+      clientId: TEST_CLIENT,
+      enabled: true,
+      publicClient: true,
+      standardFlowEnabled: false,
+      directAccessGrantsEnabled: true,
+    })
+    await kc.admin("POST", `/${OLD}/users`, {
+      username: PAT.email,
+      email: PAT.email,
+      emailVerified: true,
+      firstName: "Pat",
+      lastName: "Lunos",
+      enabled: true,
+      credentials: [{ type: "password", value: PAT.password, temporary: false }],
+    })
+    const tokens = await passwordGrant(kc, TEST_CLIENT, PAT.email, PAT.password, OLD)
+    expect(idp(tokens)).toEqual({ id: "lunos", access: "lunos" })
+    expect([claims(tokens.access_token).aud].flat()).toContain("lunos-api")
+  })
+
+  test("configure is idempotent", async () => {
+    expect(await configure(oldEnv())).toEqual([])
   })
 })

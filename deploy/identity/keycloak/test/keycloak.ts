@@ -313,8 +313,8 @@ export async function deviceLogin(
   return { tokens, jar, posted }
 }
 
-async function tokenRequest(kc: Kc, form: Record<string, string>): Promise<Tokens> {
-  const res = await fetch(`${kc.base}/realms/Lunos/protocol/openid-connect/token`, {
+async function tokenRequest(kc: Kc, form: Record<string, string>, realm = "Lunos"): Promise<Tokens> {
+  const res = await fetch(`${kc.base}/realms/${realm}/protocol/openid-connect/token`, {
     method: "POST",
     body: new URLSearchParams(form),
   })
@@ -333,8 +333,8 @@ export function exchange(kc: Kc, clientId: string, code: string, verifier: strin
   })
 }
 
-export function passwordGrant(kc: Kc, clientId: string, username: string, password: string) {
-  return tokenRequest(kc, { grant_type: "password", client_id: clientId, username, password, scope: "openid" })
+export function passwordGrant(kc: Kc, clientId: string, username: string, password: string, realm = "Lunos") {
+  return tokenRequest(kc, { grant_type: "password", client_id: clientId, username, password, scope: "openid" }, realm)
 }
 
 export function refresh(kc: Kc, clientId: string, refreshToken: string) {
