@@ -43,7 +43,7 @@ The value never comes from user attributes or request parameters. Never name an 
 
 **How it works.** The jar built from `lunos-idp-mapper/` provides two things: the protocol mapper `lunos-idp-mapper` (in the `lunos` scope) and the event listener `lunos-idp`. The listener records the provider of the session's latest authentication in the session note `lunos.idp.alias`; the mapper reads it. A cookie (SSO) sign-in to another client keeps the value, a brokered sign-in records the alias, and a sign-in with Lunos's own credentials records an empty one. That covers the device flow (including its consent step) and offline sessions. A step-up second factor on top of the session cookie (OTP, say) counts as a fresh non-brokered sign-in and clears the organisation value; that errs on the side of refusing.
 
-**If the listener isn't enabled, every token says `lunos`.** That fails closed: organisation members are refused by enforce-SSO, never let through. `configure-realm.ts` enables it; the realm file lists it in `eventsListeners`.
+**If the listener isn't enabled in the realm (not in `eventsListeners`), every token says `lunos`.** This is a different failure from a missing jar (see Install). That fails closed: organisation members are refused by enforce-SSO, never let through. `configure-realm.ts` enables it; the realm file lists it in `eventsListeners`.
 
 **Setting `lunosIdp` on an organisation's provider.** The admin console has no field for custom config keys, so use the admin REST API. Only realm admins and the console's service account (`lunos-console-admin`) can write it.
 
@@ -53,6 +53,7 @@ TOKEN=$(curl -fsS "$KC/realms/Lunos/protocol/openid-connect/token" \
   -d grant_type=client_credentials -d client_id=lunos-console-admin \
   -d client_secret="$CONSOLE_ADMIN_SECRET" | jq -r .access_token)
 ALIAS=acme-oidc
+# Replace <org id> and <connection> below with the organisation's console id and connection name.
 # PUT replaces the whole provider: fetch it, add the attribute, send it back.
 curl -fsS -H "Authorization: Bearer $TOKEN" "$KC/admin/realms/Lunos/identity-provider/instances/$ALIAS" \
   | jq '.config.lunosIdp = "org:<org id>:<connection>"' \
@@ -71,7 +72,9 @@ docker compose --env-file .env up -d
 ./verify.sh http://localhost:8080
 ```
 
-`./build.sh` first (it needs only Docker): it builds `providers/lunos-idp-mapper.jar`, which `compose.yaml` mounts read-only into Keycloak. Without it the realm file's `lunos-idp-mapper` mapper doesn't exist and the import fails. So on a fresh server the sequence is `./build.sh`, then `docker compose --env-file .env up -d`, then `./verify.sh http://localhost:8080`.
+`./build.sh` first (it needs only Docker): it builds `providers/lunos-idp-mapper.jar`, which `compose.yaml` mounts read-only into Keycloak. So on a fresh server the sequence is `./build.sh`, then `docker compose --env-file .env up -d`, then `./verify.sh http://localhost:8080`.
+
+**Without the jar, the import still succeeds, silently.** The realm keeps its `lunos-idp` listener and the `lunos-idp-mapper` mapper, but Keycloak has no provider behind them. It logs `KC-SERVICES0083: Event listener 'lunos-idp' registered, but provider not found` on events, and tokens carry no `lunos_idp` claim. An organisation's enforce-SSO rule (`lunos_idp=org:...`) then can't match and its members are refused: it fails closed, but it is broken. `./verify.sh` does not detect this. `configure-realm.ts` does (it refuses when the server lacks the mapper or listener), and so does that log line. Fix it by adding the jar and restarting Keycloak; no re-import is needed.
 
 Put a reverse proxy with TLS in front of `127.0.0.1:8080` for the public name in `KC_HOSTNAME` (for example `https://auth.lunos.tech`). Then check it from outside:
 
