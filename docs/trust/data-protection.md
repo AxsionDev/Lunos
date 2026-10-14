@@ -6,8 +6,13 @@ the organisation deploying it can do its own assessment. It is not legal advice 
 ## Roles
 
 - **Lunos is software you run yourself.** ITService EOOD operates no service in the data path,
-  receives no data from your deployment and has no telemetry
+  receives no data from your deployment and has no telemetry, unless you sign in and use
+  [session sync](../cloud-sync.md), which uploads sessions to Lunos Cloud, operated by ITService EOOD
+  in the EU
   ([deployment guide §3](../deployment/self-hosted.md#3-where-your-data-goes)).
+  > **Not yet assessed:** when you sign in and use session sync, ITService EOOD stores the synced
+  > sessions. The controller/processor roles for that processing have not been reviewed by counsel
+  > yet; until they are, treat this section as covering self-hosted use without sign-in only.
 - **Your organisation is the controller** for personal data processed with Lunos. ITService EOOD is
   **neither controller nor processor** for that data: supplying software is not processing it.
 - **The model provider you configure** is your processor, or an independent controller depending on

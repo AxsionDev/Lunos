@@ -14,7 +14,7 @@ An AI coding assistant that runs as a command-line tool on a developer's machine
 
 It is a fork of the open-source project [opencode](https://github.com/anomalyco/opencode), maintained by **ITService EOOD** (Bulgaria, UIC 201069485). MIT licensed.
 
-**The deployment model is self-hosted.** You install it on infrastructure you control. No Lunos-operated service is needed to run it, and there is no account to create with us. (The optional built-in marketplace catalogue is a static file on lunos.tech; see §3.)
+**The deployment model is self-hosted.** You install it on infrastructure you control. No Lunos-operated service is needed to run it, and there is no account to create with us, unless you sign in and use [session sync](../cloud-sync.md), which uploads sessions to Lunos Cloud, operated by ITService EOOD in the EU. (The optional built-in marketplace catalogue is a static file on lunos.tech; see §3.)
 
 ## 2. What is true today — the sovereignty claim, stated precisely
 
@@ -26,7 +26,7 @@ This is the claim table maintained in the project's own sovereignty decision rec
 | The vendor is outside non-EU compulsory-disclosure reach       | **Yes**                | Bulgarian legal person; not a US-parented subsidiary                                                                                                                                                       |
 | Lunos can be run entirely on infrastructure the buyer controls | **Yes**                | Self-hosted is the shipping distribution model                                                                                                                                                             |
 | Lunos is provider-agnostic for model routing                   | **Yes**                | Inherited from opencode                                                                                                                                                                                    |
-| _Lunos-operated_ infrastructure is EU-sovereign                | **N/A**                | There is no Lunos-operated production infrastructure for customers                                                                                                                                         |
+| _Lunos-operated_ infrastructure is EU-sovereign                | **N/A**                | There is no Lunos-operated production infrastructure for customers, except Lunos Cloud's session sync if you sign in and use it (uploads to ITService EOOD, EU; [Session sync](../cloud-sync.md))          |
 | EU-specific functionality exists in the build                  | **Yes, from v1.18.39** | Provider jurisdiction metadata ships, and the data-residency controls in §5 are enforced for sessions from v1.18.39. In v1.18.38 and earlier they are **not enforced** (see the correction in §5, XCOD-93) |
 
 ### Wording rules
@@ -35,7 +35,7 @@ These govern how the project describes itself, and are reproduced so you can hol
 
 - ✅ **"EU-sovereign, self-hostable"** — accurate; the two words qualify each other.
 - ✅ **"EU-incorporated vendor"** — a fact about the entity.
-- ❌ **"EU-sovereign infrastructure" / "sovereign cloud"** — implies Lunos-operated hosting. Not true, and not claimed.
+- ❌ **"EU-sovereign infrastructure" / "sovereign cloud"** — implies Lunos-operated hosting. Not true of the self-hosted product, and not claimed. (Session sync, if you sign in and use it, is a Lunos-operated service in the EU; see [Session sync](../cloud-sync.md).)
 - ❌ **Any claim of CRA, EUCS or similar certification.** None is held. See §7.
 
 If you encounter Lunos marketing that uses the ❌ phrasings, it contradicts this document and this document is authoritative.
@@ -125,9 +125,9 @@ Everything else:
 
 ### Touches Lunos-operated infrastructure
 
-**No project data.** There is no Lunos-operated production infrastructure in the data path, because there is no hosted offering. Nothing about your code, prompts or sessions is sent to ITService EOOD, and there is no telemetry endpoint we operate for you to disable.
+**No project data, unless you sign in and use [session sync](../cloud-sync.md), which uploads sessions to Lunos Cloud, operated by ITService EOOD in the EU.** There is no Lunos-operated production infrastructure in the data path of a self-hosted deployment, because there is no hosted offering. Nothing about your code, prompts or sessions is sent to ITService EOOD, and there is no telemetry endpoint we operate for you to disable. With session sync, completed sessions (messages, tool calls and results, after the path rule and credential scanner; see [Session sync](../cloud-sync.md)) are uploaded to `cloud.lunos.tech`; it stops with `lunos logout`, `lunos sync off`, `"sync": false`, a locked organisation policy or `LUNOS_OFFLINE=1`.
 
-**One Lunos-operated host is contacted, and only on use:** `lunos.tech`, which serves the built-in marketplace catalogue (`https://lunos.tech/marketplace.json`, a static file) when you run a marketplace command or open the Discover view. The request carries nothing from your project, and turning off the built-in catalogue with `"marketplace_default": false` stops it (see "The marketplace" above). The update check goes to your npm registry, not to us.
+**Lunos-operated hosts contacted:** `lunos.tech` always on use, and `auth.lunos.tech` (sign-in) and `cloud.lunos.tech` (session sync) only if you sign in. `lunos.tech` which serves the built-in marketplace catalogue (`https://lunos.tech/marketplace.json`, a static file) when you run a marketplace command or open the Discover view. The request carries nothing from your project, and turning off the built-in catalogue with `"marketplace_default": false` stops it (see "The marketplace" above). The update check goes to your npm registry, not to us.
 
 ```
    ┌──────────────────────────────────────┐
@@ -141,7 +141,8 @@ Everything else:
    │         │          └──────────────┘  │
    └─────────┼────────────────────────────┘
              │  prompts + code context
-             │  (the only egress)
+             │  (the only egress, unless you
+             │  use session sync)
              ▼
    ┌──────────────────────────────────────┐
    │  MODEL PROVIDER YOU CHOOSE           │
@@ -152,6 +153,7 @@ Everything else:
    ┌──────────────────────────────────────┐
    │  ITSERVICE EOOD / LUNOS              │
    │  ── not in the data path ──          │
+   │  (unless you use session sync)       │
    └──────────────────────────────────────┘
 ```
 
@@ -199,7 +201,7 @@ Every refused call names `LUNOS_OFFLINE` in its message. It doesn't hang or retr
 | Notification after an unattended agent run (`lunos agent run --notify`)                                                                                   | the https URL you pass to --notify                                                                        | after a scheduled or unattended run, only if you set --notify                                                                    | **Off**                    | none                                                                                                            |
 | `providers login`, `import <url>`, `agent import <url>`, `github install` / `run`                                                                         | api.github.com, the URL you pass                                                                          | only when you run that command                                                                                                   | Only if you run it         | none                                                                                                            |
 | `lunos run --cloud` and `lunos-cloud` workspaces (Lunos Cloud workers)                                                                                    | `cloud.endpoint`, and the `cloud.issuer` you signed in to                                                 | only with --cloud, signed in, with cloud.endpoint set                                                                            | **Off**                    | none                                                                                                            |
-| Session sync to your Lunos space                                                                                                                          | cloud.lunos.tech (or `cloud.endpoint` in global or managed config)                                        | after each completed turn, while signed in to Lunos Cloud                                                                        | **Off**                    | `lunos sync off` (this device), `"sync": false` (this directory, or everywhere when your organisation locks it) |
+| Session sync to your Lunos space                                                                                                                          | cloud.lunos.tech (or `cloud.endpoint` in global or managed config)                                        | after each completed turn, once you sign in with `lunos login` (on from then until you turn it off)                              | **Off**                    | `lunos sync off` (this device), `"sync": false` (this directory, or everywhere when your organisation locks it) |
 
 <!-- offline-calls:end -->
 
@@ -682,7 +684,7 @@ Lunos requires no database, no message broker and no inbound network access. An 
 
 **Can it run fully air-gapped?** Not with a hosted model provider: model inference needs egress. Against a self-hosted, OpenAI-compatible model endpoint on your own network, set `LUNOS_OFFLINE=1` ([offline mode](#every-outbound-call-and-offline-mode)) and Lunos contacts only that endpoint and anything else you configured. To keep a residency policy on, declare the endpoint's region in `residency.endpoints` (from v1.18.41); otherwise the policy refuses it, because Lunos can't know where it runs. See [Air-gapped deployment](#air-gapped-deployment). To install without internet access, use the offline bundle (see [Installing without internet access](#installing-without-internet-access)).
 
-**Does the vendor receive telemetry?** No. There is no Lunos-operated endpoint receiving data from your deployment.
+**Does the vendor receive telemetry?** No. There is no Lunos-operated endpoint receiving telemetry from your deployment. The one flow of project data to Lunos is session sync, which exists only if you sign in and use it ([Session sync](../cloud-sync.md)).
 
 **What happens if the project is abandoned?** It is MIT-licensed and the full source is public. You may fork, build and maintain it without our involvement — the same property that let Lunos itself fork from opencode.
 

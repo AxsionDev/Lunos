@@ -4,13 +4,13 @@ When you are signed in to Lunos Cloud (`lunos login`), Lunos copies your session
 
 ## What syncs, and when
 
-After each completed turn, the session's new complete messages are queued and uploaded: the session record (title, model, summary and so on), user messages and finished assistant messages with their parts, which include tool calls and their results. Alongside, small metadata goes with the first chunk: title, the git remote URL (without any user name or token), the commit, the model and the project id. Each message is sent once. Uploads are numbered chunks of at most 4 MiB, in order.
+After each completed turn, the session's new complete messages are queued and uploaded: the session record (title, model, summary and so on), user messages and finished assistant messages with their parts, which include tool calls and their results. Alongside, small metadata (title, the git remote URL, the commit, the model and the project id) rides on the first chunk of each turn. For `http(s)` remotes any credentials are stripped from the URL; `ssh://` remotes are sent with the user name but no password; a local-path or `file://` remote is not sent. Each message is sent once. Uploads are numbered chunks of at most 4 MiB, in order. A single message larger than that has its tool outputs truncated (marked `…[truncated for sync]`) to fit.
 
 Uploads happen in the background and never block or slow a session; a failure is logged, not shown in the session. A turn still waiting out its short delay when Lunos closes (a TUI quitting, `lunos run` finishing) is written to the queue on disk within a few seconds, and uploaded the next time Lunos starts.
 
 ## Where it goes
 
-To your personal space, or to the space project that `lunos sync link` bound for the directory. The control plane is `https://cloud.lunos.tech`, or `cloud.endpoint` from your **global or managed** config. A project's own `opencode.json` is never consulted for the endpoint, so a repository can't redirect where your sign-in and sessions are sent. The endpoint must be `https` (plain `http` only for localhost). Your device is registered at the endpoint in force when you ran `lunos login`; if `cloud.endpoint` later changes, nothing is sent (a warning is logged) until you run `lunos login` again.
+To your personal space, or to the space project that `lunos sync link` bound for the directory. The control plane is `https://cloud.lunos.tech`, or `cloud.endpoint` from your **global or managed** config. A project's own `opencode.json` is never consulted for the endpoint, so a repository can't redirect where your sessions and token are sent for sync. (`cloud.issuer`, which only chooses where `lunos login` signs you in, can come from project config, as can `sync` itself.) The endpoint must be `https` (plain `http` only for localhost). Your device is registered at the endpoint in force when you ran `lunos login`; if `cloud.endpoint` later changes, nothing is sent (a warning is logged) until you run `lunos login` again.
 
 ## What never syncs
 
@@ -36,7 +36,7 @@ Be aware of these; they are covered only by the scanner:
 
 Also:
 
-- Absolute project paths inside tool input and output are uploaded as they are. Only the session's own `directory` field is removed.
+- Absolute project paths are uploaded, including your home directory name: each assistant message carries its working directory and root in `path`, and tool inputs and outputs name files by absolute path. Only the session's own `directory` field and its revert state are removed.
 - A chunk the server refuses as too large (HTTP 413, even after Lunos splits a turn into 4 MiB chunks), or keeps refusing for its own reasons (8 attempts), is replaced by an empty chunk so later chunks still line up. That turn is missing in your space.
 - A session record whose metadata alone would take more than half a chunk is uploaded without its `summary` and `metadata`; it keeps its identity, title and counts.
 
@@ -57,7 +57,7 @@ An organisation stops sync everywhere with `{ "sync": false, "$locked": ["sync"]
 
 ## The gates
 
-Checked in this order before every turn, and before any token is read or refreshed. The first that refuses stops it:
+Checked in this order once per turn or flush (not per chunk), and before any token is read or refreshed. The first that refuses stops it:
 
 1. **Offline.** `LUNOS_OFFLINE=1` stops sync entirely and silently.
 2. **Signed out.** Silent.
@@ -75,16 +75,17 @@ lunos sync status          # who, endpoint, device, switches, policy, directory,
 lunos sync off             # stop on this device (the switch lives in your space, so the app shows it too)
 lunos sync on              # start again; also clears a "space full" pause
 lunos sync link [project]  # choose the space project for this directory (a list if no id is given)
+lunos sync link --personal # sync this directory to your personal space, with no project
 lunos sync link --off      # write "sync": false for this directory
 ```
 
-`link` writes `.opencode/opencode.json` in the project (comments and other keys are kept), as `lunos settings set --project` does. A project id that is not in your spaces is refused. `on` under a locked-off organisation policy still switches the device on, but says your organisation's policy keeps sync off.
+`link` writes `.opencode/opencode.json` in the project (or `.opencode/opencode.jsonc` if that is the file you have), keeping comments and other keys, as `lunos settings set --project` does. It replaces the directory's existing `sync` setting, keeping only any `exclude` list; `--off` replaces it with `false`. A project id that is not in your spaces is refused, and `--personal` can't be combined with an id. Under `LUNOS_OFFLINE=1`, `link` with a project is refused (it needs the server); `--off` and `--personal` still work. `on` under a locked-off organisation policy still switches the device on, but says your organisation's policy keeps sync off.
 
 The first time a device is registered, `lunos login` shows: `Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.` See [Signing in](cloud-login.md).
 
 ## Offline queue and retries
 
-Chunks are written to a queue on disk (`cloud/sync/queue/<session>/` in Lunos's data directory) after redaction, and deleted one by one as the server acknowledges them. If the network, the server (5xx) or rate limits (429) fail, they stay queued and are retried with a growing delay (1 s doubling to 10 min, plus jitter), and again at the next turn or start. A 401 makes Lunos refresh your sign-in token and try once more; if that fails too, sync stops until you sign in again. If the server's position differs from the queue's, Lunos asks for it and resends from there; the server ignores repeats. A session you deleted in the app (HTTP 410) stops uploading for good.
+Chunks are written to a queue on disk (`cloud/sync/queue/<session>/` in Lunos's data directory) after redaction, and deleted one by one as the server acknowledges them. If the network, the server (5xx) or rate limits (429) fail, they stay queued and are retried with a growing delay (1 s doubling to 10 min, plus jitter), and again at the next turn or start. A 401 makes Lunos refresh your sign-in token and try that chunk once more; if it is refused again, this upload attempt stops and is tried again at the next turn or start. After a failure the first retry waits about 2 s. If the server's position differs from the queue's, Lunos asks for it and resends from there; the server ignores repeats. A session you deleted in the app (HTTP 410) stops uploading for good.
 
 ## When your space is full
 
@@ -92,7 +93,7 @@ If the server answers that the space is full (507), sync pauses on this device a
 
 ## Audit events
 
-When the [audit log](audit-log.md) is on: `sync.upload` (`session`, `device`, `seq`, `bytes`, `endpoint`) for each acknowledged chunk, and `sync.denied` (`session`, `gate`) for a refusal. Neither holds session content.
+When the [audit log](audit-log.md) is on: `sync.upload` (`session`, `device`, `seq`, `bytes`, `endpoint`) for each acknowledged chunk, and `sync.denied` (`session`, `gate`) for a refusal; for `gate: "server"` it also carries the server's `code`, and for `gate: "residency"` the residency fields (`providerID`, `region`, `basis`, `host`, `allowed: false`, `timestamp`). Neither holds session content.
 
 ## Deleting and exporting
 

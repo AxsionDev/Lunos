@@ -4,7 +4,7 @@
 # Questions: caiq-v3.0.1-questions.json, extracted from the CSA's published workbook
 # (csa-caiq-v3.0.1-09-01-2017.xlsx, 295 questions, as distributed in github.com/metanorma/csa-ccm-tools, Apache-2.0).
 # CAIQ is written for cloud-service providers. Lunos is self-hosted software with no Lunos-operated
-# service in the data path, so many questions don't apply; those say so and why.
+# service in the data path (unless a customer signs in and uses session sync), so many questions don't apply; those say so and why.
 #
 # Answer values:
 #   Yes / No / Partial        about the Lunos software or project, with the source that backs it
@@ -19,7 +19,10 @@ import csv, json, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 REL = "https://github.com/AxsionDev/Lunos/blob/dev/"
 
-SELF_HOSTED = ("N/A", "Lunos is self-hosted software. ITService EOOD operates no service that stores or processes customer data, so there is no provider-side infrastructure, tenant data or tenancy to which this applies.", "docs/deployment/self-hosted.md")
+# The qualifier for every "no Lunos service holds your data" answer: session sync is the exception.
+SYNC = " This holds unless the customer signs in and uses session sync (docs/cloud-sync.md, from the release that ships it), which uploads sessions to Lunos Cloud, operated by ITService EOOD in the EU."
+
+SELF_HOSTED = ("N/A", "Lunos is self-hosted software. ITService EOOD operates no service that stores or processes customer data, so there is no provider-side infrastructure, tenant data or tenancy to which this applies." + SYNC, "docs/deployment/self-hosted.md")
 ORG = ("Axsion to answer", "An organisational policy of ITService EOOD. Not documented in the Lunos repository; to be answered by Axsion.", "")
 
 DEFAULTS = {
@@ -60,7 +63,7 @@ O = {
     "BCR-03.1": ("Yes", "The deployment guide documents every destination Lunos sends data to and what is sent.", "docs/deployment/self-hosted.md#3-where-your-data-goes"),
     "BCR-03.2": ("Yes", "The customer chooses the model provider, and the data-residency policy restricts which jurisdictions requests may go to.", "docs/data-residency.md"),
     "BCR-04.1": ("Yes", "Installation, configuration and user documentation, and a data-flow description, are published.", "docs/deployment/self-hosted.md"),
-    "BCR-10.1": ORG, "BCR-11.2": ("N/A", "ITService EOOD holds no customer data, so it has none to produce in response to a request. A procedure for such requests is an organisational matter for Axsion.", "docs/deployment/self-hosted.md"),
+    "BCR-10.1": ORG, "BCR-11.2": ("N/A", "ITService EOOD holds no customer data, so it has none to produce in response to a request. A procedure for such requests is an organisational matter for Axsion." + SYNC, "docs/deployment/self-hosted.md"),
     # Change control
     "CCC-01.2": ("Yes", "Installation, configuration and usage documentation is published.", "docs/deployment/self-hosted.md"),
     "CCC-02.1": ("Partial", "Every pull request runs typecheck, unit, end-to-end and Nix checks. Branch protection is not enabled, so passing checks is not enforced before merge.", ".github/workflows/test.yml"),
@@ -71,26 +74,26 @@ O = {
     "CCC-03.4": ("No", "Not verified by a dedicated control.", ""),
     "CCC-05.1": ("Partial", "Every change is a public pull request, and releases carry a changelog. There is no production service to change-manage.", "CHANGELOG.md"),
     # Data security
-    "DSI-01.4": ("Yes", "Customer data is stored on infrastructure the customer runs, so its location is the customer's choice.", "docs/deployment/self-hosted.md"),
-    "DSI-01.5": ("Yes", "As above: the customer chooses where Lunos runs and stores its local state.", "docs/deployment/self-hosted.md"),
+    "DSI-01.4": ("Yes", "Customer data is stored on infrastructure the customer runs, so its location is the customer's choice." + SYNC, "docs/deployment/self-hosted.md"),
+    "DSI-01.5": ("Yes", "As above: the customer chooses where Lunos runs and stores its local state." + SYNC, "docs/deployment/self-hosted.md"),
     "DSI-01.7": ("Yes", "The data-residency policy restricts the jurisdictions model requests may be routed to.", "docs/data-residency.md"),
     "DSI-02.1": ("Yes", "Data flows are documented in the deployment guide.", "docs/deployment/self-hosted.md#3-where-your-data-goes"),
     "DSI-02.2": ("Partial", "With a residency policy set, Lunos refuses model requests to providers outside the allowed jurisdictions and records every call in the audit log. What a permitted provider does with the data is governed by the customer's agreement with it.", "docs/data-residency.md"),
     "DSI-03.1": ("Partial", "Lunos connects to model providers over the endpoints the customer configures; hosted providers use HTTPS. Transport security for self-hosted endpoints is the customer's configuration.", ""),
-    "DSI-06.1": ("Yes", "Responsibilities are documented: the customer operates Lunos and chooses the provider; ITService EOOD is not in the data path.", "docs/deployment/self-hosted.md#6-what-you-need-to-provide"),
+    "DSI-06.1": ("Yes", "Responsibilities are documented: the customer operates Lunos and chooses the provider; ITService EOOD is not in the data path." + SYNC, "docs/deployment/self-hosted.md#6-what-you-need-to-provide"),
     # Encryption: none held
-    "EKM-03.2": ("Partial", "Model requests go to the endpoints the customer configures; hosted providers use HTTPS. There are no Lunos-operated networks or hypervisors.", ""),
+    "EKM-03.2": ("Partial", "Model requests go to the endpoints the customer configures; hosted providers use HTTPS. There are no Lunos-operated networks or hypervisors." + SYNC, ""),
     # Governance
     "GRM-04.1": ("Partial", "The security posture is documented in SECURITY.md and this Trust pack. There is no formal ISMS.", "docs/trust/README.md"),
     "GRM-06.4": ("Yes", "The claim table states exactly what is claimed; no certification or regulatory compliance is claimed.", "docs/deployment/self-hosted.md#2-what-is-true-today--the-sovereignty-claim-stated-precisely"),
     # HR: access to tenant data
-    "HRS-08.1": ("Yes", "Documented: ITService EOOD has no access to customer data or metadata, and there is no telemetry. The only Lunos-operated host contacted is lunos.tech, for the static marketplace catalogue, and the request carries nothing from the project.", "docs/deployment/self-hosted.md#touches-lunos-operated-infrastructure"),
-    "HRS-08.2": ("No", "No metadata about customer data is collected. Lunos has no telemetry.", "docs/deployment/self-hosted.md"),
+    "HRS-08.1": ("Yes", "Documented: ITService EOOD has no access to customer data or metadata, and there is no telemetry. The only Lunos-operated host contacted is lunos.tech, for the static marketplace catalogue, and the request carries nothing from the project." + SYNC, "docs/deployment/self-hosted.md#touches-lunos-operated-infrastructure"),
+    "HRS-08.2": ("No", "No metadata about customer data is collected. Lunos has no telemetry." + SYNC, "docs/deployment/self-hosted.md"),
     "HRS-08.3": ("N/A", "No customer data or metadata is accessed.", ""),
-    "HRS-01.1": ("N/A", "ITService EOOD holds no customer data, so has no privacy breach of customer data to detect. See the data-protection note.", "docs/trust/data-protection.md"),
+    "HRS-01.1": ("N/A", "ITService EOOD holds no customer data, so has no privacy breach of customer data to detect. See the data-protection note." + SYNC, "docs/trust/data-protection.md"),
     # IAM
     "IAM-06.1": ("Partial", "Write access to the source repository is restricted to the AxsionDev GitHub organisation's members. Branch protection is not enabled on `dev`.", ""),
-    "IAM-06.2": ("N/A", "Customer source code stays on the customer's machines; ITService EOOD has no access to it.", "docs/deployment/self-hosted.md"),
+    "IAM-06.2": ("N/A", "Customer source code stays on the customer's machines; ITService EOOD has no access to it." + SYNC, "docs/deployment/self-hosted.md"),
     "IAM-12.1": ("N/A", "Lunos has no user login to integrate SSO with. The admin-console/SSO decision is recorded in specs/admin-console-sso.md (deferred).", "packages/opencode/specs/admin-console-sso.md"),
     # IVS: audit logging in the product
     "IVS-01.4": ("N/A", "No Lunos-operated service produces audit logs. For customers: the product writes a local, hash-chained audit log the customer controls, and can forward it to the customer's SIEM" + NEXT + ". v1.18.39 and earlier record model calls and share uploads only, when a residency policy is set.", "docs/audit-log.md"),
@@ -101,7 +104,7 @@ O = {
     "IPY-02.1": ("Yes", "All data is local files on the customer's machine; a session can be exported as JSON with the `export` command.", "packages/web/src/content/docs/cli.mdx#export"),
     "IPY-03.1": ("N/A", "There is no service agreement: Lunos is MIT-licensed software the customer runs.", ""),
     "IPY-03.2": ("N/A", "Same as IPY-03.1.", ""),
-    "IPY-04.1": ("N/A", "Data is not imported to or exported from a Lunos-operated service.", ""),
+    "IPY-04.1": ("N/A", "Data is not imported to or exported from a Lunos-operated service." + SYNC, ""),
     "IPY-04.2": ("N/A", "Same as IPY-04.1.", ""),
     # Incident management
     "SEF-02.1": ("Partial", "A vulnerability-handling process (intake, assessment, remediation, release, disclosure) is documented. There is no incident-response plan for a service, because none is operated.", "SECURITY.md#vulnerability-handling-process"),
@@ -177,7 +180,7 @@ def main():
         "[`questionnaire/caiq-v3.0.1-answers.csv`](questionnaire/caiq-v3.0.1-answers.csv).",
         "",
         "**Read this first.** CAIQ is written for cloud-service providers. Lunos is software you run on",
-        "your own infrastructure; ITService EOOD operates no service that stores or processes your data. So",
+        "your own infrastructure; ITService EOOD operates no service that stores or processes your data, unless you sign in and use session sync (docs/cloud-sync.md), which uploads sessions to Lunos Cloud (ITService EOOD, EU). So",
         "many questions are **N/A**, and say why. **Axsion to answer** marks organisational questions",
         "(HR, devices, contracts, internal audits) whose answers are not documented here; ask ITService",
         "EOOD for them. Where the answer is **No**, it is No.",
