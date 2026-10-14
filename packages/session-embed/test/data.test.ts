@@ -13,3 +13,8 @@ test("groups messages and parts for DataProvider", () => {
 test("a session with no messages renders nothing and does not throw", () => {
   expect(toData({ id: "s" }, []).userMessageIDs).toEqual([])
 })
+
+test("explicit undefined fields keep the defaults", () => {
+  const { data } = toData({ id: "s", title: undefined, directory: undefined }, [])
+  expect(data.session[0]).toMatchObject({ id: "s", title: "", directory: "" })
+})

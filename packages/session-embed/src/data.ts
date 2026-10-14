@@ -6,7 +6,9 @@ export type EmbedSession = Partial<Session> & { id: string }
 
 export function toData(session: EmbedSession, messages: EmbedMessage[]) {
   const sorted = [...messages].sort((a, b) => a.info.time.created - b.info.time.created)
-  const full = { directory: "", title: "", version: "", time: { created: 0, updated: 0 }, ...session } as Session
+  // drop explicit undefined so it cannot override the defaults
+  const given = Object.fromEntries(Object.entries(session).filter(([, v]) => v !== undefined))
+  const full = { directory: "", title: "", version: "", time: { created: 0, updated: 0 }, ...given } as Session
   return {
     data: {
       session: [full],
