@@ -53,15 +53,9 @@ async function request(base: string, token: string, method: string, p: string, b
   })
 }
 
-// The control plane names the last stored sequence only in the message: "Send chunk N next (last stored: M)."
-const lastStored = (message: unknown) => {
-  const m = typeof message === "string" ? /last stored: (\d+)/.exec(message) : null
-  return m ? Number(m[1]) : undefined
-}
-
 async function failure(res: Response): Promise<UploadResult & { ok: false }> {
   const json = (await res.json().catch(() => undefined)) as any
-  return { ok: false, status: res.status, code: json?.error?.code ?? `http_${res.status}`, message: json?.error?.message ?? `HTTP ${res.status}`, lastSeq: lastStored(json?.error?.message) }
+  return { ok: false, status: res.status, code: json?.error?.code ?? `http_${res.status}`, message: json?.error?.message ?? `HTTP ${res.status}`, lastSeq: json?.last_seq ?? json?.lastSeq }
 }
 
 export async function load(): Promise<State | undefined> {
