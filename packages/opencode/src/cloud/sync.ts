@@ -263,11 +263,22 @@ async function git(directory: string, args: string[]) {
   }
 }
 
-/** Remote URL (without any user name or token in it) and commit, best effort. */
+/**
+ * The origin as it may be uploaded: an http(s) URL without any user name or token in it, or an
+ * scp-style `user@host:path`. Anything else (a local path, `file://`) names this machine, not the
+ * repository, so it is left out.
+ */
+export function repoUrl(raw: string) {
+  if (/^https?:\/\//i.test(raw)) return CloudWorkers.publicRemote(raw).url
+  if (/^[^\s/@:]+@[^\s/:]+:(?!\/\/)/.test(raw)) return raw
+  return undefined
+}
+
+/** Remote URL and commit, best effort. */
 async function repo(directory: string) {
   const url = await git(directory, ["remote", "get-url", "origin"])
   const commit = await git(directory, ["rev-parse", "HEAD"])
-  return { url: url ? CloudWorkers.publicRemote(url).url : undefined, commit }
+  return { url: url ? repoUrl(url) : undefined, commit }
 }
 
 export type Source = { info: Session.Info; messages: SessionV1.WithParts[] }
@@ -323,6 +334,11 @@ export function worker(input: WorkerInput) {
     if (r.allowed) return true
     denied.add(key)
     return false
+  }
+
+  /** The cheap sign-in check: a stored session exists (no refresh, no network). */
+  async function signedIn() {
+    return !!input.opts?.token || !!(await CloudStore.load())
   }
 
   /**
@@ -534,6 +550,7 @@ export function worker(input: WorkerInput) {
       endpointWarned = true
       return {}
     }
+    if (!(await signedIn())) return {}
     // The gates first: a closed one must not cost a token refresh.
     const admitted: string[] = []
     for (const session of mine) if (await admit(session, state, config)) admitted.push(session)
@@ -570,16 +587,17 @@ export function worker(input: WorkerInput) {
   async function prepare(session: string): Promise<boolean> {
     if (Offline.enabled()) return false
     const state = await CloudSyncApi.load()
+    // Signed out comes before the gates and is silent: device.json outlives `lunos logout`.
+    if (state && !(await signedIn())) return false
     const config = await input.config()
     if (!(await admit(session, state, config))) return false
     const cursor = await CloudSyncQueue.cursor(session)
     if (cursor?.stopped) return false
     const source = await input.load(session)
     if (!source) return true
-    // Nothing new: no git, no keychain read. What is still queued uploads anyway.
+    // Nothing new: no git. What is still queued uploads anyway.
     const sent = new Set(cursor?.sent ?? [])
     if (!source.messages.some((m) => !sent.has(m.info.id) && complete(m))) return true
-    if (!input.opts?.token && !(await CloudStore.load())) return false
     await enqueue(session, config, cursor, source)
     return true
   }

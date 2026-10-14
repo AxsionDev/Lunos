@@ -247,6 +247,24 @@ describe("build", () => {
   })
 })
 
+describe("repoUrl", () => {
+  test("only http(s) remotes, without credentials, and scp-style remotes are sent", () => {
+    expect(CloudSync.repoUrl("https://someone:tok@github.com/acme/app.git")).toBe("https://github.com/acme/app.git")
+    expect(CloudSync.repoUrl("http://git.example.org/app")).toBe("http://git.example.org/app")
+    expect(CloudSync.repoUrl("git@github.com:acme/app.git")).toBe("git@github.com:acme/app.git")
+    expect(CloudSync.repoUrl("/home/me/src/app")).toBeUndefined()
+    expect(CloudSync.repoUrl("../app")).toBeUndefined()
+    expect(CloudSync.repoUrl("file:///home/me/src/app")).toBeUndefined()
+    expect(CloudSync.repoUrl("C:\\src\\app")).toBeUndefined()
+  })
+
+  test("a local-path origin leaves meta.repoUrl out", async () => {
+    await $`git init -q && git remote add origin /home/me/src/app`.cwd(dir).quiet()
+    await make([user("msg_1")]).turn(S)
+    expect(JSON.parse(plane.uploads()[0]!).meta.repoUrl).toBeUndefined()
+  })
+})
+
 describe("upload loop", () => {
   test("path rule end to end: the bytes the server receives hold no secret", async () => {
     await $`git init -q && git remote add origin https://someone:ghp_tokenvalue123@github.com/acme/app.git`
@@ -520,6 +538,15 @@ describe("upload loop", () => {
     expect(calls).toBe(1)
     await w.turn(S)
     expect(calls).toBe(1)
+  })
+
+  test("signed out with device.json left behind: silent, even with a gate closed", async () => {
+    await CloudSyncQueue.enqueue(S, dir, 1, JSON.stringify({ messages: [] }), ["msg_0"])
+    const w = make([user("msg_1")], { sync: false }, undefined, { opts: { endpoint: plane.url } })
+    expect(await w.turn(S)).toEqual({})
+    expect(await w.flush()).toEqual({})
+    expect(puts()).toEqual([])
+    expect((await auditLines()).filter((l) => l.event === "sync.denied")).toEqual([])
   })
 
   test("403 device_revoked deletes device.json", async () => {
