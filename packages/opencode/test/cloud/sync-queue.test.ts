@@ -1,12 +1,19 @@
-import { beforeEach, expect, test } from "bun:test"
+import { afterEach, beforeEach, expect, test } from "bun:test"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import { CloudSyncQueue as Q } from "@/cloud/sync-queue"
 
+const original = Global.Path.data
 beforeEach(async () => {
   ;(Global.Path as any).data = await fs.mkdtemp(path.join(os.tmpdir(), "q-"))
+})
+// Restore it: bun runs test files in one process, and later files (provider auth.json) read Global.Path.data.
+afterEach(async () => {
+  const dir = Global.Path.data
+  ;(Global.Path as any).data = original
+  await fs.rm(dir, { recursive: true, force: true })
 })
 
 test("queue order, ack, drop", async () => {
