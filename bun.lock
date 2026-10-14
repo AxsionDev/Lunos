@@ -807,6 +807,27 @@
         "@typescript/native-preview": "catalog:",
       },
     },
+    "packages/session-embed": {
+      "name": "@lunos/session-embed",
+      "version": "0.0.0",
+      "dependencies": {
+        "@opencode-ai/sdk": "workspace:*",
+        "@opencode-ai/session-ui": "workspace:*",
+        "@opencode-ai/ui": "workspace:*",
+        "@solidjs/meta": "catalog:",
+        "solid-js": "catalog:",
+      },
+      "devDependencies": {
+        "@playwright/test": "catalog:",
+        "@tailwindcss/vite": "catalog:",
+        "@tsconfig/bun": "catalog:",
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "tailwindcss": "catalog:",
+        "vite": "catalog:",
+        "vite-plugin-solid": "catalog:",
+      },
+    },
     "packages/session-ui": {
       "name": "@opencode-ai/session-ui",
       "version": "1.18.46",
@@ -1810,6 +1831,8 @@
     "@lukeed/ms": ["@lukeed/ms@2.0.2", "", {}, "sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA=="],
 
     "@lunos/eval": ["@lunos/eval@workspace:packages/eval"],
+
+    "@lunos/session-embed": ["@lunos/session-embed@workspace:packages/session-embed"],
 
     "@lydell/node-pty": ["@lydell/node-pty@1.2.0-beta.12", "", { "optionalDependencies": { "@lydell/node-pty-darwin-arm64": "1.2.0-beta.12", "@lydell/node-pty-darwin-x64": "1.2.0-beta.12", "@lydell/node-pty-linux-arm64": "1.2.0-beta.12", "@lydell/node-pty-linux-x64": "1.2.0-beta.12", "@lydell/node-pty-win32-arm64": "1.2.0-beta.12", "@lydell/node-pty-win32-x64": "1.2.0-beta.12" } }, "sha512-qIK890UwPupoj07osVvgOIa++1mxeHbcGry4PKRHhNVNs81V2SCG34eJr46GybiOmBtc8Sj5PB1/GGM5PL549g=="],
 
