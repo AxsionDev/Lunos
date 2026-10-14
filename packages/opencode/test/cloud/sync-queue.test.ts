@@ -91,3 +91,13 @@ test("backoff", () => {
   expect(Q.backoff(20)).toBeLessThanOrEqual(720_000)
   expect(Q.backoff(20)).toBeGreaterThanOrEqual(600_000)
 })
+
+test("reset deletes every chunk and rewinds the cursor to seq with nothing sent", async () => {
+  for (const seq of [1, 2, 3]) await Q.enqueue("ses_1", "/w", seq, `{"s":${seq}}`, [`m${seq}`])
+  await Q.reset("ses_1", 1)
+  expect(await Q.pending("ses_1")).toEqual([])
+  expect(await Q.cursor("ses_1")).toEqual({ session: "ses_1", directory: "/w", seq: 1, sent: [] })
+  // The rebuilt chunks start right after it.
+  expect(await Q.enqueue("ses_1", "/w", 2, "new", ["m1", "m2"])).toBe(true)
+  expect((await fs.readdir(path.join(Q.dir(), "ses_1"))).filter((n) => n.endsWith(".lock") || n.endsWith(".tmp"))).toEqual([])
+})

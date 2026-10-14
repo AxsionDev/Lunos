@@ -45,6 +45,8 @@ export function start(options: { port?: number } = {}) {
   const plane = {
     requests,
     devices,
+    refreshes: 0,
+    tokenFail: false,
     sessions,
     /** The spaces and projects `GET /v1/spaces` and `/v1/spaces/{id}/projects` answer with. */
     spaces: [{ id: "sp_1", name: "Personal", projects: [{ id: "p1", name: "Website" }] }] as Array<{
@@ -103,6 +105,12 @@ export function start(options: { port?: number } = {}) {
         device_authorization_endpoint: `${plane.issuer}/device`,
         token_endpoint: `${plane.issuer}/token`,
       })
+    // A refresh hands out TOKEN (`tokenFail`: the provider is down); `refreshes` counts them.
+    if (req.method === "POST" && url.pathname === "/oidc/token") {
+      if (plane.tokenFail) return error(503, "temporarily_unavailable", "Try later.")
+      plane.refreshes++
+      return Response.json({ access_token: TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: "refresh-2" })
+    }
     if (req.headers.get("authorization") !== `Bearer ${TOKEN}`) return error(401, "unauthorized", "Sign in again.")
 
     if (req.method === "GET" && url.pathname === "/v1/spaces")

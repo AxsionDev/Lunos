@@ -50,6 +50,8 @@ import { CloudWorkers } from "./workers"
 export const LIMIT = 4 * 1024 * 1024
 export const TRUNCATED = "…[truncated for sync]"
 const DEBOUNCE = "2 seconds"
+/** How long a closing instance waits to queue a turn still in its debounce (disk only). */
+const SHUTDOWN_QUEUE = "3 seconds"
 const QUOTA_MESSAGE =
   "Session sync paused: your Lunos space is full. Free space at https://app.lunos.tech/settings/usage, then run lunos sync on."
 /** What a chunk the server refused as too large (413) becomes, so its seq still arrives. */
@@ -209,6 +211,11 @@ export function build(
   // A session whose summary diffs alone would crowd out the messages keeps their names and counts only.
   if (bytes({ meta, info }) > LIMIT / 4 && Array.isArray(info.summary?.diffs))
     info = { ...info, summary: { ...info.summary, diffs: info.summary.diffs.map(({ patch: _, ...d }: any) => d) } }
+  // Still more than half a chunk (a huge `metadata`): the record keeps its identity, title and counts.
+  if (bytes({ meta, info }) > LIMIT / 2) {
+    const { summary: _s, metadata: _m, ...rest } = info
+    info = rest
+  }
 
   const head = bytes({ meta, info, messages: [] })
   const plain = bytes({ messages: [] })
@@ -272,7 +279,12 @@ export type WorkerInput = {
   /** Tests inject `fetch`, `token`, `sub`; without `token` the stored Lunos Cloud session is used. */
   opts?: CloudSyncApi.Options
   log?: (level: "warn" | "error", message: string, fields?: Record<string, unknown>) => void
+  /** The repository's public remote and commit; `git` by default. */
+  repo?: (directory: string) => Promise<{ url?: string; commit?: string }>
 }
+
+/** Failed attempts after which a chunk the server keeps rejecting is replaced by an empty one. */
+const MAX_REJECTIONS = 8
 type Outcome = "done" | "next" | "stop" | "retry" | "rebuild" | "stuck"
 
 /**
@@ -283,6 +295,8 @@ type Outcome = "done" | "next" | "stop" | "retry" | "rebuild" | "stuck"
 export function worker(input: WorkerInput) {
   const log = input.log ?? (() => {})
   const denied = new Set<string>()
+  const rejections = new Map<string, number>()
+  let endpointWarned = false
   let attempt = 0
   let chain: Promise<unknown> = Promise.resolve()
   const serial = <T>(fn: () => Promise<T>) => {
@@ -311,11 +325,17 @@ export function worker(input: WorkerInput) {
     return false
   }
 
-  /** Who uploads: the injected token, or the stored session (refreshed if it is about to expire). */
-  async function authorize(state: CloudSyncApi.State): Promise<CloudSyncApi.Options | "signed-out" | "network"> {
+  /**
+   * Who uploads: the injected token, or the stored session (refreshed if it is about to expire, or
+   * always with `force`, after a 401).
+   */
+  async function authorize(
+    state: CloudSyncApi.State,
+    force = false,
+  ): Promise<CloudSyncApi.Options | "signed-out" | "network"> {
     if (input.opts?.token) return input.opts
     try {
-      const s = await CloudAuth.session("Session sync")
+      const s = await CloudAuth.session("Session sync", { force })
       // device.json belongs to whoever signed in last; another user's sign-in re-registers at login.
       if (s.sub !== state.sub) return "signed-out"
       const token = s.tokens.access_token
@@ -338,16 +358,15 @@ export function worker(input: WorkerInput) {
     session: string,
     config: SyncConfig,
     cursor: CloudSyncQueue.Cursor | undefined,
+    source: Source,
     retried = false,
   ): Promise<void> {
-    const source = await input.load(session)
-    if (!source) return
     const options = config.sync || undefined
     const chunks = build(source.info, source.messages, cursor, {
       directory: input.directory,
       exclude: options?.exclude ?? [],
       project: options?.project,
-      repo: await repo(input.directory),
+      repo: await (input.repo ?? repo)(input.directory),
       model: model(source),
     })
     try {
@@ -358,7 +377,7 @@ export function worker(input: WorkerInput) {
       // Another process (a TUI and `lunos run` on one session) queued this seq first: build again
       // from the cursor it left, once.
       if (!(error instanceof CloudSyncQueue.SeqTakenError) || retried) throw error
-      return enqueue(session, config, await CloudSyncQueue.cursor(session), true)
+      return enqueue(session, config, await CloudSyncQueue.cursor(session), source, true)
     }
   }
 
@@ -373,14 +392,17 @@ export function worker(input: WorkerInput) {
       const chunk = chunks[i]!
       let r = await CloudSyncApi.upload(state, session, chunk.seq, chunk.body, auth.opts)
       if (!r.ok && r.status === 401) {
-        // Refresh once and retry once; still refused means signed out.
-        const again = await authorize(state)
-        if (typeof again !== "object") return "stop"
+        // Refresh once (even if the token looks current) and retry once; still refused means signed out.
+        const again = await authorize(state, true)
+        if (again === "network") return "retry"
+        if (again === "signed-out") return "stop"
         auth.opts = again
         r = await CloudSyncApi.upload(state, session, chunk.seq, chunk.body, auth.opts)
         if (!r.ok && r.status === 401) return "stop"
       }
+      const key = `${session}:${chunk.seq}`
       if (r.ok) {
+        rejections.delete(key)
         await CloudSyncQueue.ack(session, chunk.seq)
         AuditLog.emit("sync.upload", {
           session,
@@ -415,10 +437,9 @@ export function worker(input: WorkerInput) {
           continue
         }
         // The server needs a seq no longer queued (it lost data, or the queue did): start over from
-        // its position. The rebuilt chunks hold every message again; the server dedupes them.
-        await CloudSyncQueue.ack(session, Number.MAX_SAFE_INTEGER)
-        const cursor = await CloudSyncQueue.cursor(session)
-        await CloudSyncQueue.writeCursor({ session, directory: input.directory, ...cursor, seq: st.lastSeq, sent: [] })
+        // its position. The rebuilt chunks hold every message again; the server and the app keep the
+        // latest copy of each message id.
+        await CloudSyncQueue.reset(session, st.lastSeq)
         return "rebuild"
       }
       if (r.status === 409 && r.code === "chunk_conflict") {
@@ -456,11 +477,20 @@ export function worker(input: WorkerInput) {
         log("warn", QUOTA_MESSAGE)
         return "stop"
       }
-      if (r.status === 413) {
-        // Too big even after splitting. Its messages are lost to the space, but its seq is filled
-        // with an empty chunk: a gap would make every later chunk out_of_order, and the rebuild
-        // that follows would hit the same 413 again.
-        log("warn", "session sync: the server refused a chunk as too large; it is skipped", { session, seq: chunk.seq })
+      const transient = r.status === 0 || r.status === 429 || r.status >= 500
+      const rejected = !transient && r.status !== 413 ? (rejections.get(key) ?? 0) + 1 : 0
+      if (rejected) rejections.set(key, rejected)
+      if (r.status === 413 || rejected >= MAX_REJECTIONS) {
+        // Too big even after splitting, or refused again and again for its own reasons. Its messages
+        // are lost to the space, but its seq is filled with an empty chunk: a gap would make every
+        // later chunk out_of_order, and the rebuild that follows would hit the same refusal again.
+        rejections.delete(key)
+        log("warn", "session sync: the server refused a chunk; it is skipped", {
+          session,
+          seq: chunk.seq,
+          status: r.status,
+          code: r.code,
+        })
         if (chunk.body === EMPTY) {
           await CloudSyncQueue.ack(session, chunk.seq)
           continue
@@ -475,7 +505,7 @@ export function worker(input: WorkerInput) {
       log("warn", "session sync upload failed; will retry", { session, seq: chunk.seq, status: r.status, code: r.code })
       // Network, timeout, 5xx, 429: the server is the problem, so everything waits. Any other answer
       // is about this session's chunk: it stays queued and the other sessions go ahead.
-      return r.status === 0 || r.status === 429 || r.status >= 500 ? "retry" : "stuck"
+      return transient ? "retry" : "stuck"
     }
     return "done"
   }
@@ -492,17 +522,33 @@ export function worker(input: WorkerInput) {
       if (cursor?.directory === input.directory && !cursor.stopped) mine.push(s)
     }
     if (!mine.length) return {}
+    // device.json names the endpoint the device was registered with at login. If managed or global
+    // config now names another, nothing goes anywhere until `lunos login` registers there.
+    const expected = input.opts?.endpoint ?? (await CloudSyncApi.endpoint().catch(() => undefined))
+    if (expected !== state.endpoint) {
+      if (!endpointWarned)
+        log(
+          "warn",
+          `Session sync paused: this device is registered with ${state.endpoint}, but cloud.endpoint is now ${expected ?? "invalid"}. Run lunos login to sync there.`,
+        )
+      endpointWarned = true
+      return {}
+    }
+    // The gates first: a closed one must not cost a token refresh.
+    const admitted: string[] = []
+    for (const session of mine) if (await admit(session, state, config)) admitted.push(session)
+    if (!admitted.length) return {}
     const opts = await authorize(state)
     if (opts === "signed-out") return {}
     if (opts === "network") return { retryIn: CloudSyncQueue.backoff(++attempt) }
     const auth = { opts, synced: false }
     let later = false
     try {
-      for (const session of mine) {
-        if (!(await admit(session, state, config))) continue
+      for (const session of admitted) {
         let outcome = await send(session, state, auth)
         if (outcome === "rebuild") {
-          await enqueue(session, config, await CloudSyncQueue.cursor(session))
+          const source = await input.load(session)
+          if (source) await enqueue(session, config, await CloudSyncQueue.cursor(session), source)
           outcome = await send(session, state, auth)
           if (outcome === "rebuild") outcome = "next"
         }
@@ -517,21 +563,37 @@ export function worker(input: WorkerInput) {
     }
   }
 
-  async function turn(session: string): Promise<Flushed> {
-    if (Offline.enabled()) return {}
+  /**
+   * The local half of a turn: gates, then build and queue the session's new complete messages (disk
+   * only). Returns whether an upload may follow.
+   */
+  async function prepare(session: string): Promise<boolean> {
+    if (Offline.enabled()) return false
     const state = await CloudSyncApi.load()
-    if (state && !input.opts?.token && !(await CloudStore.load())) return {}
     const config = await input.config()
-    if (!(await admit(session, state, config))) return {}
+    if (!(await admit(session, state, config))) return false
     const cursor = await CloudSyncQueue.cursor(session)
-    if (cursor?.stopped) return {}
-    await enqueue(session, config, cursor)
-    return drain()
+    if (cursor?.stopped) return false
+    const source = await input.load(session)
+    if (!source) return true
+    // Nothing new: no git, no keychain read. What is still queued uploads anyway.
+    const sent = new Set(cursor?.sent ?? [])
+    if (!source.messages.some((m) => !sent.has(m.info.id) && complete(m))) return true
+    if (!input.opts?.token && !(await CloudStore.load())) return false
+    await enqueue(session, config, cursor, source)
+    return true
   }
 
   return {
-    turn: (session: string) => serial(() => turn(session)),
+    turn: (session: string) => serial(async (): Promise<Flushed> => ((await prepare(session)) ? drain() : {})),
     flush: () => serial(drain),
+    /**
+     * Queues a session's turn without uploading, outside the one-at-a-time chain (an upload in
+     * flight mustn't hold it up): for an instance that is closing. The next start uploads it.
+     */
+    queue: async (session: string) => {
+      await prepare(session)
+    },
   }
 }
 export type Worker = ReturnType<typeof worker>
@@ -591,8 +653,26 @@ const layer = Layer.effect(
               ),
           }),
         }
+        // Closing (`lunos run` exits as soon as the session is idle, a TUI quits): a turn still in its
+        // debounce is queued on disk now, briefly; the next start uploads it.
         yield* Effect.addFinalizer(() =>
-          Scope.close(cache.scope, Exit.void).pipe(Effect.andThen(Effect.sync(() => cache.pending.clear()))),
+          Effect.gen(function* () {
+            const waiting = [...cache.pending.keys()]
+            for (const fiber of cache.pending.values()) yield* Fiber.interrupt(fiber)
+            cache.pending.clear()
+            yield* Effect.forEach(
+              waiting,
+              (id) =>
+                Effect.promise(() => cache.worker.queue(id)).pipe(
+                  Effect.timeout(SHUTDOWN_QUEUE),
+                  Effect.catchCause((cause) =>
+                    Effect.logError("session sync couldn't queue a turn on close", { cause }),
+                  ),
+                ),
+              { concurrency: "unbounded", discard: true },
+            )
+            yield* Scope.close(cache.scope, Exit.void)
+          }),
         )
 
         // A turn is over when its session goes idle; a burst of them uploads once, 2 s after the last.

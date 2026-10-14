@@ -140,6 +140,19 @@ export async function ack(session: string, seq: number) {
   })
 }
 
+/**
+ * Starts the session over from the server's position: deletes every queued chunk and sets the cursor
+ * to `seq` with nothing sent, so the next build re-chunks every message after it. One lock, so no
+ * enqueue from another process lands in between.
+ */
+export async function reset(session: string, seq: number) {
+  await locked(session, async () => {
+    for (const n of await files(session)) await fs.rm(path.join(sessionDir(session), `${n}.json`), { force: true })
+    const current = await cursor(session)
+    await writeCursor({ session, directory: "", ...current, seq, sent: [] })
+  })
+}
+
 export async function drop(session: string, reason: "deleted" | "denied") {
   await locked(session, async () => {
     for (const n of await files(session)) await fs.rm(path.join(sessionDir(session), `${n}.json`), { force: true })
