@@ -21,7 +21,6 @@ import { Session } from "@/session/session"
 import { SessionStatus } from "@/session/status"
 import { MessageID } from "@/session/schema"
 import { provideTmpdirInstance } from "../fixture/fixture"
-import { resetDatabase } from "../fixture/db"
 import { pollWithTimeout, testEffect } from "../lib/effect"
 import * as Fake from "./fixtures/fake-sync-plane"
 
@@ -31,6 +30,7 @@ let dir: string
 let audit: string
 let logs: string[]
 const original = Global.Path.data
+const originalAudit = AuditLog.current()
 
 beforeEach(async () => {
   tmp = await fs.mkdtemp(path.join(os.tmpdir(), "cloud-sync-"))
@@ -46,6 +46,7 @@ beforeEach(async () => {
 afterEach(async () => {
   plane.stop()
   await AuditLog.flush()
+  AuditLog.activate(originalAudit ?? { enabled: false, file: AuditLog.DEFAULT_FILE(), redact: [] })
   ;(Global.Path as any).data = original
   await fs.rm(tmp, { recursive: true, force: true })
 })
@@ -378,6 +379,38 @@ describe("upload loop", () => {
     expect(await CloudSyncQueue.pending(S)).toEqual([])
   })
 
+  test("a chunk the server rejects (400) stays queued and doesn't hold up other sessions", async () => {
+    const other = "ses_sync2"
+    const w = CloudSync.worker({
+      directory: dir,
+      config: async () => ({}),
+      load: async (id) =>
+        id === S
+          ? { info: info(), messages: [user("msg_1")] }
+          : {
+              info: info({ id: other }),
+              messages: [{ ...user("msg_9"), info: { ...user("msg_9").info, sessionID: other } } as any],
+            },
+      opts: opts(),
+    })
+    plane.fail = { status: 400, code: "bad_request", times: 1 }
+    expect((await w.turn(S)).retryIn).toBeGreaterThan(0)
+    expect(await CloudSyncQueue.pending(S)).toHaveLength(1)
+    await w.turn(other)
+    expect(plane.messages(other)).toEqual(["msg_9"])
+    expect(await w.flush()).toEqual({})
+    expect(plane.messages(S)).toEqual(["msg_1"])
+  })
+
+  test("truncation to fit never cuts ids or names", () => {
+    const big = assistant("msg_big", [
+      { id: "prt_" + "i".repeat(64), sessionID: S, type: "text", text: "z".repeat(5 * 1024 * 1024) },
+    ])
+    const body = JSON.parse(CloudSync.build(info(), [big], undefined, { directory: dir, exclude: [] })[0]!.body)
+    expect(body.messages[0].parts[0].id).toBe("prt_" + "i".repeat(64))
+    expect(body.messages[0].parts[0].text.endsWith(CloudSync.TRUNCATED)).toBe(true)
+  })
+
   test("403 device_revoked deletes device.json", async () => {
     const w = make([user("msg_1")])
     plane.device()!.revokedAt = 1
@@ -455,7 +488,6 @@ describe("service", () => {
     () =>
       provideTmpdirInstance(() =>
         Effect.gen(function* () {
-          yield* Effect.promise(() => resetDatabase())
           yield* Effect.promise(() =>
             CloudStore.save({
               issuer: plane.issuer,

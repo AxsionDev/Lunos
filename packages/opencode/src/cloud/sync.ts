@@ -126,11 +126,14 @@ function sessionInfo(info: Session.Info, isSecret: (p: string) => boolean) {
   return CloudSyncRedact.scan(CloudSyncRedact.message({ info: out, parts: [] }, isSecret).info)
 }
 
-/** Every string in `value`, each with a way to replace it. */
+/** Ids and names the space needs intact; never shortened to fit. */
+const STRUCTURAL = new Set(["id", "messageID", "sessionID", "callID", "type", "tool", "status", "mime", "filename"])
+
+/** Every content string in `value` (not the structural fields), each with a way to replace it. */
 function strings(value: unknown, out: Array<{ get: () => string; set: (s: string) => void }>) {
   if (Array.isArray(value)) value.forEach((v, i) => visit(value, i, v, out))
   else if (value && typeof value === "object")
-    for (const [k, v] of Object.entries(value)) visit(value as any, k, v, out)
+    for (const [k, v] of Object.entries(value)) if (!STRUCTURAL.has(k)) visit(value as any, k, v, out)
   return out
 }
 function visit(
@@ -143,7 +146,7 @@ function visit(
   else strings(v, out)
 }
 
-/** Shrinks one redacted message to `budget` bytes: its largest tool outputs first, then any string. */
+/** Shrinks one redacted message to `budget` bytes: its largest tool outputs first, then other content. */
 function fit<M extends { parts: any[] }>(m: M, budget: number): M {
   let size = bytes(m)
   if (size <= budget) return m
@@ -270,7 +273,7 @@ export type WorkerInput = {
   opts?: CloudSyncApi.Options
   log?: (level: "warn" | "error", message: string, fields?: Record<string, unknown>) => void
 }
-type Outcome = "done" | "next" | "stop" | "retry" | "rebuild"
+type Outcome = "done" | "next" | "stop" | "retry" | "rebuild" | "stuck"
 
 /**
  * The sync loop without the Effect service around it: `turn` gates, builds and queues a session's
@@ -456,7 +459,9 @@ export function worker(input: WorkerInput) {
         continue
       }
       log("warn", "session sync upload failed; will retry", { session, seq: chunk.seq, status: r.status, code: r.code })
-      return "retry"
+      // Network, timeout, 5xx, 429: the server is the problem, so everything waits. Any other answer
+      // is about this session's chunk: it stays queued and the other sessions go ahead.
+      return r.status === 0 || r.status === 429 || r.status >= 500 ? "retry" : "stuck"
     }
     return "done"
   }
@@ -477,6 +482,7 @@ export function worker(input: WorkerInput) {
     if (opts === "signed-out") return {}
     if (opts === "network") return { retryIn: CloudSyncQueue.backoff(++attempt) }
     const auth = { opts, synced: false }
+    let later = false
     try {
       for (const session of mine) {
         if (!(await admit(session, state, config))) continue
@@ -488,8 +494,9 @@ export function worker(input: WorkerInput) {
         }
         if (outcome === "stop") return {}
         if (outcome === "retry") return { retryIn: CloudSyncQueue.backoff(++attempt) }
+        if (outcome === "stuck") later = true
       }
-      return {}
+      return later ? { retryIn: CloudSyncQueue.backoff(++attempt) } : {}
     } finally {
       if (auth.synced)
         await update(state, (s) => ({ ...s, device: { ...s.device, lastSyncAt: Date.now() } })).catch(() => {})
