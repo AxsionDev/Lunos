@@ -6,6 +6,7 @@ import { CloudAuth } from "@/cloud/auth"
 import { CloudDefaults } from "@/cloud/defaults"
 import { CloudOidc } from "@/cloud/oidc"
 import { CloudStore } from "@/cloud/store"
+import { CloudSyncApi } from "@/cloud/sync-api"
 import { effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
 
@@ -71,6 +72,17 @@ export const LoginCommand = effectCmd({
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
     out(`Signed in as ${result.user.email ?? result.user.preferred_username ?? result.user.sub} ${dim(`(${issuer})`)}`)
     out(dim(`Session kept in ${where(result.backend)}. lunos logout signs out.`))
+    // Registering the device never fails the login. XCOD-185: the notice is shown once per device.
+    const sync = yield* Effect.promise(() =>
+      CloudSyncApi.register().catch((error) => {
+        out(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`))
+        return undefined
+      }),
+    )
+    if (sync && !sync.noticeShown && sync.device.syncEnabled) {
+      out(`Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.`)
+      yield* Effect.promise(() => CloudSyncApi.save({ ...sync, noticeShown: true }).catch(() => undefined))
+    }
   }),
 })
 
