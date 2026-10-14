@@ -87,7 +87,7 @@ O = {
     "GRM-04.1": ("Partial", "The security posture is documented in SECURITY.md and this Trust pack. There is no formal ISMS.", "docs/trust/README.md"),
     "GRM-06.4": ("Yes", "The claim table states exactly what is claimed; no certification or regulatory compliance is claimed.", "docs/deployment/self-hosted.md#2-what-is-true-today--the-sovereignty-claim-stated-precisely"),
     # HR: access to tenant data
-    "HRS-08.1": ("Yes", "Documented: ITService EOOD has no access to customer data or metadata, and there is no telemetry. The only Lunos-operated host contacted is lunos.tech, for the static marketplace catalogue, and the request carries nothing from the project." + SYNC, "docs/deployment/self-hosted.md#touches-lunos-operated-infrastructure"),
+    "HRS-08.1": ("Yes", "Documented: ITService EOOD has no access to customer data or metadata, and there is no telemetry. Without a sign-in, the only Lunos-operated host contacted is lunos.tech, for the static marketplace catalogue, and the request carries nothing from the project. Signing in (`lunos login`) contacts auth.lunos.tech, Lunos's identity provider, for sign-in." + SYNC, "docs/deployment/self-hosted.md#touches-lunos-operated-infrastructure"),
     "HRS-08.2": ("No", "No metadata about customer data is collected. Lunos has no telemetry." + SYNC, "docs/deployment/self-hosted.md"),
     "HRS-08.3": ("N/A", "No customer data or metadata is accessed.", ""),
     "HRS-01.1": ("N/A", "ITService EOOD holds no customer data, so has no privacy breach of customer data to detect. See the data-protection note." + SYNC, "docs/trust/data-protection.md"),

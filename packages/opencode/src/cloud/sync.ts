@@ -345,9 +345,15 @@ export function worker(input: WorkerInput) {
     return false
   }
 
-  /** The cheap sign-in check: a stored session exists (no refresh, no network). */
+  /**
+   * The cheap sign-in check (no refresh, no network): a stored session exists, and sync may use it,
+   * meaning it's Lunos's own sign-in or `cloud.endpoint` is set explicitly. An organisation's token
+   * is never sent to Lunos Cloud by default; that case is as silent as signed out.
+   */
   async function signedIn() {
-    return !!input.opts?.token || !!(await CloudStore.load())
+    if (input.opts?.token) return true
+    const stored = await CloudStore.load()
+    return !!stored && (await CloudSyncApi.permitted(stored.issuer))
   }
 
   /**
@@ -539,6 +545,8 @@ export function worker(input: WorkerInput) {
     if (Offline.enabled()) return {}
     const state = await CloudSyncApi.load()
     if (!state) return {}
+    // Before the queue is read: a signed-out user's queued bodies stay unread.
+    if (!(await signedIn())) return {}
     const config = await input.config()
     const sessions = [...new Set((await CloudSyncQueue.pending()).map((c) => c.session))]
     const mine: string[] = []
@@ -559,7 +567,6 @@ export function worker(input: WorkerInput) {
       endpointWarned = true
       return {}
     }
-    if (!(await signedIn())) return {}
     // The gates first: a closed one must not cost a token refresh.
     const admitted: string[] = []
     for (const session of mine) if (await admit(session, state, config)) admitted.push(session)

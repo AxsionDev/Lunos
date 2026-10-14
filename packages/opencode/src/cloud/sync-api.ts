@@ -1,6 +1,5 @@
 export * as CloudSyncApi from "./sync-api"
 
-
 import { randomUUID } from "crypto"
 import fs from "fs/promises"
 import os from "os"
@@ -8,6 +7,7 @@ import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import { CloudAuth } from "./auth"
 import { CloudDefaults } from "./defaults"
+import { CloudStore } from "./store"
 import { ConfigPolicy } from "@/config/policy"
 import { SandboxConfig } from "@/sandbox/config"
 
@@ -17,7 +17,15 @@ import { SandboxConfig } from "@/sandbox/config"
  * user's token, so a repository must not choose where it goes. The device's sync switch lives on
  * the server (C4); `device.json` caches it for offline starts.
  */
-export type Device = { id: string; name: string; platform: string; syncEnabled: boolean; lastSyncAt?: number; createdAt: number; revokedAt?: number }
+export type Device = {
+  id: string
+  name: string
+  platform: string
+  syncEnabled: boolean
+  lastSyncAt?: number
+  createdAt: number
+  revokedAt?: number
+}
 export type State = { endpoint: string; sub: string; device: Device; noticeShown: boolean; paused?: "quota" }
 export type Options = {
   fetch?: typeof fetch
@@ -38,29 +46,80 @@ export type StatusResult = { ok: true; lastSeq: number; deleted?: boolean } | Fa
 
 export const file = () => path.join(Global.Path.data, "cloud", "sync", "device.json")
 
-export async function endpoint() {
+export const NOTICE = `Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.`
+export const POLICY_OFF = "Your organisation's policy keeps session sync off."
+export const NEEDS_ENDPOINT = "Session sync needs cloud.endpoint for your organisation's identity provider."
+export const NOT_REGISTERED = "This device isn't registered for session sync. Run lunos sync on (or lunos login)."
+
+/** No device.json: only `lunos login` and `lunos sync on` register one. */
+export class NotRegisteredError extends Error {
+  constructor() {
+    super(NOT_REGISTERED)
+  }
+}
+
+/** The signed-in issuer is an organisation's, and no endpoint was configured for it. */
+export class NotPermittedError extends Error {
+  constructor() {
+    super(NEEDS_ENDPOINT)
+  }
+}
+
+/** `cloud.endpoint` as managed, then global config set it; undefined when neither does. */
+async function configured() {
   const managed = await SandboxConfig.managedDoc()
-  const raw =
+  return (
     (ConfigPolicy.get(managed, "cloud.endpoint") as string | undefined) ??
-    (ConfigPolicy.get(SandboxConfig.globalDoc(), "cloud.endpoint") as string | undefined) ??
-    CloudDefaults.DEFAULT_ENDPOINT
+    (ConfigPolicy.get(SandboxConfig.globalDoc(), "cloud.endpoint") as string | undefined)
+  )
+}
+
+const trimmed = (url: string) => url.replace(/\/+$/, "")
+
+/**
+ * Whether sync may send this sign-in's token anywhere: only a Lunos sign-in goes to Lunos Cloud by
+ * default. An organisation's identity provider issues tokens meant for the organisation, so they go
+ * only to a control plane someone configured explicitly (global or managed `cloud.endpoint`).
+ */
+export async function permitted(issuer: string) {
+  if (trimmed(issuer) === trimmed(CloudDefaults.DEFAULT_ISSUER)) return true
+  return (await configured()) !== undefined
+}
+
+export async function endpoint() {
+  const raw = (await configured()) ?? CloudDefaults.DEFAULT_ENDPOINT
   const url = new URL(raw)
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
-  if (url.protocol !== "https:" && !(local && url.protocol === "http:")) throw new Error(`cloud.endpoint must be https: ${raw}`)
+  if (url.protocol !== "https:" && !(local && url.protocol === "http:"))
+    throw new Error(`cloud.endpoint must be https: ${raw}`)
   return url.toString().replace(/\/$/, "")
 }
 
 async function who(opts: Options) {
   if (opts.token && opts.sub) return { token: await opts.token(), sub: opts.sub }
+  // Checked on the stored session before any refresh: nothing is sent for a sign-in sync may not use.
+  const stored = await CloudStore.load()
+  if (stored && !(await permitted(stored.issuer))) throw new NotPermittedError()
   const s = await CloudAuth.session("Session sync")
   return { token: opts.token ? await opts.token() : s.tokens.access_token, sub: opts.sub ?? s.sub }
 }
 
-async function request(base: string, token: string, method: string, p: string, body: string | undefined, opts: Options) {
+async function request(
+  base: string,
+  token: string,
+  method: string,
+  p: string,
+  body: string | undefined,
+  opts: Options,
+) {
   return (opts.fetch ?? fetch)(base + p, {
     method,
     redirect: "error",
-    headers: { authorization: `Bearer ${token}`, accept: "application/json", ...(body === undefined ? {} : { "content-type": "application/json" }) },
+    headers: {
+      authorization: `Bearer ${token}`,
+      accept: "application/json",
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+    },
     body,
     signal: AbortSignal.timeout(opts.timeoutMs ?? 30_000),
   })
@@ -68,7 +127,12 @@ async function request(base: string, token: string, method: string, p: string, b
 
 async function failure(res: Response): Promise<Failure> {
   const json = (await res.json().catch(() => undefined)) as any
-  return { ok: false, status: res.status, code: json?.error?.code ?? `http_${res.status}`, message: json?.error?.message ?? `HTTP ${res.status}` }
+  return {
+    ok: false,
+    status: res.status,
+    code: json?.error?.code ?? `http_${res.status}`,
+    message: json?.error?.message ?? `HTTP ${res.status}`,
+  }
 }
 
 /** Runs one call; anything it throws becomes a `Failure` instead. */
@@ -78,12 +142,16 @@ async function settle<T>(fn: () => Promise<T | Failure>): Promise<T | Failure> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (error instanceof CloudAuth.SignedOutError) return { ok: false, status: 0, code: "signed_out", message }
+    if (error instanceof NotPermittedError) return { ok: false, status: 0, code: "not_permitted", message }
     return { ok: false, status: 0, code: "network", message }
   }
 }
 
 export async function load(): Promise<State | undefined> {
-  return fs.readFile(file(), "utf8").then((t) => JSON.parse(t) as State).catch(() => undefined)
+  return fs
+    .readFile(file(), "utf8")
+    .then((t) => JSON.parse(t) as State)
+    .catch(() => undefined)
 }
 
 export async function save(state: State) {
@@ -112,25 +180,63 @@ export async function register(opts: Options = {}): Promise<State> {
       }
     } else if (res.status !== 401 && res.status !== 403) return stored
   }
-  const res = await request(base, token, "POST", "/v1/devices", JSON.stringify({ name: os.hostname(), platform: process.platform }), opts)
+  const res = await request(
+    base,
+    token,
+    "POST",
+    "/v1/devices",
+    JSON.stringify({ name: os.hostname(), platform: process.platform }),
+    opts,
+  )
   if (!res.ok) throw new Error(`Couldn't register this device with ${base}: ${(await failure(res)).message}`)
   // On purpose, a replacement device for the same user keeps `noticeShown`: they have seen the notice.
-  const state: State = { endpoint: base, sub, device: (await res.json()) as Device, noticeShown: stored?.sub === sub ? stored.noticeShown : false }
+  const state: State = {
+    endpoint: base,
+    sub,
+    device: (await res.json()) as Device,
+    noticeShown: stored?.sub === sub ? stored.noticeShown : false,
+  }
   await save(state)
   return state
 }
 
+/** Flips this device's switch on the control plane. Never registers: throws NotRegisteredError without device.json. */
 export async function setEnabled(on: boolean, opts: Options = {}) {
-  const state = await register(opts)
+  const state = await load()
+  if (!state) throw new NotRegisteredError()
   const { token } = await who(opts)
-  const res = await request(state.endpoint, token, "PATCH", `/v1/devices/${encodeURIComponent(state.device.id)}`, JSON.stringify({ syncEnabled: on }), opts)
+  const res = await request(
+    state.endpoint,
+    token,
+    "PATCH",
+    `/v1/devices/${encodeURIComponent(state.device.id)}`,
+    JSON.stringify({ syncEnabled: on }),
+    opts,
+  )
   if (!res.ok) throw new Error((await failure(res)).message)
   const next: State = { ...state, device: (await res.json()) as Device, paused: on ? undefined : state.paused }
   await save(next)
   return next
 }
 
-export async function upload(state: State, session: string, seq: number, body: string, opts: Options = {}): Promise<UploadResult> {
+/**
+ * After `lunos login` or `lunos sync on` registered the device: the first-sync notice, once per
+ * device, when the device syncs; or the policy line when an organisation locks sync off.
+ */
+export async function notice(state: State, lockedOff: boolean, print: (line: string) => void) {
+  if (lockedOff) return print(POLICY_OFF)
+  if (state.noticeShown || !state.device.syncEnabled) return
+  print(NOTICE)
+  await save({ ...state, noticeShown: true }).catch(() => undefined)
+}
+
+export async function upload(
+  state: State,
+  session: string,
+  seq: number,
+  body: string,
+  opts: Options = {},
+): Promise<UploadResult> {
   return settle(async () => {
     const { token } = await who(opts)
     const p = `/v1/sync/devices/${encodeURIComponent(state.device.id)}/sessions/${encodeURIComponent(session)}/chunks/${seq}`

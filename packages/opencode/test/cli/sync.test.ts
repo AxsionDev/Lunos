@@ -9,7 +9,11 @@ import path from "path"
 import { cliIt } from "../lib/cli-process"
 import * as Fake from "../cloud/fixtures/fake-sync-plane"
 
-const setup = (home: string, plane: Fake.FakeSyncPlane, opts: { signedIn?: boolean; locked?: boolean; project?: string } = {}) =>
+const setup = (
+  home: string,
+  plane: Fake.FakeSyncPlane,
+  opts: { signedIn?: boolean; locked?: boolean; project?: string; endpoint?: boolean } = {},
+) =>
   Effect.promise(async () => {
     const managed = path.join(home, "managed")
     await fs.mkdir(managed, { recursive: true })
@@ -19,7 +23,11 @@ const setup = (home: string, plane: Fake.FakeSyncPlane, opts: { signedIn?: boole
     )
     const config = path.join(home, ".config", "opencode")
     await fs.mkdir(config, { recursive: true })
-    await fs.writeFile(path.join(config, "opencode.json"), JSON.stringify({ cloud: { endpoint: plane.url } }))
+    // The fake's issuer isn't Lunos's own, so sync needs cloud.endpoint set explicitly.
+    await fs.writeFile(
+      path.join(config, "opencode.json"),
+      JSON.stringify(opts.endpoint === false ? {} : { cloud: { endpoint: plane.url } }),
+    )
     if (opts.signedIn !== false) {
       const cloud = path.join(home, ".local", "share", "opencode", "cloud")
       await fs.mkdir(cloud, { recursive: true })
@@ -50,6 +58,8 @@ describe("lunos sync (subprocess)", () => {
       Effect.gen(function* () {
         const plane = yield* withPlane
         const env = yield* setup(home, plane)
+        const first = yield* opencode.spawn(["sync", "on"], { env })
+        opencode.expectExit(first, 0, "first sync on")
         const off = yield* opencode.spawn(["sync", "off"], { env })
         opencode.expectExit(off, 0, "sync off")
         expect(off.stdout).toContain("Session sync is off for this device")
@@ -93,10 +103,16 @@ describe("lunos sync (subprocess)", () => {
         const file = path.join(cwd, ".opencode", "opencode.json")
         yield* Effect.promise(async () => {
           await fs.mkdir(path.dirname(file), { recursive: true })
-          await fs.writeFile(file, '{\n  "$schema": "https://lunos.tech/config.json",\n  // keep\n  "model": "test/test-model"\n}\n')
+          await fs.writeFile(
+            file,
+            '{\n  "$schema": "https://lunos.tech/config.json",\n  // keep\n  "model": "test/test-model"\n}\n',
+          )
         })
         const linked = yield* opencode.spawn(["sync", "link", "p1"], { env })
         opencode.expectExit(linked, 0, "sync link")
+        // link never registers a device; status needs one.
+        expect(plane.requests.filter((r) => r.method === "POST" && r.path === "/v1/devices")).toEqual([])
+        opencode.expectExit(yield* opencode.spawn(["sync", "on"], { env }), 0, "sync on")
         const text = yield* Effect.promise(() => fs.readFile(file, "utf8"))
         expect(text).toContain("// keep")
         expect(parse(text)).toMatchObject({ model: "test/test-model", sync: { project: "p1" } })
@@ -119,7 +135,7 @@ describe("lunos sync (subprocess)", () => {
       Effect.gen(function* () {
         const plane = yield* withPlane
         const env = yield* setup(home, plane)
-        opencode.expectExit(yield* opencode.spawn(["sync", "status"], { env }), 0, "first status registers")
+        opencode.expectExit(yield* opencode.spawn(["sync", "on"], { env }), 0, "on registers")
         plane.stop()
         const t = Date.now()
         const status = yield* opencode.spawn(["sync", "status"], { env })
@@ -136,7 +152,7 @@ describe("lunos sync (subprocess)", () => {
       Effect.gen(function* () {
         const plane = yield* withPlane
         const env = yield* setup(home, plane)
-        opencode.expectExit(yield* opencode.spawn(["sync", "status"], { env }), 0, "register first")
+        opencode.expectExit(yield* opencode.spawn(["sync", "on"], { env }), 0, "register first")
         const before = plane.requests.length
         const offline = { ...env, LUNOS_OFFLINE: "1" }
         const status = yield* opencode.spawn(["sync", "status"], { env: offline })
@@ -186,10 +202,62 @@ describe("lunos sync (subprocess)", () => {
         expect(project.exitCode).toBe(1)
         expect(project.stdout + project.stderr).toContain("Lunos is offline (LUNOS_OFFLINE=1).")
         opencode.expectExit(yield* opencode.spawn(["sync", "link", "--off"], { env: offline }), 0, "link --off offline")
-        opencode.expectExit(yield* opencode.spawn(["sync", "link", "--personal"], { env: offline }), 0, "personal offline")
+        opencode.expectExit(
+          yield* opencode.spawn(["sync", "link", "--personal"], { env: offline }),
+          0,
+          "personal offline",
+        )
         expect(plane.requests.length).toBe(before)
       }),
     120_000,
+  )
+
+  cliIt.live(
+    "only lunos sync on registers: status and off don't, on shows the notice once",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const plane = yield* withPlane
+        const env = yield* setup(home, plane)
+        const unregistered = "This device isn't registered for session sync. Run lunos sync on (or lunos login)."
+        for (const cmd of ["status", "off"]) {
+          const r = yield* opencode.spawn(["sync", cmd], { env })
+          opencode.expectExit(r, 0, `sync ${cmd} unregistered`)
+          expect(r.stdout).toContain(unregistered)
+        }
+        expect(plane.requests.filter((r) => r.method === "POST" && r.path === "/v1/devices")).toEqual([])
+        const notice = 'Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.'
+        const on = yield* opencode.spawn(["sync", "on"], { env })
+        opencode.expectExit(on, 0, "sync on")
+        expect(on.stdout).toContain(notice)
+        expect(plane.requests.filter((r) => r.method === "POST" && r.path === "/v1/devices")).toHaveLength(1)
+        const again = yield* opencode.spawn(["sync", "on"], { env })
+        opencode.expectExit(again, 0, "sync on again")
+        expect(again.stdout).not.toContain(notice)
+      }),
+    120_000,
+  )
+
+  cliIt.live(
+    "an organisation's identity provider without cloud.endpoint: every subcommand that would send the token refuses",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const plane = yield* withPlane
+        const env = yield* setup(home, plane, { endpoint: false })
+        for (const args of [
+          ["sync", "on"],
+          ["sync", "off"],
+          ["sync", "status"],
+          ["sync", "link", "p1"],
+        ]) {
+          const r = yield* opencode.spawn(args, { env })
+          expect(r.exitCode).toBe(1)
+          expect(r.stdout + r.stderr).toContain(
+            "Session sync needs cloud.endpoint for your organisation's identity provider.",
+          )
+        }
+        expect(plane.requests).toEqual([])
+      }),
+    180_000,
   )
 
   cliIt.live(
@@ -198,7 +266,12 @@ describe("lunos sync (subprocess)", () => {
       Effect.gen(function* () {
         const plane = yield* withPlane
         const env = yield* setup(home, plane, { signedIn: false })
-        for (const args of [["sync", "on"], ["sync", "off"], ["sync", "status"], ["sync", "link", "p1"]]) {
+        for (const args of [
+          ["sync", "on"],
+          ["sync", "off"],
+          ["sync", "status"],
+          ["sync", "link", "p1"],
+        ]) {
           const r = yield* opencode.spawn(args, { env })
           expect(r.exitCode).toBe(1)
           expect(r.stdout + r.stderr).toContain("Run lunos login first.")

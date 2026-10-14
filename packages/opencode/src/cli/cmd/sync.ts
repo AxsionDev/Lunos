@@ -30,7 +30,15 @@ const signedIn = Effect.gen(function* () {
   return stored
 })
 
-const config = () => Config.Service.use((cfg) => cfg.get()) as Effect.Effect<CloudSync.SyncConfig, never, Config.Service>
+/** An organisation's sign-in sends its token only to a control plane configured explicitly. */
+const permitted = (stored: CloudStore.Session) =>
+  Effect.gen(function* () {
+    if (!(yield* Effect.promise(() => CloudSyncApi.permitted(stored.issuer))))
+      return yield* fail(CloudSyncApi.NEEDS_ENDPOINT)
+  })
+
+const config = () =>
+  Config.Service.use((cfg) => cfg.get()) as Effect.Effect<CloudSync.SyncConfig, never, Config.Service>
 const lockedOff = (cfg: CloudSync.SyncConfig) => cfg.sync === false && ConfigPolicy.isLocked(cfg.$locked, "sync")
 
 const OFFLINE = "Lunos is offline (LUNOS_OFFLINE=1)."
@@ -52,17 +60,35 @@ async function confirm(state: CloudSyncApi.State): Promise<CloudSyncApi.Device |
   }
 }
 
+const failed = (e: unknown) =>
+  e instanceof CloudAuth.SignedOutError
+    ? fail(LOGIN)
+    : e instanceof CloudSyncApi.NotPermittedError
+      ? fail(CloudSyncApi.NEEDS_ENDPOINT)
+      : fail(message(e))
+
+// Only `lunos login` and `lunos sync on` register a device (XCOD-185): `on` is an explicit act, so it
+// shows the first-sync notice. `off` without a device has nothing to stop.
 const toggle = (on: boolean) =>
   Effect.fn(`Cli.sync.${on ? "on" : "off"}`)(function* () {
-    yield* signedIn
+    const stored = yield* signedIn
+    yield* permitted(stored)
+    if (!on && !(yield* Effect.promise(() => CloudSyncApi.load())))
+      return yield* writeStdoutEffect(`${CloudSyncApi.NOT_REGISTERED}${EOL}`)
     if (Offline.enabled()) return yield* fail(OFFLINE)
-    const state = yield* Effect.tryPromise({ try: () => CloudSyncApi.setEnabled(on, { timeoutMs: 10_000 }), catch: (e) => e }).pipe(
-      Effect.catch((e) => (e instanceof CloudAuth.SignedOutError ? fail(LOGIN) : fail(message(e)))),
-    )
+    const state = yield* Effect.tryPromise({
+      try: async () => {
+        if (on) await CloudSyncApi.register({ timeoutMs: 10_000 })
+        return CloudSyncApi.setEnabled(on, { timeoutMs: 10_000 })
+      },
+      catch: (e) => e,
+    }).pipe(Effect.catch(failed))
     const cfg = yield* config()
     if (on && lockedOff(cfg))
       return yield* writeStdoutEffect(`Your organisation's policy keeps session sync off (sync is locked).${EOL}`)
     yield* writeStdoutEffect(`Session sync is ${on ? "on" : "off"} for this device (${state.device.name}).${EOL}`)
+    if (on)
+      yield* Effect.promise(() => CloudSyncApi.notice(state, false, (line) => void process.stdout.write(line + EOL)))
   })
 
 export const SyncOnCommand = effectCmd({
@@ -82,19 +108,15 @@ export const SyncStatusCommand = effectCmd({
   describe: "show whether this device and directory sync sessions, and what is queued",
   handler: Effect.fn("Cli.sync.status")(function* () {
     const stored = yield* signedIn
+    yield* permitted(stored)
     const ctx = yield* InstanceRef
     const cfg = yield* config()
     const offline = Offline.enabled()
-    let state = yield* Effect.promise(() => CloudSyncApi.load())
-    if (!state && !offline)
-      state = yield* Effect.promise(() => CloudSyncApi.register({ timeoutMs: 5_000 }).catch(() => undefined))
-    if (!state)
-      return yield* fail(
-        offline
-          ? `${OFFLINE} This device isn't registered with Lunos Cloud yet.`
-          : "This device isn't registered with Lunos Cloud yet and the control plane can't be reached.",
-      )
-    const live = offline ? undefined : yield* Effect.promise(() => confirm(state!))
+    // Status never registers a device.
+    const loaded = yield* Effect.promise(() => CloudSyncApi.load())
+    if (!loaded) return yield* writeStdoutEffect(`${CloudSyncApi.NOT_REGISTERED}${EOL}`)
+    let state = loaded
+    const live = offline ? undefined : yield* Effect.promise(() => confirm(loaded))
     const cached = live ? "" : offline ? " (cached) (offline)" : " (cached)"
     if (live) state = { ...state, device: live }
     const directory =
@@ -146,7 +168,8 @@ async function choices(): Promise<Choice[]> {
     ),
   )
   spaces.forEach((space, i) => {
-    for (const project of lists[i]!.projects) out.push({ label: `${space.name} / ${project.name}`, project: project.id })
+    for (const project of lists[i]!.projects)
+      out.push({ label: `${space.name} / ${project.name}`, project: project.id })
   })
   return out
 }
@@ -158,10 +181,17 @@ export const SyncLinkCommand = effectCmd({
     yargs
       .positional("projectId", { type: "string", describe: "project id; omit to choose from a list" })
       .option("off", { type: "boolean", default: false, describe: "don't sync sessions from this directory" })
-      .option("personal", { type: "boolean", default: false, describe: "sync to your personal space, with no project" }),
+      .option("personal", {
+        type: "boolean",
+        default: false,
+        describe: "sync to your personal space, with no project",
+      }),
   handler: Effect.fn("Cli.sync.link")(function* (args) {
-    yield* signedIn
+    const stored = yield* signedIn
     if (args.personal && args.projectId) return yield* fail("Give a project id or --personal, not both.")
+    // Choosing a project asks the control plane (with the token); --off and --personal are local writes.
+    // `link` never registers a device.
+    if (!args.off && !args.personal) yield* permitted(stored)
     // `--off` and `--personal` are local writes; choosing a project needs the server.
     if (Offline.enabled() && !args.off && !args.personal) return yield* fail(OFFLINE)
     const ctx = yield* InstanceRef

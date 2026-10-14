@@ -69,7 +69,7 @@ The tool also fetches its model catalogue (a list of available models and their 
 
 #### Session sync to your Lunos space — on when signed in
 
-Once you have run `lunos login`, Lunos copies each completed session turn to your personal space on Lunos Cloud (`https://cloud.lunos.tech`, ITService EOOD, Bulgarian data centre): messages, tool calls and their results, and session metadata. This is a call to Lunos Cloud, not to your model provider. It never happens when you are signed out. Full detail, including what is never uploaded, is in [Session sync](../cloud-sync.md).
+Once you have run `lunos login` (or `lunos sync on`), Lunos copies each completed session turn to your personal space on Lunos Cloud (`https://cloud.lunos.tech`, ITService EOOD, Bulgarian data centre), or to the space project `lunos sync link` bound the directory to: messages, tool calls and their results, and session metadata. This is a call to Lunos Cloud, not to your model provider. It never happens when you are signed out. Full detail, including what is never uploaded, is in [Session sync](../cloud-sync.md).
 
 Any of these stops it:
 
@@ -127,7 +127,7 @@ Everything else:
 
 **No project data, unless you sign in and use [session sync](../cloud-sync.md), which uploads sessions to Lunos Cloud, operated by ITService EOOD in the EU.** There is no Lunos-operated production infrastructure in the data path of a self-hosted deployment, because there is no hosted offering. Nothing about your code, prompts or sessions is sent to ITService EOOD, and there is no telemetry endpoint we operate for you to disable. With session sync, completed sessions (messages, tool calls and results, after the path rule and credential scanner; see [Session sync](../cloud-sync.md)) are uploaded to `cloud.lunos.tech`; it stops with `lunos logout`, `lunos sync off`, `"sync": false`, a locked organisation policy or `LUNOS_OFFLINE=1`.
 
-**Lunos-operated hosts contacted:** `lunos.tech` always on use, and `auth.lunos.tech` (sign-in) and `cloud.lunos.tech` (session sync) only if you sign in. `lunos.tech` which serves the built-in marketplace catalogue (`https://lunos.tech/marketplace.json`, a static file) when you run a marketplace command or open the Discover view. The request carries nothing from your project, and turning off the built-in catalogue with `"marketplace_default": false` stops it (see "The marketplace" above). The update check goes to your npm registry, not to us.
+**Lunos-operated hosts contacted:** `auth.lunos.tech` (sign-in) and `cloud.lunos.tech` (session sync) only if you sign in, and `lunos.tech` only when a marketplace command runs: it serves the built-in marketplace catalogue (`https://lunos.tech/marketplace.json`, a static file) when you run a marketplace command or open the Discover view. The request carries nothing from your project, and turning off the built-in catalogue with `"marketplace_default": false` stops it (see "The marketplace" above). The update check goes to your npm registry, not to us.
 
 ```
    ┌──────────────────────────────────────┐

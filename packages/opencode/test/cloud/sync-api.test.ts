@@ -120,3 +120,23 @@ test("device.json is written 0600 in a 0700 directory", async () => {
   expect((await fs.stat(CloudSyncApi.file())).mode & 0o777).toBe(0o600)
   expect((await fs.readdir(path.dirname(CloudSyncApi.file()))).filter((n) => n.endsWith(".tmp"))).toEqual([])
 })
+
+test("sync may send the token only for Lunos's own issuer, or to an explicitly configured endpoint", async () => {
+  const file = path.join(Global.Path.config, "opencode.json")
+  await fs.mkdir(Global.Path.config, { recursive: true })
+  await fs.rm(file, { force: true })
+  try {
+    expect(await CloudSyncApi.permitted("https://auth.lunos.tech/realms/Lunos")).toBe(true)
+    expect(await CloudSyncApi.permitted("https://auth.lunos.tech/realms/Lunos/")).toBe(true)
+    expect(await CloudSyncApi.permitted("https://idp.example.org/realms/acme")).toBe(false)
+    await fs.writeFile(file, JSON.stringify({ cloud: { endpoint: "https://cloud.example.org" } }))
+    expect(await CloudSyncApi.permitted("https://idp.example.org/realms/acme")).toBe(true)
+  } finally {
+    await fs.rm(file, { force: true })
+  }
+})
+
+test("setEnabled never registers a device", async () => {
+  await expect(CloudSyncApi.setEnabled(false, opts())).rejects.toBeInstanceOf(CloudSyncApi.NotRegisteredError)
+  expect(seen.filter((r) => r.method === "POST")).toEqual([])
+})

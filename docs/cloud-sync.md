@@ -10,7 +10,11 @@ Uploads happen in the background and never block or slow a session; a failure is
 
 ## Where it goes
 
-To your personal space, or to the space project that `lunos sync link` bound for the directory. The control plane is `https://cloud.lunos.tech`, or `cloud.endpoint` from your **global or managed** config. A project's own `opencode.json` is never consulted for the endpoint, so a repository can't redirect where your sessions and token are sent for sync. (`cloud.issuer`, which only chooses where `lunos login` signs you in, can come from project config, as can `sync` itself.) The endpoint must be `https` (plain `http` only for localhost). Your device is registered at the endpoint in force when you ran `lunos login`; if `cloud.endpoint` later changes, nothing is sent (a warning is logged) until you run `lunos login` again.
+To your personal space, or to the space project that `lunos sync link` bound for the directory. The control plane is `https://cloud.lunos.tech`, or `cloud.endpoint` from your **global or managed** config. A project's own `opencode.json` is never consulted for the endpoint, so a repository can't redirect where your sessions and token are sent for sync. (`cloud.issuer`, which only chooses where `lunos login` signs you in, can come from project config, as can `sync` itself.) The endpoint must be `https` (plain `http` only for localhost). Your device is registered at the endpoint in force when you ran `lunos login` (or `lunos sync on`); if `cloud.endpoint` later changes, nothing is sent (a warning is logged) until you run `lunos login` again.
+
+**Signed in at your organisation's identity provider?** Its token is meant for your organisation, so Lunos never sends it to Lunos Cloud by default: session sync runs only with Lunos's own sign-in (`https://auth.lunos.tech/realms/Lunos`), or when `cloud.endpoint` is set explicitly in global or managed config. Otherwise `lunos login` says `Session sync needs cloud.endpoint for your organisation's identity provider.` and registers nothing, the `lunos sync` commands that would contact the control plane exit with the same message, and nothing is synced.
+
+**Registering a device.** Only `lunos login` and `lunos sync on` register this machine, and both then show the first-sync notice once (below). `lunos sync status` and `lunos sync off` never register; without a registered device they say `This device isn't registered for session sync. Run lunos sync on (or lunos login).` **If you signed in before this release**, your machine has no registered device, so nothing syncs until you run `lunos sync on` or `lunos login`.
 
 ## What never syncs
 
@@ -57,10 +61,10 @@ An organisation stops sync everywhere with `{ "sync": false, "$locked": ["sync"]
 
 ## The gates
 
-Checked in this order once per turn or flush (not per chunk), and before any token is read or refreshed. The first that refuses stops it:
+Checked in this order once per turn or flush (not per chunk), and before any token is refreshed or sent. The first that refuses stops it:
 
 1. **Offline.** `LUNOS_OFFLINE=1` stops sync entirely and silently.
-2. **Signed out.** Silent.
+2. **Signed out.** Silent. This includes no device registered on this machine, and a sign-in at your organisation's identity provider without `cloud.endpoint` set (see below).
 3. **Organisation policy.** `sync: false` locked in managed config. Recorded as `sync.denied`, `gate: "policy"`.
 4. **Device.** This device is switched off (`lunos sync off`, or in the app), or your space is full. `gate: "device"`.
 5. **Directory.** `sync: false` in this directory's config. `gate: "directory"`.
@@ -73,7 +77,7 @@ Refusals are recorded once per session and gate per process, never with content.
 ```sh
 lunos sync status          # who, endpoint, device, switches, policy, directory, queue, last sync
 lunos sync off             # stop on this device (the switch lives in your space, so the app shows it too)
-lunos sync on              # start again; also clears a "space full" pause
+lunos sync on              # start (registering this device if needed); also clears a "space full" pause
 lunos sync link [project]  # choose the space project for this directory (a list if no id is given)
 lunos sync link --personal # sync this directory to your personal space, with no project
 lunos sync link --off      # write "sync": false for this directory
@@ -81,7 +85,7 @@ lunos sync link --off      # write "sync": false for this directory
 
 `link` writes `.opencode/opencode.json` in the project (or `.opencode/opencode.jsonc` if that is the file you have), keeping comments and other keys, as `lunos settings set --project` does. It replaces the directory's existing `sync` setting, keeping only any `exclude` list; `--off` replaces it with `false`. A project id that is not in your spaces is refused, and `--personal` can't be combined with an id. Under `LUNOS_OFFLINE=1`, `link` with a project is refused (it needs the server); `--off` and `--personal` still work. `on` under a locked-off organisation policy still switches the device on, but says your organisation's policy keeps sync off.
 
-The first time a device is registered, `lunos login` shows: `Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.` See [Signing in](cloud-login.md).
+The first time a device syncs, `lunos login` or `lunos sync on` shows: `Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.` Under an organisation policy that locks sync off, `lunos login` says `Your organisation's policy keeps session sync off.` instead. `link` never registers a device. See [Signing in](cloud-login.md).
 
 ## Offline queue and retries
 

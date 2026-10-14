@@ -2,6 +2,7 @@ import { EOL } from "os"
 import { Effect } from "effect"
 import { openUrl } from "@opencode-ai/core/open"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { CloudAuth } from "@/cloud/auth"
 import { CloudDefaults } from "@/cloud/defaults"
 import { CloudOidc } from "@/cloud/oidc"
@@ -26,12 +27,34 @@ const where = (backend: CloudStore.Backend) =>
       ? "the system keyring"
       : "a file only you can read"
 
+/**
+ * Session sync's part of `lunos login` (XCOD-185), after the sign-in is stored: register this device
+ * and show the first-sync notice once. Only for Lunos's own issuer, or with `cloud.endpoint` set
+ * explicitly: an organisation's token isn't sent to Lunos Cloud by default.
+ */
+export async function loginSync(input: {
+  issuer: string
+  locked: boolean
+  print: (line: string) => void
+  opts?: CloudSyncApi.Options
+}) {
+  if (!(await CloudSyncApi.permitted(input.issuer))) return input.print(CloudSyncApi.NEEDS_ENDPOINT)
+  const state = await CloudSyncApi.register({ timeoutMs: 5_000, ...input.opts }).catch((error) => {
+    input.print(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`))
+    return undefined
+  })
+  if (state) await CloudSyncApi.notice(state, input.locked, input.print)
+}
+
 export const LoginCommand = effectCmd({
   command: "login",
   describe: "sign in to Lunos Cloud (or your organisation's identity provider)",
   builder: (yargs) =>
     yargs
-      .option("issuer", { type: "string", describe: `OpenID Connect issuer URL (default: cloud.issuer or ${CloudDefaults.DEFAULT_ISSUER})` })
+      .option("issuer", {
+        type: "string",
+        describe: `OpenID Connect issuer URL (default: cloud.issuer or ${CloudDefaults.DEFAULT_ISSUER})`,
+      })
       .option("client-id", {
         type: "string",
         describe: `OAuth client id (default: cloud.client_id or ${DEFAULT_CLIENT_ID})`,
@@ -66,24 +89,22 @@ export const LoginCommand = effectCmd({
           sub: user.sub,
           savedAt: new Date().toISOString(),
         })
-        return { user, backend }
+        return { user, backend, issuer: discovery.issuer ?? issuer }
       },
       catch: (error) => error,
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
     out(`Signed in as ${result.user.email ?? result.user.preferred_username ?? result.user.sub} ${dim(`(${issuer})`)}`)
     out(dim(`Session kept in ${where(result.backend)}. lunos logout signs out.`))
     // Registering the device never fails the login, nor holds it up for long (5 s per request).
-    // XCOD-185: the notice is shown once per device.
-    const sync = yield* Effect.promise(() =>
-      CloudSyncApi.register({ timeoutMs: 5_000 }).catch((error) => {
-        out(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`))
-        return undefined
-      }),
+    yield* Effect.promise(() =>
+      loginSync({
+        issuer: result.issuer,
+        locked: config.sync === false && ConfigPolicy.isLocked(config.$locked, "sync"),
+        print: out,
+      }).catch((error) =>
+        out(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`)),
+      ),
     )
-    if (sync && !sync.noticeShown && sync.device.syncEnabled) {
-      out(`Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.`)
-      yield* Effect.promise(() => CloudSyncApi.save({ ...sync, noticeShown: true }).catch(() => undefined))
-    }
   }),
 })
 

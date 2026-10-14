@@ -35,7 +35,11 @@ Right after sign-in, `lunos login` registers this machine as a device with the L
 Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.
 ```
 
-If the device can't be registered, login prints "Session sync isn't set up: …" and still succeeds. Signing out leaves the registered device in place; signing in again as the same user reuses it. See [Session sync](cloud-sync.md).
+If the device can't be registered, login prints "Session sync isn't set up: …" and still succeeds. Under an organisation policy that locks sync off, it prints `Your organisation's policy keeps session sync off.` instead of the notice. Signing out leaves the registered device in place; signing in again as the same user reuses it.
+
+With your organisation's identity provider (`--issuer` or `cloud.issuer`), Lunos doesn't send that provider's token to Lunos Cloud: unless `cloud.endpoint` is set in your global or managed config, login prints `Session sync needs cloud.endpoint for your organisation's identity provider.` and registers nothing.
+
+Only `lunos login` and `lunos sync on` register a device. If you signed in before session sync shipped, there is no registered device on your machine and nothing syncs until you run `lunos sync on` or `lunos login` again. See [Session sync](cloud-sync.md).
 
 ## Where the session is kept
 

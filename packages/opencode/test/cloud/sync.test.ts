@@ -45,6 +45,7 @@ beforeEach(async () => {
 })
 afterEach(async () => {
   plane.stop()
+  await fs.rm(globalConfig(), { force: true })
   await AuditLog.flush()
   AuditLog.activate(originalAudit ?? { enabled: false, file: AuditLog.DEFAULT_FILE(), redact: [] })
   ;(Global.Path as any).data = original
@@ -122,14 +123,27 @@ function make(
 }
 
 /** A stored Lunos Cloud session for the fake's issuer (the worker then authorizes without an injected token). */
-const signIn = (tokens: Partial<{ access_token: string; refresh_token: string; expires_at: number }> = {}) =>
-  CloudStore.save({
+/**
+ * A stored Lunos Cloud session for the fake's issuer (the worker then authorizes without an injected
+ * token). The fake's issuer isn't Lunos's own, so sync needs `cloud.endpoint` set explicitly in
+ * global config; `endpoint: false` leaves it unset.
+ */
+const globalConfig = () => path.join(Global.Path.config, "opencode.json")
+const signIn = async (
+  tokens: Partial<{ access_token: string; refresh_token: string; expires_at: number }> = {},
+  options: { endpoint?: boolean } = {},
+) => {
+  await fs.mkdir(Global.Path.config, { recursive: true })
+  if (options.endpoint === false) await fs.rm(globalConfig(), { force: true })
+  else await fs.writeFile(globalConfig(), JSON.stringify({ cloud: { endpoint: plane.url } }))
+  await CloudStore.save({
     issuer: plane.issuer,
     clientID: "lunos-cli",
     tokens: { access_token: Fake.TOKEN, token_type: "Bearer", ...tokens },
     sub: Fake.SUB,
     savedAt: new Date().toISOString(),
   })
+}
 
 async function auditLines() {
   await AuditLog.flush()
@@ -554,6 +568,17 @@ describe("upload loop", () => {
     expect((await auditLines()).filter((l) => l.event === "sync.denied")).toEqual([])
   })
 
+  test("an organisation's identity provider without cloud.endpoint: silent, no request at all", async () => {
+    await signIn({ access_token: "org-token", refresh_token: "r", expires_at: 1 }, { endpoint: false })
+    await CloudSyncQueue.enqueue(S, dir, 1, JSON.stringify({ messages: [] }), ["msg_0"])
+    const before = plane.requests.length
+    const w = make([user("msg_1")], {}, undefined, { opts: { endpoint: plane.url } })
+    expect(await w.turn(S)).toEqual({})
+    expect(await w.flush()).toEqual({})
+    expect(plane.requests.length).toBe(before)
+    expect((await auditLines()).filter((l) => l.event?.startsWith("sync."))).toEqual([])
+  })
+
   test("403 device_revoked deletes device.json", async () => {
     const w = make([user("msg_1")])
     plane.device()!.revokedAt = 1
@@ -626,13 +651,7 @@ describe("service", () => {
     LayerNode.group([CloudSync.node, EventV2Bridge.node, Session.node, SessionProjector.node, Database.node]),
   )
   // The service reads cloud.endpoint from global config (never the project's) and compares it with device.json.
-  const globalConfig = path.join(Global.Path.config, "opencode.json")
-  beforeEach(async () => {
-    await fs.mkdir(Global.Path.config, { recursive: true })
-    await fs.writeFile(globalConfig, JSON.stringify({ cloud: { endpoint: plane.url } }))
-    await signIn()
-  })
-  afterEach(() => fs.rm(globalConfig, { force: true }))
+  beforeEach(() => signIn())
 
   const userMessage = (sessionID: any, id: string) =>
     Effect.gen(function* () {
@@ -666,6 +685,35 @@ describe("service", () => {
           )
           expect(plane.messages(created.id)).toEqual(["msg_wired1"])
           expect(puts()[0]!.auth).toBe(`Bearer ${Fake.TOKEN}`)
+        }).pipe(Effect.provide(layer)),
+      ),
+    20_000,
+  )
+
+  it.live(
+    "never signed in: an idle session writes nothing and sends nothing",
+    () =>
+      provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          yield* Effect.promise(async () => {
+            await CloudStore.clear()
+            await fs.rm(path.join(Global.Path.data, "cloud", "sync"), { recursive: true, force: true })
+          })
+          const before = plane.requests.length
+          yield* (yield* CloudSync.Service).init()
+          const created = yield* (yield* Session.Service).create({ title: "nobody" })
+          yield* userMessage(created.id, "msg_nobody1")
+          yield* idle(created.id)
+          yield* Effect.sleep("2500 millis")
+          yield* (yield* CloudSync.Service).flush()
+          const exists = yield* Effect.promise(() =>
+            fs.stat(path.join(Global.Path.data, "cloud", "sync")).then(
+              () => true,
+              () => false,
+            ),
+          )
+          expect(exists).toBe(false)
+          expect(plane.requests.length).toBe(before)
         }).pipe(Effect.provide(layer)),
       ),
     20_000,
