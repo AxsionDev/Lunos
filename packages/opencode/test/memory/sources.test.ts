@@ -160,7 +160,11 @@ describe("MemorySources checks", () => {
     expect(MemorySources.region("EU-DE")).toBe("eu")
     expect(MemorySources.region("FI")).toBe("eu")
     expect(MemorySources.region("US-east")).toBe("us")
+    expect(MemorySources.region("NO")).toBe("eu")
+    expect(MemorySources.region("IS")).toBe("eu")
+    expect(MemorySources.region("LI")).toBe("eu")
     expect(MemorySources.region("CH")).toBe("other")
+    expect(MemorySources.region("GB")).toBe("other")
   })
 
   test("a graph source must be encrypted unless it is on this machine, and carry no credentials in its url", () => {

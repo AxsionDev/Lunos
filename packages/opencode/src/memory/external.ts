@@ -89,9 +89,11 @@ export const credentialProblems = ConfigMemoryBackend.credentialProblems
 
 const SCHEMES = new Set(["bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc"])
 
-const EU = new Set("AT BE BG HR CY CZ DK EE FI FR DE GR IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" "))
+// "EU-only" means the EU and the EEA (PO, 2026-10-14): the 27 member states plus Iceland, Liechtenstein
+// and Norway. Switzerland and the UK are not in it.
+const EU = new Set("AT BE BG HR CY CZ DK EE FI FR DE GR IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO".split(" "))
 
-/** "EU", "EU-DE" or an EU country code → eu; "US" or "US-xx" → us; anything else → other. */
+/** "EU", "EU-DE" or an EU/EEA country code → eu; "US" or "US-xx" → us; anything else → other. */
 export function region(jurisdiction: string): Residency.Policy["allow"][number] {
   const head = jurisdiction.trim().toUpperCase().split("-")[0]
   if (head === "EU" || EU.has(head)) return "eu"

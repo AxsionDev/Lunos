@@ -142,7 +142,11 @@ describe("gate: checked before any connection", () => {
     expect(MemoryExternal.region("eu")).toBe("eu")
     expect(MemoryExternal.region("DE")).toBe("eu")
     expect(MemoryExternal.region("US-EAST")).toBe("us")
+    expect(MemoryExternal.region("NO")).toBe("eu")
+    expect(MemoryExternal.region("IS")).toBe("eu")
+    expect(MemoryExternal.region("LI")).toBe("eu")
     expect(MemoryExternal.region("CH")).toBe("other")
+    expect(MemoryExternal.region("GB")).toBe("other")
   })
 })
 
