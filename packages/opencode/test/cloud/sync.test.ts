@@ -411,6 +411,26 @@ describe("upload loop", () => {
     expect(body.messages[0].parts[0].text.endsWith(CloudSync.TRUNCATED)).toBe(true)
   })
 
+  test("a seq another process queued first: the turn rebuilds after it", async () => {
+    let raced = false
+    const other = JSON.stringify({ messages: [user("msg_other")] })
+    const w = CloudSync.worker({
+      directory: dir,
+      config: async () => ({}),
+      load: async () => {
+        if (!raced) {
+          raced = true
+          await CloudSyncQueue.enqueue(S, dir, 1, other, ["msg_other"])
+        }
+        return { info: info(), messages: [user("msg_1")] }
+      },
+      opts: opts(),
+    })
+    expect(await w.turn(S)).toEqual({})
+    expect(plane.messages(S)).toEqual(["msg_other", "msg_1"])
+    expect(plane.sessions.get(S)!.lastSeq).toBe(2)
+  })
+
   test("403 device_revoked deletes device.json", async () => {
     const w = make([user("msg_1")])
     plane.device()!.revokedAt = 1

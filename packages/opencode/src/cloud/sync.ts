@@ -334,7 +334,12 @@ export function worker(input: WorkerInput) {
     await CloudSyncApi.save(fn(fresh))
   }
 
-  async function enqueue(session: string, config: SyncConfig, cursor: CloudSyncQueue.Cursor | undefined) {
+  async function enqueue(
+    session: string,
+    config: SyncConfig,
+    cursor: CloudSyncQueue.Cursor | undefined,
+    retried = false,
+  ): Promise<void> {
     const source = await input.load(session)
     if (!source) return
     const options = config.sync || undefined
@@ -345,7 +350,16 @@ export function worker(input: WorkerInput) {
       repo: await repo(input.directory),
       model: model(source),
     })
-    for (const c of chunks) await CloudSyncQueue.enqueue(session, input.directory, c.seq, c.body, c.ids)
+    try {
+      // false: the session was stopped meanwhile (deleted, or refused by the server).
+      for (const c of chunks)
+        if (!(await CloudSyncQueue.enqueue(session, input.directory, c.seq, c.body, c.ids))) return
+    } catch (error) {
+      // Another process (a TUI and `lunos run` on one session) queued this seq first: build again
+      // from the cursor it left, once.
+      if (!(error instanceof CloudSyncQueue.SeqTakenError) || retried) throw error
+      return enqueue(session, config, await CloudSyncQueue.cursor(session), true)
+    }
   }
 
   async function send(
