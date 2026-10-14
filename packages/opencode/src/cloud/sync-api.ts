@@ -1,6 +1,7 @@
 export * as CloudSyncApi from "./sync-api"
 
 
+import { randomUUID } from "crypto"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
@@ -18,10 +19,22 @@ import { SandboxConfig } from "@/sandbox/config"
  */
 export type Device = { id: string; name: string; platform: string; syncEnabled: boolean; lastSyncAt?: number; createdAt: number; revokedAt?: number }
 export type State = { endpoint: string; sub: string; device: Device; noticeShown: boolean; paused?: "quota" }
-export type Options = { fetch?: typeof fetch; token?: () => Promise<string>; endpoint?: string; sub?: string }
-export type UploadResult =
-  | { ok: true; lastSeq: number; duplicate: boolean }
-  | { ok: false; status: number; code: string; message: string; lastSeq?: number }
+export type Options = {
+  fetch?: typeof fetch
+  token?: () => Promise<string>
+  endpoint?: string
+  sub?: string
+  /** Per request; 30 s by default. `lunos login` registers with a short one so it can't hang. */
+  timeoutMs?: number
+}
+/**
+ * A request that never reached an answer (network, timeout, a body that isn't JSON) is `status: 0`,
+ * `code: "network"`; no sign-in is `status: 0`, `code: "signed_out"`. Neither is thrown: sync
+ * failures stay out of the session.
+ */
+export type Failure = { ok: false; status: number; code: string; message: string }
+export type UploadResult = { ok: true; lastSeq: number; duplicate: boolean } | Failure
+export type StatusResult = { ok: true; lastSeq: number; deleted?: boolean } | Failure
 
 export const file = () => path.join(Global.Path.data, "cloud", "sync", "device.json")
 
@@ -49,13 +62,24 @@ async function request(base: string, token: string, method: string, p: string, b
     redirect: "error",
     headers: { authorization: `Bearer ${token}`, accept: "application/json", ...(body === undefined ? {} : { "content-type": "application/json" }) },
     body,
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 30_000),
   })
 }
 
-async function failure(res: Response): Promise<UploadResult & { ok: false }> {
+async function failure(res: Response): Promise<Failure> {
   const json = (await res.json().catch(() => undefined)) as any
-  return { ok: false, status: res.status, code: json?.error?.code ?? `http_${res.status}`, message: json?.error?.message ?? `HTTP ${res.status}`, lastSeq: json?.last_seq ?? json?.lastSeq }
+  return { ok: false, status: res.status, code: json?.error?.code ?? `http_${res.status}`, message: json?.error?.message ?? `HTTP ${res.status}` }
+}
+
+/** Runs one call; anything it throws becomes a `Failure` instead. */
+async function settle<T>(fn: () => Promise<T | Failure>): Promise<T | Failure> {
+  try {
+    return await fn()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (error instanceof CloudAuth.SignedOutError) return { ok: false, status: 0, code: "signed_out", message }
+    return { ok: false, status: 0, code: "network", message }
+  }
 }
 
 export async function load(): Promise<State | undefined> {
@@ -63,9 +87,13 @@ export async function load(): Promise<State | undefined> {
 }
 
 export async function save(state: State) {
-  await fs.mkdir(path.dirname(file()), { recursive: true, mode: 0o700 })
-  const tmp = file() + `.${process.pid}.tmp`
+  const dir = path.dirname(file())
+  await fs.mkdir(dir, { recursive: true, mode: 0o700 })
+  // mkdir's mode only applies to a directory it creates, and writeFile's is masked by the umask.
+  await fs.chmod(dir, 0o700)
+  const tmp = `${file()}.${randomUUID()}.tmp`
   await fs.writeFile(tmp, JSON.stringify(state, null, 2), { mode: 0o600 })
+  await fs.chmod(tmp, 0o600)
   await fs.rename(tmp, file())
 }
 
@@ -86,6 +114,7 @@ export async function register(opts: Options = {}): Promise<State> {
   }
   const res = await request(base, token, "POST", "/v1/devices", JSON.stringify({ name: os.hostname(), platform: process.platform }), opts)
   if (!res.ok) throw new Error(`Couldn't register this device with ${base}: ${(await failure(res)).message}`)
+  // On purpose, a replacement device for the same user keeps `noticeShown`: they have seen the notice.
   const state: State = { endpoint: base, sub, device: (await res.json()) as Device, noticeShown: stored?.sub === sub ? stored.noticeShown : false }
   await save(state)
   return state
@@ -102,17 +131,23 @@ export async function setEnabled(on: boolean, opts: Options = {}) {
 }
 
 export async function upload(state: State, session: string, seq: number, body: string, opts: Options = {}): Promise<UploadResult> {
-  const { token } = await who(opts)
-  const p = `/v1/sync/devices/${encodeURIComponent(state.device.id)}/sessions/${encodeURIComponent(session)}/chunks/${seq}`
-  const res = await request(state.endpoint, token, "PUT", p, body, opts)
-  if (!res.ok) return failure(res)
-  const json = (await res.json()) as { lastSeq: number; duplicate: boolean }
-  return { ok: true, lastSeq: json.lastSeq, duplicate: json.duplicate }
+  return settle(async () => {
+    const { token } = await who(opts)
+    const p = `/v1/sync/devices/${encodeURIComponent(state.device.id)}/sessions/${encodeURIComponent(session)}/chunks/${seq}`
+    const res = await request(state.endpoint, token, "PUT", p, body, opts)
+    if (!res.ok) return failure(res)
+    const json = (await res.json()) as { lastSeq: number; duplicate: boolean }
+    return { ok: true as const, lastSeq: json.lastSeq, duplicate: json.duplicate }
+  })
 }
 
-export async function status(state: State, session: string, opts: Options = {}) {
-  const { token } = await who(opts)
-  const res = await request(state.endpoint, token, "GET", `/v1/sync/devices/${encodeURIComponent(state.device.id)}/sessions/${encodeURIComponent(session)}`, undefined, opts)
-  if (!res.ok) throw new Error((await failure(res)).message)
-  return (await res.json()) as { lastSeq: number; deleted?: boolean }
+export async function status(state: State, session: string, opts: Options = {}): Promise<StatusResult> {
+  return settle(async () => {
+    const { token } = await who(opts)
+    const p = `/v1/sync/devices/${encodeURIComponent(state.device.id)}/sessions/${encodeURIComponent(session)}`
+    const res = await request(state.endpoint, token, "GET", p, undefined, opts)
+    if (!res.ok) return failure(res)
+    const json = (await res.json()) as { lastSeq: number; deleted?: boolean }
+    return { ok: true as const, lastSeq: json.lastSeq, ...(json.deleted ? { deleted: true } : {}) }
+  })
 }

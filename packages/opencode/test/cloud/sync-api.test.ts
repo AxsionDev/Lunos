@@ -93,5 +93,30 @@ test("status reads lastSeq", async () => {
   const s = await CloudSyncApi.register(opts())
   server.stop(true)
   server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => Response.json({ session: "s", lastSeq: 3, deleted: true }) })
-  expect(await CloudSyncApi.status({ ...s, endpoint: `http://127.0.0.1:${server.port}` }, "ses_1", opts())).toEqual({ session: "s", lastSeq: 3, deleted: true } as any)
+  expect(await CloudSyncApi.status({ ...s, endpoint: `http://127.0.0.1:${server.port}` }, "ses_1", opts())).toEqual({ ok: true, lastSeq: 3, deleted: true })
+})
+
+test("network failures, timeouts and bad JSON are results, never thrown", async () => {
+  const s = await CloudSyncApi.register(opts())
+  server.stop(true)
+  const dead = { ...s, endpoint: `http://127.0.0.1:${server.port}` }
+  expect(await CloudSyncApi.upload(dead, "ses_1", 1, "{}", opts())).toMatchObject({ ok: false, status: 0, code: "network" })
+  expect(await CloudSyncApi.status(dead, "ses_1", opts())).toMatchObject({ ok: false, status: 0, code: "network" })
+  server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("not json", { status: 200 }) })
+  const garbled = { ...s, endpoint: `http://127.0.0.1:${server.port}` }
+  expect(await CloudSyncApi.upload(garbled, "ses_1", 1, "{}", opts())).toMatchObject({ ok: false, status: 0, code: "network" })
+  server.stop(true)
+  server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Promise<Response>(() => {}) })
+  const slow = { ...s, endpoint: `http://127.0.0.1:${server.port}` }
+  expect(await CloudSyncApi.upload(slow, "ses_1", 1, "{}", { ...opts(), timeoutMs: 100 })).toMatchObject({ ok: false, status: 0, code: "network" })
+})
+
+test("device.json is written 0600 in a 0700 directory", async () => {
+  if (process.platform === "win32") return
+  await fs.mkdir(path.dirname(CloudSyncApi.file()), { recursive: true, mode: 0o755 })
+  await fs.chmod(path.dirname(CloudSyncApi.file()), 0o755)
+  await CloudSyncApi.register(opts())
+  expect((await fs.stat(path.dirname(CloudSyncApi.file()))).mode & 0o777).toBe(0o700)
+  expect((await fs.stat(CloudSyncApi.file())).mode & 0o777).toBe(0o600)
+  expect((await fs.readdir(path.dirname(CloudSyncApi.file()))).filter((n) => n.endsWith(".tmp"))).toEqual([])
 })

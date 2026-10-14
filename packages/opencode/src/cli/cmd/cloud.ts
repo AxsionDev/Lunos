@@ -72,9 +72,10 @@ export const LoginCommand = effectCmd({
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
     out(`Signed in as ${result.user.email ?? result.user.preferred_username ?? result.user.sub} ${dim(`(${issuer})`)}`)
     out(dim(`Session kept in ${where(result.backend)}. lunos logout signs out.`))
-    // Registering the device never fails the login. XCOD-185: the notice is shown once per device.
+    // Registering the device never fails the login, nor holds it up for long (5 s per request).
+    // XCOD-185: the notice is shown once per device.
     const sync = yield* Effect.promise(() =>
-      CloudSyncApi.register().catch((error) => {
+      CloudSyncApi.register({ timeoutMs: 5_000 }).catch((error) => {
         out(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`))
         return undefined
       }),
