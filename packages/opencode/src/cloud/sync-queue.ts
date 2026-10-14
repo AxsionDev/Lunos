@@ -123,7 +123,9 @@ async function files(session: string) {
 }
 
 export async function pending(session?: string) {
-  const sessions = session ? [session] : (await fs.readdir(dir()).catch(() => [] as string[])).filter((n) => /^[A-Za-z0-9_-]+$/.test(n)).sort()
+  const sessions = session
+    ? [session]
+    : (await fs.readdir(dir()).catch(() => [] as string[])).filter((n) => /^[A-Za-z0-9_-]+$/.test(n)).sort()
   const out: Array<{ session: string; seq: number; body: string }> = []
   for (const s of sessions)
     for (const seq of await files(s)) {
@@ -136,7 +138,8 @@ export async function pending(session?: string) {
 /** Deletes chunk `seq` and every lower one. */
 export async function ack(session: string, seq: number) {
   await locked(session, async () => {
-    for (const n of await files(session)) if (n <= seq) await fs.rm(path.join(sessionDir(session), `${n}.json`), { force: true })
+    for (const n of await files(session))
+      if (n <= seq) await fs.rm(path.join(sessionDir(session), `${n}.json`), { force: true })
   })
 }
 

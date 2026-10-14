@@ -46,7 +46,8 @@ function inputPaths(input: Record<string, unknown> | undefined, raw?: unknown) {
   }
   const out = PATH_KEYS.map((k) => input[k]).filter((v): v is string => typeof v === "string")
   const patch = input.patchText
-  if (typeof patch === "string") for (const re of [PATCH_FILE, MOVE_TO]) for (const m of patch.matchAll(re)) out.push(m[1]!.trim())
+  if (typeof patch === "string")
+    for (const re of [PATCH_FILE, MOVE_TO]) for (const m of patch.matchAll(re)) out.push(m[1]!.trim())
   return out
 }
 
@@ -84,7 +85,9 @@ function toolPart(part: any, isSecret: (p: string) => boolean) {
   if (hit) {
     const blank = placeholder(hit)
     const input: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(state.input ?? {})) input[k] = PATH_KEYS.includes(k as any) || typeof v === "number" || typeof v === "boolean" || v == null ? v : blank
+    for (const [k, v] of Object.entries(state.input ?? {}))
+      input[k] =
+        PATH_KEYS.includes(k as any) || typeof v === "number" || typeof v === "boolean" || v == null ? v : blank
     return {
       ...part,
       state: {
@@ -105,10 +108,18 @@ function toolPart(part: any, isSecret: (p: string) => boolean) {
 }
 
 function filePart(part: any, isSecret: (p: string) => boolean) {
-  const names = [part.source?.path, part.filename, typeof part.url === "string" && part.url.startsWith("file:") ? part.url : undefined]
+  const names = [
+    part.source?.path,
+    part.filename,
+    typeof part.url === "string" && part.url.startsWith("file:") ? part.url : undefined,
+  ]
   const p = names.find((n): n is string => typeof n === "string" && isSecret(n))
   if (!p) return part
-  return { ...part, url: "data:text/plain,", source: part.source ? { ...part.source, text: { value: placeholder(p), start: 0, end: 0 } } : undefined }
+  return {
+    ...part,
+    url: "data:text/plain,",
+    source: part.source ? { ...part.source, text: { value: placeholder(p), start: 0, end: 0 } } : undefined,
+  }
 }
 
 /** git's C-quoted path (`"caf\\303\\251.txt"`), as summary.ts reads it. */
@@ -170,7 +181,12 @@ export function message<M extends { info: any; parts: any[] }>(m: M, isSecret: (
   if (Array.isArray(diffs))
     copy.info.summary.diffs = diffs.map((d: any) =>
       typeof d?.file === "string" && isSecret(unquoteGitPath(d.file))
-        ? { file: d.file, additions: d.additions, deletions: d.deletions, ...(d.status === undefined ? {} : { status: d.status }) }
+        ? {
+            file: d.file,
+            additions: d.additions,
+            deletions: d.deletions,
+            ...(d.status === undefined ? {} : { status: d.status }),
+          }
         : d,
     )
   copy.parts = mentionParts(copy.parts, isSecret).map((part: any) => {
@@ -193,7 +209,11 @@ export function scan<T>(value: T): T {
   return value
 }
 
-export function chunkMessages<M extends { info: any; parts: any[] }>(messages: readonly M[], directory: string, exclude: readonly string[]) {
+export function chunkMessages<M extends { info: any; parts: any[] }>(
+  messages: readonly M[],
+  directory: string,
+  exclude: readonly string[],
+) {
   const isSecret = matcher(directory, exclude)
   return messages.map((m) => scan(message(m, isSecret)))
 }

@@ -17,7 +17,8 @@ beforeEach(async () => {
   seen = []
   devices = []
   server = Bun.serve({
-    port: 0, hostname: "127.0.0.1",
+    port: 0,
+    hostname: "127.0.0.1",
     async fetch(req) {
       const url = new URL(req.url)
       const body = await req.text()
@@ -34,13 +35,19 @@ beforeEach(async () => {
         return Response.json(d)
       }
       if (req.method === "PUT" && url.pathname.includes("/chunks/2"))
-        return Response.json({ error: { code: "out_of_order", message: "Send chunk 1 next (last stored: 0)." } }, { status: 409 })
+        return Response.json(
+          { error: { code: "out_of_order", message: "Send chunk 1 next (last stored: 0)." } },
+          { status: 409 },
+        )
       if (req.method === "PUT") return Response.json({ session: "s", seq: 1, lastSeq: 1, duplicate: false })
       return new Response("no", { status: 404 })
     },
   })
 })
-afterEach(() => { server.stop(true); (Global.Path as any).data = original })
+afterEach(() => {
+  server.stop(true)
+  ;(Global.Path as any).data = original
+})
 
 const opts = () => ({ token: async () => "tok", endpoint: `http://127.0.0.1:${server.port}`, sub: "u1" })
 
@@ -62,8 +69,12 @@ test("a revoked device is replaced", async () => {
 
 test("upload maps success and errors", async () => {
   const s = await CloudSyncApi.register(opts())
-  expect(await CloudSyncApi.upload(s, "ses_1", 1, "{\"messages\":[]}", opts())).toEqual({ ok: true, lastSeq: 1, duplicate: false })
-  const bad = await CloudSyncApi.upload(s, "ses_1", 2, "{\"messages\":[]}", opts())
+  expect(await CloudSyncApi.upload(s, "ses_1", 1, '{"messages":[]}', opts())).toEqual({
+    ok: true,
+    lastSeq: 1,
+    duplicate: false,
+  })
+  const bad = await CloudSyncApi.upload(s, "ses_1", 2, '{"messages":[]}', opts())
   expect(bad).toMatchObject({ ok: false, status: 409, code: "out_of_order" })
   expect((bad as { lastSeq?: number }).lastSeq).toBeUndefined()
 })
@@ -73,7 +84,11 @@ test("project config cannot move the endpoint", async () => {
   await fs.writeFile(path.join(proj, "opencode.json"), JSON.stringify({ cloud: { endpoint: "https://evil.example" } }))
   const cwd = process.cwd()
   process.chdir(proj)
-  try { expect(await CloudSyncApi.endpoint()).toBe("https://cloud.lunos.tech") } finally { process.chdir(cwd) }
+  try {
+    expect(await CloudSyncApi.endpoint()).toBe("https://cloud.lunos.tech")
+  } finally {
+    process.chdir(cwd)
+  }
 })
 
 test("global config sets the endpoint; a non-https remote is refused", async () => {
@@ -92,23 +107,43 @@ test("global config sets the endpoint; a non-https remote is refused", async () 
 test("status reads lastSeq", async () => {
   const s = await CloudSyncApi.register(opts())
   server.stop(true)
-  server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => Response.json({ session: "s", lastSeq: 3, deleted: true }) })
-  expect(await CloudSyncApi.status({ ...s, endpoint: `http://127.0.0.1:${server.port}` }, "ses_1", opts())).toEqual({ ok: true, lastSeq: 3, deleted: true })
+  server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: () => Response.json({ session: "s", lastSeq: 3, deleted: true }),
+  })
+  expect(await CloudSyncApi.status({ ...s, endpoint: `http://127.0.0.1:${server.port}` }, "ses_1", opts())).toEqual({
+    ok: true,
+    lastSeq: 3,
+    deleted: true,
+  })
 })
 
 test("network failures, timeouts and bad JSON are results, never thrown", async () => {
   const s = await CloudSyncApi.register(opts())
   server.stop(true)
   const dead = { ...s, endpoint: `http://127.0.0.1:${server.port}` }
-  expect(await CloudSyncApi.upload(dead, "ses_1", 1, "{}", opts())).toMatchObject({ ok: false, status: 0, code: "network" })
+  expect(await CloudSyncApi.upload(dead, "ses_1", 1, "{}", opts())).toMatchObject({
+    ok: false,
+    status: 0,
+    code: "network",
+  })
   expect(await CloudSyncApi.status(dead, "ses_1", opts())).toMatchObject({ ok: false, status: 0, code: "network" })
   server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("not json", { status: 200 }) })
   const garbled = { ...s, endpoint: `http://127.0.0.1:${server.port}` }
-  expect(await CloudSyncApi.upload(garbled, "ses_1", 1, "{}", opts())).toMatchObject({ ok: false, status: 0, code: "network" })
+  expect(await CloudSyncApi.upload(garbled, "ses_1", 1, "{}", opts())).toMatchObject({
+    ok: false,
+    status: 0,
+    code: "network",
+  })
   server.stop(true)
   server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Promise<Response>(() => {}) })
   const slow = { ...s, endpoint: `http://127.0.0.1:${server.port}` }
-  expect(await CloudSyncApi.upload(slow, "ses_1", 1, "{}", { ...opts(), timeoutMs: 100 })).toMatchObject({ ok: false, status: 0, code: "network" })
+  expect(await CloudSyncApi.upload(slow, "ses_1", 1, "{}", { ...opts(), timeoutMs: 100 })).toMatchObject({
+    ok: false,
+    status: 0,
+    code: "network",
+  })
 })
 
 test("device.json is written 0600 in a 0700 directory", async () => {

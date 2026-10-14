@@ -267,7 +267,10 @@ describe("sync target (XCOD-185)", () => {
     Residency.audit(resolved, file, "sync:lunos-cloud", "https://cloud.lunos.tech/v1/sync/x", true)
     Residency.audit(resolved, file, "sync:lunos-cloud", "https://evil.example/v1/sync/x", false)
     await Bun.sleep(50)
-    const events = (await readFile(file, "utf8")).trim().split("\n").map((l) => JSON.parse(l).event)
+    const events = (await readFile(file, "utf8"))
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l).event)
     expect(events).toEqual(["sync.upload", "sync.denied"])
   })
 

@@ -218,8 +218,8 @@ function append(file: string, entry: EgressRecord) {
         ? "share.upload"
         : "share.denied"
       : entry.allowed
-      ? "model.call"
-      : "model.denied"
+        ? "model.call"
+        : "model.denied"
   void Audit.write({ file }, event, { ...entry })
 }
 

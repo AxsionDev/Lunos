@@ -29,11 +29,11 @@ Vendor all of `dist/` together; the module loads `assets/*` relative to itself.
 
 Sizes at XCOD-185 (raw size, gzip in the third column):
 
-| File | Size | gzip |
-|---|---|---|
-| `session-embed.js` | 2.86 MB | 705 kB |
-| `session-embed.css` | 1.74 MB | 985 kB |
-| `assets/*` (609 files, lazy) | 20 MB | n/a |
+| File                         | Size    | gzip   |
+| ---------------------------- | ------- | ------ |
+| `session-embed.js`           | 2.86 MB | 705 kB |
+| `session-embed.css`          | 1.74 MB | 985 kB |
+| `assets/*` (609 files, lazy) | 20 MB   | n/a    |
 
 Most of the CSS is base64 fonts inlined by `@opencode-ai/ui`; the rules themselves are about 307 kB (370 kB before Tailwind's scan was narrowed to `session-ui` and `ui`).
 

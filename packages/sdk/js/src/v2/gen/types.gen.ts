@@ -1742,6 +1742,13 @@ export type CloudConfig = {
   client_start?: boolean
 }
 
+export type SyncOptions = {
+  project?: string
+  exclude?: Array<string>
+}
+
+export type SyncConfig = false | SyncOptions
+
 export type SubagentConfig = {
   background?: boolean
   model?: string
@@ -2092,6 +2099,7 @@ export type Config = {
   default_agent?: string
   external?: ExternalConfig
   cloud?: CloudConfig
+  sync?: SyncConfig
   subagent?: SubagentConfig
   subagent_depth?: number
   username?: string

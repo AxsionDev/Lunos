@@ -17,13 +17,48 @@ const session = { id: "ses_1", title: "Smoke" }
 const base = { sessionID: "ses_1" }
 const messages = [
   {
-    info: { ...base, id: "msg_u", role: "user", time: { created: 1 }, agent: "build", model: { providerID: "p", modelID: "m" } },
+    info: {
+      ...base,
+      id: "msg_u",
+      role: "user",
+      time: { created: 1 },
+      agent: "build",
+      model: { providerID: "p", modelID: "m" },
+    },
     parts: [{ ...base, id: "prt_u", messageID: "msg_u", type: "text", text: "hello from the user" }],
   },
   {
-    info: { ...base, id: "msg_a", role: "assistant", parentID: "msg_u", time: { created: 2, completed: 3 }, agent: "build", modelID: "m", providerID: "p", mode: "build", path: { cwd: "/", root: "/" }, cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } } },
+    info: {
+      ...base,
+      id: "msg_a",
+      role: "assistant",
+      parentID: "msg_u",
+      time: { created: 2, completed: 3 },
+      agent: "build",
+      modelID: "m",
+      providerID: "p",
+      mode: "build",
+      path: { cwd: "/", root: "/" },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    },
     parts: [
-      { ...base, id: "prt_t", messageID: "msg_a", type: "tool", callID: "c1", tool: "read", state: { status: "completed", input: { filePath: "/a.txt" }, output: "x", title: "a.txt", metadata: {}, time: { start: 2, end: 3 } } },
+      {
+        ...base,
+        id: "prt_t",
+        messageID: "msg_a",
+        type: "tool",
+        callID: "c1",
+        tool: "read",
+        state: {
+          status: "completed",
+          input: { filePath: "/a.txt" },
+          output: "x",
+          title: "a.txt",
+          metadata: {},
+          time: { start: 2, end: 3 },
+        },
+      },
       { ...base, id: "prt_a", messageID: "msg_a", type: "text", text: "hello from the assistant" },
     ],
   },
@@ -61,7 +96,10 @@ const server = Bun.serve({
 async function executablePath() {
   if (existsSync(chromium.executablePath())) return undefined
   const cache = process.env.PLAYWRIGHT_BROWSERS_PATH ?? path.join(homedir(), "Library/Caches/ms-playwright")
-  for (const d of (await readdir(cache).catch(() => [])).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()) {
+  for (const d of (await readdir(cache).catch(() => []))
+    .filter((d) => d.startsWith("chromium_headless_shell-"))
+    .sort()
+    .reverse()) {
     const sub = (await readdir(path.join(cache, d))).find((s) => s.startsWith("chrome-headless-shell"))
     const bin = sub && path.join(cache, d, sub, "chrome-headless-shell")
     if (bin && existsSync(bin)) return bin
@@ -75,7 +113,9 @@ try {
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()))
   page.on("pageerror", (e) => errors.push(String(e)))
   await page.addInitScript(() =>
-    document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`)),
+    document.addEventListener("securitypolicyviolation", (e) =>
+      console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`),
+    ),
   )
   await page.goto(`http://localhost:${server.port}/index.html`)
   await page.waitForFunction(() => (window as any).__mounted === true)
@@ -89,10 +129,14 @@ try {
   await page.evaluate(() => (window as any).__dispose())
   const left = await page.locator("#root").innerHTML()
   if (left.trim() !== "") throw new Error(`container not empty after dispose: ${left.slice(0, 200)}`)
-  await page.evaluate(() => { (window as any).__dispose = (window as any).__mount() })
+  await page.evaluate(() => {
+    ;(window as any).__dispose = (window as any).__mount()
+  })
   await assertRendered()
   if (errors.length) throw new Error(`console errors:\n${errors.join("\n")}`)
-  console.log("smoke ok: user text, assistant text and tool row rendered under the app CSP; dispose emptied the container; re-mount rendered; no console errors")
+  console.log(
+    "smoke ok: user text, assistant text and tool row rendered under the app CSP; dispose emptied the container; re-mount rendered; no console errors",
+  )
 } finally {
   await browser.close()
   server.stop()

@@ -12,7 +12,8 @@ export const Options = Schema.Struct({
     description: "Lunos space project this directory's sessions sync to (lunos sync link writes it)",
   }),
   exclude: Schema.Array(Schema.String).pipe(Schema.optional).annotate({
-    description: "Globs of files whose contents are never uploaded, in addition to .env*, auth.json, *.pem, *.key, id_rsa*",
+    description:
+      "Globs of files whose contents are never uploaded, in addition to .env*, auth.json, *.pem, *.key, id_rsa*",
   }),
 }).annotate({ identifier: "SyncOptions" })
 

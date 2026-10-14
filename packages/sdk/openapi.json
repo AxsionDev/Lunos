@@ -22558,6 +22558,32 @@
         },
         "additionalProperties": false
       },
+      "SyncOptions": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncConfig": {
+        "anyOf": [
+          {
+            "type": "boolean",
+            "enum": [false]
+          },
+          {
+            "$ref": "#/components/schemas/SyncOptions"
+          }
+        ]
+      },
       "SubagentConfig": {
         "type": "object",
         "properties": {
@@ -23538,6 +23564,9 @@
           },
           "cloud": {
             "$ref": "#/components/schemas/CloudConfig"
+          },
+          "sync": {
+            "$ref": "#/components/schemas/SyncConfig"
           },
           "subagent": {
             "$ref": "#/components/schemas/SubagentConfig"

@@ -69,7 +69,13 @@ test("no temp or lock files are left behind", async () => {
 test("a shape-invalid cursor reads as undefined", async () => {
   await Q.enqueue("ses_1", "/w", 1, "a", [])
   const file = path.join(Q.dir(), "ses_1", "cursor.json")
-  for (const bad of [{ session: "ses_1", directory: "/w", seq: -1, sent: [] }, { session: "ses_1", directory: "/w", seq: 1.5, sent: [] }, { session: "ses_1", directory: "/w", seq: 1, sent: [1] }, { session: "ses_1", seq: 1, sent: [] }, null]) {
+  for (const bad of [
+    { session: "ses_1", directory: "/w", seq: -1, sent: [] },
+    { session: "ses_1", directory: "/w", seq: 1.5, sent: [] },
+    { session: "ses_1", directory: "/w", seq: 1, sent: [1] },
+    { session: "ses_1", seq: 1, sent: [] },
+    null,
+  ]) {
     await fs.writeFile(file, JSON.stringify(bad))
     expect(await Q.cursor("ses_1")).toBeUndefined()
   }
@@ -99,5 +105,7 @@ test("reset deletes every chunk and rewinds the cursor to seq with nothing sent"
   expect(await Q.cursor("ses_1")).toEqual({ session: "ses_1", directory: "/w", seq: 1, sent: [] })
   // The rebuilt chunks start right after it.
   expect(await Q.enqueue("ses_1", "/w", 2, "new", ["m1", "m2"])).toBe(true)
-  expect((await fs.readdir(path.join(Q.dir(), "ses_1"))).filter((n) => n.endsWith(".lock") || n.endsWith(".tmp"))).toEqual([])
+  expect(
+    (await fs.readdir(path.join(Q.dir(), "ses_1"))).filter((n) => n.endsWith(".lock") || n.endsWith(".tmp")),
+  ).toEqual([])
 })

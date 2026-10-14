@@ -249,7 +249,8 @@ export const CALLS: Call[] = [
     hosts: "cloud.lunos.tech (or `cloud.endpoint` in global or managed config)",
     when: "after each completed turn, once you sign in with `lunos login` (on from then until you turn it off)",
     offline: "blocked",
-    alsoOffBy: '`lunos sync off` (this device), `"sync": false` (this directory, or everywhere when your organisation locks it)',
+    alsoOffBy:
+      '`lunos sync off` (this device), `"sync": false` (this directory, or everywhere when your organisation locks it)',
   },
 ]
 
