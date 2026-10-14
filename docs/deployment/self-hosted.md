@@ -606,7 +606,7 @@ From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your t
 **Checked before anything connects.** When memory starts, Lunos refuses the backend, without opening a socket or loading the database driver, if:
 
 - no `jurisdiction` is declared;
-- a residency policy is set and doesn't allow the jurisdiction's region (`EU`, `EU-DE` or an EU country code count as `eu`, `US` or `US-…` as `us`, anything else as `other`). The refusal names `memory.backend` and is written to the audit log as `memory.denied`;
+- a residency policy is set and doesn't allow the jurisdiction's region (`EU`, `EU-DE` or an EU or EEA country code count as `eu`, `US` or `US-…` as `us`, anything else as `other`). The refusal names `memory.backend` and is written to the audit log as `memory.denied`;
 - the URL is plain `bolt://` or `neo4j://` to a host that isn't this machine, unless `allow_insecure` is set. `lunos memory status` then shows a warning. `+ssc` is encrypted but doesn't verify the certificate, and says so;
 - the URL has credentials in it, or `memory.encryption` is `"os-keychain"`. That key is in one person's keychain, and the database is shared, so encrypt at rest on the server instead.
 

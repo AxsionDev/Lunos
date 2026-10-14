@@ -20,6 +20,7 @@ Intended for regulated and public-sector deployments where "we told everyone to 
 That is the whole feature for most deployments. It means:
 
 - Only providers that process data in the EU may be used. Anything else is **blocked before any request is made** — not warned about, not logged-and-allowed.
+- **`eu` means the EU and the EEA:** the 27 member states plus Iceland, Liechtenstein and Norway. Switzerland and the UK count as `other`. This applies to model providers, memory backends and memory sources alike.
 - Every outbound model call is recorded to an audit log. Auditing switches on automatically with the policy; you do not need a second setting.
 
 **With no `residency` block in config, none of this is active** — no enforcement, no logging, no added per-request work.
