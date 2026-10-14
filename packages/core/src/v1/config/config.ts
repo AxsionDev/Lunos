@@ -20,6 +20,7 @@ import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
 import { ConfigSubagent } from "../../config/subagent"
 import { ConfigCloud } from "../../config/cloud"
+import { ConfigSync } from "../../config/sync"
 import { ConfigExternal } from "../../config/external"
 import { ConfigMemory } from "../../config/memory"
 import { ConfigSandbox } from "../../config/sandbox"
@@ -152,6 +153,9 @@ export const Info = Schema.Struct({
   }),
   cloud: Schema.optional(ConfigCloud.Info).annotate({
     description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",
+  }),
+  sync: Schema.optional(ConfigSync.Info).annotate({
+    description: "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }",
   }),
   subagent: Schema.optional(ConfigSubagent.Info).annotate({
     description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",

@@ -10,7 +10,7 @@ import { Schema } from "effect"
  */
 export const Info = Schema.Struct({
   issuer: Schema.String.pipe(Schema.optional).annotate({
-    description: "OpenID Connect issuer URL that lunos login signs in to, e.g. https://id.example.eu/realms/lunos",
+    description: "OpenID Connect issuer URL that lunos login signs in to, e.g. https://id.example.eu/realms/lunos (default https://auth.lunos.tech/realms/Lunos)",
   }),
   client_id: Schema.String.pipe(Schema.optional).annotate({
     description: 'OAuth client id registered for the Lunos CLI at that issuer (default "lunos-cli")',

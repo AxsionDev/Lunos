@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtemp, readFile } from "fs/promises"
+import os from "os"
+import path from "path"
 import { Residency } from "@opencode-ai/core/residency"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
 
 const EU_ONLY: Residency.Policy = { allow: ["eu"] }
 
@@ -252,5 +256,24 @@ describe("Residency.blocked (XCOD-212)", () => {
     const resolved = Residency.resolve({ allow: ["eu"], endpoints: { "my-vllm": { region: "eu" } } })
     expect(Residency.blocked("my-vllm", "https://llm.example.eu/v1", resolved)).toBeUndefined()
     expect(Residency.blocked("my-vllm", "https://llm.example.eu/v1", euOnly)).toBeDefined()
+  })
+})
+
+describe("sync target (XCOD-185)", () => {
+  test("sync: targets get the sync events", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "res-"))
+    const file = path.join(dir, "audit.log")
+    const resolved = Residency.resolve({ allow: ["eu"] })!
+    Residency.audit(resolved, file, "sync:lunos-cloud", "https://cloud.lunos.tech/v1/sync/x", true)
+    Residency.audit(resolved, file, "sync:lunos-cloud", "https://evil.example/v1/sync/x", false)
+    await Bun.sleep(50)
+    const events = (await readFile(file, "utf8")).trim().split("\n").map((l) => JSON.parse(l).event)
+    expect(events).toEqual(["sync.upload", "sync.denied"])
+  })
+
+  test("sync:lunos-cloud is EU only on cloud.lunos.tech", () => {
+    expect(Jurisdiction.SYNC_LUNOS_CLOUD).toBe("sync:lunos-cloud")
+    expect(Jurisdiction.resolve("sync:lunos-cloud", "https://cloud.lunos.tech/v1", undefined).claim.region).toBe("eu")
+    expect(Jurisdiction.resolve("sync:lunos-cloud", "https://cp.example.eu/v1", undefined).claim.region).toBe("unknown")
   })
 })

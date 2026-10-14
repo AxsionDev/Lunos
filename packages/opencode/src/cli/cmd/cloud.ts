@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import { openUrl } from "@opencode-ai/core/open"
 import { Config } from "@/config/config"
 import { CloudAuth } from "@/cloud/auth"
+import { CloudDefaults } from "@/cloud/defaults"
 import { CloudOidc } from "@/cloud/oidc"
 import { CloudStore } from "@/cloud/store"
 import { effectCmd, fail } from "../effect-cmd"
@@ -13,9 +14,6 @@ import { UI } from "../ui"
 // asks for one: the free harness works the same signed out.
 
 export const DEFAULT_CLIENT_ID = "lunos-cli"
-
-export const NO_ISSUER =
-  "Lunos Cloud sign-in isn't available yet. To sign in to your organisation's identity provider, set cloud.issuer (lunos settings set cloud.issuer https://…) or pass --issuer."
 
 const out = (line: string) => process.stdout.write(line + EOL)
 const dim = (text: string) => UI.Style.TEXT_DIM + text + UI.Style.TEXT_NORMAL
@@ -32,7 +30,7 @@ export const LoginCommand = effectCmd({
   describe: "sign in to Lunos Cloud (or your organisation's identity provider)",
   builder: (yargs) =>
     yargs
-      .option("issuer", { type: "string", describe: "OpenID Connect issuer URL (default: cloud.issuer)" })
+      .option("issuer", { type: "string", describe: `OpenID Connect issuer URL (default: cloud.issuer or ${CloudDefaults.DEFAULT_ISSUER})` })
       .option("client-id", {
         type: "string",
         describe: `OAuth client id (default: cloud.client_id or ${DEFAULT_CLIENT_ID})`,
@@ -44,8 +42,7 @@ export const LoginCommand = effectCmd({
       }),
   handler: Effect.fn("Cli.cloud.login")(function* (args) {
     const config = yield* Config.Service.use((cfg) => cfg.get())
-    const issuer = args.issuer ?? config.cloud?.issuer
-    if (!issuer) return yield* fail(NO_ISSUER)
+    const issuer = args.issuer ?? config.cloud?.issuer ?? CloudDefaults.DEFAULT_ISSUER
     if (!/^https:\/\//.test(issuer) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(issuer))
       return yield* fail(`${issuer} isn't an https URL; sign-in tokens must not travel in the clear.`)
     const clientID = args.clientId ?? config.cloud?.client_id ?? DEFAULT_CLIENT_ID

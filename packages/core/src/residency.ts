@@ -205,14 +205,19 @@ export function resolve(block: ConfigBlock | undefined): Resolved | undefined {
 
 // XCOD-103: egress records go into the one audit stream (core/audit.ts). The v0 fields keep their
 // names; the writer adds `v`, `event`, `seq` and the hash chain. Share uploads use a `share:`
-// provider id, so they get the share events.
+// provider id, so they get the share events; session sync uses `sync:` and gets the sync events.
 function append(file: string, entry: EgressRecord) {
+  const sync = entry.providerID.startsWith("sync:")
   const share = entry.providerID.startsWith("share:")
-  const event = share
+  const event = sync
     ? entry.allowed
-      ? "share.upload"
-      : "share.denied"
-    : entry.allowed
+      ? "sync.upload"
+      : "sync.denied"
+    : share
+      ? entry.allowed
+        ? "share.upload"
+        : "share.denied"
+      : entry.allowed
       ? "model.call"
       : "model.denied"
   void Audit.write({ file }, event, { ...entry })

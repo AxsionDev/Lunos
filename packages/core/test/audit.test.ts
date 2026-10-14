@@ -121,3 +121,8 @@ describe("Audit writer (XCOD-103)", () => {
     expect(elapsed).toBeLessThan(50)
   })
 })
+
+test("sync events are known", () => {
+  expect(Audit.EVENTS).toContain("sync.upload")
+  expect(Audit.EVENTS).toContain("sync.denied")
+})
