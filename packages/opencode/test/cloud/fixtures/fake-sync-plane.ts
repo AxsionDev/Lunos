@@ -4,7 +4,7 @@
 // (`seq === lastSeq + 1`), an identical re-send is a duplicate, a different body at a stored seq is a
 // chunk_conflict. Like the real one, out_of_order says where it stands only in the message prose.
 //
-// Test-only switches: `fail` answers chunk uploads with an error, `deleted` marks a session deleted
+// Test-only switches: `fail` answers chunk uploads with an error (the next `times` of them, if set), `deleted` marks a session deleted
 // in the app, `device(id).syncEnabled = false` is the app's switch, `forget()` loses every stored
 // chunk (a control plane restored from an older backup), `stop()`/`start()` take it off the network
 // and back on the same port.
@@ -46,7 +46,7 @@ export function start(options: { port?: number } = {}) {
     requests,
     devices,
     sessions,
-    fail: undefined as { status: number; code: string; message?: string } | undefined,
+    fail: undefined as { status: number; code: string; message?: string; times?: number } | undefined,
     get url() {
       return `http://127.0.0.1:${port}`
     },
@@ -130,7 +130,8 @@ export function start(options: { port?: number } = {}) {
       return Response.json({ session, lastSeq: entry.lastSeq, ...(entry.deleted ? { deleted: true } : {}) })
     if (req.method !== "PUT" || route[3] === undefined) return error(405, "method_not_allowed", "No.")
 
-    if (plane.fail) return error(plane.fail.status, plane.fail.code, plane.fail.message ?? plane.fail.code)
+    if (plane.fail && (plane.fail.times === undefined || plane.fail.times-- > 0))
+      return error(plane.fail.status, plane.fail.code, plane.fail.message ?? plane.fail.code)
     if (!device.syncEnabled) return error(409, "sync_disabled", "Sync is off for this device.")
     if (entry.deleted) return error(410, "session_deleted", "This session was deleted.")
     if (Buffer.byteLength(body) > LIMIT) return error(413, "too_large", "Chunks are at most 4 MiB.")

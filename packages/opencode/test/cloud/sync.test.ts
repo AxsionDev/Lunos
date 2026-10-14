@@ -359,6 +359,25 @@ describe("upload loop", () => {
     ])
   })
 
+  test("413: the chunk's seq is filled with an empty chunk, so later turns stay in order", async () => {
+    const messages = [user("msg_1")]
+    const w = make(messages)
+    plane.fail = { status: 413, code: "too_large", times: 1 }
+    expect(await w.turn(S)).toEqual({})
+    expect(await CloudSyncQueue.pending(S)).toEqual([])
+    expect(plane.sessions.get(S)!.lastSeq).toBe(1)
+    messages.push(assistant("msg_2"))
+    await w.turn(S)
+    expect(plane.messages(S)).toEqual(["msg_2"])
+    expect(plane.requests.filter((r) => r.method === "GET" && r.path.includes("/sessions/"))).toEqual([])
+
+    // Refused again as the empty chunk: acked and passed over, no loop.
+    plane.fail = { status: 413, code: "too_large" }
+    messages.push(user("msg_3"))
+    expect(await w.turn(S)).toEqual({})
+    expect(await CloudSyncQueue.pending(S)).toEqual([])
+  })
+
   test("403 device_revoked deletes device.json", async () => {
     const w = make([user("msg_1")])
     plane.device()!.revokedAt = 1

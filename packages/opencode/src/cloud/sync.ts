@@ -448,6 +448,8 @@ export function worker(input: WorkerInput) {
           await CloudSyncQueue.ack(session, chunk.seq)
           continue
         }
+        // The queue never overwrites a seq with other content, so the refused chunk goes first.
+        await CloudSyncQueue.ack(session, chunk.seq)
         await CloudSyncQueue.enqueue(session, input.directory, chunk.seq, EMPTY, [])
         chunks[i] = { ...chunk, body: EMPTY }
         i--
