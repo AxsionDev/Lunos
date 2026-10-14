@@ -114,6 +114,65 @@ describe("lunos sync (subprocess)", () => {
   )
 
   cliIt.live(
+    "status with the control plane unreachable shows the cached device, quickly",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const plane = yield* withPlane
+        const env = yield* setup(home, plane)
+        opencode.expectExit(yield* opencode.spawn(["sync", "status"], { env }), 0, "first status registers")
+        plane.stop()
+        const t = Date.now()
+        const status = yield* opencode.spawn(["sync", "status"], { env })
+        opencode.expectExit(status, 0, "sync status offline plane")
+        expect(status.stdout).toMatch(/device switch:\s+on \(cached\)/)
+        expect(Date.now() - t).toBeLessThan(15_000)
+      }),
+    120_000,
+  )
+
+  cliIt.live(
+    "LUNOS_OFFLINE=1: status makes no request and says so; on and off refuse",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const plane = yield* withPlane
+        const env = yield* setup(home, plane)
+        opencode.expectExit(yield* opencode.spawn(["sync", "status"], { env }), 0, "register first")
+        const before = plane.requests.length
+        const offline = { ...env, LUNOS_OFFLINE: "1" }
+        const status = yield* opencode.spawn(["sync", "status"], { env: offline })
+        opencode.expectExit(status, 0, "offline status")
+        expect(status.stdout).toContain("(offline)")
+        for (const cmd of ["on", "off"]) {
+          const r = yield* opencode.spawn(["sync", cmd], { env: offline })
+          expect(r.exitCode).toBe(1)
+          expect(r.stdout + r.stderr).toContain("Lunos is offline (LUNOS_OFFLINE=1).")
+        }
+        expect(plane.requests.length).toBe(before)
+      }),
+    180_000,
+  )
+
+  cliIt.live(
+    "link --personal writes sync: {} and creates .opencode/opencode.json when missing",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const plane = yield* withPlane
+        const env = yield* setup(home, plane)
+        const file = path.join(home, ".opencode", "opencode.json")
+        yield* Effect.promise(() => fs.rm(file, { force: true }))
+        opencode.expectExit(yield* opencode.spawn(["sync", "link", "p1"], { env }), 0, "link p1")
+        expect(parse(yield* Effect.promise(() => fs.readFile(file, "utf8"))).sync).toEqual({ project: "p1" })
+        yield* Effect.promise(() => fs.rm(file, { force: true }))
+        opencode.expectExit(yield* opencode.spawn(["sync", "link", "--personal"], { env }), 0, "link --personal")
+        expect(parse(yield* Effect.promise(() => fs.readFile(file, "utf8"))).sync).toEqual({})
+        opencode.expectExit(yield* opencode.spawn(["sync", "link", "p1"], { env }), 0, "relink")
+        opencode.expectExit(yield* opencode.spawn(["sync", "link", "--personal"], { env }), 0, "personal after project")
+        expect(parse(yield* Effect.promise(() => fs.readFile(file, "utf8"))).sync).toEqual({})
+      }),
+    180_000,
+  )
+
+  cliIt.live(
     "signed out: every subcommand points at lunos login",
     ({ opencode, home }) =>
       Effect.gen(function* () {

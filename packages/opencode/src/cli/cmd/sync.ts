@@ -7,6 +7,7 @@ import { cmd } from "./cmd"
 import { effectCmd, fail } from "../effect-cmd"
 import { writeStdoutEffect } from "../stdout"
 import { InstanceRef } from "@/effect/instance-ref"
+import { Offline } from "@opencode-ai/core/offline"
 import { Config } from "@/config/config"
 import { ConfigPolicy } from "@/config/policy"
 import { ConfigSettings } from "@/config/settings"
@@ -32,10 +33,30 @@ const signedIn = Effect.gen(function* () {
 const config = () => Config.Service.use((cfg) => cfg.get()) as Effect.Effect<CloudSync.SyncConfig, never, Config.Service>
 const lockedOff = (cfg: CloudSync.SyncConfig) => cfg.sync === false && ConfigPolicy.isLocked(cfg.$locked, "sync")
 
+const OFFLINE = "Lunos is offline (LUNOS_OFFLINE=1)."
+
+/** True only when the control plane answered and lists the device: nothing is inferred from a cache. */
+async function confirm(state: CloudSyncApi.State): Promise<CloudSyncApi.Device | undefined> {
+  try {
+    const session = await CloudAuth.session("Session sync")
+    const res = await fetch(state.endpoint + "/v1/devices", {
+      headers: { authorization: `Bearer ${session.tokens.access_token}`, accept: "application/json" },
+      redirect: "error",
+      signal: AbortSignal.timeout(5_000),
+    })
+    if (!res.ok) return undefined
+    const json = (await res.json()) as { devices?: CloudSyncApi.Device[] }
+    return json.devices?.find((d) => d.id === state.device.id && !d.revokedAt)
+  } catch {
+    return undefined
+  }
+}
+
 const toggle = (on: boolean) =>
   Effect.fn(`Cli.sync.${on ? "on" : "off"}`)(function* () {
     yield* signedIn
-    const state = yield* Effect.tryPromise({ try: () => CloudSyncApi.setEnabled(on), catch: (e) => e }).pipe(
+    if (Offline.enabled()) return yield* fail(OFFLINE)
+    const state = yield* Effect.tryPromise({ try: () => CloudSyncApi.setEnabled(on, { timeoutMs: 10_000 }), catch: (e) => e }).pipe(
       Effect.catch((e) => (e instanceof CloudAuth.SignedOutError ? fail(LOGIN) : fail(message(e)))),
     )
     const cfg = yield* config()
@@ -63,10 +84,19 @@ export const SyncStatusCommand = effectCmd({
     const stored = yield* signedIn
     const ctx = yield* InstanceRef
     const cfg = yield* config()
-    const live = yield* Effect.promise(() => CloudSyncApi.register({ timeoutMs: 5_000 }).catch(() => undefined))
-    const state = live ?? (yield* Effect.promise(() => CloudSyncApi.load()))
-    if (!state) return yield* fail("This device isn't registered with Lunos Cloud yet and the control plane can't be reached.")
-    const cached = live ? "" : " (cached)"
+    const offline = Offline.enabled()
+    let state = yield* Effect.promise(() => CloudSyncApi.load())
+    if (!state && !offline)
+      state = yield* Effect.promise(() => CloudSyncApi.register({ timeoutMs: 5_000 }).catch(() => undefined))
+    if (!state)
+      return yield* fail(
+        offline
+          ? `${OFFLINE} This device isn't registered with Lunos Cloud yet.`
+          : "This device isn't registered with Lunos Cloud yet and the control plane can't be reached.",
+      )
+    const live = offline ? undefined : yield* Effect.promise(() => confirm(state!))
+    const cached = live ? "" : offline ? " (cached) (offline)" : " (cached)"
+    if (live) state = { ...state, device: live }
     const directory =
       cfg.sync === false
         ? "off (sync: false)"
@@ -74,11 +104,12 @@ export const SyncStatusCommand = effectCmd({
           ? `project ${cfg.sync.project}`
           : "personal space"
     const queued = (yield* Effect.promise(() => CloudSyncQueue.pending())).length
+    const device = state.device
     const lines = [
       `signed in as:   ${stored.email ?? stored.sub}`,
       `endpoint:       ${state.endpoint}`,
-      `device:         ${state.device.name} (${state.device.id})`,
-      `device switch:  ${state.device.syncEnabled ? "on" : "off"}${cached}`,
+      `device:         ${device.name} (${device.id})`,
+      `device switch:  ${device.syncEnabled ? "on" : "off"}${cached}`,
       `org policy:     ${lockedOff(cfg) ? "locked off" : "allows sync"}`,
       `this directory: ${directory}${ctx?.directory ? ` [${ctx.directory}]` : ""}`,
     ]
@@ -88,7 +119,7 @@ export const SyncStatusCommand = effectCmd({
     }
     lines.push(`queued chunks:  ${queued}`)
     if (state.paused === "quota") lines.push("paused: space full")
-    lines.push(`last sync:      ${state.device.lastSyncAt ? new Date(state.device.lastSyncAt).toISOString() : "never"}`)
+    lines.push(`last sync:      ${device.lastSyncAt ? new Date(device.lastSyncAt).toISOString() : "never"}`)
     yield* writeStdoutEffect(lines.join(EOL) + EOL)
   }),
 })
@@ -109,12 +140,14 @@ async function choices(): Promise<Choice[]> {
   }
   const out: Choice[] = []
   const { spaces } = await get<{ spaces: Array<{ id: string; name: string }> }>("/v1/spaces")
-  for (const space of spaces) {
-    const { projects } = await get<{ projects: Array<{ id: string; name: string }> }>(
-      `/v1/spaces/${encodeURIComponent(space.id)}/projects`,
-    )
-    for (const project of projects) out.push({ label: `${space.name} / ${project.name}`, project: project.id })
-  }
+  const lists = await Promise.all(
+    spaces.map((space) =>
+      get<{ projects: Array<{ id: string; name: string }> }>(`/v1/spaces/${encodeURIComponent(space.id)}/projects`),
+    ),
+  )
+  spaces.forEach((space, i) => {
+    for (const project of lists[i]!.projects) out.push({ label: `${space.name} / ${project.name}`, project: project.id })
+  })
   return out
 }
 
@@ -124,7 +157,8 @@ export const SyncLinkCommand = effectCmd({
   builder: (yargs) =>
     yargs
       .positional("projectId", { type: "string", describe: "project id; omit to choose from a list" })
-      .option("off", { type: "boolean", default: false, describe: "don't sync sessions from this directory" }),
+      .option("off", { type: "boolean", default: false, describe: "don't sync sessions from this directory" })
+      .option("personal", { type: "boolean", default: false, describe: "sync to your personal space, with no project" }),
   handler: Effect.fn("Cli.sync.link")(function* (args) {
     yield* signedIn
     const ctx = yield* InstanceRef
@@ -136,7 +170,8 @@ export const SyncLinkCommand = effectCmd({
         Effect.catch((e) => (e instanceof CloudAuth.SignedOutError ? fail(LOGIN) : fail(message(e)))),
       )
       let project: string | undefined
-      if (args.projectId) {
+      if (args.personal) project = undefined
+      else if (args.projectId) {
         if (!options.some((o) => o.project === args.projectId))
           return yield* fail(`No project ${args.projectId} in your spaces.`)
         project = args.projectId
