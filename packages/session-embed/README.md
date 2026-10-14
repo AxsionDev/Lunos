@@ -27,7 +27,7 @@ Output in `dist/`:
 
 Vendor all of `dist/` together; the module loads `assets/*` relative to itself.
 
-Sizes at XCOD-185 (minified / gzip):
+Sizes at XCOD-185 (raw size, gzip in the third column):
 
 | File | Size | gzip |
 |---|---|---|
