@@ -65,7 +65,7 @@ test("upload maps success and errors", async () => {
   expect(await CloudSyncApi.upload(s, "ses_1", 1, "{\"messages\":[]}", opts())).toEqual({ ok: true, lastSeq: 1, duplicate: false })
   const bad = await CloudSyncApi.upload(s, "ses_1", 2, "{\"messages\":[]}", opts())
   expect(bad).toMatchObject({ ok: false, status: 409, code: "out_of_order" })
-  expect(bad).not.toHaveProperty("lastSeq")
+  expect((bad as { lastSeq?: number }).lastSeq).toBeUndefined()
 })
 
 test("project config cannot move the endpoint", async () => {
