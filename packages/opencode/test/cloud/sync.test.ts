@@ -252,6 +252,11 @@ describe("repoUrl", () => {
     expect(CloudSync.repoUrl("https://someone:tok@github.com/acme/app.git")).toBe("https://github.com/acme/app.git")
     expect(CloudSync.repoUrl("http://git.example.org/app")).toBe("http://git.example.org/app")
     expect(CloudSync.repoUrl("git@github.com:acme/app.git")).toBe("git@github.com:acme/app.git")
+    expect(CloudSync.repoUrl("ssh://git@github.com/acme/app.git")).toBe("ssh://git@github.com/acme/app.git")
+    expect(CloudSync.repoUrl("ssh://git:secret@git.example.org:2222/app.git")).toBe(
+      "ssh://git@git.example.org:2222/app.git",
+    )
+    expect(CloudSync.repoUrl("git://git.example.org/app.git")).toBeUndefined()
     expect(CloudSync.repoUrl("/home/me/src/app")).toBeUndefined()
     expect(CloudSync.repoUrl("../app")).toBeUndefined()
     expect(CloudSync.repoUrl("file:///home/me/src/app")).toBeUndefined()

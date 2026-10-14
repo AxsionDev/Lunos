@@ -264,12 +264,21 @@ async function git(directory: string, args: string[]) {
 }
 
 /**
- * The origin as it may be uploaded: an http(s) URL without any user name or token in it, or an
- * scp-style `user@host:path`. Anything else (a local path, `file://`) names this machine, not the
- * repository, so it is left out.
+ * The origin as it may be uploaded: an http(s) URL without any user name or token in it, an
+ * `ssh://` URL without a password (the user name, usually `git`, stays), or an scp-style
+ * `user@host:path`. Anything else (a local path, `file://`, `git://`) is left out.
  */
 export function repoUrl(raw: string) {
   if (/^https?:\/\//i.test(raw)) return CloudWorkers.publicRemote(raw).url
+  if (/^ssh:\/\//i.test(raw)) {
+    try {
+      const url = new URL(raw)
+      url.password = ""
+      return url.toString()
+    } catch {
+      return undefined
+    }
+  }
   if (/^[^\s/@:]+@[^\s/:]+:(?!\/\/)/.test(raw)) return raw
   return undefined
 }
