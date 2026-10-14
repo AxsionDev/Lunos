@@ -161,15 +161,20 @@ export const SyncLinkCommand = effectCmd({
       .option("personal", { type: "boolean", default: false, describe: "sync to your personal space, with no project" }),
   handler: Effect.fn("Cli.sync.link")(function* (args) {
     yield* signedIn
+    if (args.personal && args.projectId) return yield* fail("Give a project id or --personal, not both.")
+    // `--off` and `--personal` are local writes; choosing a project needs the server.
+    if (Offline.enabled() && !args.off && !args.personal) return yield* fail(OFFLINE)
     const ctx = yield* InstanceRef
     const target = { directory: ctx?.directory ?? process.cwd(), worktree: ctx?.worktree }
     let value: false | { project?: string; exclude?: string[] }
     if (args.off) value = false
     else {
-      const options = yield* Effect.tryPromise({ try: choices, catch: (e) => e }).pipe(
-        Effect.catch((e) => (e instanceof CloudAuth.SignedOutError ? fail(LOGIN) : fail(message(e)))),
-      )
       let project: string | undefined
+      const options = args.personal
+        ? []
+        : yield* Effect.tryPromise({ try: choices, catch: (e) => e }).pipe(
+            Effect.catch((e) => (e instanceof CloudAuth.SignedOutError ? fail(LOGIN) : fail(message(e)))),
+          )
       if (args.personal) project = undefined
       else if (args.projectId) {
         if (!options.some((o) => o.project === args.projectId))

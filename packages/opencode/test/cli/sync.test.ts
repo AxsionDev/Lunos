@@ -173,6 +173,26 @@ describe("lunos sync (subprocess)", () => {
   )
 
   cliIt.live(
+    "link: --personal with a project id is refused; offline refuses a project but allows --off and --personal",
+    ({ opencode, home }) =>
+      Effect.gen(function* () {
+        const plane = yield* withPlane
+        const env = yield* setup(home, plane)
+        const both = yield* opencode.spawn(["sync", "link", "p1", "--personal"], { env })
+        expect(both.exitCode).toBe(1)
+        const offline = { ...env, LUNOS_OFFLINE: "1" }
+        const before = plane.requests.length
+        const project = yield* opencode.spawn(["sync", "link", "p1"], { env: offline })
+        expect(project.exitCode).toBe(1)
+        expect(project.stdout + project.stderr).toContain("Lunos is offline (LUNOS_OFFLINE=1).")
+        opencode.expectExit(yield* opencode.spawn(["sync", "link", "--off"], { env: offline }), 0, "link --off offline")
+        opencode.expectExit(yield* opencode.spawn(["sync", "link", "--personal"], { env: offline }), 0, "personal offline")
+        expect(plane.requests.length).toBe(before)
+      }),
+    120_000,
+  )
+
+  cliIt.live(
     "signed out: every subcommand points at lunos login",
     ({ opencode, home }) =>
       Effect.gen(function* () {
