@@ -57,7 +57,8 @@ function adminApi(env: Env, fetchImpl: typeof fetch) {
         password: env.KC_ADMIN_PASSWORD!,
       }),
     })
-    if (!res.ok) throw new Error(`admin sign-in to the master realm as ${env.KC_ADMIN_USER}: ${res.status} ${await res.text()}`)
+    if (!res.ok)
+      throw new Error(`admin sign-in to the master realm as ${env.KC_ADMIN_USER}: ${res.status} ${await res.text()}`)
     const body = (await res.json()) as { access_token: string; expires_in: number }
     token = { value: body.access_token, expires: Date.now() + (body.expires_in - 10) * 1000 }
     return token.value
@@ -134,7 +135,10 @@ export async function configure(
   }
   await api.call("GET", r)
   const cli = await clientByClientId("lunos-cli")
-  if (!cli) throw new Error(`realm ${realm} has no lunos-cli client; this script doesn't create it (import realm-lunos.json into a new realm instead)`)
+  if (!cli)
+    throw new Error(
+      `realm ${realm} has no lunos-cli client; this script doesn't create it (import realm-lunos.json into a new realm instead)`,
+    )
   const scopes: Json[] = await api.call("GET", `${r}/client-scopes`)
   let scopeId: string | undefined = scopes.find((s) => s.name === SCOPE)?.id
   const mappersPath = (id: string) => `${r}/client-scopes/${id}/protocol-mappers/models`
@@ -143,14 +147,18 @@ export async function configure(
     const mapper = haveMappers.find((m) => m.name === want.name)
     // Changing a mapper's type would mean replacing it, and this script never deletes.
     if (mapper && mapper.protocolMapper !== want.protocolMapper) {
-      throw new Error(`client scope ${SCOPE}'s mapper ${want.name} is a ${mapper.protocolMapper}, not a ${want.protocolMapper}; fix it by hand`)
+      throw new Error(
+        `client scope ${SCOPE}'s mapper ${want.name} is a ${mapper.protocolMapper}, not a ${want.protocolMapper}; fix it by hand`,
+      )
     }
   }
 
   // The lunos client scope and both its mappers.
   if (!scopeId) {
     const mappers = wantScope.protocolMappers.map((m: Json) => m.name).join(", ")
-    scopeId = await change(`create client scope ${SCOPE} (mappers ${mappers})`, () => api.create(`${r}/client-scopes`, wantScope))
+    scopeId = await change(`create client scope ${SCOPE} (mappers ${mappers})`, () =>
+      api.create(`${r}/client-scopes`, wantScope),
+    )
   } else {
     const scopeMappers = mappersPath(scopeId)
     for (const want of wantScope.protocolMappers) {
@@ -197,7 +205,12 @@ export async function configure(
       // The bundle's entry names its default scopes, lunos among them where it belongs.
       const from = secret ? `, secret from ${secretEnv}` : ""
       created.add(clientId)
-      ids.set(clientId, await change(`create client ${clientId}${from}`, () => api.create(`${r}/clients`, secret ? { ...want, secret } : want)))
+      ids.set(
+        clientId,
+        await change(`create client ${clientId}${from}`, () =>
+          api.create(`${r}/clients`, secret ? { ...want, secret } : want),
+        ),
+      )
       continue
     }
     ids.set(clientId, have.id)
@@ -222,7 +235,11 @@ export async function configure(
     const confidential = want.publicClient === false
     const currentSecret = async () => (await api.call("GET", `${r}/clients/${have.id}/client-secret`))?.value
     const newSecret = !!secret && (have.publicClient || (await currentSecret()) !== secret)
-    const what = [...Object.keys(update), ...Object.keys(attributes), ...(newSecret ? [`secret from ${secretEnv}`] : [])]
+    const what = [
+      ...Object.keys(update),
+      ...Object.keys(attributes),
+      ...(newSecret ? [`secret from ${secretEnv}`] : []),
+    ]
     if (what.length) {
       await change(`set ${what.join(", ")} on client ${clientId}`, () =>
         api.call("PUT", `${r}/clients/${have.id}`, {
@@ -238,7 +255,8 @@ export async function configure(
       const generate = (what: string) => change(what, () => api.call("POST", `${r}/clients/${have.id}/client-secret`))
       // In a dry run a client still public has no secret to read. Keycloak 26.3 gives it one when it turns
       // confidential, so the real run usually finds one and generates nothing.
-      if (dry && have.publicClient) await generate(`generate a secret for client ${clientId} if it has none once confidential`)
+      if (dry && have.publicClient)
+        await generate(`generate a secret for client ${clientId} if it has none once confidential`)
       else if (!(await currentSecret())) await generate(`generate a secret for client ${clientId}`)
     }
   }
@@ -258,9 +276,10 @@ export async function configure(
   // The console creates organisations' identity providers through this account and needs nothing else.
   const consoleAdmin = ids.get("lunos-console-admin")
   // In a dry run, a service account this run would create doesn't exist yet: its role is planned unread.
-  const account: Json = consoleAdmin && (!dry || hadServiceAccount)
-    ? await api.call("GET", `${r}/clients/${consoleAdmin}/service-account-user`)
-    : undefined
+  const account: Json =
+    consoleAdmin && (!dry || hadServiceAccount)
+      ? await api.call("GET", `${r}/clients/${consoleAdmin}/service-account-user`)
+      : undefined
   const realmManagement = await clientByClientId("realm-management")
   const granted: Json[] = account
     ? await api.call("GET", `${r}/users/${account.id}/role-mappings/clients/${realmManagement.id}`)
@@ -282,7 +301,8 @@ if (import.meta.main) {
     const dry = !!env.DRY_RUN && env.DRY_RUN !== "0"
     const changes = await configure(env)
     if (!changes.length) console.log(`Realm ${realm} already matches realm-lunos.json; nothing changed.`)
-    else console.log(`${dry ? "DRY_RUN, nothing changed. Would" : "Done"}:\n${changes.map((c) => `  - ${c}`).join("\n")}`)
+    else
+      console.log(`${dry ? "DRY_RUN, nothing changed. Would" : "Done"}:\n${changes.map((c) => `  - ${c}`).join("\n")}`)
     // The secrets stay in Keycloak; say where to read them, not what they are.
     const consoleUrl = `${env.KC_URL!.replace(/\/+$/, "")}/admin/master/console/#/${encodeURIComponent(realm)}/clients`
     console.log(`\nClient secrets: ${consoleUrl}, then each client's Credentials tab:`)

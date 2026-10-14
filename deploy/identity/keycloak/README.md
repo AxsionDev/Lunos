@@ -11,17 +11,17 @@ The sign-in service behind `lunos login` (XCOD-185). It's Keycloak 26 with Postg
 
 ## What the realm sets up
 
-| Setting                                                | Covers                                                                                                                                                                           |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lunos-cli`: public client, device flow only           | `lunos login` / `whoami` / `logout` (AC3), and revocation on logout (AC4)                                                                                                        |
-| Self-registration, e-mail as username, verified e-mail | Sign-up with a verified e-mail (AC1). Needs SMTP.                                                                                                                                |
-| `organizationsEnabled`, `organization` scope           | Organisations and invites by e-mail (AC2). `lunos whoami` shows the user's organisations.                                                                                        |
-| `lunos` client scope (default on every client) | The `lunos_idp` claim and the `lunos-api` audience in access tokens. The realm's default client scopes include it, so a client created later in the admin console gets both too. See below. |
-| `lunos-app`: confidential, authorization code + PKCE | The private space at `app.lunos.tech`. Back-channel logout. |
-| `lunos-console`: confidential, authorization code + PKCE | The admin console mounted in the control plane (`cloud.lunos.tech/console`). |
-| `lunos-console-admin`: service account | The console's way to create organisations' identity providers. Its only role is `manage-identity-providers`. |
-| Realm roles `org-owner`, `org-admin`, `org-member`     | Unused. Organisations and roles live in the Lunos control plane (XCOD-190). |
-| Brute-force protection, `sslRequired: external`        | Basic hardening                                                                                                                                                                  |
+| Setting                                                  | Covers                                                                                                                                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lunos-cli`: public client, device flow only             | `lunos login` / `whoami` / `logout` (AC3), and revocation on logout (AC4)                                                                                                                   |
+| Self-registration, e-mail as username, verified e-mail   | Sign-up with a verified e-mail (AC1). Needs SMTP.                                                                                                                                           |
+| `organizationsEnabled`, `organization` scope             | Organisations and invites by e-mail (AC2). `lunos whoami` shows the user's organisations.                                                                                                   |
+| `lunos` client scope (default on every client)           | The `lunos_idp` claim and the `lunos-api` audience in access tokens. The realm's default client scopes include it, so a client created later in the admin console gets both too. See below. |
+| `lunos-app`: confidential, authorization code + PKCE     | The private space at `app.lunos.tech`. Back-channel logout.                                                                                                                                 |
+| `lunos-console`: confidential, authorization code + PKCE | The admin console mounted in the control plane (`cloud.lunos.tech/console`).                                                                                                                |
+| `lunos-console-admin`: service account                   | The console's way to create organisations' identity providers. Its only role is `manage-identity-providers`.                                                                                |
+| Realm roles `org-owner`, `org-admin`, `org-member`       | Unused. Organisations and roles live in the Lunos control plane (XCOD-190).                                                                                                                 |
+| Brute-force protection, `sslRequired: external`          | Basic hardening                                                                                                                                                                             |
 
 **Not in the file, configured in the admin console once secrets exist:**
 
@@ -33,11 +33,11 @@ The sign-in service behind `lunos login` (XCOD-185). It's Keycloak 26 with Postg
 
 ID and access tokens and userinfo carry `lunos_idp`, which says which provider the session's latest sign-in used. The control plane's enforce-SSO rule compares it with an organisation's required connection (`docs/enforce-sso.md` in the lunoshq repo).
 
-| Value                      | When                                                                                                                              |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `lunos`                    | The user signed in with Lunos's own credentials (password, passkey).                                                              |
-| `org:<org id>:<connection>` | The brokered identity provider's `lunosIdp` config attribute, when it has that shape.                                            |
-| the provider's alias       | A brokered provider without a valid `lunosIdp`; any `:` in the alias becomes `-`, so an alias can't imitate the organisation form. |
+| Value                       | When                                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `lunos`                     | The user signed in with Lunos's own credentials (password, passkey).                                                               |
+| `org:<org id>:<connection>` | The brokered identity provider's `lunosIdp` config attribute, when it has that shape.                                              |
+| the provider's alias        | A brokered provider without a valid `lunosIdp`; any `:` in the alias becomes `-`, so an alias can't imitate the organisation form. |
 
 The value never comes from user attributes or request parameters. Never name an identity provider `lunos`: it would read as own credentials. Give social identity providers lowercase aliases (`google`, `github`, `microsoft`): the claim carries the alias as it is, case included, and the control plane compares it exactly.
 

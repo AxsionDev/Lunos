@@ -74,7 +74,12 @@ export async function startKeycloak(opts?: { realmFiles?: string[] }): Promise<K
     if (token && token.expires > Date.now()) return token.value
     const res = await fetch(`${BASE}/realms/master/protocol/openid-connect/token`, {
       method: "POST",
-      body: new URLSearchParams({ grant_type: "password", client_id: "admin-cli", username: "admin", password: "admin" }),
+      body: new URLSearchParams({
+        grant_type: "password",
+        client_id: "admin-cli",
+        username: "admin",
+        password: "admin",
+      }),
     })
     if (!res.ok) throw new Error(`admin token: ${res.status} ${await res.text()}`)
     const body = (await res.json()) as { access_token: string; expires_in: number }
@@ -124,12 +129,12 @@ export class CookieJar {
       const eq = pair.indexOf("=")
       const name = pair.slice(0, eq)
       const value = pair.slice(eq + 1)
-      const attr = (key: string) =>
-        attrs.find((a) => a.toLowerCase().startsWith(`${key}=`))?.slice(key.length + 1)
+      const attr = (key: string) => attrs.find((a) => a.toLowerCase().startsWith(`${key}=`))?.slice(key.length + 1)
       const cookiePath = attr("path") ?? "/"
       const maxAge = attr("max-age")
       const expires = attr("expires")
-      const expired = (maxAge !== undefined && Number(maxAge) <= 0) || (expires !== undefined && Date.parse(expires) < Date.now())
+      const expired =
+        (maxAge !== undefined && Number(maxAge) <= 0) || (expires !== undefined && Date.parse(expires) < Date.now())
       const key = `${name}\0${cookiePath}`
       if (expired) this.cookies.delete(key)
       else this.cookies.set(key, { name, value, path: cookiePath })
@@ -225,7 +230,8 @@ async function browse(start: string, opts: BrowseOptions) {
       continue
     }
     html = await res.text()
-    const link = opts.idpLink && !followedIdp && html.match(new RegExp(`href="([^"]*/broker/${opts.idpLink}/login[^"]*)"`))
+    const link =
+      opts.idpLink && !followedIdp && html.match(new RegExp(`href="([^"]*/broker/${opts.idpLink}/login[^"]*)"`))
     if (link) {
       followedIdp = true
       url = new URL(decode(link[1]), url).toString()

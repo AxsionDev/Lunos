@@ -17,17 +17,7 @@
   "oauth2DevicePollingInterval": 5,
   "offlineSessionIdleTimeout": 2592000,
   "internationalizationEnabled": true,
-  "supportedLocales": [
-    "en",
-    "de",
-    "fr",
-    "es",
-    "it",
-    "nl",
-    "pl",
-    "pt-BR",
-    "bg"
-  ],
+  "supportedLocales": ["en", "de", "fr", "es", "it", "nl", "pl", "pt-BR", "bg"],
   "defaultLocale": "en",
   "smtpServer": {
     "host": "${SMTP_HOST}",
@@ -54,19 +44,8 @@
       "attributes": {
         "oauth2.device.authorization.grant.enabled": "true"
       },
-      "defaultClientScopes": [
-        "web-origins",
-        "acr",
-        "roles",
-        "profile",
-        "basic",
-        "email",
-        "organization",
-        "lunos"
-      ],
-      "optionalClientScopes": [
-        "offline_access"
-      ]
+      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "basic", "email", "organization", "lunos"],
+      "optionalClientScopes": ["offline_access"]
     },
     {
       "clientId": "lunos-app",
@@ -80,12 +59,8 @@
       "frontchannelLogout": false,
       "standardFlowEnabled": true,
       "serviceAccountsEnabled": false,
-      "redirectUris": [
-        "https://app.lunos.tech/auth/callback"
-      ],
-      "webOrigins": [
-        "https://app.lunos.tech"
-      ],
+      "redirectUris": ["https://app.lunos.tech/auth/callback"],
+      "webOrigins": ["https://app.lunos.tech"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "https://app.lunos.tech/",
@@ -93,19 +68,8 @@
         "backchannel.logout.session.required": "true",
         "backchannel.logout.revoke.offline.tokens": "false"
       },
-      "defaultClientScopes": [
-        "web-origins",
-        "acr",
-        "roles",
-        "profile",
-        "basic",
-        "email",
-        "organization",
-        "lunos"
-      ],
-      "optionalClientScopes": [
-        "offline_access"
-      ]
+      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "basic", "email", "organization", "lunos"],
+      "optionalClientScopes": ["offline_access"]
     },
     {
       "clientId": "lunos-console",
@@ -119,26 +83,13 @@
       "frontchannelLogout": false,
       "standardFlowEnabled": true,
       "serviceAccountsEnabled": false,
-      "redirectUris": [
-        "https://cloud.lunos.tech/console/callback"
-      ],
-      "webOrigins": [
-        "https://cloud.lunos.tech"
-      ],
+      "redirectUris": ["https://cloud.lunos.tech/console/callback"],
+      "webOrigins": ["https://cloud.lunos.tech"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "https://cloud.lunos.tech/console/"
       },
-      "defaultClientScopes": [
-        "web-origins",
-        "acr",
-        "roles",
-        "profile",
-        "basic",
-        "email",
-        "organization",
-        "lunos"
-      ],
+      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "basic", "email", "organization", "lunos"],
       "optionalClientScopes": []
     },
     {
@@ -153,10 +104,7 @@
       "frontchannelLogout": false,
       "standardFlowEnabled": false,
       "serviceAccountsEnabled": true,
-      "defaultClientScopes": [
-        "roles",
-        "basic"
-      ],
+      "defaultClientScopes": ["roles", "basic"],
       "optionalClientScopes": []
     }
   ],
@@ -853,21 +801,14 @@
     "organization",
     "lunos"
   ],
-  "defaultOptionalClientScopes": [
-    "offline_access",
-    "address",
-    "phone",
-    "microprofile-jwt"
-  ],
+  "defaultOptionalClientScopes": ["offline_access", "address", "phone", "microprofile-jwt"],
   "users": [
     {
       "username": "service-account-lunos-console-admin",
       "enabled": true,
       "serviceAccountClientId": "lunos-console-admin",
       "clientRoles": {
-        "realm-management": [
-          "manage-identity-providers"
-        ]
+        "realm-management": ["manage-identity-providers"]
       }
     }
   ]

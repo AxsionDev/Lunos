@@ -74,7 +74,9 @@ const sorted = (xs: string[]) => [...xs].sort()
 function expectUris(client: any, want: { redirect: string; origin: string; postLogout: string }, extras: Extras) {
   expect(sorted(client.redirectUris)).toEqual(sorted([want.redirect, ...extras.redirectUris]))
   expect(sorted(client.webOrigins)).toEqual(sorted([want.origin, ...extras.webOrigins]))
-  expect(sorted(client.attributes["post.logout.redirect.uris"].split("##"))).toEqual(sorted([want.postLogout, ...extras.postLogout]))
+  expect(sorted(client.attributes["post.logout.redirect.uris"].split("##"))).toEqual(
+    sorted([want.postLogout, ...extras.postLogout]),
+  )
 }
 
 const APP_URIS = {
@@ -115,7 +117,11 @@ async function expectClientsAsSpecified(kc: Kc, realm: string, extras: { app?: E
   expect(console_).toMatchObject(webClient)
   expectUris(
     console_,
-    { redirect: "https://cloud.lunos.tech/console/callback", origin: "https://cloud.lunos.tech", postLogout: "https://cloud.lunos.tech/console/" },
+    {
+      redirect: "https://cloud.lunos.tech/console/callback",
+      origin: "https://cloud.lunos.tech",
+      postLogout: "https://cloud.lunos.tech/console/",
+    },
     extras.console ?? NO_EXTRAS,
   )
   expect(console_.attributes).toMatchObject({ "pkce.code.challenge.method": "S256" })
@@ -129,11 +135,18 @@ async function expectClientsAsSpecified(kc: Kc, realm: string, extras: { app?: E
     serviceAccountsEnabled: true,
   })
   const bundle = await Bun.file(path.resolve(import.meta.dir, "../realm-lunos.json")).json()
-  const wantAdminScopes: string[] = bundle.clients.find((c: any) => c.clientId === "lunos-console-admin").defaultClientScopes
-  const adminScopes: { name: string }[] = await kc.admin("GET", `${realm}/clients/${consoleAdmin.id}/default-client-scopes`)
+  const wantAdminScopes: string[] = bundle.clients.find(
+    (c: any) => c.clientId === "lunos-console-admin",
+  ).defaultClientScopes
+  const adminScopes: { name: string }[] = await kc.admin(
+    "GET",
+    `${realm}/clients/${consoleAdmin.id}/default-client-scopes`,
+  )
   // Keycloak attaches its built-in service_account scope to a client created with a service account
   // through the admin API (configure-realm.ts's path), though not on import.
-  expect(sorted(adminScopes.map((s) => s.name).filter((name) => name !== "service_account"))).toEqual(sorted(wantAdminScopes))
+  expect(sorted(adminScopes.map((s) => s.name).filter((name) => name !== "service_account"))).toEqual(
+    sorted(wantAdminScopes),
+  )
   const account = await kc.admin("GET", `${realm}/clients/${consoleAdmin.id}/service-account-user`)
   const realmManagement = await clientByClientId(kc, "realm-management", realm)
   const clientRoles: { name: string }[] = await kc.admin(
@@ -142,7 +155,9 @@ async function expectClientsAsSpecified(kc: Kc, realm: string, extras: { app?: E
   )
   expect(clientRoles.map((r) => r.name)).toEqual(["manage-identity-providers"])
   const realmRoles: { name: string }[] = await kc.admin("GET", `${realm}/users/${account.id}/role-mappings/realm`)
-  expect(realmRoles.map((r) => r.name).filter((name) => name !== `default-roles-${realm.slice(1).toLowerCase()}`)).toEqual([])
+  expect(
+    realmRoles.map((r) => r.name).filter((name) => name !== `default-roles-${realm.slice(1).toLowerCase()}`),
+  ).toEqual([])
 }
 
 describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
@@ -317,7 +332,11 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   test("re-authentication with a password in the same browser session", async () => {
     // uma, first signed in through acme-entra, now signs in with a Lunos password in the same browser.
     const [uma] = await kc.admin("GET", `${R}/users?email=${encodeURIComponent("uma@acme.test")}&exact=true`)
-    await kc.admin("PUT", `${R}/users/${uma.id}/reset-password`, { type: "password", value: UMA_LOCAL, temporary: false })
+    await kc.admin("PUT", `${R}/users/${uma.id}/reset-password`, {
+      type: "password",
+      value: UMA_LOCAL,
+      temporary: false,
+    })
     const { code, verifier, posted } = await browserLogin(kc, {
       username: "uma@acme.test",
       password: UMA_LOCAL,
@@ -325,7 +344,9 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
       extra: { prompt: "login" },
     })
     // prompt=login made Keycloak ask again: the password went to Lunos's own login form, not upstream's.
-    expect(posted.some((step) => step.startsWith("/realms/Lunos/login-actions/") && step.includes("password"))).toBe(true)
+    expect(posted.some((step) => step.startsWith("/realms/Lunos/login-actions/") && step.includes("password"))).toBe(
+      true,
+    )
     const tokens = await exchange(kc, TEST_CLIENT, code, verifier)
     expect(claims(tokens.id_token).sid).toBe(claims(acme.id_token).sid)
     expect(idp(tokens)).toEqual({ id: "lunos", access: "lunos" })
@@ -343,7 +364,10 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     const first = await browserLogin(kc, { username: "uma@acme.test", password: UMA_LOCAL })
     const password = await exchange(kc, TEST_CLIENT, first.code, first.verifier)
     expect(idp(password)).toEqual({ id: "lunos", access: "lunos" })
-    const { tokens, posted } = await brokered("acme-entra", UPSTREAM.uma, { jar: first.jar, extra: { prompt: "login" } })
+    const { tokens, posted } = await brokered("acme-entra", UPSTREAM.uma, {
+      jar: first.jar,
+      extra: { prompt: "login" },
+    })
     // The re-authentication really went through the upstream realm's login form.
     expect(posted.some((step) => step.startsWith("/realms/upstream/") && step.includes("password"))).toBe(true)
     expect(claims(tokens.id_token).sid).toBe(claims(password.id_token).sid)
@@ -371,7 +395,13 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     expect(claims(first.refresh_token).typ).toBe("Offline")
     expect(idp(await refresh(kc, TEST_CLIENT, first.refresh_token))).toEqual(ORG)
 
-    const again = await browserLogin(kc, { username: "uma@acme.test", password: UMA_LOCAL, jar, extra: { prompt: "login" }, ...offline })
+    const again = await browserLogin(kc, {
+      username: "uma@acme.test",
+      password: UMA_LOCAL,
+      jar,
+      extra: { prompt: "login" },
+      ...offline,
+    })
     const viaPassword = await exchange(kc, TEST_CLIENT, again.code, again.verifier)
     expect(claims(viaPassword.id_token).sid).toBe(claims(viaBroker.id_token).sid)
     expect(idp(viaPassword)).toEqual(OWN)
@@ -388,7 +418,11 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     const first = await exchange(kc, TEST_CLIENT, sso.code, sso.verifier)
     expect(idp(await refresh(kc, TEST_CLIENT, first.refresh_token))).toEqual(OWN)
 
-    const { tokens: viaBroker } = await brokered("acme-entra", UPSTREAM.uma, { jar: start.jar, extra: { prompt: "login" }, ...offline })
+    const { tokens: viaBroker } = await brokered("acme-entra", UPSTREAM.uma, {
+      jar: start.jar,
+      extra: { prompt: "login" },
+      ...offline,
+    })
     expect(claims(viaBroker.id_token).sid).toBe(claims(viaPassword.id_token).sid)
     expect(idp(await refresh(kc, TEST_CLIENT, viaBroker.refresh_token))).toEqual(ORG)
     expect(idp(await refresh(kc, TEST_CLIENT, first.refresh_token))).toEqual(ORG)
@@ -503,11 +537,15 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
     })
     const state = async () => ({
       clients: (await kc.admin("GET", "/BadScope/clients")).map((c: { clientId: string }) => c.clientId).sort(),
-      defaults: (await kc.admin("GET", "/BadScope/default-default-client-scopes")).map((s: { name: string }) => s.name).sort(),
+      defaults: (await kc.admin("GET", "/BadScope/default-default-client-scopes"))
+        .map((s: { name: string }) => s.name)
+        .sort(),
       listeners: (await kc.admin("GET", "/BadScope/events/config")).eventsListeners,
     })
     const before = await state()
-    await expect(configure({ ...oldEnv(), KC_REALM: "BadScope" })).rejects.toThrow(/mapper lunos_idp is a oidc-hardcoded-claim-mapper/)
+    await expect(configure({ ...oldEnv(), KC_REALM: "BadScope" })).rejects.toThrow(
+      /mapper lunos_idp is a oidc-hardcoded-claim-mapper/,
+    )
     expect(await state()).toEqual(before)
     await kc.admin("DELETE", "/BadScope")
   })
