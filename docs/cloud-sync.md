@@ -6,7 +6,7 @@ When you are signed in to Lunos Cloud (`lunos login`), Lunos copies your session
 
 After each completed turn, the session's new complete messages are queued and uploaded: the session record (title, model, summary and so on), user messages and finished assistant messages with their parts, which include tool calls and their results. Alongside, small metadata (title, the git remote URL, the commit, the model and the project id) rides on the first chunk of each turn. For `http(s)` remotes any credentials are stripped from the URL; `ssh://` remotes are sent with the user name but no password; a local-path or `file://` remote is not sent. Each message is sent once. Uploads are numbered chunks of at most 4 MiB, in order. A single message larger than that has its tool outputs truncated (marked `…[truncated for sync]`) to fit.
 
-Uploads happen in the background and never block or slow a session; a failure is logged, not shown in the session. A turn still waiting out its short delay when Lunos closes (a TUI quitting, `lunos run` finishing) is written to the queue on disk within a few seconds, and uploaded the next time Lunos starts.
+Uploads happen in the background and never block or slow a session; a failure is logged, not shown in the session. A turn still waiting out its short delay when Lunos closes (a TUI quitting, `lunos run` finishing) is written to the queue on disk within a few seconds, and uploaded the next time Lunos starts (the TUI, `lunos run` or `lunos serve`; `lunos sync status` doesn't upload). So a one-off `lunos run` session reaches your space when you next use Lunos, not when the run ends.
 
 ## Where it goes
 
