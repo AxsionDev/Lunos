@@ -6,11 +6,11 @@ When you are signed in to Lunos Cloud (`lunos login`), Lunos copies your session
 
 After each completed turn, the session's new complete messages are queued and uploaded: the session record (title, model, summary and so on), user messages and finished assistant messages with their parts, which include tool calls and their results. Alongside, small metadata goes with the first chunk: title, the git remote URL (without any user name or token), the commit, the model and the project id. Each message is sent once. Uploads are numbered chunks of at most 4 MiB, in order.
 
-Uploads happen in the background and never block or slow a session; a failure is logged, not shown in the session.
+Uploads happen in the background and never block or slow a session; a failure is logged, not shown in the session. A turn still waiting out its short delay when Lunos closes (a TUI quitting, `lunos run` finishing) is written to the queue on disk within a few seconds, and uploaded the next time Lunos starts.
 
 ## Where it goes
 
-To your personal space, or to the space project that `lunos sync link` bound for the directory. The control plane is `https://cloud.lunos.tech`, or `cloud.endpoint` from your **global or managed** config. A project's own `opencode.json` is never consulted for the endpoint, so a repository can't redirect where your sign-in and sessions are sent. The endpoint must be `https` (plain `http` only for localhost).
+To your personal space, or to the space project that `lunos sync link` bound for the directory. The control plane is `https://cloud.lunos.tech`, or `cloud.endpoint` from your **global or managed** config. A project's own `opencode.json` is never consulted for the endpoint, so a repository can't redirect where your sign-in and sessions are sent. The endpoint must be `https` (plain `http` only for localhost). Your device is registered at the endpoint in force when you ran `lunos login`; if `cloud.endpoint` later changes, nothing is sent (a warning is logged) until you run `lunos login` again.
 
 ## What never syncs
 
@@ -37,7 +37,8 @@ Be aware of these; they are covered only by the scanner:
 Also:
 
 - Absolute project paths inside tool input and output are uploaded as they are. Only the session's own `directory` field is removed.
-- A chunk the server refuses as too large (HTTP 413, even after Lunos splits a turn into 4 MiB chunks) is replaced by an empty chunk so later chunks still line up. That turn is missing in your space.
+- A chunk the server refuses as too large (HTTP 413, even after Lunos splits a turn into 4 MiB chunks), or keeps refusing for its own reasons (8 attempts), is replaced by an empty chunk so later chunks still line up. That turn is missing in your space.
+- A session record whose metadata alone would take more than half a chunk is uploaded without its `summary` and `metadata`; it keeps its identity, title and counts.
 
 Add anything else that is sensitive to `sync.exclude`, or turn sync off for the directory.
 
@@ -56,7 +57,7 @@ An organisation stops sync everywhere with `{ "sync": false, "$locked": ["sync"]
 
 ## The gates
 
-Checked in this order before every turn. The first that refuses stops it:
+Checked in this order before every turn, and before any token is read or refreshed. The first that refuses stops it:
 
 1. **Offline.** `LUNOS_OFFLINE=1` stops sync entirely and silently.
 2. **Signed out.** Silent.
@@ -83,7 +84,7 @@ The first time a device is registered, `lunos login` shows: `Sessions sync to yo
 
 ## Offline queue and retries
 
-Chunks are written to a queue on disk (`cloud/sync/queue/<session>/` in Lunos's data directory) after redaction, and deleted one by one as the server acknowledges them. If the network, the server (5xx) or rate limits (429) fail, they stay queued and are retried with a growing delay (1 s doubling to 10 min, plus jitter), and again at the next turn or start. If the server's position differs from the queue's, Lunos asks for it and resends from there; the server ignores repeats. A session you deleted in the app (HTTP 410) stops uploading for good.
+Chunks are written to a queue on disk (`cloud/sync/queue/<session>/` in Lunos's data directory) after redaction, and deleted one by one as the server acknowledges them. If the network, the server (5xx) or rate limits (429) fail, they stay queued and are retried with a growing delay (1 s doubling to 10 min, plus jitter), and again at the next turn or start. A 401 makes Lunos refresh your sign-in token and try once more; if that fails too, sync stops until you sign in again. If the server's position differs from the queue's, Lunos asks for it and resends from there; the server ignores repeats. A session you deleted in the app (HTTP 410) stops uploading for good.
 
 ## When your space is full
 
