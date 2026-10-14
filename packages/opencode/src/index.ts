@@ -42,6 +42,7 @@ import { MarketplaceCommand } from "./cli/cmd/marketplace"
 import { AuditCommand } from "./cli/cmd/audit"
 import { MemoryCommand } from "./cli/cmd/memory"
 import { SettingsCommand } from "./cli/cmd/settings"
+import { SyncCommand } from "./cli/cmd/sync"
 import { SandboxCommand } from "./cli/cmd/sandbox"
 import { LicensesCommand } from "./cli/cmd/licenses"
 import { Heap } from "./cli/heap"
@@ -187,6 +188,7 @@ const cli = yargs(args)
   .command(AuditCommand)
   .command(MemoryCommand)
   .command(SettingsCommand)
+  .command(SyncCommand)
   .command(SandboxCommand)
   .command(LicensesCommand)
   .command(DbCommand)

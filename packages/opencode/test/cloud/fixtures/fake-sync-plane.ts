@@ -46,6 +46,12 @@ export function start(options: { port?: number } = {}) {
     requests,
     devices,
     sessions,
+    /** The spaces and projects `GET /v1/spaces` and `/v1/spaces/{id}/projects` answer with. */
+    spaces: [{ id: "sp_1", name: "Personal", projects: [{ id: "p1", name: "Website" }] }] as Array<{
+      id: string
+      name: string
+      projects: Array<{ id: string; name: string }>
+    }>,
     fail: undefined as { status: number; code: string; message?: string; times?: number } | undefined,
     get url() {
       return `http://127.0.0.1:${port}`
@@ -99,6 +105,13 @@ export function start(options: { port?: number } = {}) {
       })
     if (req.headers.get("authorization") !== `Bearer ${TOKEN}`) return error(401, "unauthorized", "Sign in again.")
 
+    if (req.method === "GET" && url.pathname === "/v1/spaces")
+      return Response.json({ spaces: plane.spaces.map(({ projects: _, ...space }) => space) })
+    const projects = url.pathname.match(/^\/v1\/spaces\/([^/]+)\/projects$/)
+    if (req.method === "GET" && projects) {
+      const space = plane.spaces.find((x) => x.id === decodeURIComponent(projects[1]!))
+      return space ? Response.json({ projects: space.projects }) : error(404, "not_found", "No such space.")
+    }
     if (req.method === "POST" && url.pathname === "/v1/devices") {
       const input = JSON.parse(body)
       const d: Device = {
