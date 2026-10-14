@@ -442,7 +442,7 @@
       "properties": {
         "issuer": {
           "type": "string",
-          "description": "OpenID Connect issuer URL that lunos login signs in to, e.g. https://id.example.eu/realms/lunos"
+          "description": "OpenID Connect issuer URL that lunos login signs in to, e.g. https://id.example.eu/realms/lunos (default https://auth.lunos.tech/realms/Lunos)"
         },
         "client_id": {
           "type": "string",
@@ -462,6 +462,34 @@
         }
       },
       "additionalProperties": false
+    },
+    "SyncOptions": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string",
+          "description": "Lunos space project this directory's sessions sync to (lunos sync link writes it)"
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Globs of files whose contents are never uploaded, in addition to .env*, auth.json, *.pem, *.key, id_rsa*"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SyncConfig": {
+      "anyOf": [
+        {
+          "type": "boolean",
+          "enum": [false]
+        },
+        {
+          "$ref": "#/$defs/SyncOptions"
+        }
+      ]
     },
     "SubagentConfig": {
       "type": "object",
@@ -1570,6 +1598,10 @@
         "cloud": {
           "$ref": "#/$defs/CloudConfig",
           "description": "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)"
+        },
+        "sync": {
+          "$ref": "#/$defs/SyncConfig",
+          "description": "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }"
         },
         "subagent": {
           "$ref": "#/$defs/SubagentConfig",

@@ -44,7 +44,7 @@ If you encounter Lunos marketing that uses the ❌ phrasings, it contradicts thi
 
 ### Leaves your infrastructure
 
-**Only one thing: the model requests you make.** When Lunos answers a prompt it sends the prompt, relevant file contents, and conversation context to the model provider **you configure** — for example Mistral, Scaleway, Anthropic or OpenAI.
+**Only one thing, unless you sign in to Lunos Cloud: the model requests you make.** (Signed in, completed sessions also sync to your Lunos space; see [Session sync](#session-sync-to-your-lunos-space--on-when-signed-in) below.) When Lunos answers a prompt it sends the prompt, relevant file contents, and conversation context to the model provider **you configure** — for example Mistral, Scaleway, Anthropic or OpenAI.
 
 That provider is your choice and your contractual relationship. Lunos does not select one for you and has no commercial arrangement with any of them. Where each provider processes data is documented in [Model provider jurisdictions](../provider-jurisdictions.md).
 
@@ -66,6 +66,19 @@ The tool also fetches its model catalogue (a list of available models and their 
   - Every memory operation is an audit event (`memory.remember`, `recall`, `forget`, `outdate`, `import`, `export`, `purge`, `verify_failed`): time, scope, fact ids, counts and where it came from, never a fact's text or a search query. They are forwarded to your SIEM with everything else.
 
 **The marketplace** (`lunos marketplace …` commands and the TUI's Discover view) fetches `https://lunos.tech/marketplace.json`, the built-in `lunos-community` catalogue: names, descriptions and install sources of community plugins and MCP servers. It sends no project data, runs only when you use those commands, never at startup, and is cached for a day. Installing an entry then fetches that entry's package (for example from npm). Turn off the built-in catalogue with `"marketplace_default": false`. Marketplaces you add yourself are fetched the same way.
+
+#### Session sync to your Lunos space — on when signed in
+
+Once you have run `lunos login`, Lunos copies each completed session turn to your personal space on Lunos Cloud (`https://cloud.lunos.tech`, ITService EOOD, Bulgarian data centre): messages, tool calls and their results, and session metadata. This is a call to Lunos Cloud, not to your model provider. It never happens when you are signed out. Full detail, including what is never uploaded, is in [Session sync](../cloud-sync.md).
+
+Any of these stops it:
+
+- not signing in (or `lunos logout`)
+- `LUNOS_OFFLINE=1`, silently
+- `"sync": false` in config; an organisation locks it for everyone with `{"sync": false, "$locked": ["sync"]}` in managed config
+- `lunos sync off` on a device, or switching the device off in the app
+
+The endpoint is read from managed or global config (`cloud.endpoint`) and never from a project's config, so a repository can't redirect it. A `residency` policy is checked as `sync:lunos-cloud` before each upload.
 
 #### Session sharing — off by default
 

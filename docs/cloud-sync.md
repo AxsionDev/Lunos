@@ -1,0 +1,98 @@
+# Session sync
+
+When you are signed in to Lunos Cloud (`lunos login`), Lunos copies your sessions to your space at `https://app.lunos.tech` so you can read them from the app. It is on by default once you sign in, it never runs signed out, and you can stop it per device, per directory or, for an organisation, everywhere. This page describes what the CLI does today.
+
+## What syncs, and when
+
+After each completed turn, the session's new complete messages are queued and uploaded: the session record (title, model, summary and so on), user messages and finished assistant messages with their parts, which include tool calls and their results. Alongside, small metadata goes with the first chunk: title, the git remote URL (without any user name or token), the commit, the model and the project id. Each message is sent once. Uploads are numbered chunks of at most 4 MiB, in order.
+
+Uploads happen in the background and never block or slow a session; a failure is logged, not shown in the session.
+
+## Where it goes
+
+To your personal space, or to the space project that `lunos sync link` bound for the directory. The control plane is `https://cloud.lunos.tech`, or `cloud.endpoint` from your **global or managed** config. A project's own `opencode.json` is never consulted for the endpoint, so a repository can't redirect where your sign-in and sessions are sent. The endpoint must be `https` (plain `http` only for localhost).
+
+## What never syncs
+
+Two layers run on every chunk before it is written to the on-disk queue.
+
+**1. The path rule (the guarantee).** The contents of these files are never uploaded:
+
+- `.env*` (including `.envrc`, `.env.local`), `auth.json`, `*.pem`, `*.key`, `id_rsa*`, matched on the file's base name, case-insensitively
+- anything matching a glob in `sync.exclude` (matched against the path relative to the project directory, and the base name)
+
+A tool call, attachment or diff that touches such a file has its content replaced by `[not synced: <path>]`. This covers the `read`, `write`, `edit`, `apply_patch`, `grep` and `lsp` tools (inputs, outputs and the diffs they carry), files you @-mention in a prompt (the file and the content Lunos reads from it), and the diffs in a message's summary. `grep` output keeps its other files and drops the lines and matches under a secret file.
+
+**2. The credential scanner (best effort).** Every string in the chunk then goes through the same credential patterns as the audit log (bearer tokens, `Authorization` headers, key-shaped strings, `--password` style flags), and matches become `[redacted]`. It is a safety net, not a guarantee: it recognises common shapes only.
+
+### What the path rule does not cover
+
+Be aware of these; they are covered only by the scanner:
+
+- a shell command that prints a secret file (for example `cat .env`), and its output
+- MCP tools that name files under other argument keys
+- the code-mode `execute` tool
+- assistant text that repeats a secret
+
+Also:
+
+- Absolute project paths inside tool input and output are uploaded as they are. Only the session's own `directory` field is removed.
+- A chunk the server refuses as too large (HTTP 413, even after Lunos splits a turn into 4 MiB chunks) is replaced by an empty chunk so later chunks still line up. That turn is missing in your space.
+
+Add anything else that is sensitive to `sync.exclude`, or turn sync off for the directory.
+
+## Configuration
+
+```jsonc
+// opencode.json (project) or your user config
+{
+  "sync": { "project": "<space project id>", "exclude": ["config/prod/**"] }
+}
+// or, to stop sync from this directory:
+{ "sync": false }
+```
+
+An organisation stops sync everywhere with `{ "sync": false, "$locked": ["sync"] }` in managed config; see [examples/managed-policy](../examples/managed-policy/README.md).
+
+## The gates
+
+Checked in this order before every turn. The first that refuses stops it:
+
+1. **Offline.** `LUNOS_OFFLINE=1` stops sync entirely and silently.
+2. **Signed out.** Silent.
+3. **Organisation policy.** `sync: false` locked in managed config. Recorded as `sync.denied`, `gate: "policy"`.
+4. **Device.** This device is switched off (`lunos sync off`, or in the app), or your space is full. `gate: "device"`.
+5. **Directory.** `sync: false` in this directory's config. `gate: "directory"`.
+6. **Residency.** If you have a `residency` policy, the target `sync:lunos-cloud` must be allowed. `gate: "residency"`. See [Data residency](data-residency.md).
+
+Refusals are recorded once per session and gate per process, never with content. A refusal from the server itself (your access to the project was removed, or it was archived) stops that session and is recorded with `gate: "server"` and the server's code.
+
+## Commands
+
+```sh
+lunos sync status          # who, endpoint, device, switches, policy, directory, queue, last sync
+lunos sync off             # stop on this device (the switch lives in your space, so the app shows it too)
+lunos sync on              # start again; also clears a "space full" pause
+lunos sync link [project]  # choose the space project for this directory (a list if no id is given)
+lunos sync link --off      # write "sync": false for this directory
+```
+
+`link` writes `.opencode/opencode.json` in the project (comments and other keys are kept), as `lunos settings set --project` does. A project id that is not in your spaces is refused. `on` under a locked-off organisation policy still switches the device on, but says your organisation's policy keeps sync off.
+
+The first time a device is registered, `lunos login` shows: `Sessions sync to your Lunos space (EU). Run "lunos sync off" to stop on this device.` See [Signing in](cloud-login.md).
+
+## Offline queue and retries
+
+Chunks are written to a queue on disk (`cloud/sync/queue/<session>/` in Lunos's data directory) after redaction, and deleted one by one as the server acknowledges them. If the network, the server (5xx) or rate limits (429) fail, they stay queued and are retried with a growing delay (1 s doubling to 10 min, plus jitter), and again at the next turn or start. If the server's position differs from the queue's, Lunos asks for it and resends from there; the server ignores repeats. A session you deleted in the app (HTTP 410) stops uploading for good.
+
+## When your space is full
+
+If the server answers that the space is full (507), sync pauses on this device and logs a message. Free space at `https://app.lunos.tech/settings/usage`, then run `lunos sync on`.
+
+## Audit events
+
+When the [audit log](audit-log.md) is on: `sync.upload` (`session`, `device`, `seq`, `bytes`, `endpoint`) for each acknowledged chunk, and `sync.denied` (`session`, `gate`) for a refusal. Neither holds session content.
+
+## Deleting and exporting
+
+Deleting synced sessions, and exporting them, happen in the app at `https://app.lunos.tech`. The CLI doesn't delete from your space.

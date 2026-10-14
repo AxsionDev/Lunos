@@ -3,9 +3,9 @@ export * as ConfigCloud from "./cloud"
 import { Schema } from "effect"
 
 /**
- * XCOD-185: where `lunos login` signs in. Lunos Cloud's own identity provider runs in the Phase 7
- * data centre; until then, and for organisations with their own, `issuer` is any OpenID Connect
- * provider that offers the device authorization grant. Declared in both config schemas. Lock
+ * XCOD-185: where `lunos login` signs in. By default that is Lunos Cloud's own identity provider,
+ * https://auth.lunos.tech/realms/Lunos; organisations with their own set `issuer` to any OpenID
+ * Connect provider that offers the device authorization grant. Declared in both config schemas. Lock
  * `cloud` with `$locked` to pin an organisation's provider.
  */
 export const Info = Schema.Struct({
