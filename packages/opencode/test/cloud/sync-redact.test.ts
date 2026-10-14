@@ -11,7 +11,7 @@ const tool = (tool: string, input: Record<string, unknown>, output: string, meta
 const bytes = (v: unknown) => JSON.stringify(v)
 
 describe("matcher", () => {
-  test.each([".env", ".env.local", "sub/.env.production", "auth.json", "k.pem", "a/b.key", "id_rsa", "id_rsa.pub", "/work/app/config/prod/db.yml"])("%s is secret", (p) => expect(secret(p)).toBe(true))
+  test.each([".env", ".env.local", "sub/.env.production", "auth.json", "k.pem", "a/b.key", "id_rsa", "id_rsa.pub", "/work/app/config/prod/db.yml", ".envrc", ".env_local", ".env-prod", ".ENV", "ID_RSA", "X.PEM", "./config/prod/db.yml", "../app/config/prod/db.yml", "config/dev/../prod/db.yml"])("%s is secret", (p) => expect(secret(p)).toBe(true))
   test.each(["src/env.ts", "README.md", "config/dev/db.yml", "keys.ts"])("%s is not", (p) => expect(secret(p)).toBe(false))
 })
 
@@ -104,6 +104,63 @@ describe("path rule", () => {
     const m = tool("read", { filePath: ".env" }, "A=1")
     CloudSyncRedact.message(m, secret)
     expect((m.parts[0] as any).state.output).toBe("A=1")
+  })
+})
+
+// Real shapes (grep.ts rows keep ripgrep's trailing "\n"; prompt.ts @-mention part sequence; summary diffs).
+const user = (parts: unknown[], info: Record<string, unknown> = {}) =>
+  ({ info: { id: "msg_u", sessionID: "ses_1", role: "user", ...info }, parts: parts.map((p, i) => ({ id: `p${i}`, messageID: "msg_u", sessionID: "ses_1", ...(p as object) })) }) as any
+const textPart = (text: string) => ({ type: "text", synthetic: true, text })
+
+describe("fix round 1", () => {
+  test("grep: a secret file with several matches loses every row (rows end in a blank line)", () => {
+    const output = ["Found 4 matches", "/work/app/.env:", "  Line 1: A=hunter1\n", "  Line 2: B=hunter2\n", "", "/work/app/src/db.ts:", "  Line 4: ok\n", "", "(Results truncated. Consider using a more specific path or pattern.)"].join("\n")
+    const text = (CloudSyncRedact.message(tool("grep", { pattern: "x" }, output), secret).parts[0] as any).state.output as string
+    expect(text).not.toContain("hunter")
+    expect(text).toContain("Line 4: ok")
+    expect(text).toContain("(Results truncated")
+  })
+  test("@-mention of .env via file: URL: call, content and file part all go", () => {
+    const m = user([
+      textPart('Called the Read tool with the following input: {"filePath":"/work/app/.env"}'),
+      textPart("<path>/work/app/.env</path>\n<content>\n1: TOKEN=hunter2\n</content>"),
+      { type: "file", mime: "text/plain", filename: ".env", url: "file:///work/app/.env" },
+      { type: "text", text: "what is in it?" },
+    ])
+    const out = bytes(CloudSyncRedact.message(m, secret))
+    expect(out).not.toContain("hunter2")
+    expect(out).toContain("what is in it?")
+  })
+  test("@-mention of .env via data: URL", () => {
+    const m = user([
+      textPart('Called the Read tool with the following input: {"filePath":".env"}'),
+      textPart("TOKEN=hunter2"),
+      { type: "file", mime: "text/plain", filename: ".env", url: "data:text/plain;base64," + Buffer.from("TOKEN=hunter2").toString("base64") },
+    ])
+    expect(bytes(CloudSyncRedact.message(m, secret))).not.toContain("hunter2")
+  })
+  test("a failed @-mention read of .env loses the error text; an ordinary file is untouched", () => {
+    const m = user([
+      textPart('Called the Read tool with the following input: {"filePath":"/work/app/.env"}'),
+      textPart("Read tool failed to read /work/app/.env with the following error: nope"),
+      textPart('Called the Read tool with the following input: {"filePath":"/work/app/a.ts"}'),
+      textPart("export const a = 1"),
+    ])
+    const out = bytes(CloudSyncRedact.message(m, secret))
+    expect(out).not.toContain("nope")
+    expect(out).toContain("export const a = 1")
+  })
+  test("summary diffs: quoted path matches; only file/additions/deletions/status survive", () => {
+    const m = user([], { summary: { diffs: [{ file: '"\\303\\251/id_rsa"', patch: "+leak", before: "old-leak", after: "new-leak", additions: 1, deletions: 0, status: "added", extra: "leak" }] } })
+    const out = CloudSyncRedact.message(m, secret)
+    expect(bytes(out)).not.toContain("leak")
+    expect((out.info as any).summary.diffs[0]).toEqual({ file: '"\\303\\251/id_rsa"', additions: 1, deletions: 0, status: "added" })
+  })
+  test("tool hit: array and object inputs are replaced too", () => {
+    const m = tool("edit", { filePath: ".env", edits: [{ old: "A=1", new: "A=hunter2" }], extra: { v: "hunter2" }, replaceAll: true }, "ok")
+    const out = CloudSyncRedact.message(m, secret)
+    expect(bytes(out)).not.toContain("hunter2")
+    expect((out.parts[0] as any).state.input.replaceAll).toBe(true)
   })
 })
 
