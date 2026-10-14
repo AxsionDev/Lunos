@@ -47,6 +47,16 @@ Ansible, for example:
     mode: "0644"
 ```
 
+## Stopping session sync
+
+Signed-in developers sync their sessions to their Lunos space (see `docs/cloud-sync.md`). To stop that for everyone, add to `managed.json`:
+
+```json
+{ "$locked": ["sync"], "sync": false }
+```
+
+(or add `"sync"` to the existing `$locked` list and `"sync": false` beside the other keys). Developers can then no longer turn it on, and `lunos sync on` reports that your policy keeps it off.
+
 ## Notes
 
 - `lunos upgrade` never writes to these locations.

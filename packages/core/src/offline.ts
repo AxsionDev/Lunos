@@ -242,6 +242,15 @@ export const CALLS: Call[] = [
     when: "only with --cloud, signed in, with cloud.endpoint set",
     offline: "blocked",
   },
+  {
+    // XCOD-185: each completed turn, redacted (never-upload files and credentials removed first).
+    id: "session-sync",
+    what: "Session sync to your Lunos space",
+    hosts: "cloud.lunos.tech (or `cloud.endpoint` in global or managed config)",
+    when: "after each completed turn, once you sign in with `lunos login` (on from then until you turn it off)",
+    offline: "blocked",
+    alsoOffBy: '`lunos sync off` (this device), `"sync": false` (this directory, or everywhere when your organisation locks it)',
+  },
 ]
 
 /** One line per blocked call, for `lunos --version --verbose`. */

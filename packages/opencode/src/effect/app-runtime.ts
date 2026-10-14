@@ -45,6 +45,7 @@ import { Workspace } from "@/control-plane/workspace"
 import { Worktree } from "@/worktree"
 import { Installation } from "@/installation"
 import { ShareNext } from "@/share/share-next"
+import { CloudSync } from "@/cloud/sync"
 import { SessionShare } from "@/share/session"
 import { Memory } from "@/memory"
 import { Npm } from "@opencode-ai/core/npm"
@@ -105,6 +106,7 @@ export const AppLayer = AppNodeBuilderV1.build(
     Worktree.node,
     Installation.node,
     ShareNext.node,
+    CloudSync.node,
     SessionShare.node,
     Memory.node,
   ]),

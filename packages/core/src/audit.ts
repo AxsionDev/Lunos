@@ -23,6 +23,9 @@ export const EVENTS = [
   "model.denied",
   "share.upload",
   "share.denied",
+  // Session sync (lunos-web spec 2026-10-13 §3): session id, device id, seq, bytes, endpoint; the gate that refused. Never content.
+  "sync.upload",
+  "sync.denied",
   "tool.run",
   "permission.decision",
   "mcp.connect",

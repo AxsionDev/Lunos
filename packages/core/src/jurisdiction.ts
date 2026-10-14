@@ -277,6 +277,11 @@ export const SHARE_ENTERPRISE = "share:enterprise"
  * so it is "unknown" until `residency.endpoints` declares `share:lunos-console`.
  */
 export const SHARE_LUNOS_CONSOLE = "share:lunos-console"
+/**
+ * XCOD-185: session sync to the user's Lunos space. Lunos Cloud's control plane is ITService's EU
+ * service only on its own host; any other endpoint is "unknown".
+ */
+export const SYNC_LUNOS_CLOUD = "sync:lunos-cloud"
 const SHARE_HOSTS: Record<string, Claim> = {
   [SHARE_OPNCD]: {
     region: "us",
@@ -288,6 +293,12 @@ const SHARE_HOSTS: Record<string, Claim> = {
     basis: "entity",
     hosts: ["cloud.lunos.tech"],
     note: "Lunos Cloud's console, operated by ITService EOOD (Bulgaria) in its EU data centre. Holds only on cloud.lunos.tech: a self-hosted console is assessed as your own endpoint.",
+  },
+  [SYNC_LUNOS_CLOUD]: {
+    region: "eu",
+    basis: "entity",
+    hosts: ["cloud.lunos.tech"],
+    note: "Lunos Cloud's control plane, where sessions sync, operated by ITService EOOD (Bulgaria) in its EU data centre. Holds only on cloud.lunos.tech.",
   },
   [SHARE_ENTERPRISE]: {
     region: "unknown",

@@ -45,6 +45,8 @@ export const KNOWN = [
   "cloud.endpoint",
   "cloud.policy",
   "cloud.client_start",
+  // lunos-web spec 2026-10-13 C3: an organisation can stop session sync.
+  "sync",
   // XCOD-202: every permission, or one tool's (`permission.webfetch`, `permission.bash`, …).
   "permission",
   // XCOD-219: the models a session and its subagents run on (plus `agent.<name>.model`).

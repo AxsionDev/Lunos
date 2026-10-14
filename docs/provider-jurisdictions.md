@@ -4,7 +4,7 @@
 
 Where each model provider processes your data, and — just as importantly — what that claim actually rests on.
 
-Lunos itself is self-hosted: it runs on infrastructure you provide, and there is no Lunos-operated service in the data path. The only data that leaves your infrastructure goes to the model provider you configure. This page is about _those_ providers.
+Lunos itself is self-hosted: it runs on infrastructure you provide, and there is no Lunos-operated service in the path of your model requests. Your model requests go to the provider you configure. The one exception: once you sign in with `lunos login`, completed sessions sync to Lunos Cloud (`sync:lunos-cloud`), which you can turn off; see [Session sync](cloud-sync.md). This page is about the model providers.
 
 ## How to read this
 

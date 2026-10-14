@@ -2,9 +2,12 @@ import { EOL } from "os"
 import { Effect } from "effect"
 import { openUrl } from "@opencode-ai/core/open"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { CloudAuth } from "@/cloud/auth"
+import { CloudDefaults } from "@/cloud/defaults"
 import { CloudOidc } from "@/cloud/oidc"
 import { CloudStore } from "@/cloud/store"
+import { CloudSyncApi } from "@/cloud/sync-api"
 import { effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
 
@@ -13,9 +16,6 @@ import { UI } from "../ui"
 // asks for one: the free harness works the same signed out.
 
 export const DEFAULT_CLIENT_ID = "lunos-cli"
-
-export const NO_ISSUER =
-  "Lunos Cloud sign-in isn't available yet. To sign in to your organisation's identity provider, set cloud.issuer (lunos settings set cloud.issuer https://…) or pass --issuer."
 
 const out = (line: string) => process.stdout.write(line + EOL)
 const dim = (text: string) => UI.Style.TEXT_DIM + text + UI.Style.TEXT_NORMAL
@@ -27,12 +27,34 @@ const where = (backend: CloudStore.Backend) =>
       ? "the system keyring"
       : "a file only you can read"
 
+/**
+ * Session sync's part of `lunos login` (XCOD-185), after the sign-in is stored: register this device
+ * and show the first-sync notice once. Only for Lunos's own issuer, or with `cloud.endpoint` set
+ * explicitly: an organisation's token isn't sent to Lunos Cloud by default.
+ */
+export async function loginSync(input: {
+  issuer: string
+  locked: boolean
+  print: (line: string) => void
+  opts?: CloudSyncApi.Options
+}) {
+  if (!(await CloudSyncApi.permitted(input.issuer))) return input.print(CloudSyncApi.NEEDS_ENDPOINT)
+  const state = await CloudSyncApi.register({ timeoutMs: 5_000, ...input.opts }).catch((error) => {
+    input.print(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`))
+    return undefined
+  })
+  if (state) await CloudSyncApi.notice(state, input.locked, input.print)
+}
+
 export const LoginCommand = effectCmd({
   command: "login",
   describe: "sign in to Lunos Cloud (or your organisation's identity provider)",
   builder: (yargs) =>
     yargs
-      .option("issuer", { type: "string", describe: "OpenID Connect issuer URL (default: cloud.issuer)" })
+      .option("issuer", {
+        type: "string",
+        describe: `OpenID Connect issuer URL (default: cloud.issuer or ${CloudDefaults.DEFAULT_ISSUER})`,
+      })
       .option("client-id", {
         type: "string",
         describe: `OAuth client id (default: cloud.client_id or ${DEFAULT_CLIENT_ID})`,
@@ -44,8 +66,7 @@ export const LoginCommand = effectCmd({
       }),
   handler: Effect.fn("Cli.cloud.login")(function* (args) {
     const config = yield* Config.Service.use((cfg) => cfg.get())
-    const issuer = args.issuer ?? config.cloud?.issuer
-    if (!issuer) return yield* fail(NO_ISSUER)
+    const issuer = args.issuer ?? config.cloud?.issuer ?? CloudDefaults.DEFAULT_ISSUER
     if (!/^https:\/\//.test(issuer) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(issuer))
       return yield* fail(`${issuer} isn't an https URL; sign-in tokens must not travel in the clear.`)
     const clientID = args.clientId ?? config.cloud?.client_id ?? DEFAULT_CLIENT_ID
@@ -68,12 +89,22 @@ export const LoginCommand = effectCmd({
           sub: user.sub,
           savedAt: new Date().toISOString(),
         })
-        return { user, backend }
+        return { user, backend, issuer: discovery.issuer ?? issuer }
       },
       catch: (error) => error,
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
     out(`Signed in as ${result.user.email ?? result.user.preferred_username ?? result.user.sub} ${dim(`(${issuer})`)}`)
     out(dim(`Session kept in ${where(result.backend)}. lunos logout signs out.`))
+    // Registering the device never fails the login, nor holds it up for long (5 s per request).
+    yield* Effect.promise(() =>
+      loginSync({
+        issuer: result.issuer,
+        locked: config.sync === false && ConfigPolicy.isLocked(config.$locked, "sync"),
+        print: out,
+      }).catch((error) =>
+        out(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`)),
+      ),
+    )
   }),
 })
 

@@ -12,7 +12,7 @@ submit one that will be an automatic ban from the project.
 
 Lunos is an AI-powered coding assistant that runs locally on your machine. It provides an agent system with access to powerful tools including shell execution, file operations, and web access.
 
-Lunos is self-hosted. It is operated entirely on infrastructure you provide — there is no Lunos-operated service in the data path. See [Reporting Security Issues](#reporting-security-issues) for where reports go.
+Lunos is self-hosted. It is operated entirely on infrastructure you provide — there is no Lunos-operated service in the data path, unless you sign in and use [session sync](docs/cloud-sync.md), which uploads sessions to Lunos Cloud, operated by ITService EOOD in the EU. See [Reporting Security Issues](#reporting-security-issues) for where reports go.
 
 ### No Sandbox
 

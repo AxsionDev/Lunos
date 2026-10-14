@@ -15,9 +15,12 @@ server you operate) with that user's permissions. It has three parts:
 - **Tools the model can call:** read, edit and write files, run shell commands, search, fetch web
   pages, and call MCP servers and plugins the user has installed.
 
-Lunos-operated infrastructure is **not** in the data path: there is no Lunos account, no telemetry
-endpoint and no hosted service. The only Lunos-operated host the CLI contacts is `lunos.tech`, for
-the built-in marketplace catalogue, and only when a marketplace command runs
+Lunos-operated infrastructure is **not** in the data path, unless you sign in and use
+[session sync](../cloud-sync.md), which uploads sessions to Lunos Cloud, operated by ITService EOOD
+in the EU. Without that there is no Lunos account, no telemetry endpoint and no hosted service, and
+the only Lunos-operated host the CLI contacts is `lunos.tech`, for the built-in marketplace
+catalogue, and only when a marketplace command runs. When you sign in it also contacts
+`auth.lunos.tech` (sign-in) and `cloud.lunos.tech` (device registration and session sync)
 ([deployment guide §3](../deployment/self-hosted.md#3-where-your-data-goes)).
 
 ## Trust boundaries
