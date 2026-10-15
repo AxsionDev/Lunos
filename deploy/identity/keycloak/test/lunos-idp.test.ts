@@ -59,7 +59,20 @@ function writeOldRealm() {
   const dir = path.resolve(import.meta.dir, "..")
   const out = Bun.spawnSync(["git", "show", "origin/dev:deploy/identity/keycloak/realm-lunos.json"], { cwd: dir })
   if (out.exitCode !== 0) throw new Error(`git show origin/dev's realm file: ${out.stderr.toString()}`)
-  writeFileSync(path.join(dir, OLD_FILE), JSON.stringify({ ...JSON.parse(out.stdout.toString()), realm: OLD }))
+  // dev's file now carries XCOD-185 (and later) itself; strip that back off so OldLunos is the realm as live
+  // before it: lunos-cli only, no lunos scope, no lunos-idp listener, no login theme.
+  const old = { ...JSON.parse(out.stdout.toString()), realm: OLD }
+  const added = new Set(["lunos-app", "lunos-console", "lunos-console-admin"])
+  const withoutLunos = (names?: string[]) => names?.filter((name) => name !== "lunos")
+  old.clients = old.clients
+    .filter((c: { clientId: string }) => !added.has(c.clientId))
+    .map((c: { defaultClientScopes?: string[] }) => ({ ...c, defaultClientScopes: withoutLunos(c.defaultClientScopes) }))
+  old.clientScopes = old.clientScopes.filter((c: { name: string }) => c.name !== "lunos")
+  old.defaultDefaultClientScopes = withoutLunos(old.defaultDefaultClientScopes)
+  old.eventsListeners = old.eventsListeners?.filter((l: string) => l !== "lunos-idp")
+  old.users = old.users?.filter((u: { serviceAccountClientId?: string }) => !added.has(u.serviceAccountClientId ?? ""))
+  delete old.loginTheme
+  writeFileSync(path.join(dir, OLD_FILE), JSON.stringify(old))
 }
 
 async function clientByClientId(kc: Kc, clientId: string, realm = R) {
