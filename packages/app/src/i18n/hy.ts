@@ -1207,6 +1207,7 @@ export const dict = {
   "sessions.state.finished": "Ավարտված",
   "sessions.state.failed": "Ձախողված",
   "sessions.state.elsewhere": "Աշխատում է Lunos-ի մեկ այլ պատուհանում",
+  "sessions.state.stale": "Չի արձագանքում (Lunos-ը փակվել է)",
   "sessions.kind.subagent": "Ենթագործակալ",
   "sessions.kind.scheduled": "Պլանավորված",
   "sessions.kind.external": "Արտաքին",

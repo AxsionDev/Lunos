@@ -1210,6 +1210,7 @@ export const dict = {
   "sessions.state.finished": "完了",
   "sessions.state.failed": "失敗",
   "sessions.state.elsewhere": "別の Lunos ウィンドウで実行中",
+  "sessions.state.stale": "応答なし (Lunos が終了しました)",
   "sessions.kind.subagent": "サブエージェント",
   "sessions.kind.scheduled": "スケジュール済み",
   "sessions.kind.external": "外部",

@@ -138,6 +138,7 @@ export const SessionOverviewItem = Schema.Struct({
   updated: Schema.Finite,
   state: Schema.Literals(["running", "waiting", "idle", "finished", "failed"]),
   elsewhere: Schema.optional(Schema.Boolean),
+  stale: Schema.optional(Schema.Boolean),
   permissions: NonNegativeInt,
   questions: NonNegativeInt,
   groupID: Schema.optional(Schema.String),

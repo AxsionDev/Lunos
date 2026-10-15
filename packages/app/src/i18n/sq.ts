@@ -1203,6 +1203,7 @@ export const dict = {
   "sessions.state.finished": "Përfunduar",
   "sessions.state.failed": "Dështoi",
   "sessions.state.elsewhere": "Në ekzekutim në një dritare tjetër Lunos",
+  "sessions.state.stale": "Nuk përgjigjet (Lunos u mbyll)",
   "sessions.kind.subagent": "Nënagjent",
   "sessions.kind.scheduled": "I planifikuar",
   "sessions.kind.external": "I jashtëm",

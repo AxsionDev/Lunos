@@ -1167,6 +1167,7 @@ export const dict = {
   "sessions.state.finished": "ተጠናቋል",
   "sessions.state.failed": "አልተሳካም",
   "sessions.state.elsewhere": "በሌላ Lunos መስኮት ውስጥ በመሄድ ላይ",
+  "sessions.state.stale": "ምላሽ አይሰጥም (Lunos ተዘግቷል)",
   "sessions.kind.subagent": "ንዑስ ወኪል",
   "sessions.kind.scheduled": "የታቀደ",
   "sessions.kind.external": "ውጫዊ",

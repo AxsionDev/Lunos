@@ -1279,6 +1279,7 @@ export const dict = {
   "sessions.state.finished": "เสร็จสิ้น",
   "sessions.state.failed": "ล้มเหลว",
   "sessions.state.elsewhere": "กำลังทำงานในหน้าต่าง Lunos อื่น",
+  "sessions.state.stale": "ไม่ตอบสนอง (Lunos ถูกปิดแล้ว)",
   "sessions.kind.subagent": "เอเจนต์ย่อย",
   "sessions.kind.scheduled": "ตามกำหนดเวลา",
   "sessions.kind.external": "ภายนอก",

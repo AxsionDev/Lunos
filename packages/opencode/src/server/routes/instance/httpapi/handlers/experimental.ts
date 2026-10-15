@@ -31,6 +31,7 @@ import {
 import { InvalidRequestError, notFound } from "../errors"
 import { SessionGroups } from "@/session/groups"
 import { SessionLive } from "@/session/live"
+import { SessionPeers } from "@/session/peers"
 import { SessionOverview } from "@/session/overview"
 import { ExternalRegistry } from "@/external/registry"
 import { GlobalBus } from "@/bus/global"
@@ -46,6 +47,17 @@ function groupErrors<A>(run: () => Promise<A>) {
       throw error
     },
   })
+}
+
+let peerEvents: (() => void) | undefined
+// XCOD-234: other Lunos processes' sessions changed (or one stopped responding): every surface re-reads.
+function publishPeerChanges() {
+  peerEvents ??= SessionPeers.subscribe(() =>
+    GlobalBus.emit("event", {
+      directory: "global",
+      payload: { type: SessionGroupEvent.LiveUpdated.type, properties: {} },
+    }),
+  )
 }
 
 let groupEvents: (() => void) | undefined
@@ -80,6 +92,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const flags = yield* RuntimeFlags.Service
     SessionLive.start()
     publishGroupChanges()
+    publishPeerChanges()
 
     const capabilities = Effect.fn("ExperimentalHttpApi.capabilities")(function* () {
       return { backgroundSubagents: backgroundEnabled(flags.experimentalBackgroundSubagents, yield* config.get()) }

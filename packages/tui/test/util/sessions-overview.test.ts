@@ -179,5 +179,9 @@ describe("TUI /sessions model (XCOD-205)", () => {
     expect(stoppable({ id: "external:abc", state: "finished" })).toBe(false)
     expect(toolOnly({ id: "ses_2" })).toBe(false)
     expect(waiting([{ state: "waiting" }, { state: "idle" }, { state: "waiting" }])).toBe(2)
+    // XCOD-234: another process's live state, and a turn whose Lunos stopped.
+    expect(stateLabel({ state: "waiting", elsewhere: true })).toBe("waiting in another Lunos")
+    expect(stateLabel({ state: "running", elsewhere: true })).toBe("running in another Lunos")
+    expect(stateLabel({ state: "idle", stale: true })).toBe("not responding (its Lunos closed)")
   })
 })

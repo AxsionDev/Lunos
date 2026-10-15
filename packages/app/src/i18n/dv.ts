@@ -1218,6 +1218,7 @@ export const dict = {
   "sessions.state.finished": "ނިމިއްޖެ",
   "sessions.state.failed": "ނާކާމިޔާބު",
   "sessions.state.elsewhere": "އެހެން Lunos ވިންޑޯއެއްގައި ދުވަނީ",
+  "sessions.state.stale": "ޖަވާބެއް ނުދޭ (Lunos ބަންދުވެއްޖެ)",
   "sessions.kind.subagent": "ސަބް އޭޖެންޓް",
   "sessions.kind.scheduled": "ޝެޑިއުލްކުރެވިފައި",
   "sessions.kind.external": "ބޭރުގެ",

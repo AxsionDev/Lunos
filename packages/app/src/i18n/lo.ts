@@ -1189,6 +1189,7 @@ export const dict = {
   "sessions.state.finished": "ສຳເລັດແລ້ວ",
   "sessions.state.failed": "ລົ້ມເຫຼວ",
   "sessions.state.elsewhere": "ກຳລັງເຮັດວຽກໃນໜ້າຕ່າງ Lunos ອື່ນ",
+  "sessions.state.stale": "ບໍ່ຕອບສະໜອງ (Lunos ຖືກປິດແລ້ວ)",
   "sessions.kind.subagent": "ເອເຈນຍ່ອຍ",
   "sessions.kind.scheduled": "ຕັ້ງເວລາໄວ້",
   "sessions.kind.external": "ພາຍນອກ",

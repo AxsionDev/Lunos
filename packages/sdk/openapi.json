@@ -17321,6 +17321,9 @@
             "$ref": "#/components/schemas/EventSessionGroupUpdated"
           },
           {
+            "$ref": "#/components/schemas/EventSessionLiveUpdated"
+          },
+          {
             "$ref": "#/components/schemas/EventQuestionAsked"
           },
           {
@@ -21950,6 +21953,25 @@
                   },
                   "type": {
                     "type": "string",
+                    "enum": ["session.live.updated"]
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": ["id", "type", "properties"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^evt_"
+                  },
+                  "type": {
+                    "type": "string",
                     "enum": ["question.asked"]
                   },
                   "properties": {
@@ -25374,6 +25396,9 @@
           "elsewhere": {
             "type": "boolean"
           },
+          "stale": {
+            "type": "boolean"
+          },
           "permissions": {
             "type": "integer",
             "minimum": 0
@@ -28270,6 +28295,9 @@
           },
           {
             "$ref": "#/components/schemas/SessionGroupUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/SessionLiveUpdated"
           },
           {
             "$ref": "#/components/schemas/QuestionAsked"
@@ -37396,6 +37424,47 @@
         "required": ["id", "type", "data"],
         "additionalProperties": false
       },
+      "SessionLiveUpdated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^evt_"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["session.live.updated"]
+          },
+          "durable": {
+            "type": "object",
+            "properties": {
+              "aggregateID": {
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "version": {
+                "type": "integer"
+              }
+            },
+            "required": ["aggregateID", "seq", "version"],
+            "additionalProperties": false
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationRef"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        "required": ["id", "type", "data"],
+        "additionalProperties": false
+      },
       "QuestionAsked": {
         "type": "object",
         "properties": {
@@ -40540,6 +40609,25 @@
           "type": {
             "type": "string",
             "enum": ["session.group.updated"]
+          },
+          "properties": {
+            "type": "object",
+            "properties": {}
+          }
+        },
+        "required": ["id", "type", "properties"],
+        "additionalProperties": false
+      },
+      "EventSessionLiveUpdated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^evt_"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["session.live.updated"]
           },
           "properties": {
             "type": "object",

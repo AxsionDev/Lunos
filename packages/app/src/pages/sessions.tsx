@@ -36,6 +36,7 @@ const REFRESH_ON = new Set([
   "question.replied",
   "question.rejected",
   "session.group.updated",
+  "session.live.updated",
   "server.instance.disposed",
   "global.disposed",
   "server.connected",
@@ -215,7 +216,11 @@ export function SessionsPage() {
   }
 
   const stateLabel = (item: SessionOverviewItem) =>
-    item.elsewhere ? language.t("sessions.state.elsewhere") : language.t(`sessions.state.${item.state}`)
+    item.stale
+      ? language.t("sessions.state.stale")
+      : item.elsewhere && item.state === "running"
+        ? language.t("sessions.state.elsewhere")
+        : language.t(`sessions.state.${item.state}`)
 
   const money = (value: number) => formatMoney(value, language.intl())
   const ago = (time: number) => {

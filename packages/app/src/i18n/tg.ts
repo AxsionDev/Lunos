@@ -1205,6 +1205,7 @@ export const dict = {
   "sessions.state.finished": "Анҷомёфта",
   "sessions.state.failed": "Ноком",
   "sessions.state.elsewhere": "Дар равзанаи дигари Lunos иҷро мешавад",
+  "sessions.state.stale": "Ҷавоб намедиҳад (Lunos баста шуд)",
   "sessions.kind.subagent": "Зерагент",
   "sessions.kind.scheduled": "Банақшагирифта",
   "sessions.kind.external": "Берунӣ",

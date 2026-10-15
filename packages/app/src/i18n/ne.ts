@@ -1198,6 +1198,7 @@ export const dict: Record<string, string> = {
   "sessions.state.finished": "समाप्त",
   "sessions.state.failed": "असफल",
   "sessions.state.elsewhere": "अर्को Lunos सञ्झ्यालमा चलिरहेको",
+  "sessions.state.stale": "प्रतिक्रिया छैन (Lunos बन्द भयो)",
   "sessions.kind.subagent": "उप-एजेन्ट",
   "sessions.kind.scheduled": "तालिकाबद्ध",
   "sessions.kind.external": "बाह्य",

@@ -82,6 +82,7 @@ export type Event =
   | EventSessionStatus
   | EventSessionIdle
   | EventSessionGroupUpdated
+  | EventSessionLiveUpdated
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
@@ -1516,6 +1517,13 @@ export type GlobalEvent = {
       }
     | {
         id: string
+        type: "session.live.updated"
+        properties: {
+          [key: string]: unknown
+        }
+      }
+    | {
+        id: string
         type: "question.asked"
         properties: {
           id: string
@@ -2640,6 +2648,7 @@ export type SessionOverviewItem = {
   updated: number
   state: "running" | "waiting" | "idle" | "finished" | "failed"
   elsewhere?: boolean
+  stale?: boolean
   permissions: number
   questions: number
   groupID?: string
@@ -3531,6 +3540,7 @@ export type V2Event =
   | SessionStatus2
   | SessionIdle
   | SessionGroupUpdated
+  | SessionLiveUpdated
   | QuestionAsked
   | QuestionReplied2
   | QuestionRejected2
@@ -6583,6 +6593,23 @@ export type SessionGroupUpdated = {
   }
 }
 
+export type SessionLiveUpdated = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "session.live.updated"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    [key: string]: unknown
+  }
+}
+
 export type QuestionAsked = {
   id: string
   metadata?: {
@@ -7604,6 +7631,14 @@ export type EventSessionIdle = {
 export type EventSessionGroupUpdated = {
   id: string
   type: "session.group.updated"
+  properties: {
+    [key: string]: unknown
+  }
+}
+
+export type EventSessionLiveUpdated = {
+  id: string
+  type: "session.live.updated"
   properties: {
     [key: string]: unknown
   }

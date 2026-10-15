@@ -59,8 +59,10 @@ export function nextStateFilter(current: StateFilter): StateFilter {
   return STATE_FILTERS[(index + 1) % STATE_FILTERS.length]!
 }
 
-export function stateLabel(item: Pick<SessionOverviewItem, "state" | "elsewhere">) {
-  if (item.elsewhere) return "running in another Lunos"
+export function stateLabel(item: Pick<SessionOverviewItem, "state" | "elsewhere" | "stale">) {
+  // XCOD-234: the Lunos that ran it stopped without finishing the turn.
+  if (item.stale) return "not responding (its Lunos closed)"
+  if (item.elsewhere) return item.state === "waiting" ? "waiting in another Lunos" : "running in another Lunos"
   return STATE_LABEL[item.state]
 }
 

@@ -1214,6 +1214,7 @@ export const dict = {
   "sessions.state.finished": "Baigtas",
   "sessions.state.failed": "Nepavyko",
   "sessions.state.elsewhere": "Vykdomas kitame Lunos lange",
+  "sessions.state.stale": "Neatsako (Lunos uždarytas)",
   "sessions.kind.subagent": "Subagentas",
   "sessions.kind.scheduled": "Suplanuotas",
   "sessions.kind.external": "Išorinis",

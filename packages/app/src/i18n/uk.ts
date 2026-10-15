@@ -1307,6 +1307,7 @@ export const dict = {
   "sessions.state.finished": "Завершена",
   "sessions.state.failed": "Збій",
   "sessions.state.elsewhere": "Виконується в іншому вікні Lunos",
+  "sessions.state.stale": "Не відповідає (Lunos закрито)",
   "sessions.kind.subagent": "Субагент",
   "sessions.kind.scheduled": "За розкладом",
   "sessions.kind.external": "Зовнішня",

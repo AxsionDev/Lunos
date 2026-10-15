@@ -6,6 +6,7 @@ import { ExternalRegistry } from "../../src/external/registry"
 import { SessionGroups } from "../../src/session/groups"
 import { SessionLive } from "../../src/session/live"
 import { SessionOverview } from "../../src/session/overview"
+import { SessionPeers } from "../../src/session/peers"
 
 afterEach(async () => {
   await fs.rm(SessionGroups.file(), { force: true })
@@ -175,35 +176,64 @@ describe("SessionOverview.state (XCOD-205)", () => {
   const idle: SessionLive.Activity = { permissions: 0, questions: 0 }
 
   test("waiting for an answer wins over running", () => {
-    expect(
-      SessionOverview.state({ activity: { status: "busy", permissions: 1, questions: 0 }, updated: now, now }),
-    ).toEqual({ state: "waiting" })
+    expect(SessionOverview.state({ activity: { status: "busy", permissions: 1, questions: 0 } })).toEqual({
+      state: "waiting",
+    })
   })
 
   test("running in this process", () => {
-    expect(
-      SessionOverview.state({ activity: { status: "retry", permissions: 0, questions: 0 }, updated: now, now }),
-    ).toEqual({ state: "running" })
+    expect(SessionOverview.state({ activity: { status: "retry", permissions: 0, questions: 0 } })).toEqual({
+      state: "running",
+    })
   })
 
   test("finished, failed, stopped and never-answered turns", () => {
     const done = { role: "assistant", time: { completed: now } }
-    expect(SessionOverview.state({ activity: idle, last: done, updated: now, now }).state).toBe("finished")
+    expect(SessionOverview.state({ activity: idle, last: done }).state).toBe("finished")
     const failed = { role: "assistant", error: { name: "APIError" }, time: {} }
-    expect(SessionOverview.state({ activity: idle, last: failed, updated: now, now }).state).toBe("failed")
+    expect(SessionOverview.state({ activity: idle, last: failed }).state).toBe("failed")
     const stopped = { role: "assistant", error: { name: "MessageAbortedError" }, time: {} }
-    expect(SessionOverview.state({ activity: idle, last: stopped, updated: now, now }).state).toBe("idle")
-    expect(SessionOverview.state({ activity: idle, last: { role: "user" }, updated: now, now }).state).toBe("idle")
-    expect(SessionOverview.state({ activity: idle, updated: now, now }).state).toBe("idle")
+    expect(SessionOverview.state({ activity: idle, last: stopped }).state).toBe("idle")
+    expect(SessionOverview.state({ activity: idle, last: { role: "user" } }).state).toBe("idle")
+    expect(SessionOverview.state({ activity: idle }).state).toBe("idle")
   })
 
-  test("an unfinished turn nobody here is running: recent means another Lunos runs it, old means abandoned", () => {
+  test("XCOD-234: another live Lunos's state; an unfinished turn nobody live has is stale", () => {
     const open = { role: "assistant", time: {} }
-    expect(SessionOverview.state({ activity: idle, last: open, updated: now - 1000, now })).toEqual({
+    const peer = (extra: Partial<SessionPeers.Peer>): SessionPeers.Peer => ({
+      ...idle,
+      fresh: true,
+      pid: 4242,
+      ...extra,
+    })
+    expect(SessionOverview.state({ activity: idle, peer: peer({ status: "busy" }), last: open })).toEqual({
       state: "running",
       elsewhere: true,
     })
-    expect(SessionOverview.state({ activity: idle, last: open, updated: now - 60 * 60 * 1000, now }).state).toBe("idle")
+    expect(SessionOverview.state({ activity: idle, peer: peer({ permissions: 1 }), last: open })).toEqual({
+      state: "waiting",
+      elsewhere: true,
+    })
+    // This process's own state wins over a claim.
+    expect(
+      SessionOverview.state({ activity: { status: "busy", permissions: 0, questions: 0 }, peer: peer({}) }),
+    ).toEqual({
+      state: "running",
+    })
+    // The process that claimed it stopped heartbeating (kill -9): stale, not running.
+    expect(SessionOverview.state({ activity: idle, peer: peer({ status: "busy", fresh: false }), last: open })).toEqual(
+      {
+        state: "idle",
+        stale: true,
+      },
+    )
+    // Nobody claims it at all.
+    expect(SessionOverview.state({ activity: idle, last: open })).toEqual({ state: "idle", stale: true })
+    // A finished turn stays finished whatever an old file says.
+    const done = { role: "assistant", time: { completed: 1 } }
+    expect(SessionOverview.state({ activity: idle, peer: peer({ fresh: false }), last: done })).toEqual({
+      state: "finished",
+    })
   })
 
   test("kinds: subagent by parent, scheduled by unattended metadata", () => {

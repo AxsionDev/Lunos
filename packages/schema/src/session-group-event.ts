@@ -11,4 +11,13 @@ export const Updated = Event.define({
   schema: {},
 })
 
-export const Definitions = Event.inventory(Updated)
+/**
+ * XCOD-234: another Lunos process on this machine started, finished, stopped or is waiting on one of
+ * its sessions, or stopped responding. Carries nothing: the Sessions window re-reads the overview.
+ */
+export const LiveUpdated = Event.define({
+  type: "session.live.updated",
+  schema: {},
+})
+
+export const Definitions = Event.inventory(Updated, LiveUpdated)

@@ -48,6 +48,7 @@ const REFRESH_ON = new Set([
   "question.replied",
   "question.rejected",
   "session.group.updated",
+  "session.live.updated",
   "server.instance.disposed",
   "global.disposed",
 ])

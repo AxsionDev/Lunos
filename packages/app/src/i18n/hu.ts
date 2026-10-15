@@ -1212,6 +1212,7 @@ export const dict = {
   "sessions.state.finished": "Befejezve",
   "sessions.state.failed": "Sikertelen",
   "sessions.state.elsewhere": "Egy másik Lunos-ablakban fut",
+  "sessions.state.stale": "Nem válaszol (a Lunos bezárult)",
   "sessions.kind.subagent": "Alügynök",
   "sessions.kind.scheduled": "Ütemezett",
   "sessions.kind.external": "Külső",

@@ -1217,6 +1217,7 @@ export const dict = {
   "sessions.state.finished": "ပြီးဆုံးပြီ",
   "sessions.state.failed": "မအောင်မြင်ပါ",
   "sessions.state.elsewhere": "အခြား Lunos ဝင်းဒိုးတွင် လုပ်ဆောင်နေသည်",
+  "sessions.state.stale": "တုံ့ပြန်မှုမရှိ (Lunos ပိတ်သွားသည်)",
   "sessions.kind.subagent": "လက်အောက်ခံ အေးဂျင့်",
   "sessions.kind.scheduled": "အချိန်ဇယားသတ်မှတ်ထားသည်",
   "sessions.kind.external": "ပြင်ပ",
