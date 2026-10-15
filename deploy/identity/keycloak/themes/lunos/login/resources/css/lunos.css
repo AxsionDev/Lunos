@@ -1,0 +1,76 @@
+/* XCOD-244: the Lunos look on keycloak.v2 (PatternFly 5). Tokens: Catppuccin Mocha, as lunos.tech and app.lunos.tech. */
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("../fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url("../fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("../fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("../fonts/ibm-plex-sans-latin-ext-400-normal.woff2") format("woff2"); unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url("../fonts/ibm-plex-sans-latin-ext-500-normal.woff2") format("woff2"); unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("../fonts/ibm-plex-sans-latin-ext-600-normal.woff2") format("woff2"); unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("../fonts/ibm-plex-sans-cyrillic-400-normal.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url("../fonts/ibm-plex-sans-cyrillic-500-normal.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("../fonts/ibm-plex-sans-cyrillic-600-normal.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+
+:root.pf-v5-theme-dark {
+  --crust: #11111b; --mantle: #181825; --base: #1e1e2e;
+  --surface0: #313244; --surface1: #45475a; --surface2: #585b70; --overlay0: #6c7086; --overlay1: #7f849c;
+  --text: #cdd6f4; --subtext1: #bac2de; --subtext0: #a6adc8;
+  --mauve: #cba6f7; --lavender: #b4befe; --peach: #fab387; --yellow: #f9e2af; --green: #a6e3a1;
+
+  --pf-v5-global--FontFamily--text: "IBM Plex Sans", system-ui, sans-serif;
+  --pf-v5-global--FontFamily--heading: "IBM Plex Sans", system-ui, sans-serif;
+  --pf-v5-global--BackgroundColor--100: var(--base);
+  --pf-v5-global--BackgroundColor--200: var(--mantle);
+  --pf-v5-global--Color--100: var(--text);
+  --pf-v5-global--Color--200: var(--subtext0);
+  --pf-v5-global--BorderColor--100: var(--surface1);
+  --pf-v5-global--link--Color: var(--lavender);
+  --pf-v5-global--link--Color--hover: var(--mauve);
+  --pf-v5-global--primary-color--100: var(--mauve);
+  --pf-v5-global--primary-color--200: var(--lavender);
+  --pf-v5-global--danger-color--100: var(--peach);
+  --pf-v5-global--warning-color--100: var(--yellow);
+  --pf-v5-global--success-color--100: var(--green);
+}
+/* PatternFly declares component variables on the component class, so they're overridden there, not on :root. */
+.pf-v5-theme-dark .pf-v5-c-form-control { --pf-v5-c-form-control--BackgroundColor: var(--mantle); }
+.pf-v5-theme-dark .pf-v5-c-button {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--mauve);
+  --pf-v5-c-button--m-primary--Color: var(--crust);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--lavender);
+  --pf-v5-c-button--m-primary--hover--Color: var(--crust);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--lavender);
+  --pf-v5-c-button--m-primary--focus--Color: var(--crust);
+}
+
+.login-pf body, body#keycloak-bg { background: var(--crust) none !important; }
+.pf-v5-c-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+.pf-v5-c-login__container { display: block; width: 100%; max-width: 400px; padding: 0; }
+.lunos-header { padding: 0 0 20px; text-align: center; }
+.lunos-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; color: var(--text); }
+.pf-v5-c-login__main {
+  background: var(--base); border: 1px solid var(--surface0); border-radius: 16px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.35);
+}
+.pf-v5-c-login__main-header { padding: 32px 32px 8px; text-align: center; display: block; }
+.pf-v5-c-login__main-header .pf-v5-c-title { font-size: 24px; font-weight: 600; }
+.pf-v5-c-login__main-body { padding: 8px 32px 24px; }
+.pf-v5-c-login__main-footer { padding: 0 32px 24px; }
+
+/* Social buttons: full width, outlined, icon left, label centred. */
+#kc-social-providers ul { list-style: none; margin: 0; padding: 0; }
+.lunos-social {
+  display: flex !important; align-items: center; justify-content: center; gap: 10px;
+  background: var(--mantle); color: var(--text); border: 1px solid var(--surface1); border-radius: 10px;
+  min-height: 44px; font-weight: 500;
+}
+.lunos-social:hover { border-color: var(--overlay0); background: var(--surface0); }
+.lunos-social svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
+.lunos-or {
+  display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--overlay1);
+  font-size: 12px; letter-spacing: 0.08em;
+}
+.lunos-or::before, .lunos-or::after { content: ""; flex: 1; height: 1px; background: var(--surface0); }
+
+.pf-v5-c-button.pf-m-primary { border-radius: 10px; min-height: 44px; font-weight: 600; }
+.pf-v5-c-form-control { border-radius: 10px; }
+:focus-visible { outline: 2px solid var(--lavender); outline-offset: 2px; }
+#kc-info, #kc-registration { text-align: center; color: var(--subtext0); }

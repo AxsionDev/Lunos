@@ -45,6 +45,8 @@ services:
     volumes:
       # XCOD-185: the lunos_idp claim mapper; run ./build.sh first so providers/lunos-idp-mapper.jar exists.
       - ./providers:/opt/keycloak/providers:ro
+      # XCOD-244: the lunos login theme (themes/lunos/login); realm-lunos.json selects it.
+      - ./themes:/opt/keycloak/themes:ro
       - ./realm-lunos.json:/opt/keycloak/data/import/realm-lunos.json:ro
     ports:
       # Only the reverse proxy on this host should reach it.
