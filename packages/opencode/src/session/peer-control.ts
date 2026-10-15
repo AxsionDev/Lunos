@@ -1,6 +1,7 @@
 export * as SessionPeerControl from "./peer-control"
 
 import { randomBytes, timingSafeEqual } from "crypto"
+import { createServer, type Server as HttpServer } from "node:http"
 import { SessionLive } from "./live"
 import { SessionPeers } from "./peers"
 
@@ -22,14 +23,27 @@ import { SessionPeers } from "./peers"
 export type Handler = (request: Request) => Promise<Response>
 
 let handler: Handler | undefined
-let server: ReturnType<typeof Bun.serve> | undefined
+let server: HttpServer | undefined
 let token: string | undefined
 
 const defaultHandler: Handler = async (request) => {
   const [{ Server }, { ServerAuth }] = await Promise.all([import("@/server/server"), import("@/server/auth")])
+  const headers = new Headers(request.headers)
   const auth = ServerAuth.header()
-  if (auth && !request.headers.get("authorization")) request.headers.set("authorization", auth)
-  return Server.Default().app.fetch(request)
+  if (auth) headers.set("authorization", auth)
+  // A process that listens (`lunos serve`, the desktop app) runs its sessions in that listener's
+  // services; Server.Default() would be a second, empty copy. The TUI and `lunos run` run them in
+  // Server.Default().
+  if (Server.url) {
+    const url = new URL(request.url)
+    return fetch(new URL(url.pathname + url.search, Server.url), {
+      method: request.method,
+      headers,
+      ...(request.method !== "GET" ? { body: await request.text() } : {}),
+      redirect: "error",
+    })
+  }
+  return Server.Default().app.fetch(new Request(request, { headers }))
 }
 
 /** Tests: hand forwarded actions to `next` instead of this process's API. */
@@ -102,17 +116,47 @@ export async function serve(request: Request): Promise<Response> {
   return json(404, { error: "No such route." })
 }
 
-/** Starts listening (once) and records the endpoint in this process's file. */
+/**
+ * Starts listening (once) and records the endpoint in this process's file. node:http, not Bun.serve:
+ * the desktop app runs this server in Node.
+ */
 export function start() {
   if (server) return
   token = randomBytes(32).toString("hex")
-  server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: serve })
-  server.unref?.()
-  SessionPeers.setControl({ port: server.port!, token })
+  const listener = createServer(async (req, res) => {
+    try {
+      const chunks: Buffer[] = []
+      for await (const chunk of req) chunks.push(chunk as Buffer)
+      const body = Buffer.concat(chunks)
+      const headers = new Headers()
+      for (const [key, value] of Object.entries(req.headers))
+        if (typeof value === "string") headers.set(key, value)
+        else if (Array.isArray(value)) headers.set(key, value.join(", "))
+      const host = req.headers.host ?? "127.0.0.1"
+      const response = await serve(
+        new Request(`http://${host}${req.url ?? "/"}`, {
+          method: req.method,
+          headers,
+          ...(body.length && req.method !== "GET" && req.method !== "HEAD" ? { body } : {}),
+        }),
+      )
+      res.writeHead(response.status, { "content-type": "application/json" })
+      res.end(await response.text())
+    } catch {
+      res.writeHead(500, { "content-type": "application/json" })
+      res.end(JSON.stringify({ error: "Failed." }))
+    }
+  })
+  listener.unref()
+  server = listener
+  listener.listen(0, "127.0.0.1", () => {
+    const address = listener.address()
+    if (address && typeof address === "object" && token) SessionPeers.setControl({ port: address.port, token })
+  })
 }
 
 export function stop() {
-  server?.stop(true)
+  server?.close()
   server = undefined
   token = undefined
   SessionPeers.setControl(undefined)
