@@ -10,6 +10,7 @@ import { Offline } from "@opencode-ai/core/offline"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { AuditLog } from "@/audit/log"
 import { CloudAuth } from "@/cloud/auth"
+import { CloudHosted } from "@/cloud/hosted"
 import { CloudStore } from "@/cloud/store"
 import { ConfigParse } from "./parse"
 import { ConfigPolicy } from "./policy"
@@ -59,6 +60,27 @@ export function policyURL(onDisk: readonly unknown[]): string | undefined {
   if (!url) return
   // As for lunos login: the access token must never travel in the clear, except to this machine.
   if (/^https:\/\//.test(url) || /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/.test(url)) return url
+}
+
+/** XCOD-242: whether on-disk managed config turns hosted team features off (`cloud.auto_team: false`). */
+export function autoTeamOff(onDisk: readonly unknown[]) {
+  return onDisk.some((doc) => ConfigPolicy.get(doc, "cloud.auto_team") === false)
+}
+
+/** Where team features come from: managed config's `cloud.policy`, or a Lunos sign-in (XCOD-242). */
+export type TeamSource = { url: string; via: "managed" | "hosted" }
+
+/**
+ * The organisation policy URL in effect, and why. Managed `cloud.policy` always wins; without it, the
+ * hosted organisation remembered at `lunos login`, unless managed config sets `cloud.auto_team: false`.
+ * No network: every team feature (the policy, marketplace, memory, sharing) finds its console here.
+ */
+export function teamSource(onDisk: readonly unknown[]): TeamSource | undefined {
+  const managed = policyURL(onDisk)
+  if (managed) return { url: managed, via: "managed" }
+  if (autoTeamOff(onDisk)) return
+  const hosted = CloudHosted.policyURL()
+  if (hosted) return { url: hosted, via: "hosted" }
 }
 
 export type Cache = {
@@ -253,7 +275,7 @@ export async function fetchPolicy(url: string, onDisk: readonly unknown[], opts:
 
 /** The cached copy only, without any network: for decisions made before async work can run. */
 export function resolveSync(onDisk: readonly unknown[]): Result {
-  const url = policyURL(onDisk)
+  const url = teamSource(onDisk)?.url
   if (!url) return { source: "none" }
   return fromCache(url, readCache(url), onDisk, "unreachable")
 }
@@ -303,7 +325,7 @@ export function surface(): Surface {
  */
 export function resolve(onDisk: readonly unknown[], opts: Options = {}): Promise<Result> {
   current ??= (async () => {
-    const url = policyURL(onDisk)
+    const url = teamSource(onDisk)?.url
     const result: Result = !url
       ? { source: "none" }
       : Offline.enabled()

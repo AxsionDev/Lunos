@@ -20,6 +20,13 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Hosted Lunos Team works without MDM.** After `lunos login` with Lunos's own sign-in, Lunos
+  looks up your hosted organisation on cloud.lunos.tech and turns on its policy, private
+  marketplace, team memory and sharing, with no managed config to push. Only Lunos's built-in
+  console is ever used. Managed `cloud.policy` still wins, and an organisation turns this off with
+  `"cloud": { "auto_team": false }` in managed config. `/settings` → Status shows where team
+  features come from (XCOD-242).
+
 - **See on your Lunos console which Lunos versions run where, and which policy they enforce.** Each
   start bound to your organisation's console tells it the version, OS, architecture, surface, a
   random install id and the policy digest, nothing else; developers can turn it off with
