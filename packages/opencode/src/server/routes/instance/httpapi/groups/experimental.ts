@@ -185,6 +185,7 @@ export const ExperimentalPaths = {
   sessionGroups: "/experimental/session-group",
   sessionGroup: "/experimental/session-group/:groupID",
   sessionGroupMove: "/experimental/session-group/move",
+  externalStop: "/experimental/external/:sessionID/stop",
 } as const
 
 export const ExperimentalApi = HttpApi.make("experimental")
@@ -436,6 +437,19 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.sessionGroup.delete",
             summary: "Delete session group",
             description: "Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalStop", ExperimentalPaths.externalStop, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "External session stopped"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.stop",
+            summary: "Stop an external session",
+            description:
+              "Stop a running Claude Code or Codex session Lunos started (as lunos external stop), from any Lunos process on this machine.",
           }),
         ),
         HttpApiEndpoint.get("resource", ExperimentalPaths.resource, {

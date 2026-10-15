@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import fs from "node:fs/promises"
+import path from "node:path"
+import { Global } from "@opencode-ai/core/global"
+import { ExternalRegistry } from "../../src/external/registry"
 import { SessionGroups } from "../../src/session/groups"
 import { SessionLive } from "../../src/session/live"
 import { SessionOverview } from "../../src/session/overview"
@@ -211,5 +214,37 @@ describe("SessionOverview.state (XCOD-205)", () => {
     expect(SessionOverview.kind({ metadata: { external: { tool: "claude", session: "abc" } } })).toBe("external")
     expect(SessionOverview.externalOf({ metadata: { external: { tool: "codex" } } })).toEqual({ tool: "codex" })
     expect(SessionOverview.externalOf({ metadata: { external: { tool: "other" } } })).toBeUndefined()
+  })
+})
+
+describe("external sessions in the Sessions window (XCOD-234)", () => {
+  test("a registry-only external session is named after its tool and folder, never its id", () => {
+    expect(SessionOverview.externalTitle({ tool: "claude", cwd: "/work/api" })).toBe("Claude Code · api")
+    expect(SessionOverview.externalTitle({ tool: "codex", cwd: "C:\\Users\\ada\\web\\" })).toBe("Codex · web")
+    expect(SessionOverview.externalTitle({ tool: "claude", cwd: "/" })).toBe("Claude Code")
+  })
+
+  test("stop ends the tool's process whichever Lunos started it, and only a running one", async () => {
+    const child = Bun.spawn(["sleep", "30"])
+    const entry = {
+      sessionID: "ext-test-stop",
+      tool: "claude" as const,
+      cwd: "/work/api",
+      started: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      status: "running" as const,
+      pid: child.pid,
+    }
+    await ExternalRegistry.save(entry)
+    try {
+      expect(await ExternalRegistry.stop(entry.sessionID)).toEqual({ ok: true })
+      expect(await child.exited).not.toBe(0)
+      expect((await ExternalRegistry.get(entry.sessionID))?.status).toBe("stopped")
+      expect((await ExternalRegistry.stop(entry.sessionID)).ok).toBe(false)
+      expect((await ExternalRegistry.stop("no-such-session")).ok).toBe(false)
+    } finally {
+      child.kill()
+      await fs.rm(path.join(Global.Path.data, "external", `${entry.sessionID}.json`), { force: true })
+    }
   })
 })

@@ -32,6 +32,7 @@ import { InvalidRequestError, notFound } from "../errors"
 import { SessionGroups } from "@/session/groups"
 import { SessionLive } from "@/session/live"
 import { SessionOverview } from "@/session/overview"
+import { ExternalRegistry } from "@/external/registry"
 import { GlobalBus } from "@/bus/global"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
 
@@ -272,6 +273,19 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return yield* groupErrors(() => SessionGroups.move(ctx.payload.sessionIDs, ctx.payload.groupID ?? null))
     })
 
+    // XCOD-234: the same as `lunos external stop`; the registry finds the tool's process by pid, so
+    // this works whichever Lunos process started it.
+    const externalStop = Effect.fn("ExperimentalHttpApi.externalStop")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      const result = yield* Effect.promise(() => ExternalRegistry.stop(ctx.params.sessionID))
+      if (result.ok) return true
+      const missing = !(yield* Effect.promise(() => ExternalRegistry.get(ctx.params.sessionID)))
+      return yield* missing
+        ? Effect.fail(notFound(result.reason))
+        : Effect.fail(new InvalidRequestError({ message: result.reason }))
+    })
+
     const resource = Effect.fn("ExperimentalHttpApi.resource")(function* () {
       return yield* mcp.resources()
     })
@@ -298,6 +312,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionGroupUpdate", sessionGroupUpdate)
       .handle("sessionGroupDelete", sessionGroupDelete)
       .handle("sessionGroupMove", sessionGroupMove)
+      .handle("externalStop", externalStop)
       .handle("resource", resource)
   }),
 )

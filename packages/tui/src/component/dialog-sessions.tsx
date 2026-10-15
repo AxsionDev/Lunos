@@ -325,8 +325,11 @@ export function DialogSessions(props: { select?: string }) {
   }
 
   async function stop(item: SessionOverviewItem) {
-    await sdk.client.session
-      .abort({ sessionID: item.id }, { throwOnError: true })
+    // XCOD-234: a Claude Code / Codex session Lunos started, stopped like `lunos external stop`.
+    const request = toolOnly(item)
+      ? sdk.client.experimental.external.stop({ sessionID: item.id.replace(/^external:/, "") }, { throwOnError: true })
+      : sdk.client.session.abort({ sessionID: item.id }, { throwOnError: true })
+    await request
       .then(() => toast.show({ variant: "info", message: `Stopped "${Locale.truncate(item.title, 40)}"` }))
       .catch(fail)
     refresh()

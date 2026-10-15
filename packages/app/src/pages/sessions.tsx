@@ -205,9 +205,11 @@ export function SessionsPage() {
       refresh()
     },
     stop: async (item: SessionOverviewItem) => {
-      await client()
-        ?.session.abort({ sessionID: item.id, directory: item.directory }, { throwOnError: true })
-        .catch(fail)
+      // XCOD-234: a Claude Code / Codex session Lunos started, stopped like `lunos external stop`.
+      const request = item.id.startsWith("external:")
+        ? client()?.experimental.external.stop({ sessionID: item.id.slice("external:".length) }, { throwOnError: true })
+        : client()?.session.abort({ sessionID: item.id, directory: item.directory }, { throwOnError: true })
+      await request?.catch(fail)
       refresh()
     },
   }
@@ -327,6 +329,15 @@ export function SessionsPage() {
                 {language.t("sessions.action.stop")}
               </button>
             </Show>
+          </Show>
+          <Show when={external() && item().state === "running"}>
+            <button
+              type="button"
+              class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
+              onClick={() => void sessionActions.stop(item())}
+            >
+              {language.t("sessions.action.stop")}
+            </button>
           </Show>
           <Show when={!props.child}>
             <select

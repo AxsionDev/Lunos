@@ -56,6 +56,8 @@ import type {
   ExperimentalConsoleSwitchOrgResponses,
   ExperimentalControlPlaneMoveSessionErrors,
   ExperimentalControlPlaneMoveSessionResponses,
+  ExperimentalExternalStopErrors,
+  ExperimentalExternalStopResponses,
   ExperimentalProjectCopyGenerateNameErrors,
   ExperimentalProjectCopyGenerateNameResponses,
   ExperimentalResourceListErrors,
@@ -1291,6 +1293,44 @@ export class SessionGroup extends HeyApiClient {
   }
 }
 
+export class External extends HeyApiClient {
+  /**
+   * Stop an external session
+   *
+   * Stop a running Claude Code or Codex session Lunos started (as lunos external stop), from any Lunos process on this machine.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalStopResponses,
+      ExperimentalExternalStopErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/stop",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Resource extends HeyApiClient {
   /**
    * Get MCP resources
@@ -1679,6 +1719,11 @@ export class Experimental extends HeyApiClient {
   private _sessionGroup?: SessionGroup
   get sessionGroup(): SessionGroup {
     return (this._sessionGroup ??= new SessionGroup({ client: this.client }))
+  }
+
+  private _external?: External
+  get external(): External {
+    return (this._external ??= new External({ client: this.client }))
   }
 
   private _resource?: Resource

@@ -90,6 +90,16 @@ export function externalOf(session: Pick<Session.Info, "metadata">): { tool: str
   return { tool: value.tool, ...(typeof value.session === "string" ? { session: value.session } : {}) }
 }
 
+/**
+ * XCOD-234: a name for a Claude Code / Codex session that has no Lunos session. The registry keeps
+ * no prompt (by design), so the tool and the folder, e.g. "Claude Code · api". The window shows when.
+ */
+export function externalTitle(entry: Pick<ExternalRegistry.Entry, "tool" | "cwd">) {
+  const tool = entry.tool === "codex" ? "Codex" : "Claude Code"
+  const folder = entry.cwd.split(/[\\/]/).filter(Boolean).at(-1)
+  return folder ? `${tool} · ${folder}` : tool
+}
+
 const lastMessages = Effect.fn("SessionOverview.lastMessages")(function* (ids: string[]) {
   const result = new Map<string, Last>()
   if (ids.length === 0) return result
@@ -175,7 +185,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
     items.push({
       id,
       kind: "external",
-      title: entry.sessionID,
+      title: externalTitle(entry),
       directory: entry.cwd,
       tool: entry.tool,
       cost: entry.costUSD ?? 0,

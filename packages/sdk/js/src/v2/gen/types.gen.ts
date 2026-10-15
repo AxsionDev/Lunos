@@ -8964,6 +8964,41 @@ export type ExperimentalSessionGroupUpdateResponses = {
 export type ExperimentalSessionGroupUpdateResponse =
   ExperimentalSessionGroupUpdateResponses[keyof ExperimentalSessionGroupUpdateResponses]
 
+export type ExperimentalExternalStopData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/{sessionID}/stop"
+}
+
+export type ExperimentalExternalStopErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalExternalStopError = ExperimentalExternalStopErrors[keyof ExperimentalExternalStopErrors]
+
+export type ExperimentalExternalStopResponses = {
+  /**
+   * External session stopped
+   */
+  200: boolean
+}
+
+export type ExperimentalExternalStopResponse =
+  ExperimentalExternalStopResponses[keyof ExperimentalExternalStopResponses]
+
 export type ExperimentalResourceListData = {
   body?: never
   path?: never
