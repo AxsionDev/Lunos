@@ -33,5 +33,11 @@ export const Info = Schema.Struct({
     description:
       "Tell your organisation's Lunos console (cloud.policy) when Lunos starts: version, OS, architecture, surface, a random install id and the policy in effect (default true). Read from managed and user config only; your organisation can lock it on",
   }),
+  // XCOD-242: read from managed config only. Without managed cloud.policy, a sign-in to Lunos's own
+  // identity provider turns on team features for the account's hosted organisation.
+  auto_team: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      "Turn on team features (organisation policy, private marketplace, team memory, sharing) for your hosted Lunos organisation after lunos login, without cloud.policy (default true). Only read from managed config; set false to turn it off",
+  }),
 }).annotate({ identifier: "CloudConfig" })
 export type Info = Schema.Schema.Type<typeof Info>

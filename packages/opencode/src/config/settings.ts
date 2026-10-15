@@ -1241,6 +1241,15 @@ export const SnapshotSchema = Schema.Struct({
     project: Schema.Struct({ config: Schema.String, tui: Schema.String }),
   }),
   usage: Usage,
+  // XCOD-242: where team features come from, for the Status tab: managed config's cloud.policy, or a
+  // Lunos sign-in (hosted). Absent when they're off. Optional, so older servers still decode.
+  team: Schema.optional(
+    Schema.Struct({
+      via: Schema.Literals(["managed", "hosted"]),
+      org: Schema.String,
+      host: Schema.String,
+    }),
+  ),
   // XCOD-158: sandboxes, for the Status tab. Optional, so older servers still decode.
   sandbox: Schema.optional(
     Schema.Struct({

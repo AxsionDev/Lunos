@@ -22554,6 +22554,9 @@
           },
           "client_start": {
             "type": "boolean"
+          },
+          "auto_team": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -24070,6 +24073,23 @@
           },
           "usage": {
             "$ref": "#/components/schemas/SettingsUsage"
+          },
+          "team": {
+            "type": "object",
+            "properties": {
+              "via": {
+                "type": "string",
+                "enum": ["managed", "hosted"]
+              },
+              "org": {
+                "type": "string"
+              },
+              "host": {
+                "type": "string"
+              }
+            },
+            "required": ["via", "org", "host"],
+            "additionalProperties": false
           },
           "sandbox": {
             "type": "object",

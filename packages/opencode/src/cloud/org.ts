@@ -8,8 +8,9 @@ import { CloudStore } from "./store"
 /**
  * XCOD-191: your organisation's Lunos console, for the team features (its private marketplace, team
  * memory and shares). Found the same way as its policy (XCOD-238): `cloud.policy` in managed config,
- * `<console>/v1/orgs/<org>/policy`. Never from user or project config, so a repository can't send
- * your sign-in to its own server, and only to that console, with the `lunos login` session's token.
+ * `<console>/v1/orgs/<org>/policy`, or (XCOD-242) the hosted organisation remembered at a Lunos
+ * sign-in, on a console host built into Lunos. Never from user or project config, so a repository
+ * can't send your sign-in to its own server, and only to that console, with the session's token.
  */
 
 export const TIMEOUT_MS = 10_000
@@ -62,10 +63,13 @@ export function parse(url: string | undefined): Org | undefined {
   }
 }
 
-/** The organisation this machine's managed config points at, if any. */
+/**
+ * The organisation this machine's managed config (on disk) points at, or the hosted one (XCOD-242).
+ * Never from the fetched policy: an organisation's console can't send the token to another host.
+ */
 export async function resolve(docs?: readonly unknown[]): Promise<Org | undefined> {
-  const onDisk = docs ?? (await ConfigManaged.readManagedDocs().catch(() => [] as unknown[]))
-  return parse(ConfigOrgPolicy.policyURL(onDisk))
+  const onDisk = docs ?? (await ConfigManaged.readOnDiskDocs().catch(() => [] as unknown[]))
+  return parse(ConfigOrgPolicy.teamSource(onDisk)?.url)
 }
 
 /** The session's access token; refreshed (with discovery) only when it is about to expire. */
