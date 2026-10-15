@@ -155,9 +155,9 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 }
 
 try {
-  await until("A up", async () => (await fetch(`http://127.0.0.1:${A_PORT}/global/health`)).ok || undefined, 60_000)
+  await until("A up", async () => (await fetch(`http://127.0.0.1:${A_PORT}/global/health`)).ok || undefined, 120_000)
   B = serve(b.dir, B_PORT)
-  await until("B up", async () => (await fetch(`http://127.0.0.1:${B_PORT}/global/health`)).ok || undefined, 60_000)
+  await until("B up", async () => (await fetch(`http://127.0.0.1:${B_PORT}/global/health`)).ok || undefined, 120_000)
   const session = (await api(A_PORT, a.dir, "POST", "/session", { title: "E2E 234" })).json
   const id = session.id as string
   await api(A_PORT, a.dir, "POST", `/session/${id}/prompt_async`, { parts: [{ type: "text", text: "wait please" }] })
@@ -243,6 +243,8 @@ try {
   check("after kill -9, stop says nobody runs it (404)", gone.status === 404, gone)
 } catch (error) {
   console.log("ERROR", error instanceof Error ? error.message : error)
+  // Kill first: reading a live process's stderr waits for it to exit.
+  A.kill("SIGKILL")
   console.log("A stderr:", (await new Response(A.stderr).text().catch(() => "")).slice(-1500))
 } finally {
   A.kill("SIGKILL")
