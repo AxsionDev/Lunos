@@ -579,10 +579,23 @@ describe("sandbox network", () => {
       network: "policy",
       extra: [],
     })
-    expect(eu.allow).toContain("api.mistral.ai:443")
+    // XCOD-194: Mistral's default host is global, so it's dropped too; at its EU endpoint it stays.
+    expect(eu.allow).not.toContain("api.mistral.ai:443")
     expect(eu.allow).not.toContain("api.anthropic.com:443")
     expect(eu.allow).not.toContain("10.0.0.5:8000")
-    expect(eu.denied.map((item) => item.provider).sort()).toEqual(["anthropic", "local"])
+    expect(eu.denied.map((item) => item.provider).sort()).toEqual(["anthropic", "local", "mistral"])
+    const euMistral = SandboxAllow.compute({
+      doc: {
+        ...doc,
+        provider: { ...doc.provider, mistral: { options: { baseURL: "https://api.eu.mistral.ai/v1" } } },
+        residency: { allow: ["eu"] },
+      },
+      providers: ["mistral"],
+      network: "policy",
+      extra: [],
+    })
+    expect(euMistral.allow).toContain("api.eu.mistral.ai:443")
+    expect(euMistral.allow).not.toContain("api.mistral.ai:443")
     expect(SandboxAllow.compute({ doc, providers: [], network: "none", extra: ["x"] }).allow).toEqual([])
     expect(SandboxAllow.providersFromEnv(["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "FIREWORKS_API_KEY"])).toEqual([
       "anthropic",

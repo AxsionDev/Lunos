@@ -2142,14 +2142,32 @@ it.instance(
     const anthropic = Object.values(providers[ProviderV2.ID.anthropic].models)
     expect(anthropic.length).toBeGreaterThan(0)
     for (const model of anthropic) expect(model.blocked).toMatchObject({ policy: "residency", region: "us" })
+    // XCOD-194: Mistral's default host (api.mistral.ai) is global, not EU.
     for (const model of Object.values(providers[ProviderV2.ID.make("mistral")].models))
-      expect(model.blocked).toBeUndefined()
+      expect(model.blocked).toMatchObject({ policy: "residency", region: "unknown" })
     const pub = Provider.toPublicInfo(providers[ProviderV2.ID.anthropic])
     expect(Object.keys(pub.models)).toEqual(anthropic.map((model) => model.id))
     expect(Object.values(pub.models)[0].blocked?.reason).toContain("does not allow")
     expect(Provider.blockedModels(providers).has(`anthropic/${anthropic[0].id}`)).toBe(true)
   }),
   { config: { residency: { allow: ["eu"] } } },
+)
+
+it.instance(
+  "XCOD-194: Mistral at its EU endpoint is allowed under an EU-only policy",
+  Effect.gen(function* () {
+    yield* setProcessEnv("MISTRAL_API_KEY", "test-api-key")
+    const providers = yield* list
+    const mistral = Object.values(providers[ProviderV2.ID.make("mistral")].models)
+    expect(mistral.length).toBeGreaterThan(0)
+    for (const model of mistral) expect(model.blocked).toBeUndefined()
+  }),
+  {
+    config: {
+      residency: { allow: ["eu"] },
+      provider: { mistral: { options: { baseURL: "https://api.eu.mistral.ai/v1" } } },
+    },
+  },
 )
 
 it.instance(

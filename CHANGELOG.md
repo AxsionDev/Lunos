@@ -123,6 +123,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **Mistral counts as EU only at its EU endpoint.** Mistral's default endpoint, `api.mistral.ai`,
+  is global, with no committed inference location, so an EU-only data-residency policy now
+  refuses it; before, Lunos counted it as EU. To use Mistral under an EU-only policy, set
+  `"provider": { "mistral": { "options": { "baseURL": "https://api.eu.mistral.ai/v1" } } }`
+  (Mistral charges 1.1× list price there). Without a residency policy nothing changes (XCOD-194).
 - **/settings keys work the same on every screen.** Esc closes the whole settings window from any
   depth without saving what you were typing; ← goes back one level to the row you came from (in a
   text field, from the start of the field). Every screen shows `← back · esc close` (XCOD-233).

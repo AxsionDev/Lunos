@@ -25,6 +25,8 @@ export const DEFAULT_HOSTS: Record<string, readonly string[]> = {
   togetherai: ["api.together.xyz"],
   "fireworks-ai": ["api.fireworks.ai"],
   perplexity: ["api.perplexity.ai"],
+  // XCOD-194: Mistral's SDK default; its EU claim covers only api.eu.mistral.ai.
+  mistral: ["api.mistral.ai", "codestral.mistral.ai"],
   "github-copilot": ["api.githubcopilot.com", "api.individual.githubcopilot.com", "api.github.com"],
 }
 

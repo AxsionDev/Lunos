@@ -86,7 +86,17 @@ A self-hosted model (vLLM, Ollama, LM Studio) has no recorded jurisdiction, so a
 - The audit log records these calls with basis `declared` and the real host, so a reviewer can tell your declaration from a recorded fact.
 - In managed config, lock it with `"$locked": ["residency"]`, so developers can't add their own declarations.
 
-The built-in EU claims hold only for these hosts: `api.mistral.ai` and `codestral.mistral.ai` (Mistral), `api.scaleway.ai` (Scaleway), `*.endpoints.kepler.ai.cloud.ovh.net` (OVHcloud) and `inference.hetzner.com` (Hetzner).
+The built-in EU claims hold only for these hosts: `api.eu.mistral.ai` (Mistral), `api.scaleway.ai` (Scaleway), `*.endpoints.kepler.ai.cloud.ovh.net` (OVHcloud) and `inference.hetzner.com` (Hetzner).
+
+**Mistral under an EU-only policy.** Mistral's default endpoint, `api.mistral.ai`, is global: Mistral doesn't commit to an inference location for it, so an EU-only policy refuses it. Point the Mistral provider at its EU endpoint instead (Mistral charges 1.1× list price there):
+
+```json
+{
+  "provider": {
+    "mistral": { "options": { "baseURL": "https://api.eu.mistral.ai/v1" } }
+  }
+}
+```
 
 ## Allowed values
 
