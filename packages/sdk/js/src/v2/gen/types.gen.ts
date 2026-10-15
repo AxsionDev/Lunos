@@ -1748,6 +1748,7 @@ export type CloudConfig = {
   endpoint?: string
   policy?: string
   client_start?: boolean
+  auto_team?: boolean
 }
 
 export type SyncOptions = {
@@ -2265,6 +2266,11 @@ export type SettingsSnapshot = {
     }
   }
   usage: SettingsUsage
+  team?: {
+    via: "managed" | "hosted"
+    org: string
+    host: string
+  }
   sandbox?: {
     inside?: {
       id: string

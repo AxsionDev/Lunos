@@ -31,6 +31,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
     port on `127.0.0.1` only, for stop and approval answers from your other Lunos windows. The
     port and a random token are in a file only you can read (`live/` in Lunos's data directory);
     requests from web pages are refused. Nothing is sent off this machine.
+- **Hosted Lunos Team works without MDM.** After `lunos login` with Lunos's own sign-in, Lunos
+  looks up your hosted organisation on cloud.lunos.tech and turns on its policy, private
+  marketplace, team memory and sharing, with no managed config to push. Only Lunos's built-in
+  console is ever used. Managed `cloud.policy` still wins, and an organisation turns this off with
+  `"cloud": { "auto_team": false }` in managed config. `/settings` → Status shows where team
+  features come from (XCOD-242).
 
 - **See on your Lunos console which Lunos versions run where, and which policy they enforce.** Each
   start bound to your organisation's console tells it the version, OS, architecture, surface, a

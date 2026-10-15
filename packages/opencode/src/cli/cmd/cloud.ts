@@ -2,9 +2,12 @@ import { EOL } from "os"
 import { Effect } from "effect"
 import { openUrl } from "@opencode-ai/core/open"
 import { Config } from "@/config/config"
+import { ConfigManaged } from "@/config/managed"
+import { ConfigOrgPolicy } from "@/config/org-policy"
 import { ConfigPolicy } from "@/config/policy"
 import { CloudAuth } from "@/cloud/auth"
 import { CloudDefaults } from "@/cloud/defaults"
+import { CloudHosted } from "@/cloud/hosted"
 import { CloudOidc } from "@/cloud/oidc"
 import { CloudStore } from "@/cloud/store"
 import { CloudSyncApi } from "@/cloud/sync-api"
@@ -89,7 +92,7 @@ export const LoginCommand = effectCmd({
           sub: user.sub,
           savedAt: new Date().toISOString(),
         })
-        return { user, backend, issuer: discovery.issuer ?? issuer }
+        return { user, backend, issuer: discovery.issuer ?? issuer, tokens }
       },
       catch: (error) => error,
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
@@ -105,6 +108,18 @@ export const LoginCommand = effectCmd({
         out(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`)),
       ),
     )
+    // XCOD-242: team features for the account's hosted organisation, unless managed config decides
+    // (it sets cloud.policy, or cloud.auto_team: false): then nothing is looked up, exactly as before.
+    const hosted = yield* Effect.promise(async () => {
+      const onDisk = await ConfigManaged.readOnDiskDocs().catch(() => [] as unknown[])
+      if (ConfigOrgPolicy.policyURL(onDisk) || ConfigOrgPolicy.autoTeamOff(onDisk)) {
+        await CloudHosted.clear()
+        return { kind: "none" } as const
+      }
+      return CloudHosted.afterLogin({ issuer: result.issuer, sub: result.user.sub, tokens: result.tokens })
+    })
+    const line = CloudHosted.describe(hosted)
+    if (line) out(hosted.kind === "on" ? line : dim(line))
   }),
 })
 
@@ -124,6 +139,7 @@ export const LogoutCommand = effectCmd({
       }
     })
     yield* Effect.promise(() => CloudStore.clear())
+    yield* Effect.promise(() => CloudHosted.clear())
     out(`Signed out${session.email ? ` ${session.email}` : ""}.`)
     if (!revoked)
       out(dim("The identity provider couldn't be told; the session ends when its tokens expire, or revoke it there."))
