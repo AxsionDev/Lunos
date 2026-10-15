@@ -45,27 +45,40 @@
 .pf-v5-c-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
 .pf-v5-c-login__container { display: block; width: 100%; max-width: 400px; padding: 0; }
 .lunos-header { padding: 0 0 20px; text-align: center; }
+#kc-header-wrapper.lunos-brand { text-transform: none; letter-spacing: normal; }
 .lunos-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; color: var(--text); }
 .pf-v5-c-login__main {
   background: var(--base); border: 1px solid var(--surface0); border-radius: 16px;
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.35);
 }
-.pf-v5-c-login__main-header { padding: 32px 32px 8px; text-align: center; display: block; }
+/* keycloak.v2 puts a 4px coloured bar on the card's top edge; Lunos has none. */
+.pf-v5-c-login__main-header { padding: 32px 32px 8px; text-align: center; display: block; border-top: 0; }
 .pf-v5-c-login__main-header .pf-v5-c-title { font-size: 24px; font-weight: 600; }
 .pf-v5-c-login__main-body { padding: 8px 32px 24px; }
 .pf-v5-c-login__main-footer { padding: 0 32px 24px; }
 
-/* Social buttons: full width, outlined, icon left, label centred. */
+/* Social buttons: full width, neutral outline, icon left, label centred. PatternFly's secondary button sets
+   its colours through these variables on .pf-v5-c-button, so they're overridden at the same place. */
 #kc-social-providers ul { list-style: none; margin: 0; padding: 0; }
-.lunos-social {
-  display: flex !important; align-items: center; justify-content: center; gap: 10px;
-  background: var(--mantle); color: var(--text); border: 1px solid var(--surface1); border-radius: 10px;
+.pf-v5-c-button.lunos-social {
+  --pf-v5-c-button--m-secondary--BackgroundColor: var(--mantle);
+  --pf-v5-c-button--m-secondary--Color: var(--text);
+  --pf-v5-c-button--m-secondary--after--BorderColor: var(--surface1);
+  --pf-v5-c-button--m-secondary--hover--BackgroundColor: var(--surface0);
+  --pf-v5-c-button--m-secondary--hover--Color: var(--text);
+  --pf-v5-c-button--m-secondary--hover--after--BorderColor: var(--overlay0);
+  --pf-v5-c-button--m-secondary--focus--BackgroundColor: var(--surface0);
+  --pf-v5-c-button--m-secondary--focus--Color: var(--text);
+  --pf-v5-c-button--m-secondary--active--BackgroundColor: var(--surface0);
+  --pf-v5-c-button--m-secondary--active--Color: var(--text);
+  --pf-v5-c-button--after--BorderRadius: 10px;
+  --pf-v5-c-button--BorderRadius: 10px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
   min-height: 44px; font-weight: 500;
 }
-.lunos-social:hover { border-color: var(--overlay0); background: var(--surface0); }
 .lunos-social svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
 .lunos-or {
-  display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--overlay1);
+  display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--subtext0);
   font-size: 12px; letter-spacing: 0.08em;
 }
 .lunos-or::before, .lunos-or::after { content: ""; flex: 1; height: 1px; background: var(--surface0); }

@@ -100,6 +100,14 @@ describe.skipIf(!dockerAvailable())("lunos login theme", () => {
     expect(after.match(/<form\b[^>]*>/)![0]).toContain('id="kc-form-login"')
   })
 
+  test("the theme's images are well-formed SVG (an <img> rejects invalid XML a tab icon tolerates)", async () => {
+    for (const file of ["lunos-mark.svg", "favicon.svg"]) {
+      const svg = await Bun.file(`${import.meta.dir}/../themes/lunos/login/resources/img/${file}`).text()
+      for (const comment of svg.match(/<!--[\s\S]*?-->/g) ?? []) expect(comment.slice(4, -3)).not.toContain("--")
+      expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
+    }
+  })
+
   test("nothing on the login page loads from another origin", async () => {
     const html = await page(authUrl(), new CookieJar())
     const urls = [...html.matchAll(/(?:href|src)="(https?:\/\/[^"]+)"/g)].map((m) => m[1])
@@ -198,5 +206,33 @@ describe.skipIf(!dockerAvailable())("lunos login theme", () => {
       await kc.admin("PUT", R, { verifyEmail: true })
       await removeIdp("github")
     }
+  })
+
+  test("the lunos login device pages render with the lunos theme", async () => {
+    const res = await fetch(`${kc.base}/realms/Lunos/protocol/openid-connect/auth/device`, {
+      method: "POST",
+      body: new URLSearchParams({ client_id: "lunos-cli", scope: "openid" }),
+    })
+    const device = (await res.json()) as { verification_uri: string; verification_uri_complete: string }
+    const jar = new CookieJar()
+    const entry = await page(device.verification_uri, jar)
+    expect(entry).toMatch(/login\/lunos\/css\/lunos\.css/)
+    expect(entry).toContain("lunos-mark.svg")
+    // Signing in from the complete URI lands on the consent screen (lunos-cli asks for consent).
+    const signIn = await page(device.verification_uri_complete, jar)
+    const form = firstForm(signIn)!
+    const after = await fetch(new URL(form.action, kc.base), {
+      method: "POST",
+      redirect: "manual",
+      headers: { "content-type": "application/x-www-form-urlencoded", cookie: jar.header(form.action) },
+      body: new URLSearchParams({ ...form.fields, username: PAT.email, password: PAT.password }),
+    })
+    jar.store(after)
+    const consent =
+      after.status >= 300
+        ? await page(new URL(after.headers.get("location")!, kc.base).toString(), jar)
+        : await after.text()
+    expect(consent).toMatch(/login\/lunos\/css\/lunos\.css/)
+    expect(consent).toMatch(/template: login-oauth-grant\.ftl|kc-oauth|oauth-grant/)
   })
 })
