@@ -10,7 +10,9 @@ import { Global } from "@opencode-ai/core/global"
 import { CloudDefaults } from "../../src/cloud/defaults"
 import { CloudHosted } from "../../src/cloud/hosted"
 import { CloudOrg } from "../../src/cloud/org"
+import { ConfigManaged } from "../../src/config/managed"
 import { ConfigOrgPolicy } from "../../src/config/org-policy"
+import { ConfigPolicy } from "../../src/config/policy"
 
 let dir: string
 let previousData: string
@@ -61,6 +63,8 @@ beforeAll(async () => {
   })
   base = `http://127.0.0.1:${server.port}`
   restoreHost = CloudHosted.useHostForTests(base)
+  // resolve() keeps one result per process; another suite in the same run may have resolved it.
+  ConfigOrgPolicy.reset()
 })
 
 afterAll(async () => {
@@ -142,6 +146,34 @@ describe("hosted Team after a Lunos sign-in (XCOD-242)", () => {
     await fs.writeFile(CloudHosted.file(), JSON.stringify({ ...remembered, org: "evil.example/v1/orgs/x" }))
     expect(CloudHosted.policyURL()).toBeUndefined()
     expect(requested.every((url) => url.startsWith(`${base}/`))).toBe(true)
+  })
+
+  test("a hosted organisation's policy can't set or lock cloud.* (endpoint, issuer, policy); a managed one still can", async () => {
+    served = {
+      cloud: { endpoint: "https://evil.example", issuer: "https://evil.example/realms/x" },
+      residency: { allow: ["eu"] },
+      $locked: ["cloud", "cloud.endpoint", "residency"],
+    }
+    await CloudHosted.afterLogin(await signIn(), { fetch: recording })
+    // What session sync, cloud runs and `lunos login` read: the merged managed documents.
+    const docs = await ConfigManaged.readManagedDocs()
+    expect(docs.map((doc) => ConfigPolicy.get(doc, "cloud.endpoint")).filter(Boolean)).toEqual([])
+    expect(docs.map((doc) => ConfigPolicy.get(doc, "cloud.issuer")).filter(Boolean)).toEqual([])
+    expect(docs.flatMap(ConfigPolicy.lockList)).toEqual(["residency"])
+    // The rest of the policy applies.
+    expect(docs.map((doc) => ConfigPolicy.get(doc, "residency.allow")).filter(Boolean)).toEqual([["eu"]])
+    expect(ConfigOrgPolicy.readCache(`${base}/v1/orgs/acme/policy`)).toBeDefined()
+    // Synchronous readers (sandbox decisions) see the same.
+    const sync = ConfigManaged.readManagedDocsSync()
+    expect(sync.map((doc) => ConfigPolicy.get(doc, "cloud.endpoint")).filter(Boolean)).toEqual([])
+
+    // A console named in managed config (MDM) keeps that power, exactly as before (AC3).
+    ConfigOrgPolicy.reset()
+    await managed({ cloud: { policy: `${base}/v1/orgs/acme/policy` } })
+    const pinned = await ConfigManaged.readManagedDocs()
+    expect(pinned.map((doc) => ConfigPolicy.get(doc, "cloud.endpoint")).filter(Boolean)).toEqual([
+      "https://evil.example",
+    ])
   })
 
   test("the org claim chooses which of the account's hosted organisations, never which host", async () => {

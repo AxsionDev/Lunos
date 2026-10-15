@@ -83,6 +83,26 @@ export function teamSource(onDisk: readonly unknown[]): TeamSource | undefined {
   if (hosted) return { url: hosted, via: "hosted" }
 }
 
+/**
+ * XCOD-242: a hosted organisation's policy may not set or lock `cloud` (issuer, endpoint, policy).
+ * Its members' Lunos sign-in is valid for their whole Lunos account, so an organisation admin must
+ * not be able to point sync, cloud runs or the next sign-in at another host. Managed config, which
+ * the organisation pushes to machines it owns, keeps that power.
+ */
+export function withoutCloud(layer: Doc | undefined): Doc | undefined {
+  if (!layer) return layer
+  const { cloud: _cloud, ...rest } = layer
+  const locked = ConfigPolicy.lockList(rest).filter((key) => key !== "cloud" && !key.startsWith("cloud."))
+  if (ConfigPolicy.FIELD in rest) rest[ConfigPolicy.FIELD] = locked
+  return rest
+}
+
+/** The result, with a hosted organisation's policy kept out of `cloud` (withoutCloud). */
+function scoped(result: Result, source: TeamSource | undefined): Result {
+  if (source?.via !== "hosted" || !result.layer) return result
+  return { ...result, layer: withoutCloud(result.layer) }
+}
+
 export type Cache = {
   url: string
   etag: string
@@ -275,9 +295,9 @@ export async function fetchPolicy(url: string, onDisk: readonly unknown[], opts:
 
 /** The cached copy only, without any network: for decisions made before async work can run. */
 export function resolveSync(onDisk: readonly unknown[]): Result {
-  const url = teamSource(onDisk)?.url
-  if (!url) return { source: "none" }
-  return fromCache(url, readCache(url), onDisk, "unreachable")
+  const source = teamSource(onDisk)
+  if (!source) return { source: "none" }
+  return scoped(fromCache(source.url, readCache(source.url), onDisk, "unreachable"), source)
 }
 
 let current: Promise<Result> | undefined
@@ -325,12 +345,16 @@ export function surface(): Surface {
  */
 export function resolve(onDisk: readonly unknown[], opts: Options = {}): Promise<Result> {
   current ??= (async () => {
-    const url = teamSource(onDisk)?.url
-    const result: Result = !url
-      ? { source: "none" }
-      : Offline.enabled()
-        ? fromCache(url, readCache(url), onDisk, "offline")
-        : await fetchPolicy(url, onDisk, opts).catch(() => fromCache(url, readCache(url), onDisk, "failed"))
+    const source = teamSource(onDisk)
+    const url = source?.url
+    const result: Result = scoped(
+      !url
+        ? { source: "none" }
+        : Offline.enabled()
+          ? fromCache(url, readCache(url), onDisk, "offline")
+          : await fetchPolicy(url, onDisk, opts).catch(() => fromCache(url, readCache(url), onDisk, "failed")),
+      source,
+    )
     const fields = startFields(result, onDisk)
     started = { result, fields }
     if (announce) AuditLog.emit("client.start", fields)
