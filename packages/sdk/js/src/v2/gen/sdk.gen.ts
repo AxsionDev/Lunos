@@ -58,6 +58,16 @@ import type {
   ExperimentalControlPlaneMoveSessionResponses,
   ExperimentalExternalStopErrors,
   ExperimentalExternalStopResponses,
+  ExperimentalPeerAsksErrors,
+  ExperimentalPeerAsksResponses,
+  ExperimentalPeerPermissionReplyErrors,
+  ExperimentalPeerPermissionReplyResponses,
+  ExperimentalPeerQuestionRejectErrors,
+  ExperimentalPeerQuestionRejectResponses,
+  ExperimentalPeerQuestionReplyErrors,
+  ExperimentalPeerQuestionReplyResponses,
+  ExperimentalPeerStopErrors,
+  ExperimentalPeerStopResponses,
   ExperimentalProjectCopyGenerateNameErrors,
   ExperimentalProjectCopyGenerateNameResponses,
   ExperimentalResourceListErrors,
@@ -1331,6 +1341,210 @@ export class External extends HeyApiClient {
   }
 }
 
+export class Peer extends HeyApiClient {
+  /**
+   * Stop a session another Lunos runs
+   *
+   * Stop a session that another Lunos process on this machine is running, through that process.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerStopResponses,
+      ExperimentalPeerStopErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/stop",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * What a session another Lunos runs is waiting for
+   *
+   * The pending permission requests and questions of a session another Lunos process on this machine runs.
+   */
+  public asks<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalPeerAsksResponses,
+      ExperimentalPeerAsksErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/asks",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Answer a permission request in another Lunos
+   *
+   * Answer a permission request of a session another Lunos process on this machine runs. That process checks and audits the answer.
+   */
+  public permissionReply<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      requestID: string
+      directory?: string
+      workspace?: string
+      reply?: "once" | "always" | "reject"
+      message?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "requestID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "reply" },
+            { in: "body", key: "message" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerPermissionReplyResponses,
+      ExperimentalPeerPermissionReplyErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/permission/{requestID}/reply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Answer a question in another Lunos
+   *
+   * Answer a question of a session another Lunos process on this machine runs.
+   */
+  public questionReply<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      requestID: string
+      directory?: string
+      workspace?: string
+      answers?: Array<QuestionAnswer>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "requestID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "answers" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerQuestionReplyResponses,
+      ExperimentalPeerQuestionReplyErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/question/{requestID}/reply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Dismiss a question in another Lunos
+   *
+   * Dismiss a question of a session another Lunos process on this machine runs.
+   */
+  public questionReject<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      requestID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "requestID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerQuestionRejectResponses,
+      ExperimentalPeerQuestionRejectErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/question/{requestID}/reject",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Resource extends HeyApiClient {
   /**
    * Get MCP resources
@@ -1724,6 +1938,11 @@ export class Experimental extends HeyApiClient {
   private _external?: External
   get external(): External {
     return (this._external ??= new External({ client: this.client }))
+  }
+
+  private _peer?: Peer
+  get peer(): Peer {
+    return (this._peer ??= new Peer({ client: this.client }))
   }
 
   private _resource?: Resource

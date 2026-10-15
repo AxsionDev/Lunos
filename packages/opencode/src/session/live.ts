@@ -22,13 +22,31 @@ function drop(predicate: (directory: string | undefined, sessionID: string) => b
 }
 
 let pending: ReturnType<typeof setTimeout> | undefined
+let control: (() => void) | undefined
+
+/** XCOD-234: called before this process first shares an active session (starts SessionPeerControl). */
+export function withControl(start: () => void) {
+  control = start
+}
 
 /** XCOD-234: tell other Lunos processes what this one's sessions are doing (debounced). */
 function share() {
   if (!started || pending) return
   pending = setTimeout(() => {
     pending = undefined
-    SessionPeers.publish(Object.fromEntries([...active()].map((id) => [id, get(id)])))
+    if (active().size > 0) {
+      try {
+        control?.()
+      } catch {}
+    }
+    SessionPeers.publish(
+      Object.fromEntries(
+        [...active()].map((id) => {
+          const directory = directoryOf(id)
+          return [id, { ...get(id), ...(directory ? { directory } : {}) }]
+        }),
+      ),
+    )
   }, 50)
   pending.unref?.()
 }
@@ -108,6 +126,13 @@ export function get(sessionID: string): Activity {
     else questions++
   }
   return { status: status.get(sessionID)?.type, permissions, questions }
+}
+
+/** The project directory this process serves a running or waiting session under. */
+export function directoryOf(sessionID: string) {
+  const own = status.get(sessionID)?.directory
+  if (own) return own
+  for (const item of asks.values()) if (item.sessionID === sessionID && item.directory) return item.directory
 }
 
 /** Session ids this process knows to be running or waiting, so they're listed however old they are. */

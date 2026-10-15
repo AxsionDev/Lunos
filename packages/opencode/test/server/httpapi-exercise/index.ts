@@ -773,6 +773,39 @@ const scenarios: Scenario[] = [
       headers: ctx.headers(),
     }))
     .json(404, object, "status"),
+  // XCOD-234: a session no other Lunos process runs is a 404 for every peer action.
+  ...(
+    [
+      ["post", "/experimental/peer/{sessionID}/stop", "experimental.peer.stop", undefined],
+      ["get", "/experimental/peer/{sessionID}/asks", "experimental.peer.asks", undefined],
+      [
+        "post",
+        "/experimental/peer/{sessionID}/permission/{requestID}/reply",
+        "experimental.peer.permissionReply",
+        { reply: "once" },
+      ],
+      [
+        "post",
+        "/experimental/peer/{sessionID}/question/{requestID}/reply",
+        "experimental.peer.questionReply",
+        { answers: [] },
+      ],
+      [
+        "post",
+        "/experimental/peer/{sessionID}/question/{requestID}/reject",
+        "experimental.peer.questionReject",
+        undefined,
+      ],
+    ] as const
+  ).map(([method, template, id, body]) =>
+    http.protected[method](template, id)
+      .at((ctx) => ({
+        path: route(template, { sessionID: "ses_nobody", requestID: "per_nobody" }),
+        headers: ctx.headers(),
+        ...(body ? { body } : {}),
+      }))
+      .json(404, object, "status"),
+  ),
   http.protected.get("/experimental/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")

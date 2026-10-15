@@ -106,12 +106,13 @@ export function toolOnly(item: Pick<SessionOverviewItem, "id">) {
 
 /**
  * Whether a row can be stopped from here: a Lunos session this Lunos is running or waiting on.
- * Tool-only sessions run in their own process, and "elsewhere" ones in another Lunos.
+ * Tool-only sessions run in their own process; "elsewhere" ones are stopped by the Lunos that runs them.
  */
-export function stoppable(item: Pick<SessionOverviewItem, "id" | "state" | "elsewhere">) {
+export function stoppable(item: Pick<SessionOverviewItem, "id" | "state" | "elsewhere" | "stale">) {
   // XCOD-234: a running Claude Code / Codex session stops like `lunos external stop`.
   if (toolOnly(item)) return item.state === "running"
-  return !item.elsewhere && (item.state === "running" || item.state === "waiting")
+  // XCOD-234: a session another Lunos runs is stopped by that Lunos.
+  return item.state === "running" || item.state === "waiting"
 }
 
 function matches(item: SessionOverviewItem, search: string, state: StateFilter, groupName: string | undefined) {

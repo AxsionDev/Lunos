@@ -171,7 +171,8 @@ describe("TUI /sessions model (XCOD-205)", () => {
     expect(stoppable({ id: "ses_1", state: "running" })).toBe(true)
     expect(stoppable({ id: "ses_1", state: "waiting" })).toBe(true)
     expect(stoppable({ id: "ses_1", state: "idle" })).toBe(false)
-    expect(stoppable({ id: "ses_1", state: "running", elsewhere: true })).toBe(false)
+    expect(stoppable({ id: "ses_1", state: "running", elsewhere: true })).toBe(true)
+    expect(stoppable({ id: "ses_1", state: "idle", stale: true })).toBe(false)
     // A tool-only external row runs in its own process; an /external session is a Lunos session.
     expect(toolOnly({ id: "external:abc" })).toBe(true)
     // XCOD-234: a running one stops like `lunos external stop`; a finished one can't.

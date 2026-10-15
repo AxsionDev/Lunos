@@ -22,9 +22,12 @@ export const STALE_MS = 3 * HEARTBEAT_MS
 /** Files of processes gone for this long are deleted by whoever reads them. */
 const FORGET_MS = 60 * 60 * 1000
 
-export type Claim = SessionLive.Activity
-export type File = { version: 1; pid: number; heartbeat: number; sessions: Record<string, Claim> }
-export type Peer = Claim & { fresh: boolean; pid: number }
+/** A session's state, and the project directory its process serves it under. */
+export type Claim = SessionLive.Activity & { directory?: string }
+/** Where that process takes stop and approval answers (loopback only; see SessionPeerControl). */
+export type Control = { port: number; token: string }
+export type File = { version: 1; pid: number; heartbeat: number; sessions: Record<string, Claim>; control?: Control }
+export type Peer = Claim & { fresh: boolean; pid: number; control?: Control }
 
 export const dir = () => path.join(Global.Path.data, "live")
 
@@ -38,12 +41,24 @@ function ensureDir() {
 }
 
 let current: Record<string, Claim> = {}
+let control: Control | undefined
+
+/** XCOD-234: this process's control endpoint, written into its file for the other processes. */
+export function setControl(value: Control | undefined) {
+  control = value
+}
 let beat: ReturnType<typeof setInterval> | undefined
 let exitHooked = false
 
 function write() {
   ensureDir()
-  const body: File = { version: 1, pid: process.pid, heartbeat: Date.now(), sessions: current }
+  const body: File = {
+    version: 1,
+    pid: process.pid,
+    heartbeat: Date.now(),
+    sessions: current,
+    ...(control ? { control } : {}),
+  }
   const tmp = `${own()}.${randomBytes(3).toString("hex")}.tmp`
   writeFileSync(tmp, JSON.stringify(body), { mode: 0o600 })
   renameSync(tmp, own())
@@ -126,12 +141,22 @@ export function read(input: { now?: number } = {}): Map<string, Peer> {
       if (!claim || typeof claim !== "object") continue
       const known = result.get(sessionID)
       if (known?.fresh && !fresh) continue
+      const ctl = body.control
       result.set(sessionID, {
         status: claim.status === "busy" || claim.status === "retry" ? claim.status : undefined,
         permissions: Number.isInteger(claim.permissions) && claim.permissions > 0 ? claim.permissions : 0,
         questions: Number.isInteger(claim.questions) && claim.questions > 0 ? claim.questions : 0,
+        ...(typeof claim.directory === "string" && claim.directory ? { directory: claim.directory } : {}),
         fresh,
         pid: body.pid,
+        ...(ctl &&
+        Number.isInteger(ctl.port) &&
+        ctl.port > 0 &&
+        ctl.port < 65536 &&
+        typeof ctl.token === "string" &&
+        /^[a-f0-9]{64}$/.test(ctl.token)
+          ? { control: { port: ctl.port, token: ctl.token } }
+          : {}),
       })
     }
   }

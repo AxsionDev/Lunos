@@ -2666,6 +2666,36 @@ export type NotFoundError = {
   }
 }
 
+export type PermissionRequest = {
+  id: string
+  sessionID: string
+  permission: string
+  patterns: Array<string>
+  metadata: {
+    [key: string]: unknown
+  }
+  always: Array<string>
+  tool?: {
+    messageID: string
+    callID: string
+  }
+}
+
+export type QuestionRequest = {
+  id: string
+  sessionID: string
+  /**
+   * Questions to ask
+   */
+  questions: Array<QuestionInfo>
+  tool?: QuestionTool
+}
+
+export type SessionPeerAsks = {
+  permissions: Array<PermissionRequest>
+  questions: Array<QuestionRequest>
+}
+
 export type McpResource = {
   name: string
   uri: string
@@ -2870,16 +2900,6 @@ export type PtyForbiddenError = {
   message: string
 }
 
-export type QuestionRequest = {
-  id: string
-  sessionID: string
-  /**
-   * Questions to ask
-   */
-  questions: Array<QuestionInfo>
-  tool?: QuestionTool
-}
-
 export type QuestionNotFoundError = {
   _tag: "QuestionNotFoundError"
   requestID: string
@@ -3038,21 +3058,6 @@ export type MemoryImportResult = {
     text: string
     reason: string
   }>
-}
-
-export type PermissionRequest = {
-  id: string
-  sessionID: string
-  permission: string
-  patterns: Array<string>
-  metadata: {
-    [key: string]: unknown
-  }
-  always: Array<string>
-  tool?: {
-    messageID: string
-    callID: string
-  }
 }
 
 export type PermissionNotFoundError = {
@@ -9033,6 +9038,190 @@ export type ExperimentalExternalStopResponses = {
 
 export type ExperimentalExternalStopResponse =
   ExperimentalExternalStopResponses[keyof ExperimentalExternalStopResponses]
+
+export type ExperimentalPeerStopData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/peer/{sessionID}/stop"
+}
+
+export type ExperimentalPeerStopErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalPeerStopError = ExperimentalPeerStopErrors[keyof ExperimentalPeerStopErrors]
+
+export type ExperimentalPeerStopResponses = {
+  /**
+   * Stopped
+   */
+  200: boolean
+}
+
+export type ExperimentalPeerStopResponse = ExperimentalPeerStopResponses[keyof ExperimentalPeerStopResponses]
+
+export type ExperimentalPeerAsksData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/peer/{sessionID}/asks"
+}
+
+export type ExperimentalPeerAsksErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalPeerAsksError = ExperimentalPeerAsksErrors[keyof ExperimentalPeerAsksErrors]
+
+export type ExperimentalPeerAsksResponses = {
+  /**
+   * Pending permissions and questions
+   */
+  200: SessionPeerAsks
+}
+
+export type ExperimentalPeerAsksResponse = ExperimentalPeerAsksResponses[keyof ExperimentalPeerAsksResponses]
+
+export type ExperimentalPeerPermissionReplyData = {
+  body?: {
+    reply: "once" | "always" | "reject"
+    message?: string
+  }
+  path: {
+    sessionID: string
+    requestID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/peer/{sessionID}/permission/{requestID}/reply"
+}
+
+export type ExperimentalPeerPermissionReplyErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalPeerPermissionReplyError =
+  ExperimentalPeerPermissionReplyErrors[keyof ExperimentalPeerPermissionReplyErrors]
+
+export type ExperimentalPeerPermissionReplyResponses = {
+  /**
+   * Answered
+   */
+  200: boolean
+}
+
+export type ExperimentalPeerPermissionReplyResponse =
+  ExperimentalPeerPermissionReplyResponses[keyof ExperimentalPeerPermissionReplyResponses]
+
+export type ExperimentalPeerQuestionReplyData = {
+  body?: {
+    answers: Array<QuestionAnswer>
+  }
+  path: {
+    sessionID: string
+    requestID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/peer/{sessionID}/question/{requestID}/reply"
+}
+
+export type ExperimentalPeerQuestionReplyErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalPeerQuestionReplyError =
+  ExperimentalPeerQuestionReplyErrors[keyof ExperimentalPeerQuestionReplyErrors]
+
+export type ExperimentalPeerQuestionReplyResponses = {
+  /**
+   * Answered
+   */
+  200: boolean
+}
+
+export type ExperimentalPeerQuestionReplyResponse =
+  ExperimentalPeerQuestionReplyResponses[keyof ExperimentalPeerQuestionReplyResponses]
+
+export type ExperimentalPeerQuestionRejectData = {
+  body?: never
+  path: {
+    sessionID: string
+    requestID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/peer/{sessionID}/question/{requestID}/reject"
+}
+
+export type ExperimentalPeerQuestionRejectErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalPeerQuestionRejectError =
+  ExperimentalPeerQuestionRejectErrors[keyof ExperimentalPeerQuestionRejectErrors]
+
+export type ExperimentalPeerQuestionRejectResponses = {
+  /**
+   * Dismissed
+   */
+  200: boolean
+}
+
+export type ExperimentalPeerQuestionRejectResponse =
+  ExperimentalPeerQuestionRejectResponses[keyof ExperimentalPeerQuestionRejectResponses]
 
 export type ExperimentalResourceListData = {
   body?: never

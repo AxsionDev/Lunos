@@ -231,9 +231,57 @@ export function DialogSessions(props: { select?: string }) {
       await startExternal(item.tool as ExternalTool, item.id.replace(/^external:/, ""))
       return
     }
+    // XCOD-234: another Lunos runs it, and its pending request lives there: answer it from here.
+    if (item.elsewhere && item.state === "waiting") return answerElsewhere(item)
     dialog.clear()
     // A session waiting for approval opens at its prompt: the session view shows the pending request.
     route.navigate({ type: "session", sessionID: item.id })
+  }
+
+  /** XCOD-234: the Lunos that runs the session checks and audits the answer. */
+  async function answerElsewhere(item: SessionOverviewItem) {
+    const asks = await sdk.client.experimental.peer
+      .asks({ sessionID: item.id }, { throwOnError: true })
+      .then((result) => result.data)
+      .catch((cause) => (fail(cause), undefined))
+    const request = asks?.permissions[0]
+    const question = asks?.questions[0]
+    if (!request && !question) return reopen(item.id)
+    const what = request
+      ? `${request.permission}${request.patterns.length ? `: ${request.patterns.join(", ")}` : ""}`
+      : (question!.questions[0]?.question ?? "a question")
+    const choice = await new Promise<string | undefined>((resolve) =>
+      dialog.replace(
+        () => (
+          <DialogSelect<string>
+            title={`"${Locale.truncate(item.title, 30)}" (another Lunos) asks: ${Locale.truncate(what, 60)}`}
+            options={
+              request
+                ? [
+                    { value: "once", title: "Allow once" },
+                    { value: "always", title: "Allow always" },
+                    { value: "reject", title: "Deny" },
+                  ]
+                : [{ value: "dismiss", title: "Dismiss (answer it in the Lunos that runs it)" }]
+            }
+            onSelect={(option) => resolve(option.value)}
+          />
+        ),
+        () => resolve(undefined),
+      ),
+    )
+    if (choice === undefined) return reopen(item.id)
+    const reply = request
+      ? sdk.client.experimental.peer.permissionReply(
+          { sessionID: item.id, requestID: request.id, reply: choice as "once" | "always" | "reject" },
+          { throwOnError: true },
+        )
+      : sdk.client.experimental.peer.questionReject(
+          { sessionID: item.id, requestID: question!.id },
+          { throwOnError: true },
+        )
+    await reply.catch(fail)
+    reopen(item.id)
   }
 
   async function toggle(entry: Extract<Line, { type: "group" }>) {
@@ -327,9 +375,14 @@ export function DialogSessions(props: { select?: string }) {
 
   async function stop(item: SessionOverviewItem) {
     // XCOD-234: a Claude Code / Codex session Lunos started, stopped like `lunos external stop`.
-    const request = toolOnly(item)
-      ? sdk.client.experimental.external.stop({ sessionID: item.id.replace(/^external:/, "") }, { throwOnError: true })
-      : sdk.client.session.abort({ sessionID: item.id }, { throwOnError: true })
+    const request = item.elsewhere
+      ? sdk.client.experimental.peer.stop({ sessionID: item.id }, { throwOnError: true })
+      : toolOnly(item)
+        ? sdk.client.experimental.external.stop(
+            { sessionID: item.id.replace(/^external:/, "") },
+            { throwOnError: true },
+          )
+        : sdk.client.session.abort({ sessionID: item.id }, { throwOnError: true })
     await request
       .then(() => toast.show({ variant: "info", message: `Stopped "${Locale.truncate(item.title, 40)}"` }))
       .catch(fail)
