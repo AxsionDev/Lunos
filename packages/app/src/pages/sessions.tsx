@@ -12,6 +12,7 @@ import { showToast } from "@/utils/toast"
 import {
   build,
   GROUP_COLORS,
+  money as formatMoney,
   projectName,
   STATE_ORDER,
   UNGROUPED,
@@ -214,10 +215,7 @@ export function SessionsPage() {
   const stateLabel = (item: SessionOverviewItem) =>
     item.elsewhere ? language.t("sessions.state.elsewhere") : language.t(`sessions.state.${item.state}`)
 
-  const money = (value: number) =>
-    new Intl.NumberFormat(language.intl(), { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(
-      value,
-    )
+  const money = (value: number) => formatMoney(value, language.intl())
   const ago = (time: number) => {
     const seconds = Math.round((time - Date.now()) / 1000)
     const format = new Intl.RelativeTimeFormat(language.intl(), { numeric: "auto" })

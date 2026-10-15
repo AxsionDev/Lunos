@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionGroup, SessionOverviewItem } from "@opencode-ai/sdk/v2/client"
-import { build, projectName, UNGROUPED, waiting, type Filter } from "./sessions-model"
+import { build, money, projectName, UNGROUPED, waiting, type Filter } from "./sessions-model"
 
 const all: Filter = { search: "", state: "all", group: "all" }
 
@@ -97,5 +97,14 @@ describe("Sessions window model (XCOD-205)", () => {
   test("project name falls back to the folder name", () => {
     expect(projectName(item("x", { project: undefined, directory: "/home/me/client-site" }))).toBe("client-site")
     expect(projectName(item("x", { project: undefined, directory: "C:\\work\\win-proj" }))).toBe("win-proj")
+  })
+})
+
+describe("money (XCOD-235)", () => {
+  test("a cost below $0.0001 isn't shown as $0.00", () => {
+    expect(money(0, "en-US")).toBe("$0.00")
+    expect(money(0.00004, "en-US")).toBe("<$0.0001")
+    expect(money(0.0001, "en-US")).toBe("$0.0001")
+    expect(money(1.23456, "en-US")).toBe("$1.2346")
   })
 })

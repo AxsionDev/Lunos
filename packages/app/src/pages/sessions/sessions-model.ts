@@ -95,3 +95,13 @@ export function waiting(sessions: SessionOverviewItem[]) {
 export const STATE_ORDER: SessionState[] = ["waiting", "running", "idle", "finished", "failed"]
 
 export const GROUP_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6b7280"]
+
+/** The smallest cost the window shows as a number; anything above zero but below it reads "<$0.0001". */
+const SMALLEST = 0.0001
+
+/** A session's cost in USD, up to 4 decimals. A cost too small to round to a cent fraction isn't "$0.00" (XCOD-235). */
+export function money(value: number, locale?: string) {
+  const format = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 4 })
+  if (value > 0 && value < SMALLEST) return `<${format.format(SMALLEST)}`
+  return format.format(value)
+}
