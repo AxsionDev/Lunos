@@ -1239,6 +1239,7 @@ export const dict = {
   "sessions.state.finished": "Terminée",
   "sessions.state.failed": "Échouée",
   "sessions.state.elsewhere": "En cours dans une autre fenêtre Lunos",
+  "sessions.state.stale": "Ne répond plus (Lunos a été fermé)",
   "sessions.kind.subagent": "Sous-agent",
   "sessions.kind.scheduled": "Planifiée",
   "sessions.kind.external": "Externe",

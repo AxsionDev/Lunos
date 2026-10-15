@@ -15,7 +15,6 @@ import { MemorySourceGraph } from "./graph"
 import { MemorySourceMcp } from "./mcp"
 import { MemorySourceOrg } from "./org"
 import { CloudOrg } from "@/cloud/org"
-import { ConfigOrgPolicy } from "@/config/org-policy"
 
 /**
  * External memory sources (XCOD-135, OWASP ASI06). A knowledge graph or an MCP memory server that
@@ -248,9 +247,10 @@ const layer = Layer.effect(
       const managed = sources.some((source) => source.trusted === true || source.type === "org")
         ? yield* Effect.promise(() => (data.managed ??= ConfigManaged.readManagedDocs().catch(() => [] as unknown[])))
         : []
-      // XCOD-191: an org source's console is the one managed config names (cloud.policy), never config's.
+      // XCOD-191: an org source's console is the one managed config on disk names (cloud.policy), or
+      // the hosted one (XCOD-242); never config's, nor the fetched policy's.
       const org = sources.some((source) => source.type === "org")
-        ? CloudOrg.parse(ConfigOrgPolicy.policyURL(managed))
+        ? yield* Effect.promise(() => CloudOrg.resolve())
         : undefined
       const seen = new Set<string>()
       const list = sources.map((source) => {

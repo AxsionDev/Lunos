@@ -1203,6 +1203,7 @@ export const dict = {
   "sessions.state.finished": "Finalizată",
   "sessions.state.failed": "Eșuată",
   "sessions.state.elsewhere": "În execuție în altă fereastră Lunos",
+  "sessions.state.stale": "Nu răspunde (Lunos a fost închis)",
   "sessions.kind.subagent": "Subagent",
   "sessions.kind.scheduled": "Programată",
   "sessions.kind.external": "Externă",

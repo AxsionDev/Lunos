@@ -171,11 +171,18 @@ describe("TUI /sessions model (XCOD-205)", () => {
     expect(stoppable({ id: "ses_1", state: "running" })).toBe(true)
     expect(stoppable({ id: "ses_1", state: "waiting" })).toBe(true)
     expect(stoppable({ id: "ses_1", state: "idle" })).toBe(false)
-    expect(stoppable({ id: "ses_1", state: "running", elsewhere: true })).toBe(false)
+    expect(stoppable({ id: "ses_1", state: "running", elsewhere: true })).toBe(true)
+    expect(stoppable({ id: "ses_1", state: "idle", stale: true })).toBe(false)
     // A tool-only external row runs in its own process; an /external session is a Lunos session.
     expect(toolOnly({ id: "external:abc" })).toBe(true)
-    expect(stoppable({ id: "external:abc", state: "running" })).toBe(false)
+    // XCOD-234: a running one stops like `lunos external stop`; a finished one can't.
+    expect(stoppable({ id: "external:abc", state: "running" })).toBe(true)
+    expect(stoppable({ id: "external:abc", state: "finished" })).toBe(false)
     expect(toolOnly({ id: "ses_2" })).toBe(false)
     expect(waiting([{ state: "waiting" }, { state: "idle" }, { state: "waiting" }])).toBe(2)
+    // XCOD-234: another process's live state, and a turn whose Lunos stopped.
+    expect(stateLabel({ state: "waiting", elsewhere: true })).toBe("waiting in another Lunos")
+    expect(stateLabel({ state: "running", elsewhere: true })).toBe("running in another Lunos")
+    expect(stateLabel({ state: "idle", stale: true })).toBe("not responding (its Lunos closed)")
   })
 })

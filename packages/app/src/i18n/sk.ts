@@ -1199,6 +1199,7 @@ export const dict = {
   "sessions.state.finished": "Dokončená",
   "sessions.state.failed": "Zlyhala",
   "sessions.state.elsewhere": "Beží v inom okne Lunos",
+  "sessions.state.stale": "Neodpovedá (Lunos bol ukončený)",
   "sessions.kind.subagent": "Podagent",
   "sessions.kind.scheduled": "Naplánovaná",
   "sessions.kind.external": "Externá",

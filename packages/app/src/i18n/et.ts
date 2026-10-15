@@ -1192,6 +1192,7 @@ export const dict = {
   "sessions.state.finished": "Lõpetatud",
   "sessions.state.failed": "Ebaõnnestus",
   "sessions.state.elsewhere": "Töötab teises Lunose aknas",
+  "sessions.state.stale": "Ei vasta (Lunos suleti)",
   "sessions.kind.subagent": "Alamagent",
   "sessions.kind.scheduled": "Ajastatud",
   "sessions.kind.external": "Väline",

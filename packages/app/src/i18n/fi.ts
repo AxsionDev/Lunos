@@ -1209,6 +1209,7 @@ export const dict = {
   "sessions.state.finished": "Valmis",
   "sessions.state.failed": "Epäonnistui",
   "sessions.state.elsewhere": "Käynnissä toisessa Lunos-ikkunassa",
+  "sessions.state.stale": "Ei vastaa (Lunos suljettiin)",
   "sessions.kind.subagent": "Aliagentti",
   "sessions.kind.scheduled": "Ajastettu",
   "sessions.kind.external": "Ulkoinen",

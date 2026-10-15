@@ -1199,6 +1199,7 @@ export const dict = {
   "sessions.state.finished": "Tamamlandy",
   "sessions.state.failed": "Şowsuz",
   "sessions.state.elsewhere": "Başga bir Lunos penjiresinde işleýär",
+  "sessions.state.stale": "Jogap bermeýär (Lunos ýapyldy)",
   "sessions.kind.subagent": "Kömekçi agent",
   "sessions.kind.scheduled": "Meýilleşdirilen",
   "sessions.kind.external": "Daşarky",

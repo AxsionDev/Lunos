@@ -1291,6 +1291,7 @@ export const dict = {
   "sessions.state.finished": "Selesai",
   "sessions.state.failed": "Gagal",
   "sessions.state.elsewhere": "Berjalan di jendela Lunos lain",
+  "sessions.state.stale": "Tidak merespons (Lunos ditutup)",
   "sessions.kind.subagent": "Subagen",
   "sessions.kind.scheduled": "Terjadwal",
   "sessions.kind.external": "Eksternal",

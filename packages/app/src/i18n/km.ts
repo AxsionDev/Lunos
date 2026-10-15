@@ -1192,6 +1192,7 @@ export const dict = {
   "sessions.state.finished": "បានបញ្ចប់",
   "sessions.state.failed": "បរាជ័យ",
   "sessions.state.elsewhere": "កំពុងដំណើរការក្នុងបង្អួច Lunos ផ្សេងទៀត",
+  "sessions.state.stale": "មិនឆ្លើយតប (Lunos ត្រូវបានបិទ)",
   "sessions.kind.subagent": "ភ្នាក់ងាររង",
   "sessions.kind.scheduled": "បានកំណត់ពេល",
   "sessions.kind.external": "ខាងក្រៅ",

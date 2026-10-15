@@ -1206,6 +1206,7 @@ export const dict = {
   "sessions.state.finished": "Завршена",
   "sessions.state.failed": "Неуспешна",
   "sessions.state.elsewhere": "Се извршува во друг Lunos прозорец",
+  "sessions.state.stale": "Не одговара (Lunos е затворен)",
   "sessions.kind.subagent": "Подагент",
   "sessions.kind.scheduled": "Закажана",
   "sessions.kind.external": "Надворешна",

@@ -20,6 +20,24 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **The Sessions window sees and controls every Lunos on this machine.** Sessions run by another
+  Lunos (a second terminal, the desktop app, `lunos serve`) show their live state within seconds:
+  running, or waiting with the number of approvals. You can stop them and answer their approvals
+  from any window; the Lunos that runs the session checks and audits the answer as usual. A session
+  whose Lunos crashed or was killed shows as "Not responding" within 6 seconds instead of looking
+  like it's still running. Claude Code and Codex sessions Lunos started can be stopped from the
+  window too, and are named after their tool and folder (XCOD-234).
+  - **New local listener.** While a Lunos has a running or waiting session, it listens on a random
+    port on `127.0.0.1` only, for stop and approval answers from your other Lunos windows. The
+    port and a random token are in a file only you can read (`live/` in Lunos's data directory);
+    requests from web pages are refused. Nothing is sent off this machine.
+- **Hosted Lunos Team works without MDM.** After `lunos login` with Lunos's own sign-in, Lunos
+  looks up your hosted organisation on cloud.lunos.tech and turns on its policy, private
+  marketplace, team memory and sharing, with no managed config to push. Only Lunos's built-in
+  console is ever used. Managed `cloud.policy` still wins, and an organisation turns this off with
+  `"cloud": { "auto_team": false }` in managed config. `/settings` → Status shows where team
+  features come from (XCOD-242).
+
 - **See on your Lunos console which Lunos versions run where, and which policy they enforce.** Each
   start bound to your organisation's console tells it the version, OS, architecture, surface, a
   random install id and the policy digest, nothing else; developers can turn it off with

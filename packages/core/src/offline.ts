@@ -163,15 +163,17 @@ export const CALLS: Call[] = [
     // XCOD-238. XCOD-241: off offline; the last fetched copy applies (it doesn't lift the policy).
     id: "org-policy",
     what: "Organisation policy from your Lunos console",
-    hosts: "`cloud.policy` in managed config, and the `cloud.issuer` you signed in to (token refresh)",
-    when: "startup, only if managed config sets `cloud.policy` and you're signed in (`lunos login`). Offline, the last fetched copy applies",
+    hosts:
+      "`cloud.policy` in managed config (or, XCOD-242, cloud.lunos.tech for your hosted organisation), and the `cloud.issuer` you signed in to (token refresh)",
+    when: "startup, only if managed config sets `cloud.policy`, or you signed in to Lunos (`lunos login`) as a member of a hosted organisation, and you're signed in. Offline, the last fetched copy applies",
     offline: "blocked",
   },
   {
     // XCOD-241: version, OS, architecture, surface, a random install id and the policy digest.
     id: "client-start",
     what: "`client.start` to your Lunos console: version, OS, architecture, surface, install id, policy digest",
-    hosts: "the console in `cloud.policy` (`/v1/orgs/<org>/clients/start`)",
+    hosts:
+      "the console in `cloud.policy`, or cloud.lunos.tech for your hosted organisation (`/v1/orgs/<org>/clients/start`)",
     when: "startup, right after the console answered the policy fetch",
     offline: "blocked",
     alsoOffBy: '`"cloud": { "client_start": false }` in user config, unless your organisation locks it',
@@ -233,6 +235,15 @@ export const CALLS: Call[] = [
     hosts: "api.github.com, the URL you pass",
     when: "only when you run that command",
     offline: "command",
+  },
+  {
+    // XCOD-242: which hosted organisations the account belongs to; only the chosen id is kept.
+    id: "hosted-team",
+    what: "Your hosted Lunos organisations (`GET /v1/account`), to turn on team features",
+    hosts: "cloud.lunos.tech",
+    when: "only when you run `lunos login` against Lunos's sign-in (auth.lunos.tech), and managed config sets neither `cloud.policy` nor `cloud.auto_team: false`",
+    offline: "blocked",
+    alsoOffBy: '`"cloud": { "auto_team": false }` in managed config',
   },
   {
     // XCOD-186: sends the repository's remote URL and commit (never the working tree) to a worker.

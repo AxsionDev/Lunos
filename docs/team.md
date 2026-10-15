@@ -31,11 +31,38 @@ profile) names it, and you sign in with `lunos login`:
 
 On Lunos Cloud the console is `https://cloud.lunos.tech/v1/orgs/<org>/policy`. `cloud.policy` is
 read from managed config only: in user or project config it is ignored, so a repository can't send
-your sign-in to its own server. Signing in alone doesn't point Lunos at a console. Every request
-carries your `lunos login` access token to that one host only, and doesn't follow redirects.
-Each start also tells the console the Lunos version, OS, architecture, surface, a random install
-id and the policy digest; locking all of `cloud`, as above, keeps that on for everyone (see
-[what Lunos sends to the console](deployment/self-hosted.md#what-lunos-sends-to-the-console-at-start-clientstart)).
+your sign-in to its own server. Every request carries your `lunos login` access token to that one
+host only, and doesn't follow redirects.
+
+### Hosted Lunos Team without MDM
+
+If your organisation is on hosted Lunos Team, no managed config is needed. Run `lunos login`
+(Lunos's own sign-in, `auth.lunos.tech`). Lunos asks `cloud.lunos.tech` which hosted organisations
+you belong to and turns team features on for yours: `Team features: on for acme`. The policy,
+private marketplace, team memory and sharing then work as if managed config set
+`cloud.policy` to `https://cloud.lunos.tech/v1/orgs/acme/policy`. `/settings` → Status shows
+**Team features: acme on cloud.lunos.tech, from hosted (Lunos sign-in)**.
+
+- **Only Lunos's console.** The host is built into Lunos. Nothing in your sign-in, your account or
+  your organisation's policy can point it anywhere else. A sign-in to any other identity provider
+  never turns this on.
+- **Several organisations.** If your sign-in's organisation claim names one of them, that one is
+  used. Otherwise, with more than one, nothing is turned on, and your administrator sets
+  `cloud.policy` in managed config.
+- **Your sign-in stays yours.** A hosted organisation's policy can't set or lock anything under
+  `cloud` (the sign-in issuer, the Lunos Cloud endpoint, the policy address): your Lunos sign-in
+  is valid for your whole Lunos account, so an organisation admin can't point it at another host.
+  Organisations that need those keys set them in managed config.
+- **Managed config wins.** If managed config sets `cloud.policy`, that console is used and nothing
+  is looked up. An organisation turns this off with `"cloud": { "auto_team": false }` in managed
+  config.
+- **When it's checked.** Only at `lunos login`. If you join an organisation later, run
+  `lunos login` again. `lunos logout` turns it off, including the organisation's policy: unlike
+  `cloud.policy` in managed config, a policy you only get through your sign-in doesn't outlive it.
+  An organisation that needs its policy enforced on every machine, signed in or not, uses MDM.
+  Each start also tells the console the Lunos version, OS, architecture, surface, a random install
+  id and the policy digest; locking all of `cloud`, as above, keeps that on for everyone (see
+  [what Lunos sends to the console](deployment/self-hosted.md#what-lunos-sends-to-the-console-at-start-clientstart)).
 
 ## Private marketplace
 

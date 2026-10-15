@@ -8,6 +8,7 @@ import { ExternalRegistry } from "@/external/registry"
 import { Session } from "./session"
 import { SessionGroups } from "./groups"
 import { SessionLive } from "./live"
+import { SessionPeers } from "./peers"
 import type { SessionID } from "./schema"
 
 /**
@@ -34,8 +35,13 @@ export interface Item {
   created: number
   updated: number
   state: State
-  /** Running according to the database, but not in this process (another Lunos is running it). */
+  /** Running or waiting in another Lunos process on this machine (XCOD-234: its live state). */
   elsewhere?: boolean
+  /**
+   * XCOD-234: its turn never finished and no running Lunos has it: the process that ran it stopped
+   * (crashed, killed, closed). Shown as stale, not running.
+   */
+  stale?: boolean
   permissions: number
   questions: number
   groupID?: string
@@ -49,8 +55,6 @@ export interface Overview {
 /** "Recently finished": sessions touched in the last week. Running and waiting ones are always listed. */
 export const WINDOW = 7 * 24 * 60 * 60 * 1000
 export const LIMIT = 300
-/** An unfinished turn this old, with nobody in this process running it, is treated as abandoned. */
-const STALE = 10 * 60 * 1000
 
 type Last = {
   role?: string
@@ -61,18 +65,27 @@ type Last = {
   providerID?: string
 }
 
-export function state(input: { activity: SessionLive.Activity; last?: Last; updated: number; now: number }): {
+/**
+ * A session's state from what this process knows (`activity`), what another live Lunos process
+ * reports (`peer`, XCOD-234) and its last message. An unfinished turn that no live process has is
+ * stale: whoever ran it is gone.
+ */
+export function state(input: { activity: SessionLive.Activity; peer?: SessionPeers.Peer; last?: Last }): {
   state: State
   elsewhere?: boolean
+  stale?: boolean
 } {
-  if (input.activity.permissions > 0 || input.activity.questions > 0) return { state: "waiting" }
-  if (input.activity.status) return { state: "running" }
+  const local = input.activity
+  if (local.permissions > 0 || local.questions > 0) return { state: "waiting" }
+  if (local.status) return { state: "running" }
+  const peer = input.peer?.fresh ? input.peer : undefined
+  if (peer && (peer.permissions > 0 || peer.questions > 0)) return { state: "waiting", elsewhere: true }
+  if (peer?.status) return { state: "running", elsewhere: true }
   const last = input.last
   if (!last || last.role !== "assistant") return { state: "idle" }
   if (last.error) return { state: last.error.name === "MessageAbortedError" ? "idle" : "failed" }
   if (last.time?.completed) return { state: "finished" }
-  if (input.now - input.updated < STALE) return { state: "running", elsewhere: true }
-  return { state: "idle" }
+  return { state: "idle", stale: true }
 }
 
 export function kind(session: Pick<Session.Info, "parentID" | "metadata">): Kind {
@@ -88,6 +101,16 @@ export function externalOf(session: Pick<Session.Info, "metadata">): { tool: str
   if (!value || typeof value !== "object") return undefined
   if (value.tool !== "claude" && value.tool !== "codex") return undefined
   return { tool: value.tool, ...(typeof value.session === "string" ? { session: value.session } : {}) }
+}
+
+/**
+ * XCOD-234: a name for a Claude Code / Codex session that has no Lunos session. The registry keeps
+ * no prompt (by design), so the tool and the folder, e.g. "Claude Code · api". The window shows when.
+ */
+export function externalTitle(entry: Pick<ExternalRegistry.Entry, "tool" | "cwd">) {
+  const tool = entry.tool === "codex" ? "Codex" : "Claude Code"
+  const folder = entry.cwd.split(/[\\/]/).filter(Boolean).at(-1)
+  return folder ? `${tool} · ${folder}` : tool
 }
 
 const lastMessages = Effect.fn("SessionOverview.lastMessages")(function* (ids: string[]) {
@@ -117,8 +140,11 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
 
   const recent = yield* sessions.listGlobal({ start: now - WINDOW, limit: LIMIT })
   const seen = new Set(recent.map((item) => item.id))
+  // XCOD-234: other Lunos processes' running and waiting sessions, listed however old they are.
+  const peers = SessionPeers.read({ now })
+  const livePeers = [...peers].filter(([, peer]) => peer.fresh).map(([id]) => id)
   const older = yield* Effect.forEach(
-    [...SessionLive.active()].filter((id) => !seen.has(id as SessionID)),
+    [...new Set([...SessionLive.active(), ...livePeers])].filter((id) => !seen.has(id as SessionID)),
     (id) =>
       sessions.get(id as SessionID).pipe(
         Effect.map((info) => ({ ...info, project: null }) as Session.GlobalInfo),
@@ -134,8 +160,10 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
     const external = externalOf(session)
     if (external?.session) linked.add(external.session)
     const message = last.get(session.id)
-    const activity = SessionLive.get(session.id)
-    const derived = state({ activity, last: message, updated: session.time.updated, now })
+    const local = SessionLive.get(session.id)
+    const peer = peers.get(session.id)
+    const derived = state({ activity: local, peer, last: message })
+    const activity = derived.elsewhere && peer ? peer : local
     const model = session.model
       ? `${session.model.providerID}/${session.model.id}`
       : message?.providerID && message.modelID
@@ -158,6 +186,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       updated: session.time.updated,
       state: derived.state,
       ...(derived.elsewhere ? { elsewhere: true } : {}),
+      ...(derived.stale ? { stale: true } : {}),
       permissions: activity.permissions,
       questions: activity.questions,
       ...(group ? { groupID: group } : {}),
@@ -175,7 +204,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
     items.push({
       id,
       kind: "external",
-      title: entry.sessionID,
+      title: externalTitle(entry),
       directory: entry.cwd,
       tool: entry.tool,
       cost: entry.costUSD ?? 0,

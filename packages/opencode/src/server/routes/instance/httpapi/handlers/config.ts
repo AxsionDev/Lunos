@@ -14,6 +14,17 @@ import { Database } from "@opencode-ai/core/database/database"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { gte } from "drizzle-orm"
 import type { Schema } from "effect"
+import { CloudOrg } from "@/cloud/org"
+import { ConfigManaged } from "@/config/managed"
+import { ConfigOrgPolicy } from "@/config/org-policy"
+
+/** XCOD-242: where team features come from, for /settings → Status. No network. */
+async function teamStatus() {
+  const source = ConfigOrgPolicy.teamSource(await ConfigManaged.readOnDiskDocs().catch(() => [] as unknown[]))
+  const org = CloudOrg.parse(source?.url)
+  if (!source || !org) return undefined
+  return { via: source.via, org: org.org, host: org.host }
+}
 
 export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (handlers) =>
   Effect.gen(function* () {
@@ -70,6 +81,7 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
             },
           },
           usage: ConfigSettings.usage(sessions, USAGE_DAYS),
+          team: await teamStatus(),
           sandbox: await import("@/sandbox")
             .then(({ Sandbox }) => Sandbox.status(scope?.worktree))
             .catch(() => undefined),

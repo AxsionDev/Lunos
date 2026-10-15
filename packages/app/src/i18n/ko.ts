@@ -1208,6 +1208,7 @@ export const dict = {
   "sessions.state.finished": "완료됨",
   "sessions.state.failed": "실패함",
   "sessions.state.elsewhere": "다른 Lunos 창에서 실행 중",
+  "sessions.state.stale": "응답 없음 (Lunos가 종료됨)",
   "sessions.kind.subagent": "하위 에이전트",
   "sessions.kind.scheduled": "예약됨",
   "sessions.kind.external": "외부",

@@ -1210,6 +1210,7 @@ export const dict = {
   "sessions.state.finished": "Đã hoàn tất",
   "sessions.state.failed": "Thất bại",
   "sessions.state.elsewhere": "Đang chạy trong một cửa sổ Lunos khác",
+  "sessions.state.stale": "Không phản hồi (Lunos đã đóng)",
   "sessions.kind.subagent": "Tác tử phụ",
   "sessions.kind.scheduled": "Đã lên lịch",
   "sessions.kind.external": "Bên ngoài",

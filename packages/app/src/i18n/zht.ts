@@ -1263,6 +1263,7 @@ export const dict = {
   "sessions.state.finished": "已完成",
   "sessions.state.failed": "失敗",
   "sessions.state.elsewhere": "正在另一個 Lunos 視窗中執行",
+  "sessions.state.stale": "沒有回應（Lunos 已關閉）",
   "sessions.kind.subagent": "子代理",
   "sessions.kind.scheduled": "排程",
   "sessions.kind.external": "外部",

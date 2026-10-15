@@ -1214,6 +1214,7 @@ export const dict = {
   "sessions.state.finished": "Ολοκληρώθηκε",
   "sessions.state.failed": "Απέτυχε",
   "sessions.state.elsewhere": "Εκτελείται σε άλλο παράθυρο του Lunos",
+  "sessions.state.stale": "Δεν αποκρίνεται (το Lunos έκλεισε)",
   "sessions.kind.subagent": "Υποπράκτορας",
   "sessions.kind.scheduled": "Προγραμματισμένη",
   "sessions.kind.external": "Εξωτερική",

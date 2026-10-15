@@ -767,6 +767,12 @@ function StatusTab(props: { snapshot: SettingsSnapshot | undefined }) {
     return `on${config.embedding ? `, embeddings ${config.embedding}` : ""}${config.model ? `, model ${config.model}` : ""}`
   })
   const loaded = createMemo(() => (props.snapshot?.layers ?? []).filter((layer) => layer.loaded))
+  // XCOD-242: where the organisation's team features come from.
+  const team = createMemo(() => {
+    const info = props.snapshot?.team
+    if (!info) return "off"
+    return `${info.org} on ${info.host}, from ${info.via === "managed" ? "managed config" : "hosted (Lunos sign-in)"}`
+  })
   // XCOD-158: inside a sandbox, what it runs in; on this machine, the project's sandboxes.
   const sandbox = createMemo(() => {
     const info = props.snapshot?.sandbox
@@ -812,6 +818,9 @@ function StatusTab(props: { snapshot: SettingsSnapshot | undefined }) {
         </text>
         <text fg={theme.text} wrapMode="char">
           <b>Sandbox</b> <span style={{ fg: theme.textMuted }}>{sandbox()}</span>
+        </text>
+        <text fg={theme.text}>
+          <b>Team features</b> <span style={{ fg: theme.textMuted }}>{team()}</span>
         </text>
         <text fg={theme.text}>
           <b>Locked by your organisation</b>{" "}

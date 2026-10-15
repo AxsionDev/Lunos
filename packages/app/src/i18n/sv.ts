@@ -1201,6 +1201,7 @@ export const dict = {
   "sessions.state.finished": "Slutförd",
   "sessions.state.failed": "Misslyckades",
   "sessions.state.elsewhere": "Körs i ett annat Lunos-fönster",
+  "sessions.state.stale": "Svarar inte (Lunos har stängts)",
   "sessions.kind.subagent": "Underagent",
   "sessions.kind.scheduled": "Schemalagd",
   "sessions.kind.external": "Extern",

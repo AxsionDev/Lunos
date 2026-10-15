@@ -459,6 +459,10 @@
         "client_start": {
           "type": "boolean",
           "description": "Tell your organisation's Lunos console (cloud.policy) when Lunos starts: version, OS, architecture, surface, a random install id and the policy in effect (default true). Read from managed and user config only; your organisation can lock it on"
+        },
+        "auto_team": {
+          "type": "boolean",
+          "description": "Turn on team features (organisation policy, private marketplace, team memory, sharing) for your hosted Lunos organisation after lunos login, without cloud.policy (default true). Only read from managed config; set false to turn it off"
         }
       },
       "additionalProperties": false

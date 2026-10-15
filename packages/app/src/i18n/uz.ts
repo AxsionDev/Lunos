@@ -1212,6 +1212,7 @@ export const dict = {
   "sessions.state.finished": "Tugallangan",
   "sessions.state.failed": "Muvaffaqiyatsiz",
   "sessions.state.elsewhere": "Boshqa Lunos oynasida ishlamoqda",
+  "sessions.state.stale": "Javob bermayapti (Lunos yopildi)",
   "sessions.kind.subagent": "Quyi agent",
   "sessions.kind.scheduled": "Rejalashtirilgan",
   "sessions.kind.external": "Tashqi",

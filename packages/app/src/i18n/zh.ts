@@ -1291,6 +1291,7 @@ export const dict = {
   "sessions.state.finished": "已完成",
   "sessions.state.failed": "失败",
   "sessions.state.elsewhere": "正在另一个 Lunos 窗口中运行",
+  "sessions.state.stale": "无响应（Lunos 已关闭）",
   "sessions.kind.subagent": "子智能体",
   "sessions.kind.scheduled": "定时",
   "sessions.kind.external": "外部",
