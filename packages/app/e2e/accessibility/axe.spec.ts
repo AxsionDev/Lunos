@@ -107,6 +107,43 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(panel.getByRole("tab", { name: "README.md" })).toHaveCount(0)
     })
 
+    // XCOD-235: the Sessions window (all sessions on this machine), with a group and every state.
+    test("sessions", async ({ page }, info) => {
+      const now = Date.now()
+      const row = (id: string, title: string, state: string, extra: object = {}) => ({
+        id,
+        kind: "session",
+        title,
+        directory: fixture.directory,
+        project: { id: "prj_axe", name: "axe", worktree: fixture.directory },
+        cost: 0.0123,
+        created: now - 60_000,
+        updated: now - 30_000,
+        state,
+        permissions: state === "waiting" ? 1 : 0,
+        questions: 0,
+        ...extra,
+      })
+      const overview = {
+        groups: [{ id: "grp_axe", name: "Client A", color: "#3b82f6", collapsed: false, created: now, updated: now }],
+        sessions: [
+          row("ses_run", "Refactor parser", "running", { groupID: "grp_axe" }),
+          row("ses_wait", "Deploy script", "waiting"),
+          row("ses_other", "Long migration", "running", { elsewhere: true }),
+          row("ses_stale", "Old experiment", "idle", { stale: true }),
+          row("ses_done", "Fix typo", "finished"),
+          row("ses_fail", "Flaky test", "failed"),
+          row("external:abc", "Claude Code · axe", "running", { kind: "external", tool: "claude" }),
+        ],
+      }
+      await page.route(/\/experimental\/session-overview(?:\?.*)?$/, (route) =>
+        route.fulfill({ json: overview, headers: { "access-control-allow-origin": "*" } }),
+      )
+      await page.goto("/sessions")
+      await expectAppVisible(page.getByText("Refactor parser", { exact: true }))
+      await audit(page, info, "sessions")
+    })
+
     for (const tab of ["General", "Shortcuts", "Servers", "Providers", "Models"]) {
       test(`settings: ${tab}`, async ({ page }, info) => {
         await openSession(page)
