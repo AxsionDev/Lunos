@@ -8,6 +8,8 @@ export function createWindowRegistry<W>(persistence: {
   const windows = new Map<string, W>()
   let quitting = false
   let lastFocusedID: string | undefined
+  /** Window ids, most recently focused first. */
+  let order: string[] = []
 
   const persisted = () => {
     const value = persistence.read()
@@ -27,13 +29,20 @@ export function createWindowRegistry<W>(persistence: {
     },
     focused(id: string) {
       lastFocusedID = id
+      order = [id, ...order.filter((item) => item !== id)]
     },
     lastFocused() {
       if (!lastFocusedID) return
       return windows.get(lastFocusedID)
     },
+    /** XCOD-235: the most recently focused open window that `accept` allows (e.g. not the Sessions window). */
+    lastFocusedWhere(accept: (id: string) => boolean) {
+      const id = order.find((item) => windows.has(item) && accept(item)) ?? [...windows.keys()].find(accept)
+      return id === undefined ? undefined : windows.get(id)
+    },
     closed(id: string) {
       windows.delete(id)
+      order = order.filter((item) => item !== id)
       if (lastFocusedID === id) lastFocusedID = windows.keys().next().value
       // Only a deliberate close (app keeps running with other windows open)
       // forgets a window. Closing the last window quits the app and fires

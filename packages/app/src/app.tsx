@@ -33,6 +33,7 @@ import {
   type JSX,
   lazy,
   onCleanup,
+  onMount,
   type ParentProps,
   Show,
 } from "solid-js"
@@ -67,6 +68,7 @@ import { createSessionLineage } from "@/pages/session/session-lineage"
 
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
 import { SessionsPage } from "@/pages/sessions"
+import { useOpenSession } from "@/pages/sessions/open-session"
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
 
@@ -345,6 +347,13 @@ function DesktopCommands() {
       },
     },
   ])
+
+  // XCOD-235: sessions picked in the desktop Sessions window open here, in the main window.
+  const openSession = useOpenSession()
+  onMount(() => {
+    const off = platform.onOpenSession?.((target) => openSession(target))
+    if (off) onCleanup(off)
+  })
 
   command.register("desktop", () => {
     const commands: CommandOption[] = []

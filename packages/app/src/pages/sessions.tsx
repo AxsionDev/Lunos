@@ -1,13 +1,10 @@
 import type { SessionGroup, SessionOverview, SessionOverviewItem } from "@opencode-ai/sdk/v2/client"
-import { useNavigate } from "@solidjs/router"
-import { createMemo, createSignal, For, onCleanup, onMount, Show, startTransition } from "solid-js"
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
-import { ServerConnection, useServer } from "@/context/server"
-import { useSettings } from "@/context/settings"
-import { useTabs } from "@/context/tabs"
-import { legacySessionHref } from "@/utils/session-route"
+import { usePlatform } from "@/context/platform"
+import { useServer } from "@/context/server"
 import { showToast } from "@/utils/toast"
 import {
   build,
@@ -21,6 +18,7 @@ import {
   type Row,
   type Section,
 } from "./sessions/sessions-model"
+import { useOpenSession } from "./sessions/open-session"
 
 // Events after which the overview is re-read. Everything else is noise for this page.
 const REFRESH_ON = new Set([
@@ -51,9 +49,8 @@ export function SessionsPage() {
   const global = useGlobal()
   const server = useServer()
   const language = useLanguage()
-  const settings = useSettings()
-  const tabs = useTabs()
-  const navigate = useNavigate()
+  const platform = usePlatform()
+  const openSession = useOpenSession()
 
   const ctx = createMemo(() => (server.current ? global.ensureServerCtx(server.current) : undefined))
   const client = () => ctx()?.sdk.client
@@ -179,21 +176,14 @@ export function SessionsPage() {
 
   const sessionActions = {
     open: (item: SessionOverviewItem) => {
-      const conn = server.current
-      const current = ctx()
       // An "external:" row is a tool session with no Lunos session to open (XCOD-218 ones have one).
-      if (!conn || !current || item.id.startsWith("external:")) return
-      const directory = item.project?.worktree ?? item.directory
-      current.projects.open(directory)
-      current.projects.touch(directory)
-      if (!settings.general.newLayoutDesigns()) {
-        navigate(legacySessionHref(item.directory, item.id))
+      if (item.id.startsWith("external:")) return
+      // XCOD-235: the desktop Sessions window hands it to the main window.
+      if (platform.openSessionInMain) {
+        void platform.openSessionInMain(item.directory, item.id).catch(fail)
         return
       }
-      void startTransition(() => {
-        const tab = tabs.addSessionTab({ server: ServerConnection.key(conn), sessionId: item.id })
-        tabs.select(tab)
-      })
+      openSession({ sessionID: item.id, directory: item.directory, worktree: item.project?.worktree })
     },
     rename: async (item: SessionOverviewItem) => {
       const title = ui.draft.trim()
