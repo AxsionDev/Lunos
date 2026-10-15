@@ -177,6 +177,18 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     version: pkg.version,
     windowID: windowState.id,
     openSessionsWindow,
+    // XCOD-235: the Sessions window opens sessions in the main window; every other window opens them.
+    ...(windowState.id === SESSIONS_WINDOW_ID
+      ? {
+          openSessionInMain: (directory: string, sessionID: string) =>
+            window.api.openSessionInMain(directory, sessionID),
+        }
+      : {
+          onOpenSession: (cb: (target: { directory: string; sessionID: string }) => void) => {
+            void window.api.takePendingOpenSession().then((items) => items.forEach(cb))
+            return window.api.onOpenSession(cb)
+          },
+        }),
 
     async openDirectoryPickerDialog(opts) {
       return window.api.openDirectoryPicker({

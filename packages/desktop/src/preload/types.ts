@@ -73,6 +73,11 @@ export type ElectronAPI = {
   getWindowID: () => Promise<string>
   onMenuCommand: (cb: (id: string) => void) => () => void
   onDeepLink: (cb: (urls: string[]) => void) => () => void
+  /** XCOD-235: ask the main window to open a session (from the Sessions window). */
+  openSessionInMain: (directory: string, sessionID: string) => Promise<void>
+  /** XCOD-235: sessions to open here; `takePendingOpenSession` returns any sent before this window was ready. */
+  onOpenSession: (cb: (target: { directory: string; sessionID: string }) => void) => () => void
+  takePendingOpenSession: () => Promise<Array<{ directory: string; sessionID: string }>>
 
   openDirectoryPicker: (opts?: {
     multiple?: boolean
