@@ -66,7 +66,10 @@ function writeOldRealm() {
   const withoutLunos = (names?: string[]) => names?.filter((name) => name !== "lunos")
   old.clients = old.clients
     .filter((c: { clientId: string }) => !added.has(c.clientId))
-    .map((c: { defaultClientScopes?: string[] }) => ({ ...c, defaultClientScopes: withoutLunos(c.defaultClientScopes) }))
+    .map((c: { defaultClientScopes?: string[] }) => ({
+      ...c,
+      defaultClientScopes: withoutLunos(c.defaultClientScopes),
+    }))
   old.clientScopes = old.clientScopes.filter((c: { name: string }) => c.name !== "lunos")
   old.defaultDefaultClientScopes = withoutLunos(old.defaultDefaultClientScopes)
   old.eventsListeners = old.eventsListeners?.filter((l: string) => l !== "lunos-idp")
@@ -509,6 +512,7 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
       defaults: defaults.map((s) => s.name).sort(),
       cliScopes: cliScopes.map((s) => s.name).sort(),
       listeners: (await kc.admin("GET", `/${OLD}/events/config`)).eventsListeners,
+      loginTheme: (await kc.admin("GET", `/${OLD}`)).loginTheme ?? null,
     }
   }
   let asImported: Awaited<ReturnType<typeof oldRealmState>>
@@ -529,6 +533,11 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
       delete info.providers.eventsListener.providers["lunos-idp"]
     })
     await expect(configure(oldEnv(), noListener)).rejects.toThrow(/event listener lunos-idp[\s\S]*build\.sh/)
+
+    const noTheme = serverinfoWithout((info) => {
+      info.themes.login = info.themes.login.filter((t: { name: string }) => t.name !== "lunos")
+    })
+    await expect(configure(oldEnv(), noTheme)).rejects.toThrow(/login theme lunos[\s\S]*themes/)
     expect(await oldRealmState()).toEqual(asImported)
   })
 
@@ -603,7 +612,18 @@ describe.skipIf(!dockerAvailable())("lunos_idp against Keycloak 26.3", () => {
   })
 
   test("configure brings an old realm to the new shape", async () => {
-    const changes = await configure(oldEnv())
+    // An operator's client-level theme override is noted, never overwritten.
+    const consoleBefore = await clientByClientId(kc, "lunos-console", `/${OLD}`)
+    await kc.admin("PUT", `/${OLD}/clients/${consoleBefore.id}`, {
+      ...consoleBefore,
+      attributes: { ...consoleBefore.attributes, login_theme: "keycloak.v2" },
+    })
+    const notes: string[] = []
+    const changes = await configure(oldEnv(), fetch, (line) => notes.push(line))
+    expect(changes).toContain("set the realm's login theme to lunos (was the default)")
+    expect((await kc.admin("GET", `/${OLD}`)).loginTheme).toBe("lunos")
+    expect((await kc.admin("GET", `/${OLD}`)).registrationAllowed).toBe(true)
+    expect(notes).toContain("client lunos-console overrides the login theme with keycloak.v2; left as is")
     expect(changes).toContain("create client lunos-app")
     expect(changes).toContain("create client lunos-console-admin")
 

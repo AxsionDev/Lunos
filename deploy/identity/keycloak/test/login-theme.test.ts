@@ -2,7 +2,17 @@
 // bun test test/login-theme.test.ts (skipped when Docker isn't running). The form contract checked here is
 // what browserLogin (test/keycloak.ts) and the lunoshq Playwright e2e drive the pages by.
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { browse, CookieJar, dockerAvailable, firstForm, type Kc, pkce, startKeycloak, TEST_CLIENT, TEST_REDIRECT } from "./keycloak"
+import {
+  browse,
+  CookieJar,
+  dockerAvailable,
+  firstForm,
+  type Kc,
+  pkce,
+  startKeycloak,
+  TEST_CLIENT,
+  TEST_REDIRECT,
+} from "./keycloak"
 
 setDefaultTimeout(30_000)
 
