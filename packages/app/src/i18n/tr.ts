@@ -1301,6 +1301,7 @@ export const dict = {
   "sessions.state.finished": "Tamamlandı",
   "sessions.state.failed": "Başarısız",
   "sessions.state.elsewhere": "Başka bir Lunos penceresinde çalışıyor",
+  "sessions.state.stale": "Yanıt vermiyor (Lunos kapatıldı)",
   "sessions.kind.subagent": "Alt ajan",
   "sessions.kind.scheduled": "Zamanlanmış",
   "sessions.kind.external": "Harici",

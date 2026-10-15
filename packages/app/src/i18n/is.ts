@@ -1199,6 +1199,7 @@ export const dict = {
   "sessions.state.finished": "Lokið",
   "sessions.state.failed": "Mistókst",
   "sessions.state.elsewhere": "Í gangi í öðrum Lunos-glugga",
+  "sessions.state.stale": "Svarar ekki (Lunos var lokað)",
   "sessions.kind.subagent": "Undirfulltrúi",
   "sessions.kind.scheduled": "Tímasett",
   "sessions.kind.external": "Ytri",

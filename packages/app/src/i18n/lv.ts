@@ -1201,6 +1201,7 @@ export const dict = {
   "sessions.state.finished": "Pabeigta",
   "sessions.state.failed": "Neizdevās",
   "sessions.state.elsewhere": "Darbojas citā Lunos logā",
+  "sessions.state.stale": "Neatbild (Lunos ir aizvērts)",
   "sessions.kind.subagent": "Apakšaģents",
   "sessions.kind.scheduled": "Ieplānota",
   "sessions.kind.external": "Ārēja",

@@ -20,6 +20,7 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import {
+  PeerAsks,
   ConsoleSwitchPayload,
   SessionGroupCreatePayload,
   SessionGroupMovePayload,
@@ -31,7 +32,10 @@ import {
 import { InvalidRequestError, notFound } from "../errors"
 import { SessionGroups } from "@/session/groups"
 import { SessionLive } from "@/session/live"
+import { SessionPeers } from "@/session/peers"
+import { SessionPeerControl } from "@/session/peer-control"
 import { SessionOverview } from "@/session/overview"
+import { ExternalRegistry } from "@/external/registry"
 import { GlobalBus } from "@/bus/global"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
 
@@ -45,6 +49,17 @@ function groupErrors<A>(run: () => Promise<A>) {
       throw error
     },
   })
+}
+
+let peerEvents: (() => void) | undefined
+// XCOD-234: other Lunos processes' sessions changed (or one stopped responding): every surface re-reads.
+function publishPeerChanges() {
+  peerEvents ??= SessionPeers.subscribe(() =>
+    GlobalBus.emit("event", {
+      directory: "global",
+      payload: { type: SessionGroupEvent.LiveUpdated.type, properties: {} },
+    }),
+  )
 }
 
 let groupEvents: (() => void) | undefined
@@ -78,7 +93,9 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const runState = yield* SessionRunState.Service
     const flags = yield* RuntimeFlags.Service
     SessionLive.start()
+    SessionLive.withControl(SessionPeerControl.start)
     publishGroupChanges()
+    publishPeerChanges()
 
     const capabilities = Effect.fn("ExperimentalHttpApi.capabilities")(function* () {
       return { backgroundSubagents: backgroundEnabled(flags.experimentalBackgroundSubagents, yield* config.get()) }
@@ -272,6 +289,64 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return yield* groupErrors(() => SessionGroups.move(ctx.payload.sessionIDs, ctx.payload.groupID ?? null))
     })
 
+    // XCOD-234: the same as `lunos external stop`; the registry finds the tool's process by pid, so
+    // this works whichever Lunos process started it.
+    const externalStop = Effect.fn("ExperimentalHttpApi.externalStop")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      const result = yield* Effect.promise(() => ExternalRegistry.stop(ctx.params.sessionID))
+      if (result.ok) return true
+      const missing = !(yield* Effect.promise(() => ExternalRegistry.get(ctx.params.sessionID)))
+      return yield* missing
+        ? Effect.fail(notFound(result.reason))
+        : Effect.fail(new InvalidRequestError({ message: result.reason }))
+    })
+
+    // XCOD-234: sessions another Lunos process runs; that process does the work (and the audit).
+    const peer = <A>(sessionID: string, path: string, init?: { method?: string; body?: unknown }) =>
+      Effect.tryPromise({
+        try: () => SessionPeerControl.call(sessionID, path, init) as Promise<A>,
+        catch: (error) =>
+          error instanceof SessionPeerControl.PeerError && error.status === 404
+            ? notFound(error.message)
+            : new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+    const peerStop = Effect.fn("ExperimentalHttpApi.peerStop")(function* (ctx: { params: { sessionID: string } }) {
+      return Boolean(yield* peer<boolean>(ctx.params.sessionID, "/stop", { method: "POST" }))
+    })
+    const peerAsks = Effect.fn("ExperimentalHttpApi.peerAsks")(function* (ctx: { params: { sessionID: string } }) {
+      return yield* peer<typeof PeerAsks.Type>(ctx.params.sessionID, "/asks")
+    })
+    const peerPermissionReply = Effect.fn("ExperimentalHttpApi.peerPermissionReply")(function* (ctx: {
+      params: { sessionID: string; requestID: string }
+      payload: { reply: string; message?: string }
+    }) {
+      return Boolean(
+        yield* peer<boolean>(ctx.params.sessionID, `/permission/${ctx.params.requestID}/reply`, {
+          method: "POST",
+          body: ctx.payload,
+        }),
+      )
+    })
+    const peerQuestionReply = Effect.fn("ExperimentalHttpApi.peerQuestionReply")(function* (ctx: {
+      params: { sessionID: string; requestID: string }
+      payload: { answers: ReadonlyArray<unknown> }
+    }) {
+      return Boolean(
+        yield* peer<boolean>(ctx.params.sessionID, `/question/${ctx.params.requestID}/reply`, {
+          method: "POST",
+          body: ctx.payload,
+        }),
+      )
+    })
+    const peerQuestionReject = Effect.fn("ExperimentalHttpApi.peerQuestionReject")(function* (ctx: {
+      params: { sessionID: string; requestID: string }
+    }) {
+      return Boolean(
+        yield* peer<boolean>(ctx.params.sessionID, `/question/${ctx.params.requestID}/reject`, { method: "POST" }),
+      )
+    })
+
     const resource = Effect.fn("ExperimentalHttpApi.resource")(function* () {
       return yield* mcp.resources()
     })
@@ -298,6 +373,12 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionGroupUpdate", sessionGroupUpdate)
       .handle("sessionGroupDelete", sessionGroupDelete)
       .handle("sessionGroupMove", sessionGroupMove)
+      .handle("externalStop", externalStop)
+      .handle("peerStop", peerStop)
+      .handle("peerAsks", peerAsks)
+      .handle("peerPermissionReply", peerPermissionReply)
+      .handle("peerQuestionReply", peerQuestionReply)
+      .handle("peerQuestionReject", peerQuestionReject)
       .handle("resource", resource)
   }),
 )

@@ -1204,6 +1204,7 @@ export const dict = {
   "sessions.state.finished": "Končana",
   "sessions.state.failed": "Ni uspela",
   "sessions.state.elsewhere": "Se izvaja v drugem oknu Lunos",
+  "sessions.state.stale": "Se ne odziva (Lunos je zaprt)",
   "sessions.kind.subagent": "Podagent",
   "sessions.kind.scheduled": "Načrtovana",
   "sessions.kind.external": "Zunanja",

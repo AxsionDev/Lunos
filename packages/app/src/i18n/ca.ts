@@ -1213,6 +1213,7 @@ export const dict = {
   "sessions.state.finished": "Finalitzada",
   "sessions.state.failed": "Ha fallat",
   "sessions.state.elsewhere": "En execució en una altra finestra de Lunos",
+  "sessions.state.stale": "No respon (Lunos s'ha tancat)",
   "sessions.kind.subagent": "Subagent",
   "sessions.kind.scheduled": "Programada",
   "sessions.kind.external": "Externa",

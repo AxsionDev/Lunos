@@ -1221,6 +1221,7 @@ export const dict: Record<string, string> = {
   "sessions.state.finished": "མཇུག་བསྡུ་ཡི",
   "sessions.state.failed": "འཐུས་ཤོར",
   "sessions.state.elsewhere": "Lunos སྒོ་སྒྲིག་གཞན་ཅིག་ནང་ གཡོག་བཀོལ་དོ",
+  "sessions.state.stale": "ལན་མི་སྤྲོད (Lunos ཁ་བསྡམས་ཡོད)",
   "sessions.kind.subagent": "ངོ་ཚབ་ཡན་ལག",
   "sessions.kind.scheduled": "དུས་ཚོད་བཀོད་ཡོདཔ",
   "sessions.kind.external": "ཕྱི་ཁ",

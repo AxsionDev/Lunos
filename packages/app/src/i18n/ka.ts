@@ -1197,6 +1197,7 @@ export const dict = {
   "sessions.state.finished": "დასრულებული",
   "sessions.state.failed": "ვერ შესრულდა",
   "sessions.state.elsewhere": "მიმდინარეობს Lunos-ის სხვა ფანჯარაში",
+  "sessions.state.stale": "არ პასუხობს (Lunos დაიხურა)",
   "sessions.kind.subagent": "ქვეაგენტი",
   "sessions.kind.scheduled": "დაგეგმილი",
   "sessions.kind.external": "გარე",

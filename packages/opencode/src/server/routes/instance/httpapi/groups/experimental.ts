@@ -1,5 +1,7 @@
 import { AccountID, OrgID } from "@/account/schema"
 import { MCP } from "@/mcp"
+import { Question } from "@/question"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 
 import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
@@ -138,6 +140,7 @@ export const SessionOverviewItem = Schema.Struct({
   updated: Schema.Finite,
   state: Schema.Literals(["running", "waiting", "idle", "finished", "failed"]),
   elsewhere: Schema.optional(Schema.Boolean),
+  stale: Schema.optional(Schema.Boolean),
   permissions: NonNegativeInt,
   questions: NonNegativeInt,
   groupID: Schema.optional(Schema.String),
@@ -185,7 +188,19 @@ export const ExperimentalPaths = {
   sessionGroups: "/experimental/session-group",
   sessionGroup: "/experimental/session-group/:groupID",
   sessionGroupMove: "/experimental/session-group/move",
+  externalStop: "/experimental/external/:sessionID/stop",
+  peerStop: "/experimental/peer/:sessionID/stop",
+  peerAsks: "/experimental/peer/:sessionID/asks",
+  peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
+  peerQuestionReply: "/experimental/peer/:sessionID/question/:requestID/reply",
+  peerQuestionReject: "/experimental/peer/:sessionID/question/:requestID/reject",
 } as const
+
+// XCOD-234: what another Lunos process's session is waiting for.
+export const PeerAsks = Schema.Struct({
+  permissions: Schema.mutable(Schema.Array(PermissionV1.Request)),
+  questions: Schema.mutable(Schema.Array(Question.Request)),
+}).annotate({ identifier: "SessionPeerAsks" })
 
 export const ExperimentalApi = HttpApi.make("experimental")
   .add(
@@ -436,6 +451,83 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.sessionGroup.delete",
             summary: "Delete session group",
             description: "Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalStop", ExperimentalPaths.externalStop, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "External session stopped"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.stop",
+            summary: "Stop an external session",
+            description:
+              "Stop a running Claude Code or Codex session Lunos started (as lunos external stop), from any Lunos process on this machine.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerStop", ExperimentalPaths.peerStop, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Stopped"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.stop",
+            summary: "Stop a session another Lunos runs",
+            description: "Stop a session that another Lunos process on this machine is running, through that process.",
+          }),
+        ),
+        HttpApiEndpoint.get("peerAsks", ExperimentalPaths.peerAsks, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(PeerAsks, "Pending permissions and questions"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.asks",
+            summary: "What a session another Lunos runs is waiting for",
+            description:
+              "The pending permission requests and questions of a session another Lunos process on this machine runs.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerPermissionReply", ExperimentalPaths.peerPermissionReply, {
+          params: { sessionID: Schema.String, requestID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({ reply: PermissionV1.Reply, message: Schema.optional(Schema.String) }),
+          success: described(Schema.Boolean, "Answered"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.permissionReply",
+            summary: "Answer a permission request in another Lunos",
+            description:
+              "Answer a permission request of a session another Lunos process on this machine runs. That process checks and audits the answer.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerQuestionReply", ExperimentalPaths.peerQuestionReply, {
+          params: { sessionID: Schema.String, requestID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({ answers: Schema.Array(Question.Answer) }),
+          success: described(Schema.Boolean, "Answered"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.questionReply",
+            summary: "Answer a question in another Lunos",
+            description: "Answer a question of a session another Lunos process on this machine runs.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerQuestionReject", ExperimentalPaths.peerQuestionReject, {
+          params: { sessionID: Schema.String, requestID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Dismissed"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.questionReject",
+            summary: "Dismiss a question in another Lunos",
+            description: "Dismiss a question of a session another Lunos process on this machine runs.",
           }),
         ),
         HttpApiEndpoint.get("resource", ExperimentalPaths.resource, {

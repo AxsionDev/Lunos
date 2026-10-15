@@ -1204,6 +1204,7 @@ export const dict = {
   "sessions.state.finished": "समाप्त",
   "sessions.state.failed": "विफल",
   "sessions.state.elsewhere": "किसी अन्य Lunos विंडो में चल रहा है",
+  "sessions.state.stale": "प्रतिक्रिया नहीं दे रहा (Lunos बंद हो गया)",
   "sessions.kind.subagent": "सबएजेंट",
   "sessions.kind.scheduled": "निर्धारित",
   "sessions.kind.external": "बाहरी",

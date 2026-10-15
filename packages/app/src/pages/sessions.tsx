@@ -1,4 +1,9 @@
-import type { SessionGroup, SessionOverview, SessionOverviewItem } from "@opencode-ai/sdk/v2/client"
+import type {
+  SessionGroup,
+  SessionOverview,
+  SessionOverviewItem,
+  SessionPeerAsks as PeerAsks,
+} from "@opencode-ai/sdk/v2/client"
 import { useNavigate } from "@solidjs/router"
 import { createMemo, createSignal, For, onCleanup, onMount, Show, startTransition } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -9,6 +14,7 @@ import { useSettings } from "@/context/settings"
 import { useTabs } from "@/context/tabs"
 import { legacySessionHref } from "@/utils/session-route"
 import { showToast } from "@/utils/toast"
+import { SessionPermissionDock } from "./session/composer/session-permission-dock"
 import {
   build,
   GROUP_COLORS,
@@ -36,6 +42,7 @@ const REFRESH_ON = new Set([
   "question.replied",
   "question.rejected",
   "session.group.updated",
+  "session.live.updated",
   "server.instance.disposed",
   "global.disposed",
   "server.connected",
@@ -70,6 +77,9 @@ export function SessionsPage() {
     renamingSession: undefined as string | undefined,
     draft: "",
     dropTarget: undefined as string | undefined,
+    // XCOD-234: what a session another Lunos runs is waiting for, shown under its row.
+    peerAsks: undefined as { sessionID: string; asks: PeerAsks } | undefined,
+    responding: false,
   })
   const [error, setError] = createSignal<string>()
 
@@ -205,15 +215,58 @@ export function SessionsPage() {
       refresh()
     },
     stop: async (item: SessionOverviewItem) => {
-      await client()
-        ?.session.abort({ sessionID: item.id, directory: item.directory }, { throwOnError: true })
-        .catch(fail)
+      // XCOD-234: a Claude Code / Codex session Lunos started, stopped like `lunos external stop`;
+      // a session another Lunos runs, stopped by that Lunos.
+      const request = item.elsewhere
+        ? client()?.experimental.peer.stop({ sessionID: item.id }, { throwOnError: true })
+        : item.id.startsWith("external:")
+          ? client()?.experimental.external.stop(
+              { sessionID: item.id.slice("external:".length) },
+              { throwOnError: true },
+            )
+          : client()?.session.abort({ sessionID: item.id, directory: item.directory }, { throwOnError: true })
+      await request?.catch(fail)
       refresh()
     },
   }
 
+  // XCOD-234: answering a session another Lunos runs; that Lunos checks and audits the answer.
+  const peerActions = {
+    load: async (item: SessionOverviewItem) => {
+      if (ui.peerAsks?.sessionID === item.id) return setUi("peerAsks", undefined)
+      const result = await client()
+        ?.experimental.peer.asks({ sessionID: item.id }, { throwOnError: true })
+        .catch((error) => void fail(error))
+      if (result) setUi("peerAsks", { sessionID: item.id, asks: result.data })
+    },
+    after: async (item: SessionOverviewItem) => {
+      setUi("responding", false)
+      setUi("peerAsks", undefined)
+      refresh()
+      if (item.state === "waiting") await peerActions.load(item)
+    },
+    permission: async (item: SessionOverviewItem, requestID: string, reply: "once" | "always" | "reject") => {
+      setUi("responding", true)
+      await client()
+        ?.experimental.peer.permissionReply({ sessionID: item.id, requestID, reply }, { throwOnError: true })
+        .catch(fail)
+      await peerActions.after(item)
+    },
+    dismiss: async (item: SessionOverviewItem, requestID: string) => {
+      setUi("responding", true)
+      await client()
+        ?.experimental.peer.questionReject({ sessionID: item.id, requestID }, { throwOnError: true })
+        .catch(fail)
+      await peerActions.after(item)
+    },
+  }
+
   const stateLabel = (item: SessionOverviewItem) =>
-    item.elsewhere ? language.t("sessions.state.elsewhere") : language.t(`sessions.state.${item.state}`)
+    item.stale
+      ? language.t("sessions.state.stale")
+      : item.elsewhere && item.state === "running"
+        ? language.t("sessions.state.elsewhere")
+        : language.t(`sessions.state.${item.state}`)
 
   const money = (value: number) => formatMoney(value, language.intl())
   const ago = (time: number) => {
@@ -300,7 +353,7 @@ export function SessionsPage() {
             <button
               type="button"
               class="rounded border border-v2-state-border-warning bg-v2-state-bg-warning px-2 py-1 text-12-medium text-v2-state-fg-warning"
-              onClick={() => sessionActions.open(item())}
+              onClick={() => (item().elsewhere ? void peerActions.load(item()) : sessionActions.open(item()))}
             >
               {language.t("sessions.action.answer")}
             </button>
@@ -318,7 +371,7 @@ export function SessionsPage() {
             >
               {language.t("common.rename")}
             </button>
-            <Show when={(item().state === "running" && !item().elsewhere) || item().state === "waiting"}>
+            <Show when={item().state === "running" || item().state === "waiting"}>
               <button
                 type="button"
                 class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
@@ -327,6 +380,15 @@ export function SessionsPage() {
                 {language.t("sessions.action.stop")}
               </button>
             </Show>
+          </Show>
+          <Show when={external() && item().state === "running"}>
+            <button
+              type="button"
+              class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
+              onClick={() => void sessionActions.stop(item())}
+            >
+              {language.t("sessions.action.stop")}
+            </button>
           </Show>
           <Show when={!props.child}>
             <select
@@ -344,6 +406,36 @@ export function SessionsPage() {
             </select>
           </Show>
         </div>
+        <Show when={ui.peerAsks?.sessionID === item().id ? ui.peerAsks : undefined}>
+          {(peer) => (
+            <div class="w-full">
+              <For each={peer().asks.permissions}>
+                {(request) => (
+                  <SessionPermissionDock
+                    request={request}
+                    responding={ui.responding}
+                    onDecide={(reply) => void peerActions.permission(item(), request.id, reply)}
+                  />
+                )}
+              </For>
+              <For each={peer().asks.questions}>
+                {(question) => (
+                  <div class="flex items-center gap-2 py-1 text-12-regular">
+                    <span class="flex-1 truncate">{question.questions[0]?.question}</span>
+                    <button
+                      type="button"
+                      class="rounded px-2 py-1 text-12-medium"
+                      disabled={ui.responding}
+                      onClick={() => void peerActions.dismiss(item(), question.id)}
+                    >
+                      {language.t("common.dismiss")}
+                    </button>
+                  </div>
+                )}
+              </For>
+            </div>
+          )}
+        </Show>
       </li>
     )
   }

@@ -1202,6 +1202,7 @@ export const dict = {
   "sessions.state.finished": "مکمل",
   "sessions.state.failed": "ناکام",
   "sessions.state.elsewhere": "کسے ہور Lunos ونڈو وچ چل رہیا اے",
+  "sessions.state.stale": "جواب نئیں دے رہیا (Lunos بند ہو گیا)",
   "sessions.kind.subagent": "ذیلی ایجنٹ",
   "sessions.kind.scheduled": "شیڈول کیتا",
   "sessions.kind.external": "باہری",

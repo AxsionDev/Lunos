@@ -1209,6 +1209,7 @@ export const dict = {
   "sessions.state.finished": "Дууссан",
   "sessions.state.failed": "Амжилтгүй",
   "sessions.state.elsewhere": "Өөр Lunos цонхонд ажиллаж байна",
+  "sessions.state.stale": "Хариу өгөхгүй байна (Lunos хаагдсан)",
   "sessions.kind.subagent": "Дэд агент",
   "sessions.kind.scheduled": "Хуваарьт",
   "sessions.kind.external": "Гадаад",
