@@ -15,6 +15,7 @@ import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
 import { LoginCommand, LogoutCommand, WhoamiCommand } from "./cli/cmd/cloud"
+import { CloudCommand } from "./cli/cmd/cloud-git-token"
 import { ExternalCommand } from "./cli/cmd/external"
 import { UI } from "./cli/ui"
 import { InstallationVersion, versionVerbose } from "@opencode-ai/core/installation/version"
@@ -175,6 +176,7 @@ const cli = yargs(args)
   .command(LoginCommand)
   .command(LogoutCommand)
   .command(WhoamiCommand)
+  .command(CloudCommand)
   .command(ExternalCommand)
   .command(StatsCommand)
   .command(ExportCommand)

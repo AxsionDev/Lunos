@@ -9,6 +9,7 @@
 ```sh
 lunos login                                   # once; see cloud-login.md
 lunos settings set cloud.endpoint https://cloud.lunos.tech
+lunos cloud git-token set github.com          # once per git host; paste the token (hidden)
 git push                                      # the worker starts from what's on your remote
 lunos run --cloud "Add input validation to parse.ts"
 git fetch origin lunos/cloud/<id>             # the results, when it's done
@@ -27,6 +28,25 @@ A run whose session ends in an error (for example, refused by the residency poli
 If Lunos Cloud stops the run part-way, for example because the spending cap was reached or the subscription was suspended after a failed payment, Lunos prints Lunos Cloud's reason (`Lunos Cloud stopped the run: …`), exits non-zero and reports `failed`. The worker is still ended, and anything it changed is pushed to its branch.
 
 Ctrl+C ends the worker, and anything it changed is still pushed to its branch.
+
+### Your git token
+
+The worker clones and pushes with your own git token for the repository's host, which Lunos Cloud
+keeps encrypted and never shows again (XCOD-243):
+
+```sh
+lunos cloud git-token set github.com          # type it at a hidden prompt
+echo "$GH_TOKEN" | lunos cloud git-token set github.com   # or pipe it in
+lunos cloud git-token set gitlab.example.eu --username ada
+lunos cloud git-token rm github.com
+```
+
+The token is read from stdin or a hidden prompt, never from an argument, so it doesn't end up in
+your shell history. Use a token that can read and push to the repositories you run on (for GitHub, a
+fine-grained token with Contents and Pull requests read and write). Lunos Cloud only keeps tokens for
+the git hosts it clones from. You can also manage them in the console, under **Git access**. The
+token goes to the same Lunos Cloud as session sync: `cloud.endpoint` in your user or managed config,
+never a project's.
 
 ## What leaves your machine, and what doesn't
 
