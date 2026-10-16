@@ -148,7 +148,8 @@ const layer = Layer.effect(
 
         const servers: Record<string, LSPServer.Info> = {}
 
-        if (!cfg.lsp) {
+        // XCOD-246: on unless set to false. Upstream is opt-in; Lunos ships LSP ready.
+        if (cfg.lsp === false) {
           yield* Effect.logInfo("all LSPs are disabled")
         } else {
           for (const server of Object.values(LSPServer)) {
@@ -157,7 +158,7 @@ const layer = Layer.effect(
 
           filterExperimentalServers(servers, flags)
 
-          if (cfg.lsp !== true) {
+          if (typeof cfg.lsp === "object") {
             for (const [name, item] of Object.entries(cfg.lsp)) {
               const existing = servers[name]
               if (item.disabled) {
