@@ -237,6 +237,14 @@ export const CALLS: Call[] = [
     offline: "command",
   },
   {
+    // XCOD-243: the user's git token for one host, to the control plane that clones with it.
+    id: "cloud-git-token",
+    what: "`lunos cloud git-token set` / `rm`: your git token for a host, to Lunos Cloud",
+    hosts: "cloud.lunos.tech (or `cloud.endpoint` in global or managed config)",
+    when: "only when you run `lunos cloud git-token`",
+    offline: "blocked",
+  },
+  {
     // XCOD-242: which hosted organisations the account belongs to; only the chosen id is kept.
     id: "hosted-team",
     what: "Your hosted Lunos organisations (`GET /v1/account`), to turn on team features",

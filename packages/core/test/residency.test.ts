@@ -10,8 +10,10 @@ const EU_ONLY: Residency.Policy = { allow: ["eu"] }
 describe("Residency.evaluate", () => {
   describe("under an EU-only policy", () => {
     test("permits EU-resident providers", () => {
+      // Mistral only at its EU endpoint (XCOD-194); the others at their default hosts.
+      const url: Record<string, string | undefined> = { mistral: "https://api.eu.mistral.ai/v1" }
       for (const id of ["mistral", "scaleway", "ovhcloud", "hetzner"]) {
-        const decision = Residency.evaluate(id, EU_ONLY)
+        const decision = Residency.evaluate(id, EU_ONLY, url[id])
         expect(decision.allowed).toBe(true)
         expect(decision.region).toBe("eu")
       }
@@ -185,7 +187,7 @@ describe("Residency.enforce", () => {
     const seen: string[] = []
     const wrapped = Residency.enforce({
       providerID: "mistral",
-      baseURL: "https://api.mistral.ai/v1",
+      baseURL: "https://api.eu.mistral.ai/v1",
       resolved: Residency.resolve({ allow: ["eu"] })!,
       defaultAuditPath: file,
       fetch: async (input) => {
@@ -193,16 +195,16 @@ describe("Residency.enforce", () => {
         return new Response("ok")
       },
     })!
-    await wrapped("https://api.mistral.ai/v1/chat/completions?secret=x")
-    expect(seen).toEqual(["https://api.mistral.ai/v1/chat/completions?secret=x"])
-    expect(await read(file)).toMatchObject([{ providerID: "mistral", host: "api.mistral.ai", allowed: true }])
+    await wrapped("https://api.eu.mistral.ai/v1/chat/completions?secret=x")
+    expect(seen).toEqual(["https://api.eu.mistral.ai/v1/chat/completions?secret=x"])
+    expect(await read(file)).toMatchObject([{ providerID: "mistral", host: "api.eu.mistral.ai", allowed: true }])
   })
 
   test("audit: false keeps enforcement but leaves the fetch untouched", () => {
     const inner = async () => new Response()
     const out = Residency.enforce({
       providerID: "mistral",
-      baseURL: "",
+      baseURL: "https://api.eu.mistral.ai/v1",
       resolved: Residency.resolve({ allow: ["eu"], audit: false })!,
       defaultAuditPath: tmp(),
       fetch: inner,
@@ -249,7 +251,9 @@ describe("Residency.blocked (XCOD-212)", () => {
     const decision = Residency.blocked("anthropic", undefined, euOnly)
     expect(decision?.region).toBe("us")
     expect(decision?.reason).toContain("does not allow")
-    expect(Residency.blocked("mistral", undefined, euOnly)).toBeUndefined()
+    expect(Residency.blocked("mistral", "https://api.eu.mistral.ai/v1", euOnly)).toBeUndefined()
+    // XCOD-194: Mistral's default (global) host is blocked under EU-only.
+    expect(Residency.blocked("mistral", undefined, euOnly)?.region).toBe("unknown")
   })
 
   test("a declared endpoint is allowed", () => {

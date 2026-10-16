@@ -20,10 +20,24 @@ const read = async (file: string) => {
 }
 
 describe("residency endpoints (XCOD-121, XCOD-138)", () => {
-  test("a built-in EU provider at its own API is allowed, with or without a baseURL", () => {
-    expect(Residency.evaluate("mistral", eu).allowed).toBe(true)
-    expect(Residency.evaluate("mistral", eu, "https://api.mistral.ai/v1").allowed).toBe(true)
+  test("a built-in EU provider at its own API is allowed", () => {
+    expect(Residency.evaluate("mistral", eu, "https://api.eu.mistral.ai/v1").allowed).toBe(true)
     expect(Residency.evaluate("ovhcloud", eu, "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1").allowed).toBe(true)
+    expect(Residency.evaluate("ovhcloud", eu).allowed).toBe(true)
+  })
+
+  test("XCOD-194: Mistral is EU only at api.eu.mistral.ai; its global default host isn't, with or without a baseURL", () => {
+    for (const url of [undefined, "", "https://api.mistral.ai/v1", "https://codestral.mistral.ai/v1"]) {
+      const decision = Residency.evaluate("mistral", eu, url)
+      expect(decision.allowed).toBe(false)
+      expect(decision.region).toBe("unknown")
+    }
+    // The global host is no longer Mistral's own EU API, so a deployment can still accept it
+    // deliberately, by declaring it in residency.endpoints (audited with basis "declared").
+    expect(
+      Residency.evaluate("mistral", { ...eu, endpoints: { mistral: { region: "eu" } } }, "https://api.mistral.ai/v1")
+        .allowed,
+    ).toBe(true)
   })
 
   test("XCOD-138: a built-in EU provider pointed at another host no longer passes an EU-only policy", () => {
@@ -31,7 +45,7 @@ describe("residency endpoints (XCOD-121, XCOD-138)", () => {
     expect(decision.allowed).toBe(false)
     expect(decision.region).toBe("unknown")
     // Nor does a host that merely contains the real one.
-    expect(Residency.evaluate("mistral", eu, "https://api.mistral.ai.evil.example/v1").allowed).toBe(false)
+    expect(Residency.evaluate("mistral", eu, "https://api.eu.mistral.ai.evil.example/v1").allowed).toBe(false)
   })
 
   test("a self-hosted endpoint is denied until declared, then allowed as declared", () => {
