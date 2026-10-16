@@ -84,23 +84,40 @@ export function teamSource(onDisk: readonly unknown[]): TeamSource | undefined {
 }
 
 /**
- * XCOD-242: a hosted organisation's policy may not set or lock `cloud` (issuer, endpoint, policy).
- * Its members' Lunos sign-in is valid for their whole Lunos account, so an organisation admin must
- * not be able to point sync, cloud runs or the next sign-in at another host. Managed config, which
- * the organisation pushes to machines it owns, keeps that power.
+ * XCOD-242 (PO decision 2026-10-15): the top-level keys a hosted organisation's policy may set or
+ * lock. Its members joined by invitation, without MDM, so the organisation may restrict what their
+ * Lunos does (permissions, residency, models, sync, sharing, sandboxing, external agents) but not
+ * make it run anything new (`plugin`, `mcp`, `command`, `agent`, ...) or send their Lunos sign-in
+ * elsewhere (`cloud`). Managed config, which an organisation pushes to machines it owns, keeps every key.
  */
-export function withoutCloud(layer: Doc | undefined): Doc | undefined {
+export const HOSTED_KEYS: ReadonlySet<string> = new Set([
+  "permission",
+  "residency",
+  "model",
+  "small_model",
+  "subagent",
+  "recommended",
+  "enabled_providers",
+  "disabled_providers",
+  "sync",
+  "share",
+  "sandbox",
+  "external",
+])
+
+/** A hosted organisation's policy, reduced to HOSTED_KEYS (and locks on them only). */
+export function hostedOnly(layer: Doc | undefined): Doc | undefined {
   if (!layer) return layer
-  const { cloud: _cloud, ...rest } = layer
-  const locked = ConfigPolicy.lockList(rest).filter((key) => key !== "cloud" && !key.startsWith("cloud."))
-  if (ConfigPolicy.FIELD in rest) rest[ConfigPolicy.FIELD] = locked
-  return rest
+  const allowed = (key: string) => HOSTED_KEYS.has(key.split(".")[0]!)
+  const next: Doc = Object.fromEntries(Object.entries(layer).filter(([key]) => allowed(key)))
+  if (ConfigPolicy.FIELD in layer) next[ConfigPolicy.FIELD] = ConfigPolicy.lockList(layer).filter(allowed)
+  return next
 }
 
-/** The result, with a hosted organisation's policy kept out of `cloud` (withoutCloud). */
+/** The result, with a hosted organisation's policy limited to HOSTED_KEYS (hostedOnly). */
 function scoped(result: Result, source: TeamSource | undefined): Result {
   if (source?.via !== "hosted" || !result.layer) return result
-  return { ...result, layer: withoutCloud(result.layer) }
+  return { ...result, layer: hostedOnly(result.layer) }
 }
 
 export type Cache = {

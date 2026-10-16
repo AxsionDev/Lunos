@@ -36,7 +36,9 @@ reasoning behind a change are published separately as **Lunos Notes**.
   marketplace, team memory and sharing, with no managed config to push. Only Lunos's built-in
   console is ever used. Managed `cloud.policy` still wins, and an organisation turns this off with
   `"cloud": { "auto_team": false }` in managed config. `/settings` → Status shows where team
-  features come from (XCOD-242).
+  features come from. A hosted organisation's policy can only restrict your Lunos (permissions,
+  residency, models, sync, sharing, sandbox, external agents); it can't add plugins, MCP servers,
+  commands or agents, or change where your sign-in goes (XCOD-242).
 
 - **See on your Lunos console which Lunos versions run where, and which policy they enforce.** Each
   start bound to your organisation's console tells it the version, OS, architecture, surface, a

@@ -49,10 +49,13 @@ private marketplace, team memory and sharing then work as if managed config set
 - **Several organisations.** If your sign-in's organisation claim names one of them, that one is
   used. Otherwise, with more than one, nothing is turned on, and your administrator sets
   `cloud.policy` in managed config.
-- **Your sign-in stays yours.** A hosted organisation's policy can't set or lock anything under
-  `cloud` (the sign-in issuer, the Lunos Cloud endpoint, the policy address): your Lunos sign-in
-  is valid for your whole Lunos account, so an organisation admin can't point it at another host.
-  Organisations that need those keys set them in managed config.
+- **What a hosted policy can set.** Only what limits your Lunos: `permission`, `residency`, the
+  models (`model`, `small_model`, `subagent`, `recommended`, `enabled_providers`,
+  `disabled_providers`), `sync`, `share`, `sandbox` and `external`, and locks on those. Anything
+  else in it is ignored. In particular it can't add plugins, MCP servers, commands, agents or
+  instructions (code that would run on your machine), and it can't set `cloud`: your Lunos
+  sign-in is valid for your whole Lunos account, so an organisation admin can't point it at
+  another host. Organisations that need other keys set them in managed config (MDM).
 - **Managed config wins.** If managed config sets `cloud.policy`, that console is used and nothing
   is looked up. An organisation turns this off with `"cloud": { "auto_team": false }` in managed
   config.
