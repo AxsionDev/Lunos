@@ -18,6 +18,8 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+## [1.18.48] - 2026-10-16
+
 ### Changed
 
 - **LSP is on by default.** Language servers start as soon as you open a matching file, so the
@@ -730,7 +732,8 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.47...dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.48...dev
+[1.18.48]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.48
 [1.18.47]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.47
 [1.18.46]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.46
 [1.18.44]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.44
