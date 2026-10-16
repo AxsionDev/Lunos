@@ -18,7 +18,18 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+## [1.18.47] - 2026-10-16
+
 ### Added
+
+- **Session sync to Lunos Cloud.** Once you sign in with `lunos login`, Lunos copies each
+  finished turn of your sessions to your space at app.lunos.tech, in the background; it is on by
+  default when signed in and never runs signed out. `.env*`, keys, `auth.json` and anything in
+  `sync.exclude` are never uploaded, and a credential scanner redacts common token shapes in the
+  rest. Turn it off with `lunos sync off`, `"sync": false` for a directory, or for a whole
+  organisation in managed config. With an organisation's own identity provider, nothing syncs
+  unless `cloud.endpoint` is set. **If you signed in before this release**, run `lunos sync on`
+  (or `lunos login`) to start. See [Session sync](docs/cloud-sync.md) (XCOD-185).
 
 - **`lunos cloud git-token set <host>` / `rm <host>`.** Store, replace or remove the git token
   Lunos Cloud clones and pushes with, without curl. The token is read from stdin or a hidden
@@ -146,6 +157,10 @@ reasoning behind a change are published separately as **Lunos Notes**.
   to OpenCode 2) are not included.
 
 ### Fixed
+
+- **Desktop Sessions window.** Opening a session from it now opens it in the main window; costs
+  under a cent show instead of $0.00; its warning text meets contrast in the light theme
+  (XCOD-235).
 
 - **Cloud runs report how they really ended.** `lunos run --cloud --cloud-secret NAME "message"`
   works with the flag before the message (repeat it, or write `A,B`); the message was taken as a
@@ -705,7 +720,8 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.46...dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.47...dev
+[1.18.47]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.47
 [1.18.46]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.46
 [1.18.44]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.44
 [1.18.43]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.43
