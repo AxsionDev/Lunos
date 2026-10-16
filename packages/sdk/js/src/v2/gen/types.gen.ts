@@ -2154,7 +2154,7 @@ export type Config = {
         }
       }
   /**
-   * Enable or configure LSP servers. Omit or set to false to disable, true to enable built-ins, or an object to enable built-ins with overrides.
+   * Enable or configure LSP servers. On by default; set to false to disable all, or an object to enable built-ins with overrides.
    */
   lsp?:
     | boolean

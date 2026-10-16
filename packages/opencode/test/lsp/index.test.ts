@@ -70,7 +70,7 @@ describe("lsp.spawn", () => {
           }
         }),
       ),
-      { config: { lsp: false } },
+    { config: { lsp: false } },
   )
 
   it.instance("would spawn builtin LSP for files inside instance when LSP is unset (XCOD-246)", () =>

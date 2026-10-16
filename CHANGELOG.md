@@ -18,6 +18,16 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Changed
+
+- **LSP is on by default.** Language servers start as soon as you open a matching file, so the
+  agent gets diagnostics after its edits without setting `lsp` first. A server already on your
+  machine (in the project's `node_modules/.bin` or on your `PATH`) is used first; otherwise it's
+  downloaded the first time a matching file is opened, as before. Set `"lsp": false` to turn LSP
+  off, or disable single servers. `OPENCODE_DISABLE_LSP_DOWNLOAD=true` now also stops the
+  TypeScript and Biome servers from being installed from npm, so with it only servers you already
+  have are used (XCOD-246).
+
 ## [1.18.47] - 2026-10-16
 
 ### Added

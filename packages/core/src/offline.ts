@@ -76,7 +76,7 @@ export const CALLS: Call[] = [
     id: "lsp-download",
     what: "LSP server downloads and toolchain installs (`go install`, `gem`, `dotnet tool`)",
     hosts: "github.com, download-cdn.jetbrains.com, releases.hashicorp.com, proxy.golang.org, rubygems.org, nuget.org",
-    when: "when a matching file is first opened",
+    when: "when a matching file is first opened and the server isn't already installed (LSP is on by default)",
     offline: "blocked",
     alsoOffBy: "`OPENCODE_DISABLE_LSP_DOWNLOAD`",
   },

@@ -124,7 +124,9 @@ export const Typescript: Info = {
     if (!tsserver) return
     // XCOD-246: prefer a server already on the machine, and only download when allowed.
     const localBin = path.join(root, "node_modules", ".bin", "typescript-language-server")
-    let bin = (await Filesystem.exists(localBin)) ? localBin : which("typescript-language-server")
+    let bin: string | undefined = (await Filesystem.exists(localBin))
+      ? localBin
+      : (which("typescript-language-server") ?? undefined)
     if (!bin) {
       if (flags.disableLspDownload) return
       bin = await Npm.which("typescript-language-server")

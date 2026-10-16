@@ -19,7 +19,10 @@ const flags = (disableLspDownload: boolean) => ({ disableLspDownload }) as Runti
 // A project that resolves typescript/lib/tsserver.js, which the server needs before anything else.
 async function project(dir: string) {
   await fs.mkdir(path.join(dir, "node_modules", "typescript", "lib"), { recursive: true })
-  await Bun.write(path.join(dir, "node_modules", "typescript", "package.json"), '{"name":"typescript","main":"lib/typescript.js"}')
+  await Bun.write(
+    path.join(dir, "node_modules", "typescript", "package.json"),
+    '{"name":"typescript","main":"lib/typescript.js"}',
+  )
   await Bun.write(path.join(dir, "node_modules", "typescript", "lib", "tsserver.js"), "")
 }
 
