@@ -18,6 +18,18 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+## [1.18.48] - 2026-10-16
+
+### Changed
+
+- **LSP is on by default.** Language servers start as soon as you open a matching file, so the
+  agent gets diagnostics after its edits without setting `lsp` first. A server already on your
+  machine (in the project's `node_modules/.bin` or on your `PATH`) is used first; otherwise it's
+  downloaded the first time a matching file is opened, as before. Set `"lsp": false` to turn LSP
+  off, or disable single servers. `OPENCODE_DISABLE_LSP_DOWNLOAD=true` now also stops the
+  TypeScript and Biome servers from being installed from npm, so with it only servers you already
+  have are used (XCOD-246).
+
 ## [1.18.47] - 2026-10-16
 
 ### Added
@@ -720,7 +732,8 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.47...dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.48...dev
+[1.18.48]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.48
 [1.18.47]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.47
 [1.18.46]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.46
 [1.18.44]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.44

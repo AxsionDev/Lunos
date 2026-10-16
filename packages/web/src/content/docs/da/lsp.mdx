@@ -47,7 +47,7 @@ OpenCode leveres med flere indbyggede LSP-servere til populære sprog:
 | yaml-ls            | .yaml,.yml                                                | Autoinstallerer Red Hat yaml-language-server                    |
 | zls                | .zig,.zon                                                 | `zig` kommando tilgængelig                                      |
 
-LSP er deaktiveret som standard. Når det er aktiveret, starter servere, når en af ovenstående filtypenavne opdages, og kravene er opfyldt.
+LSP er aktiveret som standard. Servere starter, når en af ovenstående filtypenavne opdages, og kravene er opfyldt.
 
 :::note
 Du kan deaktivere automatisk LSP-serverdownloads ved at indstille miljøvariablen `OPENCODE_DISABLE_LSP_DOWNLOAD` til `true`.
@@ -154,7 +154,7 @@ Initialiseringsmuligheder forskellige afhængige af LSP-serveren. Se din LSP-ser
 
 ### Deaktivering af LSP-servere
 
-Hvis `lsp` udelades, er alle LSP-servere deaktiveret. For at deaktivere alle LSP-servere efter at en anden konfiguration har aktiveret dem, skal du indstille `lsp` til `false`:
+Hvis `lsp` udelades, er de indbyggede LSP-servere aktiveret. For at deaktivere alle LSP-servere skal du indstille `lsp` til `false`:
 
 ```json title="opencode.json" {3}
 {
