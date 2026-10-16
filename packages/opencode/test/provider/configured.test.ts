@@ -22,9 +22,17 @@ describe("ProviderConfigured.list (XCOD-130)", () => {
     expect(items.map((item) => [item.id, item.method, item.status, item.stored, item.jurisdiction.region])).toEqual([
       ["anthropic", "oauth", "connected", true, "us"],
       ["gone", "api", "error", true, "unknown"],
-      ["mistral", "api", "connected", true, "eu"],
+      // XCOD-194: no baseURL means Mistral's global default host, which isn't EU.
+      ["mistral", "api", "connected", true, "unknown"],
       ["openai", "env", "connected", false, "us"],
     ])
+    const [eu] = ProviderConfigured.list({
+      now: NOW,
+      credentials: {},
+      loaded: { mistral: { name: "Mistral", source: "config", options: { baseURL: "https://api.eu.mistral.ai/v1" } } },
+      names: {},
+    })
+    expect(eu.jurisdiction.region).toBe("eu")
   })
 
   test("an OAuth credential is expired only when it can't be refreshed", () => {
