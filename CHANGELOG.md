@@ -20,6 +20,10 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **`lunos cloud git-token set <host>` / `rm <host>`.** Store, replace or remove the git token
+  Lunos Cloud clones and pushes with, without curl. The token is read from stdin or a hidden
+  prompt, never from an argument, and is never printed back (XCOD-243).
+
 - **The Sessions window sees and controls every Lunos on this machine.** Sessions run by another
   Lunos (a second terminal, the desktop app, `lunos serve`) show their live state within seconds:
   running, or waiting with the number of approvals. You can stop them and answer their approvals
