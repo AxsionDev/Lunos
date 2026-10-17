@@ -12,6 +12,7 @@ import { GenerateCommand } from "./cli/cmd/generate"
 import { ProvidersCommand } from "./cli/cmd/providers"
 import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
+import { ChangelogCommand } from "./cli/cmd/changelog"
 import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
 import { LoginCommand, LogoutCommand, WhoamiCommand } from "./cli/cmd/cloud"
@@ -169,6 +170,7 @@ const cli = yargs(args)
   .command(ProvidersCommand)
   .command(AgentCommand)
   .command(UpgradeCommand)
+  .command(ChangelogCommand)
   .command(UninstallCommand)
   .command(ServeCommand)
   .command(WebCommand)

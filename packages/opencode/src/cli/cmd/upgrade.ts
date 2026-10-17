@@ -4,6 +4,7 @@ import * as prompts from "@clack/prompts"
 import semver from "semver"
 import { Installation } from "../../installation"
 import { InstallationVersion, manualInstallCommand } from "@opencode-ai/core/installation/version"
+import { updateNotes } from "./changelog"
 
 /** "Lunos is up to date (1.18.43)." when nothing newer is published. */
 export function upToDateMessage(version: string) {
@@ -80,6 +81,8 @@ export const UpgradeCommand = {
       return
     }
     spinner.stop("Update complete")
+    // XCOD-248: what changed since the version you had, before the restart hint.
+    console.log("\n" + (await updateNotes(InstallationVersion, target)) + "\n")
     prompts.outro("Restart Lunos to use v" + target)
   },
 }

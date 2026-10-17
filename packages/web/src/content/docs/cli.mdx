@@ -676,6 +676,22 @@ opencode uninstall
 
 ---
 
+### changelog
+
+Shows what changed in Lunos, from the release notes built into this version, so it works offline.
+
+```bash
+lunos changelog [--since <version>] [--full] [--json]
+```
+
+Without options it summarizes the version you have. `--since 1.18.43` covers every version after
+1.18.43, skipped ones included. The summary lists behaviour changes and security entries first, then
+what's new and a count of fixes, one line each with its ticket. `--full` prints the notes as written,
+and `--json` prints the entries as `{ version, section, text, tickets }` for scripts. A version with
+no notes says `No notes for X.Y.Z.`
+
+---
+
 ### update
 
 Updates Lunos to the latest version or a specific version. `lunos upgrade` is an alias and still works.
@@ -697,6 +713,9 @@ To update to a specific version.
 ```bash
 lunos update v0.1.48
 ```
+
+After a successful update, Lunos prints what changed since the version you had (the same summary
+as `lunos changelog --since <your version>`) before the restart hint.
 
 If the update fails, Lunos prints the command to run by hand. For npm installs that's
 `npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`.

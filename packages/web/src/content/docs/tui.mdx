@@ -360,6 +360,19 @@ Unshare current session. [Learn more](/docs/share#un-sharing).
 
 ---
 
+### whatsnew
+
+Show what changed since your previous version: behaviour changes and security entries first, then
+what's new and a count of fixes, taken from the release notes built into Lunos (no network). The
+same panel opens by itself once, on the first start after an update. Turn that off with
+`"whats_new": false` in `tui.json`; `/whatsnew` keeps working.
+
+```bash frame="none"
+/whatsnew
+```
+
+---
+
 ### update
 
 Update Lunos to the latest version. Also available as `/upgrade`, its old name.
@@ -572,6 +585,7 @@ This is separate from `opencode.json`, which configures server/runtime behavior.
 - `scroll_acceleration.enabled` - Enable macOS-style scroll acceleration for smooth, natural scrolling. When enabled, scroll speed increases with rapid scrolling gestures and stays precise for slower movements. **This setting takes precedence over `scroll_speed` and overrides it when enabled.**
 - `scroll_speed` - Controls how fast the TUI scrolls when using scroll commands (minimum: `0.001`, supports decimal values). Defaults to `3`. **Note: This is ignored if `scroll_acceleration.enabled` is set to `true`.**
 - `diff_style` - Controls diff rendering. `"auto"` adapts to terminal width, `"stacked"` always shows a single-column layout.
+- `whats_new` - `false` stops the "What's new" panel on the first start after an update (default: `true`). [`/whatsnew`](#whatsnew) and [`lunos changelog`](/docs/cli#changelog) still work.
 - `reduced_motion` - `true` turns off every animation (the home screen's moon reflection, spinners, placeholder cycling), and the in-app "Disable animations" toggle can't turn them back on. When unset, animations are off by default if `NO_COLOR` is set or `TERM=dumb`, and the toggle decides.
 
 For a high-contrast display, set `"theme": "high-contrast"` (see [Themes](/docs/themes)).
