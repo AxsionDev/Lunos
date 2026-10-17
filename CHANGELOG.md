@@ -18,6 +18,8 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+## [1.18.49] - 2026-10-17
+
 ### Added
 
 - **Memory analytics in `/memory`.** It now opens on an Overview and an Activity tab beside the
