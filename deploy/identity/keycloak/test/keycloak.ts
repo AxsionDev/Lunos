@@ -57,6 +57,7 @@ export async function startKeycloak(opts?: { realmFiles?: string[] }): Promise<K
     // The realm file's ${SMTP_*} placeholders must resolve or the import fails.
     "-e", "SMTP_HOST=", "-e", "SMTP_PORT=587", "-e", "SMTP_FROM=no-reply@lunos.test", "-e", "SMTP_USER=", "-e", "SMTP_PASSWORD=",
     "-v", `${path.join(DIR, "providers")}:/opt/keycloak/providers:ro`,
+    "-v", `${path.join(DIR, "themes")}:/opt/keycloak/themes:ro`,
     ...realmFiles.flatMap((file) => ["-v", `${path.resolve(DIR, file)}:/opt/keycloak/data/import/${path.basename(file)}:ro`]),
     IMAGE, "start-dev", `--http-port=${PORT}`, "--import-realm",
   ]
@@ -172,7 +173,7 @@ const attrsOf = (tag: string) =>
  * The page's first form: its action and the values it would submit as it stands. Of its submit
  * buttons only the first counts, as if clicked: a consent page's second button is "No".
  */
-function firstForm(html: string) {
+export function firstForm(html: string) {
   const m = html.match(/<form\b[^>]*\baction="[^"]*"[^>]*>([\s\S]*?)<\/form>/i)
   if (!m) return undefined
   const action = attrsOf(m[0].slice(0, m[0].indexOf(">") + 1)).action
@@ -200,6 +201,8 @@ type BrowseOptions = {
   idpLink?: string
   /** A redirect to a URL starting with this ends the walk. */
   stopAt?: string
+  /** Values for named fields on any form posted (e.g. a registration form's email and names). */
+  fill?: Record<string, string>
 }
 
 /**
@@ -208,7 +211,7 @@ type BrowseOptions = {
  * username and password wherever the form asks for them. Ends at a redirect to `stopAt`, or at a page
  * with nothing to submit.
  */
-async function browse(start: string, opts: BrowseOptions) {
+export async function browse(start: string, opts: BrowseOptions) {
   let url = start
   let init: RequestInit = {}
   let html = ""
@@ -243,6 +246,7 @@ async function browse(start: string, opts: BrowseOptions) {
     const fields = { ...form.fields }
     if ("username" in fields) fields.username = opts.username
     if ("password" in fields) fields.password = opts.password
+    for (const [name, value] of Object.entries(opts.fill ?? {})) if (name in fields) fields[name] = value
     url = new URL(form.action, url).toString()
     posted.push(`${new URL(url).pathname} ${Object.keys(fields).join(",")}`)
     init = {
