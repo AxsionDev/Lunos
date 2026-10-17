@@ -53,6 +53,7 @@ export type Event =
   | EventSessionError
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
+  | EventInstallationUpgradeProgress
   | EventFileEdited
   | EventReferenceUpdated
   | EventPermissionV2Asked
@@ -1238,6 +1239,14 @@ export type GlobalEvent = {
         id: string
         type: "installation.update-available"
         properties: {
+          version: string
+        }
+      }
+    | {
+        id: string
+        type: "installation.upgrade-progress"
+        properties: {
+          step: "checking" | "installing" | "verifying"
           version: string
         }
       }
@@ -3534,6 +3543,7 @@ export type V2Event =
   | SessionError
   | InstallationUpdated
   | InstallationUpdateAvailable
+  | InstallationUpgradeProgress
   | FileEdited
   | ReferenceUpdated
   | PermissionV2Asked
@@ -6070,6 +6080,24 @@ export type InstallationUpdateAvailable = {
   }
 }
 
+export type InstallationUpgradeProgress = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "installation.upgrade-progress"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    step: "checking" | "installing" | "verifying"
+    version: string
+  }
+}
+
 export type FileEdited = {
   id: string
   metadata?: {
@@ -7408,6 +7436,15 @@ export type EventInstallationUpdateAvailable = {
   id: string
   type: "installation.update-available"
   properties: {
+    version: string
+  }
+}
+
+export type EventInstallationUpgradeProgress = {
+  id: string
+  type: "installation.upgrade-progress"
+  properties: {
+    step: "checking" | "installing" | "verifying"
     version: string
   }
 }

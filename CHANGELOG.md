@@ -36,6 +36,23 @@ reasoning behind a change are published separately as **Lunos Notes**.
   explains, and a policy refusal is audited as `external.denied`). A command of your own with the
   same name wins.
 
+### Changed
+
+- **Updates show their progress.** `lunos update`, the TUI's `/update` and the desktop app show what
+  an update is doing while it runs (XCOD-247).
+  - **`lunos update`:** a spinner with the step (checking, downloading and installing, verifying) and
+    the elapsed time. After a minute on one step it says the package manager is still working.
+  - **TUI:** `/update` shows the same line in the bottom-right corner, and the prompt stays usable.
+  - **Desktop:** the update settings show a progress bar, with the download percentage when the
+    updater reports it, and announce each step to screen readers.
+  - **Reduced motion:** with `NO_COLOR`, `TERM=dumb` or `reduced_motion` the line is static.
+  - **Pipes and CI:** `lunos update` prints plain lines with no escape codes.
+  - **Cancelling:** Ctrl+C cancels only while checking. The package manager now runs in its own
+    process group and always finishes, so a Ctrl+C or a closed TUI can't leave a half-installed Lunos.
+  - **Verifying:** after installing, Lunos checks which version the package manager reports, and
+    fails if it's a different one.
+  - **Exit code:** a failed `lunos update` now exits with code 1.
+
 ## [1.18.48] - 2026-10-16
 
 ### Changed

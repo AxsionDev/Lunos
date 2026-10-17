@@ -15,6 +15,7 @@ import {
   manualInstallCommand,
   newVersionMessage,
   updateRestartHint,
+  upgradeStepText,
 } from "@opencode-ai/core/installation/version"
 import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
@@ -42,6 +43,7 @@ import { DialogProvider as DialogProviderConnect, DialogProviders } from "./comp
 import { ErrorComponent } from "./component/error-component"
 import { PluginRouteMissing } from "./component/plugin-route-missing"
 import { UpdateNotice } from "./component/update-notice"
+import { UpdateProgress, type UpgradeProgress } from "./component/update-progress"
 import { ProjectProvider, useProject } from "./context/project"
 import { EditorContextProvider } from "./context/editor"
 import { useEvent } from "./context/event"
@@ -632,6 +634,8 @@ function App(props: {
   })
   // XCOD-129: /restart. Set by /update, so the restart runs the newly installed version.
   const [upgradedTo, setUpgradedTo] = createSignal<string | undefined>()
+  // XCOD-247: the update this session is running, shown bottom-right until it ends.
+  const [upgrading, setUpgrading] = createSignal<UpgradeProgress>()
   // While "wait for the current turn" is pending; running /restart again cancels it.
   const [restartPending, setRestartPending] = createSignal<{ cancel: () => void } | undefined>()
 
@@ -1384,13 +1388,19 @@ function App(props: {
   // One flow for the reminder dialog and /update. `target` undefined means "latest";
   // the server resolves it from the lunos-ai registry entry.
   async function runUpgrade(target: string | undefined) {
-    toast.show({
-      variant: "info",
-      message: target ? `Updating to Lunos v${target}…` : "Updating Lunos to the latest release…",
-      duration: 30000,
-    })
+    const running = upgrading()
+    if (running) {
+      // The package manager can't be stopped safely once it runs, so a second /update only says so.
+      toast.show({
+        variant: "info",
+        message: `An update is already running (${upgradeStepText(running.step, running.version || undefined)}). It can't be cancelled while installing.`,
+      })
+      return
+    }
+    const started = Date.now()
+    setUpgrading({ step: target ? "installing" : "checking", version: target ?? "", started, stepStarted: started })
 
-    const result = await sdk.client.global.upgrade({ target })
+    const result = await sdk.client.global.upgrade({ target }).finally(() => setUpgrading(undefined))
 
     if (result.error || !result.data?.success) {
       // A refused upgrade comes back as a 400 whose body is `{ success: false, error }`.
@@ -1417,6 +1427,14 @@ function App(props: {
       `Updated to Lunos v${result.data.version}. ${updateRestartHint(result.data.version)}`,
     )
   }
+
+  event.on("installation.upgrade-progress", (evt) => {
+    const current = upgrading()
+    if (!current) return
+    const { step, version } = evt.properties
+    if (step === current.step && version === current.version) return
+    setUpgrading({ ...current, step, version, stepStarted: step === current.step ? current.stepStarted : Date.now() })
+  })
 
   event.on("installation.update-available", async (evt) => {
     const version = evt.properties.version
@@ -1492,7 +1510,9 @@ function App(props: {
           </Switch>
           {plugin()}
         </box>
-        <UpdateNotice version={updateNotice()} />
+        <Show when={upgrading()} fallback={<UpdateNotice version={updateNotice()} />}>
+          <UpdateProgress progress={upgrading()} />
+        </Show>
         <box flexShrink={0}>
           <pluginRuntime.Slot name="app_bottom" />
         </box>

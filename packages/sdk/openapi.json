@@ -17754,6 +17754,9 @@
             "$ref": "#/components/schemas/EventInstallationUpdate-available"
           },
           {
+            "$ref": "#/components/schemas/EventInstallationUpgrade-progress"
+          },
+          {
             "$ref": "#/components/schemas/EventFileEdited"
           },
           {
@@ -21542,6 +21545,35 @@
                       }
                     },
                     "required": ["version"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "type", "properties"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^evt_"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["installation.upgrade-progress"]
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {
+                      "step": {
+                        "type": "string",
+                        "enum": ["checking", "installing", "verifying"]
+                      },
+                      "version": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["step", "version"],
                     "additionalProperties": false
                   }
                 },
@@ -28804,6 +28836,9 @@
           },
           {
             "$ref": "#/components/schemas/InstallationUpdate-available"
+          },
+          {
+            "$ref": "#/components/schemas/InstallationUpgrade-progress"
           },
           {
             "$ref": "#/components/schemas/FileEdited"
@@ -36517,6 +36552,57 @@
         "required": ["id", "type", "data"],
         "additionalProperties": false
       },
+      "InstallationUpgrade-progress": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^evt_"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["installation.upgrade-progress"]
+          },
+          "durable": {
+            "type": "object",
+            "properties": {
+              "aggregateID": {
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "version": {
+                "type": "integer"
+              }
+            },
+            "required": ["aggregateID", "seq", "version"],
+            "additionalProperties": false
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationRef"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "string",
+                "enum": ["checking", "installing", "verifying"]
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": ["step", "version"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "type", "data"],
+        "additionalProperties": false
+      },
       "FileEdited": {
         "type": "object",
         "properties": {
@@ -40431,6 +40517,35 @@
               }
             },
             "required": ["version"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "type", "properties"],
+        "additionalProperties": false
+      },
+      "EventInstallationUpgrade-progress": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^evt_"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["installation.upgrade-progress"]
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "string",
+                "enum": ["checking", "installing", "verifying"]
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": ["step", "version"],
             "additionalProperties": false
           }
         },

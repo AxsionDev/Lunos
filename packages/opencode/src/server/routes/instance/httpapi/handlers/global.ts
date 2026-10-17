@@ -94,16 +94,25 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
           { status: 400 },
         )
       }
+      // XCOD-247: the step goes out as an event, so the TUI and desktop can show it while this runs.
+      const progress = (step: "checking" | "installing" | "verifying", version: string) =>
+        GlobalBus.emit("event", {
+          directory: "global",
+          payload: { type: Installation.Event.UpgradeProgress.type, properties: { step, version } },
+        })
+      if (!ctx.payload.target) progress("checking", "")
       const target = ctx.payload.target ?? (yield* installation.latest(method))
-      const result = yield* installation.upgrade(method, target).pipe(
-        Effect.as({ success: true as const, version: target }),
-        Effect.catch((err) =>
-          Effect.succeed({
-            success: false as const,
-            error: err instanceof Error ? err.message : String(err),
-          }),
-        ),
-      )
+      const result = yield* installation
+        .upgrade(method, target, (step) => progress(step, target))
+        .pipe(
+          Effect.as({ success: true as const, version: target }),
+          Effect.catch((err) =>
+            Effect.succeed({
+              success: false as const,
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          ),
+        )
       if (!result.success) return HttpServerResponse.jsonUnsafe(result, { status: 500 })
       GlobalBus.emit("event", {
         directory: "global",
