@@ -20,6 +20,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **`/marketplace` in the TUI.** It opens the marketplace's Discover view straight from the prompt
+  (XCOD-251). `/marketplace mcp` (or `plugins`, `skills`, `hooks`) opens that tab,
+  `/marketplace playwright` searches every kind at once, and `/marketplace installed` lists what's
+  already installed, marking entries the marketplace now serves in a newer version or definition.
+  Entries show whether they're installed or verified. `/discover` is an alias. `/plugins` now opens
+  the Plugins manager, which points to `/marketplace`. With `LUNOS_OFFLINE=1` the view shows the
+  cached catalogue and its date, or says there's no cache yet instead of an empty list.
+
 - **`/claude` and `/codex` in the TUI.** `/claude <task>` hands a task to your own Claude Code in a
   new session view, and `/codex <task>` to Codex CLI; their approvals come to Lunos's prompt as
   before (XCOD-250). On their own they open a picker to start a new session or continue a recent one

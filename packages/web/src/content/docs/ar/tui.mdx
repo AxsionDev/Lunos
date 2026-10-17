@@ -163,6 +163,18 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### marketplace
+
+تصفّح الإضافات والمهارات والخطافات وخوادم MCP من أسواقك وثبّتها. أضف اسم تبويب (`plugins` أو `skills` أو `hooks` أو `mcp`) لفتحه، أو `installed` لعرض ما هو مثبّت مع تمييز التحديثات المتاحة، أو أي كلمات أخرى للبحث. _الاسم المستعار_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 اعرض النماذج المتاحة.
@@ -184,6 +196,16 @@ How is auth handled in @packages/functions/src/api/index.ts?
 ```
 
 **اختصار لوحة المفاتيح:** `ctrl+x n`
+
+---
+
+### plugins
+
+اعرض الإضافات المثبّتة وشغّلها أو أوقفها.
+
+```bash frame="none"
+/plugins
+```
 
 ---
 
