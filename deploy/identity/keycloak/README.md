@@ -11,17 +11,18 @@ The sign-in service behind `lunos login` (XCOD-185). It's Keycloak 26 with Postg
 
 ## What the realm sets up
 
-| Setting                                                  | Covers                                                                                                                                                                                      |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lunos-cli`: public client, device flow only             | `lunos login` / `whoami` / `logout` (AC3), and revocation on logout (AC4)                                                                                                                   |
-| Self-registration, e-mail as username, verified e-mail   | Sign-up with a verified e-mail (AC1). Needs SMTP.                                                                                                                                           |
-| `organizationsEnabled`, `organization` scope             | Organisations and invites by e-mail (AC2). `lunos whoami` shows the user's organisations.                                                                                                   |
-| `lunos` client scope (default on every client)           | The `lunos_idp` claim and the `lunos-api` audience in access tokens. The realm's default client scopes include it, so a client created later in the admin console gets both too. See below. |
-| `lunos-app`: confidential, authorization code + PKCE     | The private space at `app.lunos.tech`. Back-channel logout.                                                                                                                                 |
-| `lunos-console`: confidential, authorization code + PKCE | The admin console mounted in the control plane (`cloud.lunos.tech/console`).                                                                                                                |
-| `lunos-console-admin`: service account                   | The console's way to create organisations' identity providers. Its only role is `manage-identity-providers`.                                                                                |
-| Realm roles `org-owner`, `org-admin`, `org-member`       | Unused. Organisations and roles live in the Lunos control plane (XCOD-190).                                                                                                                 |
-| Brute-force protection, `sslRequired: external`          | Basic hardening                                                                                                                                                                             |
+| Setting                                                            | Covers                                                                                                                                                                                      |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lunos-cli`: public client, device flow only                       | `lunos login` / `whoami` / `logout` (AC3), and revocation on logout (AC4)                                                                                                                   |
+| Self-registration, e-mail as username, verified e-mail             | Sign-up with a verified e-mail (AC1). Needs SMTP.                                                                                                                                           |
+| `organizationsEnabled`, `organization` scope                       | Organisations and invites by e-mail (AC2). `lunos whoami` shows the user's organisations.                                                                                                   |
+| `lunos` client scope (default on every client)                     | The `lunos_idp` claim and the `lunos-api` audience in access tokens. The realm's default client scopes include it, so a client created later in the admin console gets both too. See below. |
+| `lunos-app`: confidential, authorization code + PKCE               | The private space at `app.lunos.tech`. Back-channel logout.                                                                                                                                 |
+| `lunos-console`: confidential, authorization code + PKCE           | The admin console mounted in the control plane (`cloud.lunos.tech/console`).                                                                                                                |
+| `lunos-console-admin`: service account                             | The console's way to create organisations' identity providers. Its only role is `manage-identity-providers`.                                                                                |
+| Realm roles `org-owner`, `org-admin`, `org-member`                 | Unused. Organisations and roles live in the Lunos control plane (XCOD-190).                                                                                                                 |
+| Brute-force protection, `sslRequired: external`                    | Basic hardening                                                                                                                                                                             |
+| Login theme `lunos` (`themes/lunos/login`, child of `keycloak.v2`) | The look of every sign-in, sign-up and device page (XCOD-244): a centred card, social sign-in first, Lunos colours. Fonts and icons are served from the theme, nothing from other sites.    |
 
 **Not in the file, configured in the admin console once secrets exist:**
 
@@ -72,7 +73,7 @@ docker compose --env-file .env up -d
 ./verify.sh http://localhost:8080
 ```
 
-`./build.sh` first (it needs only Docker): it builds `providers/lunos-idp-mapper.jar`, which `compose.yaml` mounts read-only into Keycloak. So on a fresh server the sequence is `./build.sh`, then `docker compose --env-file .env up -d`, then `./verify.sh http://localhost:8080`.
+`./build.sh` first (it needs only Docker): it builds `providers/lunos-idp-mapper.jar`, which `compose.yaml` mounts read-only into Keycloak. `themes/` (the login theme) sits next to `compose.yaml` and is mounted read-only too. So on a fresh server the sequence is `./build.sh`, then `docker compose --env-file .env up -d`, then `./verify.sh http://localhost:8080`.
 
 **Without the jar, the import still succeeds, silently.** The realm keeps its `lunos-idp` listener and the `lunos-idp-mapper` mapper, but Keycloak has no provider behind them. It logs `KC-SERVICES0083: Event listener 'lunos-idp' registered, but provider not found` on events, and tokens carry no `lunos_idp` claim. An organisation's enforce-SSO rule (`lunos_idp=org:...`) then can't match and its members are refused: it fails closed, but it is broken. `./verify.sh` does not detect this. `configure-realm.ts` does (it refuses when the server lacks the mapper or listener), and so does that log line. Fix it by adding the jar and restarting Keycloak; no re-import is needed.
 
@@ -88,7 +89,7 @@ Put a reverse proxy with TLS in front of `127.0.0.1:8080` for the public name in
 
 `auth.lunos.tech` was imported before the `lunos` scope and the new clients existed, and a realm file is imported only into an empty Keycloak. Bring the running realm up with these steps (they need the server and the realm's admin credentials):
 
-1. Build the jar (`./build.sh`) and copy `providers/lunos-idp-mapper.jar` to the server's `providers/` directory. Add the volume line to the server's `compose.yaml`: `- ./providers:/opt/keycloak/providers:ro`. Restart Keycloak (`docker compose up -d`).
+1. Build the jar (`./build.sh`) and copy `providers/lunos-idp-mapper.jar` to the server's `providers/` directory. Add the volume line to the server's `compose.yaml`: `- ./providers:/opt/keycloak/providers:ro`. Copy `themes/` next to the server's `compose.yaml` and add `- ./themes:/opt/keycloak/themes:ro`. Restart Keycloak (`docker compose up -d`). Keycloak caches themes in production mode, so restart it after every theme change.
 2. Preview the changes:
 
    ```sh
@@ -100,13 +101,14 @@ Put a reverse proxy with TLS in front of `127.0.0.1:8080` for the public name in
 5. On the control plane, set `LUNOSHQ_OIDC_ISSUER=https://auth.lunos.tech/realms/Lunos`, `LUNOSHQ_OIDC_AUDIENCE=lunos-api`, `LUNOSHQ_CONSOLE_CLIENT_ID=lunos-console` and `LUNOSHQ_CONSOLE_CLIENT_SECRET`.
 6. Check: `./verify.sh https://auth.lunos.tech`.
 
-`configure-realm.ts` refuses to run unless the server offers both the mapper and the listener (step 1 missing or Keycloak not restarted). It only adds and merges, never removes: URI lists are unioned with what the client already has, an existing client keeps its name and enabled flag, and a confidential client always ends up with a secret. A `lunos-console-admin` it creates also gets Keycloak's built-in `service_account` default scope, which a fresh import of the realm file doesn't add; it is harmless. It never prints a secret, only where to read it. Each step reads first and writes only what differs, so running it twice changes nothing.
+`configure-realm.ts` refuses to run unless the server offers the mapper, the listener and the `lunos` login theme (step 1 missing or Keycloak not restarted). It sets the realm's login theme; a client that overrides the login theme itself is noted and left as is. It only adds and merges, never removes: URI lists are unioned with what the client already has, an existing client keeps its name and enabled flag, and a confidential client always ends up with a secret. A `lunos-console-admin` it creates also gets Keycloak's built-in `service_account` default scope, which a fresh import of the realm file doesn't add; it is harmless. It never prints a secret, only where to read it. Each step reads first and writes only what differs, so running it twice changes nothing.
 
 ## Operating it
 
 - **Admin console:** `https://<host>/admin/`, signing in with `KC_ADMIN_USER` / `KC_ADMIN_PASSWORD`. After the first sign-in, create a named admin and delete the bootstrap one.
 - **Backups:** the `db` volume holds everything (users, organisations, sessions). Back it up with `docker compose exec db pg_dump -U keycloak keycloak`.
 - **Changing the realm:** `--import-realm` skips a realm that already exists. Edits to `realm-lunos.json` therefore apply only to a fresh database. On a running server, change the realm in the console, or run `configure-realm.ts` (see "Upgrade the running realm").
+- **Social sign-in buttons** ("Continue with Google") appear for each identity provider configured in the realm (Google, GitHub, Microsoft: lowercase aliases). With none configured, the page shows only e-mail and password.
 - **Registration rate limit:** Keycloak's brute-force protection covers sign-in, not sign-up. Limit `POST /realms/Lunos/login-actions/registration` per IP at the reverse proxy (IIS: Dynamic IP Restrictions on that path).
 - **After a Keycloak upgrade:** re-run `bun test test/lunos-idp.test.ts`. The device-flow fix depends on how Keycloak attaches sessions after consent.
 - **GDPR (AC5):** deleting a user in the console removes the account, its sessions and its organisation memberships. A self-service export and delete flow is still to be built.
@@ -123,6 +125,9 @@ Tested locally on 2026-10-13 with Keycloak 26.3 and Postgres 17. `./build.sh && 
 - Cookie SSO to a second client keeps the value.
 - Device flow, brokered and through the session cookie.
 - Client settings: the `lunos-api` audience, PKCE, redirects, the service account's single role.
+
+`bun test test/login-theme.test.ts` (9 tests, Docker) covers the login theme: the login page is the `lunos` theme and keeps the form contract (`kc-form-login` with `username`/`password` first, `kc-login`, `kc-registration`); a wrong password; well-formed SVG images; nothing loaded from another origin; no OR divider without identity providers; social buttons before the form in one column; every supported locale (Bulgarian translated); registration with social buttons and a full sign-up; the `lunos login` device pages.
+
 - With the listener disabled, every token says `lunos`.
 - `configure-realm.ts` takes an old realm to the new shape, is idempotent, honours `DRY_RUN`, and refuses a server without the mapper or listener.
 
