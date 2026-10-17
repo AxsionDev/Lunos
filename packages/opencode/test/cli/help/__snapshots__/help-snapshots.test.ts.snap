@@ -456,6 +456,8 @@ Commands:
                                memory.backend; previews first
   lunos memory share <ids..>   share facts with your organisation's team memory (an admin approves
                                each one)
+  lunos memory check           check that memory works: remember, recall and remove a test fact
+  lunos memory setup           set up memory in a few steps, each with a recommended answer
 
 Options:
   -h, --help        show help                                                              [boolean]

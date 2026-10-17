@@ -75,6 +75,8 @@ import { PromptHistoryProvider } from "./component/prompt/history"
 import { FrecencyProvider } from "./component/prompt/frecency"
 import { PromptStashProvider } from "./component/prompt/stash"
 import { DialogAlert } from "./ui/dialog-alert"
+import { Changelog } from "@opencode-ai/core/changelog"
+import { whatsNewOnStart } from "./util/whats-new"
 import { DialogConfirm } from "./ui/dialog-confirm"
 import { ToastProvider, useToast } from "./ui/toast"
 import { isDefaultTitle } from "./util/session"
@@ -564,7 +566,32 @@ function App(props: {
         message: restartBanner(props.restarted, InstallationVersion),
         duration: 8000,
       })
+    // XCOD-248: the first start of a newer version shows what changed since the one seen before.
+    const whatsNew = whatsNewOnStart({
+      current: InstallationVersion,
+      seen: kv.get("whats_new_seen"),
+      enabled: tuiConfig.whats_new !== false,
+    })
+    if (whatsNew.record) {
+      if (whatsNew.show) kv.set("whats_new_from", whatsNew.show.since)
+      kv.set("whats_new_seen", whatsNew.record)
+    }
+    if (whatsNew.show) setPendingWhatsNew(whatsNew.show.since)
+    if (whatsNew.hint)
+      toast.show({ variant: "info", message: "See what changed in each version: /whatsnew", duration: 6000 })
   })
+
+  // Shown once nothing else is: a start-up dialog (connect a provider, `lunos settings`) would
+  // otherwise replace it, and the version already counts as seen.
+  const [pendingWhatsNew, setPendingWhatsNew] = createSignal<string>()
+
+  function showWhatsNew(since: string | undefined) {
+    const to = Changelog.current(InstallationVersion)
+    if (!to) return
+    const from = since ?? Changelog.previous(to)
+    const [title, ...lines] = Changelog.summary({ since: from, to })
+    void DialogAlert.show(dialog, title!, lines.join("\n"))
+  }
 
   // XCOD-129: a relaunch has started once its data is loaded; a later error is an ordinary one.
   let started = false
@@ -623,6 +650,14 @@ function App(props: {
       },
     ),
   )
+
+  // XCOD-248: after the effect above, so a "connect a provider" dialog opens first and the panel waits.
+  createEffect(() => {
+    const since = pendingWhatsNew()
+    if (!since || sync.status !== "complete" || dialog.stack.length > 0) return
+    setPendingWhatsNew(undefined)
+    showWhatsNew(since)
+  })
 
   const connected = useConnected()
   const currentWorktreeWorkspace = createMemo(() => {
@@ -1136,6 +1171,17 @@ function App(props: {
         run: () => {
           openUrl("https://docs.lunos.tech/docs/").catch(() => {})
           dialog.clear()
+        },
+        category: "System",
+      },
+      {
+        name: "app.whatsnew",
+        title: "What's new",
+        desc: "What changed since your previous version",
+        slashName: "whatsnew",
+        run: () => {
+          dialog.clear()
+          showWhatsNew(kv.get("whats_new_from"))
         },
         category: "System",
       },

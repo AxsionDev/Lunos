@@ -397,6 +397,19 @@ Unshare current session. [Learn more](/docs/share#un-sharing).
 
 ---
 
+### whatsnew
+
+Show what changed since your previous version: behaviour changes and security entries first, then
+what's new and a count of fixes, taken from the release notes built into Lunos (no network). The
+same panel opens by itself once, on the first start after an update. Turn that off with
+`"whats_new": false` in `tui.json`; `/whatsnew` keeps working.
+
+```bash frame="none"
+/whatsnew
+```
+
+---
+
 ### update
 
 Update Lunos to the latest version. Also available as `/upgrade`, its old name.
@@ -463,8 +476,8 @@ How Enter changes a setting depends on its type:
   whole list to that scope. The pickers show the new list at once, without a restart.
 - **Reasoning variant** (`subagent.variant`, an agent's Variant): pick from the variants of the
   model it applies to (the subagent's or agent's model, or the main model it inherits), or Inherit;
-  Clear removes the key. A saved variant that model doesn't have is marked "not available for
-  <model>", and requests use the model's default effort.
+  Clear removes the key. A saved variant that model doesn't have is marked
+  `not available for <model>`, and requests use the model's default effort.
 - **Text, numbers and lists:** an inline prompt. Lists are comma-separated (`eu, us`).
 - **MCP servers and providers:** open the `/mcps` and `/providers` dialogs.
 - **Structured settings made of simple fields** (`subagent`, `compaction`, `sandbox`, `memory`…):
@@ -610,6 +623,7 @@ This is separate from `opencode.json`, which configures server/runtime behavior.
 - `scroll_acceleration.enabled` - Enable macOS-style scroll acceleration for smooth, natural scrolling. When enabled, scroll speed increases with rapid scrolling gestures and stays precise for slower movements. **This setting takes precedence over `scroll_speed` and overrides it when enabled.**
 - `scroll_speed` - Controls how fast the TUI scrolls when using scroll commands (minimum: `0.001`, supports decimal values). Defaults to `3`. **Note: This is ignored if `scroll_acceleration.enabled` is set to `true`.**
 - `diff_style` - Controls diff rendering. `"auto"` adapts to terminal width, `"stacked"` always shows a single-column layout.
+- `whats_new` - `false` stops the "What's new" panel on the first start after an update (default: `true`). [`/whatsnew`](#whatsnew) and [`lunos changelog`](/docs/cli#changelog) still work.
 - `reduced_motion` - `true` turns off every animation (the home screen's moon reflection, spinners, placeholder cycling), and the in-app "Disable animations" toggle can't turn them back on. When unset, animations are off by default if `NO_COLOR` is set or `TERM=dumb`, and the toggle decides.
 
 For a high-contrast display, set `"theme": "high-contrast"` (see [Themes](/docs/themes)).

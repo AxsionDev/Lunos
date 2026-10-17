@@ -172,6 +172,11 @@ import type {
   MemoryOutdateResponses,
   MemoryRelatedErrors,
   MemoryRelatedResponses,
+  MemorySetupBackendErrors,
+  MemorySetupBackendResponses,
+  MemorySetupCheckErrors,
+  MemorySetupCheckResponses,
+  MemorySetupInput,
   ModelRef,
   MoveSessionDestination,
   OutputFormat,
@@ -3982,6 +3987,82 @@ export class Question extends HeyApiClient {
   }
 }
 
+export class Setup extends HeyApiClient {
+  /**
+   * Check a memory database
+   *
+   * Run the checks Lunos makes before connecting to an external memory database (URL, TLS, credentials by reference, jurisdiction against the residency policy) on a proposed memory block. Connects to nothing.
+   */
+  public backend<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupBackendResponses, MemorySetupBackendErrors, ThrowOnError>({
+      url: "/memory/setup/backend",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Check memory works
+   *
+   * Remember, recall and remove a test fact with a proposed memory block, in a separate Lunos process (memory settings apply on restart). The first run downloads the engine's packages and embedding model.
+   */
+  public check<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupCheckResponses, MemorySetupCheckErrors, ThrowOnError>({
+      url: "/memory/setup/check",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Memory extends HeyApiClient {
   /**
    * List memory
@@ -4222,6 +4303,11 @@ export class Memory extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _setup?: Setup
+  get setup(): Setup {
+    return (this._setup ??= new Setup({ client: this.client }))
   }
 }
 

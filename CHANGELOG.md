@@ -20,6 +20,15 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Set up memory in a few steps.** `/settings` → Memory now starts with **Set up memory…**, which
+  walks through turning memory on, where it's kept, the model, the first-start download, retention
+  and encryption, then checks that a test fact can be remembered and recalled (XCOD-249). Each step
+  has a recommended answer, nothing is saved before the summary, and organisation-locked keys are
+  shown as fixed. A team Neo4j database whose region the residency policy doesn't allow is refused at
+  the step it's entered. Every other memory option is under a collapsed **Advanced**, next to a
+  status line. `lunos memory setup` (`--yes` for scripts) does the same on the command line, and
+  `lunos memory check` runs the check alone.
+
 - **`/marketplace` in the TUI.** It opens the marketplace's Discover view straight from the prompt
   (XCOD-251). `/marketplace mcp` (or `plugins`, `skills`, `hooks`) opens that tab,
   `/marketplace playwright` searches every kind at once, and `/marketplace installed` lists what's
@@ -35,6 +44,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
   reason when the tool isn't installed or signed in, or is blocked by policy (choosing one then
   explains, and a policy refusal is audited as `external.denied`). A command of your own with the
   same name wins.
+
+- **"What's new" after an update.** The first start of a new version opens a short panel with what
+  changed since the version you had, skipped versions included: behaviour changes and security
+  entries first, then what's new and a count of fixes, one line each with its ticket (XCOD-248).
+  `/whatsnew` reopens it, and `"whats_new": false` in `tui.json` turns the panel off. `lunos update`
+  prints the same summary after a successful install, and `lunos changelog` (`--since <version>`,
+  `--full`, `--json`) shows any range. The notes are built into Lunos, so none of this uses the
+  network.
 
 ### Changed
 
