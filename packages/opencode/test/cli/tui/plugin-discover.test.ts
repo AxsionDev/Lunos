@@ -65,6 +65,66 @@ test("discovers plugins from a locally added marketplace", async () => {
   }
 })
 
+test("XCOD-251: marketplace discover marks installed entries and says when it's offline", async () => {
+  await using tmp = await tmpdir()
+  await fs.mkdir(path.join(tmp.path, ".opencode"), { recursive: true })
+  await Bun.write(
+    path.join(tmp.path, ".opencode", "opencode.json"),
+    JSON.stringify({
+      marketplace: [tmp.path],
+      marketplace_default: false,
+      mcp: { fs: { type: "local", command: ["npx", "fs-mcp@1"], enabled: true } },
+    }),
+  )
+  await Bun.write(
+    path.join(tmp.path, "marketplace.json"),
+    JSON.stringify({
+      ...manifest,
+      mcp: [
+        { name: "fs", type: "local", command: ["npx", "fs-mcp@2"] },
+        { name: "git", type: "local", command: ["npx", "git-mcp"], review: { status: "verified" } },
+      ],
+    }),
+  )
+
+  process.env.OPENCODE_PLUGIN_META_FILE = path.join(tmp.path, "plugin-meta.json")
+  const config = createTuiResolvedConfig({ plugin: [] })
+  const wait = spyOn(TuiConfig, "waitForDependencies").mockResolvedValue()
+  const cwd = spyOn(process, "cwd").mockImplementation(() => tmp.path)
+  const api = createTuiPluginApi({
+    state: {
+      path: {
+        state: path.join(tmp.path, "state.json"),
+        config: path.join(tmp.path, "tui.json"),
+        worktree: tmp.path,
+        directory: tmp.path,
+      },
+    },
+  })
+
+  try {
+    await TuiPluginRuntime.init({ api, config })
+    const online = await TuiPluginRuntime.discoverMarketplace("mcp")
+    expect(online.offline).toBeUndefined()
+    expect(online.items.find((item) => item.name === "fs")?.installed).toBe("update")
+    const git = online.items.find((item) => item.name === "git")
+    expect(git?.installed).toBeUndefined()
+    expect(git?.review).toBe("verified")
+
+    process.env.LUNOS_OFFLINE = "1"
+    // A local marketplace needs no network, so offline it's still listed, flagged as offline.
+    const offline = await TuiPluginRuntime.discoverMarketplace("mcp")
+    expect(offline.offline).toBe(true)
+    expect(offline.items.map((item) => item.name)).toEqual(["fs", "git"])
+  } finally {
+    delete process.env.LUNOS_OFFLINE
+    await TuiPluginRuntime.dispose()
+    cwd.mockRestore()
+    wait.mockRestore()
+    delete process.env.OPENCODE_PLUGIN_META_FILE
+  }
+})
+
 test("discover returns an empty result before the plugin runtime has initialized", async () => {
   const result = await TuiPluginRuntime.discoverPlugins()
   expect(result).toEqual({ marketplaceCount: 0, marketplaces: [], plugins: [] })

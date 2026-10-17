@@ -602,12 +602,21 @@ export type TuiMarketplaceEntry = {
   description?: string
   /** Install spec for `plugins.install`; present only for `kind: "plugin"`. */
   spec?: string
+  /** The marketplace's review status (XCOD-105); absent means not reviewed. */
+  review?: "verified" | "community"
+  /**
+   * Whether it's already in your config: `installed` as the marketplace serves it now, `update`
+   * when the marketplace now serves a different version or definition than the one installed.
+   */
+  installed?: "installed" | "update"
 }
 
 export type TuiMarketplaceDiscoverResult = {
   marketplaceCount: number
   marketplaces: ReadonlyArray<TuiPluginMarketplaceStatus>
   items: ReadonlyArray<TuiMarketplaceEntry>
+  /** Network use is off (`LUNOS_OFFLINE=1`): only cached catalogues are listed. */
+  offline?: boolean
 }
 
 /** What installing a skill source, hook or MCP server would run, connect to or fetch. */

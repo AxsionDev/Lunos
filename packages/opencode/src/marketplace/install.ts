@@ -260,3 +260,76 @@ export async function planInstall(
       return planHook(item, configPath)
   }
 }
+
+// A plugin spec without its version or git ref: `@scope/pkg@1.2.0` -> `@scope/pkg`, `owner/repo#v2` -> `owner/repo`.
+function pluginPackage(spec: string) {
+  const ref = spec.indexOf("#")
+  if (ref > 0) return spec.slice(0, ref)
+  const version = spec.lastIndexOf("@")
+  return version > 0 ? spec.slice(0, version) : spec
+}
+
+function pluginSpecs(config: Record<string, any>): string[] {
+  const list: unknown = config.plugin
+  if (!Array.isArray(list)) return []
+  return list
+    .map((item) => (Array.isArray(item) ? item[0] : item))
+    .filter((item): item is string => typeof item === "string")
+}
+
+/**
+ * XCOD-251: whether a marketplace entry is already in one of `configs`, by the same comparisons
+ * `planInstall` uses to refuse a duplicate. `update` means the name is taken by a different
+ * version (plugins) or definition (MCP servers) than the marketplace serves now. Skill sources and
+ * hooks have no version to compare, so they are only ever `installed`.
+ */
+export function installedState(
+  item: ContentItem,
+  configs: Record<string, any>[],
+  loadedPlugins: string[] = [],
+): "installed" | "update" | undefined {
+  try {
+    switch (item.kind) {
+      case "plugin": {
+        const specs = [...configs.flatMap(pluginSpecs), ...loadedPlugins]
+        if (specs.includes(item.spec)) return "installed"
+        const name = pluginPackage(item.spec)
+        return specs.some((spec) => pluginPackage(spec) === name) ? "update" : undefined
+      }
+      case "mcp": {
+        const want = mcpConfigFromEntry(item.entry)
+        const found = configs.map((config) => config.mcp?.[item.name]).filter((entry) => entry !== undefined)
+        if (!found.length) return undefined
+        return found.some((entry) => isDeepStrictEqual(entry, want)) ? "installed" : "update"
+      }
+      case "skill":
+        return configs.some(
+          (config) =>
+            Array.isArray(config.skills?.urls) &&
+            config.skills.urls.some((url: unknown) => typeof url === "string" && sameUrl(url, item.entry.url)),
+        )
+          ? "installed"
+          : undefined
+      case "hook": {
+        const want = hookConfigFromEntry(item.entry)
+        return configs.some(
+          (config) =>
+            Array.isArray(config.hooks?.[item.entry.event]) &&
+            config.hooks[item.entry.event].some(
+              (hook: any) =>
+                isDeepStrictEqual(hook?.command, want.command) && isDeepStrictEqual(hook?.matcher, want.matcher),
+            ),
+        )
+          ? "installed"
+          : undefined
+      }
+    }
+  } catch {
+    // An entry the installer would refuse (unknown hook event, substitution) can't be installed either.
+    return undefined
+  }
+}
+
+export async function readConfigs(paths: string[]) {
+  return Promise.all(paths.map((configPath) => readConfig(configPath).then((out) => out.parsed)))
+}

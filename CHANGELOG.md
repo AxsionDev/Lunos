@@ -18,6 +18,16 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **`/marketplace` in the TUI.** It opens the marketplace's Discover view straight from the prompt
+  (XCOD-251). `/marketplace mcp` (or `plugins`, `skills`, `hooks`) opens that tab,
+  `/marketplace playwright` searches every kind at once, and `/marketplace installed` lists what's
+  already installed, marking entries the marketplace now serves in a newer version or definition.
+  Entries show whether they're installed or verified. `/discover` is an alias. `/plugins` now opens
+  the Plugins manager, which points to `/marketplace`. With `LUNOS_OFFLINE=1` the view shows the
+  cached catalogue and its date, or says there's no cache yet instead of an empty list.
+
 ## [1.18.48] - 2026-10-16
 
 ### Changed
