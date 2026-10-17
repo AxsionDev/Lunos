@@ -163,6 +163,18 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### marketplace
+
+从你的市场浏览并安装插件、技能、钩子和 MCP 服务器。加上标签页名称（`plugins`、`skills`、`hooks`、`mcp`）可打开该标签页，加上 `installed` 可查看已安装的内容并标出可用更新，加上其他任何词则进行搜索。_别名_：`/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 列出可用模型。
@@ -184,6 +196,16 @@ How is auth handled in @packages/functions/src/api/index.ts?
 ```
 
 **快捷键：** `ctrl+x n`
+
+---
+
+### plugins
+
+列出已安装的插件并启用或停用它们。
+
+```bash frame="none"
+/plugins
+```
 
 ---
 
