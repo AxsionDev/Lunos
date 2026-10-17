@@ -702,8 +702,18 @@ To update to a specific version.
 lunos update v0.1.48
 ```
 
-If the update fails, Lunos prints the command to run by hand. For npm installs that's
-`npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`.
+While it runs, a spinner shows the step and the elapsed time: checking for the latest version,
+downloading and installing `lunos-ai`, then verifying the installed version. If a step takes longer
+than a minute, the line adds that the package manager is still working; there's no timeout. With
+`NO_COLOR` or `TERM=dumb` you get one `Updating… (step)` line per step instead of the spinner, and
+when the output isn't a terminal (a pipe, CI) one plain line per step with no escape codes.
+
+Ctrl+C cancels while Lunos is still checking for the version. Once the package manager is installing
+it runs to the end, even if you press Ctrl+C or close the TUI, because stopping it halfway could leave
+no working `lunos`.
+
+If the update fails, Lunos prints the command to run by hand and exits with code 1. For npm installs
+that's `npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`.
 
 A running TUI keeps using the old version until it restarts. After `/update` in the TUI, run
 `/restart`: it starts the newly installed version back in the same session. See

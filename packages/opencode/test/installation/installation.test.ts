@@ -215,6 +215,55 @@ describe("installation", () => {
     )
   })
 
+  // XCOD-247: steps reported while it runs, and a check of what the package manager installed.
+  describe("upgrade progress", () => {
+    const steps: string[] = []
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        (cmd, args) => (args[0] === "list" ? "/usr/lib\n├── lunos-ai@9.9.9\n" : ""),
+      ),
+    ).effect("reports installing then verifying, and passes when the listing shows the target", () =>
+      Effect.gen(function* () {
+        yield* Installation.use.upgrade("npm", "9.9.9", (step) => steps.push(step))
+        expect(steps).toEqual(["installing", "verifying"])
+      }),
+    )
+
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        (cmd, args) => (args[0] === "list" ? "/usr/lib\n├── lunos-ai@1.0.0\n" : ""),
+      ),
+    ).effect("fails when the package manager lists another version afterwards", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(Installation.use.upgrade("npm", "9.9.9"))
+        expect(error.stderr).toContain("npm reports lunos-ai 1.0.0 after installing 9.9.9")
+      }),
+    )
+
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        () => "",
+      ),
+    ).effect("passes when the listing can't be read (the install itself succeeded)", () =>
+      Effect.gen(function* () {
+        yield* Installation.use.upgrade("bun", "9.9.9")
+      }),
+    )
+
+    test("reads the version from npm, pnpm and bun listings", () => {
+      expect(Installation.listedVersion("/usr/lib\n├── lunos-ai@1.18.48\n└── npm@12.0.0")).toBe("1.18.48")
+      expect(Installation.listedVersion("dependencies:\nlunos-ai 1.18.48\n")).toBe("1.18.48")
+      expect(Installation.listedVersion("/home/u/.bun/install/global node_modules\n└── lunos-ai@1.18.48")).toBe(
+        "1.18.48",
+      )
+      expect(Installation.listedVersion("├── lunos-ai-extra@2.0.0")).toBeUndefined()
+      expect(Installation.listedVersion("")).toBeUndefined()
+    })
+  })
+
   describe("failureDetail", () => {
     test("reads npm 10 (ERR!) and npm 12 (error) output", () => {
       expect(Installation.failureDetail("npm ERR! code EACCES\n").code).toBe("EACCES")
