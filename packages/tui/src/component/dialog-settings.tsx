@@ -17,6 +17,8 @@ import { DialogConfirm } from "../ui/dialog-confirm"
 import { useBindings, useOpencodeKeymap } from "../keymap"
 import { openFileInEditor } from "../editor"
 import { DialogModel } from "./dialog-model"
+import { useMemorySetup } from "./dialog-memory-setup"
+import { MemorySetup } from "@opencode-ai/core/memory-setup"
 import { DialogRecommended } from "./dialog-recommended"
 import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
@@ -56,6 +58,11 @@ function home(file: string) {
 }
 
 const LABEL: Record<Tab, string> = { status: "Status", settings: "Settings", usage: "Usage" }
+
+// XCOD-249: the Memory section shows the setup wizard, a status line and a collapsed "Advanced"
+// holding every memory.* key. Whether Advanced is open is remembered for the session.
+let memoryAdvancedOpen = false
+const MEMORY = "Memory"
 
 /**
  * `section` (XCOD-231): one structured setting's own screen, e.g. `subagent`, listing its fields
@@ -114,7 +121,17 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     )
   })
   const visible = createMemo(() => filterRows(rows(), query()))
-  const current = createMemo(() => rows().find((row) => row.key === highlighted()) ?? visible()[0])
+  const [advancedOpen, setAdvancedOpen] = createSignal(memoryAdvancedOpen)
+  // A search lists matching memory keys as usual; collapsing is only for browsing the list.
+  const collapsing = createMemo(() => !query() && !props.section && rows().some((row) => row.category === MEMORY))
+  const shown = createMemo(() =>
+    collapsing() && !advancedOpen() ? visible().filter((row) => row.category !== MEMORY) : visible(),
+  )
+  const current = createMemo(() =>
+    highlighted()?.startsWith("+memory.") ? undefined : (rows().find((row) => row.key === highlighted()) ?? shown()[0]),
+  )
+  const memorySetup = useMemorySetup()
+  const openMemorySetup = () => memorySetup({ scope: scope(), rows: rows(), onExit: () => reopen("+memory.setup") })
 
   // Reopens this dialog where the user left it, after a picker or prompt replaced it.
   function reopen(key?: string) {
@@ -571,8 +588,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   const width = createMemo(() => Math.min(88, dimensions().width - 2))
   const sectionRow = createMemo(() => snapshot()?.rows.find((row) => row.key === props.section))
 
-  const options = createMemo(() =>
-    visible().map((row) => {
+  const options = createMemo(() => {
+    const list = shown().map((row) => {
       const value =
         (row.secret && row.kind !== "object" ? "••• (see /providers)" : row.display) +
         (variantProblem(row) || agentProblem(row) ? " ⚠" : "")
@@ -585,10 +602,50 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
         titleWidth: Math.max(12, width() - right.length - 12),
         footer: right,
       }
-    }),
-  )
+    })
+    if (!collapsing()) return list
+    const config = sync.data.config.memory
+    const enabledRow = rows().find((row) => row.key === "memory.enabled")
+    const count = rows().filter((row) => row.category === MEMORY).length
+    const synthetic = [
+      {
+        title: config?.enabled === true ? "Change memory setup…" : "Set up memory…",
+        value: "+memory.setup",
+        category: MEMORY,
+        footer: "guided, 6 steps",
+      },
+      {
+        title: MemorySetup.status(config, enabledRow?.override?.split(" is set")[0]),
+        value: "+memory.status",
+        category: MEMORY,
+      },
+      {
+        title: `Advanced ${advancedOpen() ? "▾" : "▸"}`,
+        value: "+memory.advanced",
+        category: MEMORY,
+        footer: `${count} settings`,
+      },
+    ]
+    // Where the Memory section starts in the full, ordered list.
+    const first = rows().findIndex((row) => row.category === MEMORY)
+    const at = shown().filter((row) => rows().indexOf(row) < first).length
+    return [...list.slice(0, at), ...synthetic, ...list.slice(at)]
+  })
 
   const footer = () => {
+    const synthetic = highlighted()
+    if (synthetic === "+memory.setup" || synthetic === "+memory.status")
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          A few steps that get memory working, each with a recommended answer. Saves to the {scope()} config.
+        </text>
+      )
+    if (synthetic === "+memory.advanced")
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          Every memory setting, one by one: backend, sources, limits, retention, encryption.
+        </text>
+      )
     const row = current()
     if (!row) return <text fg={theme.textMuted}>No setting matches "{query()}"</text>
     const lines: { text: string; color: typeof theme.text }[] = []
@@ -680,6 +737,11 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               onFilter={(value) => setQuery(value)}
               onMove={(option) => setHighlighted(option.value)}
               onSelect={(option) => {
+                if (option.value === "+memory.advanced") {
+                  memoryAdvancedOpen = !advancedOpen()
+                  return setAdvancedOpen(memoryAdvancedOpen)
+                }
+                if (option.value === "+memory.setup" || option.value === "+memory.status") return openMemorySetup()
                 const row = rows().find((item) => item.key === option.value)
                 if (row) void edit(row)
               }}

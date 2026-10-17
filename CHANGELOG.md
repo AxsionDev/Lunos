@@ -20,6 +20,17 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Set up memory in a few steps.** `/settings` → Memory now starts with **Set up memory…**, which
+  walks through turning memory on, where it's kept, the model, the first-start download, retention
+  and encryption, then checks that a test fact can be remembered and recalled (XCOD-249). Each step
+  has a recommended answer, nothing is saved before the summary, and organisation-locked keys are
+  shown as fixed. A team Neo4j database whose region the residency policy doesn't allow is refused at
+  the step it's entered. Every other memory option is under a collapsed **Advanced**, next to a
+  status line. `lunos memory setup` (`--yes` for scripts) does the same on the command line, and
+  `lunos memory check` runs the check alone.
+
+### Added
+
 - **`/marketplace` in the TUI.** It opens the marketplace's Discover view straight from the prompt
   (XCOD-251). `/marketplace mcp` (or `plugins`, `skills`, `hooks`) opens that tab,
   `/marketplace playwright` searches every kind at once, and `/marketplace installed` lists what's
