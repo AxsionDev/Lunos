@@ -28,6 +28,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
   the Plugins manager, which points to `/marketplace`. With `LUNOS_OFFLINE=1` the view shows the
   cached catalogue and its date, or says there's no cache yet instead of an empty list.
 
+- **"What's new" after an update.** The first start of a new version opens a short panel with what
+  changed since the version you had, skipped versions included: behaviour changes and security
+  entries first, then what's new and a count of fixes, one line each with its ticket (XCOD-248).
+  `/whatsnew` reopens it, and `"whats_new": false` in `tui.json` turns the panel off. `lunos update`
+  prints the same summary after a successful install, and `lunos changelog` (`--since <version>`,
+  `--full`, `--json`) shows any range. The notes are built into Lunos, so none of this uses the
+  network.
+
 ### Changed
 
 - **Updates show their progress.** `lunos update`, the TUI's `/update` and the desktop app show what
