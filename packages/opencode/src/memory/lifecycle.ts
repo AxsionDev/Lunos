@@ -15,6 +15,8 @@ import { MemoryStore } from "./store"
  */
 
 export const DEFAULT_GRACE_DAYS = 7
+/** Active facts expiring within this many days count as "expiring" (status, /memory Analytics). */
+export const DEFAULT_EXPIRING_DAYS = 7
 const DAY = 24 * 60 * 60 * 1000
 
 /**

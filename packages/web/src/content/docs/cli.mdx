@@ -478,6 +478,7 @@ opencode memory export [--format bundle|markdown] [--scope project|user|both] [-
 opencode memory import <path> [--scope project|user] [--yes] [--dry-run] [--as-facts] [--include-conflicts]
 opencode memory migrate --to neo4j [--scope project|user] [--yes] [--include-conflicts]
 opencode memory status
+opencode memory stats [--scope project|user] [--days N] [--json]
 ```
 
 - `export` writes all of memory as a versioned bundle (facts, graph, notes and provenance) to `./lunos-memory-<time>/`, or a `.zip` with `--zip`, or an encrypted `.zip.enc` with `--encrypt`. See [Rules: exporting memory](/docs/rules#exporting-memory).
@@ -487,6 +488,17 @@ opencode memory status
 - `purge` deletes a memory's stored facts and graph. Your notes in `.opencode/memory/*.md` are kept.
 - `migrate --to neo4j` moves this machine's embedded memory into the external database set in `memory.backend`: it exports a bundle and imports it with the same preview, keeping each fact's id and provenance. It writes only with `--yes`. See [Rules: an external memory database](/docs/rules#an-external-memory-database).
 - `status` shows whether memory is on, the backend and whether it can be reached, and each scope's fact count and last write.
+- `stats` prints what `/memory`'s Overview and Activity show (see [Rules: memory analytics](/docs/rules#memory-analytics)). `--days` limits growth and recall to the last N days.
+
+  `--json` prints one object, `version: 1`, with these fields:
+  - `status`: `on`, `reason`, `backend`, `encryption`, retention, and ledger `health`.
+  - `scopes[]`: `counts` (`active`, `outdated`, `expiring`, `expired`, `quarantined`), `lastWrite`, `error`, `chars` and `tokens`.
+  - `sources`: counts by `source`, `agent`, `kind`, `native` and `imported`.
+  - `growth[]`: per `week` and `scope`, the facts `added`, `outdated`, `forgotten` and `expired`.
+  - `recall`: `audit`, `dataSince`, `total`, `perDay[]`, `origin`, `hitRate`, `avgFacts` and `truncatedRate`.
+  - `top[]` (`id`, `count`, `last`) and `supersession` (`count`, `chains`).
+  - `facts`: each recalled fact's `recalls` and `last`.
+  - `groups`: the fact ids behind each count, e.g. `never`, `state:project:outdated`, `source:file`.
 
 ---
 

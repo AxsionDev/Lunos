@@ -22,6 +22,7 @@ import { Config } from "@/config/config"
 import { CloudAuth } from "@/cloud/auth"
 import { CloudOrg } from "@/cloud/org"
 import { CloudShare } from "@/cloud/share"
+import { MemoryStatsCommand } from "./memory-stats"
 
 // XCOD-94: the review surface for long-term memory. `list`, `show`, `status`, `verify` and `export`
 // read the provenance ledger only, so reviewing memory never starts the engine or needs a model.
@@ -57,7 +58,7 @@ function oneLine(text: string, max = 100) {
 const factsOf = (scope: MemoryStore.Scope) =>
   Memory.Service.use((memory) => memory.facts(scope)).pipe(Effect.catch((error) => fail(error.message)))
 
-export const DEFAULT_EXPIRING_DAYS = 7
+export const DEFAULT_EXPIRING_DAYS = MemoryLifecycle.DEFAULT_EXPIRING_DAYS
 
 export const MemoryListCommand = effectCmd({
   command: "list",
@@ -709,6 +710,7 @@ export const MemoryCommand = cmd({
       .command(MemoryImportCommand)
       .command(MemoryMigrateCommand)
       .command(MemoryShareCommand)
+      .command(MemoryStatsCommand)
       .demandCommand(),
   handler: () => {},
 })

@@ -20,6 +20,21 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **Memory analytics in `/memory`.** It now opens on an Overview and an Activity tab beside the
+  fact browser (XCOD-252).
+  - **Overview:** what's in memory per scope and state, its size against the recall budget, where
+    facts came from, and ledger health.
+  - **Activity:** growth per week, recalls per day and by origin, hit and token-cap rates, the most
+    recalled facts, and facts never recalled. Every count drills down to exactly those facts, which
+    can be forgotten together after typing their number.
+  - **Privacy:** it's computed locally from the ledger and the audit log (ids and counts, never a
+    query or a fact's text). Nothing about memory leaves the machine.
+  - **CLI:** `lunos memory stats [--json]` prints the same numbers.
+- **`memory.recall` audit entries for a turn record `truncated` and `chars`:** whether the token cap
+  left facts out, and how many characters were injected.
+
+### Added
+
 - **`/marketplace` in the TUI.** It opens the marketplace's Discover view straight from the prompt
   (XCOD-251). `/marketplace mcp` (or `plugins`, `skills`, `hooks`) opens that tab,
   `/marketplace playwright` searches every kind at once, and `/marketplace installed` lists what's

@@ -92,6 +92,18 @@ export function block(
   maxTokens = DEFAULT_MAX_TOKENS,
   external?: External,
 ): string | undefined {
+  return blockWithStats(results, maxTokens, external).text
+}
+
+/**
+ * XCOD-252: the block, plus what the audit log records about it: whether the token cap left
+ * recalled facts out (`truncated`) and how many characters went into the turn (`chars`).
+ */
+export function blockWithStats(
+  results: { scope: MemoryStore.Scope; facts: MemoryBackend.Recalled[]; graph: string }[],
+  maxTokens = DEFAULT_MAX_TOKENS,
+  external?: External,
+): { text: string | undefined; truncated: boolean; chars: number } {
   const total = maxTokens * 4
   const extra = external && (external.sections.length || external.notices.length) ? external : undefined
   // XCOD-135: external sources get their own share, set aside before local facts fill the block,
@@ -138,8 +150,10 @@ export function block(
     used += text.length + 1
     sections++
   }
-  if (added === 0 && sections === 0 && notices.length === 0) return
+  const truncated = added < facts.length
+  if (added === 0 && sections === 0 && notices.length === 0) return { text: undefined, truncated, chars: 0 }
   lines.push(...notices)
   lines.push("</memory>")
-  return lines.join("\n")
+  const text = lines.join("\n")
+  return { text, truncated, chars: text.length }
 }

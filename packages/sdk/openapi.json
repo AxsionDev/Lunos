@@ -6332,6 +6332,87 @@
         ]
       }
     },
+    "/memory/stats": {
+      "get": {
+        "tags": ["memory"],
+        "operationId": "memory.stats",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["project", "user"]
+            },
+            "required": false
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Memory analytics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MemoryUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryUnavailableError"
+                }
+              }
+            }
+          }
+        },
+        "description": "What's in memory, where it came from, how it grows and which facts are recalled, computed locally from the ledger and the local audit log. Never starts memory; `days` limits the time-based figures (default: all).",
+        "summary": "Memory analytics",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.stats({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/memory": {
       "get": {
         "tags": ["memory"],
@@ -26672,6 +26753,362 @@
         "required": ["answers"],
         "additionalProperties": false
       },
+      "MemoryStats": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number"
+          },
+          "generatedAt": {
+            "type": "string"
+          },
+          "rangeDays": {
+            "type": "number"
+          },
+          "since": {
+            "type": "string"
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "on": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "host": {
+                    "type": "string"
+                  },
+                  "jurisdiction": {
+                    "type": "string"
+                  }
+                },
+                "required": ["type", "host", "jurisdiction"],
+                "additionalProperties": false
+              },
+              "encryption": {
+                "type": "string"
+              },
+              "retentionDays": {
+                "type": "number"
+              },
+              "graceDays": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              "health": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "scope": {
+                      "type": "string"
+                    },
+                    "facts": {
+                      "type": "number"
+                    },
+                    "problems": {
+                      "type": "number"
+                    },
+                    "unsealed": {
+                      "type": "number"
+                    },
+                    "encrypted": {
+                      "type": "number"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["scope", "facts", "problems", "unsealed", "encrypted", "error"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["on", "reason", "backend", "encryption", "retentionDays", "graceDays", "health"],
+            "additionalProperties": false
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scope": {
+                  "type": "string"
+                },
+                "counts": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "type": "number"
+                    },
+                    "outdated": {
+                      "type": "number"
+                    },
+                    "expiring": {
+                      "type": "number"
+                    },
+                    "expired": {
+                      "type": "number"
+                    },
+                    "quarantined": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["active", "outdated", "expiring", "expired", "quarantined"],
+                  "additionalProperties": false
+                },
+                "lastWrite": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                },
+                "chars": {
+                  "type": "number"
+                },
+                "tokens": {
+                  "type": "number"
+                }
+              },
+              "required": ["scope", "counts", "lastWrite", "error", "chars", "tokens"],
+              "additionalProperties": false
+            }
+          },
+          "maxTokens": {
+            "type": "number"
+          },
+          "sources": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "agent": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "kind": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "native": {
+                "type": "number"
+              },
+              "imported": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              }
+            },
+            "required": ["source", "agent", "kind", "native", "imported"],
+            "additionalProperties": false
+          },
+          "growth": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "week": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "added": {
+                  "type": "number"
+                },
+                "outdated": {
+                  "type": "number"
+                },
+                "forgotten": {
+                  "type": "number"
+                },
+                "expired": {
+                  "type": "number"
+                }
+              },
+              "required": ["week", "scope", "added", "outdated", "forgotten", "expired"],
+              "additionalProperties": false
+            }
+          },
+          "recall": {
+            "type": "object",
+            "properties": {
+              "audit": {
+                "type": "boolean"
+              },
+              "dataSince": {
+                "type": "string"
+              },
+              "total": {
+                "type": "number"
+              },
+              "perDay": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "day": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["day", "count"],
+                  "additionalProperties": false
+                }
+              },
+              "origin": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "hitRate": {
+                "type": "number"
+              },
+              "avgFacts": {
+                "type": "number"
+              },
+              "truncatedRate": {
+                "type": "number"
+              }
+            },
+            "required": ["audit", "dataSince", "total", "perDay", "origin", "hitRate", "avgFacts", "truncatedRate"],
+            "additionalProperties": false
+          },
+          "top": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                },
+                "last": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "count", "last"],
+              "additionalProperties": false
+            }
+          },
+          "supersession": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "number"
+              },
+              "chains": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "required": ["count", "chains"],
+            "additionalProperties": false
+          },
+          "facts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "recalls": {
+                  "type": "number"
+                },
+                "last": {
+                  "type": "string"
+                }
+              },
+              "required": ["recalls", "last"],
+              "additionalProperties": false
+            }
+          },
+          "groups": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "version",
+          "generatedAt",
+          "rangeDays",
+          "since",
+          "status",
+          "scopes",
+          "maxTokens",
+          "sources",
+          "growth",
+          "recall",
+          "top",
+          "supersession",
+          "facts",
+          "groups"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryUnavailableError": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["MemoryUnavailableError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
       "MemoryFact": {
         "type": "object",
         "properties": {
@@ -26755,20 +27192,6 @@
           }
         },
         "required": ["on", "facts"],
-        "additionalProperties": false
-      },
-      "MemoryUnavailableError": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": ["MemoryUnavailableError"]
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": ["_tag", "message"],
         "additionalProperties": false
       },
       "MemoryNotFoundError": {

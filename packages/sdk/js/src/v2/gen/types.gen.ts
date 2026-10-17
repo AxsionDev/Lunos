@@ -2920,6 +2920,109 @@ export type QuestionDrafts = {
   custom?: Array<string>
 }
 
+export type MemoryStats = {
+  version: number
+  generatedAt: string
+  rangeDays: number
+  since: string
+  status: {
+    on: boolean
+    reason: string
+    backend: {
+      type: string
+      host: string
+      jurisdiction: string
+    }
+    encryption: string
+    retentionDays: number
+    graceDays: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    health: Array<{
+      scope: string
+      facts: number
+      problems: number
+      unsealed: number
+      encrypted: number
+      error: string
+    }>
+  }
+  scopes: Array<{
+    scope: string
+    counts: {
+      active: number
+      outdated: number
+      expiring: number
+      expired: number
+      quarantined: number
+    }
+    lastWrite: string
+    error: string
+    chars: number
+    tokens: number
+  }>
+  maxTokens: number
+  sources: {
+    source: {
+      [key: string]: number
+    }
+    agent: {
+      [key: string]: number
+    }
+    kind: {
+      [key: string]: number
+    }
+    native: number
+    imported: {
+      [key: string]: number
+    }
+  }
+  growth: Array<{
+    week: string
+    scope: string
+    added: number
+    outdated: number
+    forgotten: number
+    expired: number
+  }>
+  recall: {
+    audit: boolean
+    dataSince: string
+    total: number
+    perDay: Array<{
+      day: string
+      count: number
+    }>
+    origin: {
+      [key: string]: number
+    }
+    hitRate: number
+    avgFacts: number
+    truncatedRate: number
+  }
+  top: Array<{
+    id: string
+    count: number
+    last: string
+  }>
+  supersession: {
+    count: number
+    chains: Array<Array<string>>
+  }
+  facts: {
+    [key: string]: {
+      recalls: number
+      last: string
+    }
+  }
+  groups: {
+    [key: string]: Array<string>
+  }
+}
+
+export type MemoryUnavailableError = {
+  _tag: "MemoryUnavailableError"
+  message: string
+}
+
 export type MemoryFact = {
   id: string
   scope: "project" | "user"
@@ -2951,11 +3054,6 @@ export type MemoryList = {
   on: boolean
   reason?: string
   facts: Array<MemoryFact>
-}
-
-export type MemoryUnavailableError = {
-  _tag: "MemoryUnavailableError"
-  message: string
 }
 
 export type MemoryNotFoundError = {
@@ -10606,6 +10704,40 @@ export type QuestionRejectResponses = {
 }
 
 export type QuestionRejectResponse = QuestionRejectResponses[keyof QuestionRejectResponses]
+
+export type MemoryStatsData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    scope?: "project" | "user"
+    days?: string
+  }
+  url: "/memory/stats"
+}
+
+export type MemoryStatsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * MemoryUnavailableError
+   */
+  409: MemoryUnavailableError
+}
+
+export type MemoryStatsError = MemoryStatsErrors[keyof MemoryStatsErrors]
+
+export type MemoryStatsResponses = {
+  /**
+   * Memory analytics
+   */
+  200: MemoryStats
+}
+
+export type MemoryStatsResponse = MemoryStatsResponses[keyof MemoryStatsResponses]
 
 export type MemoryListData = {
   body?: never

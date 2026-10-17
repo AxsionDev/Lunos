@@ -456,6 +456,8 @@ Commands:
                                memory.backend; previews first
   lunos memory share <ids..>   share facts with your organisation's team memory (an admin approves
                                each one)
+  lunos memory stats           what's in memory, where it came from, how it grows and which facts
+                               are recalled
 
 Options:
   -h, --help        show help                                                              [boolean]

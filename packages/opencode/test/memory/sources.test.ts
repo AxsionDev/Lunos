@@ -360,6 +360,22 @@ describe("MemorySources service (a real stdio MCP server)", () => {
     ),
   )
 
+  it.live("XCOD-252: a turn's memory.recall records truncated and chars, and never the query or fact text", () =>
+    withSources({}, (ctx) =>
+      Effect.gen(function* () {
+        const text = yield* recall("ses_252", "who owns payments-service?")
+        const [event] = yield* Effect.promise(() => events(ctx.audit, "memory.recall"))
+        expect(event).toMatchObject({ session: "ses_252", source: "turn", count: 0, ids: [], truncated: false })
+        expect(event.chars).toBe(text?.length ?? 0)
+        const keys = Object.keys(event).filter(
+          (key) => !["v", "seq", "prev", "hash", "chain", "timestamp"].includes(key),
+        )
+        expect(keys.toSorted()).toEqual(["chars", "count", "event", "ids", "scopes", "session", "source", "truncated"])
+        expect(JSON.stringify(event)).not.toContain("payments")
+      }),
+    ),
+  )
+
   it.live("a poisoned result is withheld and flagged; the rest is kept", () =>
     withSources({ mode: "poison" }, (ctx) =>
       Effect.gen(function* () {
