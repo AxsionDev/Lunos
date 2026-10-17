@@ -88,5 +88,9 @@ export const Info = Schema.Struct({
       "true turns off every animation (the home screen's moon reflection, spinners, placeholder cycling) and the in-app toggle can't turn them back on. Unset: off by default when NO_COLOR is set or TERM=dumb",
   }),
   question: Schema.optional(QuestionPrompt),
+  whats_new: Schema.optional(Schema.Boolean).annotate({
+    description:
+      'false stops the "What\'s new" panel on the first start after an update. /whatsnew and lunos changelog still work (default: true)',
+  }),
 })
 export type Info = Schema.Schema.Type<typeof Info>

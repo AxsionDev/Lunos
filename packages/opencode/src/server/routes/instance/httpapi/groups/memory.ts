@@ -244,6 +244,27 @@ export const MemoryStatsResponse = Schema.Struct({
   groups: Schema.Record(Schema.String, Schema.mutable(Schema.Array(Schema.String))),
 }).annotate({ identifier: "MemoryStats" })
 
+// XCOD-249: the setup wizard checks what it is about to save, before saving it.
+export const MemorySetupInput = Schema.Struct({
+  memory: Schema.Record(Schema.String, Schema.Unknown).annotate({
+    description: "The memory block the wizard would save (memory.enabled, model, backend, retention, encryption)",
+  }),
+}).annotate({ identifier: "MemorySetupInput" })
+
+export const MemorySetupBackendResult = Schema.Struct({
+  ok: Schema.Boolean,
+  warnings: Schema.mutable(Schema.Array(Schema.String)),
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemorySetupBackendResult" })
+
+export const MemorySetupCheckResult = Schema.Struct({
+  ok: Schema.Boolean,
+  scope: Schema.optional(Schema.String),
+  ms: Schema.optional(Schema.Number),
+  error: Schema.optional(Schema.String),
+  fix: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemorySetupCheckResult" })
+
 export const MemoryApi = HttpApi.make("memory")
   .add(
     HttpApiGroup.make("memory")
@@ -337,6 +358,30 @@ export const MemoryApi = HttpApi.make("memory")
             summary: "Mark a fact outdated",
             description:
               "Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.",
+          }),
+        ),
+        HttpApiEndpoint.post("setupBackend", `${root}/setup/backend`, {
+          payload: MemorySetupInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupBackendResult, "Whether that memory database may be used"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.backend",
+            summary: "Check a memory database",
+            description:
+              "Run the checks Lunos makes before connecting to an external memory database (URL, TLS, credentials by reference, jurisdiction against the residency policy) on a proposed memory block. Connects to nothing.",
+          }),
+        ),
+        HttpApiEndpoint.post("setupCheck", `${root}/setup/check`, {
+          payload: MemorySetupInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupCheckResult, "The check's result"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.check",
+            summary: "Check memory works",
+            description:
+              "Remember, recall and remove a test fact with a proposed memory block, in a separate Lunos process (memory settings apply on restart). The first run downloads the engine's packages and embedding model.",
           }),
         ),
         HttpApiEndpoint.post("forget", `${root}/:id/forget`, {

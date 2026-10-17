@@ -23,6 +23,7 @@ import { CloudAuth } from "@/cloud/auth"
 import { CloudOrg } from "@/cloud/org"
 import { CloudShare } from "@/cloud/share"
 import { MemoryStatsCommand } from "./memory-stats"
+import { MemoryCheckCommand, MemorySetupCommand } from "./memory-setup"
 
 // XCOD-94: the review surface for long-term memory. `list`, `show`, `status`, `verify` and `export`
 // read the provenance ledger only, so reviewing memory never starts the engine or needs a model.
@@ -711,6 +712,8 @@ export const MemoryCommand = cmd({
       .command(MemoryMigrateCommand)
       .command(MemoryShareCommand)
       .command(MemoryStatsCommand)
+      .command(MemoryCheckCommand)
+      .command(MemorySetupCommand)
       .demandCommand(),
   handler: () => {},
 })

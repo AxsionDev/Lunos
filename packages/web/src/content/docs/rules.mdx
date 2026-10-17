@@ -168,6 +168,17 @@ Lunos can also keep a knowledge graph of what it learns, and recall the relevant
 
 **What you need:** [uv](https://docs.astral.sh/uv/) and Python 3.10–3.13. Memory runs [Cognee](https://github.com/topoteretes/cognee) (Apache-2.0) in a local Python process. Lunos never installs Python for you: without it, memory stays off and says why.
 
+**Setting it up.** In the TUI, `/settings` → Memory → **Set up memory…** walks through six steps, each with a recommended answer, so pressing Enter through them gives a working setup:
+
+1. Turn memory on.
+2. Choose where it's kept: this machine, or a team Neo4j database, which is checked against your residency policy before anything connects.
+3. Pick the model that extracts facts.
+4. Confirm the first-start download.
+5. Choose how long facts are kept and whether the ledger is encrypted.
+6. Run a check that remembers, recalls and removes a test fact.
+
+A summary then shows what will be saved and where (user or project config, `ctrl+s` in `/settings`), and anything that would still override it. Nothing is saved or downloaded before you confirm, and keys your organisation locks are shown as fixed. Below the wizard, the Memory section shows a status line, and every other memory setting is under **Advanced**. `lunos memory setup` asks the same questions on the command line (`--yes` takes every recommended answer, for scripts), and `lunos memory check` runs the check on its own.
+
 - **Remembering.** The agent saves facts with a `memory_remember` tool. You approve each one: the tool asks by default. It refuses:
   - anything in a turn that used `webfetch`, `websearch`, an MCP resource, or read a file outside the project
   - anything that looks like a key, token or password

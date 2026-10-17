@@ -458,6 +458,8 @@ Commands:
                                each one)
   lunos memory stats           what's in memory, where it came from, how it grows and which facts
                                are recalled
+  lunos memory check           check that memory works: remember, recall and remove a test fact
+  lunos memory setup           set up memory in a few steps, each with a recommended answer
 
 Options:
   -h, --help        show help                                                              [boolean]

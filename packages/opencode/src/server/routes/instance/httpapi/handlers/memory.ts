@@ -17,7 +17,12 @@ import {
   MemoryPassphraseRequiredError,
   MemoryUnavailableError,
 } from "../errors"
-import type { MemoryExportInput, MemoryImportApplyInput, MemoryImportInput } from "../groups/memory"
+import type { MemoryExportInput, MemoryImportApplyInput, MemoryImportInput, MemorySetupInput } from "../groups/memory"
+import { Config } from "@/config/config"
+import { AuditLog } from "@/audit/log"
+import { MemoryExternal } from "@/memory/external"
+import { MemorySetupCheck } from "@/memory/setup-check"
+import type { ConfigMemory } from "@opencode-ai/core/config/memory"
 
 const SCOPES = ["project", "user"] as const
 
@@ -29,6 +34,7 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
   Effect.gen(function* () {
     const memory = yield* Memory.Service
     const provider = yield* Provider.Service
+    const config = yield* Config.Service
 
     const unavailable = (message: string) => new MemoryUnavailableError({ message })
 
@@ -250,8 +256,43 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       return yield* MemoryStatsLoad.load({ scope: ctx.query.scope, days: ctx.query.days })
     })
 
+    // XCOD-249: the wizard's step 2. The same gate as connecting, on the answer instead of the config.
+    const setupBackend = Effect.fn("MemoryHttpApi.setupBackend")(function* (ctx: {
+      payload: typeof MemorySetupInput.Type
+    }) {
+      const proposed = ctx.payload.memory as ConfigMemory.Info
+      if (MemoryExternal.type(proposed) === "embedded") return { ok: true, warnings: [] }
+      const cfg = yield* config.get()
+      return yield* Effect.try({
+        try: () => ({
+          ok: true,
+          warnings: MemoryExternal.gate({ memory: proposed, residency: AuditLog.residency(cfg) }).warnings,
+        }),
+        catch: (error) => error,
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.succeed({ ok: false, warnings: [], error: error instanceof Error ? error.message : String(error) }),
+        ),
+      )
+    })
+
+    // XCOD-249: the wizard's step 6, in a fresh `lunos memory check` that loads the proposed block on
+    // top of the config files. This process's own engine for the project is stopped first, so the
+    // two never open the same database; it starts again on next use.
+    const setupCheck = Effect.fn("MemoryHttpApi.setupCheck")(function* (ctx: {
+      payload: typeof MemorySetupInput.Type
+    }) {
+      const instance = yield* InstanceState.context
+      for (const scope of SCOPES) yield* memory.release(scope)
+      return yield* Effect.promise(() =>
+        MemorySetupCheck.run({ directory: instance.directory, memory: ctx.payload.memory }),
+      )
+    })
+
     return handlers
       .handle("stats", stats)
+      .handle("setupBackend", setupBackend)
+      .handle("setupCheck", setupCheck)
       .handle("list", list)
       .handle("importPreview", importPreview)
       .handle("importApply", importApply)

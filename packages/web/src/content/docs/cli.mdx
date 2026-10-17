@@ -479,6 +479,8 @@ opencode memory import <path> [--scope project|user] [--yes] [--dry-run] [--as-f
 opencode memory migrate --to neo4j [--scope project|user] [--yes] [--include-conflicts]
 opencode memory status
 opencode memory stats [--scope project|user] [--days N] [--json]
+opencode memory setup [--yes] [--project] [--no-check]
+opencode memory check [--json]
 ```
 
 - `export` writes all of memory as a versioned bundle (facts, graph, notes and provenance) to `./lunos-memory-<time>/`, or a `.zip` with `--zip`, or an encrypted `.zip.enc` with `--encrypt`. See [Rules: exporting memory](/docs/rules#exporting-memory).
@@ -499,6 +501,9 @@ opencode memory stats [--scope project|user] [--days N] [--json]
   - `top[]` (`id`, `count`, `last`) and `supersession` (`count`, `chains`).
   - `facts`: each recalled fact's `recalls` and `last`.
   - `groups`: the fact ids behind each count, e.g. `never`, `state:project:outdated`, `source:file`.
+
+- `setup` asks the setup wizard's questions: on or off, where memory is kept, the model, the first-start download, retention and encryption. It then checks memory works and saves to your user config (`--project` for this project). `--yes` accepts every recommended answer. Without a terminal it needs `--yes`. A failed check still saves, but exits with 1.
+- `check` remembers a test fact, recalls it and removes it, then says ✓ or the error and how to fix it (`--json` for scripts). The first run downloads the engine and the embedding model.
 
 ---
 
@@ -688,6 +693,22 @@ opencode uninstall
 
 ---
 
+### changelog
+
+Shows what changed in Lunos, from the release notes built into this version, so it works offline.
+
+```bash
+lunos changelog [--since <version>] [--full] [--json]
+```
+
+Without options it summarizes the version you have. `--since 1.18.43` covers every version after
+1.18.43, skipped ones included. The summary lists behaviour changes and security entries first, then
+what's new and a count of fixes, one line each with its ticket. `--full` prints the notes as written,
+and `--json` prints the entries as `{ version, section, text, tickets }` for scripts. A version with
+no notes says `No notes for X.Y.Z.`
+
+---
+
 ### update
 
 Updates Lunos to the latest version or a specific version. `lunos upgrade` is an alias and still works.
@@ -719,6 +740,9 @@ when the output isn't a terminal (a pipe, CI) one plain line per step with no es
 Ctrl+C cancels while Lunos is still checking for the version. Once the package manager is installing
 it runs to the end, even if you press Ctrl+C or close the TUI, because stopping it halfway could leave
 no working `lunos`.
+
+After a successful update, Lunos prints what changed since the version you had (the same summary
+as `lunos changelog --since <your version>`) before the restart hint.
 
 If the update fails, Lunos prints the command to run by hand and exits with code 1. For npm installs
 that's `npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`.
