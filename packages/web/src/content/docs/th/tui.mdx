@@ -163,6 +163,18 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### marketplace
+
+เรียกดูและติดตั้งปลั๊กอิน สกิล ฮุก และเซิร์ฟเวอร์ MCP จากมาร์เก็ตเพลสของคุณ เพิ่มชื่อแท็บ (`plugins`, `skills`, `hooks`, `mcp`) เพื่อเปิดแท็บนั้น `installed` เพื่อดูสิ่งที่ติดตั้งแล้วพร้อมทำเครื่องหมายการอัปเดตที่มี หรือคำอื่นใดเพื่อค้นหา _นามแฝง_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 รายการรุ่นที่มีจำหน่าย
@@ -184,6 +196,16 @@ How is auth handled in @packages/functions/src/api/index.ts?
 ```
 
 **ผูกปุ่ม:** `ctrl+x n`
+
+---
+
+### plugins
+
+แสดงรายการปลั๊กอินที่ติดตั้งแล้วและเปิดหรือปิดการใช้งาน
+
+```bash frame="none"
+/plugins
+```
 
 ---
 

@@ -11,6 +11,7 @@ import { fileURLToPath } from "url"
 import { DialogSelect, type DialogSelectOption } from "../../ui/dialog-select"
 import { Show, createEffect, createMemo, createSignal } from "solid-js"
 import { useBindings } from "../../keymap"
+import { takeDiscoverRequest, type DiscoverRequest } from "../../util/marketplace"
 
 const id = "internal:plugin-manager"
 
@@ -147,22 +148,47 @@ const KIND_NOUN: Record<TuiMarketplaceKind, string> = {
   mcp: "MCP servers",
 }
 
-// One strip for all four kinds, the active one bracketed, so the title doubles as the tab bar.
-function tabTitle(kind: TuiMarketplaceKind) {
-  return `Discover  ${KINDS.map((k) => (k === kind ? `[${KIND_TITLE[k]}]` : KIND_TITLE[k])).join("  ")}`
+// One strip for all four kinds, the active one bracketed, so the title doubles as the tab bar. A
+// search (`/marketplace <words>`) starts on "All", so a match is found whatever kind it is.
+function tabTitle(kind: TuiMarketplaceKind | "all", withAll: boolean) {
+  const tabs = [...(withAll ? (["all"] as const) : []), ...KINDS]
+  const title = (k: (typeof tabs)[number]) => (k === "all" ? "All" : KIND_TITLE[k])
+  return `Discover  ${tabs.map((k) => (k === kind ? `[${title(k)}]` : title(k))).join("  ")}`
 }
 
-function discoverRow(item: TuiMarketplaceEntry): DialogSelectOption<TuiMarketplaceEntry> {
+function discoverRow(
+  api: TuiPluginApi,
+  item: TuiMarketplaceEntry,
+  withKind: boolean,
+): DialogSelectOption<TuiMarketplaceEntry> {
+  const theme = api.theme.current
+  const status =
+    item.installed === "update" ? (
+      <span style={{ fg: theme.warning }}>update available</span>
+    ) : item.installed === "installed" ? (
+      <span style={{ fg: theme.success }}>installed</span>
+    ) : item.review === "verified" ? (
+      <span style={{ fg: theme.textMuted }}>verified</span>
+    ) : undefined
   return {
     title: item.name,
     value: item,
     category: item.marketplace,
-    description: item.description,
+    description: withKind ? [KIND_TITLE[item.kind], item.description].filter(Boolean).join(" · ") : item.description,
+    footer: status,
   }
 }
 
-function Discover(props: { api: TuiPluginApi; kind?: TuiMarketplaceKind }) {
-  const [kind, setKind] = createSignal<TuiMarketplaceKind>(props.kind ?? "plugin")
+// The oldest copy shown, so the notice never claims a catalogue is fresher than it is.
+function cachedSince(marketplaces: readonly { fetchedAt: number }[]) {
+  const oldest = Math.min(...marketplaces.map((marketplace) => marketplace.fetchedAt))
+  return new Date(oldest).toLocaleString()
+}
+
+function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
+  const withAll = Boolean(props.search)
+  const [kind, setKind] = createSignal<TuiMarketplaceKind | "all">(props.kind ?? (withAll ? "all" : "plugin"))
+  const [offline, setOffline] = createSignal(false)
   const [items, setItems] = createSignal<TuiMarketplaceEntry[]>()
   const [marketplaceCount, setMarketplaceCount] = createSignal(0)
   const [installing, setInstalling] = createSignal(false)
@@ -171,6 +197,12 @@ function Discover(props: { api: TuiPluginApi; kind?: TuiMarketplaceKind }) {
   props.api.marketplace.discover().then((out) => {
     setMarketplaceCount(out.marketplaceCount)
     setItems([...out.items])
+    setOffline(Boolean(out.offline))
+    if (out.offline && out.marketplaces.length)
+      props.api.ui.toast({
+        variant: "info",
+        message: `Offline — showing cached catalogue from ${cachedSince(out.marketplaces)}`,
+      })
     // A source that's fallen back to a stale cache still lists its entries (last-known-good), but
     // the toast makes that visible rather than presenting it as a fully healthy marketplace.
     for (const marketplace of out.marketplaces) {
@@ -182,15 +214,23 @@ function Discover(props: { api: TuiPluginApi; kind?: TuiMarketplaceKind }) {
     }
   })
 
-  const rows = createMemo(() => (items() ?? []).filter((item) => item.kind === kind()).map(discoverRow))
+  const rows = createMemo(() =>
+    (items() ?? [])
+      .filter((item) => (props.installed ? item.installed !== undefined : kind() === "all" || item.kind === kind()))
+      .map((item) => discoverRow(props.api, item, Boolean(props.installed) || kind() === "all")),
+  )
   const loading = createMemo(() => items() === undefined)
-  const cycle = () => setKind((current) => KINDS[(KINDS.indexOf(current) + 1) % KINDS.length]!)
+  const cycle = () =>
+    setKind((current) => {
+      const tabs: (TuiMarketplaceKind | "all")[] = withAll ? ["all", ...KINDS] : [...KINDS]
+      return tabs[(tabs.indexOf(current) + 1) % tabs.length]!
+    })
 
-  const installPlugin = (spec: string) => {
+  const installPlugin = (spec: string, replace: boolean) => {
     if (installing()) return
     setInstalling(true)
     void props.api.plugins
-      .install(spec)
+      .install(spec, { replace })
       .then((out) => {
         if (!out.ok) {
           props.api.ui.toast({ variant: "error", message: out.message })
@@ -259,22 +299,31 @@ function Discover(props: { api: TuiPluginApi; kind?: TuiMarketplaceKind }) {
                   ? { variant: "success", message: `Added ${item.name} to ${out.configPath}. Restart to load it.` }
                   : { variant: "error", message: out.message },
               )
-              showDiscover(props.api, item.kind)
+              showDiscover(props.api, { kind: item.kind })
             })
           }}
-          onCancel={() => showDiscover(props.api, item.kind)}
+          onCancel={() => showDiscover(props.api, { kind: item.kind })}
         />
       ))
     })
   }
 
   const select = (item: TuiMarketplaceEntry) => {
-    if (item.kind === "plugin") return item.spec && installPlugin(item.spec)
+    // An update replaces the configured version; otherwise an install never touches one.
+    if (item.kind === "plugin") return item.spec && installPlugin(item.spec, item.installed === "update")
     confirmConfigItem(item as TuiMarketplaceEntry & { kind: Exclude<TuiMarketplaceKind, "plugin"> })
   }
 
   const emptyView = createMemo(() => {
     if (loading()) return <text fg={props.api.theme.current.textMuted}>Loading marketplaces…</text>
+    if (offline() && marketplaceCount() > 0 && !items()?.length)
+      return (
+        <text fg={props.api.theme.current.textMuted}>
+          {
+            "Offline (LUNOS_OFFLINE) and no cached catalogue yet. Open /marketplace once with network access; after that it works offline."
+          }
+        </text>
+      )
     if (marketplaceCount() === 0)
       return (
         <text fg={props.api.theme.current.textMuted}>
@@ -282,13 +331,21 @@ function Discover(props: { api: TuiPluginApi; kind?: TuiMarketplaceKind }) {
         </text>
       )
     if (rows().length) return undefined
-    return <text fg={props.api.theme.current.textMuted}>{`No ${KIND_NOUN[kind()]} in added marketplaces.`}</text>
+    if (props.installed)
+      return <text fg={props.api.theme.current.textMuted}>Nothing from the added marketplaces is installed.</text>
+    const current = kind()
+    return (
+      <text fg={props.api.theme.current.textMuted}>
+        {current === "all" ? "Nothing in added marketplaces." : `No ${KIND_NOUN[current]} in added marketplaces.`}
+      </text>
+    )
   })
 
   return (
     <DialogSelect
-      title={tabTitle(kind())}
+      title={props.installed ? "Installed from marketplaces" : tabTitle(kind(), withAll)}
       options={rows()}
+      initialFilter={props.search}
       locked={loading() || installing()}
       emptyView={emptyView()}
       onSelect={(item) => select(item.value)}
@@ -296,7 +353,7 @@ function Discover(props: { api: TuiPluginApi; kind?: TuiMarketplaceKind }) {
         {
           title: "next tab",
           command: "dialog.plugins.discover.next_kind",
-          hidden: loading() || installing(),
+          hidden: loading() || installing() || props.installed,
           // A tab can be empty (the community marketplace ships no skills); without this the user
           // would be stuck on it, unable to cycle on to the MCP tab.
           withoutSelection: true,
@@ -314,8 +371,8 @@ function Discover(props: { api: TuiPluginApi; kind?: TuiMarketplaceKind }) {
   )
 }
 
-function showDiscover(api: TuiPluginApi, kind?: TuiMarketplaceKind) {
-  api.ui.dialog.replace(() => <Discover api={api} kind={kind} />)
+function showDiscover(api: TuiPluginApi, request: DiscoverRequest = {}) {
+  api.ui.dialog.replace(() => <Discover api={api} {...request} />)
 }
 
 function row(api: TuiPluginApi, item: TuiPluginStatus, width: number): DialogSelectOption<string> {
@@ -417,6 +474,7 @@ function View(props: { api: TuiPluginApi }) {
           },
         },
       ]}
+      footerHints={[{ title: "browse the marketplace", label: "/marketplace" }]}
       onSelect={(item) => {
         setCur(item.value)
         flip(item.value)
@@ -435,8 +493,10 @@ const tui: TuiPlugin = async (api) => {
       {
         name: "plugins.list",
         title: "Plugins",
+        desc: "Manage installed plugins",
         category: "System",
         namespace: "palette",
+        slashName: "plugins",
         run() {
           show(api)
         },
@@ -453,10 +513,15 @@ const tui: TuiPlugin = async (api) => {
       {
         name: "plugins.discover",
         title: "Discover marketplace (plugins, skills, hooks, MCP)",
+        desc: "Browse and install plugins, skills, hooks and MCP servers",
         category: "System",
         namespace: "palette",
+        // XCOD-251: `/marketplace` with no words opens the Plugins tab; with words, the prompt has
+        // already parsed them into the request taken here.
+        slashName: "marketplace",
+        slashAliases: ["discover"],
         run() {
-          showDiscover(api)
+          showDiscover(api, takeDiscoverRequest())
         },
       },
     ],

@@ -3,7 +3,7 @@ import path from "path"
 import { parse as parseJsonc } from "jsonc-parser"
 import { Marketplace } from "@opencode-ai/core/marketplace"
 import { Filesystem } from "@/util/filesystem"
-import { hookConfigFromEntry, planInstall, type ConfigItem } from "../../src/marketplace/install"
+import { hookConfigFromEntry, installedState, planInstall, type ConfigItem } from "../../src/marketplace/install"
 import type { FetchDeps } from "../../src/marketplace/shared"
 import { tmpdir } from "../fixture/fixture"
 import { MarketplaceAlreadyInstalled } from "../../src/marketplace/guard"
@@ -163,5 +163,57 @@ describe("planInstall: remote MCP headers", () => {
     expect(plan.warnings).toEqual(["X_API_KEY is not set in your environment; the reference is written anyway"])
     await plan.apply()
     expect((await readConfig(file)).mcp.api.headers).toEqual({ "X-Api-Key": "{env:X_API_KEY}" })
+  })
+})
+
+describe("installedState (XCOD-251)", () => {
+  const mcp = (command: string[]): ConfigItem => ({
+    kind: "mcp",
+    name: "fs",
+    marketplace: "mp",
+    source: "mp.json",
+    entry: new Marketplace.McpLocalEntry({ name: "fs", type: "local", command }),
+  })
+  const plugin = (spec: string) =>
+    ({
+      kind: "plugin",
+      name: "weather",
+      marketplace: "mp",
+      source: "mp.json",
+      spec,
+      entry: new Marketplace.Entry({
+        name: "weather",
+        source: new Marketplace.NpmSource({ type: "npm", package: "weather" }),
+      }),
+    }) as Parameters<typeof installedState>[0]
+
+  test("an MCP server is installed when the config holds what the marketplace serves, an update when it differs", () => {
+    const config = { mcp: { fs: { type: "local", command: ["npx", "fs@1"], enabled: true } } }
+    expect(installedState(mcp(["npx", "fs@1"]), [config])).toBe("installed")
+    expect(installedState(mcp(["npx", "fs@2"]), [config])).toBe("update")
+    expect(installedState(mcp(["npx", "fs@1"]), [{}])).toBeUndefined()
+  })
+
+  test("a plugin matches by spec; the same package at another version is an update, in any config or loaded", () => {
+    expect(installedState(plugin("weather@1.2.0"), [{}, { plugin: ["weather@1.2.0"] }])).toBe("installed")
+    expect(installedState(plugin("weather@1.3.0"), [{ plugin: [["weather@1.2.0", {}]] }])).toBe("update")
+    expect(installedState(plugin("@acme/weather@2.0.0"), [{}], ["@acme/weather@1.0.0"])).toBe("update")
+    expect(installedState(plugin("weather@1.2.0"), [{ plugin: ["weather-extra@1.2.0"] }])).toBeUndefined()
+  })
+
+  test("skill sources and hooks are installed by the installer's own duplicate rule", () => {
+    expect(installedState(skill("https://skills.example/"), [{ skills: { urls: ["https://skills.example"] } }])).toBe(
+      "installed",
+    )
+    expect(installedState(skill("https://skills.example/"), [{}])).toBeUndefined()
+    const fmt = hookConfigFromEntry((hook() as Extract<ConfigItem, { kind: "hook" }>).entry)
+    expect(installedState(hook(), [{ hooks: { "tool.execute.after": [fmt] } }])).toBe("installed")
+    expect(
+      installedState(hook({ command: ["biome", "format"] }), [{ hooks: { "tool.execute.after": [fmt] } }]),
+    ).toBeUndefined()
+  })
+
+  test("an entry the installer would refuse is never reported installed", () => {
+    expect(installedState(hook({ event: "no.such.event" }), [{ hooks: { "no.such.event": [] } }])).toBeUndefined()
   })
 })
