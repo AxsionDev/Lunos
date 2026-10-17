@@ -29,8 +29,6 @@ reasoning behind a change are published separately as **Lunos Notes**.
   status line. `lunos memory setup` (`--yes` for scripts) does the same on the command line, and
   `lunos memory check` runs the check alone.
 
-### Added
-
 - **`/marketplace` in the TUI.** It opens the marketplace's Discover view straight from the prompt
   (XCOD-251). `/marketplace mcp` (or `plugins`, `skills`, `hooks`) opens that tab,
   `/marketplace playwright` searches every kind at once, and `/marketplace installed` lists what's
