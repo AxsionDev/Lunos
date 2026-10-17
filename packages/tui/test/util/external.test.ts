@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { externalCost, externalOf, parseExternalSlash, refusalMessage } from "../../src/util/external"
+import {
+  externalCost,
+  externalOf,
+  parseExternalSlash,
+  parseToolSlash,
+  refusalMessage,
+  toolUnavailable,
+} from "../../src/util/external"
 
 describe("external sessions in the TUI (XCOD-218)", () => {
   test("/external opens a picker; with a tool it starts one; resume takes an id", () => {
@@ -34,5 +41,32 @@ describe("external sessions in the TUI (XCOD-218)", () => {
     expect(refusalMessage({ message: "Claude Code sends your code to Anthropic" }, "x")).toContain("Anthropic")
     expect(refusalMessage({ data: { message: "nested" } }, "x")).toBe("nested")
     expect(refusalMessage(undefined, "fallback")).toBe("fallback")
+  })
+})
+
+describe("/claude and /codex (XCOD-250)", () => {
+  test("a task goes to the tool as typed, its own /commands included; no task means the picker", () => {
+    expect(parseToolSlash("/claude Fix the failing test")).toEqual({ tool: "claude", text: "Fix the failing test" })
+    expect(parseToolSlash("/codex /review")).toEqual({ tool: "codex", text: "/review" })
+    expect(parseToolSlash("/claude")).toEqual({ tool: "claude", text: "" })
+    expect(parseToolSlash("/claudette")).toBeUndefined()
+    expect(parseToolSlash("ask /claude")).toBeUndefined()
+  })
+
+  test("greyed out with the reason: policy, not installed, not signed in; ready otherwise", () => {
+    expect(toolUnavailable("claude", undefined)).toBeUndefined()
+    expect(toolUnavailable("claude", { installed: true, loggedIn: true })).toBeUndefined()
+    expect(toolUnavailable("claude", { installed: false })).toBe(
+      "Claude Code isn't installed — see lunos external list",
+    )
+    expect(toolUnavailable("codex", { installed: true, loggedIn: false })).toBe(
+      "Codex CLI isn't signed in — see lunos external list",
+    )
+    expect(
+      toolUnavailable("claude", { installed: true, refused: { reason: "residency", message: "sends your code to…" } }),
+    ).toBe("blocked by policy")
+    expect(
+      toolUnavailable("claude", { installed: true, refused: { reason: "policy", message: "turned off by policy" } }),
+    ).toBe("turned off by policy")
   })
 })

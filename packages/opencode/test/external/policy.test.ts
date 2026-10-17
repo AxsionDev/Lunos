@@ -86,3 +86,18 @@ describe("ExternalDetect (XCOD-204)", () => {
     expect(env).toEqual({ PATH: "/bin", HOME: "/h" })
   })
 })
+
+describe("ExternalPolicy.evaluate (XCOD-250)", () => {
+  test("says why without auditing: /claude and /codex ask it just to grey themselves out", async () => {
+    const dir = await tmp()
+    const auditPath = path.join(dir, "audit.log")
+    const config = { residency: { allow: ["eu"] as const, auditPath } }
+    expect(ExternalPolicy.evaluate("claude", config)).toMatchObject({ reason: "residency" })
+    expect(ExternalPolicy.evaluate("codex", { external: { enabled: false } })).toMatchObject({ reason: "disabled" })
+    expect(
+      ExternalPolicy.evaluate("codex", { external: { enabled: false }, $locked: ["external.enabled"] }),
+    ).toMatchObject({ reason: "policy" })
+    expect(ExternalPolicy.evaluate("claude", {})).toBeUndefined()
+    expect(await events(auditPath)).toEqual([])
+  })
+})

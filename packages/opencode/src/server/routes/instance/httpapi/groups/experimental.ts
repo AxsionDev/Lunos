@@ -124,6 +124,19 @@ export const SessionGroupInfo = Schema.Struct({
   updated: Schema.Finite,
 }).annotate({ identifier: "SessionGroup" })
 
+// XCOD-250: what /claude and /codex show before anything starts.
+export const ExternalToolStatus = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  label: Schema.String,
+  installed: Schema.Boolean,
+  loggedIn: Schema.optional(Schema.Boolean),
+  /** What to do when it isn't usable (install, sign in, update). */
+  hint: Schema.optional(Schema.String),
+  refused: Schema.optional(
+    Schema.Struct({ reason: Schema.Literals(["disabled", "policy", "residency"]), message: Schema.String }),
+  ),
+}).annotate({ identifier: "ExternalToolStatus" })
+
 // XCOD-205: one row of the Sessions window.
 export const SessionOverviewItem = Schema.Struct({
   id: Schema.String,
@@ -189,6 +202,7 @@ export const ExperimentalPaths = {
   sessionGroup: "/experimental/session-group/:groupID",
   sessionGroupMove: "/experimental/session-group/move",
   externalStop: "/experimental/external/:sessionID/stop",
+  externalTools: "/experimental/external/tools",
   peerStop: "/experimental/peer/:sessionID/stop",
   peerAsks: "/experimental/peer/:sessionID/asks",
   peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
@@ -451,6 +465,17 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.sessionGroup.delete",
             summary: "Delete session group",
             description: "Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.",
+          }),
+        ),
+        HttpApiEndpoint.get("externalTools", ExperimentalPaths.externalTools, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.mutable(Schema.Array(ExternalToolStatus)), "External tools"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.tools",
+            summary: "External tools",
+            description:
+              "Whether Claude Code and Codex CLI can be started from Lunos here: installed, signed in, and allowed by external.enabled and the residency policy. Asking doesn't audit anything.",
           }),
         ),
         HttpApiEndpoint.post("externalStop", ExperimentalPaths.externalStop, {

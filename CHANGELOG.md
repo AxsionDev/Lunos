@@ -18,6 +18,16 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **`/claude` and `/codex` in the TUI.** `/claude <task>` hands a task to your own Claude Code in a
+  new session view, and `/codex <task>` to Codex CLI; their approvals come to Lunos's prompt as
+  before (XCOD-250). On their own they open a picker to start a new session or continue a recent one
+  in this project. They're listed only while external sessions are on, and show greyed out with the
+  reason when the tool isn't installed or signed in, or is blocked by policy (choosing one then
+  explains, and a policy refusal is audited as `external.denied`). A command of your own with the
+  same name wins.
+
 ## [1.18.48] - 2026-10-16
 
 ### Changed

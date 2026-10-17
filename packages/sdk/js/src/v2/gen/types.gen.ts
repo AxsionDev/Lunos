@@ -2672,6 +2672,18 @@ export type NotFoundError = {
   }
 }
 
+export type ExternalToolStatus = {
+  tool: "claude" | "codex"
+  label: string
+  installed: boolean
+  loggedIn?: boolean
+  hint?: string
+  refused?: {
+    reason: "disabled" | "policy" | "residency"
+    message: string
+  }
+}
+
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -9009,6 +9021,35 @@ export type ExperimentalSessionGroupUpdateResponses = {
 
 export type ExperimentalSessionGroupUpdateResponse =
   ExperimentalSessionGroupUpdateResponses[keyof ExperimentalSessionGroupUpdateResponses]
+
+export type ExperimentalExternalToolsData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/tools"
+}
+
+export type ExperimentalExternalToolsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalExternalToolsError = ExperimentalExternalToolsErrors[keyof ExperimentalExternalToolsErrors]
+
+export type ExperimentalExternalToolsResponses = {
+  /**
+   * External tools
+   */
+  200: Array<ExternalToolStatus>
+}
+
+export type ExperimentalExternalToolsResponse =
+  ExperimentalExternalToolsResponses[keyof ExperimentalExternalToolsResponses]
 
 export type ExperimentalExternalStopData = {
   body?: never

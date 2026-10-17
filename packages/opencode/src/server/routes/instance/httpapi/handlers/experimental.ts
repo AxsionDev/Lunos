@@ -36,6 +36,9 @@ import { SessionPeers } from "@/session/peers"
 import { SessionPeerControl } from "@/session/peer-control"
 import { SessionOverview } from "@/session/overview"
 import { ExternalRegistry } from "@/external/registry"
+import { ExternalDetect } from "@/external/detect"
+import { ExternalPolicy } from "@/external/policy"
+import { ExternalRun } from "@/external/run"
 import { GlobalBus } from "@/bus/global"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
 
@@ -302,6 +305,28 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
         : Effect.fail(new InvalidRequestError({ message: result.reason }))
     })
 
+    // XCOD-250: availability for /claude and /codex. Detection runs the tools' own --version/--help,
+    // so it's asked when the commands are offered, not on every keystroke.
+    const externalTools = Effect.fn("ExperimentalHttpApi.externalTools")(function* () {
+      const cfg = yield* config.get()
+      return yield* Effect.promise(() =>
+        Promise.all(
+          (["claude", "codex"] as const).map(async (tool) => {
+            const status = await ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, cfg))
+            const refused = ExternalPolicy.evaluate(tool, cfg)
+            return {
+              tool,
+              label: status.label,
+              installed: status.installed && !status.outdated,
+              ...(status.loggedIn !== undefined ? { loggedIn: status.loggedIn } : {}),
+              ...(status.hint || status.outdated ? { hint: status.hint ?? status.outdated } : {}),
+              ...(refused ? { refused } : {}),
+            }
+          }),
+        ),
+      )
+    })
+
     // XCOD-234: sessions another Lunos process runs; that process does the work (and the audit).
     const peer = <A>(sessionID: string, path: string, init?: { method?: string; body?: unknown }) =>
       Effect.tryPromise({
@@ -374,6 +399,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionGroupDelete", sessionGroupDelete)
       .handle("sessionGroupMove", sessionGroupMove)
       .handle("externalStop", externalStop)
+      .handle("externalTools", externalTools)
       .handle("peerStop", peerStop)
       .handle("peerAsks", peerAsks)
       .handle("peerPermissionReply", peerPermissionReply)

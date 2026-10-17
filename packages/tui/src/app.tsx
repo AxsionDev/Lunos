@@ -2,7 +2,9 @@ import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@op
 import { animationsEnabled } from "./util/motion"
 import { DialogArtifacts } from "./component/dialog-artifacts"
 import { DialogBackground } from "./component/dialog-background"
-import { DialogExternal } from "./component/dialog-external"
+import { DialogExternal, useExternalCommand } from "./component/dialog-external"
+import { EXTERNAL_LABEL, toolUnavailable } from "./util/external"
+import type { ExternalToolStatus } from "@opencode-ai/sdk/v2"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
@@ -743,6 +745,31 @@ function App(props: {
     exit()
   }
 
+  // XCOD-250: whether /claude and /codex can start here, asked once external sessions are known to be on.
+  const externalOn = createMemo(() => sync.data.config.external?.enabled !== false)
+  const [externalTools, setExternalTools] = createSignal<ExternalToolStatus[]>()
+  createEffect(() => {
+    if (!externalOn() || sync.status !== "complete" || externalTools()) return
+    void sdk.client.experimental.external
+      .tools()
+      .then((result) => setExternalTools(result.data ?? []))
+      .catch(() => setExternalTools([]))
+  })
+  // Once per tool: the user's own /claude or /codex command shadows Lunos's.
+  createEffect(() => {
+    if (!externalOn() || sync.status !== "complete") return
+    for (const tool of ["claude", "codex"] as const) {
+      if (!sync.data.command.some((item) => item.name === tool) || kv.get(`external_shadowed_${tool}`)) continue
+      kv.set(`external_shadowed_${tool}`, true)
+      toast.show({
+        variant: "info",
+        message: `Your own /${tool} command runs, not Lunos's. Lunos's is /external ${tool}.`,
+        duration: 8000,
+      })
+    }
+  })
+  const runExternalCommand = useExternalCommand()
+
   const appCommands = createMemo(() =>
     [
       {
@@ -821,6 +848,27 @@ function App(props: {
           dialog.replace(() => <DialogExternal />)
         },
       },
+      // XCOD-250: /claude and /codex, listed only while external sessions are on and the user has no
+      // command of that name (theirs wins; this one stays reachable as /external claude).
+      ...(["claude", "codex"] as const).map((tool) => {
+        const unavailable = toolUnavailable(
+          tool,
+          externalTools()?.find((item) => item.tool === tool),
+        )
+        return {
+          name: `external.${tool}`,
+          title: `Give ${EXTERNAL_LABEL[tool]} a task`,
+          desc: unavailable ?? `Give ${EXTERNAL_LABEL[tool]} a task: /${tool} <task>, or pick a session`,
+          category: "Session",
+          slashName: tool,
+          slashMuted: unavailable !== undefined,
+          hidden: !externalOn() || sync.data.command.some((item) => item.name === tool),
+          run: () => {
+            dialog.clear()
+            void runExternalCommand(tool, "")
+          },
+        }
+      }),
       {
         name: "workspace.copy_path",
         title: "Copy worktree path",
