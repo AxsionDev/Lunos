@@ -3075,6 +3075,29 @@ export type MemoryImportResult = {
   }>
 }
 
+export type MemorySetupInput = {
+  /**
+   * The memory block the wizard would save (memory.enabled, model, backend, retention, encryption)
+   */
+  memory: {
+    [key: string]: unknown
+  }
+}
+
+export type MemorySetupBackendResult = {
+  ok: boolean
+  warnings: Array<string>
+  error?: string
+}
+
+export type MemorySetupCheckResult = {
+  ok: boolean
+  scope?: string
+  ms?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  error?: string
+  fix?: string
+}
+
 export type PermissionNotFoundError = {
   _tag: "PermissionNotFoundError"
   requestID: string
@@ -10856,6 +10879,62 @@ export type MemoryOutdateResponses = {
 }
 
 export type MemoryOutdateResponse = MemoryOutdateResponses[keyof MemoryOutdateResponses]
+
+export type MemorySetupBackendData = {
+  body?: MemorySetupInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/backend"
+}
+
+export type MemorySetupBackendErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupBackendError = MemorySetupBackendErrors[keyof MemorySetupBackendErrors]
+
+export type MemorySetupBackendResponses = {
+  /**
+   * Whether that memory database may be used
+   */
+  200: MemorySetupBackendResult
+}
+
+export type MemorySetupBackendResponse = MemorySetupBackendResponses[keyof MemorySetupBackendResponses]
+
+export type MemorySetupCheckData = {
+  body?: MemorySetupInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/check"
+}
+
+export type MemorySetupCheckErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupCheckError = MemorySetupCheckErrors[keyof MemorySetupCheckErrors]
+
+export type MemorySetupCheckResponses = {
+  /**
+   * The check's result
+   */
+  200: MemorySetupCheckResult
+}
+
+export type MemorySetupCheckResponse = MemorySetupCheckResponses[keyof MemorySetupCheckResponses]
 
 export type MemoryForgetData = {
   body?: never
