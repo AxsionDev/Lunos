@@ -33,8 +33,6 @@ reasoning behind a change are published separately as **Lunos Notes**.
 - **`memory.recall` audit entries for a turn record `truncated` and `chars`:** whether the token cap
   left facts out, and how many characters were injected.
 
-### Added
-
 - **`/marketplace` in the TUI.** It opens the marketplace's Discover view straight from the prompt
   (XCOD-251). `/marketplace mcp` (or `plugins`, `skills`, `hooks`) opens that tab,
   `/marketplace playwright` searches every kind at once, and `/marketplace installed` lists what's
