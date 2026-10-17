@@ -117,6 +117,8 @@ export interface Interface {
     limit?: number
     history?: boolean
     origin?: Origin
+    /** XCOD-252: false when the caller records the recall itself (a turn, with what it injected). */
+    audit?: boolean
   }) => Effect.Effect<{ scope: MemoryStore.Scope; facts: MemoryBackend.Recalled[]; graph: string }[], Error>
   /**
    * The `<memory>` block for a user message, computed once per message and cached, so the steps of
@@ -213,6 +215,28 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Memory") {}
+
+/**
+ * `memory.recall` in the audit log: ids and counts, never the query or a fact's text. A turn also
+ * records whether the token cap cut the results and how many characters were injected (XCOD-252).
+ */
+function auditRecall(
+  session: string | undefined,
+  source: Origin,
+  results: readonly { scope: MemoryStore.Scope; facts: readonly MemoryBackend.Recalled[] }[],
+  history?: boolean,
+  injected?: { truncated: boolean; chars: number },
+) {
+  AuditLog.emit("memory.recall", {
+    session,
+    source,
+    history: history || undefined,
+    scopes: results.map((result) => result.scope),
+    count: results.reduce((sum, result) => sum + result.facts.length, 0),
+    ids: results.flatMap((result) => result.facts.map((item) => item.fact.id)),
+    ...(injected ?? {}),
+  })
+}
 
 interface State {
   sessionOff: Set<string>
@@ -634,6 +658,7 @@ const layer = Layer.effect(
       limit?: number
       history?: boolean
       origin?: Origin
+      audit?: boolean
     }) {
       const s = yield* InstanceState.get(state)
       const results: { scope: MemoryStore.Scope; facts: MemoryBackend.Recalled[]; graph: string }[] = []
@@ -658,14 +683,7 @@ const layer = Layer.effect(
         })
         results.push({ scope, ...found })
       }
-      AuditLog.emit("memory.recall", {
-        session: input.sessionID,
-        source: input.origin ?? "tool",
-        history: input.history || undefined,
-        scopes: results.map((result) => result.scope),
-        count: results.reduce((sum, result) => sum + result.facts.length, 0),
-        ids: results.flatMap((result) => result.facts.map((item) => item.fact.id)),
-      })
+      if (input.audit !== false) auditRecall(input.sessionID, input.origin ?? "tool", results, input.history)
       return results
     })
 
@@ -681,30 +699,41 @@ const layer = Layer.effect(
       const cfg = yield* config.get()
       // XCOD-135: local memory and external sources are recalled side by side; either failing
       // leaves the other's results in the block.
-      const [local, external] = yield* Effect.all(
+      const [recalled, external] = yield* Effect.all(
         [
           search({
             query: input.query,
             sessionID: input.sessionID,
             parent: input.parent,
             origin: "turn",
+            audit: false,
           }).pipe(
+            Effect.map((results) => ({ results, ok: true })),
             Effect.catch((error) =>
-              Effect.logWarning("memory recall failed", { error: error.message }).pipe(Effect.as([])),
+              Effect.logWarning("memory recall failed", { error: error.message }).pipe(
+                Effect.as({
+                  results: [] as { scope: MemoryStore.Scope; facts: MemoryBackend.Recalled[]; graph: string }[],
+                  ok: false,
+                }),
+              ),
             ),
           ),
           sources.recall({ sessionID: input.sessionID, query: input.query }),
         ],
         { concurrency: 2 },
       )
+      const local = recalled.results
       yield* Effect.logInfo("memory recalled", {
         session: input.sessionID,
         facts: local.flatMap((result) => result.facts.map((item) => `${result.scope}:${item.fact.id}`)),
         sources: external.labels,
       })
-      const text = MemoryRecall.block(local, cfg.memory?.retrieval?.max_tokens, external)
-      s.recalled.set(input.userMessageID, text)
-      return text
+      const built = MemoryRecall.blockWithStats(local, cfg.memory?.retrieval?.max_tokens, external)
+      // A failed recall isn't one: like search, nothing is recorded for it.
+      if (recalled.ok)
+        auditRecall(input.sessionID, "turn", local, undefined, { truncated: built.truncated, chars: built.chars })
+      s.recalled.set(input.userMessageID, built.text)
+      return built.text
     })
 
     const facts = Effect.fn("Memory.facts")(function* (scope: MemoryStore.Scope) {

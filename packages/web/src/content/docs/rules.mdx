@@ -208,6 +208,30 @@ A summary then shows what will be saved and where (user or project config, `ctrl
 
   When memory is off, no memory process starts, no memory files are created and the memory tools aren't offered.
 
+#### Memory analytics
+
+`/memory` opens on **Overview**, with **Activity** and **Facts** (the browser) beside it. Tab switches tabs, `ctrl+r` sets the range for everything time-based (7, 30 or 90 days, or all), and Esc closes.
+
+- **Overview:**
+  - whether memory is on, where it's kept, encryption and retention, worded as `lunos memory status` words them;
+  - each scope's active, outdated, expiring, expired and quarantined facts, and its last write;
+  - its size in characters and tokens (characters / 4), next to `retrieval.max_tokens`;
+  - where facts came from: your messages, files or tools; which agent; observed or inferred; native or imported;
+  - ledger health.
+- **Activity:**
+  - facts added, outdated, forgotten and expired per week;
+  - recalls per day and by origin;
+  - how often a recall returned a fact or hit the token cap;
+  - the ten most recalled facts;
+  - **never recalled**: active facts older than 14 days with no recall in the range. These are clean-up candidates.
+- **Drilling down.** Every count opens the Facts tab filtered to exactly those facts, and ← goes back. In a filtered list, `ctrl+k` forgets them all after you type their number; each forget is audited separately. Each fact shows how often it was recalled in the range.
+
+Everything is computed on your machine from the memory ledger and the local [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md); nothing about memory leaves your machine because of this view.
+
+Recall figures come from the audit log's `memory.recall` entries, which hold ids and counts, never a query or a fact's text. They exist only while the audit log is on (`audit.enabled`, or a residency policy), and only as far back as it goes: the view says "Recall data since …" instead of guessing.
+
+`lunos memory stats` prints the same numbers (`--json` for scripts), and desktop and web can read them from `GET /memory/stats`.
+
 #### Facts that stop being true
 
 A fact can be marked **outdated**, optionally with the fact that replaces it. It is kept, with when it became true (`valid_from`) and when it stopped (`invalid_at`), but it is no longer recalled. `lunos memory search --history`, or `memory_search` with `history: true`, shows outdated facts too, marked as such. `lunos memory show <id>` shows an outdated fact's `invalid_at` and `replaced_by`.

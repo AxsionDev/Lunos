@@ -177,6 +177,8 @@ import type {
   MemorySetupCheckErrors,
   MemorySetupCheckResponses,
   MemorySetupInput,
+  MemoryStatsErrors,
+  MemoryStatsResponses,
   ModelRef,
   MoveSessionDestination,
   OutputFormat,
@@ -4064,6 +4066,40 @@ export class Setup extends HeyApiClient {
 }
 
 export class Memory extends HeyApiClient {
+  /**
+   * Memory analytics
+   *
+   * What's in memory, where it came from, how it grows and which facts are recalled, computed locally from the ledger and the local audit log. Never starts memory; `days` limits the time-based figures (default: all).
+   */
+  public stats<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      scope?: "project" | "user"
+      days?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "scope" },
+            { in: "query", key: "days" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryStatsResponses, MemoryStatsErrors, ThrowOnError>({
+      url: "/memory/stats",
+      ...options,
+      ...params,
+    })
+  }
+
   /**
    * List memory
    *

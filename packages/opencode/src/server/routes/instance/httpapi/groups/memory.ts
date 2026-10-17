@@ -155,6 +155,95 @@ export const MemoryImportResult = Schema.Struct({
   failed: Schema.Array(Schema.Struct({ text: Schema.String, reason: Schema.String })),
 }).annotate({ identifier: "MemoryImportResult" })
 
+// XCOD-252: /memory's Analytics, computed locally from the ledger and the local audit log.
+const Count = Schema.Finite
+const MemoryStatsCounts = Schema.Struct({
+  active: Count,
+  outdated: Count,
+  expiring: Count,
+  expired: Count,
+  quarantined: Count,
+})
+export const MemoryStatsResponse = Schema.Struct({
+  version: Schema.Finite,
+  generatedAt: Schema.String,
+  rangeDays: Schema.NullOr(Schema.Finite),
+  since: Schema.NullOr(Schema.String),
+  status: Schema.Struct({
+    on: Schema.Boolean,
+    reason: Schema.NullOr(Schema.String),
+    backend: Schema.Struct({
+      type: Schema.String,
+      host: Schema.NullOr(Schema.String),
+      jurisdiction: Schema.NullOr(Schema.String),
+    }),
+    encryption: Schema.String,
+    retentionDays: Schema.NullOr(Schema.Finite),
+    graceDays: Schema.Number,
+    health: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          scope: Schema.String,
+          facts: Count,
+          problems: Count,
+          unsealed: Count,
+          encrypted: Count,
+          error: Schema.NullOr(Schema.String),
+        }),
+      ),
+    ),
+  }),
+  scopes: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        scope: Schema.String,
+        counts: MemoryStatsCounts,
+        lastWrite: Schema.NullOr(Schema.String),
+        error: Schema.NullOr(Schema.String),
+        chars: Count,
+        tokens: Count,
+      }),
+    ),
+  ),
+  maxTokens: Count,
+  sources: Schema.Struct({
+    source: Schema.Record(Schema.String, Count),
+    agent: Schema.Record(Schema.String, Count),
+    kind: Schema.Record(Schema.String, Count),
+    native: Count,
+    imported: Schema.Record(Schema.String, Count),
+  }),
+  growth: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        week: Schema.String,
+        scope: Schema.String,
+        added: Count,
+        outdated: Count,
+        forgotten: Count,
+        expired: Count,
+      }),
+    ),
+  ),
+  recall: Schema.Struct({
+    audit: Schema.Boolean,
+    dataSince: Schema.NullOr(Schema.String),
+    total: Count,
+    perDay: Schema.mutable(Schema.Array(Schema.Struct({ day: Schema.String, count: Count }))),
+    origin: Schema.Record(Schema.String, Count),
+    hitRate: Schema.NullOr(Schema.Finite),
+    avgFacts: Schema.NullOr(Schema.Finite),
+    truncatedRate: Schema.NullOr(Schema.Finite),
+  }),
+  top: Schema.mutable(Schema.Array(Schema.Struct({ id: Schema.String, count: Count, last: Schema.String }))),
+  supersession: Schema.Struct({
+    count: Count,
+    chains: Schema.mutable(Schema.Array(Schema.mutable(Schema.Array(Schema.String)))),
+  }),
+  facts: Schema.Record(Schema.String, Schema.Struct({ recalls: Count, last: Schema.String })),
+  groups: Schema.Record(Schema.String, Schema.mutable(Schema.Array(Schema.String))),
+}).annotate({ identifier: "MemoryStats" })
+
 // XCOD-249: the setup wizard checks what it is about to save, before saving it.
 export const MemorySetupInput = Schema.Struct({
   memory: Schema.Record(Schema.String, Schema.Unknown).annotate({
@@ -180,6 +269,22 @@ export const MemoryApi = HttpApi.make("memory")
   .add(
     HttpApiGroup.make("memory")
       .add(
+        HttpApiEndpoint.get("stats", `${root}/stats`, {
+          query: Schema.Struct({
+            ...WorkspaceRoutingQueryFields,
+            scope: Schema.optional(Schema.Literals(["project", "user"])),
+            days: Schema.optional(Schema.NumberFromString),
+          }),
+          success: described(MemoryStatsResponse, "Memory analytics"),
+          error: [MemoryUnavailableError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.stats",
+            summary: "Memory analytics",
+            description:
+              "What's in memory, where it came from, how it grows and which facts are recalled, computed locally from the ledger and the local audit log. Never starts memory; `days` limits the time-based figures (default: all).",
+          }),
+        ),
         HttpApiEndpoint.get("list", root, {
           query: WorkspaceRoutingQuery,
           success: described(MemoryList, "Stored facts, with provenance"),

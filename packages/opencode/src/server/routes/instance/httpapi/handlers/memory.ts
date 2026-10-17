@@ -8,6 +8,7 @@ import { MemoryExport } from "@/memory/export"
 import { MemoryImport } from "@/memory/import"
 import { MemoryLifecycle } from "@/memory/lifecycle"
 import { MemoryStore } from "@/memory/store"
+import { MemoryStatsLoad } from "@/memory/stats-load"
 import { Provider } from "@/provider/provider"
 import { InstanceHttpApi } from "../api"
 import {
@@ -248,6 +249,13 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       return { facts: result.facts, noteParagraphs: result.noteParagraphs, notes: result.notes, failed: result.failed }
     })
 
+    // XCOD-252: analytics, from the ledger and the local audit log only.
+    const stats = Effect.fn("MemoryHttpApi.stats")(function* (ctx: {
+      query: { scope?: MemoryStore.Scope; days?: number }
+    }) {
+      return yield* MemoryStatsLoad.load({ scope: ctx.query.scope, days: ctx.query.days })
+    })
+
     // XCOD-249: the wizard's step 2. The same gate as connecting, on the answer instead of the config.
     const setupBackend = Effect.fn("MemoryHttpApi.setupBackend")(function* (ctx: {
       payload: typeof MemorySetupInput.Type
@@ -282,6 +290,7 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
     })
 
     return handlers
+      .handle("stats", stats)
       .handle("setupBackend", setupBackend)
       .handle("setupCheck", setupCheck)
       .handle("list", list)
