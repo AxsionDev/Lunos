@@ -17,6 +17,7 @@ import {
   InstallationVersion,
   NPM_ALLOW_SCRIPTS,
   manualInstallCommand,
+  type UpgradeStep,
 } from "@opencode-ai/core/installation/version"
 import { NpmConfig } from "@opencode-ai/core/npm-config"
 import { InstallationEvent } from "@opencode-ai/schema/installation-event"
@@ -91,11 +92,29 @@ export function failureDetail(output: string) {
 
 const NpmPackage = Schema.Struct({ version: Schema.String })
 
+/**
+ * XCOD-247: the lunos-ai version a global listing shows (`npm list -g`: `lunos-ai@1.2.3`, `pnpm list
+ * -g`: `lunos-ai 1.2.3`, `bun pm ls -g`: `lunos-ai@1.2.3`), or undefined when it can't be told.
+ */
+export function listedVersion(listing: string) {
+  return listing.match(new RegExp(`(?:^|[\\s/])${PACKAGE}[@ ]v?(\\d+\\.\\d+\\.\\d+[^\\s]*)`, "m"))?.[1]
+}
+
+const LIST_COMMAND: Partial<Record<Method, string[]>> = {
+  npm: ["npm", "list", "-g", "--depth=0"],
+  pnpm: ["pnpm", "list", "-g", "--depth=0"],
+  bun: ["bun", "pm", "ls", "-g"],
+}
+
 export interface Interface {
   readonly info: () => Effect.Effect<Info>
   readonly method: () => Effect.Effect<Method>
   readonly latest: (method?: Method) => Effect.Effect<string>
-  readonly upgrade: (method: Method, target: string) => Effect.Effect<void, UpgradeFailedError>
+  readonly upgrade: (
+    method: Method,
+    target: string,
+    onStep?: (step: UpgradeStep) => void,
+  ) => Effect.Effect<void, UpgradeFailedError>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Installation") {}
@@ -124,12 +143,13 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
     )
 
     const run = Effect.fnUntraced(
-      function* (cmd: string[], opts?: { cwd?: string; env?: Record<string, string> }) {
+      function* (cmd: string[], opts?: { cwd?: string; env?: Record<string, string>; detached?: boolean }) {
         const result = yield* appProcess.run(
           ChildProcess.make(cmd[0], cmd.slice(1), {
             cwd: opts?.cwd,
             env: opts?.env,
             extendEnv: true,
+            detached: opts?.detached,
           }),
         )
         return {
@@ -195,13 +215,23 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         const data = yield* HttpClientResponse.schemaBodyJson(NpmPackage)(response)
         return data.version
       }, Effect.orDie),
-      upgrade: Effect.fn("Installation.upgrade")(function* (m: Method, target: string) {
+      upgrade: Effect.fn("Installation.upgrade")(function* (
+        m: Method,
+        target: string,
+        onStep?: (step: UpgradeStep) => void,
+      ) {
         if (!UPGRADABLE.has(m)) return yield* new UpgradeFailedError({ stderr: unpublishedMessage(m) })
         const manager = m === "bun" ? ["bun", "install", "-g"] : [m, "install", "-g"]
         // Without the flag, npm 12 upgrades the package but skips the postinstall that fetches
         // the new binary, leaving a `lunos` that won't start.
         const flags = m === "npm" ? [NPM_ALLOW_SCRIPTS] : []
-        const upgradeResult = yield* run([...manager, `${PACKAGE}@${target}`, ...flags])
+        onStep?.("installing")
+        // XCOD-247: a package manager stopped halfway can leave no working `lunos` at all, so once it
+        // starts it runs to the end: in its own process group (a terminal's Ctrl+C doesn't reach it)
+        // and uninterruptible (a closed TUI request doesn't kill it).
+        const upgradeResult = yield* Effect.uninterruptible(
+          run([...manager, `${PACKAGE}@${target}`, ...flags], { detached: true }),
+        )
         AuditLog.emit("upgrade", {
           method: m,
           version: target,
@@ -217,7 +247,16 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
           stdout: upgradeResult.stdout,
           stderr: upgradeResult.stderr,
         })
-        yield* text([process.execPath, "--version"])
+        onStep?.("verifying")
+        // Only a listing that clearly names another version fails; one that can't be read passes,
+        // since the install itself already succeeded.
+        const listing = yield* text(LIST_COMMAND[m]!)
+        const installed = listedVersion(listing)
+        if (installed && installed !== target) {
+          return yield* new UpgradeFailedError({
+            stderr: `${m} reports lunos-ai ${installed} after installing ${target}. To update manually, run: ${manualInstallCommand(target)}`,
+          })
+        }
       }),
     }
 

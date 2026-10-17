@@ -1,4 +1,5 @@
 import { Component, Show, createMemo, createResource } from "solid-js"
+import { UpdaterProgress } from "@/components/updater-progress"
 import { createMediaQuery } from "@solid-primitives/media"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
@@ -546,9 +547,12 @@ export const SettingsGeneralV2: Component<{
           title={language.t("settings.updates.row.check.title")}
           description={language.t("settings.updates.row.check.description")}
         >
-          <ButtonV2 size="normal" variant="neutral" disabled={!updater.action().run} onClick={() => updater.run()}>
-            {language.t(updater.action().label)}
-          </ButtonV2>
+          <div class="flex flex-col items-end gap-2">
+            <ButtonV2 size="normal" variant="neutral" disabled={!updater.action().run} onClick={() => updater.run()}>
+              {language.t(updater.action().label)}
+            </ButtonV2>
+            <UpdaterProgress progress={updater.progress()} />
+          </div>
         </SettingsRowV2>
       </SettingsListV2>
     </div>
