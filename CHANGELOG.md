@@ -20,12 +20,20 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **`/marketplace` in the TUI.** It opens the marketplace's Discover view straight from the prompt
+  (XCOD-251). `/marketplace mcp` (or `plugins`, `skills`, `hooks`) opens that tab,
+  `/marketplace playwright` searches every kind at once, and `/marketplace installed` lists what's
+  already installed, marking entries the marketplace now serves in a newer version or definition.
+  Entries show whether they're installed or verified. `/discover` is an alias. `/plugins` now opens
+  the Plugins manager, which points to `/marketplace`. With `LUNOS_OFFLINE=1` the view shows the
+  cached catalogue and its date, or says there's no cache yet instead of an empty list.
+
 - **"What's new" after an update.** The first start of a new version opens a short panel with what
   changed since the version you had, skipped versions included: behaviour changes and security
   entries first, then what's new and a count of fixes, one line each with its ticket (XCOD-248).
   `/whatsnew` reopens it, and `"whats_new": false` in `tui.json` turns the panel off. `lunos update`
-  prints the same summary after a successful install, and `lunos changelog [--since <version>]
-[--full] [--json]` shows any range. The notes are built into Lunos, so none of this uses the
+  prints the same summary after a successful install, and `lunos changelog` (`--since <version>`,
+  `--full`, `--json`) shows any range. The notes are built into Lunos, so none of this uses the
   network.
 
 ## [1.18.48] - 2026-10-16

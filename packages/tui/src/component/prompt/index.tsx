@@ -62,6 +62,7 @@ import { useLocation } from "../../context/location"
 import { parseRestartSlash } from "../../util/restart"
 import { parseSettingsSlash } from "../../util/settings"
 import { externalOf, parseExternalSlash } from "../../util/external"
+import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
 import { DialogExternal, useStartExternal } from "../dialog-external"
 
 registerOpencodeSpinner()
@@ -1042,6 +1043,18 @@ export function Prompt(props: PromptProps) {
             duration: 6000,
           })
         })
+      return false
+    }
+    // XCOD-251: `/marketplace mcp|skills|…|installed|<search words>` has arguments, so the slash list
+    // can't run it; the words are left for the Discover view, which the plugins feature owns.
+    // A user's own command of the same name wins and goes to the server as usual.
+    const marketplaceSlash = parseMarketplaceSlash(store.prompt.input)
+    const ownCommand = sync.data.command.some((x) => x.name === store.prompt.input.trim().split(/\s/)[0]!.slice(1))
+    if (marketplaceSlash && !ownCommand) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      requestDiscover(marketplaceSlash)
+      keymap.dispatchCommand("plugins.discover")
       return false
     }
     // XCOD-218: `/external claude|codex` or `/external resume <tool> <id>` opens an external session.

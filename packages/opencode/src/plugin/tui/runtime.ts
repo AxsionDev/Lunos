@@ -36,7 +36,8 @@ import { PluginMeta } from "@/plugin/meta"
 import { installPlugin as installModulePlugin, patchPluginConfig, readPluginManifest } from "@/plugin/install"
 import { listPlugins } from "@/plugin/discover"
 import { listContent } from "@/marketplace/content"
-import { planInstall, resolveConfigPath, type ConfigItem } from "@/marketplace/install"
+import { installedState, planInstall, readConfigs, resolveConfigPath, type ConfigItem } from "@/marketplace/install"
+import { Offline } from "@opencode-ai/core/offline"
 import { hasTheme, upsertTheme } from "@opencode-ai/tui/context/theme"
 import { Global } from "@opencode-ai/core/global"
 import { Filesystem } from "@/util/filesystem"
@@ -651,7 +652,7 @@ function pluginApi(runtime: RuntimeState, plugin: PluginEntry, scope: PluginScop
         return addPluginBySpec(runtime, spec)
       },
       install(spec, options) {
-        return installPluginBySpec(runtime, spec, options?.global)
+        return installPluginBySpec(runtime, spec, options?.global, options?.replace)
       },
       discover() {
         return discoverPluginsForRuntime(runtime)
@@ -951,16 +952,30 @@ async function discoverMarketplaceForRuntime(
   const ctx = marketplaceCtx(state)
   if (!ctx) return { marketplaceCount: 0, marketplaces: [], items: [] }
   const { marketplaceCount, marketplaces, items } = await listContent(ctx, kind)
+  // XCOD-251: the global config is where Discover installs skill sources, hooks and MCP servers;
+  // plugins can also be in the project's config, or loaded from tui.json.
+  const configs = await readConfigs([
+    await resolveConfigPath(Global.Path.config, true),
+    await resolveConfigPath(ctx.directory),
+  ]).catch(() => [])
+  const loaded = state?.plugins.map((plugin) => plugin.load.spec) ?? []
   return {
     marketplaceCount,
     marketplaces,
-    items: items.map((item) => ({
-      kind: item.kind,
-      name: item.name,
-      marketplace: item.marketplace,
-      description: item.description,
-      ...(item.kind === "plugin" ? { spec: item.spec } : {}),
-    })),
+    items: items.map((item) => {
+      const installed = installedState(item, configs, loaded)
+      const review = item.entry.review?.status
+      return {
+        kind: item.kind,
+        name: item.name,
+        marketplace: item.marketplace,
+        description: item.description,
+        ...(item.kind === "plugin" ? { spec: item.spec } : {}),
+        ...(review ? { review } : {}),
+        ...(installed ? { installed } : {}),
+      }
+    }),
+    ...(Offline.enabled() ? { offline: true } : {}),
   }
 }
 
@@ -1013,6 +1028,7 @@ async function installPluginBySpec(
   state: RuntimeState | undefined,
   raw: string,
   global = false,
+  replace = false,
 ): Promise<TuiPluginInstallResult> {
   if (!state) {
     return {
@@ -1066,6 +1082,7 @@ async function installPluginBySpec(
     spec,
     targets: manifest.targets,
     global,
+    force: replace,
     vcs: dir.worktree && dir.worktree !== "/" ? "git" : undefined,
     worktree: dir.worktree,
     directory: dir.directory,
