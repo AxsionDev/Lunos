@@ -652,7 +652,7 @@ function pluginApi(runtime: RuntimeState, plugin: PluginEntry, scope: PluginScop
         return addPluginBySpec(runtime, spec)
       },
       install(spec, options) {
-        return installPluginBySpec(runtime, spec, options?.global)
+        return installPluginBySpec(runtime, spec, options?.global, options?.replace)
       },
       discover() {
         return discoverPluginsForRuntime(runtime)
@@ -1028,6 +1028,7 @@ async function installPluginBySpec(
   state: RuntimeState | undefined,
   raw: string,
   global = false,
+  replace = false,
 ): Promise<TuiPluginInstallResult> {
   if (!state) {
     return {
@@ -1081,6 +1082,7 @@ async function installPluginBySpec(
     spec,
     targets: manifest.targets,
     global,
+    force: replace,
     vcs: dir.worktree && dir.worktree !== "/" ? "git" : undefined,
     worktree: dir.worktree,
     directory: dir.directory,

@@ -226,11 +226,11 @@ function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
       return tabs[(tabs.indexOf(current) + 1) % tabs.length]!
     })
 
-  const installPlugin = (spec: string) => {
+  const installPlugin = (spec: string, replace: boolean) => {
     if (installing()) return
     setInstalling(true)
     void props.api.plugins
-      .install(spec)
+      .install(spec, { replace })
       .then((out) => {
         if (!out.ok) {
           props.api.ui.toast({ variant: "error", message: out.message })
@@ -309,7 +309,8 @@ function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
   }
 
   const select = (item: TuiMarketplaceEntry) => {
-    if (item.kind === "plugin") return item.spec && installPlugin(item.spec)
+    // An update replaces the configured version; otherwise an install never touches one.
+    if (item.kind === "plugin") return item.spec && installPlugin(item.spec, item.installed === "update")
     confirmConfigItem(item as TuiMarketplaceEntry & { kind: Exclude<TuiMarketplaceKind, "plugin"> })
   }
 

@@ -559,6 +559,8 @@ export type TuiPluginStatus = {
 
 export type TuiPluginInstallOptions = {
   global?: boolean
+  /** Replace a configured version of the same package instead of leaving it (a marketplace update). */
+  replace?: boolean
 }
 
 export type TuiPluginInstallResult =
