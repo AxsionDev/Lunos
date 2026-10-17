@@ -83,3 +83,31 @@ export function versionVerbose(
     `upstream: anomalyco/opencode dev @ ${sync.commit.slice(0, 10)}, ${lag} as of ${sync.measuredAt}`,
   ].join("\n")
 }
+
+/**
+ * XCOD-247: the steps an update reports while it runs, worded once for `lunos update`, the TUI and
+ * the desktop app. Package managers don't report downloading and installing separately (the large
+ * download, the platform binary, happens inside the install's postinstall), so they are one step.
+ */
+export type UpgradeStep = "checking" | "installing" | "verifying"
+
+/** After this long on one step, the line says the package manager is still working. */
+export const UPGRADE_SLOW_MS = 60_000
+
+export function upgradeStepText(step: UpgradeStep, version?: string) {
+  if (step === "checking") return "Checking for the latest version…"
+  if (step === "installing") return `Downloading and installing lunos-ai${version ? ` ${version}` : ""}…`
+  return "Verifying…"
+}
+
+/** `0:12`, `1:05`, `12:40`. */
+export function formatElapsed(ms: number) {
+  const seconds = Math.max(0, Math.floor(ms / 1000))
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+}
+
+/** The step, the elapsed time and, once the step has run past a minute, why it's still going. */
+export function upgradeProgressText(step: UpgradeStep, version: string | undefined, stepMs: number, totalMs: number) {
+  const slow = stepMs >= UPGRADE_SLOW_MS ? " — still working, package managers can be slow on first install" : ""
+  return `${upgradeStepText(step, version)} ${formatElapsed(totalMs)}${slow}`
+}

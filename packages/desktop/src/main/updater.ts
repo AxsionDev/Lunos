@@ -33,6 +33,11 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
     backend: {
       checkForUpdates: () => autoUpdater.checkForUpdates(),
       downloadUpdate: () => autoUpdater.downloadUpdate(),
+      onDownloadProgress: (listener) => {
+        const handler = (progress: { percent: number }) => listener(progress.percent)
+        autoUpdater.on("download-progress", handler)
+        return () => autoUpdater.off("download-progress", handler)
+      },
       quitAndInstall: () => {
         // quitAndInstall closes all windows before emitting before-quit, so
         // flag the quit first to keep window ids persisted for restore.

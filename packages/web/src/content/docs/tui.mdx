@@ -405,7 +405,8 @@ Update Lunos to the latest version. Also available as `/upgrade`, its old name.
 
 When a new version is published, the bottom-right corner of every screen shows
 `There is a new version: X.Y.Z — please run lunos update` (`New version: X.Y.Z · lunos update` in
-terminals narrower than 100 columns) until you update. After updating, run [`/restart`](#restart) to
+terminals narrower than 100 columns) until you update. While `/update` runs, that corner shows the step
+and the elapsed time instead, and you can keep using the prompt. After updating, run [`/restart`](#restart) to
 use the new version: it starts the newly installed Lunos, not the old binary, back in the same
 session. See [`lunos update`](/docs/cli#update) for when the check runs and how to turn it off.
 
