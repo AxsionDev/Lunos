@@ -18,7 +18,34 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+## [1.18.48] - 2026-10-16
+
+### Changed
+
+- **LSP is on by default.** Language servers start as soon as you open a matching file, so the
+  agent gets diagnostics after its edits without setting `lsp` first. A server already on your
+  machine (in the project's `node_modules/.bin` or on your `PATH`) is used first; otherwise it's
+  downloaded the first time a matching file is opened, as before. Set `"lsp": false` to turn LSP
+  off, or disable single servers. `OPENCODE_DISABLE_LSP_DOWNLOAD=true` now also stops the
+  TypeScript and Biome servers from being installed from npm, so with it only servers you already
+  have are used (XCOD-246).
+
+## [1.18.47] - 2026-10-16
+
 ### Added
+
+- **Session sync to Lunos Cloud.** Once you sign in with `lunos login`, Lunos copies each
+  finished turn of your sessions to your space at app.lunos.tech, in the background; it is on by
+  default when signed in and never runs signed out. `.env*`, keys, `auth.json` and anything in
+  `sync.exclude` are never uploaded, and a credential scanner redacts common token shapes in the
+  rest. Turn it off with `lunos sync off`, `"sync": false` for a directory, or for a whole
+  organisation in managed config. With an organisation's own identity provider, nothing syncs
+  unless `cloud.endpoint` is set. **If you signed in before this release**, run `lunos sync on`
+  (or `lunos login`) to start. See [Session sync](docs/cloud-sync.md) (XCOD-185).
+
+- **`lunos cloud git-token set <host>` / `rm <host>`.** Store, replace or remove the git token
+  Lunos Cloud clones and pushes with, without curl. The token is read from stdin or a hidden
+  prompt, never from an argument, and is never printed back (XCOD-243).
 
 - **The Sessions window sees and controls every Lunos on this machine.** Sessions run by another
   Lunos (a second terminal, the desktop app, `lunos serve`) show their live state within seconds:
@@ -36,7 +63,9 @@ reasoning behind a change are published separately as **Lunos Notes**.
   marketplace, team memory and sharing, with no managed config to push. Only Lunos's built-in
   console is ever used. Managed `cloud.policy` still wins, and an organisation turns this off with
   `"cloud": { "auto_team": false }` in managed config. `/settings` → Status shows where team
-  features come from (XCOD-242).
+  features come from. A hosted organisation's policy can only restrict your Lunos (permissions,
+  residency, models, sync, sharing, sandbox, external agents); it can't add plugins, MCP servers,
+  commands or agents, or change where your sign-in goes (XCOD-242).
 
 - **See on your Lunos console which Lunos versions run where, and which policy they enforce.** Each
   start bound to your organisation's console tells it the version, OS, architecture, surface, a
@@ -123,6 +152,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **Mistral counts as EU only at its EU endpoint.** Mistral's default endpoint, `api.mistral.ai`,
+  is global, with no committed inference location, so an EU-only data-residency policy now
+  refuses it; before, Lunos counted it as EU. To use Mistral under an EU-only policy, set
+  `"provider": { "mistral": { "options": { "baseURL": "https://api.eu.mistral.ai/v1" } } }`
+  (Mistral charges 1.1× list price there). Without a residency policy nothing changes (XCOD-194).
 - **/settings keys work the same on every screen.** Esc closes the whole settings window from any
   depth without saving what you were typing; ← goes back one level to the row you came from (in a
   text field, from the start of the field). Every screen shows `← back · esc close` (XCOD-233).
@@ -135,6 +169,10 @@ reasoning behind a change are published separately as **Lunos Notes**.
   to OpenCode 2) are not included.
 
 ### Fixed
+
+- **Desktop Sessions window.** Opening a session from it now opens it in the main window; costs
+  under a cent show instead of $0.00; its warning text meets contrast in the light theme
+  (XCOD-235).
 
 - **Cloud runs report how they really ended.** `lunos run --cloud --cloud-secret NAME "message"`
   works with the flag before the message (repeat it, or write `A,B`); the message was taken as a
@@ -694,7 +732,9 @@ Upstream changes are not re-listed here. See
 
 Lunos is not affiliated with, or endorsed by, the opencode project or Anthropic.
 
-[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.46...dev
+[Unreleased]: https://github.com/AxsionDev/Lunos/compare/v1.18.48...dev
+[1.18.48]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.48
+[1.18.47]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.47
 [1.18.46]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.46
 [1.18.44]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.44
 [1.18.43]: https://github.com/AxsionDev/Lunos/releases/tag/v1.18.43

@@ -64,6 +64,11 @@ export interface Claim {
    * else's endpoint, and is assessed like one (XCOD-138).
    */
   readonly hosts?: readonly string[]
+  /**
+   * XCOD-194: the host the provider's SDK calls when no baseURL is configured, when it isn't one
+   * of `hosts`. Without it, a call with no baseURL would get the claim although it goes elsewhere.
+   */
+  readonly defaultHost?: string
 }
 
 const UNKNOWN: Claim = {
@@ -86,8 +91,12 @@ const CLAIMS: Record<string, Claim> = {
   mistral: {
     region: "eu",
     basis: "both",
-    hosts: ["api.mistral.ai", "codestral.mistral.ai"],
-    note: "Mistral AI is a French company and its own API serves EU-hosted inference. Note this is the direct Mistral API only — Mistral models served via Azure or Bedrock inherit that platform's region instead, and are covered by the `azure` / `amazon-bedrock` rows.",
+    // XCOD-194 (PO 2026-10-15): only Mistral's EU endpoint. Its docs say api.mistral.ai is "Global"
+    // with no committed inference location, so the default host is not EU; set the provider's
+    // baseURL to https://api.eu.mistral.ai/v1 to run Mistral under an EU-only policy.
+    hosts: ["api.eu.mistral.ai"],
+    defaultHost: "api.mistral.ai",
+    note: "Mistral AI is a French company. Only its EU endpoint, api.eu.mistral.ai, serves EU-hosted inference; the default api.mistral.ai is global, with no committed inference location. Mistral models served via Azure or Bedrock inherit that platform's region instead, and are covered by the `azure` / `amazon-bedrock` rows.",
   },
   scaleway: {
     region: "eu",
@@ -352,7 +361,8 @@ export function resolve(
   declared: Readonly<Record<string, Declaration>> | undefined,
 ): { claim: Claim; tagged: boolean } {
   const builtIn = CLAIMS[providerID] ?? SHARE_HOSTS[providerID]
-  const host = hostOf(baseURL)
+  // No baseURL: the SDK's own default host (XCOD-194), so the claim follows where calls really go.
+  const host = hostOf(baseURL) ?? builtIn?.defaultHost
   if (builtIn && (!builtIn.hosts || !host || hostMatches(host, builtIn.hosts))) return { claim: builtIn, tagged: true }
   const declaration = declared?.[providerID]
   if (declaration) {

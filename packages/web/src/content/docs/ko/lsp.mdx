@@ -47,7 +47,7 @@ OpenCode는 널리 사용되는 언어를 위해 여러 built-in LSP 서버를 �
 | yaml-ls            | .yaml, .yml                                                         | Red Hat `yaml-language-server` 자동 설치                   |
 | zls                | .zig, .zon                                                          | `zig` 명령 사용 가능                                       |
 
-LSP는 기본적으로 비활성화되어 있습니다. 활성화하면 위 확장자 중 하나가 감지되고 요구 사항이 충족될 때 서버가 시작됩니다.
+LSP는 기본적으로 활성화되어 있습니다. 위 확장자 중 하나가 감지되고 요구 사항이 충족될 때 서버가 시작됩니다.
 
 :::note
 `OPENCODE_DISABLE_LSP_DOWNLOAD` 환경 변수를 `true`로 설정하면 LSP 서버 자동 다운로드를 비활성화할 수 있습니다.
@@ -154,7 +154,7 @@ OpenCode config의 `lsp` 섹션에서 LSP 서버를 활성화하고 사용자 �
 
 ### LSP 서버 비활성화
 
-`lsp`를 생략하면 모든 LSP 서버가 비활성화됩니다. 다른 config에서 활성화한 모든 LSP 서버를 비활성화하려면 `lsp`를 `false`로 설정하세요.
+`lsp`를 생략하면 내장 LSP 서버가 활성화됩니다. 모든 LSP 서버를 비활성화하려면 `lsp`를 `false`로 설정하세요.
 
 ```json title="opencode.json" {3}
 {

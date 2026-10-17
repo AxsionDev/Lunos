@@ -16,15 +16,15 @@ export const LARGE_MIN_B = 70
 
 /**
  * Curated defaults, "provider/model" → why. EU-hosted and local models only, to match the
- * residency defaults Lunos is built around. Reasons stay under ~50 characters so they fit the
+ * residency defaults Lunos is built around (Mistral's only at its EU endpoint, XCOD-194). Reasons stay under ~50 characters so they fit the
  * TUI picker's detail line. An organisation replaces this list with the
  * `recommended` config key (lockable with `$locked`).
  */
 export const RECOMMENDED: Readonly<Record<string, string>> = {
-  "mistral/mistral-medium-latest": "EU-hosted; a balanced default for coding",
-  "mistral/mistral-large-latest": "EU-hosted; flagship for hard reasoning",
-  "mistral/codestral-latest": "EU-hosted; fast for completion and small edits",
-  "mistral/mistral-small-latest": "EU-hosted; cheap and fast for simple tasks",
+  "mistral/mistral-medium-latest": "EU at api.eu.mistral.ai; balanced coding default",
+  "mistral/mistral-large-latest": "EU at api.eu.mistral.ai; flagship, hard reasoning",
+  "mistral/codestral-latest": "EU at api.eu.mistral.ai; fast completion, edits",
+  "mistral/mistral-small-latest": "EU at api.eu.mistral.ai; cheap, fast, simple",
   "scaleway/qwen3-coder-30b-a3b-instruct": "EU-hosted (Scaleway, France); open-weight coder",
   "ovhcloud/qwen3-coder-30b-a3b-instruct": "EU-hosted (OVHcloud); open-weight coding model",
   "ollama/qwen3:4b": "Runs on your machine, offline; for simple edits",
