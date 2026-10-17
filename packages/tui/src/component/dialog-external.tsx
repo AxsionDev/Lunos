@@ -5,7 +5,9 @@ import { DialogPrompt } from "../ui/dialog-prompt"
 import { useRoute } from "../context/route"
 import { useSDK } from "../context/sdk"
 import { useToast } from "../ui/toast"
-import { EXTERNAL_LABEL, refusalMessage, type ExternalTool } from "../util/external"
+import { createResource } from "solid-js"
+import { useProject } from "../context/project"
+import { EXTERNAL_LABEL, refusalMessage, toolUnavailable, type ExternalTool } from "../util/external"
 
 /** Creates the external session (the server applies the policy and residency gate) and opens it. */
 export function useStartExternal() {
@@ -28,8 +30,85 @@ export function useStartExternal() {
     }
     dialog.clear()
     route.navigate({ type: "session", sessionID: res.data.id })
-    return true
+    return res.data.id
   }
+}
+
+/**
+ * XCOD-250: `/claude [task]` and `/codex [task]`. Not installed or not signed in: says how to fix it
+ * and starts nothing. Refused by policy: tries anyway, so the server refuses with the reason and
+ * audits it (`external.denied`). Otherwise a task starts a new session with it, and no task opens the
+ * picker (new session, or continue a recent one of that tool in this project).
+ */
+export function useExternalCommand() {
+  const sdk = useSDK()
+  const toast = useToast()
+  const dialog = useDialog()
+  const start = useStartExternal()
+  return async (tool: ExternalTool, text: string) => {
+    const tools = await sdk.client.experimental.external.tools().catch(() => undefined)
+    const state = tools?.data?.find((item) => item.tool === tool)
+    const unavailable = toolUnavailable(tool, state)
+    if (unavailable && !state?.refused) {
+      toast.show({
+        variant: "warning",
+        title: `${EXTERNAL_LABEL[tool]} can't start`,
+        message: [unavailable, state?.hint].filter(Boolean).join("\n"),
+        duration: 10000,
+      })
+      return
+    }
+    if (!text && !state?.refused) return void dialog.replace(() => <DialogExternalPick tool={tool} />)
+    const sessionID = await start(tool)
+    if (!sessionID || !text) return
+    // No agent: the current mode (plan, say) mustn't refuse every approval the tool asks for.
+    await sdk.client.session
+      .prompt({ sessionID, parts: [{ type: "text", text }] }, { throwOnError: true })
+      .catch((error: unknown) =>
+        toast.show({
+          variant: "error",
+          title: "Failed to send the task",
+          message: refusalMessage(error, String(error)),
+        }),
+      )
+  }
+}
+
+/** New session, or one of this tool's recent sessions in this project, newest first. */
+export function DialogExternalPick(props: { tool: ExternalTool }) {
+  const sdk = useSDK()
+  const project = useProject()
+  const route = useRoute()
+  const dialog = useDialog()
+  const start = useStartExternal()
+  const [recent] = createResource(async () => {
+    const overview = await sdk.client.experimental.session.overview().catch(() => undefined)
+    const directory = project.instance.directory()
+    return (overview?.data?.sessions ?? [])
+      .filter((item) => item.kind === "external" && item.tool === props.tool && item.directory === directory)
+      .toSorted((a, b) => b.updated - a.updated)
+      .slice(0, 10)
+  })
+  const options = () => [
+    { value: "", title: "New session", description: `start ${EXTERNAL_LABEL[props.tool]} here` },
+    ...(recent() ?? []).map((item) => ({
+      value: item.id,
+      title: item.title,
+      category: "Continue",
+      description: new Date(item.updated).toLocaleString(),
+    })),
+  ]
+  // A Lunos session view of the tool opens as it is, context and all; a session Lunos only has in
+  // its registry (started by `lunos external run`) is resumed in a new view by the tool's own id.
+  const pick = (id: string) => {
+    if (!id) return void start(props.tool)
+    if (id.startsWith("external:")) return void start(props.tool, id.slice("external:".length))
+    dialog.clear()
+    route.navigate({ type: "session", sessionID: id })
+  }
+  return (
+    <DialogSelect title={EXTERNAL_LABEL[props.tool]} options={options()} onSelect={(option) => pick(option.value)} />
+  )
 }
 
 export function DialogExternal() {

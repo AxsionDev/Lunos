@@ -37,29 +37,38 @@ export function record(config: Config, event: "external.session" | "external.den
   if (file) void Audit.write({ file }, event, fields)
 }
 
-/** Throws RefusedError (after auditing it) when the session must not start. */
-export function check(tool: ExternalDetect.Tool, config: Config) {
+export type Refusal = { reason: "disabled" | "policy" | "residency"; message: string }
+
+/**
+ * Why a session with `tool` must not start, if it mustn't. Nothing is audited: XCOD-250's commands
+ * ask this to grey themselves out, and only an attempt to start (`check`) is recorded.
+ */
+export function evaluate(tool: ExternalDetect.Tool, config: Config): Refusal | undefined {
   const spec = ExternalDetect.TOOLS[tool]
-  const refuse = (reason: string, why: string) => {
-    record(config, "external.denied", { tool, provider: spec.provider, reason })
-    throw new RefusedError(why)
-  }
   if (config.external?.enabled === false) {
     const locked = config.$locked?.some((key) => key === "external" || key === "external.enabled")
-    refuse(
-      locked ? "policy" : "disabled",
-      locked
-        ? `Starting ${spec.label} from Lunos is turned off by your organisation's policy (external.enabled is locked).`
-        : `Starting ${spec.label} from Lunos is turned off (external.enabled is false).`,
-    )
+    return locked
+      ? {
+          reason: "policy",
+          message: `Starting ${spec.label} from Lunos is turned off by your organisation's policy (external.enabled is locked).`,
+        }
+      : { reason: "disabled", message: `Starting ${spec.label} from Lunos is turned off (external.enabled is false).` }
   }
   const resolved = AuditLog.residency(config)
   if (resolved && resolved.enforce !== false) {
     const decision = Residency.evaluate(spec.provider, resolved.policy)
     if (!decision.allowed)
-      refuse(
-        "residency",
-        `${spec.label} sends your code to ${spec.provider === "anthropic" ? "Anthropic" : "OpenAI"} (${decision.region}), and the data-residency policy allows only: ${resolved.policy.allow.join(", ")}. It can't be started from Lunos under this policy.`,
-      )
+      return {
+        reason: "residency",
+        message: `${spec.label} sends your code to ${spec.provider === "anthropic" ? "Anthropic" : "OpenAI"} (${decision.region}), and the data-residency policy allows only: ${resolved.policy.allow.join(", ")}. It can't be started from Lunos under this policy.`,
+      }
   }
+}
+
+/** Throws RefusedError (after auditing it) when the session must not start. */
+export function check(tool: ExternalDetect.Tool, config: Config) {
+  const refusal = evaluate(tool, config)
+  if (!refusal) return
+  record(config, "external.denied", { tool, provider: ExternalDetect.TOOLS[tool].provider, reason: refusal.reason })
+  throw new RefusedError(refusal.message)
 }

@@ -1,5 +1,5 @@
 import type { BoxRenderable, TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
-import { EXTERNAL_LABEL, externalOf } from "../../util/external"
+import { EXTERNAL_LABEL, externalOf, wantExternalTools } from "../../util/external"
 import { pathToFileURL } from "bun"
 import fuzzysort from "fuzzysort"
 import path from "path"
@@ -69,6 +69,8 @@ export type AutocompleteOption = {
   aliases?: string[]
   aliasHints?: Record<string, string>
   disabled?: boolean
+  /** Shown greyed out (XCOD-250), still selectable. */
+  muted?: boolean
   description?: string
   isDirectory?: boolean
   onSelect?: () => void
@@ -665,6 +667,8 @@ export function Autocomplete(props: {
   }))
 
   function show(mode: "@" | "/") {
+    // XCOD-250: /claude and /codex find out now whether their tools are usable.
+    if (mode === "/") wantExternalTools()
     setStore({
       visible: mode,
       index: props.input().cursorOffset,
@@ -788,7 +792,12 @@ export function Autocomplete(props: {
               }}
               onMouseUp={() => select()}
             >
-              <text fg={index === store.selected ? selectedForeground(theme) : theme.text} flexShrink={0}>
+              <text
+                fg={
+                  index === store.selected ? selectedForeground(theme) : option().muted ? theme.textMuted : theme.text
+                }
+                flexShrink={0}
+              >
                 {option().display}
               </text>
               <Show when={option().description}>

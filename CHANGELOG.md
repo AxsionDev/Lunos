@@ -37,6 +37,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
   the Plugins manager, which points to `/marketplace`. With `LUNOS_OFFLINE=1` the view shows the
   cached catalogue and its date, or says there's no cache yet instead of an empty list.
 
+- **`/claude` and `/codex` in the TUI.** `/claude <task>` hands a task to your own Claude Code in a
+  new session view, and `/codex <task>` to Codex CLI; their approvals come to Lunos's prompt as
+  before (XCOD-250). On their own they open a picker to start a new session or continue a recent one
+  in this project. They're listed only while external sessions are on, and show greyed out with the
+  reason when the tool isn't installed or signed in, or is blocked by policy (choosing one then
+  explains, and a policy refusal is audited as `external.denied`). A command of your own with the
+  same name wins.
+
 - **"What's new" after an update.** The first start of a new version opens a short panel with what
   changed since the version you had, skipped versions included: behaviour changes and security
   entries first, then what's new and a count of fixes, one line each with its ticket (XCOD-248).

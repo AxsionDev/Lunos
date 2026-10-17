@@ -58,6 +58,8 @@ import type {
   ExperimentalControlPlaneMoveSessionResponses,
   ExperimentalExternalStopErrors,
   ExperimentalExternalStopResponses,
+  ExperimentalExternalToolsErrors,
+  ExperimentalExternalToolsResponses,
   ExperimentalPeerAsksErrors,
   ExperimentalPeerAsksResponses,
   ExperimentalPeerPermissionReplyErrors,
@@ -1309,6 +1311,40 @@ export class SessionGroup extends HeyApiClient {
 }
 
 export class External extends HeyApiClient {
+  /**
+   * External tools
+   *
+   * Whether Claude Code and Codex CLI can be started from Lunos here: installed, signed in, and allowed by external.enabled and the residency policy. Asking doesn't audit anything.
+   */
+  public tools<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalExternalToolsResponses,
+      ExperimentalExternalToolsErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/tools",
+      ...options,
+      ...params,
+    })
+  }
+
   /**
    * Stop an external session
    *

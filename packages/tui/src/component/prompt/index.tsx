@@ -61,9 +61,9 @@ import { readLocalAttachment } from "./local-attachment"
 import { useLocation } from "../../context/location"
 import { parseRestartSlash } from "../../util/restart"
 import { parseSettingsSlash } from "../../util/settings"
-import { externalOf, parseExternalSlash } from "../../util/external"
+import { externalOf, parseExternalSlash, parseToolSlash } from "../../util/external"
 import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
-import { DialogExternal, useStartExternal } from "../dialog-external"
+import { DialogExternal, useExternalCommand, useStartExternal } from "../dialog-external"
 
 registerOpencodeSpinner()
 
@@ -168,6 +168,7 @@ export function Prompt(props: PromptProps) {
   const dialog = useDialog()
   const toast = useToast()
   const startExternal = useStartExternal()
+  const runExternalCommand = useExternalCommand()
   const status = createMemo(() => sync.data.session_status?.[props.sessionID ?? ""] ?? { type: "idle" })
   const history = usePromptHistory()
   const stash = usePromptStash()
@@ -1065,6 +1066,20 @@ export function Prompt(props: PromptProps) {
       if ("error" in externalSlash) toast.show({ variant: "warning", message: externalSlash.error })
       else if ("pick" in externalSlash) dialog.replace(() => <DialogExternal />)
       else void startExternal(externalSlash.tool, externalSlash.session)
+      return false
+    }
+    // XCOD-250: `/claude <task>` / `/codex <task>` start a new session of that tool with the task,
+    // also from inside another external session. A user's own command of the same name wins, and
+    // with external sessions off the text isn't ours.
+    const toolSlash = parseToolSlash(store.prompt.input)
+    if (
+      toolSlash &&
+      sync.data.config.external?.enabled !== false &&
+      !sync.data.command.some((x) => x.name === toolSlash.tool)
+    ) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      void runExternalCommand(toolSlash.tool, toolSlash.text)
       return false
     }
     const agent = local.mode.current()

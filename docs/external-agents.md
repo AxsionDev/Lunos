@@ -62,6 +62,18 @@ After each session Lunos shows what the tool reports:
 
 It's gated like `lunos external run`: under a residency policy that doesn't allow the vendor's region, it isn't started, the reason is shown, and the refusal is written to the audit log.
 
+### `/claude` and `/codex`
+
+The quick way in from the prompt:
+
+- `/claude <task>` (or `/codex <task>`) starts a new session of that tool with the task, in its own view, and switches to it. The task goes as typed, so `/codex /review` runs Codex's review.
+- `/claude` or `/codex` on its own opens a picker: a new session, or one of that tool's recent sessions in this project to continue.
+- Inside a Claude Code or Codex view, `/claude` and `/codex` start a new session; anything else still goes to the tool.
+
+They're listed only while external sessions are on (`external.enabled` isn't `false`). They show greyed out, with the reason, when the tool isn't installed or signed in ("see `lunos external list`"), or as "blocked by policy" under a residency policy that refuses the vendor. Choosing a greyed command says how to fix it and starts nothing; a policy refusal is written to the audit log (`external.denied`). Checking whether the commands are available writes nothing.
+
+If you have your own command, skill or agent command named `claude` or `codex`, yours runs, and Lunos says once that its own is `/external claude` / `/external codex`.
+
 ## Handing a task from a Lunos agent
 
 To let Lunos agents hand a task to Claude Code or Codex CLI, turn on the `external_agent` tool:

@@ -1,3 +1,4 @@
+import { createSignal } from "solid-js"
 // XCOD-218: external sessions (Claude Code / Codex driven from Lunos) in the TUI.
 
 export type ExternalTool = "claude" | "codex"
@@ -33,6 +34,43 @@ export function parseExternalSlash(
   const session = words[1]
   if (session !== undefined && !/^[A-Za-z0-9_-]+$/.test(session)) return { error: `"${session}" isn't a session id` }
   return { tool, ...(session ? { session } : {}) }
+}
+
+/**
+ * XCOD-250: `/claude <task>` and `/codex <task>`. The text goes to the tool as typed, its own
+ * /commands included (`/codex /review`); bare `/claude` or `/codex` opens the session picker.
+ */
+export function parseToolSlash(input: string): { tool: ExternalTool; text: string } | undefined {
+  const match = /^\/(claude|codex)(?:\s+([\s\S]*))?$/.exec(input.trim())
+  if (!match) return undefined
+  return { tool: match[1] as ExternalTool, text: (match[2] ?? "").trim() }
+}
+
+export type ExternalToolState = {
+  installed: boolean
+  loggedIn?: boolean
+  hint?: string
+  refused?: { reason: string; message: string }
+}
+
+/**
+ * Why a tool's command is greyed out, or undefined when it's ready. A refusal by policy still lets
+ * the command be chosen: the server then refuses it with the reason and audits the attempt.
+ */
+export function toolUnavailable(tool: ExternalTool, state: ExternalToolState | undefined) {
+  if (!state) return undefined
+  if (state.refused) return state.refused.reason === "residency" ? "blocked by policy" : state.refused.message
+  if (!state.installed) return `${EXTERNAL_LABEL[tool]} isn't installed — see lunos external list`
+  if (state.loggedIn === false) return `${EXTERNAL_LABEL[tool]} isn't signed in — see lunos external list`
+  return undefined
+}
+
+// Probing the tools runs `claude --version`, `--help` and `auth status` (and Codex's equivalents),
+// so it waits until someone opens the slash commands instead of running on every start.
+const [toolsWanted, setToolsWanted] = createSignal(false)
+export { toolsWanted }
+export function wantExternalTools() {
+  if (!toolsWanted()) setToolsWanted(true)
 }
 
 /** "$0.3211": the cost the tool reported, to four places like `lunos external`. */

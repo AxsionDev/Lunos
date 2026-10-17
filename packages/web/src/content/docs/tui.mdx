@@ -165,6 +165,21 @@ Guided setup for creating or updating `AGENTS.md`. [Learn more](/docs/rules).
 
 ---
 
+### claude
+
+Give Claude Code a task from the prompt: `/claude <task>` starts a new Claude Code session with it,
+in its own view. `/claude` on its own lets you pick a new session or continue a recent one in this
+project. `/codex` does the same for Codex CLI (`/codex /review` runs its review). Listed while
+external sessions are on; greyed out with the reason when the tool isn't installed, isn't signed in,
+or is blocked by policy. See [Claude Code and Codex CLI from Lunos](https://github.com/AxsionDev/Lunos/blob/dev/docs/external-agents.md).
+
+```bash frame="none"
+/claude Fix the failing test
+/codex /review
+```
+
+---
+
 ### marketplace
 
 Browse and install plugins, skills, hooks and MCP servers from your marketplaces. Add a tab name (`plugins`, `skills`, `hooks`, `mcp`) to open that tab, `installed` to see what is installed with available updates marked, or any other words to search. _Alias_: `/discover`
