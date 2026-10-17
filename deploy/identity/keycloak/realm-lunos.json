@@ -17,6 +17,7 @@
   "oauth2DevicePollingInterval": 5,
   "offlineSessionIdleTimeout": 2592000,
   "internationalizationEnabled": true,
+  "loginTheme": "lunos",
   "supportedLocales": ["en", "de", "fr", "es", "it", "nl", "pl", "pt-BR", "bg"],
   "defaultLocale": "en",
   "smtpServer": {

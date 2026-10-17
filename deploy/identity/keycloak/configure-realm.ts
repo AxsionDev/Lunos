@@ -1,6 +1,6 @@
 // XCOD-185: brings a running realm (the live Lunos at auth.lunos.tech) to realm-lunos.json's shape through
 // the admin REST API: the lunos client scope and its mappers, lunos as a realm default scope, the lunos-idp
-// event listener, the app and console clients, and lunos on lunos-cli. A realm file is imported only into
+// event listener, the app and console clients, lunos on lunos-cli, and the lunos login theme (XCOD-244). A realm file is imported only into
 // an empty Keycloak, so an existing realm needs this instead.
 //
 //   KC_URL=https://auth.lunos.tech KC_ADMIN_USER=admin KC_ADMIN_PASSWORD=... bun configure-realm.ts
@@ -118,6 +118,12 @@ export async function configure(
   }
   const clientByClientId = async (clientId: string): Promise<Json | undefined> =>
     (await api.call("GET", `${r}/clients?clientId=${encodeURIComponent(clientId)}`))[0]
+  // A client-level login theme beats the realm's; it's the operator's choice, so it's only noted.
+  const noteThemeOverride = (client: Json | undefined) => {
+    const override = client?.attributes?.login_theme
+    if (override && override !== bundle.loginTheme)
+      log(`client ${client.clientId} overrides the login theme with ${override}; left as is`)
+  }
 
   // Every check that can refuse runs before the first write, so a refusal leaves the realm untouched.
   const info = await api.call("GET", "/serverinfo")
@@ -126,15 +132,25 @@ export async function configure(
       ? []
       : ["the protocol mapper lunos-idp-mapper"]),
     ...(info.providers?.eventsListener?.providers?.["lunos-idp"] ? [] : ["the event listener lunos-idp"]),
+    ...(info.themes?.login?.some((t: Json) => t.name === bundle.loginTheme)
+      ? []
+      : [`the login theme ${bundle.loginTheme}`]),
   ]
   if (missing.length) {
+    const isTheme = (m: string) => m.startsWith("the login theme")
     throw new Error(
-      `Keycloak at ${api.base} doesn't offer ${missing.join(" or ")}: the lunos-idp jar isn't deployed. ` +
-        "Run ./build.sh, mount providers/ at /opt/keycloak/providers (compose.yaml does) and restart Keycloak.",
+      `Keycloak at ${api.base} doesn't offer ${missing.join(" or ")}. ` +
+        (missing.some((m) => !isTheme(m))
+          ? "The lunos-idp jar isn't deployed: run ./build.sh, mount providers/ at /opt/keycloak/providers (compose.yaml does) and restart Keycloak. "
+          : "") +
+        (missing.some(isTheme)
+          ? "The theme isn't mounted: copy themes/ next to compose.yaml, mount it at /opt/keycloak/themes (compose.yaml does) and restart Keycloak."
+          : ""),
     )
   }
   await api.call("GET", r)
   const cli = await clientByClientId("lunos-cli")
+  noteThemeOverride(cli)
   if (!cli)
     throw new Error(
       `realm ${realm} has no lunos-cli client; this script doesn't create it (import realm-lunos.json into a new realm instead)`,
@@ -193,6 +209,15 @@ export async function configure(
     )
   }
 
+  // XCOD-244: the login pages' look. The refusal above made sure Keycloak has the theme.
+  const realmNow: Json = await api.call("GET", r)
+  if (realmNow.loginTheme !== bundle.loginTheme) {
+    await change(
+      `set the realm's login theme to ${bundle.loginTheme} (was ${realmNow.loginTheme || "the default"})`,
+      () => api.call("PUT", r, { loginTheme: bundle.loginTheme }),
+    )
+  }
+
   const ids = new Map<string, string | undefined>([["lunos-cli", cli.id]])
   const created = new Set<string>()
   let hadServiceAccount = false
@@ -201,6 +226,7 @@ export async function configure(
     const secretEnv = SECRET_ENV[clientId]
     const secret = env[secretEnv]
     const have = await clientByClientId(clientId)
+    noteThemeOverride(have)
     if (!have) {
       // The bundle's entry names its default scopes, lunos among them where it belongs.
       const from = secret ? `, secret from ${secretEnv}` : ""
