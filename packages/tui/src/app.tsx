@@ -3,7 +3,7 @@ import { animationsEnabled } from "./util/motion"
 import { DialogArtifacts } from "./component/dialog-artifacts"
 import { DialogBackground } from "./component/dialog-background"
 import { DialogExternal, useExternalCommand } from "./component/dialog-external"
-import { EXTERNAL_LABEL, toolUnavailable } from "./util/external"
+import { EXTERNAL_LABEL, toolUnavailable, toolsWanted } from "./util/external"
 import type { ExternalToolStatus } from "@opencode-ai/sdk/v2"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
@@ -749,7 +749,7 @@ function App(props: {
   const externalOn = createMemo(() => sync.data.config.external?.enabled !== false)
   const [externalTools, setExternalTools] = createSignal<ExternalToolStatus[]>()
   createEffect(() => {
-    if (!externalOn() || sync.status !== "complete" || externalTools()) return
+    if (!externalOn() || !toolsWanted() || sync.status !== "complete" || externalTools()) return
     void sdk.client.experimental.external
       .tools()
       .then((result) => setExternalTools(result.data ?? []))

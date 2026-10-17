@@ -1,5 +1,5 @@
 import type { BoxRenderable, TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
-import { EXTERNAL_LABEL, externalOf } from "../../util/external"
+import { EXTERNAL_LABEL, externalOf, wantExternalTools } from "../../util/external"
 import { pathToFileURL } from "bun"
 import fuzzysort from "fuzzysort"
 import path from "path"
@@ -667,6 +667,8 @@ export function Autocomplete(props: {
   }))
 
   function show(mode: "@" | "/") {
+    // XCOD-250: /claude and /codex find out now whether their tools are usable.
+    if (mode === "/") wantExternalTools()
     setStore({
       visible: mode,
       index: props.input().cursorOffset,

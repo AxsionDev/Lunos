@@ -1,3 +1,4 @@
+import { createSignal } from "solid-js"
 // XCOD-218: external sessions (Claude Code / Codex driven from Lunos) in the TUI.
 
 export type ExternalTool = "claude" | "codex"
@@ -62,6 +63,14 @@ export function toolUnavailable(tool: ExternalTool, state: ExternalToolState | u
   if (!state.installed) return `${EXTERNAL_LABEL[tool]} isn't installed — see lunos external list`
   if (state.loggedIn === false) return `${EXTERNAL_LABEL[tool]} isn't signed in — see lunos external list`
   return undefined
+}
+
+// Probing the tools runs `claude --version`, `--help` and `auth status` (and Codex's equivalents),
+// so it waits until someone opens the slash commands instead of running on every start.
+const [toolsWanted, setToolsWanted] = createSignal(false)
+export { toolsWanted }
+export function wantExternalTools() {
+  if (!toolsWanted()) setToolsWanted(true)
 }
 
 /** "$0.3211": the cost the tool reported, to four places like `lunos external`. */
