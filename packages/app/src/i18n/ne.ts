@@ -387,6 +387,8 @@ export const dict: Record<string, string> = {
   "prompt.attachment.remove": "संलग्नक हटाउनुहोस्",
   "prompt.action.send": "पठाउनुहोस्",
   "prompt.action.stop": "रोक्नुहोस्",
+  "prompt.escape.again": "खाली गर्न फेरि Esc थिच्नुहोस्",
+  "prompt.toast.cleared": "प्रम्प्ट खाली गरियो · फर्काउन {{key}}",
   "prompt.toast.pasteUnsupported.title": "असमर्थित संलग्नक",
   "prompt.toast.pasteUnsupported.description": "केवल छविहरू, PDF हरू, वा पाठ फाइलहरू यहाँ संलग्न गर्न सकिन्छ।",
   "prompt.toast.attachmentDuplicate.title": "यो फाइल पहिले नै अपलोड गरिएको छ",

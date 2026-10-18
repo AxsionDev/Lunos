@@ -387,6 +387,8 @@ export const dict = {
   "prompt.attachment.remove": "Замимаро хориҷ кунед",
   "prompt.action.send": "Фиристодан",
   "prompt.action.stop": "Ист",
+  "prompt.escape.again": "Барои тоза кардан боз Esc",
+  "prompt.toast.cleared": "Дархост тоза шуд · барои барқарор {{key}}",
   "prompt.toast.pasteUnsupported.title": "Замимаи дастгирӣнашаванда",
   "prompt.toast.pasteUnsupported.description":
     "Дар ин ҷо танҳо тасвирҳо, PDFс ё файлҳои матнӣ замима кардан мумкин аст.",

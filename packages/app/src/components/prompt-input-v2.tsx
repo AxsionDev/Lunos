@@ -18,7 +18,7 @@ import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-
 import { createPromptSubmit } from "@/components/prompt-input/submit"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import { useComments } from "@/context/comments"
-import { useCommand } from "@/context/command"
+import { formatKeybind, useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePermission } from "@/context/permission"
@@ -111,6 +111,11 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
             Lunos · {item().name}
           </span>
         )}
+      </Show>
+      <Show when={props.controller.escapeArmed()}>
+        <span class="px-3 -mt-2 text-12-regular text-text-weak" role="status">
+          {language.t("prompt.escape.again")}
+        </span>
       </Show>
     </div>
   )
@@ -444,6 +449,10 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
         onSubmit: () => void submission.handleSubmit(new Event("submit")),
         onStop: () => void submission.abort(),
       },
+      onCleared: () =>
+        showToast({
+          title: language.t("prompt.toast.cleared", { key: formatKeybind("mod+z", language.t) }),
+        }),
     },
   })
   Object.defineProperty(controller, "model", { get: () => props.controls.model })

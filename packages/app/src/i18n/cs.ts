@@ -386,6 +386,8 @@ export const dict = {
   "prompt.attachment.remove": "Odstraňte přílohu",
   "prompt.action.send": "Odeslat",
   "prompt.action.stop": "Přestaň",
+  "prompt.escape.again": "Dalším Esc vymažete",
+  "prompt.toast.cleared": "Výzva vymazána · {{key}} pro obnovení",
   "prompt.toast.pasteUnsupported.title": "Nepodporovaná příloha",
   "prompt.toast.pasteUnsupported.description": "Zde lze připojit pouze obrázky, PDFs nebo textové soubory.",
   "prompt.toast.attachmentDuplicate.title": "Tento soubor již byl nahrán",

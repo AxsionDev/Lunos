@@ -61,6 +61,8 @@ export const QuestionPrompt = Schema.Struct({
   }),
 }).annotate({ description: "Guards against dismissing an agent's question by accident" })
 
+export const DoubleEscapeWindowDefault = 1000
+
 const PromptSize = Schema.Int.check(Schema.isGreaterThan(0))
 export const Prompt = Schema.Struct({
   max_height: Schema.optional(PromptSize).annotate({ description: "Prompt textarea max height" }),
@@ -91,6 +93,13 @@ export const Info = Schema.Struct({
   external_accent: Schema.optional(Schema.Boolean).annotate({
     description:
       'false keeps the theme\'s colours in Claude Code and Codex sessions; the "Lunos · Claude Code" badge and the ▸ label stay (default: true)',
+  }),
+  double_escape_clear: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Esc twice in the prompt clears it while the session is idle; the cleared prompt can be undone and is kept in history (default: true)",
+  }),
+  double_escape_ms: Schema.optional(PromptSize).annotate({
+    description: "Milliseconds in which a second Esc clears the prompt (default 1000)",
   }),
   whats_new: Schema.optional(Schema.Boolean).annotate({
     description:

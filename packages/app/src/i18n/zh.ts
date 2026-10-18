@@ -430,6 +430,8 @@ export const dict = {
   "prompt.attachment.remove": "移除附件",
   "prompt.action.send": "发送",
   "prompt.action.stop": "停止",
+  "prompt.escape.again": "再按一次 Esc 清空",
+  "prompt.toast.cleared": "已清空输入 · 按 {{key}} 恢复",
   "prompt.toast.pasteUnsupported.title": "不支持的附件",
   "prompt.toast.attachmentDuplicate.title": "此文件已上传",
   "prompt.toast.pasteUnsupported.description": "此处仅能附加图片、PDF 或文本文件。",
