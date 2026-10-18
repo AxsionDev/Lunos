@@ -46,7 +46,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover, ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
-import { useCommand } from "@/context/command"
+import { formatKeybind, useCommand } from "@/context/command"
 import { usePermission } from "@/context/permission"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
@@ -417,6 +417,47 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const escBlur = () => platform.platform === "desktop" && platform.os === "macos"
+
+  // XCOD-255: Esc twice clears the prompt while the agent is idle (busy, Esc stops it and the text
+  // stays). The cleared prompt goes to history, and mod+Z right after brings it back, comments too.
+  const DOUBLE_ESCAPE_MS = 1000
+  const [escapeArmed, setEscapeArmed] = createSignal(false)
+  let escapeTimer: ReturnType<typeof setTimeout> | undefined
+  let cleared: (PromptHistoryEntry & { mode: "normal" | "shell" }) | undefined
+  onCleanup(() => clearTimeout(escapeTimer))
+
+  const disarmEscape = () => {
+    clearTimeout(escapeTimer)
+    setEscapeArmed(false)
+  }
+
+  const escapeClear = () => {
+    if (!escapeArmed()) {
+      setEscapeArmed(true)
+      escapeTimer = setTimeout(() => setEscapeArmed(false), DOUBLE_ESCAPE_MS)
+      return
+    }
+    disarmEscape()
+    const entry = { prompt: prompt.current(), comments: historyComments(), mode: store.mode }
+    addToHistory(entry.prompt, entry.mode)
+    resetHistoryNavigation()
+    applyHistoryComments([])
+    prompt.set(DEFAULT_PROMPT, 0)
+    cleared = entry
+    // After this keydown has finished: the same Esc reaching the toast region would dismiss it.
+    setTimeout(() =>
+      showToast({ title: language.t("prompt.toast.cleared", { key: formatKeybind("mod+z", language.t) }) }),
+    )
+  }
+
+  const restoreCleared = () => {
+    const entry = cleared
+    if (!entry) return false
+    cleared = undefined
+    setStore("mode", entry.mode)
+    applyHistoryPrompt(entry, "end")
+    return true
+  }
 
   const pick = () => {
     pickAttachmentFiles({
@@ -1265,6 +1306,21 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       }
     }
 
+    if (event.key !== "Escape") disarmEscape()
+
+    if (
+      cleared &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === "z" &&
+      blank() &&
+      restoreCleared()
+    ) {
+      event.preventDefault()
+      return
+    }
+
     if (event.key === "Escape") {
       if (store.popover) {
         closePopover()
@@ -1282,6 +1338,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
       if (working()) {
         void abort()
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+
+      // A selection is the innermost thing Esc undoes: collapse it, and don't count the press.
+      const selection = window.getSelection()
+      if (selection && !selection.isCollapsed && editorRef.contains(selection.anchorNode)) {
+        selection.collapseToEnd()
+        disarmEscape()
+        event.preventDefault()
+        return
+      }
+
+      if (!blank()) {
+        escapeClear()
         event.preventDefault()
         event.stopPropagation()
         return
@@ -1574,6 +1646,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               }}
             />
 
+            <Show when={escapeArmed()}>
+              <span class="text-12-regular text-text-weak" role="status">
+                {language.t("prompt.escape.again")}
+              </span>
+            </Show>
             <div class="flex items-center gap-1 pointer-events-auto">
               <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
                 <IconButton

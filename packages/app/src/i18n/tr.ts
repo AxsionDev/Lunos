@@ -417,6 +417,8 @@ export const dict = {
   "prompt.attachment.remove": "Eki kaldır",
   "prompt.action.send": "Gönder",
   "prompt.action.stop": "Durdur",
+  "prompt.escape.again": "Temizlemek için tekrar Esc",
+  "prompt.toast.cleared": "İstem temizlendi · geri almak için {{key}}",
 
   "prompt.toast.pasteUnsupported.title": "Desteklenmeyen ek",
   "prompt.toast.attachmentDuplicate.title": "Bu dosya zaten yüklendi",

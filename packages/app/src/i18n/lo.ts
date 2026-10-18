@@ -385,6 +385,8 @@ export const dict = {
   "prompt.attachment.remove": "ເອົາໄຟລ໌ແນບອອກ",
   "prompt.action.send": "ສົ່ງ",
   "prompt.action.stop": "ຢຸດ",
+  "prompt.escape.again": "ກົດ Esc ອີກຄັ້ງເພື່ອລຶບ",
+  "prompt.toast.cleared": "ລຶບຄຳສັ່ງແລ້ວ · {{key}} ເພື່ອກູ້ຄືນ",
   "prompt.toast.pasteUnsupported.title": "ບໍ່ຮອງຮັບໄຟລ໌ແນບ",
   "prompt.toast.pasteUnsupported.description": "ພຽງແຕ່ຮູບພາບ, PDFs, ຫຼືໄຟລ໌ຂໍ້ຄວາມສາມາດຕິດຢູ່ນີ້.",
   "prompt.toast.attachmentDuplicate.title": "ໄຟລ໌ນີ້ໄດ້ຖືກອັບໂຫລດໄປກ່ອນແລ້ວ",
