@@ -103,7 +103,21 @@ Each approval request a tool makes comes to Lunos:
 
 Review those rules if you rely on Lunos to see every edit.
 
-Settings that skip approval or the sandbox are refused unless you ask for one explicitly for that run, for example `--permission-mode bypassPermissions --unsafe`. That covers Claude Code's `bypassPermissions`, and Codex's `danger-full-access` and `never`. They can't be set in config. For Codex, `--permission-mode` takes either a sandbox (`read-only`, `workspace-write`) or an approval policy (`untrusted`, `on-request`).
+Settings that skip approval or the sandbox are refused unless you ask for one explicitly for that run, for example `--permission-mode bypassPermissions --unsafe`. That covers Claude Code's `bypassPermissions`, and Codex's `danger-full-access` and `never`. They can't be saved to config, and one already in a config file is ignored (the safe default is used) and flagged in `/settings`. For Codex, `--permission-mode` takes either a sandbox (`read-only`, `workspace-write`) or an approval policy (`untrusted`, `on-request`).
+
+### Choosing the settings for every run
+
+`/settings` → Models & agents lists each one as a choice, with what it does. Manual approval (the safe default above) is selected when nothing is set; choosing it writes nothing, or removes the key if one is set. The unsafe values are listed greyed out with how to pass them for one run.
+
+| Key                               | Values                                                                                       | Default     |
+| --------------------------------- | -------------------------------------------------------------------------------------------- | ----------- |
+| `external.claude.permission_mode` | `default`, `acceptEdits`, `plan`, `auto`, `dontAsk` (what your Claude Code's `--help` lists) | `default`   |
+| `external.codex.sandbox`          | `read-only`, `workspace-write`                                                               | `read-only` |
+| `external.codex.approval_policy`  | `untrusted`, `on-request`                                                                    | `untrusted` |
+
+An empty value means the default. `auto` lets Claude Code's own classifier approve routine actions, so those don't come to Lunos.
+
+`external.codex.permission_mode` (one field for either a sandbox or an approval policy) still works while the new keys are unset. Saving either new key moves it: its value goes to whichever of the two it names.
 
 ## Data residency and policy
 

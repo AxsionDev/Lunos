@@ -7,7 +7,8 @@ import { ExternalDetect } from "./detect"
 /**
  * XCOD-204: one way to start either tool, so the CLI and the external_agent tool don't care
  * which. `permissionMode` is Claude Code's permission mode, or for Codex its sandbox or approval
- * policy (whichever the value names).
+ * policy (whichever the value names, as `--permission-mode` on the CLI passes it). XCOD-256: from
+ * config, `sandbox` / `approvalPolicy` come separately (`ConfigExternal.launch`).
  */
 
 export interface Options {
@@ -16,6 +17,8 @@ export interface Options {
   prompt: string
   resume?: string
   permissionMode?: string
+  sandbox?: string
+  approvalPolicy?: string
   /** The tool's model; validated as an id because it reaches Claude Code's command line. */
   model?: string
   allowUnsafe?: boolean
@@ -30,8 +33,8 @@ export function start(options: Options): ExternalClaude.Running {
   const mode = options.permissionMode
   return ExternalCodex.start({
     ...options,
-    sandbox: mode && ["read-only", "workspace-write", "danger-full-access"].includes(mode) ? mode : undefined,
-    approvalPolicy: mode && ["untrusted", "on-request", "never"].includes(mode) ? mode : undefined,
+    sandbox: mode && ["read-only", "workspace-write", "danger-full-access"].includes(mode) ? mode : options.sandbox,
+    approvalPolicy: mode && ["untrusted", "on-request", "never"].includes(mode) ? mode : options.approvalPolicy,
   })
 }
 

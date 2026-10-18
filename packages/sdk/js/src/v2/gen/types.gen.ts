@@ -1738,15 +1738,36 @@ export type MemoryConfig = {
   backend?: MemoryBackendConfig
 }
 
+export type BlankString = string
+
 export type ExternalConfig = {
   enabled?: boolean
   delegate?: boolean
   claude?: {
     path?: string
-    permission_mode?: string
+    /**
+     * Claude Code's permission mode on every run. Unset or empty: manual approval (every edit and command asks in Lunos). bypassPermissions is refused here; pass it for one run only
+     */
+    permission_mode?:
+      | "default"
+      | "manual"
+      | "acceptEdits"
+      | "plan"
+      | "auto"
+      | "dontAsk"
+      | "bypassPermissions"
+      | BlankString
   }
   codex?: {
     path?: string
+    /**
+     * Codex's sandbox on every run. Unset or empty: read-only. danger-full-access is refused here; pass it for one run only
+     */
+    sandbox?: "read-only" | "workspace-write" | "danger-full-access" | BlankString
+    /**
+     * Codex's approval policy on every run. Unset or empty: untrusted (anything beyond reading asks in Lunos). never is refused here; pass it for one run only
+     */
+    approval_policy?: "untrusted" | "on-request" | "never" | BlankString
     permission_mode?: string
   }
 }
@@ -2691,6 +2712,7 @@ export type ExternalToolStatus = {
     reason: "disabled" | "policy" | "residency"
     message: string
   }
+  permissionModes?: Array<string>
 }
 
 export type PermissionRequest = {

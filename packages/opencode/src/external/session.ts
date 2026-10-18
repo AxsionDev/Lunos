@@ -1,5 +1,6 @@
 export * as ExternalSession from "./session"
 
+import { ConfigExternal } from "@opencode-ai/core/config/external"
 import { Cause, Effect, Exit } from "effect"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
@@ -183,7 +184,7 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
       cwd: ctx.directory,
       prompt,
       resume: marker.session,
-      permissionMode: (cfg.external as any)?.[tool]?.permission_mode,
+      ...ConfigExternal.launch(tool, cfg.external),
       executable: status.path,
       onEvent: (event) => {
         if (event.type === "init") {
