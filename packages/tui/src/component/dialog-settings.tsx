@@ -23,6 +23,8 @@ import { DialogRecommended } from "./dialog-recommended"
 import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
 import { DialogThemeList } from "./dialog-theme-list"
+import * as Sections from "../util/settings-sections"
+import { DialogMemory } from "./dialog-memory"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogProviders } from "./dialog-provider"
 import { StatusServers } from "./dialog-status"
@@ -62,13 +64,23 @@ const LABEL: Record<Tab, string> = { status: "Status", settings: "Settings", usa
 // XCOD-249: the Memory section shows the setup wizard, a status line and a collapsed "Advanced"
 // holding every memory.* key. Whether Advanced is open is remembered for the session.
 let memoryAdvancedOpen = false
+/** XCOD-259: keys saved this session that wait for a restart, for the section badges. */
+const pendingRestart = new Set<string>()
 const MEMORY = "Memory"
 
 /**
  * `section` (XCOD-231): one structured setting's own screen, e.g. `subagent`, listing its fields
  * (`subagent.model`, …) with the same controls as the main list. ← goes back to its row there.
  */
-export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope; section?: string }) {
+export function DialogSettings(props: {
+  tab?: Tab
+  focus?: string
+  scope?: Scope
+  section?: string
+  /** XCOD-259: a section window (a category), and its sub-tab. */
+  area?: string
+  sub?: string
+}) {
   const sdk = useSDK()
   const dialog = useDialog()
   const toast = useToast()
@@ -84,6 +96,10 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   const [error, setError] = createSignal<string>()
   const [query, setQuery] = createSignal("")
   const [highlighted, setHighlighted] = createSignal<string | undefined>(props.focus)
+  const tabsOf = () => (props.area ? (Sections.SUBTABS[props.area] ?? []) : [])
+  const [sub, setSub] = createSignal<string | undefined>(props.sub ?? tabsOf()[0])
+  /** The Settings home: a list of sections, unless something is typed. */
+  const atHome = () => !props.section && !props.area
 
   let list: DialogSelectRef<string> | undefined
   // XCOD-233: a save still running when Esc closed the window must not reopen it.
@@ -112,7 +128,11 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   const rows = createMemo(() => {
     // XCOD-215: the deprecated top-level `mode` is listed only while it's still set (Agents migrates it).
     const all = (snapshot()?.rows ?? []).filter((row) => row.key !== "mode" || row.source !== "default")
-    const list = props.section ? all.filter((row) => row.key.startsWith(`${props.section}.`)) : all
+    const list = props.section
+      ? all.filter((row) => row.key.startsWith(`${props.section}.`))
+      : props.area
+        ? all.filter((row) => row.category === props.area)
+        : all
     // tui.json is read by this process: show the theme actually in use.
     return list.map((row) =>
       row.key === "tui.theme" && row.source === "default"
@@ -123,10 +143,15 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   const visible = createMemo(() => filterRows(rows(), query()))
   const [advancedOpen, setAdvancedOpen] = createSignal(memoryAdvancedOpen)
   // A search lists matching memory keys as usual; collapsing is only for browsing the list.
-  const collapsing = createMemo(() => !query() && !props.section && rows().some((row) => row.category === MEMORY))
-  const shown = createMemo(() =>
-    collapsing() && !advancedOpen() ? visible().filter((row) => row.category !== MEMORY) : visible(),
-  )
+  // XCOD-259: Memory's wizard and status now live in Memory › Overview, so nothing collapses.
+  const collapsing = createMemo(() => false)
+  const shown = createMemo(() => {
+    // The home lists sections; typed words search every setting. Inside a section, the sub-tab's
+    // rows, and a search covers the whole section.
+    if (atHome() && !query()) return []
+    if (props.area && !query() && tabsOf().length) return visible().filter((row) => row.sub === sub())
+    return visible()
+  })
   const current = createMemo(() =>
     highlighted()?.startsWith("+memory.") ? undefined : (rows().find((row) => row.key === highlighted()) ?? shown()[0]),
   )
@@ -136,11 +161,41 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   // Reopens this dialog where the user left it, after a picker or prompt replaced it.
   function reopen(key?: string) {
     const section = props.section
+    const area = props.area
     dialog.replace(
-      () => <DialogSettings tab="settings" focus={key ?? highlighted()} scope={scope()} section={section} />,
+      () => (
+        <DialogSettings
+          tab="settings"
+          focus={key ?? highlighted()}
+          scope={scope()}
+          section={section}
+          area={area}
+          sub={sub()}
+        />
+      ),
       undefined,
-      section ? { back: () => openTop(section), generation } : { nav: true, generation },
+      section
+        ? { back: () => openTop(section), generation }
+        : area
+          ? { back: () => openHome(area), generation }
+          : { nav: true, generation },
     )
+  }
+
+  /** XCOD-259: a section window, on a sub-tab and row; ← goes back to the home on its row. */
+  function openArea(area: string, tab?: string, focus?: string) {
+    dialog.replace(
+      () => <DialogSettings tab="settings" area={area} sub={tab} focus={focus} scope={scope()} />,
+      undefined,
+      { back: () => openHome(area), generation },
+    )
+  }
+
+  function openHome(area: string) {
+    dialog.replace(() => <DialogSettings tab="settings" focus={`+area:${area}`} scope={scope()} />, undefined, {
+      nav: true,
+      generation,
+    })
   }
 
   /** The main list, on row `key` (from a section screen, its own row). */
@@ -306,6 +361,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     if (options.reopen) reopen(row.key)
     else await load()
     if (data.restart && data.changed) {
+      pendingRestart.add(row.key)
       const restart = await DialogConfirm.show(
         dialog,
         "Restart required",
@@ -544,7 +600,13 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   }
 
   const bindings = createMemo((): { key: string; desc: string; group: string; cmd: () => void }[] => [
-    ...(props.section
+    ...(props.area && tabsOf().length
+      ? [
+          { key: "tab", desc: "Next sub-tab", group: "Settings", cmd: () => moveSub(1) },
+          { key: "shift+tab", desc: "Previous sub-tab", group: "Settings", cmd: () => moveSub(-1) },
+        ]
+      : []),
+    ...(props.section || props.area
       ? []
       : [
           { key: "tab", desc: "Next tab", group: "Settings", cmd: () => void setTab((t) => nextTab(t, 1)) },
@@ -563,6 +625,13 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     },
     { key: "space", desc: "Toggle or cycle the setting", group: "Settings", cmd: () => toggle(current()) },
   ])
+
+  function moveSub(step: number) {
+    const list = tabsOf()
+    const next = list[(list.indexOf(sub() ?? list[0]!) + step + list.length) % list.length]
+    setSub(next)
+    setHighlighted(undefined)
+  }
 
   const tabs = () => (
     <box flexDirection="row" gap={1}>
@@ -589,6 +658,20 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   const sectionRow = createMemo(() => snapshot()?.rows.find((row) => row.key === props.section))
 
   const options = createMemo(() => {
+    // XCOD-259: the home is a list of sections, each with what's set and its badges.
+    if (atHome() && !query()) {
+      const all = snapshot()?.rows ?? []
+      return Sections.SECTIONS.map((item) => {
+        const mine = all.filter((row) => row.category === item.category)
+        const marks = Sections.badges(mine, pendingRestart)
+        return {
+          title: item.category,
+          value: `+area:${item.category}`,
+          description: Sections.summary(item.category, mine),
+          footer: marks || `${mine.length} settings`,
+        }
+      })
+    }
     const list = shown().map((row) => {
       const value =
         (row.secret && row.kind !== "object" ? "••• (see /providers)" : row.display) +
@@ -598,42 +681,51 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       return {
         title: props.section ? sectionLabel(row, sectionRow()) : row.label,
         value: row.key,
-        category: query() || props.section ? undefined : row.category,
+        // A search from the home says where each result lives.
+        ...(atHome() ? { description: Sections.breadcrumb(row) } : {}),
+        category: undefined,
         titleWidth: Math.max(12, width() - right.length - 12),
         footer: right,
       }
     })
-    if (!collapsing()) return list
+    if (props.area !== MEMORY || sub() !== "Overview" || query()) return list
+    // Memory › Overview: the status, the guided setup and the analytics.
     const config = sync.data.config.memory
     const enabledRow = rows().find((row) => row.key === "memory.enabled")
-    const count = rows().filter((row) => row.category === MEMORY).length
-    const synthetic = [
-      {
-        title: config?.enabled === true ? "Change memory setup…" : "Set up memory…",
-        value: "+memory.setup",
-        category: MEMORY,
-        footer: "guided, 6 steps",
-      },
+    return [
       {
         title: MemorySetup.status(config, enabledRow?.override?.split(" is set")[0]),
         value: "+memory.status",
-        category: MEMORY,
       },
       {
-        title: `Advanced ${advancedOpen() ? "▾" : "▸"}`,
-        value: "+memory.advanced",
-        category: MEMORY,
-        footer: `${count} settings`,
+        title: config?.enabled === true ? "Change memory setup…" : "Set up memory…",
+        value: "+memory.setup",
+        footer: "guided, 6 steps",
       },
+      { title: "Open memory analytics…", value: "+memory.analytics", footer: "/memory" },
     ]
-    // Where the Memory section starts in the full, ordered list.
-    const first = rows().findIndex((row) => row.category === MEMORY)
-    const at = shown().filter((row) => rows().indexOf(row) < first).length
-    return [...list.slice(0, at), ...synthetic, ...list.slice(at)]
   })
 
   const footer = () => {
     const synthetic = highlighted()
+    if (atHome() && !query())
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          Enter opens a section; type to search every setting. Esc closes, ← goes back a level.
+        </text>
+      )
+    if (props.area === MEMORY && sub() === "Overview" && !query() && !synthetic?.startsWith("+memory."))
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          Memory at a glance: its status, a guided setup, and what's in it. Tab for every setting.
+        </text>
+      )
+    if (synthetic === "+memory.analytics")
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          What's in memory, where it came from, and which facts are recalled.
+        </text>
+      )
     if (synthetic === "+memory.setup" || synthetic === "+memory.status")
       return (
         <text fg={theme.textMuted} wrapMode="word">
@@ -707,15 +799,39 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
             <DialogSelect<string>
               title="Settings"
               titleView={
-                <box flexDirection="row" gap={2}>
-                  <Show when={props.section} fallback={tabs()}>
-                    <text fg={theme.text} attributes={TextAttributes.BOLD}>
-                      {sectionRow()?.label ?? props.section}
+                <box flexDirection="column" flexShrink={1}>
+                  <box flexDirection="row" gap={2}>
+                    <Show when={props.section || props.area} fallback={tabs()}>
+                      {/* XCOD-259: where you are; "Settings" goes back to the home. */}
+                      <box flexDirection="row">
+                        <text fg={theme.textMuted} onMouseUp={() => openHome(props.area ?? "")}>
+                          {"Settings › "}
+                        </text>
+                        <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                          {props.area ?? sectionRow()?.label ?? props.section}
+                          {props.area && sub() ? " › " + sub() : ""}
+                        </text>
+                      </box>
+                    </Show>
+                    <text fg={theme.textMuted}>
+                      saving to <span style={{ fg: theme.text }}>{scope()}</span> config (ctrl+s)
                     </text>
+                  </box>
+                  <Show when={tabsOf().length}>
+                    <box flexDirection="row" gap={2} flexWrap="wrap">
+                      <For each={tabsOf()}>
+                        {(item) => (
+                          <text
+                            fg={item === sub() ? theme.primary : theme.textMuted}
+                            attributes={item === sub() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : undefined}
+                            onMouseUp={() => setSub(item)}
+                          >
+                            {item === sub() ? `[${item}]` : item}
+                          </text>
+                        )}
+                      </For>
+                    </box>
                   </Show>
-                  <text fg={theme.textMuted}>
-                    saving to <span style={{ fg: theme.text }}>{scope()}</span> config (ctrl+s)
-                  </text>
                 </box>
               }
               placeholder="Type to filter by name, key or description"
@@ -737,6 +853,11 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               onFilter={(value) => setQuery(value)}
               onMove={(option) => setHighlighted(option.value)}
               onSelect={(option) => {
+                if (option.value.startsWith("+area:")) return openArea(option.value.slice("+area:".length))
+                if (option.value === "+memory.analytics") return dialog.replace(() => <DialogMemory />)
+                // A search result from the home opens its section and sub-tab, on that row.
+                const found = atHome() ? rows().find((item) => item.key === option.value) : undefined
+                if (found) return openArea(found.category, found.sub ?? undefined, found.key)
                 if (option.value === "+memory.advanced") {
                   memoryAdvancedOpen = !advancedOpen()
                   return setAdvancedOpen(memoryAdvancedOpen)
@@ -749,7 +870,9 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
               footerHints={[
                 { title: "change", label: "enter" },
                 { title: "toggle", label: "space" },
-                ...(props.section ? [] : [{ title: "tabs", label: "tab", side: "right" as const }]),
+                ...(props.section
+                  ? []
+                  : [{ title: props.area ? "sub-tabs" : "tabs", label: "tab", side: "right" as const }]),
               ]}
             />
             <box paddingLeft={4} paddingRight={4} paddingBottom={1}>

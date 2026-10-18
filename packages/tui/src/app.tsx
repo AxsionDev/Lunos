@@ -58,6 +58,7 @@ import { DialogModel } from "./component/dialog-model"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogStatus } from "./component/dialog-status"
+import { takeSettingsRequest } from "./util/settings-sections"
 import { DialogSettings } from "./component/dialog-settings"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
@@ -1106,7 +1107,18 @@ function App(props: {
         slashName: "settings",
         slashAliases: ["config"],
         run: () => {
-          dialog.replace(() => <DialogSettings tab="settings" />)
+          // XCOD-259: `/settings <section> [sub-tab]` lands there; an unknown name shows the home.
+          const request = takeSettingsRequest()
+          if (request && "unknown" in request)
+            toast.show({ variant: "warning", message: `No settings section "${request.unknown}"` })
+          const area = request && "category" in request ? request : undefined
+          dialog.replace(
+            () => <DialogSettings tab="settings" area={area?.category} sub={area?.sub} />,
+            undefined,
+            area
+              ? { back: () => dialog.replace(() => <DialogSettings tab="settings" focus={`+area:${area.category}`} />) }
+              : undefined,
+          )
         },
         category: "System",
       },

@@ -30,10 +30,11 @@ describe("/settings (XCOD-128)", () => {
     expect(parseSettingsSlash('/settings residency.allow=["eu"]')).toEqual({ key: "residency.allow", value: '["eu"]' })
   })
 
-  test("bare /settings is left to the slash list, and a missing = is explained", () => {
+  test("bare /settings is left to the slash list; words without = open a section (XCOD-259)", () => {
     expect(parseSettingsSlash("/settings")).toBeUndefined()
     expect(parseSettingsSlash("/settingsx a=b")).toBeUndefined()
-    expect(parseSettingsSlash("/settings share")).toEqual({
+    expect(parseSettingsSlash("/settings tools lsp")).toEqual({ open: "tools lsp" })
+    expect(parseSettingsSlash("/settings =x")).toEqual({
       error: "Use /settings key=value, e.g. /settings share=disabled",
     })
   })

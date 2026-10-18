@@ -18,6 +18,15 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Changed
+
+- **`/settings` opens on a list of sections instead of one long list.** Each section (Models &
+  agents, Permissions, Memory, Tools…) shows what's set and badges for changed, locked and
+  restart-needed settings; Enter opens it in its own window, with sub-tabs where it has distinct
+  parts (Memory: Overview · Settings · Advanced). Typing on the home still searches every setting
+  and Enter lands on it in its section. `/settings memory` or `/settings tools lsp` opens a section
+  or sub-tab directly.
+
 ## [1.18.49] - 2026-10-17
 
 ### Added

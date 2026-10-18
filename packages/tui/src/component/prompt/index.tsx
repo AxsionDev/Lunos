@@ -61,6 +61,8 @@ import { readLocalAttachment } from "./local-attachment"
 import { useLocation } from "../../context/location"
 import { parseRestartSlash } from "../../util/restart"
 import { parseSettingsSlash } from "../../util/settings"
+import * as Sections from "../../util/settings-sections"
+import { requestSettings } from "../../util/settings-sections"
 import { externalOf, parseExternalSlash, parseToolSlash } from "../../util/external"
 import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
 import { DialogExternal, useExternalCommand, useStartExternal } from "../dialog-external"
@@ -1023,6 +1025,11 @@ export function Prompt(props: PromptProps) {
       setStore("prompt", { input: "", parts: [] })
       if ("error" in settingsSlash) {
         toast.show({ variant: "warning", message: settingsSlash.error })
+        return false
+      }
+      if ("open" in settingsSlash) {
+        requestSettings(Sections.target(settingsSlash.open) ?? { unknown: settingsSlash.open })
+        keymap.dispatchCommand("settings.open")
         return false
       }
       void sdk.client.config
