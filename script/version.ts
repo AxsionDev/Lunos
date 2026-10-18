@@ -2,6 +2,7 @@
 
 import { Script } from "@opencode-ai/script"
 import { $ } from "bun"
+import { notes, scrub } from "./check-changelog"
 
 const output = [`version=${Script.version}`]
 const sha = process.env.GITHUB_SHA ?? (await $`git rev-parse HEAD`.text()).trim()
@@ -25,9 +26,13 @@ if (!Script.preview) {
     }
   }
 
-  const body = await Bun.file(file)
+  const generated = await Bun.file(file)
     .text()
     .catch(() => "No notable changes")
+  // XCOD-253: readers see the curated CHANGELOG section first, and no ticket ids anywhere: the
+  // generated notes come from commit subjects, which carry them.
+  const curated = notes(await Bun.file(`${process.cwd()}/CHANGELOG.md`).text(), Script.version)
+  const body = [curated, scrub(generated).trim()].filter(Boolean).join("\n\n---\n\n")
   const dir = process.env.RUNNER_TEMP ?? "/tmp"
   const notesFile = `${dir}/opencode-release-notes.txt`
   await Bun.write(notesFile, body)

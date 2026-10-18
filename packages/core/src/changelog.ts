@@ -9,9 +9,12 @@ export type Entry = {
   section: string
   /** The bold lead sentence, without its asterisks; the whole first line when there is none. */
   lead: string
-  /** The entry as written, sub-items included. */
+  /** The entry as written, sub-items included, without its HTML comments. */
   text: string
-  tickets: string[]
+  /** `<!-- internal -->`: kept for the record, left out of "What's new" (only `--full` shows it). */
+  internal: boolean
+  /** `<!-- highlight -->`: listed first in its section. */
+  highlight: boolean
 }
 
 export type Version = { version: string; date?: string; entries: Entry[]; markdown: string }
@@ -19,15 +22,26 @@ export type Version = { version: string; date?: string; entries: Entry[]; markdo
 const VERSION_HEADING = /^## \[([^\]]+)\](?:\s+-\s+(\S+))?/
 const SECTION_HEADING = /^### (.+)$/
 
+/**
+ * XCOD-253: HTML comments hold what readers shouldn't see: ticket ids (`<!-- XCOD-246 -->`) and the
+ * `internal` / `highlight` markers. A rendered page hides them; everything here strips them.
+ */
+const COMMENT = /\s*<!--([\s\S]*?)-->/g
+
+export function stripComments(markdown: string) {
+  return markdown.replace(COMMENT, "")
+}
+
 function entry(version: string, section: string, lines: string[]): Entry {
-  const text = lines
-    .join("\n")
+  const raw = lines.join("\n")
+  const marks = [...raw.matchAll(COMMENT)].flatMap((match) => match[1]!.trim().split(/\s+/))
+  const text = stripComments(raw)
     .replace(/^- /, "")
-    // Wrapped lines join up; sub-items (`  - …`) keep their own line.
-    .replace(/\n[ ]+(?![ ]*- )/g, " ")
+    // Wrapped lines join up, lazily continued ones too; sub-items (`  - …`) keep their own line.
+    .replace(/\n(?![ ]*- |\n)[ ]*/g, " ")
     .trim()
   const lead = (text.match(/^\*\*(.+?)\*\*/)?.[1] ?? text.split("\n")[0]!).trim()
-  return { version, section, lead, text, tickets: [...new Set(text.match(/XCOD-\d+/g) ?? [])] }
+  return { version, section, lead, text, internal: marks.includes("internal"), highlight: marks.includes("highlight") }
 }
 
 /** Every released version, newest first, with its entries. `[Unreleased]` is left out. */
@@ -40,7 +54,10 @@ export function parse(markdown: string): Version[] {
     if (version && lines) version.entries.push(entry(version.version, section, lines))
     lines = undefined
   }
+  let blank = false
   for (const line of markdown.split("\n")) {
+    const lazy = !blank && line !== "" && !line.startsWith("#")
+    blank = line === ""
     const heading = line.match(VERSION_HEADING)
     if (heading) {
       flush()
@@ -58,7 +75,7 @@ export function parse(markdown: string): Version[] {
       version = undefined
       continue
     }
-    version.markdown += line + "\n"
+    version.markdown += stripComments(line) + "\n"
     const sub = line.match(SECTION_HEADING)
     if (sub) {
       flush()
@@ -70,7 +87,8 @@ export function parse(markdown: string): Version[] {
       lines = [line]
       continue
     }
-    if (lines && (line.startsWith(" ") || line === "")) lines.push(line)
+    // A wrapped line that starts at column 0 (lazy continuation) still belongs to the entry.
+    if (lines && (line.startsWith(" ") || line === "" || lazy)) lines.push(line)
   }
   flush()
   for (const item of versions) item.markdown = item.markdown.trim()
@@ -108,20 +126,21 @@ function short(text: string, max = 100) {
 }
 
 function item(entry: Entry) {
-  const lead = short(entry.lead)
-  const tickets = entry.tickets.filter((ticket) => !lead.includes(ticket))
-  return `• ${lead}${tickets.length ? ` (${tickets.join(", ")})` : ""}`
+  return `• ${short(entry.lead)}`
 }
 
 /**
- * The short, engineering-focused summary: behaviour changes first and never trimmed, then every
- * security entry, then what's new, then a one-line count of fixes. About `max` lines in all; what
- * doesn't fit is behind `lunos changelog`.
+ * The short summary of what a user notices: behaviour changes first and never trimmed, then every
+ * security entry, then what's new, then a one-line count of fixes. Internal entries are left out,
+ * and highlights lead their section. About `max` lines in all; the rest is behind `lunos changelog`.
  */
 export function summary(input: { since?: string; to: string; max?: number; all?: Version[] }) {
   const picked = range(input.since, input.to, input.all)
-  const entries = picked.flatMap((item) => item.entries)
-  const of = (sections: string[]) => entries.filter((item) => sections.includes(item.section))
+  const entries = picked.flatMap((item) => item.entries).filter((item) => !item.internal)
+  const of = (sections: string[]) =>
+    entries
+      .filter((item) => sections.includes(item.section))
+      .toSorted((a, b) => Number(b.highlight) - Number(a.highlight))
   const lines: string[] = [
     input.since && input.since !== input.to
       ? `What's new in Lunos ${input.to} (since ${input.since})`
