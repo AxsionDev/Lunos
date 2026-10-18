@@ -391,6 +391,8 @@ export const dict = {
   "prompt.attachment.remove": "Fjarlægðu viðhengi",
   "prompt.action.send": "Senda",
   "prompt.action.stop": "Stöðva",
+  "prompt.escape.again": "Esc aftur til að hreinsa",
+  "prompt.toast.cleared": "Fyrirmæli hreinsuð · {{key}} til að endurheimta",
   "prompt.toast.pasteUnsupported.title": "Óstudd viðhengi",
   "prompt.toast.pasteUnsupported.description": "Aðeins er hægt að hengja myndir, PDF-skjöl eða textaskrár hér við.",
   "prompt.toast.attachmentDuplicate.title": "Þessari skrá hefur þegar verið hlaðið upp",

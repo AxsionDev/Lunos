@@ -385,6 +385,8 @@ export const dict = {
   "prompt.attachment.remove": "Elimină atașamentul",
   "prompt.action.send": "Trimite",
   "prompt.action.stop": "Oprește",
+  "prompt.escape.again": "Esc din nou pentru a șterge",
+  "prompt.toast.cleared": "Solicitare ștearsă · {{key}} pentru restaurare",
   "prompt.toast.pasteUnsupported.title": "Atașament neacceptat",
   "prompt.toast.pasteUnsupported.description": "Poți atașa doar imagini, PDF-uri sau fișiere text aici.",
   "prompt.toast.attachmentDuplicate.title": "Acest fișier a fost deja încărcat",

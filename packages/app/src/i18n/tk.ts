@@ -386,6 +386,8 @@ export const dict = {
   "prompt.attachment.remove": "Goşundyny aýyryň",
   "prompt.action.send": "Iber",
   "prompt.action.stop": "Dur",
+  "prompt.escape.again": "Arassalamak üçin ýene Esc",
+  "prompt.toast.cleared": "Haýyş arassalandy · dikeltmek üçin {{key}}",
   "prompt.toast.pasteUnsupported.title": "Goldaw berilmeýän goşundy",
   "prompt.toast.pasteUnsupported.description": "Bu ýerde diňe suratlar, PDF ýa-da tekst faýllary birikdirilip bilner.",
   "prompt.toast.attachmentDuplicate.title": "Bu faýl eýýäm ýüklendi",

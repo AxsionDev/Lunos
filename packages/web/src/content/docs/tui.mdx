@@ -61,6 +61,18 @@ The output of the command is added to the conversation as a tool result.
 
 ---
 
+## Clearing the prompt
+
+Press `Esc` twice to clear what you've typed and start again. The first `Esc` shows "esc again to clear" under the prompt; a second within a second clears the text, pasted blocks and `@` references.
+
+- Nothing is lost: the toast names the undo key (`input_undo`, `ctrl+-` by default, plus `ctrl+z` where the terminal doesn't use it to suspend), which brings the prompt back as it was, and `↑` finds it in prompt history.
+- While the agent is working, `Esc` `Esc` stops it as before, and what you've typed stays.
+- An `Esc` that closes autocomplete, leaves shell mode or clears a selection doesn't count as the first press.
+- It works the same in `/claude` and `/codex` sessions; the prompt is cleared in Lunos and nothing is sent to the tool.
+- Turn it off with `"double_escape_clear": false`, or change the window with `double_escape_ms`. `ctrl+c` (`input_clear`) still clears the prompt at once.
+
+---
+
 ## Commands
 
 When using the Lunos TUI, you can type `/` followed by a command name to quickly execute actions. For example:
@@ -643,6 +655,8 @@ This is separate from `opencode.json`, which configures server/runtime behavior.
 - `scroll_acceleration.enabled` - Enable macOS-style scroll acceleration for smooth, natural scrolling. When enabled, scroll speed increases with rapid scrolling gestures and stays precise for slower movements. **This setting takes precedence over `scroll_speed` and overrides it when enabled.**
 - `scroll_speed` - Controls how fast the TUI scrolls when using scroll commands (minimum: `0.001`, supports decimal values). Defaults to `3`. **Note: This is ignored if `scroll_acceleration.enabled` is set to `true`.**
 - `diff_style` - Controls diff rendering. `"auto"` adapts to terminal width, `"stacked"` always shows a single-column layout.
+- `double_escape_clear` - `false` turns off [clearing the prompt with `Esc` `Esc`](#clearing-the-prompt) (default: `true`).
+- `double_escape_ms` - Milliseconds in which the second `Esc` clears the prompt (default: `1000`).
 - `whats_new` - `false` stops the "What's new" panel on the first start after an update (default: `true`). [`/whatsnew`](#whatsnew) and [`lunos changelog`](/docs/cli#changelog) still work.
 - `reduced_motion` - `true` turns off every animation (the home screen's moon reflection, spinners, placeholder cycling), and the in-app "Disable animations" toggle can't turn them back on. When unset, animations are off by default if `NO_COLOR` is set or `TERM=dumb`, and the toggle decides.
 

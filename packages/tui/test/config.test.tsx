@@ -165,6 +165,19 @@ test("question dismissal guards decode through Info and resolve to defaults (XCO
   expect(() => decodeInfo({ question: { undo_window: 1.5 } })).toThrow()
 })
 
+test("Esc Esc clears the prompt by default, with a 1000 ms window (XCOD-255)", () => {
+  const defaults = resolve(decodeInfo({}), { terminalSuspend: true })
+  expect(defaults.double_escape_clear).toBe(true)
+  expect(defaults.double_escape_ms).toBe(1000)
+
+  const off = resolve(decodeInfo({ double_escape_clear: false, double_escape_ms: 600 }), { terminalSuspend: true })
+  expect(off.double_escape_clear).toBe(false)
+  expect(off.double_escape_ms).toBe(600)
+
+  expect(() => decodeInfo({ double_escape_ms: 0 })).toThrow()
+  expect(() => decodeInfo({ double_escape_clear: "yes" })).toThrow()
+})
+
 test("reduced_motion decodes through Info and survives resolve (XCOD-107)", () => {
   expect(resolve(decodeInfo({ reduced_motion: true }), { terminalSuspend: true }).reduced_motion).toBe(true)
   expect(resolve(decodeInfo({}), { terminalSuspend: true }).reduced_motion).toBeUndefined()

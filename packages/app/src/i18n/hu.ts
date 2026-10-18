@@ -391,6 +391,8 @@ export const dict = {
   "prompt.attachment.remove": "Távolítsa el a mellékletet",
   "prompt.action.send": "Elküld",
   "prompt.action.stop": "Leállítás",
+  "prompt.escape.again": "Törléshez nyomja meg újra az Esc-et",
+  "prompt.toast.cleared": "Kérés törölve · visszaállítás: {{key}}",
   "prompt.toast.pasteUnsupported.title": "Nem támogatott melléklet",
   "prompt.toast.pasteUnsupported.description": "Ide csak képeket, PDF-eket vagy szöveges fájlokat lehet csatolni.",
   "prompt.toast.attachmentDuplicate.title": "Ezt a fájlt már feltöltötték",

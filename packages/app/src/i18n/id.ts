@@ -413,6 +413,8 @@ export const dict = {
   "prompt.attachment.remove": "Hapus lampiran",
   "prompt.action.send": "Kirim",
   "prompt.action.stop": "Hentikan",
+  "prompt.escape.again": "Esc lagi untuk menghapus",
+  "prompt.toast.cleared": "Prompt dihapus · {{key}} untuk memulihkan",
 
   "prompt.toast.pasteUnsupported.title": "Lampiran tidak didukung",
   "prompt.toast.pasteUnsupported.description": "Hanya gambar, PDF, atau berkas teks yang dapat dilampirkan di sini.",

@@ -409,6 +409,8 @@ export const dict = {
   "prompt.attachment.remove": "移除附件",
   "prompt.action.send": "傳送",
   "prompt.action.stop": "停止",
+  "prompt.escape.again": "再按一次 Esc 清除",
+  "prompt.toast.cleared": "已清除輸入 · 按 {{key}} 還原",
 
   "prompt.toast.pasteUnsupported.title": "不支援的附件",
   "prompt.toast.attachmentDuplicate.title": "此檔案已上傳",
