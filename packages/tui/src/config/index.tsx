@@ -9,12 +9,23 @@ export * from "./schema"
 import {
   type AttentionSoundPaths,
   type Info,
+  DoubleEscapeWindowDefault,
   LeaderTimeoutDefault,
   QuestionDismissWindowDefault,
   QuestionUndoWindowDefault,
 } from "./schema"
 
-export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | "mouse" | "cursor" | "question"> & {
+export type Resolved = Omit<
+  Info,
+  | "attention"
+  | "keybinds"
+  | "leader_timeout"
+  | "mouse"
+  | "cursor"
+  | "question"
+  | "double_escape_clear"
+  | "double_escape_ms"
+> & {
   attention: {
     enabled: boolean
     notifications: boolean
@@ -27,6 +38,8 @@ export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | 
   leader_timeout: number
   mouse: boolean
   question: { dismiss_window: number; undo_window: number }
+  double_escape_clear: boolean
+  double_escape_ms: number
   cursor?: {
     style: "block" | "underline" | "line" | "default"
     blinking: boolean
@@ -75,6 +88,8 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
       dismiss_window: input.question?.dismiss_window ?? QuestionDismissWindowDefault,
       undo_window: input.question?.undo_window ?? QuestionUndoWindowDefault,
     },
+    double_escape_clear: input.double_escape_clear ?? true,
+    double_escape_ms: input.double_escape_ms ?? DoubleEscapeWindowDefault,
     cursor: input.cursor
       ? {
           style: input.cursor.style ?? "block",

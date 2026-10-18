@@ -48,6 +48,7 @@ import { DialogProvider as DialogProviderConnect } from "../dialog-provider"
 import { DialogAlert } from "../../ui/dialog-alert"
 import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
+import { createDoublePress } from "../../util/dismiss"
 import { createFadeIn } from "../../util/signal"
 import { DialogSkill } from "../dialog-skill"
 import { DialogMemory } from "../dialog-memory"
@@ -175,6 +176,7 @@ export function Prompt(props: PromptProps) {
   const keymap = useOpencodeKeymap()
   const modeShortcut = useCommandShortcut("mode.cycle")
   const paletteShortcut = useCommandShortcut("command.palette.show")
+  const undoShortcut = useCommandShortcut("input.undo")
   const renderer = useRenderer()
   const exit = useExit()
   const dimensions = useTerminalDimensions()
@@ -846,6 +848,29 @@ export function Prompt(props: PromptProps) {
     }
   })
 
+  // XCOD-255: Esc twice clears the prompt while the session is idle. Busy, Esc Esc interrupts
+  // (session.interrupt) and the text stays. Autocomplete and shell mode take their Esc first, so
+  // that press never counts as the first of two.
+  useBindings(() => ({
+    target: inputTarget,
+    enabled:
+      inputTarget() !== undefined &&
+      !props.disabled &&
+      tuiConfig.double_escape_clear &&
+      status().type === "idle" &&
+      store.mode === "normal" &&
+      !auto()?.visible &&
+      hasContent(),
+    bindings: [{ key: "escape", desc: "Clear prompt (press twice)", group: "Prompt", cmd: escapeClear }],
+  }))
+
+  useBindings(() => ({
+    target: inputTarget,
+    enabled: inputTarget() !== undefined && !props.disabled && cleared() !== undefined && !hasContent(),
+    priority: 10,
+    bindings: tuiConfig.keybinds.get("input.undo").map((binding) => ({ ...binding, cmd: restoreCleared })),
+  }))
+
   useBindings(() => {
     return {
       target: inputTarget,
@@ -1415,8 +1440,61 @@ export function Prompt(props: PromptProps) {
     return
   }
 
-  function clearPrompt() {
-    if (store.prompt.input.trim().length >= DRAFT_RETENTION_MIN_CHARS || store.prompt.parts.length > 0) {
+  const hasContent = () => store.prompt.input !== "" || store.prompt.parts.length > 0
+  const escapeGuard = createDoublePress(() => tuiConfig.double_escape_ms)
+  const [escapeArmed, setEscapeArmed] = createSignal(false)
+  const [cleared, setCleared] = createSignal<{ prompt: PromptInfo; mode: "normal" | "shell"; cursor: number }>()
+  let escapeTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(escapeTimer))
+
+  function disarmEscape() {
+    clearTimeout(escapeTimer)
+    escapeGuard.reset()
+    setEscapeArmed(false)
+  }
+
+  function escapeClear() {
+    // A selection is the innermost thing Esc can undo: drop it, and don't count the press.
+    if (input.hasSelection()) {
+      input.clearSelection()
+      disarmEscape()
+      return
+    }
+    clearTimeout(escapeTimer)
+    if (escapeGuard.press() === "armed") {
+      setEscapeArmed(true)
+      escapeTimer = setTimeout(() => {
+        escapeGuard.reset()
+        setEscapeArmed(false)
+      }, tuiConfig.double_escape_ms)
+      return
+    }
+    setEscapeArmed(false)
+    const snapshot = { prompt: structuredClone(unwrap(store.prompt)), mode: store.mode, cursor: input.cursorOffset }
+    clearPrompt(true)
+    setCleared(snapshot)
+    toast.show({ variant: "info", message: `Prompt cleared · ${undoShortcut()} to restore`, duration: 4000 })
+  }
+
+  function restoreCleared() {
+    const saved = cleared()
+    if (!saved) return
+    setCleared(undefined)
+    input.setText(saved.prompt.input)
+    setStore("mode", saved.mode)
+    setStore("prompt", saved.prompt)
+    restoreExtmarksFromParts(saved.prompt.parts)
+    input.cursorOffset = saved.cursor
+    toast.show({ variant: "success", message: "Prompt restored", duration: 1500 })
+  }
+
+  /** `keep`: always save the prompt to history, not only a long draft (Esc Esc promises ↑ brings it back). */
+  function clearPrompt(keep = false) {
+    if (
+      (keep && store.prompt.input.trim() !== "") ||
+      store.prompt.input.trim().length >= DRAFT_RETENTION_MIN_CHARS ||
+      store.prompt.parts.length > 0
+    ) {
       history.append({
         ...store.prompt,
         mode: store.mode,
@@ -1523,6 +1601,9 @@ export function Prompt(props: PromptProps) {
               onContentChange={() => {
                 const value = input.plainText
                 setStore("prompt", "input", value)
+                // Typing after the first Esc starts over; typing after a clear makes it final.
+                if (escapeArmed()) disarmEscape()
+                if (value !== "") setCleared(undefined)
                 auto()?.onInput(value)
                 syncExtmarksWithPromptParts()
                 setCursorVersion((value) => value + 1)
@@ -1735,6 +1816,13 @@ export function Prompt(props: PromptProps) {
                   <span style={{ fg: store.interrupt > 0 ? theme.primary : theme.textMuted }}>
                     {store.interrupt > 0 ? "again to interrupt" : "interrupt"}
                   </span>
+                </text>
+              </box>
+            </Match>
+            <Match when={escapeArmed()}>
+              <box paddingLeft={3}>
+                <text fg={theme.primary}>
+                  esc <span style={{ fg: theme.textMuted }}>again to clear</span>
                 </text>
               </box>
             </Match>

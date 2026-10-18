@@ -309,6 +309,8 @@ export const dict = {
   "prompt.attachment.remove": "Fjern vedhæftning",
   "prompt.action.send": "Send",
   "prompt.action.stop": "Stop",
+  "prompt.escape.again": "Esc igen for at rydde",
+  "prompt.toast.cleared": "Prompt ryddet · {{key}} for at gendanne",
 
   "prompt.toast.pasteUnsupported.title": "Ikke understøttet vedhæftning",
   "prompt.toast.attachmentDuplicate.title": "Denne fil er allerede uploadet",

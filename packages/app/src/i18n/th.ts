@@ -410,6 +410,8 @@ export const dict = {
   "prompt.attachment.remove": "เอาไฟล์แนบออก",
   "prompt.action.send": "ส่ง",
   "prompt.action.stop": "หยุด",
+  "prompt.escape.again": "กด Esc อีกครั้งเพื่อล้าง",
+  "prompt.toast.cleared": "ล้างพรอมต์แล้ว · {{key}} เพื่อกู้คืน",
 
   "prompt.toast.pasteUnsupported.title": "ไฟล์แนบที่ไม่รองรับ",
   "prompt.toast.attachmentDuplicate.title": "ไฟล์นี้ถูกอัปโหลดแล้ว",
