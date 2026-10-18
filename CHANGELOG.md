@@ -18,6 +18,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **Your Lunos commands work in Claude Code and Codex sessions.** The `/` list shows the tool's
+  own commands and your Lunos custom commands and MCP prompts, labelled; a Lunos command is
+  expanded by Lunos and the text goes to the tool. On a name clash the Lunos one is `/<name>:lunos`.
+  Lunos commands that switch a Lunos agent, mode or model are greyed out there instead of being sent
+  to the tool as text.
+
 ## [1.18.49] - 2026-10-17
 
 ### Added

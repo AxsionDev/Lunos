@@ -1,5 +1,6 @@
 import type { BoxRenderable, TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
 import { EXTERNAL_LABEL, externalOf, wantExternalTools } from "../../util/external"
+import { lunosName, UNAVAILABLE } from "../../util/external-commands"
 import { pathToFileURL } from "bun"
 import fuzzysort from "fuzzysort"
 import path from "path"
@@ -455,13 +456,26 @@ export function Autocomplete(props: {
     // (they're sent to Claude Code / Codex as typed); Lunos's app commands stay unless a name clashes.
     const external = props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined
     const own = external?.commands ?? []
+    const tool = external ? EXTERNAL_LABEL[external.tool] : ""
     const results: AutocompleteOption[] = external
-      ? slashes().filter((item) => !own.includes(item.display.slice(1).trim()))
+      ? slashes()
+          .filter((item) => !own.includes(item.display.slice(1).trim()))
+          .map((item) => {
+            // XCOD-254: app commands for a Lunos agent, mode or model mean nothing here.
+            const name = item.display.slice(1).trim()
+            if (!UNAVAILABLE.has(name)) return item
+            return {
+              ...item,
+              muted: true,
+              description: `Not available in a ${tool} session`,
+              onSelect: () => toast.show({ variant: "info", message: `/${name} isn't available in a ${tool} session` }),
+            }
+          })
       : [...slashes()]
     for (const name of own)
       results.push({
         display: "/" + name,
-        description: `${EXTERNAL_LABEL[external!.tool]} command`,
+        description: `${tool} command`,
         onSelect: () => {
           const newText = "/" + name + " "
           const cursor = props.input().logicalCursor
@@ -471,14 +485,25 @@ export function Autocomplete(props: {
         },
       })
 
-    for (const serverCommand of external ? [] : sync.data.command) {
+    for (const serverCommand of sync.data.command) {
       if (serverCommand.source === "skill") continue
-      const label = serverCommand.source === "mcp" ? ":mcp" : ""
+      // XCOD-254: in an external session Lunos's commands are listed too, labelled, and renamed
+      // `name:lunos` where the tool has one of the same name.
+      const name = external ? lunosName(serverCommand.name, own) : serverCommand.name
+      const label = serverCommand.source === "mcp" && !external ? ":mcp" : ""
       results.push({
-        display: "/" + serverCommand.name + label,
-        description: serverCommand.description,
+        display: "/" + name + label,
+        description: external
+          ? [
+              "Lunos",
+              serverCommand.source === "mcp" ? "MCP prompt" : "command",
+              serverCommand.description ? `· ${serverCommand.description}` : "",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : serverCommand.description,
         onSelect: () => {
-          const newText = "/" + serverCommand.name + " "
+          const newText = "/" + name + " "
           const cursor = props.input().logicalCursor
           props.input().deleteRange(0, 0, cursor.row, cursor.col)
           props.input().insertText(newText)
