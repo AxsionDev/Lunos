@@ -411,6 +411,8 @@ export const dict = {
   "prompt.attachment.remove": "Удалить вложение",
   "prompt.action.send": "Отправить",
   "prompt.action.stop": "Остановить",
+  "prompt.escape.again": "Ещё раз Esc, чтобы очистить",
+  "prompt.toast.cleared": "Запрос очищен · {{key}} — восстановить",
 
   "prompt.toast.pasteUnsupported.title": "Неподдерживаемое вложение",
   "prompt.toast.attachmentDuplicate.title": "Этот файл уже загружен",

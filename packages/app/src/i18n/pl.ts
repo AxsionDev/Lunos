@@ -393,6 +393,8 @@ export const dict = {
   "prompt.attachment.remove": "Usuń załącznik",
   "prompt.action.send": "Wyślij",
   "prompt.action.stop": "Zatrzymaj",
+  "prompt.escape.again": "Naciśnij ponownie Esc, aby wyczyścić",
+  "prompt.toast.cleared": "Wyczyszczono polecenie · {{key}}, aby przywrócić",
   "prompt.toast.pasteUnsupported.title": "Nieobsługiwany załącznik",
   "prompt.toast.attachmentDuplicate.title": "Ten plik został już przesłany",
   "prompt.toast.pasteUnsupported.description": "Można tutaj załączać tylko obrazy, pliki PDF lub pliki tekstowe.",

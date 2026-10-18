@@ -390,6 +390,8 @@ export const dict = {
   "prompt.attachment.remove": "إزالة المرفق",
   "prompt.action.send": "إرسال",
   "prompt.action.stop": "إيقاف",
+  "prompt.escape.again": "اضغط Esc مرة أخرى للمسح",
+  "prompt.toast.cleared": "تم مسح الطلب · {{key}} للاستعادة",
   "prompt.toast.pasteUnsupported.title": "مرفق غير مدعوم",
   "prompt.toast.attachmentDuplicate.title": "تم تحميل هذا الملف بالفعل",
   "prompt.toast.pasteUnsupported.description": "يمكن إرفاق الصور أو ملفات PDF أو الملفات النصية فقط هنا.",

@@ -296,6 +296,8 @@ export const dict = {
   "prompt.attachment.remove": "Anhang entfernen",
   "prompt.action.send": "Senden",
   "prompt.action.stop": "Stoppen",
+  "prompt.escape.again": "Erneut Esc zum Leeren",
+  "prompt.toast.cleared": "Eingabe geleert · {{key}} zum Wiederherstellen",
   "prompt.toast.pasteUnsupported.title": "Nicht unterstützter Anhang",
   "prompt.toast.attachmentDuplicate.title": "Diese Datei wurde bereits hochgeladen",
   "prompt.toast.pasteUnsupported.description": "Hier können nur Bilder, PDFs oder Textdateien angehängt werden.",
