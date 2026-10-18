@@ -386,6 +386,8 @@ export const dict = {
   "prompt.attachment.remove": "დანართის წაშლა",
   "prompt.action.send": "გაგზავნა",
   "prompt.action.stop": "შეჩერება",
+  "prompt.escape.again": "გასასუფთავებლად კვლავ Esc",
+  "prompt.toast.cleared": "მოთხოვნა გასუფთავდა · აღსადგენად {{key}}",
   "prompt.toast.pasteUnsupported.title": "მხარდაუჭერელი დანართი",
   "prompt.toast.pasteUnsupported.description": "აქ შეიძლება დაერთოს მხოლოდ სურათები, PDF ან ტექსტური ფაილები.",
   "prompt.toast.attachmentDuplicate.title": "ეს ფაილი უკვე ატვირთულია",

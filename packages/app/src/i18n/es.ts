@@ -413,6 +413,8 @@ export const dict = {
   "prompt.attachment.remove": "Eliminar adjunto",
   "prompt.action.send": "Enviar",
   "prompt.action.stop": "Detener",
+  "prompt.escape.again": "Esc otra vez para borrar",
+  "prompt.toast.cleared": "Indicación borrada · {{key}} para restaurar",
 
   "prompt.toast.pasteUnsupported.title": "Adjunto no compatible",
   "prompt.toast.attachmentDuplicate.title": "Este archivo ya se ha subido",

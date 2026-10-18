@@ -386,6 +386,8 @@ export const dict = {
   "prompt.attachment.remove": "حذف پیوست",
   "prompt.action.send": "ارسال کنید",
   "prompt.action.stop": "توقف کنید",
+  "prompt.escape.again": "برای پاک کردن دوباره Esc را بزنید",
+  "prompt.toast.cleared": "درخواست پاک شد · {{key}} برای بازگردانی",
   "prompt.toast.pasteUnsupported.title": "پیوست پشتیبانی نشده است",
   "prompt.toast.pasteUnsupported.description": "فقط تصاویر، PDFs، یا فایل های متنی را می توان در اینجا پیوست کرد.",
   "prompt.toast.attachmentDuplicate.title": "این فایل قبلا آپلود شده است",

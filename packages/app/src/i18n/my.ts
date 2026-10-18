@@ -389,6 +389,8 @@ export const dict = {
   "prompt.attachment.remove": "ပူးတွဲပါဖိုင်ကို ဖယ်ရှားပါ။",
   "prompt.action.send": "ပို့ပါ။",
   "prompt.action.stop": "ရပ်ပါ။",
+  "prompt.escape.again": "ရှင်းရန် Esc ကို ထပ်နှိပ်ပါ",
+  "prompt.toast.cleared": "ညွှန်ကြားချက်ကို ရှင်းလိုက်ပြီ · ပြန်ယူရန် {{key}}",
   "prompt.toast.pasteUnsupported.title": "ပူးတွဲပါဖိုင်ကို ပံ့ပိုးမထားပါ။",
   "prompt.toast.pasteUnsupported.description":
     "ရုပ်ပုံများ၊ PDF များ သို့မဟုတ် စာသားဖိုင်များကိုသာ ဤနေရာတွင် ပူးတွဲနိုင်ပါသည်။",

@@ -390,6 +390,8 @@ export const dict: Record<string, string> = {
   "prompt.attachment.remove": "མཉམ་སྦྲགས་རྩ་བསྐྲད་གཏང་།",
   "prompt.action.send": "བཏང༌ནི",
   "prompt.action.stop": "བཀག་པ",
+  "prompt.escape.again": "བསལ་ནིའི་དོན་ལུ་ Esc ལོག་སྟེ་ནོན།",
+  "prompt.toast.cleared": "འདྲི་བ་བསལ་ཡོདཔ། · སླར་གསོ་ལུ་ {{key}}",
   "prompt.toast.pasteUnsupported.title": "རྒྱབ་སྐྱོར་མེད་པའི་མཉམ་སྦྲགས།",
   "prompt.toast.pasteUnsupported.description":
     "པར་རིས་དང་པི་ཌི་ཨེཕ་ ཡང་ན་ ཚིག་ཡིག་ཡིག་སྣོད་ཚུ་རྐྱངམ་ཅིག་ ནཱ་ལུ་མཉམ་སྦྲགས་འབད་བཏུབ།",
