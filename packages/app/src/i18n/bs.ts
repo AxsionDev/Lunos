@@ -413,6 +413,8 @@ export const dict = {
   "prompt.attachment.remove": "Ukloni prilog",
   "prompt.action.send": "Pošalji",
   "prompt.action.stop": "Zaustavi",
+  "prompt.escape.again": "Esc ponovo za brisanje",
+  "prompt.toast.cleared": "Upit obrisan · {{key}} za vraćanje",
 
   "prompt.toast.pasteUnsupported.title": "Nepodržan prilog",
   "prompt.toast.attachmentDuplicate.title": "Ova datoteka je već učitana",

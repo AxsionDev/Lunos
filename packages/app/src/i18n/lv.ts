@@ -386,6 +386,8 @@ export const dict = {
   "prompt.attachment.remove": "Noņemt pielikumu",
   "prompt.action.send": "Sūtīt",
   "prompt.action.stop": "Apturēt",
+  "prompt.escape.again": "Vēlreiz Esc, lai notīrītu",
+  "prompt.toast.cleared": "Uzvedne notīrīta · {{key}}, lai atjaunotu",
   "prompt.toast.pasteUnsupported.title": "Neatbalstīts pielikums",
   "prompt.toast.pasteUnsupported.description": "Šeit var pievienot tikai attēlus, PDF vai teksta failus.",
   "prompt.toast.attachmentDuplicate.title": "Šis fails jau ir augšupielādēts",

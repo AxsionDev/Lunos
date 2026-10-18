@@ -391,6 +391,8 @@ export const dict = {
   "prompt.attachment.remove": "އެޓޭޗްމަންޓް ނަގާށެވެ",
   "prompt.action.send": "ފޮނުވުން",
   "prompt.action.stop": "ހުއްޓުން",
+  "prompt.escape.again": "ފޮހެލުމަށް އަލުން Esc",
+  "prompt.toast.cleared": "ޕްރޮމްޕްޓް ފޮހެލެވިއްޖެ · އަނބުރާ ގެނައުމަށް {{key}}",
   "prompt.toast.pasteUnsupported.title": "ސަޕޯޓް ނުކުރާ އެޓޭޗްމަންޓެވެ",
   "prompt.toast.pasteUnsupported.description":
     "މިތަނުގައި އެޓޭޗް ކުރެވޭނީ ހަމައެކަނި ތަސްވީރު، PDFs، ނުވަތަ ޓެކްސްޓް ފައިލްތަކެވެ.",

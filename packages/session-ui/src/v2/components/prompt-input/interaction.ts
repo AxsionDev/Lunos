@@ -1,4 +1,4 @@
-import { createEffect, on, type Accessor } from "solid-js"
+import { createEffect, createSignal, on, onCleanup, type Accessor } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { useFilteredList } from "@opencode-ai/ui/hooks"
 import { createPromptInputV2Attachments, type PromptInputV2AttachmentConfig } from "./attachments"
@@ -45,6 +45,8 @@ export type PromptInputV2ViewConfig = {
     onClose: () => void
   }
   onKeyDown?: (event: KeyboardEvent) => void
+  /** Esc Esc cleared the prompt; mod+Z right after brings it back. */
+  onCleared?: () => void
   onPaste?: (event: ClipboardEvent) => void
   onDrop?: (event: DragEvent) => void
 }
@@ -185,7 +187,51 @@ export function createPromptInputV2Controller(input: {
     return result.handled
   }
 
+  // XCOD-255: Esc twice clears the prompt while the agent is idle (busy, Esc stops it and the text
+  // stays). The cleared prompt goes to history, and mod+Z right after brings it back, comments too.
+  const [escapeArmed, setEscapeArmed] = createSignal(false)
+  let escapeTimer: ReturnType<typeof setTimeout> | undefined
+  let cleared: PromptInputV2HistoryEntry | undefined
+  onCleanup(() => clearTimeout(escapeTimer))
+  const disarmEscape = () => {
+    clearTimeout(escapeTimer)
+    setEscapeArmed(false)
+  }
+  const populated = () =>
+    draft.state.prompt.some((part) => ("content" in part ? part.content.trim() !== "" : true)) ||
+    draft.state.context.items.length > 0
+  const escapeClear = () => {
+    if (!escapeArmed()) {
+      setEscapeArmed(true)
+      escapeTimer = setTimeout(() => setEscapeArmed(false), DOUBLE_ESCAPE_MS)
+      return
+    }
+    disarmEscape()
+    cleared = { prompt: clonePrompt(draft.state.prompt), metadata: input.history?.capture?.() }
+    input.history?.add(cleared.prompt, state.mode)
+    setState({ historyIndex: -1, savedHistory: undefined })
+    input.history?.restore?.([])
+    draft.reset()
+    // After this keydown has finished: the same Esc reaching a toast region would dismiss it.
+    setTimeout(() => input.view.onCleared?.(), 0)
+  }
+
   const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") disarmEscape()
+    if (
+      cleared &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === "z" &&
+      !populated()
+    ) {
+      event.preventDefault()
+      const entry = cleared
+      cleared = undefined
+      applyHistory(entry, "end")
+      return true
+    }
     if (
       state.mode === "normal" &&
       (event.metaKey || event.ctrlKey) &&
@@ -220,6 +266,16 @@ export function createPromptInputV2Controller(input: {
     if (stop) {
       event.preventDefault()
       input.view.submit.onStop()
+      return true
+    }
+    if (event.key === "Escape" && state.mode === "normal" && populated()) {
+      // A selection is the innermost thing Esc undoes: collapse it, and don't count the press.
+      const selection = window.getSelection()
+      if (selection && !selection.isCollapsed && editor?.contains(selection.anchorNode)) {
+        selection.collapseToEnd()
+        disarmEscape()
+      } else escapeClear()
+      event.preventDefault()
       return true
     }
     if (
@@ -338,7 +394,9 @@ export function createPromptInputV2Controller(input: {
       input.onEditor?.(element)
     },
     restoreFocus,
+    escapeArmed,
     onInput(value: string, prompt?: PromptInputV2PersistedState["prompt"], cursor?: number) {
+      if (value !== "") cleared = undefined
       if (prompt) draft.setPrompt(prompt, cursor)
       dispatch({ type: "input.changed", value, persist: !prompt })
     },
@@ -440,6 +498,8 @@ function canNavigateHistory(direction: "up" | "down", text: string, cursor: numb
   if (direction === "up") return position === 0 && text.length === 0
   return position === text.length
 }
+
+const DOUBLE_ESCAPE_MS = 1000
 
 function clonePrompt(prompt: PromptInputV2PersistedState["prompt"]): PromptInputV2PersistedState["prompt"] {
   return prompt.map((part) =>
