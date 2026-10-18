@@ -47,6 +47,17 @@ describe("createDoublePress", () => {
     expect(createDoublePress(() => 0, fakeTimers()).press()).toBe("confirmed")
   })
 
+  test("the prompt's Esc Esc window (XCOD-255): 1000 ms by default, inclusive at the edge", () => {
+    const timers = fakeTimers()
+    const guard = createDoublePress(() => 1000, timers)
+    expect(guard.press()).toBe("armed")
+    timers.advance(1000)
+    expect(guard.press()).toBe("confirmed")
+    expect(guard.press()).toBe("armed")
+    timers.advance(1001)
+    expect(guard.press()).toBe("armed")
+  })
+
   test("reset forgets the first press", () => {
     const guard = createDoublePress(() => 2000, fakeTimers())
     guard.press()

@@ -414,6 +414,8 @@ export const dict = {
   "prompt.attachment.remove": "Видалити вкладення",
   "prompt.action.send": "Надіслати",
   "prompt.action.stop": "Зупинити",
+  "prompt.escape.again": "Ще раз Esc, щоб очистити",
+  "prompt.toast.cleared": "Запит очищено · {{key}} — відновити",
 
   "prompt.toast.pasteUnsupported.title": "Непідтримуване вкладення",
   "prompt.toast.attachmentDuplicate.title": "Цей файл уже завантажено",

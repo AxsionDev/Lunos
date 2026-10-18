@@ -21,6 +21,13 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Press Esc twice to clear the prompt** and start again, in the terminal, desktop and web apps.
+  The first Esc shows "esc again to clear"; a second within a second clears it. The undo key brings
+  it back right after, and ↑ finds it in history. While the agent is working, Esc still stops it and
+  what you've typed stays. Turn it off with `"double_escape_clear": false` in `tui.json`.
+
 ### Changed
 
 - **"What's new" and the changelog show only the changes you'll notice, in plain words.** Ticket
