@@ -18,6 +18,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Changed
+
+- **`/marketplace` has a real tab bar** (All · Plugins · Skills · Hooks · MCP · Installed) with a
+  count on each tab that follows your search. `tab` / `shift+tab` or a click switches tabs, and it
+  reopens on the one you used last. Each kind shows what matters for it: a hook's event and the
+  command it runs, an MCP server's transport, host, region and whether your residency policy allows
+  it. After installing you're back on the same tab and row, and `ctrl+g` picks where plugins go.
+
 ## [1.18.49] - 2026-10-17
 
 ### Added

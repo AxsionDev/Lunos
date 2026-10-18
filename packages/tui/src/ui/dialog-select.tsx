@@ -57,6 +57,8 @@ export interface DialogSelectProps<T> {
     side?: "left" | "right"
   }[]
   bindings?: readonly Binding<Renderable, KeyEvent>[]
+  /** false leaves Tab / Shift+Tab to `bindings` (XCOD-258's marketplace tabs) instead of cycling actions. */
+  tabCyclesActions?: boolean
   current?: T
   /** Let the list use the rest of the terminal's height instead of half of it (XCOD-205's /sessions). */
   fill?: boolean
@@ -489,7 +491,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
           "dialog.select.submit",
         ]),
         ...visible.flatMap((item) => tuiConfig.keybinds.get(item.command)),
-        ...(visible.length
+        ...(visible.length && props.tabCyclesActions !== false
           ? [
               {
                 key: "tab",
