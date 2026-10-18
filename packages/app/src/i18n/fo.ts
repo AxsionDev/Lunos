@@ -385,6 +385,8 @@ export const dict = {
   "prompt.attachment.remove": "Strika viðheftið",
   "prompt.action.send": "Send",
   "prompt.action.stop": "Steðga",
+  "prompt.escape.again": "Esc aftur fyri at strika",
+  "prompt.toast.cleared": "Áheitan strikað · {{key}} fyri at endurskapa",
   "prompt.toast.pasteUnsupported.title": "Óstuðlað viðhefti",
   "prompt.toast.pasteUnsupported.description": "Bert myndir, PDFs, ella tekstfílur kunnu viðheftast her.",
   "prompt.toast.attachmentDuplicate.title": "Hendan fílan er longu løgd upp.",

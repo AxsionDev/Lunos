@@ -403,6 +403,8 @@ export const dict = {
   "prompt.attachment.remove": "Fjern vedlegg",
   "prompt.action.send": "Send",
   "prompt.action.stop": "Stopp",
+  "prompt.escape.again": "Esc igjen for å tømme",
+  "prompt.toast.cleared": "Ledetekst tømt · {{key}} for å gjenopprette",
 
   "prompt.toast.pasteUnsupported.title": "Ikke støttet vedlegg",
   "prompt.toast.attachmentDuplicate.title": "Denne filen er allerede lastet opp",
