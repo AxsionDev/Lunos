@@ -4474,6 +4474,204 @@
         ]
       }
     },
+    "/lsp/servers": {
+      "get": {
+        "tags": ["instance"],
+        "operationId": "lsp.servers",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every LSP server Lunos knows and its state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LSPOverview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "XCOD-257: every built-in and custom language server with its state (running, starting, failed with the reason, not started, off), source, PID and diagnostics count, and whether LSP and downloads are on.",
+        "summary": "List LSP servers",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.lsp.servers({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/lsp/{serverID}/stop": {
+      "post": {
+        "tags": ["instance"],
+        "operationId": "lsp.stop",
+        "parameters": [
+          {
+            "name": "serverID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stopped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "description": "Stopped"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Stops the server's running clients. With restart, a recorded failure is forgotten too, so the next matching file starts it again.",
+        "summary": "Stop or restart an LSP server",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restart": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.lsp.stop({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/lsp/{serverID}/log": {
+      "get": {
+        "tags": ["instance"],
+        "operationId": "lsp.log",
+        "parameters": [
+          {
+            "name": "serverID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The last lines of the server's stderr",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The last lines of the server's stderr"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The last 200 lines the server wrote to stderr in this session.",
+        "summary": "LSP server log",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.lsp.log({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/formatter": {
       "get": {
         "tags": ["instance"],
@@ -26755,10 +26953,76 @@
           },
           "status": {
             "type": "string",
-            "enum": ["connected", "error"]
+            "enum": ["connected", "starting", "error"]
+          },
+          "reason": {
+            "type": "string"
           }
         },
         "required": ["id", "name", "root", "status"],
+        "additionalProperties": false
+      },
+      "LSPServerInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "type": "string",
+            "enum": ["running", "starting", "failed", "not_started", "disabled"]
+          },
+          "custom": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "root": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "number"
+          },
+          "started": {
+            "type": "number"
+          },
+          "diagnostics": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "extensions", "state", "custom"],
+        "additionalProperties": false
+      },
+      "LSPOverview": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "downloads": {
+            "type": "boolean"
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LSPServerInfo"
+            }
+          }
+        },
+        "required": ["enabled", "downloads", "servers"],
         "additionalProperties": false
       },
       "FormatterStatus": {

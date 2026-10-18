@@ -18,6 +18,16 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **See whether LSP works, and why a language server didn't start.** `/lsp` (and `/settings` →
+  Tools → lsp) lists every language server as running, starting, failed with its reason (for example
+  "command not found: gopls" or "exited with code 3 before it finished starting"), not started, or
+  off, with where it came from and its PID. Enter on one restarts, stops, turns it off or shows its
+  log. The sidebar shows a failed server's reason, and `lunos lsp status [--file <path>] [--json]`
+  prints the same list. A server that quits while starting now fails at once instead of after the
+  start-up timeout.
+
 ## [1.18.49] - 2026-10-17
 
 ### Added

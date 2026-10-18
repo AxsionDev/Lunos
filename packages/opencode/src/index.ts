@@ -18,6 +18,7 @@ import { ModelsCommand } from "./cli/cmd/models"
 import { LoginCommand, LogoutCommand, WhoamiCommand } from "./cli/cmd/cloud"
 import { CloudCommand } from "./cli/cmd/cloud-git-token"
 import { ExternalCommand } from "./cli/cmd/external"
+import { LspCommand } from "./cli/cmd/lsp"
 import { UI } from "./cli/ui"
 import { InstallationVersion, versionVerbose } from "@opencode-ai/core/installation/version"
 import { Offline } from "@opencode-ai/core/offline"
@@ -180,6 +181,7 @@ const cli = yargs(args)
   .command(WhoamiCommand)
   .command(CloudCommand)
   .command(ExternalCommand)
+  .command(LspCommand)
   .command(StatsCommand)
   .command(ExportCommand)
   .command(ShareCommand)

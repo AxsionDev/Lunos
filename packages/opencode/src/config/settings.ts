@@ -407,7 +407,17 @@ function agentEntry(key: string): Entry | undefined {
 
 export function find(key: string) {
   const name = ALIASES[key] ?? key
-  return entries().find((item) => item.key === name) ?? agentEntry(name)
+  return entries().find((item) => item.key === name) ?? agentEntry(name) ?? lspEntry(name)
+}
+
+/** XCOD-257: `lsp.<server>.disabled`, which /lsp's "Turn off" writes for one server. */
+function lspEntry(key: string): Entry | undefined {
+  const parts = key.split(".")
+  if (parts.length !== 3 || parts[0] !== "lsp" || parts[2] !== "disabled" || !/^[A-Za-z0-9_-]+$/.test(parts[1])) return
+  return {
+    ...entry(key, "config", CATEGORY.lsp, Schema.Boolean.ast, false),
+    description: `Turns the ${parts[1]} language server off`,
+  }
 }
 
 // ---------------------------------------------------------------------------------------------

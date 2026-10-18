@@ -442,7 +442,7 @@ export type TuiSidebarMcpItem = {
   error?: string
 }
 
-export type TuiSidebarLspItem = Pick<LspStatus, "id" | "root" | "status">
+export type TuiSidebarLspItem = Pick<LspStatus, "id" | "root" | "status" | "reason">
 
 export type TuiSidebarTodoItem = Pick<Todo, "content" | "status">
 
