@@ -18,6 +18,14 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ## [Unreleased]
 
+### Added
+
+- **You always see when a prompt goes to Claude Code or Codex.** Their sessions show `▸ Claude Code`
+  (or `▸ Codex`) by the prompt and `Lunos · Claude Code` bottom right, and the prompt border, cursor
+  and spinner take the tool's accent colour, in the terminal, desktop and web apps. `/sessions` and
+  the sidebar mark these sessions with the tool's name. `"external_accent": false` in `tui.json`
+  keeps your theme's colours.
+
 ## [1.18.49] - 2026-10-17
 
 ### Added

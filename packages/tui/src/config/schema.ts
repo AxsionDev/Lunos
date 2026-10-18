@@ -88,6 +88,10 @@ export const Info = Schema.Struct({
       "true turns off every animation (the home screen's moon reflection, spinners, placeholder cycling) and the in-app toggle can't turn them back on. Unset: off by default when NO_COLOR is set or TERM=dumb",
   }),
   question: Schema.optional(QuestionPrompt),
+  external_accent: Schema.optional(Schema.Boolean).annotate({
+    description:
+      'false keeps the theme\'s colours in Claude Code and Codex sessions; the "Lunos · Claude Code" badge and the ▸ label stay (default: true)',
+  }),
   whats_new: Schema.optional(Schema.Boolean).annotate({
     description:
       'false stops the "What\'s new" panel on the first start after an update. /whatsnew and lunos changelog still work (default: true)',
