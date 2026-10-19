@@ -51,6 +51,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   default_agent: "Models & agents",
   subagent: "Models & agents",
   cloud: "Advanced / experimental",
+  auth: "Advanced / experimental",
   sync: "Advanced / experimental",
   external: "Models & agents",
   subagent_depth: "Models & agents",

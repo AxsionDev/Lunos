@@ -25073,6 +25073,15 @@
         },
         "additionalProperties": false
       },
+      "AuthConfig": {
+        "type": "object",
+        "properties": {
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "SyncOptions": {
         "type": "object",
         "properties": {
@@ -26132,6 +26141,9 @@
           },
           "cloud": {
             "$ref": "#/components/schemas/CloudConfig"
+          },
+          "auth": {
+            "$ref": "#/components/schemas/AuthConfig"
           },
           "sync": {
             "$ref": "#/components/schemas/SyncConfig"

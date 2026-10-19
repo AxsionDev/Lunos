@@ -245,6 +245,25 @@ export const CALLS: Call[] = [
     offline: "blocked",
   },
   {
+    // XCOD-273: the official build's Welcome screen. None of it happens with an exemption.
+    id: "account-signin",
+    what: "Signing in to your free Lunos account (the Welcome screen, `/login`), and refreshing the sign-in",
+    hosts: "auth.lunos.tech (or `cloud.issuer` in global config)",
+    when: "at start while signed out, in the official build only; a refresh when the sign-in is due",
+    offline: "blocked",
+    alsoOffBy:
+      'managed `"auth": { "required": false }` or an organisation\'s `cloud.issuer`; `CI=true`; not a terminal (`lunos run`, pipes); a build from source',
+  },
+  {
+    // XCOD-273: /account and its actions, with the sign-in's own token.
+    id: "account-api",
+    what: "Your account: plan, organisations and devices (`/account`), Terms consent, Resend e-mail, sign out everywhere, Delete my account",
+    hosts: "cloud.lunos.tech (or `cloud.endpoint` in global or managed config), auth.lunos.tech",
+    when: "after you sign in, and when you open `/account` or use one of its actions",
+    offline: "blocked",
+    alsoOffBy: "the same exemptions as signing in: with one, you aren't signed in to a Lunos account",
+  },
+  {
     // XCOD-242: which hosted organisations the account belongs to; only the chosen id is kept.
     id: "hosted-team",
     what: "Your hosted Lunos organisations (`GET /v1/account`), to turn on team features",

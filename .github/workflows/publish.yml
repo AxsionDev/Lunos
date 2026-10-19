@@ -150,6 +150,9 @@ jobs:
         env:
           OPENCODE_VERSION: ${{ needs.version.outputs.version }}
           OPENCODE_RELEASE: ${{ needs.version.outputs.release }}
+          # XCOD-273: the official build asks for a free Lunos account at start (docs: "Your Lunos
+          # account"). Builds from source don't.
+          LUNOS_OFFICIAL_BUILD: "1"
           GH_REPO: ${{ needs.version.outputs.repo }}
           GH_TOKEN: ${{ steps.committer.outputs.token }}
 

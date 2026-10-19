@@ -2,52 +2,23 @@ import { EOL } from "os"
 import { Effect } from "effect"
 import { openUrl } from "@opencode-ai/core/open"
 import { Config } from "@/config/config"
-import { ConfigManaged } from "@/config/managed"
-import { ConfigOrgPolicy } from "@/config/org-policy"
 import { ConfigPolicy } from "@/config/policy"
 import { CloudAuth } from "@/cloud/auth"
 import { CloudDefaults } from "@/cloud/defaults"
-import { CloudHosted } from "@/cloud/hosted"
 import { CloudOidc } from "@/cloud/oidc"
+import { CloudSignin } from "@/cloud/signin"
 import { CloudStore } from "@/cloud/store"
-import { CloudSyncApi } from "@/cloud/sync-api"
 import { effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
 
 // XCOD-185: `lunos login` / `logout` / `whoami` for Lunos Cloud, with the OAuth device flow
-// against the configured OpenID Connect issuer. Nothing else in Lunos needs a login, and nothing
-// asks for one: the free harness works the same signed out.
+// against the configured OpenID Connect issuer. XCOD-273: the TUI's Welcome screen runs the same
+// sign-in (cloud/signin.ts); the official build asks for it at start, unless an exemption applies.
 
 export const DEFAULT_CLIENT_ID = "lunos-cli"
 
 const out = (line: string) => process.stdout.write(line + EOL)
 const dim = (text: string) => UI.Style.TEXT_DIM + text + UI.Style.TEXT_NORMAL
-
-const where = (backend: CloudStore.Backend) =>
-  backend === "keychain"
-    ? "the macOS Keychain"
-    : backend === "secret-service"
-      ? "the system keyring"
-      : "a file only you can read"
-
-/**
- * Session sync's part of `lunos login` (XCOD-185), after the sign-in is stored: register this device
- * and show the first-sync notice once. Only for Lunos's own issuer, or with `cloud.endpoint` set
- * explicitly: an organisation's token isn't sent to Lunos Cloud by default.
- */
-export async function loginSync(input: {
-  issuer: string
-  locked: boolean
-  print: (line: string) => void
-  opts?: CloudSyncApi.Options
-}) {
-  if (!(await CloudSyncApi.permitted(input.issuer))) return input.print(CloudSyncApi.NEEDS_ENDPOINT)
-  const state = await CloudSyncApi.register({ timeoutMs: 5_000, ...input.opts }).catch((error) => {
-    input.print(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`))
-    return undefined
-  })
-  if (state) await CloudSyncApi.notice(state, input.locked, input.print)
-}
 
 export const LoginCommand = effectCmd({
   command: "login",
@@ -70,56 +41,38 @@ export const LoginCommand = effectCmd({
   handler: Effect.fn("Cli.cloud.login")(function* (args) {
     const config = yield* Config.Service.use((cfg) => cfg.get())
     const issuer = args.issuer ?? config.cloud?.issuer ?? CloudDefaults.DEFAULT_ISSUER
-    if (!/^https:\/\//.test(issuer) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(issuer))
-      return yield* fail(`${issuer} isn't an https URL; sign-in tokens must not travel in the clear.`)
+    const refused = CloudSignin.insecure(issuer)
+    if (refused) return yield* fail(refused)
     const clientID = args.clientId ?? config.cloud?.client_id ?? DEFAULT_CLIENT_ID
-    const result = yield* Effect.tryPromise({
+    const confirmed = yield* Effect.tryPromise({
       try: async () => {
-        const discovery = await CloudOidc.discover(issuer)
-        const device = await CloudOidc.startDevice(discovery, clientID)
-        const link = device.verification_uri_complete ?? device.verification_uri
+        const started = await CloudSignin.begin({ issuer, clientID })
+        const link = started.device.verification_uri_complete ?? started.device.verification_uri
         out(`Open ${link}`)
-        out(`and confirm the code ${UI.Style.TEXT_HIGHLIGHT_BOLD}${device.user_code}${UI.Style.TEXT_NORMAL}`)
+        out(`and confirm the code ${UI.Style.TEXT_HIGHLIGHT_BOLD}${started.device.user_code}${UI.Style.TEXT_NORMAL}`)
         if (args.browser) await openUrl(link).catch(() => undefined)
         out(dim("Waiting for you to approve it in the browser… (ctrl+c to cancel)"))
-        const tokens = await CloudOidc.waitForTokens(discovery, clientID, device)
-        const user = await CloudOidc.user(discovery, tokens)
-        const backend = await CloudStore.save({
-          issuer: discovery.issuer ?? issuer,
-          clientID,
-          tokens,
-          email: user.email,
-          sub: user.sub,
-          savedAt: new Date().toISOString(),
-        })
-        return { user, backend, issuer: discovery.issuer ?? issuer, tokens }
+        return CloudSignin.complete(started)
       },
       catch: (error) => error,
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
-    out(`Signed in as ${result.user.email ?? result.user.preferred_username ?? result.user.sub} ${dim(`(${issuer})`)}`)
-    out(dim(`Session kept in ${where(result.backend)}. lunos logout signs out.`))
-    // Registering the device never fails the login, nor holds it up for long (5 s per request).
-    yield* Effect.promise(() =>
-      loginSync({
-        issuer: result.issuer,
-        locked: config.sync === false && ConfigPolicy.isLocked(config.$locked, "sync"),
-        print: out,
-      }).catch((error) =>
-        out(dim(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`)),
-      ),
+    if (CloudSignin.unverified(confirmed))
+      return yield* fail(
+        `Confirm your e-mail address first: open the link in the e-mail sent to ${confirmed.user.email ?? "you"}, then run lunos login again.`,
+      )
+    // Session sync and team features report after the sign-in line, as before.
+    const notes: string[] = []
+    const kept = yield* Effect.promise(() =>
+      CloudSignin.keep(confirmed, {
+        syncLocked: config.sync === false && ConfigPolicy.isLocked(config.$locked, "sync"),
+        print: (line) => notes.push(line),
+      }),
     )
-    // XCOD-242: team features for the account's hosted organisation, unless managed config decides
-    // (it sets cloud.policy, or cloud.auto_team: false): then nothing is looked up, exactly as before.
-    const hosted = yield* Effect.promise(async () => {
-      const onDisk = await ConfigManaged.readOnDiskDocs().catch(() => [] as unknown[])
-      if (ConfigOrgPolicy.policyURL(onDisk) || ConfigOrgPolicy.autoTeamOff(onDisk)) {
-        await CloudHosted.clear()
-        return { kind: "none" } as const
-      }
-      return CloudHosted.afterLogin({ issuer: result.issuer, sub: result.user.sub, tokens: result.tokens })
-    })
-    const line = CloudHosted.describe(hosted)
-    if (line) out(hosted.kind === "on" ? line : dim(line))
+    out(
+      `Signed in as ${confirmed.user.email ?? confirmed.user.preferred_username ?? confirmed.user.sub} ${dim(`(${issuer})`)}`,
+    )
+    out(dim(`Session kept in ${CloudSignin.where(kept.backend)}. lunos logout signs out.`))
+    for (const line of notes) out(kept.hosted.kind === "on" && line.startsWith("Team features: on") ? line : dim(line))
   }),
 })
 
@@ -128,18 +81,9 @@ export const LogoutCommand = effectCmd({
   describe: "sign out of Lunos Cloud and revoke this machine's session",
   instance: false,
   handler: Effect.fn("Cli.cloud.logout")(function* () {
-    const session = yield* Effect.promise(() => CloudStore.load())
+    const { session, revoked } = yield* Effect.promise(() => CloudSignin.logout())
     if (!session) return out("Not signed in.")
-    // Revoke first, so the refresh token stops working even if a copy exists somewhere.
-    const revoked = yield* Effect.promise(async () => {
-      try {
-        return await CloudOidc.revoke(await CloudOidc.discover(session.issuer), session.clientID, session.tokens)
-      } catch {
-        return false
-      }
-    })
-    yield* Effect.promise(() => CloudStore.clear())
-    yield* Effect.promise(() => CloudHosted.clear())
+    if (session.fromEnv) return out(`Signed in with ${CloudStore.TOKEN_ENV}; unset it to sign out.`)
     out(`Signed out${session.email ? ` ${session.email}` : ""}.`)
     if (!revoked)
       out(dim("The identity provider couldn't be told; the session ends when its tokens expire, or revoke it there."))
@@ -156,7 +100,7 @@ export const WhoamiCommand = effectCmd({
     const user = yield* Effect.tryPromise({
       try: async () => {
         const fresh = await CloudAuth.session()
-        return CloudOidc.user(fresh.discovery, fresh.tokens)
+        return CloudOidc.user(fresh.discovery ?? (await CloudOidc.discover(fresh.issuer)), fresh.tokens)
       },
       catch: (error) => error,
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))

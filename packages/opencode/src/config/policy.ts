@@ -52,6 +52,10 @@ export const KNOWN = [
   "cloud.endpoint",
   "cloud.policy",
   "cloud.client_start",
+  // XCOD-273: whether the TUI needs a Lunos account. Only managed config sets it, so a lock only
+  // makes that explicit.
+  "auth",
+  "auth.required",
   // lunos-web spec 2026-10-13 C3: an organisation can stop session sync.
   "sync",
   // XCOD-202: every permission, or one tool's (`permission.webfetch`, `permission.bash`, …).
