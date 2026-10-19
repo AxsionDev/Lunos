@@ -236,7 +236,11 @@ describe("external session (XCOD-218)", () => {
       config: {
         formatter: false,
         lsp: false,
-        external: { codex: { path: path.join(import.meta.dir, "..", "external", "fixtures", "fake-codex.ts") } },
+        // XCOD-254: nothing shared, so no consent question: the tool runs as it did before the bridge.
+        external: {
+          codex: { path: path.join(import.meta.dir, "..", "external", "fixtures", "fake-codex.ts") },
+          share: { mcp: false, skills: false, memory: false },
+        },
       } as any,
     },
     30_000,
@@ -376,7 +380,11 @@ describe("external session (XCOD-218)", () => {
       config: {
         formatter: false,
         lsp: false,
-        external: { codex: { path: path.join(import.meta.dir, "..", "external", "fixtures", "fake-codex.ts") } },
+        // XCOD-254: nothing shared, so no consent question: the tool runs as it did before the bridge.
+        external: {
+          codex: { path: path.join(import.meta.dir, "..", "external", "fixtures", "fake-codex.ts") },
+          share: { mcp: false, skills: false, memory: false },
+        },
       } as any,
     },
     30_000,

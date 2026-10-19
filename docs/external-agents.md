@@ -99,6 +99,10 @@ In the terminal app, some Lunos commands act on the tool's session instead:
 - **`/compact`** has the tool compact its own session: Claude Code's `/compact`, or Codex's compaction. No Lunos model sees the conversation.
 - **`/cost`** shows the cost Claude Code reported for the session. Codex reports tokens, not money, so its cost shows as "not reported", with the tokens used so far.
 
+### Your MCP servers, skills and memory
+
+After you agree, once per tool and project, Lunos can offer a Claude Code or Codex session your Lunos MCP servers, skills and memory through the Lunos bridge. Every call asks in Lunos unless your permission rules allow that tool by name, and is audited. Their results are sent to Anthropic or OpenAI with your prompts. See [External sessions: what Lunos adds](external-what-lunos-adds.md).
+
 ## Handing a task from a Lunos agent
 
 To let Lunos agents hand a task to Claude Code or Codex CLI, turn on the `external_agent` tool:

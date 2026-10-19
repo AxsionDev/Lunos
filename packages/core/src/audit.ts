@@ -76,6 +76,11 @@ export const EVENTS = [
   // cost), or one refused before it started (residency or policy). Never the prompt or output.
   "external.session",
   "external.denied",
+  // XCOD-254: the Lunos bridge for one turn of an external session (tool, what it offered: counts of
+  // servers and skills, memory on/off), and the user's answer to sharing with a tool. Never the
+  // tools' arguments or results: each bridged call is also a `tool.run` like a native one.
+  "external.bridge",
+  "external.consent",
   // XCOD-186: a run dispatched to a Lunos Cloud worker (worker id, endpoint, region, repo, size,
   // the secret names sent), its end (outcome, results branch, active seconds), or a dispatch refused
   // before any code left the machine (offline, residency, unpushed commit). Never secret values.

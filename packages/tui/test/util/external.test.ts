@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import {
+  bridgeLine,
   externalCost,
   externalOf,
   parseExternalSlash,
@@ -68,5 +69,27 @@ describe("/claude and /codex (XCOD-250)", () => {
     expect(
       toolUnavailable("claude", { installed: true, refused: { reason: "policy", message: "turned off by policy" } }),
     ).toBe("turned off by policy")
+  })
+})
+
+describe("the Lunos bridge's status line (XCOD-254)", () => {
+  test("counts, memory on/off, and a warning when the tool didn't connect", () => {
+    expect(bridgeLine({ servers: 2, skills: 3, memory: true, connected: true })).toEqual({
+      text: "Lunos bridge: 2 servers, 3 skills, memory on",
+      warning: false,
+    })
+    expect(bridgeLine({ servers: 1, skills: 1, memory: false })).toEqual({
+      text: "Lunos bridge: 1 server, 1 skill, memory off",
+      warning: false,
+    })
+    expect(bridgeLine({ servers: 1, skills: 0, memory: false, connected: false })).toEqual({
+      text: "Lunos bridge: 1 server, 0 skills, memory off ⚠ not connected",
+      warning: true,
+    })
+    expect(bridgeLine({ servers: 0, skills: 0, memory: false, off: "not shared in this session" })).toEqual({
+      text: "Lunos bridge: off (not shared in this session)",
+      warning: false,
+    })
+    expect(bridgeLine(undefined)).toBeUndefined()
   })
 })

@@ -24,6 +24,10 @@ export interface Options {
   allowUnsafe?: boolean
   executable?: string
   maxBudgetUSD?: number
+  /** XCOD-254: the Lunos bridge, as Claude Code's `--mcp-config` file or Codex's thread config. */
+  mcpConfig?: string
+  config?: Record<string, unknown>
+  onConfigRefused?: (message: string) => void
   ask: ExternalClaude.Options["ask"]
   onEvent?: ExternalClaude.Options["onEvent"]
 }

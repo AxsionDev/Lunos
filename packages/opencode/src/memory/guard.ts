@@ -36,6 +36,8 @@ export function taint(messages: readonly SessionV1.WithParts[], worktree: string
   for (const message of messages.slice(lastUser + 1)) {
     for (const part of message.parts) {
       if (part.type !== "tool") continue
+      const external = externalTaint(part.tool, part.state.input, worktree)
+      if (external) return external
       if ((TAINTING as readonly string[]).includes(part.tool))
         return `this turn used ${part.tool}, and memory never stores content from outside sources`
       if (part.tool === "read") {
@@ -44,6 +46,25 @@ export function taint(messages: readonly SessionV1.WithParts[], worktree: string
           return `this turn read ${file}, which is outside the project, and memory never stores content from outside it`
       }
     }
+  }
+}
+
+/**
+ * XCOD-254: a Claude Code / Codex session's own tools, recorded as `claude:<Tool>` / `codex:<Tool>`.
+ * Their web tools and any MCP server's tool bring in outside content (the Lunos bridge's skill and
+ * memory tools don't), and so does reading a file outside the project.
+ */
+function externalTaint(tool: string, input: unknown, worktree: string) {
+  const match = /^(claude|codex):(.+)$/.exec(tool)
+  if (!match) return
+  const name = match[2]!
+  const own = /^mcp__lunos__lunos_(skill|memory)_/.test(name)
+  if (/^(WebFetch|WebSearch|webSearch)$/.test(name) || (name.startsWith("mcp__") && !own))
+    return `this turn used ${tool}, and memory never stores content from outside sources`
+  if (name === "Read") {
+    const file = (input as { file_path?: unknown } | undefined)?.file_path
+    if (typeof file === "string" && outside(file, worktree))
+      return `this turn read ${file}, which is outside the project, and memory never stores content from outside it`
   }
 }
 

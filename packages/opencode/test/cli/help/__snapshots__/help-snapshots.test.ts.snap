@@ -33,6 +33,8 @@ Commands:
   lunos mcp auth [name]     authenticate with an OAuth-enabled MCP server
   lunos mcp logout [name]   remove OAuth credentials for an MCP server
   lunos mcp debug <name>    debug OAuth connection for an MCP server
+  lunos mcp bridge          the MCP server Lunos gives Claude Code and Codex sessions (started by
+                            Lunos, not by hand)
 
 Options:
   -h, --help        show help                                                              [boolean]

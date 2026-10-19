@@ -3283,6 +3283,82 @@
         ]
       }
     },
+    "/experimental/external/consent": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.external.consent",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Answer saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "description": "Answer saved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Whether Lunos's MCP servers, skills and memory are offered to Claude Code or Codex sessions in this project (share), never offered without asking (never), or asked about in the next session (ask). Kept on this machine, never in config. Audited as external.consent.",
+        "summary": "Share Lunos with Claude Code or Codex",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tool": {
+                    "type": "string",
+                    "enum": ["claude", "codex"]
+                  },
+                  "answer": {
+                    "type": "string",
+                    "enum": ["share", "never", "ask"]
+                  }
+                },
+                "required": ["tool", "answer"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.external.consent({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/experimental/peer/{sessionID}/stop": {
       "post": {
         "tags": ["experimental"],
@@ -24536,6 +24612,27 @@
               }
             },
             "additionalProperties": false
+          },
+          "share": {
+            "type": "object",
+            "properties": {
+              "mcp": {
+                "type": "boolean"
+              },
+              "skills": {
+                "type": "boolean"
+              },
+              "memory": {
+                "type": "boolean"
+              },
+              "commands": {
+                "type": "boolean"
+              },
+              "hooks": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false
@@ -27510,6 +27607,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "consent": {
+            "type": "string",
+            "enum": ["share", "never"]
           }
         },
         "required": ["tool", "label", "installed"],

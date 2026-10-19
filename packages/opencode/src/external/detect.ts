@@ -42,6 +42,8 @@ export interface Status {
   hint?: string
   /** XCOD-256: the `--permission-mode` choices this Claude Code's `--help` lists. */
   permissionModes?: string[]
+  /** XCOD-254: this Claude Code's `--help` lists `--mcp-config`, so it can be given the Lunos bridge. */
+  mcpConfig?: boolean
 }
 
 /** `(choices: "acceptEdits", "auto", …)` after `--permission-mode`, which `--help` wraps across lines. */
@@ -124,6 +126,7 @@ export async function detect(tool: Tool, configured?: string): Promise<Status> {
   if (tool === "claude") {
     const modes = permissionModes(help.stdout)
     if (modes) status.permissionModes = modes
+    status.mcpConfig = help.stdout.includes("--mcp-config")
     const auth = await run(file, ["auth", "status"])
     try {
       const parsed = JSON.parse(auth.stdout) as { loggedIn?: boolean; authMethod?: string }

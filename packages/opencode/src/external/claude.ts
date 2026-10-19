@@ -26,7 +26,15 @@ export const UNSAFE_MODES = new Set(["bypassPermissions"])
 export const SAFE_DEFAULT = "default"
 
 export type Event =
-  | { type: "init"; sessionID: string; model?: string; tools: string[]; commands: string[] }
+  | {
+      type: "init"
+      sessionID: string
+      model?: string
+      tools: string[]
+      commands: string[]
+      /** XCOD-254: the MCP servers the tool reports at start, with their state ("connected", "failed", …). */
+      mcp?: { name: string; status: string }[]
+    }
   | { type: "text"; text: string }
   | { type: "tool"; id: string; name: string; input: unknown }
   | { type: "tool_result"; id: string; isError: boolean; output: string }
@@ -64,6 +72,8 @@ export interface Options {
   allowUnsafe?: boolean
   executable?: string
   maxBudgetUSD?: number
+  /** XCOD-254: a `--mcp-config` file carrying the Lunos bridge (only when `--help` lists the flag). */
+  mcpConfig?: string
   ask: (request: PermissionRequest) => Promise<PermissionDecision>
   onEvent?: (event: Event) => void
 }
@@ -75,7 +85,12 @@ export class UnsafeModeError extends Error {
   override name = "ExternalUnsafeMode"
 }
 
-export function args(options: Pick<Options, "resume" | "model" | "permissionMode" | "allowUnsafe" | "maxBudgetUSD">) {
+/** A path that is safe on a command line, also through a shell (Windows .cmd shims): no spaces or quotes. */
+export const PATH_ARG = /^[A-Za-z0-9._:\\/~-]+$/
+
+export function args(
+  options: Pick<Options, "resume" | "model" | "permissionMode" | "allowUnsafe" | "maxBudgetUSD" | "mcpConfig">,
+) {
   const mode = options.permissionMode ?? SAFE_DEFAULT
   if (!/^[A-Za-z]+$/.test(mode)) throw new Error(`"${mode}" isn't a Claude Code permission mode`)
   if (UNSAFE_MODES.has(mode) && !options.allowUnsafe)
@@ -87,6 +102,8 @@ export function args(options: Pick<Options, "resume" | "model" | "permissionMode
     throw new Error(`"${options.model}" isn't a model name`)
   if (options.resume !== undefined && !/^[A-Za-z0-9_-]+$/.test(options.resume))
     throw new Error(`"${options.resume}" isn't a Claude Code session id`)
+  if (options.mcpConfig !== undefined && !PATH_ARG.test(options.mcpConfig))
+    throw new Error(`"${options.mcpConfig}" can't be passed to Claude Code safely`)
   return [
     "-p",
     "--input-format",
@@ -101,6 +118,7 @@ export function args(options: Pick<Options, "resume" | "model" | "permissionMode
     ...(options.resume ? ["--resume", options.resume] : []),
     ...(options.model ? ["--model", options.model] : []),
     ...(options.maxBudgetUSD !== undefined ? ["--max-budget-usd", String(options.maxBudgetUSD)] : []),
+    ...(options.mcpConfig ? ["--mcp-config", options.mcpConfig] : []),
   ]
 }
 
@@ -129,6 +147,13 @@ export function parse(line: string): { events: Event[]; permission?: PermissionR
       model: raw.model,
       tools: raw.tools ?? [],
       commands: raw.slash_commands ?? [],
+      ...(Array.isArray(raw.mcp_servers)
+        ? {
+            mcp: raw.mcp_servers.flatMap((item: any) =>
+              typeof item?.name === "string" ? [{ name: item.name, status: String(item.status ?? "") }] : [],
+            ),
+          }
+        : {}),
     })
   if (raw.type === "assistant")
     for (const block of raw.message?.content ?? []) {

@@ -36,6 +36,13 @@ export const KNOWN = [
   // XCOD-204: an organisation can turn off driving Claude Code / Codex CLI.
   "external",
   "external.enabled",
+  // XCOD-254: what Claude Code / Codex sessions may use from Lunos (each, or all of them).
+  "external.share",
+  "external.share.mcp",
+  "external.share.skills",
+  "external.share.memory",
+  "external.share.commands",
+  "external.share.hooks",
   // XCOD-185: an organisation can pin the identity provider lunos login signs in to.
   "cloud",
   // XCOD-241: lock the start event on, or lock the sign-in and policy keys one by one so developers

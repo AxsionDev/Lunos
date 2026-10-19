@@ -153,7 +153,9 @@ const cli = yargs(args)
       if (refused) throw new CliError({ message: refused, exitCode: 1 })
     }
 
-    if (!pendingNotice && NOTICE_COMMANDS.has(String(opts._[0] ?? ""))) {
+    // XCOD-254: `lunos mcp bridge` is started by Claude Code / Codex for every turn; it stays quiet.
+    const bridge = command === "mcp" && opts._[1] === "bridge"
+    if (!pendingNotice && !bridge && NOTICE_COMMANDS.has(String(opts._[0] ?? ""))) {
       pendingNotice = import("./cli/upgrade").then(({ notice }) => notice({ until: commandFinished })).catch(() => {})
     }
   })

@@ -98,6 +98,38 @@ const Codex = Schema.Struct({
   }),
 })
 
+/**
+ * XCOD-254: what an external session may use from Lunos, once the user has agreed to share it with
+ * that tool (the consent is asked once per tool and project, and kept outside config so a repository
+ * can't agree on its users' behalf). Each is on unless set to false; an organisation can lock any.
+ */
+export const SHARE = ["mcp", "skills", "memory", "commands", "hooks"] as const
+export type Share = Record<(typeof SHARE)[number], boolean>
+
+const ShareInfo = Schema.Struct({
+  mcp: Schema.Boolean.pipe(Schema.optional).annotate({
+    description: "Offer Lunos's MCP servers to Claude Code / Codex through the Lunos bridge (default true)",
+  }),
+  skills: Schema.Boolean.pipe(Schema.optional).annotate({
+    description: "Offer Lunos's skills to Claude Code / Codex through the Lunos bridge (default true)",
+  }),
+  memory: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      "Let Claude Code / Codex search and add to Lunos memory through the Lunos bridge, while memory is on (default true)",
+  }),
+  commands: Schema.Boolean.pipe(Schema.optional).annotate({
+    description: "List Lunos's custom commands, skills and MCP prompts in a Claude Code / Codex session (default true)",
+  }),
+  hooks: Schema.Boolean.pipe(Schema.optional).annotate({
+    description: "Run Lunos plugin hooks on Claude Code / Codex sessions' events (default true; not used yet)",
+  }),
+})
+
+/** Every `external.share.*` key with its default (true) filled in. */
+export function share(config: Info | undefined): Share {
+  return Object.fromEntries(SHARE.map((key) => [key, config?.share?.[key] !== false])) as Share
+}
+
 export const Info = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.optional).annotate({
     description: "Allow Lunos to start Claude Code and Codex CLI sessions (default true). Lock it to turn it off",
@@ -108,6 +140,10 @@ export const Info = Schema.Struct({
   }),
   claude: Claude.pipe(Schema.optional).annotate({ description: "Claude Code" }),
   codex: Codex.pipe(Schema.optional).annotate({ description: "Codex CLI" }),
+  share: ShareInfo.pipe(Schema.optional).annotate({
+    description:
+      "What Claude Code / Codex sessions may use from Lunos, after you agree to share it with that tool. Their results are sent to Anthropic or OpenAI with your prompts",
+  }),
 }).annotate({ identifier: "ExternalConfig" })
 export type Info = Schema.Schema.Type<typeof Info>
 

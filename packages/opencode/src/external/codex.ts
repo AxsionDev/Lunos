@@ -43,6 +43,13 @@ export interface Options {
   approvalPolicy?: string
   allowUnsafe?: boolean
   executable?: string
+  /**
+   * XCOD-254: config overrides for the thread (`config` on thread/start and thread/resume, Codex's
+   * `-c` keys), which carry the Lunos bridge. Every turn after the first resumes in a fresh app
+   * server, so it's sent on both. A Codex that refuses them runs the turn without (`onConfigRefused`).
+   */
+  config?: Record<string, unknown>
+  onConfigRefused?: (message: string) => void
   ask: (request: PermissionRequest) => Promise<PermissionDecision>
   onEvent?: (event: Event) => void
 }
@@ -315,6 +322,14 @@ export function start(options: Options): Running {
             options.onEvent?.({ type: "tool", id: item.id, name: "Bash", input: { command: item.command } })
           if (item.type === "fileChange")
             options.onEvent?.({ type: "tool", id: item.id, name: "FileChange", input: { changes: item.changes } })
+          // XCOD-254: an MCP server's tool, the Lunos bridge's included (v2 `mcpToolCall`; not recorded).
+          if (item.type === "mcpToolCall")
+            options.onEvent?.({
+              type: "tool",
+              id: item.id,
+              name: `mcp__${item.server}__${item.tool}`,
+              input: item.arguments ?? {},
+            })
           return
         }
         case "item/completed": {
@@ -326,6 +341,13 @@ export function start(options: Options): Running {
           }
           // Compaction says nothing itself, so the result would otherwise be empty.
           if (item.type === "contextCompaction" && !lastText) lastText = "Codex compacted the session."
+          if (item.type === "mcpToolCall")
+            options.onEvent?.({
+              type: "tool_result",
+              id: item.id,
+              isError: item.status !== "completed" || !!item.error,
+              output: item.error?.message ?? JSON.stringify(item.result?.content ?? item.result ?? ""),
+            })
           if (item.type === "commandExecution" || item.type === "fileChange")
             options.onEvent?.({
               type: "tool_result",
@@ -368,9 +390,17 @@ export function start(options: Options): Running {
         await request("initialize", { clientInfo: { name: "lunos", version: "1" } })
         write({ method: "initialized" })
         const common = { cwd: options.cwd, ...thread, ...(options.model ? { model: options.model } : {}) }
-        const started = options.resume
-          ? await request("thread/resume", { threadId: options.resume, ...common })
-          : await request("thread/start", common)
+        const open = (config?: Record<string, unknown>) =>
+          options.resume
+            ? request("thread/resume", { threadId: options.resume, ...common, ...(config ? { config } : {}) })
+            : request("thread/start", { ...common, ...(config ? { config } : {}) })
+        const started = options.config
+          ? await open(options.config).catch((error: unknown) => {
+              // Not an error for the turn: it runs as it would without the bridge.
+              options.onConfigRefused?.(error instanceof Error ? error.message : String(error))
+              return open()
+            })
+          : await open()
         threadID = started?.thread?.id ?? threadID
         options.onEvent?.({ type: "init", sessionID: threadID, model: started?.model, tools: [], commands: [] })
         const turn = await request(first.method, { threadId: threadID, ...first.params })
