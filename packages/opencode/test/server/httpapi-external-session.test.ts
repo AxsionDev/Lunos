@@ -18,6 +18,7 @@ import { InstanceStore } from "../../src/project/instance-store"
 import { Project } from "../../src/project/project"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
 import { SessionPaths } from "../../src/server/routes/instance/httpapi/groups/session"
+import { ExperimentalPaths } from "../../src/server/routes/instance/httpapi/groups/experimental"
 import { Session } from "@/session/session"
 import { resetDatabase } from "../fixture/db"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
@@ -92,6 +93,7 @@ const hostLog = async (file: string) =>
 
 afterEach(async () => {
   delete process.env.FAKE_CLAUDE_LOG
+  delete process.env.FAKE_CODEX_LOG
   await disposeAllInstances()
   await resetDatabase()
 })
@@ -271,6 +273,136 @@ describe("external session (XCOD-218)", () => {
         })
       }),
     { git: true, config: { formatter: false, lsp: false } },
+    30_000,
+  )
+
+  it.instance(
+    "XCOD-254: /models lists Claude Code's models; the choice applies from the next turn and survives a restart",
+    () =>
+      Effect.gen(function* () {
+        const { directory } = yield* TestInstance
+        const log = path.join(directory, "..", `fake-claude-${path.basename(directory)}.log`)
+        process.env.FAKE_CLAUDE_LOG = log
+        const created = yield* call(directory, SessionPaths.create, { metadata: { external: { tool: "claude" } } })
+        const sessionID = created.body.id as string
+        const modelsRoute = pathFor(ExperimentalPaths.externalModels, { sessionID })
+        const modelRoute = pathFor(ExperimentalPaths.externalModel, { sessionID })
+        const promptRoute = pathFor(SessionPaths.prompt, { sessionID })
+        const turn = (text: string) =>
+          Effect.gen(function* () {
+            const running = yield* call(directory, promptRoute, { parts: [{ type: "text", text }] }).pipe(
+              Effect.forkChild,
+            )
+            yield* answer(directory, sessionID, "once")
+            yield* answer(directory, sessionID, "once")
+            return (yield* Fiber.join(running)).body
+          })
+
+        const listed = (yield* call(directory, modelsRoute)).body
+        expect(listed).toMatchObject({ tool: "claude", label: "Claude Code", fallback: false })
+        expect(listed.current).toBeUndefined()
+        expect(listed.models.map((model: any) => model.id)).toEqual(["default", "sonnet", "haiku"])
+
+        // Turn 1 on the tool's default; then Sonnet is chosen.
+        expect((yield* turn("first")).info.modelID).toBe("claude-opus-5-5[1m]")
+        expect((yield* call(directory, modelRoute, { model: "sonnet; rm" })).status).toBe(400)
+        expect((yield* call(directory, modelRoute, { model: "sonnet" })).body).toBe(true)
+        const session = (yield* call(directory, pathFor(SessionPaths.get, { sessionID }))).body
+        expect(session.metadata.external).toMatchObject({ tool: "claude", session: FIXTURE_SESSION, model: "sonnet" })
+        expect((yield* call(directory, modelsRoute)).body.current).toBe("sonnet")
+
+        // Turn 2 resumes with the new model, and its init names it.
+        expect((yield* turn("second")).info.modelID).toBe("sonnet")
+        // A Lunos restart: the next turn still resumes with Sonnet.
+        yield* Effect.promise(() => disposeAllInstances())
+        expect((yield* turn("third")).info.modelID).toBe("sonnet")
+        // Back to the tool's default: no --model.
+        expect((yield* call(directory, modelRoute, {})).body).toBe(true)
+        yield* turn("fourth")
+
+        const runs = (yield* Effect.promise(() => hostLog(log))).filter((line) => line.argv?.includes("-p"))
+        const flags = runs.map((line) => {
+          const argv = line.argv as string[]
+          return [argv.includes("--resume"), argv.includes("--model") ? argv[argv.indexOf("--model") + 1] : undefined]
+        })
+        // The two /models probes start Claude Code too, with no prompt and no --resume.
+        expect(flags).toEqual([
+          [false, undefined],
+          [false, undefined],
+          [false, undefined],
+          [true, "sonnet"],
+          [true, "sonnet"],
+          [true, undefined],
+        ])
+      }),
+    { git: true, config: { formatter: false, lsp: false, external: { claude: { path: FAKE } } } as any },
+    30_000,
+  )
+
+  it.instance(
+    "XCOD-254: /models lists Codex's models through model/list; the choice goes on the resumed thread",
+    () =>
+      Effect.gen(function* () {
+        const { directory } = yield* TestInstance
+        const log = path.join(directory, "..", `fake-codex-${path.basename(directory)}.log`)
+        process.env.FAKE_CODEX_LOG = log
+        const created = yield* call(directory, SessionPaths.create, { metadata: { external: { tool: "codex" } } })
+        const sessionID = created.body.id as string
+        const listed = (yield* call(directory, pathFor(ExperimentalPaths.externalModels, { sessionID }))).body
+        expect(listed).toMatchObject({ tool: "codex", label: "Codex CLI", fallback: false })
+        expect(listed.models.map((model: any) => [model.id, model.default ?? false])).toEqual([
+          ["gpt-5.5", true],
+          ["gpt-5.5-mini", false],
+        ])
+        yield* call(directory, pathFor(ExperimentalPaths.externalModel, { sessionID }), { model: "gpt-5.5-mini" })
+        const promptRoute = pathFor(SessionPaths.prompt, { sessionID })
+        const turn = (text: string) =>
+          Effect.gen(function* () {
+            const running = yield* call(directory, promptRoute, { parts: [{ type: "text", text }] }).pipe(
+              Effect.forkChild,
+            )
+            yield* answer(directory, sessionID, "once")
+            yield* answer(directory, sessionID, "once")
+            return (yield* Fiber.join(running)).body
+          })
+        expect((yield* turn("Create note.txt")).info.modelID).toBe("gpt-5.5-mini")
+        expect((yield* turn("again")).info.modelID).toBe("gpt-5.5-mini")
+        const sent = yield* Effect.promise(() => hostLog(log))
+        expect(sent.find((m) => m.method === "thread/start")?.params.model).toBe("gpt-5.5-mini")
+        expect(sent.find((m) => m.method === "thread/resume")?.params.model).toBe("gpt-5.5-mini")
+      }),
+    {
+      git: true,
+      config: {
+        formatter: false,
+        lsp: false,
+        external: { codex: { path: path.join(import.meta.dir, "..", "external", "fixtures", "fake-codex.ts") } },
+      } as any,
+    },
+    30_000,
+  )
+
+  it.instance(
+    "XCOD-254: a Claude Code that doesn't list its models offers its aliases",
+    () =>
+      Effect.gen(function* () {
+        const { directory } = yield* TestInstance
+        process.env.FAKE_CLAUDE_MODELS = "none"
+        const created = yield* call(directory, SessionPaths.create, { metadata: { external: { tool: "claude" } } })
+        const listed = (yield* call(
+          directory,
+          pathFor(ExperimentalPaths.externalModels, { sessionID: created.body.id }),
+        )).body
+        delete process.env.FAKE_CLAUDE_MODELS
+        expect(listed.fallback).toBe(true)
+        expect(listed.models.map((model: any) => model.id)).toEqual(["opus", "sonnet", "haiku"])
+        // Not an external session: no models to list.
+        const plain = yield* call(directory, SessionPaths.create, {})
+        expect(
+          (yield* call(directory, pathFor(ExperimentalPaths.externalModels, { sessionID: plain.body.id }))).status,
+        ).toBe(400)
+      }),
+    { git: true, config: { formatter: false, lsp: false, external: { claude: { path: FAKE } } } as any },
     30_000,
   )
 })

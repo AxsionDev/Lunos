@@ -30,7 +30,13 @@ export function externalAccent<T>(
   return tool === "claude" ? theme.externalClaude : theme.externalCodex
 }
 
-export type ExternalMarker = { tool: ExternalTool; session?: string; commands?: string[] }
+export type ExternalMarker = {
+  tool: ExternalTool
+  session?: string
+  commands?: string[]
+  /** XCOD-254: the tool's model chosen with /models, used from the next turn. */
+  model?: string
+}
 
 /** The marker the server keeps on an external session (`metadata.external`), if this is one. */
 export function externalOf(session: { metadata?: Record<string, unknown> } | undefined): ExternalMarker | undefined {

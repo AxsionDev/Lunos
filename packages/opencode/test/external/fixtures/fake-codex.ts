@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // XCOD-204: stands in for `codex app-server` in tests. Answers initialize / thread/start /
-// thread/resume / turn/start, then replays the recorded turn (codex-app-server.jsonl): at each
+// thread/resume / turn/start (and model/list), then replays the recorded turn (codex-app-server.jsonl): at each
 // approval request it waits for the host's answer, and on an accepted file change writes the file
 // the way Codex would. review/start and thread/compact/start replay codex-review.jsonl and
 // codex-compact.jsonl, recorded from 0.160.1. Everything the host sends is logged to FAKE_CODEX_LOG.
@@ -43,8 +43,43 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   const m = JSON.parse(line)
   if (m.id !== undefined && !m.method) return answers.get(m.id)?.(m)
   if (m.method === "initialize") return send({ id: m.id, result: { userAgent: "codex/0.160.1" } })
+  // XCOD-254: the thread runs the model the host asked for, as Codex's does.
   if (m.method === "thread/start" || m.method === "thread/resume")
-    return send({ id: m.id, result: { thread: { id: m.params.threadId ?? thread }, model: "gpt-5.5" } })
+    return send({
+      id: m.id,
+      result: { thread: { id: m.params.threadId ?? thread }, model: m.params.model ?? "gpt-5.5" },
+    })
+  // XCOD-254: not recorded; shaped as the app server's v2 `model/list` (`data`, `nextCursor`), two
+  // pages so the host's paging is exercised.
+  if (m.method === "model/list")
+    return send({
+      id: m.id,
+      result: m.params?.cursor
+        ? {
+            data: [
+              {
+                id: "gpt-5.5-mini",
+                model: "gpt-5.5-mini",
+                displayName: "GPT-5.5 mini",
+                description: "Faster, cheaper",
+                isDefault: false,
+              },
+            ],
+            nextCursor: null,
+          }
+        : {
+            data: [
+              {
+                id: "gpt-5.5",
+                model: "gpt-5.5",
+                displayName: "GPT-5.5",
+                description: "Latest frontier model",
+                isDefault: true,
+              },
+            ],
+            nextCursor: "page-2",
+          },
+    })
   const command = commands[m.method]
   if (command) {
     send({ id: m.id, result: command.result })

@@ -68,6 +68,9 @@ export interface Options {
   onEvent?: (event: Event) => void
 }
 
+/** A model name that is safe on a command line: an id or alias, like `opus` or `claude-opus-5-5[1m]`. */
+export const MODEL_ID = /^[A-Za-z0-9._:\[\]/-]+$/
+
 export class UnsafeModeError extends Error {
   override name = "ExternalUnsafeMode"
 }
@@ -80,7 +83,7 @@ export function args(options: Pick<Options, "resume" | "model" | "permissionMode
       `Permission mode "${mode}" skips every approval. Pass it explicitly for this run (--permission-mode ${mode} --unsafe) if you mean it.`,
     )
   // Passed on the command line (through a shell on Windows), so only an id-shaped value.
-  if (options.model !== undefined && !/^[A-Za-z0-9._:\[\]/-]+$/.test(options.model))
+  if (options.model !== undefined && !MODEL_ID.test(options.model))
     throw new Error(`"${options.model}" isn't a model name`)
   if (options.resume !== undefined && !/^[A-Za-z0-9_-]+$/.test(options.resume))
     throw new Error(`"${options.resume}" isn't a Claude Code session id`)
@@ -179,6 +182,85 @@ export interface Running {
   /** Resolves with the final result (or an error event if the tool exited without one). */
   done: Promise<Extract<Event, { type: "result" }> | Extract<Event, { type: "error" }>>
   stop: () => void
+}
+
+/** One of the tool's models, as `/models` lists it in an external session (XCOD-254). */
+export interface Model {
+  /** What `--model` (or Codex's `model`) takes. */
+  id: string
+  name: string
+  description?: string
+  /** The model the tool uses when none is chosen. */
+  default?: boolean
+}
+
+/**
+ * XCOD-254: Claude Code's model aliases, for when it doesn't list its models (an older release, or
+ * the probe failing). Aliases rather than full ids, so they keep naming the current model.
+ */
+export const FALLBACK_MODELS: Model[] = [
+  { id: "opus", name: "Opus", description: "Claude Code's alias for the latest Opus" },
+  { id: "sonnet", name: "Sonnet", description: "Claude Code's alias for the latest Sonnet" },
+  { id: "haiku", name: "Haiku", description: "Claude Code's alias for the latest Haiku" },
+]
+
+/** The models in an `initialize` response (`response.models`: `{ value, displayName, description }`). */
+export function parseModels(response: unknown): Model[] {
+  const list = (response as { models?: unknown } | undefined)?.models
+  if (!Array.isArray(list)) return []
+  return list.flatMap((item: any) => {
+    const id = item?.value ?? item?.id ?? item?.model
+    if (typeof id !== "string" || !id) return []
+    const name = item.displayName ?? item.display_name ?? id
+    return [
+      {
+        id,
+        name: String(name),
+        ...(typeof item.description === "string" && item.description ? { description: item.description } : {}),
+        ...(id === "default" ? { default: true } : {}),
+      },
+    ]
+  })
+}
+
+/**
+ * XCOD-254: the models this Claude Code offers, from its answer to the host's `initialize` (as the
+ * Agent SDK's `supportedModels()` reads them). No prompt is sent, so no model is called; the process
+ * is stopped once it has answered. Empty when it doesn't list them in time.
+ */
+export function models(options: { executable: string; cwd: string; timeoutMs?: number }) {
+  const cmd = ExternalDetect.command(options.executable, args({}))
+  const child = spawn(cmd.file, cmd.args, {
+    cwd: options.cwd,
+    shell: cmd.shell,
+    env: ExternalDetect.environment(),
+    stdio: ["pipe", "pipe", "ignore"],
+  })
+  return new Promise<Model[]>((resolve) => {
+    const finish = (result: Model[]) => {
+      clearTimeout(timer)
+      child.kill()
+      resolve(result)
+    }
+    const timer = setTimeout(() => finish([]), options.timeoutMs ?? 15_000)
+    createInterface({ input: child.stdout! }).on("line", (line) => {
+      let raw: any
+      try {
+        raw = JSON.parse(line)
+      } catch {
+        return
+      }
+      if (raw.type === "control_response" && raw.response?.request_id === "lunos-models")
+        finish(raw.response.subtype === "success" ? parseModels(raw.response.response) : [])
+    })
+    child.on("error", () => finish([]))
+    child.on("close", () => finish([]))
+    child.stdin?.on("error", () => undefined)
+    child.stdin?.write(
+      JSON.stringify({ type: "control_request", request_id: "lunos-models", request: { subtype: "initialize" } }) +
+        "\n",
+    )
+  })
 }
 
 /** Start one turn. Ends when Claude Code reports its result; stdin is then closed, ending the process. */

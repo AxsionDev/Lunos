@@ -139,6 +139,31 @@ export const ExternalToolStatus = Schema.Struct({
   permissionModes: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
 }).annotate({ identifier: "ExternalToolStatus" })
 
+// XCOD-254: /models in a Claude Code or Codex session lists the tool's models.
+export const ExternalModel = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  default: Schema.optional(Schema.Boolean),
+}).annotate({ identifier: "ExternalModel" })
+
+export const ExternalModels = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  label: Schema.String,
+  /** The model chosen for this session, if one was. */
+  current: Schema.optional(Schema.String),
+  models: Schema.mutable(Schema.Array(ExternalModel)),
+  /** The tool didn't list its models; these are its aliases. */
+  fallback: Schema.Boolean,
+  /** Why the tool's models can't be listed (not installed, refused by policy, no answer). */
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "ExternalModels" })
+
+export const ExternalModelPayload = Schema.Struct({
+  /** Omitted goes back to the tool's default. */
+  model: Schema.optional(Schema.String),
+})
+
 // XCOD-205: one row of the Sessions window.
 export const SessionOverviewItem = Schema.Struct({
   id: Schema.String,
@@ -205,6 +230,8 @@ export const ExperimentalPaths = {
   sessionGroupMove: "/experimental/session-group/move",
   externalStop: "/experimental/external/:sessionID/stop",
   externalTools: "/experimental/external/tools",
+  externalModels: "/experimental/external/:sessionID/models",
+  externalModel: "/experimental/external/:sessionID/model",
   peerStop: "/experimental/peer/:sessionID/stop",
   peerAsks: "/experimental/peer/:sessionID/asks",
   peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
@@ -491,6 +518,33 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Stop an external session",
             description:
               "Stop a running Claude Code or Codex session Lunos started (as lunos external stop), from any Lunos process on this machine.",
+          }),
+        ),
+        HttpApiEndpoint.get("externalModels", ExperimentalPaths.externalModels, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(ExternalModels, "The tool's models"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.models",
+            summary: "External session models",
+            description:
+              "The models Claude Code or Codex offers for an external session, asked from the tool without a prompt (no model is called), and the one chosen for the session.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalModel", ExperimentalPaths.externalModel, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ExternalModelPayload,
+          success: described(Schema.Boolean, "Model saved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.model",
+            summary: "Choose an external session's model",
+            description:
+              "Save the model Claude Code or Codex uses in an external session from its next turn on (resumes included). Omit it to go back to the tool's default.",
           }),
         ),
         HttpApiEndpoint.post("peerStop", ExperimentalPaths.peerStop, {

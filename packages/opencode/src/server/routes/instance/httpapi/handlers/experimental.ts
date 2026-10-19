@@ -39,6 +39,7 @@ import { ExternalRegistry } from "@/external/registry"
 import { ExternalDetect } from "@/external/detect"
 import { ExternalPolicy } from "@/external/policy"
 import { ExternalRun } from "@/external/run"
+import { ExternalSession } from "@/external/session"
 import { GlobalBus } from "@/bus/global"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
 
@@ -328,6 +329,43 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       )
     })
 
+    // XCOD-254: /models and its choice in a Claude Code / Codex session.
+    const externalMarker = Effect.fn("ExperimentalHttpApi.externalMarker")(function* (sessionID: string) {
+      const info = yield* sessions
+        .get(SessionID.make(sessionID))
+        .pipe(Effect.catch(() => Effect.fail(notFound(`Session ${sessionID} not found`))))
+      const marker = ExternalSession.of(info)
+      if (!marker) return yield* Effect.fail(new InvalidRequestError({ message: "Not a Claude Code or Codex session" }))
+      return marker
+    })
+
+    const externalModels = Effect.fn("ExperimentalHttpApi.externalModels")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      const marker = yield* externalMarker(ctx.params.sessionID)
+      const cfg = yield* config.get()
+      const instance = yield* InstanceState.context
+      const listed = yield* Effect.promise(() => ExternalSession.models(marker.tool, cfg, instance.directory))
+      return {
+        tool: marker.tool,
+        label: ExternalSession.label(marker.tool),
+        ...(marker.model ? { current: marker.model } : {}),
+        ...listed,
+      }
+    })
+
+    const externalModel = Effect.fn("ExperimentalHttpApi.externalModel")(function* (ctx: {
+      params: { sessionID: string }
+      payload: { model?: string }
+    }) {
+      yield* externalMarker(ctx.params.sessionID)
+      const model = ctx.payload.model?.trim() || undefined
+      const invalid = model ? ExternalSession.invalidModel(model) : undefined
+      if (invalid) return yield* Effect.fail(new InvalidRequestError({ message: invalid }))
+      yield* ExternalSession.setModel(sessions, SessionID.make(ctx.params.sessionID), model)
+      return true
+    })
+
     // XCOD-234: sessions another Lunos process runs; that process does the work (and the audit).
     const peer = <A>(sessionID: string, path: string, init?: { method?: string; body?: unknown }) =>
       Effect.tryPromise({
@@ -401,6 +439,8 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionGroupMove", sessionGroupMove)
       .handle("externalStop", externalStop)
       .handle("externalTools", externalTools)
+      .handle("externalModels", externalModels)
+      .handle("externalModel", externalModel)
       .handle("peerStop", peerStop)
       .handle("peerAsks", peerAsks)
       .handle("peerPermissionReply", peerPermissionReply)

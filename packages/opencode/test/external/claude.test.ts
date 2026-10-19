@@ -6,7 +6,7 @@ import { ExternalClaude } from "../../src/external/claude"
 
 const FAKE = path.join(import.meta.dir, "fixtures", "fake-claude.ts")
 
-async function run(ask: ExternalClaude.Options["ask"]) {
+async function run(ask: ExternalClaude.Options["ask"], extra: Partial<ExternalClaude.Options> = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-claude-"))
   const log = path.join(dir, "host.log")
   process.env.FAKE_CLAUDE_LOG = log
@@ -17,6 +17,7 @@ async function run(ask: ExternalClaude.Options["ask"]) {
     executable: FAKE,
     ask,
     onEvent: (e) => events.push(e),
+    ...extra,
   })
   const result = await running.done
   await new Promise((resolve) => running.child.once("close", resolve).once("exit", resolve))
@@ -83,5 +84,41 @@ describe("ExternalClaude (XCOD-204)", () => {
     })
     const result = await running.done
     expect(result.type).toBe("error")
+  })
+})
+
+describe("Claude Code's models (XCOD-254)", () => {
+  test("listed from its answer to initialize, without a prompt", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-claude-"))
+    process.env.FAKE_CLAUDE_LOG = path.join(dir, "host.log")
+    const models = await ExternalClaude.models({ executable: FAKE, cwd: dir })
+    delete process.env.FAKE_CLAUDE_LOG
+    expect(models.map((model) => model.id)).toEqual(["default", "sonnet", "haiku"])
+    expect(models[0]).toMatchObject({ name: "Default (recommended)", default: true })
+    const sent = (await fs.readFile(path.join(dir, "host.log"), "utf8")).trim().split("\n")
+    expect(sent.some((line) => line.includes('"type":"user"'))).toBe(false)
+  })
+
+  test("a release that doesn't list them gives none (the caller falls back to aliases)", async () => {
+    process.env.FAKE_CLAUDE_MODELS = "none"
+    const models = await ExternalClaude.models({ executable: FAKE, cwd: os.tmpdir() })
+    delete process.env.FAKE_CLAUDE_MODELS
+    expect(models).toEqual([])
+    expect(await ExternalClaude.models({ executable: "/nonexistent/claude", cwd: os.tmpdir() })).toEqual([])
+    expect(ExternalClaude.FALLBACK_MODELS.map((model) => model.id)).toEqual(["opus", "sonnet", "haiku"])
+  })
+
+  test("other spellings of a model entry are read too; malformed ones are skipped", () => {
+    expect(
+      ExternalClaude.parseModels({ models: [{ id: "opus", display_name: "Opus" }, { displayName: "no id" }, "x"] }),
+    ).toEqual([{ id: "opus", name: "Opus" }])
+    expect(ExternalClaude.parseModels(undefined)).toEqual([])
+  })
+
+  test("the chosen model is passed with --model and the turn's init names it", async () => {
+    const { events, sent } = await run(async () => ({ allow: true }), { model: "sonnet" })
+    expect(sent[0].argv.join(" ")).toContain("--model sonnet")
+    expect(events[0]).toMatchObject({ type: "init", model: "sonnet" })
+    expect(() => ExternalClaude.args({ model: "sonnet; rm -rf" })).toThrow(/model name/)
   })
 })
