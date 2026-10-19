@@ -25,7 +25,6 @@ import { CloudShare } from "@/cloud/share"
 import { MemoryStatsCommand } from "./memory-stats"
 import { MemoryCheckCommand, MemorySetupCommand } from "./memory-setup"
 import { MemoryTemplatesCommand } from "./memory-storage"
-import { Provider } from "@/provider/provider"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 
 // XCOD-94: the review surface for long-term memory. `list`, `show`, `status`, `verify` and `export`
@@ -588,6 +587,8 @@ export const MemoryMigrateCommand = effectCmd({
     if (args.to === "embedded" && !from) return yield* fail("--to embedded needs --from-bundle: the facts to move here")
     const bundle = from ? path.resolve(from) : path.join(dir, "bundle")
     // Into memory on this computer, facts are extracted again, so that needs the model.
+    // Imported here, like the other heavy modules the memory commands use, so loading the CLI stays light.
+    const { Provider } = yield* Effect.promise(() => import("@/provider/provider"))
     const model =
       args.to === "embedded"
         ? yield* Provider.Service.use((provider) => provider.defaultModel()).pipe(

@@ -6,9 +6,11 @@ import type { Residency } from "@opencode-ai/core/residency"
 import type { ConfigMemory } from "@opencode-ai/core/config/memory"
 import { effectCmd } from "../effect-cmd"
 import { writeStdoutEffect } from "../stdout"
-import { MemoryExternal } from "@/memory/external"
-import { MemorySetupEnv } from "@/memory/setup-env"
-import { MemoryTemplate } from "@/memory/template"
+import type { MemoryTemplate } from "@/memory/template"
+
+// The memory modules are imported when used, not when the CLI loads (like memory-setup.ts does).
+const external = () => import("@/memory/external").then((mod) => mod.MemoryExternal)
+const templates = () => import("@/memory/template").then((mod) => mod.MemoryTemplate)
 
 // XCOD-264: step 2 of `lunos memory setup`, "Where should memory be stored?": start from a
 // template, or choose storage yourself from the cards (with Compare and Help me choose). The same
@@ -211,6 +213,8 @@ export async function test(input: {
   env?: Record<string, string>
 }) {
   say("Testing the connection (connect, write, read and delete a probe)…")
+  const MemoryTemplate = await templates()
+  const MemoryExternal = await external()
   const resolved = await MemoryTemplate.resolve(input.memory, input.env)
   const result = await MemoryExternal.probe({ memory: resolved as ConfigMemory.Info, residency: input.residency })
   if (result.ok) {
@@ -234,6 +238,7 @@ async function applyTemplate(input: {
   name: string
 }): Promise<Outcome> {
   const { prompts, env, args, scope } = input
+  const MemoryTemplate = await templates()
   const interactive = !args.yes
   const template = MemoryStorage.find(env.templates, input.name)
   if (!template)
@@ -393,6 +398,7 @@ export const MemoryTemplatesCommand = effectCmd({
   describe: "list the memory setup templates (lunos memory setup --template <name>)",
   builder: (yargs) => yargs.option("json", { type: "boolean", describe: "print them as JSON" }),
   handler: Effect.fn("Cli.memory.templates")(function* (args: { json?: boolean }) {
+    const { MemorySetupEnv } = yield* Effect.promise(() => import("@/memory/setup-env"))
     const { templates } = yield* MemorySetupEnv.environment()
     if (args.json) return yield* writeStdoutEffect(JSON.stringify(templates, null, 2) + EOL)
     const lines = templates.flatMap((item) => [
