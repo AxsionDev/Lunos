@@ -5,6 +5,6 @@ export const EXCLUDED_PAGES = [
   "zen", // OpenCode Zen, upstream's paid model gateway
   "go", // OpenCode Go, upstream's subscription
   "ecosystem", // upstream's community listing
-  "share", // opncd.ai sharing; Lunos turns sharing off by default
+  "share", // upstream's opncd.ai sharing, discontinued upstream in v1.19.3; Lunos turns sharing off by default
   "gitlab", // upstream's GitLab integration
 ]

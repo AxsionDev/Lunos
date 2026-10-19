@@ -626,6 +626,8 @@ export const dict = {
   "toast.session.share.success.description": "Споделете URL копиран во таблата со исечоци!",
   "toast.session.share.failed.title": "Не успеа да се сподели сесијата",
   "toast.session.share.failed.description": "Настана грешка при споделувањето на сесијата",
+  "toast.session.share.noTarget.description":
+    "За споделување е потребна Lunos организација (lunos login) или enterprise.url во конфигурацијата.",
   "toast.session.unshare.success.title": "Сесијата не е споделена",
   "toast.session.unshare.success.description": "Успешно отповикана сесија!",
   "toast.session.unshare.failed.title": "Не успеа да се откаже од споделувањето на сесијата",

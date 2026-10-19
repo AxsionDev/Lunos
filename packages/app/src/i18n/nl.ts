@@ -629,6 +629,8 @@ export const dict = {
   "toast.session.share.success.description": "Deel-URL gekopieerd naar klembord!",
   "toast.session.share.failed.title": "Kan sessie niet delen",
   "toast.session.share.failed.description": "Er is een fout opgetreden tijdens het delen van de sessie",
+  "toast.session.share.noTarget.description":
+    "Delen vereist een Lunos-organisatie (lunos login) of enterprise.url in de configuratie.",
   "toast.session.unshare.success.title": "Sessie niet gedeeld",
   "toast.session.unshare.success.description": "Sessie is niet meer gedeeld!",
   "toast.session.unshare.failed.title": "Kan het delen van de sessie niet ongedaan maken",

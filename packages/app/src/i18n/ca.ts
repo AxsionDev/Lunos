@@ -627,6 +627,8 @@ export const dict = {
   "toast.session.share.success.description": "Comparteix URL copiat al porta-retalls!",
   "toast.session.share.failed.title": "No s'ha pogut compartir la sessió",
   "toast.session.share.failed.description": "S'ha produït un error en compartir la sessió",
+  "toast.session.share.noTarget.description":
+    "Per compartir cal una organització de Lunos (lunos login) o enterprise.url a la configuració.",
   "toast.session.unshare.success.title": "S'ha deixat de compartir la sessió",
   "toast.session.unshare.success.description": "S'ha deixat de compartir la sessió correctament.",
   "toast.session.unshare.failed.title": "No s'ha pogut deixar de compartir la sessió",

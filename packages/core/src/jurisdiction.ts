@@ -295,7 +295,7 @@ const SHARE_HOSTS: Record<string, Claim> = {
   [SHARE_OPNCD]: {
     region: "us",
     basis: "entity",
-    note: "Upstream opencode's hosted share service (opncd.ai, and the opencode console's share API for signed-in orgs), operated by opencode's maintainers, a non-EU company. Not Lunos infrastructure.",
+    note: "The share API of the console you signed in to with `lunos account login` (an opencode-style console), assessed as non-EU as upstream's was. Upstream's own hosted share service was discontinued in v1.19.3 and Lunos no longer uploads to it. Not Lunos infrastructure.",
   },
   [SHARE_LUNOS_CONSOLE]: {
     region: "eu",

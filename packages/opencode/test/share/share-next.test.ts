@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect } from "bun:test"
-import { Effect, Exit, Layer, Option } from "effect"
+import { Cause, Effect, Exit, Layer, Option } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
@@ -101,15 +101,19 @@ describe("ShareNext", () => {
     ),
   )
 
-  it.live("request uses default URL when no enterprise config", () =>
+  // XCOD-266: upstream's share service is gone, so there is no default host any more.
+  it.live("request refuses, without a request, when there's no org and no enterprise config", () =>
     provideTmpdirInstance(() =>
       ShareNext.Service.use((svc) =>
         Effect.gen(function* () {
-          const req = yield* svc.request()
+          const exit = yield* Effect.exit(svc.request())
 
-          expect(req.baseUrl).toBe("https://opncd.ai")
-          expect(req.api.create).toBe("/api/share")
-          expect(req.headers).toEqual({})
+          expect(Exit.isFailure(exit)).toBe(true)
+          const error = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
+          expect(ShareNext.isNoTarget(error)).toBe(true)
+          expect((error as Error).message).toBe(
+            "Sharing needs a Lunos organisation (lunos login) or enterprise.url in config.",
+          )
         }),
       ).pipe(Effect.provide(requestLayer(none))),
     ),

@@ -534,6 +534,8 @@ export const dict = {
   "toast.session.share.success.description": "URL di condivisione copiato negli appunti",
   "toast.session.share.failed.title": "Impossibile condividere la sessione",
   "toast.session.share.failed.description": "Si è verificato un errore durante la condivisione della sessione",
+  "toast.session.share.noTarget.description":
+    "La condivisione richiede un'organizzazione Lunos (lunos login) o enterprise.url nella configurazione.",
   "toast.session.unshare.success.title": "Sessione non condivisa",
   "toast.session.unshare.success.description": "Condivisione della sessione annullata!",
   "toast.session.unshare.failed.title": "Impossibile annullare la condivisione della sessione",

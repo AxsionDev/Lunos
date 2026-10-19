@@ -348,7 +348,8 @@ exports[`opencode CLI help-text snapshots every documented command emits stable 
 import session data from JSON file or URL
 
 Positionals:
-  file  path to JSON file or share URL                                           [string] [required]
+  file  path to JSON file, or a share URL from your organisation's console or enterprise.url
+                                                                                 [string] [required]
 
 Options:
   -h, --help        show help                                                              [boolean]

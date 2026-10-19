@@ -620,6 +620,8 @@ export const dict = {
   "toast.session.share.success.description": "ແບ່ງປັນ URL ທີ່ສຳເນົາໄວ້ໃນຄລິບບອດແລ້ວ!",
   "toast.session.share.failed.title": "ລົ້ມເຫລວໃນການແບ່ງປັນເຊດຊັນ",
   "toast.session.share.failed.description": "ເກີດຄວາມຜິດພາດໃນຂະນະທີ່ແບ່ງປັນເຊດຊັນ",
+  "toast.session.share.noTarget.description":
+    "ການແບ່ງປັນຕ້ອງມີອົງກອນ Lunos (lunos login) ຫຼື enterprise.url ໃນການຕັ້ງຄ່າ.",
   "toast.session.unshare.success.title": "ເຊົາແບ່ງປັນເຊດຊັນແລ້ວ",
   "toast.session.unshare.success.description": "ເຊົາແບ່ງປັນເຊດຊັນສຳເລັດແລ້ວ!",
   "toast.session.unshare.failed.title": "ຍົກເລີກການແບ່ງປັນເຊດຊັນບໍ່ສຳເລັດ",

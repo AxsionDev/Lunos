@@ -620,6 +620,8 @@ export const dict = {
   "toast.session.share.success.description": "Jaga URL kopeeriti lõikelauale!",
   "toast.session.share.failed.title": "Seansi jagamine ebaõnnestus",
   "toast.session.share.failed.description": "Seansi jagamisel ilmnes viga",
+  "toast.session.share.noTarget.description":
+    "Jagamiseks on vaja Lunose organisatsiooni (lunos login) või konfiguratsioonis enterprise.url-i.",
   "toast.session.unshare.success.title": "Seansi jagamine tühistati",
   "toast.session.unshare.success.description": "Seansi jagamise tühistamine õnnestus!",
   "toast.session.unshare.failed.title": "Seansi jagamise tühistamine ebaõnnestus",

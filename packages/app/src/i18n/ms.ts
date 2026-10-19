@@ -623,6 +623,8 @@ export const dict = {
   "toast.session.share.success.description": "URL perkongsian telah disalin ke papan klip!",
   "toast.session.share.failed.title": "Gagal berkongsi sesi",
   "toast.session.share.failed.description": "Ralat berlaku semasa berkongsi sesi",
+  "toast.session.share.noTarget.description":
+    "Perkongsian memerlukan organisasi Lunos (lunos login) atau enterprise.url dalam konfigurasi.",
   "toast.session.unshare.success.title": "Sesi dibatalkan perkongsian",
   "toast.session.unshare.success.description": "Perkongsian sesi berjaya dibatalkan!",
   "toast.session.unshare.failed.title": "Gagal menghentikan perkongsian sesi",

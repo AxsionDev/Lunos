@@ -662,6 +662,8 @@ export const dict = {
   "toast.session.share.success.description": "คัดลอก URL แชร์ไปยังคลิปบอร์ดแล้ว!",
   "toast.session.share.failed.title": "ไม่สามารถแชร์เซสชัน",
   "toast.session.share.failed.description": "เกิดข้อผิดพลาดระหว่างการแชร์เซสชัน",
+  "toast.session.share.noTarget.description":
+    "การแชร์ต้องใช้องค์กร Lunos (lunos login) หรือ enterprise.url ในการตั้งค่า",
 
   "toast.session.unshare.success.title": "ยกเลิกการแชร์เซสชันแล้ว",
   "toast.session.unshare.success.description": "ยกเลิกการแชร์เซสชันสำเร็จ!",

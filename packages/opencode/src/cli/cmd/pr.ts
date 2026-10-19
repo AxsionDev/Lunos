@@ -4,6 +4,18 @@ import { effectCmd, fail } from "../effect-cmd"
 import { Git } from "@/git"
 import { InstanceRef } from "@/effect/instance-ref"
 import { Process } from "@/util/process"
+import { DISCONTINUED_MESSAGE, isDiscontinuedShareUrl } from "./import"
+
+/**
+ * The shared session a PR links to: the "[Lunos session](<url>)" link the GitHub action writes, or
+ * a bare link to upstream's closed share service from before XCOD-266, so it can say why it's skipped.
+ */
+export function findSessionUrl(body: string) {
+  return (
+    body.match(/\[Lunos session\]\((https?:\/\/[^\s)]+)\)/)?.[1] ??
+    body.match(/https:\/\/(?:[\w-]+\.)*opncd\.ai\/s\/[a-zA-Z0-9_-]+/)?.[0]
+  )
+}
 
 export const PrCommand = effectCmd({
   command: "pr <number>",
@@ -73,9 +85,11 @@ export const PrCommand = effectCmd({
       }
 
       if (prInfo?.body) {
-        const sessionMatch = prInfo.body.match(/https:\/\/opncd\.ai\/s\/([a-zA-Z0-9_-]+)/)
-        if (sessionMatch) {
-          const sessionUrl = sessionMatch[0]
+        const sessionUrl = findSessionUrl(prInfo.body)
+        if (sessionUrl && isDiscontinuedShareUrl(sessionUrl)) {
+          UI.println(`Found Lunos session: ${sessionUrl}`)
+          UI.println(DISCONTINUED_MESSAGE)
+        } else if (sessionUrl) {
           UI.println(`Found Lunos session: ${sessionUrl}`)
           UI.println(`Importing session...`)
 

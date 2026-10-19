@@ -12,6 +12,7 @@ import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
 import { showToast } from "@/utils/toast"
+import { shareRefusalKey } from "./share-refusal"
 import { downloadSessionExport, fetchSessionExport, sessionExportFilename } from "@/utils/session-export"
 import { findLast } from "@opencode-ai/core/util/array"
 import { createSessionTabs } from "@/pages/session/helpers"
@@ -197,14 +198,18 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       return
     }
 
+    let refusal: unknown
     const url = await sdk()
       .client.session.share({ sessionID })
       .then((res) => res.data?.share?.url)
-      .catch(() => undefined)
+      .catch((error) => {
+        refusal = error
+        return undefined
+      })
     if (!url) {
       showToast({
         title: language.t("toast.session.share.failed.title"),
-        description: language.t("toast.session.share.failed.description"),
+        description: language.t(shareRefusalKey(refusal) ?? "toast.session.share.failed.description"),
         variant: "error",
       })
       return

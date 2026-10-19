@@ -622,6 +622,8 @@ export const dict: Record<string, string> = {
   "toast.session.share.success.description": "শেয়ার করুন URL ক্লিপবোর্ডে কপি করা হয়েছে!",
   "toast.session.share.failed.title": "সেশন শেয়ার করতে ব্যর্থ হয়েছে",
   "toast.session.share.failed.description": "সেশন শেয়ার করার সময় একটি ত্রুটি ঘটেছে৷",
+  "toast.session.share.noTarget.description":
+    "শেয়ার করতে একটি Lunos সংস্থা (lunos login) বা কনফিগে enterprise.url প্রয়োজন।",
   "toast.session.unshare.success.title": "সেশন শেয়ার করা বাদ দেওয়া হয়েছে",
   "toast.session.unshare.success.description": "সেশন সফলভাবে মুক্ত করা হয়েছে!",
   "toast.session.unshare.failed.title": "সেশন শেয়ার মুক্ত করতে ব্যর্থ হয়েছে",

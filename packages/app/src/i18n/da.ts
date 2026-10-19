@@ -545,6 +545,8 @@ export const dict = {
   "toast.session.share.success.description": "Delings-URL kopieret til udklipsholder!",
   "toast.session.share.failed.title": "Kunne ikke dele session",
   "toast.session.share.failed.description": "Der opstod en fejl under deling af sessionen",
+  "toast.session.share.noTarget.description":
+    "Deling kræver en Lunos-organisation (lunos login) eller enterprise.url i konfigurationen.",
 
   "toast.session.unshare.success.title": "Deling af session stoppet",
   "toast.session.unshare.success.description": "Deling af session blev stoppet!",

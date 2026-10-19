@@ -622,6 +622,8 @@ export const dict = {
   "toast.session.share.success.description": "URL na zdieľanie skopírovaná do schránky!",
   "toast.session.share.failed.title": "Nepodarilo sa zdieľať reláciu",
   "toast.session.share.failed.description": "Pri zdieľaní relácie došlo k chybe",
+  "toast.session.share.noTarget.description":
+    "Na zdieľanie je potrebná organizácia Lunos (lunos login) alebo enterprise.url v konfigurácii.",
   "toast.session.unshare.success.title": "Zdieľanie relácie zrušené",
   "toast.session.unshare.success.description": "Zdieľanie relácie bolo úspešne zrušené!",
   "toast.session.unshare.failed.title": "Zdieľanie relácie sa nepodarilo zrušiť",

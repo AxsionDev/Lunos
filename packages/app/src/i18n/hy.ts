@@ -627,6 +627,8 @@ export const dict = {
   "toast.session.share.success.description": "Կիսվել URL-ը պատճենված է սեղմատախտակում:",
   "toast.session.share.failed.title": "Չհաջողվեց կիսել նիստը",
   "toast.session.share.failed.description": "Սխալ է տեղի ունեցել նիստը կիսելիս",
+  "toast.session.share.noTarget.description":
+    "Կիսվելու համար անհրաժեշտ է Lunos կազմակերպություն (lunos login) կամ enterprise.url կազմաձևում։",
   "toast.session.unshare.success.title": "Նիստի համօգտագործումը դադարեցված է",
   "toast.session.unshare.success.description": "Նիստի համօգտագործումը հաջողությամբ դադարեցվեց",
   "toast.session.unshare.failed.title": "Չհաջողվեց դադարեցնել նիստի համօգտագործումը",

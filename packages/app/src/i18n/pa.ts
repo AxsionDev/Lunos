@@ -633,6 +633,8 @@ export const dict = {
   "toast.session.share.success.description": "شیئر URL کلپ بورڈ تے کاپی ہو گیا!",
   "toast.session.share.failed.title": "سیشن شیئر کرن چ ناکام رہیا",
   "toast.session.share.failed.description": "سیشن شیئر کردے ویلے کوئی غلطی ہو گئی",
+  "toast.session.share.noTarget.description":
+    "ਸਾਂਝਾ ਕਰਨ ਲਈ Lunos ਸੰਸਥਾ (lunos login) ਜਾਂ ਕੌਂਫਿਗ ਵਿੱਚ enterprise.url ਚਾਹੀਦਾ ਹੈ।",
   "toast.session.unshare.success.title": "سیشن شیئر کرنا بند ہو گیا",
   "toast.session.unshare.success.description": "سیشن دا شیئر کامیابی نال بند ہو گیا!",
   "toast.session.unshare.failed.title": "سیشن ان شیئر کرن چ ناکام رہیا",

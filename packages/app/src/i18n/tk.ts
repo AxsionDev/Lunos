@@ -624,6 +624,8 @@ export const dict = {
   "toast.session.share.success.description": "Buferde göçürilen URL paýlaşyň!",
   "toast.session.share.failed.title": "Sessiýany paýlaşyp bilmedi",
   "toast.session.share.failed.description": "Sessiýa paýlaşylanda ýalňyşlyk ýüze çykdy",
+  "toast.session.share.noTarget.description":
+    "Paýlaşmak üçin Lunos guramasy (lunos login) ýa-da sazlamalarda enterprise.url gerek.",
   "toast.session.unshare.success.title": "Sessiýa paýlaşylmady",
   "toast.session.unshare.success.description": "Sessiýa üstünlikli paýlaşylmady!",
   "toast.session.unshare.failed.title": "Sessiýa paýlaşylmady",

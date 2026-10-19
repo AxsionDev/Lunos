@@ -623,6 +623,8 @@ export const dict = {
   "toast.session.share.success.description": "Deil URL avritað á klippiborð!",
   "toast.session.share.failed.title": "Tað eydnaðist ikki at deila setu",
   "toast.session.share.failed.description": "Ein feilur hendi, meðan setan varð deild.",
+  "toast.session.share.noTarget.description":
+    "Deiling krevur ein Lunos-felagsskap (lunos login) ella enterprise.url í uppsetingini.",
   "toast.session.unshare.success.title": "Setan ódeild",
   "toast.session.unshare.success.description": "Setan ódeild eydnaðist!",
   "toast.session.unshare.failed.title": "Tað eydnaðist ikki at avdeila setuna",

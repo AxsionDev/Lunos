@@ -619,6 +619,8 @@ export const dict = {
   "toast.session.share.success.description": "تم نسخ عنوان URL للمشاركة إلى الحافظة!",
   "toast.session.share.failed.title": "فشل مشاركة الجلسة",
   "toast.session.share.failed.description": "حدث خطأ أثناء مشاركة الجلسة",
+  "toast.session.share.noTarget.description":
+    "تتطلب المشاركة مؤسسة Lunos (lunos login) أو enterprise.url في الإعدادات.",
   "toast.session.unshare.success.title": "تم إلغاء مشاركة الجلسة",
   "toast.session.unshare.success.description": "تم إلغاء مشاركة الجلسة بنجاح!",
   "toast.session.unshare.failed.title": "فشل إلغاء مشاركة الجلسة",

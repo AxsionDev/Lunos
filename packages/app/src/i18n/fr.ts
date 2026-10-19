@@ -630,6 +630,8 @@ export const dict = {
   "toast.session.share.success.description": "URL de partage copiée dans le presse-papiers !",
   "toast.session.share.failed.title": "Échec du partage de la session",
   "toast.session.share.failed.description": "Une erreur s'est produite lors du partage de la session",
+  "toast.session.share.noTarget.description":
+    "Le partage nécessite une organisation Lunos (lunos login) ou enterprise.url dans la configuration.",
   "toast.session.unshare.success.title": "Partage de la session désactivé",
   "toast.session.unshare.success.description": "Le partage de la session a bien été désactivé.",
   "toast.session.unshare.failed.title": "Échec de la désactivation du partage",

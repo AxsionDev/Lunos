@@ -97,7 +97,7 @@ export const CALLS: Call[] = [
   {
     id: "share",
     what: "Session sharing",
-    hosts: "opncd.ai, or your enterprise share URL",
+    hosts: "your organisation's console, or your enterprise share URL",
     when: "only when you share (off by default)",
     offline: "blocked",
     alsoOffBy: "`OPENCODE_DISABLE_SHARE`",

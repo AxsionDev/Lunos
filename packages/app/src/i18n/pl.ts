@@ -624,6 +624,8 @@ export const dict = {
   "toast.session.share.success.description": "Adres URL udostępnionej sesji skopiowano do schowka!",
   "toast.session.share.failed.title": "Nie udało się udostępnić sesji",
   "toast.session.share.failed.description": "Wystąpił błąd podczas udostępniania sesji",
+  "toast.session.share.noTarget.description":
+    "Udostępnianie wymaga organizacji Lunos (lunos login) lub enterprise.url w konfiguracji.",
   "toast.session.unshare.success.title": "Zatrzymano udostępnianie sesji",
   "toast.session.unshare.success.description": "Udostępnianie sesji zostało pomyślnie zatrzymane!",
   "toast.session.unshare.failed.title": "Nie udało się zatrzymać udostępniania sesji",

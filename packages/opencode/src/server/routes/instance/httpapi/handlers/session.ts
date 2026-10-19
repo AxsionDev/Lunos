@@ -283,11 +283,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       yield* requireSession(ctx.params.sessionID)
       yield* shareSvc.share(ctx.params.sessionID).pipe(
         Effect.mapError((err) =>
-          // Sharing switched off, or the residency policy refused the share host (XCOD-80): both
-          // are expected refusals with a message saying what to change, not server faults.
-          err instanceof SessionShare.ShareDisabledError || err instanceof ShareNext.ResidencyDeniedError
-            ? new ShareDisabledApiError({ message: err.message })
-            : new HttpApiError.InternalServerError({}),
+          // Sharing switched off, the residency policy refused the share host (XCOD-80), or there's
+          // no host to share to (XCOD-266): expected refusals with a message saying what to change,
+          // not server faults.
+          err instanceof ShareNext.NoTargetError
+            ? new ShareDisabledApiError({ message: err.message, reason: "no-target" })
+            : err instanceof SessionShare.ShareDisabledError || err instanceof ShareNext.ResidencyDeniedError
+              ? new ShareDisabledApiError({ message: err.message })
+              : new HttpApiError.InternalServerError({}),
         ),
       )
       return yield* requireSession(ctx.params.sessionID)

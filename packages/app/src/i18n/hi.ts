@@ -632,6 +632,8 @@ export const dict = {
   "toast.session.share.success.description": "साझा URL क्लिपबोर्ड पर कॉपी किया गया!",
   "toast.session.share.failed.title": "सेशन साझा करने में विफल",
   "toast.session.share.failed.description": "सेशन साझा करते समय एक त्रुटि उत्पन्न हुई",
+  "toast.session.share.noTarget.description":
+    "साझा करने के लिए Lunos संगठन (lunos login) या कॉन्फ़िग में enterprise.url चाहिए।",
   "toast.session.unshare.success.title": "सेशन अनशेयर किया गया",
   "toast.session.unshare.success.description": "सेशन सफलतापूर्वक अनशेयर किया गया!",
   "toast.session.unshare.failed.title": "सेशन को अनशेयर करने में विफल",

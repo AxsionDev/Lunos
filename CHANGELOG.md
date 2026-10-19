@@ -94,6 +94,13 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Merged upstream opencode up to 1.19.3 (`/status` shows `based on opencode 1.19.3`). Lunos keeps
   its own session sharing, update check and install script; upstream's removal of session sharing
   and its OpenCode 1 update pinning are not included. <!-- internal -->
+- **Sharing no longer sends sessions to a service that has shut down.** Upstream opencode closed its
+  share service (opncd.ai), which Lunos used when nothing else was set. Sessions now share only to
+  your organisation's console or to `enterprise.url`. With neither, `/share` uploads nothing and
+  says "Sharing needs a Lunos organisation (lunos login) or enterprise.url in config." in the
+  terminal, the CLI and the desktop app; with `"share": "auto"` you see it once per project.
+  `lunos import` refuses opncd.ai links with a clear message, and the GitHub action logs it and
+  carries on. Share links from your own console or `enterprise.url` import as before. <!-- XCOD-266 -->
 
 ### Fixed
 
