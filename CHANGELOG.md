@@ -30,6 +30,12 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   the monitor, or sends to the sessions you tag, as in `@2 run the tests`. A busy session gets the
   prompt when its turn ends, and a session another Lunos runs gets it through that Lunos. A prompt
   never approves a tool call. <!-- XCOD-262 -->
+- **The same Agent Monitor in the desktop app and the web UI.** The Sessions window now lists
+  every session by status on the right (waiting for you with what each asks, running, completed,
+  failed, each counted and numbered), with Approve and Deny on the row. The prompt in the centre
+  starts a new session in the project you pick, or sends to the sessions you tag with `@2` or `@`
+  and part of a name, shown as chips; sending to several asks first. "By group" still shows your
+  groups. <!-- XCOD-262 -->
 - **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory, if you
   agree.** The first time per tool and project, Lunos asks: Share, Not now, or Never for this tool.
   Their results are sent to Anthropic or OpenAI with your prompts, so nothing is offered until you
