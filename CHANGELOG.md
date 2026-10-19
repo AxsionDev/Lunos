@@ -21,31 +21,33 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+## [1.18.50] - 2026-10-19
+
 ### Added
 
 - **You always see when a prompt goes to Claude Code or Codex.** Their sessions show `▸ Claude Code`
   (or `▸ Codex`) by the prompt and `Lunos · Claude Code` bottom right, and the prompt border, cursor
   and spinner take the tool's accent colour, in the terminal, desktop and web apps. `/sessions` and
   the sidebar mark these sessions with the tool's name. `"external_accent": false` in `tui.json`
-  keeps your theme's colours.
+  keeps your theme's colours. <!-- XCOD-260 -->
 
 - **Your Lunos commands work in Claude Code and Codex sessions.** The `/` list shows the tool's
   own commands and your Lunos custom commands and MCP prompts, labelled; a Lunos command is
   expanded by Lunos and the text goes to the tool. On a name clash the Lunos one is `/<name>:lunos`.
   Lunos commands that switch a Lunos agent, mode or model are greyed out there instead of being sent
-  to the tool as text.
+  to the tool as text. <!-- XCOD-254 -->
 - **See whether LSP works, and why a language server didn't start.** `/lsp` (and `/settings` →
   Tools → lsp) lists every language server as running, starting, failed with its reason (for example
   "command not found: gopls" or "exited with code 3 before it finished starting"), not started, or
   off, with where it came from and its PID. Enter on one restarts, stops, turns it off or shows its
   log. The sidebar shows a failed server's reason, and `lunos lsp status [--file <path>] [--json]`
   prints the same list. A server that quits while starting now fails at once instead of after the
-  start-up timeout.
+  start-up timeout. <!-- XCOD-257 --> <!-- highlight -->
 
 - **Press Esc twice to clear the prompt** and start again, in the terminal, desktop and web apps.
   The first Esc shows "esc again to clear"; a second within a second clears it. The undo key brings
   it back right after, and ↑ finds it in history. While the agent is working, Esc still stops it and
-  what you've typed stays. Turn it off with `"double_escape_clear": false` in `tui.json`.
+  what you've typed stays. Turn it off with `"double_escape_clear": false` in `tui.json`. <!-- XCOD-255 -->
 
 ### Changed
 
@@ -54,12 +56,12 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   restart-needed settings; Enter opens it in its own window, with sub-tabs where it has distinct
   parts (Memory: Overview · Settings · Advanced). Typing on the home still searches every setting
   and Enter lands on it in its section. `/settings memory` or `/settings tools lsp` opens a section
-  or sub-tab directly.
+  or sub-tab directly. <!-- XCOD-259 --> <!-- highlight -->
 - **`/marketplace` has a real tab bar** (All · Plugins · Skills · Hooks · MCP · Installed) with a
   count on each tab that follows your search. `tab` / `shift+tab` or a click switches tabs, and it
   reopens on the one you used last. Each kind shows what matters for it: a hook's event and the
   command it runs, an MCP server's transport, host, region and whether your residency policy allows
-  it. After installing you're back on the same tab and row, and `ctrl+g` picks where plugins go.
+  it. After installing you're back on the same tab and row, and `ctrl+g` picks where plugins go. <!-- XCOD-258 -->
 - **Claude Code's permission mode and Codex's sandbox and approval policy are chosen from a list**
   in `/settings` → Models & agents, each with what it does. Manual approval is selected when
   nothing is set, and an empty value now means the default instead of an error. Claude Code's list
@@ -68,7 +70,10 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
     `permission_mode`, which still works and is moved the first time either new key is saved.
   - **Unsafe values** (`bypassPermissions`, `danger-full-access`, `never`) are listed greyed out
     and can't be saved to config. One already in a config file is ignored, the safe default is
-    used, and `/settings` says so; previously the session failed to start.
+    used, and `/settings` says so; previously the session failed to start. <!-- XCOD-256 -->
+- **What's new and `lunos changelog` show only what you'd notice.** Each change is one line, the
+  release's highlights come first, and internal changes are left out; `lunos changelog --full` shows
+  everything. <!-- XCOD-253 -->
 
 ## [1.18.49] - 2026-10-17
 
