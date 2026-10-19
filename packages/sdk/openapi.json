@@ -23458,7 +23458,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["embedded", "neo4j", "memgraph"]
+            "enum": ["embedded", "neo4j", "postgres", "memgraph"]
           },
           "url": {
             "type": "string"
@@ -23483,6 +23483,50 @@
           },
           "user": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemoryTemplateConfig": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Short id, used by lunos memory setup --template"
+          },
+          "title": {
+            "type": "string",
+            "description": "What the setup wizard shows"
+          },
+          "description": {
+            "type": "string"
+          },
+          "leaves": {
+            "type": "string",
+            "description": "What leaves the computer, in plain words (\"the fact text, to …\")"
+          },
+          "memory": {
+            "type": "object",
+            "description": "The memory block the template sets (backend, model, encryption, …). Credentials as {env:} references"
+          }
+        },
+        "required": ["name", "title", "leaves", "memory"],
+        "additionalProperties": false
+      },
+      "MemoryTemplatesConfig": {
+        "type": "object",
+        "properties": {
+          "custom": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryTemplateConfig"
+            }
+          },
+          "hide": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false
@@ -23556,6 +23600,9 @@
           },
           "backend": {
             "$ref": "#/components/schemas/MemoryBackendConfig"
+          },
+          "templates": {
+            "$ref": "#/components/schemas/MemoryTemplatesConfig"
           }
         },
         "additionalProperties": false

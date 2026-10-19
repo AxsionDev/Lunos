@@ -1,12 +1,21 @@
 export * as MemorySetup from "./memory-setup"
 
+import { MemoryStorage } from "./memory-storage"
+
 // XCOD-249: the memory setup wizard's answers and what saving them writes, shared by the TUI
 // (/settings → Memory → Set up memory…) and `lunos memory setup`. It writes the same keys as editing
 // them one by one, through the same settings API, so validation, scope and locks are the same.
 
+/** XCOD-264: a team database, Neo4j or PostgreSQL. */
+export type Database = "neo4j" | "postgres"
+
 export type Backend =
   | { type: "embedded" }
-  | { type: "neo4j"; url: string; username: string; password: string; jurisdiction: string }
+  | { type: Database; url: string; username: string; password: string; jurisdiction: string }
+
+export function database(type: string | undefined): type is Database {
+  return type === "neo4j" || type === "postgres"
+}
 
 export type Draft = {
   enabled: boolean
@@ -54,12 +63,12 @@ export function blocked(rows: readonly Row[], memory: MemoryConfig | undefined) 
 /** The recommended answers, or the current setup when memory is already configured. */
 export function initial(memory: MemoryConfig | undefined): Draft {
   const backend = memory?.backend
-  const external = backend?.type === "neo4j"
+  const external = database(backend?.type)
   return {
     enabled: true,
     backend: external
       ? {
-          type: "neo4j",
+          type: backend.type as Database,
           url: backend.url ?? "",
           username: backend.username ?? "",
           password: backend.password ?? "",
@@ -78,7 +87,7 @@ export function block(draft: Draft): Record<string, unknown> {
   return {
     enabled: draft.enabled,
     ...(draft.model ? { model: draft.model } : {}),
-    ...(draft.backend.type === "neo4j" ? { backend: draft.backend } : {}),
+    ...(draft.backend.type !== "embedded" ? { backend: draft.backend } : {}),
     ...(draft.retentionDays ? { retention: { days: draft.retentionDays } } : {}),
     encryption: draft.encryption,
   }
@@ -102,8 +111,8 @@ export function writes(draft: Draft, memory: MemoryConfig | undefined, rows: rea
     if (String(current) !== value) out.push({ key, value })
   }
   set("memory.enabled", String(draft.enabled), memory?.enabled)
-  if (draft.backend.type === "neo4j") {
-    set("memory.backend.type", "neo4j", memory?.backend?.type)
+  if (draft.backend.type !== "embedded") {
+    set("memory.backend.type", draft.backend.type, memory?.backend?.type)
     set("memory.backend.url", draft.backend.url, memory?.backend?.url)
     set("memory.backend.username", draft.backend.username, memory?.backend?.username)
     set("memory.backend.password", draft.backend.password, memory?.backend?.password)
@@ -134,14 +143,11 @@ export function conflicts(rows: readonly Row[], scope: "user" | "project") {
   return out
 }
 
-/** "Memory: on · this machine · model mistral/ministral-8b · encrypted" */
+/** "Memory: on · on this computer · model mistral/ministral-8b · encrypted" */
 export function status(memory: MemoryConfig | undefined, off?: string) {
   if (off) return `Memory: off (${off})`
   if (memory?.enabled !== true) return "Memory: off"
-  const where =
-    memory.backend?.type === "neo4j"
-      ? `team Neo4j${memory.backend.jurisdiction ? ` (${memory.backend.jurisdiction})` : ""}`
-      : "this machine"
+  const where = MemoryStorage.short({ type: memory.backend?.type, jurisdiction: memory.backend?.jurisdiction })
   return [
     "Memory: on",
     where,

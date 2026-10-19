@@ -8,13 +8,13 @@ import { ConfigMemorySource } from "./memory-source"
  * a literal password is refused when the config is loaded (checked on the text before substitution).
  */
 export const Backend = Schema.Struct({
-  type: Schema.Literals(["embedded", "neo4j", "memgraph"]).pipe(Schema.optional).annotate({
+  type: Schema.Literals(["embedded", "neo4j", "postgres", "memgraph"]).pipe(Schema.optional).annotate({
     description:
-      '"embedded" (the default: memory on this machine), "neo4j", or "memgraph" (experimental, not supported yet: refused when memory starts)',
+      '"embedded" (the default: memory on this computer), "neo4j", "postgres" (XCOD-264), or "memgraph" (not supported yet: refused when memory starts)',
   }),
   url: Schema.String.pipe(Schema.optional).annotate({
     description:
-      "The database's Bolt URL, e.g. bolt+s://graph.internal:7687. Plain bolt:// or neo4j:// is only allowed to localhost, unless allow_insecure is set",
+      "The database's URL: Bolt for Neo4j (bolt+s://graph.internal:7687), postgres:// for PostgreSQL (postgres://db.internal:5432/lunos). Unencrypted connections are only allowed to localhost, unless allow_insecure is set",
   }),
   database: Schema.String.pipe(Schema.optional).annotate({
     description:
@@ -28,20 +28,43 @@ export const Backend = Schema.Struct({
   }),
   jurisdiction: Schema.String.pipe(Schema.optional).annotate({
     description:
-      'Where the database runs, e.g. "EU-DE" or "US". Required for an external database; checked against the residency policy before any connection',
+      'Where the database runs, e.g. "EU-DE" or "US". Required for an external database; checked against the residency policy before any connection. "local" is accepted only for a database on this computer (localhost)',
   }),
   read_only: Schema.Boolean.pipe(Schema.optional).annotate({
     description: "Recall only: nothing is written, and the remember tool isn't offered to the model",
   }),
   allow_insecure: Schema.Boolean.pipe(Schema.optional).annotate({
     description:
-      "Allow an unencrypted bolt:// or neo4j:// connection to a host that isn't localhost. Credentials and facts then cross the network in clear text",
+      "Allow an unencrypted connection (bolt://, neo4j://, or postgres:// without TLS) to a host that isn't localhost. Credentials and facts then cross the network in clear text",
   }),
   user: Schema.String.pipe(Schema.optional).annotate({
     description:
       "Who you are in a shared database, for user memory (stored only as a hash). Default: a random id kept in the Lunos data directory, so user memory is per machine unless you set this",
   }),
 }).annotate({ identifier: "MemoryBackendConfig" })
+
+/**
+ * XCOD-264: a memory setup template shipped by an organisation (managed config), e.g. "Our team
+ * Neo4j" with the URL filled in. The same fields as the built-in templates in memory-templates/.
+ */
+export const Template = Schema.Struct({
+  name: Schema.String.annotate({ description: "Short id, used by lunos memory setup --template" }),
+  title: Schema.String.annotate({ description: "What the setup wizard shows" }),
+  description: Schema.String.pipe(Schema.optional),
+  leaves: Schema.String.annotate({ description: 'What leaves the computer, in plain words ("the fact text, to …")' }),
+  memory: Schema.Record(Schema.String, Schema.Unknown).annotate({
+    description: "The memory block the template sets (backend, model, encryption, …). Credentials as {env:} references",
+  }),
+}).annotate({ identifier: "MemoryTemplateConfig" })
+
+export const Templates = Schema.Struct({
+  custom: Schema.mutable(Schema.Array(Template)).pipe(Schema.optional).annotate({
+    description: "Templates added by your organisation, listed first",
+  }),
+  hide: Schema.mutable(Schema.Array(Schema.String)).pipe(Schema.optional).annotate({
+    description: 'Built-in templates to hide, by name (e.g. ["neo4j-docker"])',
+  }),
+}).annotate({ identifier: "MemoryTemplatesConfig" })
 
 /**
  * Graph-based long-term memory (XCOD-94). Off unless `enabled` is true. Declared in both the v1
@@ -104,7 +127,11 @@ export const Info = Schema.Struct({
   }),
   backend: Backend.pipe(Schema.optional).annotate({
     description:
-      'Where memory is stored (XCOD-134): "embedded" (the default; on this machine) or an external graph database your team runs',
+      'Where memory is stored (XCOD-134): "embedded" (the default; on this computer) or a team database (Neo4j or PostgreSQL)',
+  }),
+  templates: Templates.pipe(Schema.optional).annotate({
+    description:
+      "Memory setup templates (XCOD-264): your organisation's own, and built-in ones to hide. Usually set in managed config",
   }),
 }).annotate({ identifier: "MemoryConfig" })
 export type Info = Schema.Schema.Type<typeof Info>

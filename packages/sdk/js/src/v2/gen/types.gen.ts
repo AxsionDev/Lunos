@@ -1706,7 +1706,7 @@ export type MemorySourceConfig = {
 }
 
 export type MemoryBackendConfig = {
-  type?: "embedded" | "neo4j" | "memgraph"
+  type?: "embedded" | "neo4j" | "postgres" | "memgraph"
   url?: string
   database?: string
   username?: string
@@ -1715,6 +1715,33 @@ export type MemoryBackendConfig = {
   read_only?: boolean
   allow_insecure?: boolean
   user?: string
+}
+
+export type MemoryTemplateConfig = {
+  /**
+   * Short id, used by lunos memory setup --template
+   */
+  name: string
+  /**
+   * What the setup wizard shows
+   */
+  title: string
+  description?: string
+  /**
+   * What leaves the computer, in plain words ("the fact text, to …")
+   */
+  leaves: string
+  /**
+   * The memory block the template sets (backend, model, encryption, …). Credentials as {env:} references
+   */
+  memory: {
+    [key: string]: unknown
+  }
+}
+
+export type MemoryTemplatesConfig = {
+  custom?: Array<MemoryTemplateConfig>
+  hide?: Array<string>
 }
 
 export type MemoryConfig = {
@@ -1736,6 +1763,7 @@ export type MemoryConfig = {
   }
   encryption?: "off" | "os-keychain"
   backend?: MemoryBackendConfig
+  templates?: MemoryTemplatesConfig
 }
 
 export type BlankString = string
