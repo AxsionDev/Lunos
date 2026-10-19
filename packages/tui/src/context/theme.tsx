@@ -62,6 +62,7 @@ export async function discoverThemes(directories: string[]) {
 
 export {
   DEFAULT_THEMES,
+  EXTERNAL_ACCENTS,
   addTheme,
   allThemes,
   generateSubtleSyntax,
