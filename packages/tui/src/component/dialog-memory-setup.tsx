@@ -1,7 +1,7 @@
 import type { MemorySetupEnvironment, MemorySetupTemplate, SettingRow } from "@opencode-ai/sdk/v2"
 import { MemorySetup } from "@opencode-ai/core/memory-setup"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
-import { createSignal, For } from "solid-js"
+import { createSignal, For, type JSX } from "solid-js"
 import { useTheme } from "../context/theme"
 import { useSDK } from "../context/sdk"
 import { useSync } from "../context/sync"
@@ -33,10 +33,19 @@ function Lines(props: { lines: readonly string[] }) {
   )
 }
 
+/** Text under a dialog's list, the width of the dialog. */
+function Below(props: { children: JSX.Element }) {
+  return (
+    <box paddingLeft={4} paddingRight={4} paddingBottom={1}>
+      {props.children}
+    </box>
+  )
+}
+
 /** A card that can't be picked yet: shown greyed out rather than hidden. */
 function Muted(props: { text: string }) {
   const { theme } = useTheme()
-  return <text fg={theme.textMuted}>{props.text}</text>
+  return <span style={{ fg: theme.textMuted }}>{props.text}</span>
 }
 
 const RETENTION = [
@@ -135,19 +144,47 @@ export function useMemorySetup() {
       const [shown, setShown] = createSignal(start)
       show(
         () => (
-          <DialogSelect
-            title="Where should memory be stored?"
-            skipFilter
-            renderFilter={false}
-            current={start.kind}
-            options={list.map((card) => ({
-              title: card.title,
-              value: card.kind,
-              titleView: card.unavailable ? <Muted text={card.title} /> : undefined,
-              description: card.unavailable ?? card.recommended ?? card.summary,
-            }))}
-            onMove={(option) => setShown(list.find((card) => card.kind === option.value) ?? start)}
-            footer={
+          <box flexDirection="column">
+            <DialogSelect
+              title="Where should memory be stored?"
+              skipFilter
+              renderFilter={false}
+              current={start.kind}
+              options={list.map((card) => ({
+                title: card.title,
+                value: card.kind,
+                titleView: card.unavailable ? <Muted text={card.title} /> : undefined,
+                description: card.unavailable ?? card.recommended ?? card.summary,
+              }))}
+              onMove={(option) => setShown(list.find((card) => card.kind === option.value) ?? start)}
+              actions={[
+                {
+                  command: "dialog.memory.setup.compare",
+                  title: "compare",
+                  withoutSelection: true,
+                  onTrigger: compare,
+                },
+                {
+                  command: "dialog.memory.setup.help",
+                  title: "help me choose",
+                  withoutSelection: true,
+                  onTrigger: help,
+                },
+              ]}
+              onSelect={(option) => {
+                const card = list.find((item) => item.kind === option.value)!
+                if (card.unavailable)
+                  return toast.show({ variant: "info", message: `${card.title}: ${card.unavailable}`, duration: 5000 })
+                if (card.kind === "embedded") {
+                  draft.backend = { type: "embedded" }
+                  template = undefined
+                  if (draft.encryption === "off" && !memory?.encryption) draft.encryption = "os-keychain"
+                  return step3()
+                }
+                void database(card.kind as MemorySetup.Database)
+              }}
+            />
+            <Below>
               <Lines
                 lines={[
                   ...(note ? [note, ""] : []),
@@ -155,41 +192,30 @@ export function useMemorySetup() {
                   ...MemoryStorage.meaning(shown()),
                 ]}
               />
-            }
-            actions={[
-              { command: "dialog.memory.setup.compare", title: "compare", withoutSelection: true, onTrigger: compare },
-              { command: "dialog.memory.setup.help", title: "help me choose", withoutSelection: true, onTrigger: help },
-            ]}
-            onSelect={(option) => {
-              const card = list.find((item) => item.kind === option.value)!
-              if (card.unavailable)
-                return toast.show({ variant: "info", message: `${card.title}: ${card.unavailable}`, duration: 5000 })
-              if (card.kind === "embedded") {
-                draft.backend = { type: "embedded" }
-                template = undefined
-                if (draft.encryption === "off" && !memory?.encryption) draft.encryption = "os-keychain"
-                return step3()
-              }
-              void database(card.kind as MemorySetup.Database)
-            }}
-          />
+            </Below>
+          </box>
         ),
         step2,
       )
+      dialog.setSize("large")
     }
 
     const compare = async () => {
       const { environment: machine } = await environment()
       show(
         () => (
-          <DialogSelect
-            title="Compare where memory can be stored"
-            skipFilter
-            renderFilter={false}
-            options={[{ title: "Back to the options", value: "back" }]}
-            footer={<Lines lines={MemoryStorage.compareLines(machine as MemoryStorage.Environment, 28)} />}
-            onSelect={() => void cards()}
-          />
+          <box flexDirection="column">
+            <DialogSelect
+              title="Compare where memory can be stored"
+              skipFilter
+              renderFilter={false}
+              options={[{ title: "Back to the options", value: "back" }]}
+              onSelect={() => void cards()}
+            />
+            <Below>
+              <Lines lines={MemoryStorage.compareLines(machine as MemoryStorage.Environment, 28)} />
+            </Below>
+          </box>
         ),
         () => void cards(),
       )
@@ -205,6 +231,7 @@ export function useMemorySetup() {
             <DialogSelect
               title={`Help me choose · ${q.runs.message}`}
               skipFilter
+              renderFilter={false}
               options={q.runs.options.map((item) => ({ title: item.label, value: item.value }))}
               onSelect={(option) => void recommend(MemoryStorage.choose({ who, runs: option.value }))}
             />
@@ -217,6 +244,7 @@ export function useMemorySetup() {
           <DialogSelect
             title={`Help me choose · ${q.who.message}`}
             skipFilter
+            renderFilter={false}
             options={q.who.options.map((item) => ({ title: item.label, value: item.value }))}
             onSelect={(option) => ask2(option.value)}
           />
@@ -305,24 +333,28 @@ export function useMemorySetup() {
       const refused = error.stage === "settings" || error.stage === "residency"
       show(
         () => (
-          <DialogSelect
-            title={`${MemoryStorage.label(backend.type)} · ${refused ? "That database can't be used" : "The connection failed"}`}
-            skipFilter
-            renderFilter={false}
-            options={[
-              { title: "Test again", value: "again" },
-              { title: "Change the settings", value: "edit" },
-              ...(refused ? [] : [{ title: "Use these settings anyway", value: "use" }]),
-              { title: "Back to the options", value: "back" },
-            ]}
-            footer={<Lines lines={[`✗ ${error.stage}: ${error.message}`, ...(error.fix ? [error.fix] : [])]} />}
-            onSelect={(option) => {
-              if (option.value === "again") return void test(backend, from)
-              if (option.value === "edit") return void database(backend.type)
-              if (option.value === "use") return use()
-              void cards()
-            }}
-          />
+          <box flexDirection="column">
+            <DialogSelect
+              title={`${MemoryStorage.label(backend.type)} · ${refused ? "That database can't be used" : "The connection failed"}`}
+              skipFilter
+              renderFilter={false}
+              options={[
+                { title: "Test again", value: "again" },
+                { title: "Change the settings", value: "edit" },
+                ...(refused ? [] : [{ title: "Use these settings anyway", value: "use" }]),
+                { title: "Back to the options", value: "back" },
+              ]}
+              onSelect={(option) => {
+                if (option.value === "again") return void test(backend, from)
+                if (option.value === "edit") return void database(backend.type)
+                if (option.value === "use") return use()
+                void cards()
+              }}
+            />
+            <Below>
+              <Lines lines={[`✗ ${error.stage}: ${error.message}`, ...(error.fix ? [error.fix] : [])]} />
+            </Below>
+          </box>
         ),
         () => void cards(),
       )
@@ -335,18 +367,30 @@ export function useMemorySetup() {
       const [shown, setShown] = createSignal<MemorySetupTemplate>(list[0])
       show(
         () => (
-          <DialogSelect
-            title="Start from a template"
-            skipFilter
-            renderFilter={false}
-            options={list.map((item) => ({
-              title: `${item.title}${item.organisation ? " (your organisation)" : ""}`,
-              value: item.name,
-              titleView: item.unavailable ? <Muted text={item.title} /> : undefined,
-              description: item.unavailable ? "can't be used here" : undefined,
-            }))}
-            onMove={(option) => setShown(list.find((item) => item.name === option.value) ?? list[0])}
-            footer={
+          <box flexDirection="column">
+            <DialogSelect
+              title="Start from a template"
+              skipFilter
+              renderFilter={false}
+              options={list.map((item) => ({
+                title: `${item.title}${item.organisation ? " (your organisation)" : ""}`,
+                value: item.name,
+                titleView: item.unavailable ? <Muted text={item.title} /> : undefined,
+                description: item.unavailable ? "can't be used here" : undefined,
+              }))}
+              onMove={(option) => setShown(list.find((item) => item.name === option.value) ?? list[0])}
+              onSelect={(option) => {
+                const item = list.find((entry) => entry.name === option.value)!
+                if (item.unavailable)
+                  return toast.show({
+                    variant: "warning",
+                    message: `${item.title}: ${item.unavailable}`,
+                    duration: 8000,
+                  })
+                void applyTemplate(item)
+              }}
+            />
+            <Below>
               <Lines
                 lines={[
                   ...(shown().description ? [shown().description!] : []),
@@ -354,14 +398,8 @@ export function useMemorySetup() {
                   ...(shown().unavailable ? [`Can't be used: ${shown().unavailable}`] : []),
                 ]}
               />
-            }
-            onSelect={(option) => {
-              const item = list.find((entry) => entry.name === option.value)!
-              if (item.unavailable)
-                return toast.show({ variant: "warning", message: `${item.title}: ${item.unavailable}`, duration: 8000 })
-              void applyTemplate(item)
-            }}
-          />
+            </Below>
+          </box>
         ),
         step2,
       )
@@ -433,37 +471,41 @@ export function useMemorySetup() {
       const existing = got.files.filter((file) => file.exists).map((file) => file.name)
       show(
         () => (
-          <DialogSelect
-            title={`${item.title} · Preview (nothing is written yet)`}
-            skipFilter
-            renderFilter={false}
-            options={[
-              existing.length
-                ? {
-                    title: `Replace ${existing.join(", ")} and write`,
-                    value: "replace",
-                    description: "these files already exist",
-                  }
-                : { title: "Write these files", value: "write", description: got.dir },
-              { title: "Back", value: "back" },
-              ...got.files.map((file) => ({
-                title: `${file.path}${file.exists ? " (exists)" : ""}`,
-                value: `file:${file.name}`,
-                details: file.content.trimEnd().split("\n"),
-              })),
-              {
-                title: "Memory config (credentials as {env:} references only)",
-                value: "file:config",
-                details: JSON.stringify(got.memory, null, 2).split("\n"),
-              },
-            ]}
-            footer={<Lines lines={[...(got.licence ? [got.licence] : []), `Leaves the computer: ${item.leaves}.`]} />}
-            onSelect={(option) => {
-              if (option.value === "back") return void templates()
-              if (option.value === "write" || option.value === "replace")
-                return void write(item, got.memory, option.value === "replace" ? existing : overwrite)
-            }}
-          />
+          <box flexDirection="column">
+            <DialogSelect
+              title={`${item.title} · Preview (nothing is written yet)`}
+              skipFilter
+              renderFilter={false}
+              options={[
+                existing.length
+                  ? {
+                      title: `Replace ${existing.join(", ")} and write`,
+                      value: "replace",
+                      description: "these files already exist",
+                    }
+                  : { title: "Write these files", value: "write", description: got.dir },
+                { title: "Back", value: "back" },
+                ...got.files.map((file) => ({
+                  title: `${file.path}${file.exists ? " (exists)" : ""}`,
+                  value: `file:${file.name}`,
+                  details: file.content.trimEnd().split("\n"),
+                })),
+                {
+                  title: "Memory config (credentials as {env:} references only)",
+                  value: "file:config",
+                  details: JSON.stringify(got.memory, null, 2).split("\n"),
+                },
+              ]}
+              onSelect={(option) => {
+                if (option.value === "back") return void templates()
+                if (option.value === "write" || option.value === "replace")
+                  return void write(item, got.memory, option.value === "replace" ? existing : overwrite)
+              }}
+            />
+            <Below>
+              <Lines lines={[...(got.licence ? [got.licence] : []), `Leaves the computer: ${item.leaves}.`]} />
+            </Below>
+          </box>
         ),
         () => void templates(),
       )
@@ -495,24 +537,28 @@ export function useMemorySetup() {
       ]
       show(
         () => (
-          <DialogSelect
-            title={`${item.title} · Start the database?`}
-            skipFilter
-            renderFilter={false}
-            options={[
-              { title: "Start it now", value: "now", description: "waits for it to be healthy, up to 2 minutes" },
-              { title: "I'll start it myself", value: "later", description: "shows the command to copy" },
-            ]}
-            footer={<Lines lines={[...(error ?? []), "Start it now runs:", command, "", ...env]} />}
-            onSelect={(option) => {
-              if (option.value === "later") {
-                template = undefined
-                toast.show({ variant: "info", title: "Start it with", message: command, duration: 20000 })
-                return step5()
-              }
-              void starting(item, command, dir)
-            }}
-          />
+          <box flexDirection="column">
+            <DialogSelect
+              title={`${item.title} · Start the database?`}
+              skipFilter
+              renderFilter={false}
+              options={[
+                { title: "Start it now", value: "now", description: "waits for it to be healthy, up to 2 minutes" },
+                { title: "I'll start it myself", value: "later", description: "shows the command to copy" },
+              ]}
+              onSelect={(option) => {
+                if (option.value === "later") {
+                  template = undefined
+                  toast.show({ variant: "info", title: "Start it with", message: command, duration: 20000 })
+                  return step5()
+                }
+                void starting(item, command, dir)
+              }}
+            />
+            <Below>
+              <Lines lines={[...(error ?? []), "Start it now runs:", command, "", ...env]} />
+            </Below>
+          </box>
         ),
         () => void templates(),
       )
@@ -776,34 +822,42 @@ export function useMemorySetup() {
       const moving = switching ? ["", `You're switching storage. ${MemorySetup.MOVE}`, MemorySetup.START_EMPTY] : []
       show(
         () => (
-          <DialogSelect
-            title={`Set up memory · Summary (saves to the ${input.scope} config)`}
-            skipFilter
-            renderFilter={false}
-            options={[
-              ...(switching
-                ? [
-                    { title: "Save and move my facts", value: "move", description: `${writes.length} setting(s)` },
-                    { title: "Save and start empty", value: "save", description: "the old facts stay where they are" },
-                  ]
-                : [
-                    {
-                      title: "Save",
-                      value: "save",
-                      description: writes.length ? `${writes.length} setting(s)` : "nothing to save",
-                    },
-                  ]),
-              { title: "Back", value: "back" },
-              { title: "Cancel", value: "cancel", description: "nothing is saved" },
-            ]}
-            footer={<Lines lines={[...lines, ...meaning, ...moving]} />}
-            onSelect={(option) => {
-              if (option.value === "back") return back()
-              if (option.value === "cancel") return input.onExit()
-              move = option.value === "move"
-              void save(writes, back)
-            }}
-          />
+          <box flexDirection="column">
+            <DialogSelect
+              title={`Set up memory · Summary (saves to the ${input.scope} config)`}
+              skipFilter
+              renderFilter={false}
+              options={[
+                ...(switching
+                  ? [
+                      { title: "Save and move my facts", value: "move", description: `${writes.length} setting(s)` },
+                      {
+                        title: "Save and start empty",
+                        value: "save",
+                        description: "the old facts stay where they are",
+                      },
+                    ]
+                  : [
+                      {
+                        title: "Save",
+                        value: "save",
+                        description: writes.length ? `${writes.length} setting(s)` : "nothing to save",
+                      },
+                    ]),
+                { title: "Back", value: "back" },
+                { title: "Cancel", value: "cancel", description: "nothing is saved" },
+              ]}
+              onSelect={(option) => {
+                if (option.value === "back") return back()
+                if (option.value === "cancel") return input.onExit()
+                move = option.value === "move"
+                void save(writes, back)
+              }}
+            />
+            <Below>
+              <Lines lines={[...lines, ...meaning, ...moving]} />
+            </Below>
+          </box>
         ),
         back,
       )
