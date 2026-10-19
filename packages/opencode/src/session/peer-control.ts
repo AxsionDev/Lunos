@@ -22,6 +22,9 @@ import { SessionPeers } from "./peers"
 /** The process's own API: how a forwarded action reaches its session, permission and question routes. */
 export type Handler = (request: Request) => Promise<Response>
 
+/** XCOD-262: the longest prompt the Agent Monitor sends, here or to another process. */
+export const MAX_PROMPT = 100_000
+
 let handler: Handler | undefined
 let server: HttpServer | undefined
 let token: string | undefined
@@ -67,6 +70,9 @@ function inner(path: string, directory: string, init: RequestInit = {}) {
     new Request(url, { ...init, headers: { "content-type": "application/json", ...init.headers } }),
   )
 }
+
+/** XCOD-262: a call to this process's own API, as a forwarded action makes it (SessionPromptQueue). */
+export const api = inner
 
 async function forward(response: Response) {
   return new Response(await response.text(), {
@@ -158,6 +164,20 @@ export async function serve(request: Request): Promise<Response> {
       }),
     )
     return json(200, { permissions, questions })
+  }
+  // XCOD-262: a prompt from another process's Agent Monitor. Text only: no agent, tools, system
+  // prompt or model override travel with it, and it can never answer a permission. The session
+  // queue decides when it runs, with this process's own agent, policy and audit.
+  if (rest === "/prompt" && request.method === "POST") {
+    const body = (await request.json().catch(() => undefined)) as { text?: unknown; interrupt?: unknown } | undefined
+    if (!body || typeof body.text !== "string" || !body.text.trim() || body.text.length > MAX_PROMPT)
+      return json(400, { error: "A prompt is non-empty text." })
+    return forward(
+      await inner(`/experimental/session/${sessionID}/enqueue`, directory, {
+        method: "POST",
+        body: JSON.stringify({ text: body.text, interrupt: body.interrupt === true, via: "peer" }),
+      }),
+    )
   }
   const answer = /^\/(permission|question)\/([A-Za-z0-9_-]{1,100})\/(reply|reject)$/.exec(rest)
   if (answer && request.method === "POST" && !(answer[1] === "permission" && answer[3] === "reject")) {

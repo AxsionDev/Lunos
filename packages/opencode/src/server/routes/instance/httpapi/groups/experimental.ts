@@ -191,6 +191,7 @@ export const SessionOverviewItem = Schema.Struct({
   stale: Schema.optional(Schema.Boolean),
   permissions: NonNegativeInt,
   questions: NonNegativeInt,
+  queued: Schema.optional(NonNegativeInt),
   groupID: Schema.optional(Schema.String),
   archived: Schema.optional(Schema.Finite),
 }).annotate({ identifier: "SessionOverviewItem" })
@@ -290,6 +291,8 @@ export const ExperimentalPaths = {
   peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
   peerQuestionReply: "/experimental/peer/:sessionID/question/:requestID/reply",
   peerQuestionReject: "/experimental/peer/:sessionID/question/:requestID/reject",
+  sessionEnqueue: "/experimental/session/:sessionID/enqueue",
+  peerPrompt: "/experimental/peer/:sessionID/prompt",
 } as const
 
 // XCOD-234: what another Lunos process's session is waiting for.
@@ -297,6 +300,21 @@ export const PeerAsks = Schema.Struct({
   permissions: Schema.mutable(Schema.Array(PermissionV1.Request)),
   questions: Schema.mutable(Schema.Array(Question.Request)),
 }).annotate({ identifier: "SessionPeerAsks" })
+
+// XCOD-262: a prompt from the Agent Monitor to an existing session. Text only.
+export const SessionEnqueuePayload = Schema.Struct({
+  text: Schema.String,
+  interrupt: Schema.optional(Schema.Boolean),
+  via: Schema.optional(Schema.Literals(["local", "peer"])),
+  /** A session the monitor just started: the model picked there. Not forwarded by peer.prompt. */
+  model: Schema.optional(Schema.Struct({ providerID: Schema.String, modelID: Schema.String })),
+  variant: Schema.optional(Schema.String),
+})
+
+export const SessionEnqueueResult = Schema.Struct({
+  delivery: Schema.Literals(["now", "queued", "interrupted", "answered"]),
+  position: Schema.optional(NonNegativeInt),
+}).annotate({ identifier: "SessionEnqueueResult" })
 
 export const ExperimentalApi = HttpApi.make("experimental")
   .add(
@@ -721,6 +739,34 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.peer.questionReject",
             summary: "Dismiss a question in another Lunos",
             description: "Dismiss a question of a session another Lunos process on this machine runs.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionEnqueue", ExperimentalPaths.sessionEnqueue, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionEnqueuePayload,
+          success: described(SessionEnqueueResult, "How the prompt was delivered"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.enqueue",
+            summary: "Send a prompt to a session from the Agent Monitor",
+            description:
+              "Run a prompt as the session's next turn: now when it is idle, after the current turn when it is busy (or now, stopping the turn, with interrupt), or as the answer to its one open question. A prompt never answers a permission request. Refused when another Lunos process runs the session; use experimental.peer.prompt.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerPrompt", ExperimentalPaths.peerPrompt, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({ text: Schema.String, interrupt: Schema.optional(Schema.Boolean) }),
+          success: described(SessionEnqueueResult, "How the prompt was delivered"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.prompt",
+            summary: "Send a prompt to a session another Lunos runs",
+            description:
+              "Send a prompt to a session that another Lunos process on this machine runs. That process runs it, with its own agent, policy and audit, as experimental.session.enqueue does.",
           }),
         ),
         HttpApiEndpoint.get("resource", ExperimentalPaths.resource, {

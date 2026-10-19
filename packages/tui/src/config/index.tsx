@@ -24,6 +24,7 @@ export type Resolved = Omit<
   | "cursor"
   | "question"
   | "double_escape_clear"
+  | "left_opens_monitor"
   | "double_escape_ms"
 > & {
   attention: {
@@ -39,6 +40,7 @@ export type Resolved = Omit<
   mouse: boolean
   question: { dismiss_window: number; undo_window: number }
   double_escape_clear: boolean
+  left_opens_monitor: boolean
   double_escape_ms: number
   cursor?: {
     style: "block" | "underline" | "line" | "default"
@@ -89,6 +91,7 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
       undo_window: input.question?.undo_window ?? QuestionUndoWindowDefault,
     },
     double_escape_clear: input.double_escape_clear ?? true,
+    left_opens_monitor: input.left_opens_monitor ?? true,
     double_escape_ms: input.double_escape_ms ?? DoubleEscapeWindowDefault,
     cursor: input.cursor
       ? {

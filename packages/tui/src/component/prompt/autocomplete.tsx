@@ -76,11 +76,15 @@ export type AutocompleteOption = {
   isDirectory?: boolean
   onSelect?: () => void
   path?: string
+  /** XCOD-262: plain text that replaces the typed `@query` (a session tag such as `@2`). */
+  insert?: string
 }
 
 export function Autocomplete(props: {
   value: string
   sessionID?: string
+  /** XCOD-262: extra `@` completions, before agents and files. */
+  mentions?: () => AutocompleteOption[]
   setPrompt: (input: (prompt: PromptInfo) => void) => void
   setExtmark: (partIndex: number, extmarkId: number) => void
   anchor: () => BoxRenderable
@@ -406,6 +410,30 @@ export function Autocomplete(props: {
     return options
   })
 
+  function insertText(text: string) {
+    const input = props.input()
+    const currentCursorOffset = input.cursorOffset
+    const needsSpace = displayCharAt(props.value, currentCursorOffset) !== " "
+    input.cursorOffset = store.index
+    const startCursor = input.logicalCursor
+    input.cursorOffset = currentCursorOffset
+    const endCursor = input.logicalCursor
+    input.deleteRange(startCursor.row, startCursor.col, endCursor.row, endCursor.col)
+    input.insertText(text + (needsSpace ? " " : ""))
+  }
+
+  const mentions = createMemo(() =>
+    (props.mentions?.() ?? []).map(
+      (option): AutocompleteOption => ({
+        ...option,
+        onSelect: () => {
+          if (option.insert) insertText(option.insert)
+          option.onSelect?.()
+        },
+      }),
+    ),
+  )
+
   const agents = createMemo(() => {
     return sync.data.agent
       .filter((agent) => !agent.hidden && agent.mode !== "primary")
@@ -542,7 +570,9 @@ export function Autocomplete(props: {
     // it shouldn't be additionally sorted by fuzzysort as it will loose the results
     const fileOptions: AutocompleteOption[] = store.visible === "@" ? filesValue || [] : []
     const nonFileOptions: AutocompleteOption[] =
-      store.visible === "@" ? [...referenceAliasesValue, ...agentsValue, ...mcpResources()] : [...commandsValue]
+      store.visible === "@"
+        ? [...mentions(), ...referenceAliasesValue, ...agentsValue, ...mcpResources()]
+        : [...commandsValue]
 
     if (!searchValue) {
       return [...nonFileOptions, ...fileOptions]

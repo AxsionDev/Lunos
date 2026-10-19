@@ -23,6 +23,13 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Watch and steer all your agents from one screen.** Press ← on an empty prompt (or type
+  `/monitor`) to open the Agent Monitor: every session on this computer on the right, grouped into
+  waiting for you, running, completed and failed, with what each waiting one asks. Approve or deny
+  from the list, or stop a session. The prompt in the centre starts a new session and keeps you in
+  the monitor, or sends to the sessions you tag, as in `@2 run the tests`. A busy session gets the
+  prompt when its turn ends, and a session another Lunos runs gets it through that Lunos. A prompt
+  never approves a tool call. <!-- XCOD-262 -->
 - **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory, if you
   agree.** The first time per tool and project, Lunos asks: Share, Not now, or Never for this tool.
   Their results are sent to Anthropic or OpenAI with your prompts, so nothing is offered until you

@@ -70,6 +70,8 @@ import type {
   ExperimentalPeerAsksResponses,
   ExperimentalPeerPermissionReplyErrors,
   ExperimentalPeerPermissionReplyResponses,
+  ExperimentalPeerPromptErrors,
+  ExperimentalPeerPromptResponses,
   ExperimentalPeerQuestionRejectErrors,
   ExperimentalPeerQuestionRejectResponses,
   ExperimentalPeerQuestionReplyErrors,
@@ -90,6 +92,8 @@ import type {
   ExperimentalSessionBulkStopResponses,
   ExperimentalSessionBulkUnarchiveErrors,
   ExperimentalSessionBulkUnarchiveResponses,
+  ExperimentalSessionEnqueueErrors,
+  ExperimentalSessionEnqueueResponses,
   ExperimentalSessionGroupCreateErrors,
   ExperimentalSessionGroupCreateResponses,
   ExperimentalSessionGroupDeleteErrors,
@@ -1028,6 +1032,60 @@ export class Session extends HeyApiClient {
       ...params,
     })
   }
+
+  /**
+   * Send a prompt to a session from the Agent Monitor
+   *
+   * Run a prompt as the session's next turn: now when it is idle, after the current turn when it is busy (or now, stopping the turn, with interrupt), or as the answer to its one open question. A prompt never answers a permission request. Refused when another Lunos process runs the session; use experimental.peer.prompt.
+   */
+  public enqueue<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      text?: string
+      interrupt?: boolean
+      via?: "local" | "peer"
+      model?: {
+        providerID: string
+        modelID: string
+      }
+      variant?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "text" },
+            { in: "body", key: "interrupt" },
+            { in: "body", key: "via" },
+            { in: "body", key: "model" },
+            { in: "body", key: "variant" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionEnqueueResponses,
+      ExperimentalSessionEnqueueErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/enqueue",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
 }
 
 export class Artifact extends HeyApiClient {
@@ -1913,6 +1971,51 @@ export class Peer extends HeyApiClient {
       url: "/experimental/peer/{sessionID}/question/{requestID}/reject",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Send a prompt to a session another Lunos runs
+   *
+   * Send a prompt to a session that another Lunos process on this machine runs. That process runs it, with its own agent, policy and audit, as experimental.session.enqueue does.
+   */
+  public prompt<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      text?: string
+      interrupt?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "text" },
+            { in: "body", key: "interrupt" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerPromptResponses,
+      ExperimentalPeerPromptErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/prompt",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }
