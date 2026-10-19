@@ -156,6 +156,13 @@ An organisation can turn the feature off with `"external": { "enabled": false }`
 
 Every session Lunos starts is written to the [audit log](audit-log.md) as `external.session`, and every refusal as `external.denied`. Both record the tool and its provider.
 
+## Verified against
+
+The releases whose recorded traffic the adapters' contract tests replay. A release not listed here works as far as the tests against fake tools show, but hasn't been checked against the real tool. How to record a release: [external-fixtures.md](external-fixtures.md).
+
+| Tool | Release | Recorded | Models | Bridge | Hooks and approvals | Compact |
+| ---- | ------- | -------- | ------ | ------ | ------------------- | ------- |
+
 ## What Lunos stores
 
 - **Stored:** for each session, the session id, tool, working directory, start and end time, status, and the cost and turn count the tool reported. This lives under Lunos's data directory, on this machine only, so that `sessions`, `resume` and `stop` work.

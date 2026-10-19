@@ -1,0 +1,15 @@
+{"from":"argv","argv":["app-server"]}
+{"from":"host","message":{"id":1,"method":"initialize","params":{"clientInfo":{"name":"lunos","version":"1"}}}}
+{"from":"tool","message":{"id":1,"result":{"userAgent":"codex/0.160.1"}}}
+{"from":"host","message":{"method":"initialized"}}
+{"from":"host","message":{"id":2,"method":"thread/start","params":{"cwd":"<project>","sandbox":"read-only","approvalPolicy":"untrusted","config":{"mcp_servers.lunos":{"command":"<bun>","args":["<repo>/packages/opencode/test/external/fixtures/fake-mcp-server.ts"]}}}}}
+{"from":"tool","message":{"id":2,"result":{"thread":{"id":"01a116f2-5e88-79d3-afb9-db1da07c9fcd"},"model":"gpt-5.5"}}}
+{"from":"host","message":{"id":3,"method":"turn/start","params":{"threadId":"01a116f2-5e88-79d3-afb9-db1da07c9fcd","input":[{"type":"text","text":"Call the say tool of the lunos MCP server once with the text \"ok\", then say ok."}]}}}
+{"from":"tool","message":{"id":3,"result":{"turn":{"id":"turn-1","status":"inProgress"}}}}
+{"from":"tool","message":{"method":"item/started","params":{"item":{"id":"mcp-1","type":"mcpToolCall","server":"lunos","tool":"say","arguments":{"text":"ok"},"status":"inProgress"}}}}
+{"from":"tool","message":{"id":903,"method":"mcpServer/elicitation/request","params":{"threadId":"01a116f2-5e88-79d3-afb9-db1da07c9fcd","turnId":"turn-1","serverName":"lunos","request":{"mode":"form","message":"Allow lunos to run say?","_meta":{"codex_approval_kind":"mcp_tool_call"}}}}}
+{"from":"host","message":{"id":903,"result":{"action":"accept","content":{}}}}
+{"from":"tool","message":{"method":"item/completed","params":{"item":{"id":"mcp-1","type":"mcpToolCall","server":"lunos","tool":"say","arguments":{"text":"ok"},"status":"completed","result":{"content":[{"type":"text","text":"said ok"}]}}}}}
+{"from":"tool","message":{"method":"item/completed","params":{"item":{"id":"msg-1","type":"agentMessage","text":"Done."}}}}
+{"from":"tool","message":{"method":"turn/completed","params":{"turn":{"id":"turn-1","status":"completed"}}}}
+{"from":"exit","code":0,"signal":null}

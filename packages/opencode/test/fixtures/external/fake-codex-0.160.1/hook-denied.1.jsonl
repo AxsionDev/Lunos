@@ -1,0 +1,15 @@
+{"from":"argv","argv":["app-server"]}
+{"from":"host","message":{"id":1,"method":"initialize","params":{"clientInfo":{"name":"lunos","version":"1"}}}}
+{"from":"tool","message":{"id":1,"result":{"userAgent":"codex/0.160.1"}}}
+{"from":"host","message":{"method":"initialized"}}
+{"from":"host","message":{"id":2,"method":"thread/start","params":{"cwd":"<project>","sandbox":"read-only","approvalPolicy":"untrusted"}}}
+{"from":"tool","message":{"id":2,"result":{"thread":{"id":"01a116f2-5e88-79d3-afb9-db1da07c9fcd"},"model":"gpt-5.5"}}}
+{"from":"host","message":{"id":3,"method":"turn/start","params":{"threadId":"01a116f2-5e88-79d3-afb9-db1da07c9fcd","input":[{"type":"text","text":"Run the shell command `touch denied.txt`. Nothing else."}]}}}
+{"from":"tool","message":{"id":3,"result":{"turn":{"id":"turn-1","status":"inProgress"}}}}
+{"from":"tool","message":{"method":"item/started","params":{"item":{"id":"cmd-1","type":"commandExecution","command":"touch denied.txt","cwd":"<project>","status":"inProgress"}}}}
+{"from":"tool","message":{"id":900,"method":"item/commandExecution/requestApproval","params":{"threadId":"01a116f2-5e88-79d3-afb9-db1da07c9fcd","turnId":"turn-1","itemId":"cmd-1","command":"touch denied.txt","reason":null}}}
+{"from":"host","message":{"id":900,"result":{"decision":"decline"}}}
+{"from":"tool","message":{"method":"item/completed","params":{"item":{"id":"cmd-1","type":"commandExecution","command":"touch denied.txt","cwd":"<project>","status":"declined","aggregatedOutput":""}}}}
+{"from":"tool","message":{"method":"item/completed","params":{"item":{"id":"msg-1","type":"agentMessage","text":"Done."}}}}
+{"from":"tool","message":{"method":"turn/completed","params":{"turn":{"id":"turn-1","status":"completed"}}}}
+{"from":"exit","code":0,"signal":null}

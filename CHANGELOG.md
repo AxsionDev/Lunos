@@ -85,6 +85,10 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   and send nothing to Anthropic or OpenAI, so they work even if you don't share anything. Turn
   them off with `external.share.hooks: false`. Before hooks see the calls the tool asks you about,
   not the ones it allows by itself. <!-- XCOD-254 -->
+- A recorder for Claude Code's and Codex's real traffic, run with a dedicated test key in a
+  throwaway HOME and redacted before anything is written, plus contract tests that replay the
+  recordings against the adapters. They are skipped until the recordings are added.
+  <!-- internal --> <!-- XCOD-270 -->
 
 ### Changed
 
