@@ -74,6 +74,15 @@ describe("Agent Monitor rail (XCOD-262)", () => {
     expect(rail.counts.waiting).toBe(1)
   })
 
+  test("sessions cleared from the list (archived) aren't in the rail", () => {
+    const rail = build({
+      now: NOW,
+      sessions: [item("kept", { state: "finished" }), item("gone", { state: "finished", archived: NOW })],
+    })
+    expect(ids(rail)).toEqual(["completed:0:kept"])
+    expect(rail.counts.completed).toBe(1)
+  })
+
   test("/ filters by title, project, agent or tool", () => {
     const sessions = [
       item("a", { title: "refactor-auth", agent: "build" }),

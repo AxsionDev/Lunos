@@ -45,6 +45,8 @@ export interface DialogSelectProps<T> {
     title: string
     side?: "left" | "right"
     hidden?: boolean
+    /** Shown in the footer and the Tab menu even with no key bound (XCOD-265's "stop all", "clear list"). */
+    menu?: boolean
     disabled?: boolean | ((option: DialogSelectOption<T> | undefined) => boolean)
     // Fire even when no row is selected (e.g. switching tabs away from an empty list). Such an
     // action receives no option.
@@ -107,8 +109,16 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     filter: props.initialFilter ?? "",
     input: "keyboard" as "keyboard" | "mouse",
   })
-  const [focusedAction, setFocusedAction] = createSignal<number>()
-  const actionFocused = createMemo(() => focusedAction() !== undefined)
+  // The focused footer action, by command: the list of enabled actions can change under it (a row
+  // finishes and "stop" is disabled), and the highlight must stay on the same action.
+  const [focusedCommand, setFocusedCommand] = createSignal<string>()
+  const focusedAction = () => {
+    const command = focusedCommand()
+    if (command === undefined) return undefined
+    const index = actionItems().findIndex((item) => item.command === command)
+    return index < 0 ? undefined : index
+  }
+  const actionFocused = () => focusedAction() !== undefined
   let selection: { value: T; category?: string } | undefined
   let resetSelection = false
   let visibilityGeneration = 0
@@ -154,19 +164,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const visibleActions = createMemo(() => [
     ...shownActions()
       .map((item) => ({ ...item, label: actionLabels().get(item.command) ?? "" }))
-      .filter((item) => item.label),
+      .filter((item) => item.label || item.menu),
     ...(props.footerHints ?? []),
   ])
-  const actionItems = createMemo(() =>
-    visibleActions()
-      .filter(isActionItem)
-      .filter((item) => !isActionDisabled(item)),
-  )
-
-  createEffect(() => {
-    const index = focusedAction()
-    if (index !== undefined && index >= actionItems().length) setFocusedAction(undefined)
-  })
 
   const filtered = createMemo(() => {
     if (props.skipFilter || props.renderFilter === false) return props.options.filter((x) => x.disabled !== true)
@@ -195,8 +195,16 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   createEffect(() => {
     filtered()
     setStore("input", "keyboard")
-    setFocusedAction(undefined)
   })
+  // Typing leaves the action menu. A list that refreshes underneath (XCOD-265: /sessions re-reads on
+  // every live update) doesn't, or Tab could never reach "stop all" while sessions are running.
+  createEffect(
+    on(
+      () => store.filter,
+      () => setFocusedCommand(undefined),
+      { defer: true },
+    ),
+  )
 
   const flatten = createMemo(() => props.flat && store.filter.length > 0)
 
@@ -238,6 +246,16 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   )
 
   const selected = createMemo(() => flat()[store.selected])
+  // After `selected`: an action's `disabled` reads it, and a `menu` action is listed (so checked) at once.
+  const actionItems = createMemo(() =>
+    visibleActions()
+      .filter(isActionItem)
+      .filter((item) => !isActionDisabled(item)),
+  )
+
+  createEffect(() => {
+    if (focusedCommand() !== undefined && focusedAction() === undefined) setFocusedCommand(undefined)
+  })
 
   createEffect(
     on(
@@ -327,7 +345,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   }
 
   function moveTo(next: number, center = false, preserve = true) {
-    setFocusedAction(undefined)
+    setFocusedCommand(undefined)
     setStore("selected", next)
     const option = selected()
     if (option) {
@@ -392,11 +410,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     if (props.locked) return
     const total = actionItems().length
     if (total === 0) return
-    setFocusedAction((index) => {
-      if (index === undefined) return direction === 1 ? 0 : total - 1
-      const next = index + direction
-      return next < 0 || next >= total ? undefined : next
-    })
+    const index = focusedAction()
+    const next = index === undefined ? (direction === 1 ? 0 : total - 1) : index + direction
+    setFocusedCommand(next < 0 || next >= total ? undefined : actionItems()[next]!.command)
   }
 
   useBindings(() => {
@@ -582,7 +598,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
         >
           {item.title}
         </text>
-        <text fg={disabled() ? theme.textMuted : active() ? fg : theme.textMuted}> {item.label}</text>
+        <Show when={item.label}>
+          <text fg={disabled() ? theme.textMuted : active() ? fg : theme.textMuted}> {item.label}</text>
+        </Show>
       </box>
     )
   }
@@ -677,7 +695,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                           onMouseMove={() => {
                             if (props.locked) return
                             setStore("input", "mouse")
-                            setFocusedAction(undefined)
+                            setFocusedCommand(undefined)
                           }}
                           onMouseUp={() => {
                             if (props.locked) return
@@ -750,7 +768,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       </box>
       <Show when={props.footer || visibleActions().length} fallback={<box flexShrink={0} />}>
         <box paddingRight={2} paddingLeft={4} flexDirection="row" justifyContent="space-between" flexShrink={0}>
-          <box flexDirection="row" gap={2}>
+          <box flexDirection="row" flexWrap="wrap" columnGap={2} flexShrink={1}>
             {props.footer}
             <For each={left()}>{(item) => <FooterAction item={item} />}</For>
           </box>

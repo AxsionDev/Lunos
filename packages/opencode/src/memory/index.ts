@@ -417,7 +417,7 @@ const layer = Layer.effect(
         const { retention } = yield* policy()
         const scope = input.scope
         const starting = (async () => {
-          const store = await MemoryExternal.neo4j({ checked, scope, worktree: s.worktree, limits, retention })
+          const store = await MemoryExternal.open({ checked, scope, worktree: s.worktree, limits, retention })
           try {
             const swept = await store.sweep(MemoryLifecycle.now())
             if (swept.purged.length)
@@ -459,7 +459,7 @@ const layer = Layer.effect(
         // problems. Quarantined facts stay in the ledger but are never recalled.
         await MemoryStore.prepare(root, encryption)
         report(s, scope, (await MemoryStore.load(root)).problems, "start")
-        const handle = await MemorySidecar.start({ root, sample })
+        const handle = await MemorySidecar.start({ root, sample, model: chosen.model })
         const backend = MemoryBackend.cognee({ root, handle, limits, mode: encryption, retention })
         try {
           const swept = await backend.sweep(MemoryLifecycle.now())

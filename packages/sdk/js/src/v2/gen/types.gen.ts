@@ -1706,7 +1706,7 @@ export type MemorySourceConfig = {
 }
 
 export type MemoryBackendConfig = {
-  type?: "embedded" | "neo4j" | "memgraph"
+  type?: "embedded" | "neo4j" | "postgres" | "memgraph"
   url?: string
   database?: string
   username?: string
@@ -1715,6 +1715,33 @@ export type MemoryBackendConfig = {
   read_only?: boolean
   allow_insecure?: boolean
   user?: string
+}
+
+export type MemoryTemplateConfig = {
+  /**
+   * Short id, used by lunos memory setup --template
+   */
+  name: string
+  /**
+   * What the setup wizard shows
+   */
+  title: string
+  description?: string
+  /**
+   * What leaves the computer, in plain words ("the fact text, to …")
+   */
+  leaves: string
+  /**
+   * The memory block the template sets (backend, model, encryption, …). Credentials as {env:} references
+   */
+  memory: {
+    [key: string]: unknown
+  }
+}
+
+export type MemoryTemplatesConfig = {
+  custom?: Array<MemoryTemplateConfig>
+  hide?: Array<string>
 }
 
 export type MemoryConfig = {
@@ -1736,6 +1763,7 @@ export type MemoryConfig = {
   }
   encryption?: "off" | "os-keychain"
   backend?: MemoryBackendConfig
+  templates?: MemoryTemplatesConfig
 }
 
 export type BlankString = string
@@ -2690,11 +2718,34 @@ export type SessionOverviewItem = {
   questions: number
   queued?: number
   groupID?: string
+  archived?: number
 }
 
 export type SessionOverview = {
   groups: Array<SessionGroup>
   sessions: Array<SessionOverviewItem>
+}
+
+export type SessionBulkFailure = {
+  id: string
+  reason: string
+}
+
+export type SessionBulkStopResult = {
+  stopped: Array<string>
+  failed: Array<SessionBulkFailure>
+}
+
+export type SessionBulkArchiveResult = {
+  archived: Array<string>
+  skipped: Array<SessionBulkFailure>
+  stopped?: Array<string>
+  failed?: Array<SessionBulkFailure>
+}
+
+export type SessionBulkDeleteResult = {
+  deleted: Array<string>
+  skipped: Array<SessionBulkFailure>
 }
 
 export type NotFoundError = {
@@ -2715,6 +2766,22 @@ export type ExternalToolStatus = {
     message: string
   }
   permissionModes?: Array<string>
+}
+
+export type ExternalModel = {
+  id: string
+  name: string
+  description?: string
+  default?: boolean
+}
+
+export type ExternalModels = {
+  tool: "claude" | "codex"
+  label: string
+  current?: string
+  models: Array<ExternalModel>
+  fallback: boolean
+  error?: string
 }
 
 export type PermissionRequest = {
@@ -3242,11 +3309,111 @@ export type MemorySetupInput = {
   memory: {
     [key: string]: unknown
   }
+  /**
+   * XCOD-264: a Docker template whose .env holds the variables the block's {env:} references need
+   */
+  template?: {
+    name: string
+    scope: "user" | "project"
+  }
 }
 
 export type MemorySetupBackendResult = {
   ok: boolean
   warnings: Array<string>
+  error?: string
+}
+
+export type MemorySetupTemplate = {
+  name: string
+  title: string
+  description?: string
+  leaves: string
+  requires?: Array<string>
+  ask?: Array<string>
+  memory: {
+    [key: string]: unknown
+  }
+  port?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  licence?: string
+  organisation?: boolean
+  unavailable?: string
+}
+
+export type MemorySetupEnvironment = {
+  environment: {
+    paths: {
+      project?: string
+      user?: string
+    }
+    model?: {
+      id: string
+      region?: string
+    }
+    docker?: {
+      tool: "docker" | "podman"
+      compose: boolean
+    }
+    localModels: Array<string>
+  }
+  templates: Array<MemorySetupTemplate>
+}
+
+export type MemorySetupError = {
+  type: string
+  message: string
+  stage: string
+  fix?: string
+}
+
+export type MemorySetupTestResult = {
+  ok: boolean
+  ms?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  server?: string
+  warnings?: Array<string>
+  error?: MemorySetupError
+}
+
+export type MemorySetupTemplateInput = {
+  name: string
+  scope: "user" | "project"
+  values?: {
+    vendor?: "neo4j" | "postgres"
+    url?: string
+    jurisdiction?: string
+    localModel?: string
+    port?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  }
+  overwrite?: Array<string>
+}
+
+export type MemorySetupTemplatePlan = {
+  ok: boolean
+  error?: string
+  dir: string
+  files: Array<{
+    name: string
+    path: string
+    content: string
+    exists: boolean
+  }>
+  memory: {
+    [key: string]: unknown
+  }
+  command: string
+  licence?: string
+}
+
+export type MemorySetupStartResult = {
+  ok: boolean
+  ms?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  error?: MemorySetupError
+}
+
+export type MemorySetupMoveResult = {
+  ok: boolean
+  facts?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  output?: string
   error?: string
 }
 
@@ -3256,6 +3423,12 @@ export type MemorySetupCheckResult = {
   ms?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
   error?: string
   fix?: string
+  stage?: string
+  type?: string
+  cause?: string
+  model?: string
+  log?: string
+  diagnostics?: string
 }
 
 export type PermissionNotFoundError = {
@@ -9026,6 +9199,7 @@ export type ExperimentalSessionOverviewData = {
   query?: {
     directory?: string
     workspace?: string
+    archived?: boolean | "true" | "false"
   }
   url: "/experimental/session-overview"
 }
@@ -9049,6 +9223,137 @@ export type ExperimentalSessionOverviewResponses = {
 
 export type ExperimentalSessionOverviewResponse =
   ExperimentalSessionOverviewResponses[keyof ExperimentalSessionOverviewResponses]
+
+export type ExperimentalSessionBulkStopData = {
+  body?: {
+    sessionIDs: Array<string>
+    reason?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/stop"
+}
+
+export type ExperimentalSessionBulkStopErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkStopError =
+  ExperimentalSessionBulkStopErrors[keyof ExperimentalSessionBulkStopErrors]
+
+export type ExperimentalSessionBulkStopResponses = {
+  /**
+   * Which sessions stopped, and why the others didn't
+   */
+  200: SessionBulkStopResult
+}
+
+export type ExperimentalSessionBulkStopResponse =
+  ExperimentalSessionBulkStopResponses[keyof ExperimentalSessionBulkStopResponses]
+
+export type ExperimentalSessionBulkArchiveData = {
+  body?: {
+    sessionIDs: Array<string>
+    stop?: boolean
+    reason?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/archive"
+}
+
+export type ExperimentalSessionBulkArchiveErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkArchiveError =
+  ExperimentalSessionBulkArchiveErrors[keyof ExperimentalSessionBulkArchiveErrors]
+
+export type ExperimentalSessionBulkArchiveResponses = {
+  /**
+   * Which sessions were archived
+   */
+  200: SessionBulkArchiveResult
+}
+
+export type ExperimentalSessionBulkArchiveResponse =
+  ExperimentalSessionBulkArchiveResponses[keyof ExperimentalSessionBulkArchiveResponses]
+
+export type ExperimentalSessionBulkUnarchiveData = {
+  body?: {
+    sessionIDs: Array<string>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/unarchive"
+}
+
+export type ExperimentalSessionBulkUnarchiveErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkUnarchiveError =
+  ExperimentalSessionBulkUnarchiveErrors[keyof ExperimentalSessionBulkUnarchiveErrors]
+
+export type ExperimentalSessionBulkUnarchiveResponses = {
+  /**
+   * Which sessions were restored
+   */
+  200: SessionBulkArchiveResult
+}
+
+export type ExperimentalSessionBulkUnarchiveResponse =
+  ExperimentalSessionBulkUnarchiveResponses[keyof ExperimentalSessionBulkUnarchiveResponses]
+
+export type ExperimentalSessionBulkDeleteData = {
+  body?: {
+    sessionIDs: Array<string>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/delete"
+}
+
+export type ExperimentalSessionBulkDeleteErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkDeleteError =
+  ExperimentalSessionBulkDeleteErrors[keyof ExperimentalSessionBulkDeleteErrors]
+
+export type ExperimentalSessionBulkDeleteResponses = {
+  /**
+   * Which archived sessions were deleted
+   */
+  200: SessionBulkDeleteResult
+}
+
+export type ExperimentalSessionBulkDeleteResponse =
+  ExperimentalSessionBulkDeleteResponses[keyof ExperimentalSessionBulkDeleteResponses]
 
 export type ExperimentalSessionGroupListData = {
   body?: never
@@ -9293,6 +9598,78 @@ export type ExperimentalExternalStopResponses = {
 
 export type ExperimentalExternalStopResponse =
   ExperimentalExternalStopResponses[keyof ExperimentalExternalStopResponses]
+
+export type ExperimentalExternalModelsData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/{sessionID}/models"
+}
+
+export type ExperimentalExternalModelsErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalExternalModelsError = ExperimentalExternalModelsErrors[keyof ExperimentalExternalModelsErrors]
+
+export type ExperimentalExternalModelsResponses = {
+  /**
+   * The tool's models
+   */
+  200: ExternalModels
+}
+
+export type ExperimentalExternalModelsResponse =
+  ExperimentalExternalModelsResponses[keyof ExperimentalExternalModelsResponses]
+
+export type ExperimentalExternalModelData = {
+  body?: {
+    model?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/{sessionID}/model"
+}
+
+export type ExperimentalExternalModelErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalExternalModelError = ExperimentalExternalModelErrors[keyof ExperimentalExternalModelErrors]
+
+export type ExperimentalExternalModelResponses = {
+  /**
+   * Model saved
+   */
+  200: boolean
+}
+
+export type ExperimentalExternalModelResponse =
+  ExperimentalExternalModelResponses[keyof ExperimentalExternalModelResponses]
 
 export type ExperimentalPeerStopData = {
   body?: never
@@ -11301,6 +11678,177 @@ export type MemorySetupBackendResponses = {
 }
 
 export type MemorySetupBackendResponse = MemorySetupBackendResponses[keyof MemorySetupBackendResponses]
+
+export type MemorySetupEnvironmentData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/environment"
+}
+
+export type MemorySetupEnvironmentErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupEnvironmentError = MemorySetupEnvironmentErrors[keyof MemorySetupEnvironmentErrors]
+
+export type MemorySetupEnvironmentResponses = {
+  /**
+   * This machine's memory paths, model, Docker, and the templates
+   */
+  200: MemorySetupEnvironment
+}
+
+export type MemorySetupEnvironmentResponse = MemorySetupEnvironmentResponses[keyof MemorySetupEnvironmentResponses]
+
+export type MemorySetupTestData = {
+  body?: MemorySetupInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/test"
+}
+
+export type MemorySetupTestErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupTestError = MemorySetupTestErrors[keyof MemorySetupTestErrors]
+
+export type MemorySetupTestResponses = {
+  /**
+   * Whether the database could be used
+   */
+  200: MemorySetupTestResult
+}
+
+export type MemorySetupTestResponse = MemorySetupTestResponses[keyof MemorySetupTestResponses]
+
+export type MemorySetupTemplatePreviewData = {
+  body?: MemorySetupTemplateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/template/preview"
+}
+
+export type MemorySetupTemplatePreviewErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupTemplatePreviewError = MemorySetupTemplatePreviewErrors[keyof MemorySetupTemplatePreviewErrors]
+
+export type MemorySetupTemplatePreviewResponses = {
+  /**
+   * The files and config the template would write
+   */
+  200: MemorySetupTemplatePlan
+}
+
+export type MemorySetupTemplatePreviewResponse =
+  MemorySetupTemplatePreviewResponses[keyof MemorySetupTemplatePreviewResponses]
+
+export type MemorySetupTemplateApplyData = {
+  body?: MemorySetupTemplateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/template/apply"
+}
+
+export type MemorySetupTemplateApplyErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupTemplateApplyError = MemorySetupTemplateApplyErrors[keyof MemorySetupTemplateApplyErrors]
+
+export type MemorySetupTemplateApplyResponses = {
+  /**
+   * The files written
+   */
+  200: MemorySetupTemplatePlan
+}
+
+export type MemorySetupTemplateApplyResponse =
+  MemorySetupTemplateApplyResponses[keyof MemorySetupTemplateApplyResponses]
+
+export type MemorySetupTemplateStartData = {
+  body?: MemorySetupTemplateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/template/start"
+}
+
+export type MemorySetupTemplateStartErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupTemplateStartError = MemorySetupTemplateStartErrors[keyof MemorySetupTemplateStartErrors]
+
+export type MemorySetupTemplateStartResponses = {
+  /**
+   * Whether the database started and became healthy
+   */
+  200: MemorySetupStartResult
+}
+
+export type MemorySetupTemplateStartResponse =
+  MemorySetupTemplateStartResponses[keyof MemorySetupTemplateStartResponses]
+
+export type MemorySetupMoveData = {
+  body?: MemorySetupInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/move"
+}
+
+export type MemorySetupMoveErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupMoveError = MemorySetupMoveErrors[keyof MemorySetupMoveErrors]
+
+export type MemorySetupMoveResponses = {
+  /**
+   * How many facts were moved
+   */
+  200: MemorySetupMoveResult
+}
+
+export type MemorySetupMoveResponse = MemorySetupMoveResponses[keyof MemorySetupMoveResponses]
 
 export type MemorySetupCheckData = {
   body?: MemorySetupInput

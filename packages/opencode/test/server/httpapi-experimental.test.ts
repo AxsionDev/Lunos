@@ -267,6 +267,80 @@ describe("experimental HttpApi", () => {
     { git: true, config: { formatter: false, lsp: false } },
   )
 
+  it.instance(
+    "XCOD-265: the routes a stop calls accept what it sends (a settled request is a 404, not a 400)",
+    () =>
+      Effect.gen(function* () {
+        const tmp = yield* TestInstance
+        const permissions = yield* request("/permission", tmp.directory)
+        expect(permissions.status).toBe(200)
+        expect(Array.isArray(yield* json<unknown>(permissions))).toBe(true)
+        expect((yield* request("/question", tmp.directory)).status).toBe(200)
+        const reply = yield* request("/permission/per_settled/reply", tmp.directory, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ reply: "reject", message: "Stopped from /sessions" }),
+        })
+        expect(reply.status).toBe(404)
+        const reject = yield* request("/question/que_settled/reject", tmp.directory, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "null",
+        })
+        expect(reject.status).toBe(404)
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
+    "XCOD-265: clear (archive), show archived, unarchive and delete archived over HTTP",
+    () =>
+      Effect.gen(function* () {
+        const tmp = yield* TestInstance
+        const kept = yield* createSession({ title: "kept" })
+        const cleared = yield* createSession({ title: "cleared" })
+        const post = (path: string, body: unknown) =>
+          request(path, tmp.directory, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          }).pipe(Effect.flatMap((response) => json<Record<string, unknown>>(response)))
+        const overview = (archived: boolean) =>
+          request(`${ExperimentalPaths.sessionOverview}?archived=${archived}`, tmp.directory).pipe(
+            Effect.flatMap((response) => json<{ sessions: { id: string }[] }>(response)),
+            Effect.map((body) => body.sessions.map((item) => item.id)),
+          )
+
+        expect(yield* post(ExperimentalPaths.sessionBulkArchive, { sessionIDs: [cleared.id] })).toEqual({
+          archived: [cleared.id],
+          skipped: [],
+        })
+        expect(yield* overview(false)).toContain(kept.id)
+        expect(yield* overview(false)).not.toContain(cleared.id)
+        expect(yield* overview(true)).toEqual([cleared.id])
+
+        expect(yield* post(ExperimentalPaths.sessionBulkUnarchive, { sessionIDs: [cleared.id] })).toEqual({
+          archived: [cleared.id],
+          skipped: [],
+        })
+        expect(yield* overview(false)).toContain(cleared.id)
+
+        yield* post(ExperimentalPaths.sessionBulkArchive, { sessionIDs: [cleared.id] })
+        expect(yield* post(ExperimentalPaths.sessionBulkDelete, { sessionIDs: [kept.id, cleared.id] })).toEqual({
+          deleted: [cleared.id],
+          skipped: [{ id: kept.id, reason: "it isn't archived" }],
+        })
+        expect(yield* overview(true)).toEqual([])
+        expect(yield* overview(false)).toContain(kept.id)
+
+        expect(yield* post(ExperimentalPaths.sessionBulkStop, { sessionIDs: [kept.id] })).toEqual({
+          stopped: [],
+          failed: [{ id: kept.id, reason: "it isn't running" }],
+        })
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
   testWorktreeMutations(
     "serves worktree mutations through the default server app",
     () =>

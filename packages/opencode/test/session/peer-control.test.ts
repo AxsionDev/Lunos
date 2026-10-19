@@ -68,8 +68,31 @@ describe("SessionPeerControl (XCOD-234)", () => {
   })
 
   test("AC2: stop is carried out by the process that runs the session, through its own API", async () => {
+    const before = seen.length
     expect(await SessionPeerControl.call("ses_a", "/stop", { method: "POST" })).toBe(true)
-    expect(last()).toEqual({ method: "POST", path: "/session/ses_a/abort", directory: "/work/a", body: "" })
+    const calls = seen.slice(before).map((line) => JSON.parse(line))
+    // XCOD-265: its pending approval is rejected with the reason first (only this session's), then the turn aborts.
+    expect(calls.filter((call) => call.method === "POST")).toEqual([
+      {
+        method: "POST",
+        path: "/permission/per_1/reply",
+        directory: "/work/a",
+        body: JSON.stringify({ reply: "reject", message: "Stopped from /sessions" }),
+      },
+      { method: "POST", path: "/session/ses_a/abort", directory: "/work/a", body: "" },
+    ])
+  })
+
+  test("XCOD-265: a stop can carry its own reason", async () => {
+    const before = seen.length
+    await SessionPeerControl.call("ses_a", "/stop", {
+      method: "POST",
+      body: { reason: "Stopped by lunos session stop" },
+    })
+    const calls = seen.slice(before).map((line) => JSON.parse(line))
+    expect(calls.find((call) => call.path === "/permission/per_1/reply")?.body).toBe(
+      JSON.stringify({ reply: "reject", message: "Stopped by lunos session stop" }),
+    )
   })
 
   test("AC3: only this session's asks are listed and answerable; the answer goes to the owner's permission route", async () => {
@@ -158,6 +181,63 @@ describe("SessionPeerControl (XCOD-234)", () => {
     if (process.platform !== "win32") {
       const file = (await fs.readdir(SessionPeers.dir())).find((name) => name.startsWith(`${child.pid}-`))!
       expect((await fs.stat(path.join(SessionPeers.dir(), file))).mode & 0o777).toBe(0o600)
+    }
+  })
+})
+
+describe("SessionPeerControl.stopHere (XCOD-265)", () => {
+  test("a session this process runs: its asks are rejected with the reason, then its turn aborts", async () => {
+    const { SessionLive } = await import("../../src/session/live")
+    const calls: { method: string; path: string; directory: string | null; body: string }[] = []
+    SessionPeerControl.useHandler(async (request) => {
+      const url = new URL(request.url)
+      calls.push({
+        method: request.method,
+        path: url.pathname,
+        directory: url.searchParams.get("directory"),
+        body: request.method === "POST" ? await request.text() : "",
+      })
+      if (url.pathname === "/permission") return Response.json([{ id: "per_9", sessionID: "ses_here" }])
+      if (url.pathname === "/question")
+        return Response.json([
+          { id: "que_9", sessionID: "ses_here" },
+          { id: "que_x", sessionID: "ses_other" },
+        ])
+      return Response.json(true)
+    })
+    SessionLive.handle({
+      directory: "/work/here",
+      payload: { type: "session.status", properties: { sessionID: "ses_here", status: { type: "busy" } } },
+    })
+    try {
+      expect(await SessionPeerControl.stopHere("ses_here")).toBe(true)
+      expect(calls.filter((call) => call.method === "POST")).toEqual([
+        {
+          method: "POST",
+          path: "/permission/per_9/reply",
+          directory: "/work/here",
+          body: JSON.stringify({ reply: "reject", message: "Stopped from /sessions" }),
+        },
+        { method: "POST", path: "/question/que_9/reject", directory: "/work/here", body: "null" },
+        { method: "POST", path: "/session/ses_here/abort", directory: "/work/here", body: "" },
+      ])
+      await expect(SessionPeerControl.stopHere("ses_unknown")).rejects.toThrow("isn't running that session")
+
+      // A rejection the owner refuses: the turn is not aborted (that would leave the ask hanging) and the stop fails.
+      calls.length = 0
+      SessionPeerControl.useHandler(async (request) => {
+        const url = new URL(request.url)
+        calls.push({ method: request.method, path: url.pathname, directory: null, body: "" })
+        if (url.pathname === "/permission") return Response.json([{ id: "per_9", sessionID: "ses_here" }])
+        if (url.pathname === "/question") return Response.json([])
+        if (url.pathname.endsWith("/reply")) return new Response("bad request", { status: 400 })
+        return Response.json(true)
+      })
+      await expect(SessionPeerControl.stopHere("ses_here")).rejects.toThrow("Couldn't reject its pending approval")
+      expect(calls.map((call) => call.path)).not.toContain("/session/ses_here/abort")
+    } finally {
+      SessionPeerControl.useHandler(undefined)
+      SessionLive.reset()
     }
   })
 })

@@ -13,6 +13,7 @@ import { useTheme } from "./theme"
 import { useToast } from "../ui/toast"
 import { useRoute } from "./route"
 import { usePermission } from "./permission"
+import { listed } from "../util/sessions-overview"
 
 export type LocalTheme = {
   secondary: RGBA
@@ -458,7 +459,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         })
 
       const slots = createMemo(() => {
-        const existing = new Set(sync.data.session.filter((x) => x.parentID === undefined).map((x) => x.id))
+        const existing = new Set(
+          sync.data.session.filter((x) => x.parentID === undefined && listed(x)).map((x) => x.id),
+        )
         return sessionStore.pinned.filter((id) => existing.has(id)).slice(0, 9)
       })
 

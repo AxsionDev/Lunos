@@ -38,7 +38,21 @@ import {
 import { errorMessage } from "../util/error"
 import { externalAccent, type ExternalTool } from "../util/external"
 import { Locale } from "../util/locale"
-import { STATE_GLYPH, kindLabel, money, projectName, stateLabel, stoppable, toolOnly } from "../util/sessions-overview"
+import {
+  STATE_GLYPH,
+  clearPlan,
+  clearQuestion,
+  kindLabel,
+  money,
+  projectName,
+  stateLabel,
+  stopAndClearQuestion,
+  stopPlan,
+  stopQuestion,
+  stopSummary,
+  stoppable,
+  toolOnly,
+} from "../util/sessions-overview"
 
 /** The plugin-route id the monitor is shown under. */
 export const MONITOR_ROUTE = "agent-monitor"
@@ -487,6 +501,97 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     refresh()
   }
 
+  /** XCOD-265: the rows Stop all and Clear list act on: what the rail shows (filter, Show older). */
+  const railView = () => rail().rows.map((row) => row.item)
+
+  /** Asks once, as /sessions does: the first option is the default and Esc cancels. */
+  function choose<T extends string>(message: string, options: { value: T; title: string }[]) {
+    return new Promise<T | undefined>((resolve) =>
+      dialog.replace(
+        () => (
+          <DialogSelect<T | "cancel">
+            title={message}
+            titleView={
+              <box flexShrink={1} paddingRight={2}>
+                <text fg={theme.text} wrapMode="word">
+                  {message}
+                </text>
+              </box>
+            }
+            renderFilter={false}
+            options={[...options, { value: "cancel" as const, title: "Cancel" }]}
+            onSelect={(option) => {
+              resolve(option.value === "cancel" ? undefined : (option.value as T))
+              dialog.clear()
+            }}
+          />
+        ),
+        () => resolve(undefined),
+      ),
+    )
+  }
+
+  /** XCOD-265: Stop all, with the same count-and-confirm as /sessions. */
+  async function stopAll() {
+    const plan = stopPlan(railView())
+    if (plan.targets.length === 0)
+      return toast.show({ variant: "info", message: "Nothing in the list is running or waiting." })
+    const choice = await choose(stopQuestion(plan), [{ value: "all" as const, title: `Stop ${plan.targets.length}` }])
+    if (!choice) return
+    const result = await sdk.client.experimental.sessionBulk
+      .stop({ sessionIDs: plan.targets.map((item) => item.id) }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result) toast.show({ variant: result.failed.length ? "warning" : "success", message: stopSummary(result) })
+    refresh()
+  }
+
+  /** XCOD-265: Clear list archives what isn't running or waiting; "Stop all & clear" takes the rest too. */
+  async function clearList() {
+    const items = railView()
+    const plan = clearPlan(items)
+    const running = stopPlan(plan.staying).targets.length
+    if (plan.targets.length === 0 && running === 0)
+      return toast.show({ variant: "info", message: "Nothing in the list to clear." })
+    const choice =
+      plan.targets.length === 0
+        ? await choose(clearQuestion(plan), [{ value: "stop" as const, title: "Stop all & clear" }])
+        : await choose(clearQuestion(plan), [
+            { value: "clear" as const, title: `Clear ${plan.targets.length}` },
+            ...(running ? [{ value: "stop" as const, title: "Stop all & clear" }] : []),
+          ])
+    if (!choice) return
+    if (choice === "stop") {
+      const stop = stopPlan(items).targets
+      const go = await choose(stopAndClearQuestion(items), [
+        { value: "go" as const, title: `Stop ${stop.length} and clear ${stop.length + plan.targets.length}` },
+      ])
+      if (!go) return
+      const result = await sdk.client.experimental.sessionBulk
+        .archive({ sessionIDs: [...stop, ...plan.targets].map((item) => item.id), stop: true }, { throwOnError: true })
+        .then((response) => response.data)
+        .catch((cause) => (fail(cause), undefined))
+      if (result)
+        toast.show({
+          variant: "success",
+          message: `${stopSummary({ stopped: result.stopped ?? [], failed: result.failed ?? [] })} · Cleared ${result.archived.length} (/sessions → show archived brings them back)`,
+          duration: 8000,
+        })
+      return refresh()
+    }
+    const result = await sdk.client.experimental.sessionBulk
+      .archive({ sessionIDs: plan.targets.map((item) => item.id) }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result)
+      toast.show({
+        variant: "success",
+        message: `Cleared ${result.archived.length} from the list (/sessions → show archived brings them back)`,
+        duration: 8000,
+      })
+    refresh()
+  }
+
   async function filter() {
     const value = await DialogPrompt.show(dialog, "Filter sessions", {
       value: search(),
@@ -536,6 +641,28 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       ...keys("monitor.stop", () => current() && void stop(current()!)),
       ...keys("monitor.filter", () => void filter()),
       ...keys("monitor.older", () => setShowOlder((value) => !value)),
+      ...keys("monitor.stop_all", () => void stopAll()),
+      ...keys("monitor.clear", () => void clearList()),
+    ],
+  }))
+
+  // XCOD-265: reachable from the command palette while the monitor is open (no default keys).
+  useBindings(() => ({
+    commands: [
+      {
+        namespace: "palette",
+        name: "monitor.stop_all",
+        title: "Stop all sessions in the Agent Monitor",
+        category: "Session",
+        run: () => void stopAll(),
+      },
+      {
+        namespace: "palette",
+        name: "monitor.clear",
+        title: "Clear finished sessions from the Agent Monitor",
+        category: "Session",
+        run: () => void clearList(),
+      },
     ],
   }))
 
@@ -632,7 +759,14 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
         <text fg={theme.text} attributes={TextAttributes.BOLD} flexGrow={1}>
           Sessions on this computer
         </text>
-        {/* TODO(XCOD-265): Stop all / Clear list go here once that lands. */}
+        {/* XCOD-265: unbound by default (monitor.stop_all, monitor.clear); click them, or use the command palette. */}
+        <text fg={theme.textMuted} onMouseUp={() => void stopAll()}>
+          stop all
+        </text>
+        <text fg={theme.textMuted}> · </text>
+        <text fg={theme.textMuted} onMouseUp={() => void clearList()}>
+          clear list
+        </text>
         <Show when={search()}>
           <text fg={theme.accent}>filter: {search()}</text>
         </Show>

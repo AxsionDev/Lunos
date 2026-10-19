@@ -1,6 +1,7 @@
 export * as MemorySidecar from "./sidecar"
 
 import fs from "node:fs/promises"
+import { closeSync, openSync, writeSync } from "node:fs"
 import path from "node:path"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
@@ -8,6 +9,7 @@ import { CreateMessageRequestSchema } from "@modelcontextprotocol/sdk/types.js"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import SCRIPT from "./sidecar.py" with { type: "text" }
 import LOCK from "./sidecar.py.lock" with { type: "text" }
+import { MemoryFailure } from "./failure"
 import { MemoryStore } from "./store"
 import { Offline } from "@opencode-ai/core/offline"
 
@@ -24,6 +26,9 @@ import { Offline } from "@opencode-ai/core/offline"
  * - The child gets an allow-listed environment, not Lunos's: no provider keys, no tokens.
  * - `uv` is a prerequisite, never bundled. Python itself is not downloaded either
  *   (`UV_PYTHON_DOWNLOADS=never`): a missing Python 3.10–3.13 is an error that says so.
+ * - A failed call is a `MemoryFailure.EngineError` (XCOD-263): the sidecar's exception type, cause
+ *   chain and stage, plus the sampling requests that failed while it ran. The sidecar's stderr is
+ *   kept in `<root>/logs/sidecar-<time>.stderr.txt` (the last few starts), next to cognee's own logs.
  */
 
 /**
@@ -41,6 +46,27 @@ export const ENGINE = {
 
 export class UnavailableError extends Error {
   override name = "MemoryUnavailable"
+  constructor(
+    message: string,
+    /** The sidecar's stderr log, when it got far enough to write one. */
+    readonly log?: string,
+  ) {
+    super(message)
+  }
+}
+
+/** Not `.log`: cognee prunes old `*.log` files in the same folder, and keeps its own count. */
+export const STDERR_LOG = /^sidecar-.*\.stderr\.txt$/
+const STDERR_KEEP = 5
+
+/** A new stderr log for this start, after removing all but the newest few. */
+async function stderrLog(root: string) {
+  const dir = path.join(root, "logs")
+  await fs.mkdir(dir, { recursive: true })
+  const old = (await fs.readdir(dir)).filter((name) => STDERR_LOG.test(name)).sort()
+  for (const name of old.slice(0, Math.max(0, old.length - (STDERR_KEEP - 1))))
+    await fs.rm(path.join(dir, name), { force: true })
+  return path.join(dir, `sidecar-${new Date().toISOString().replace(/[:.]/g, "-")}.stderr.txt`)
 }
 
 export interface SampleInput {
@@ -123,6 +149,9 @@ export async function start(input: {
   env?: Record<string, string | undefined>
   /** Where the embedding model is kept. Defaults to the shared models directory. */
   models?: string
+  /** The model `sample` runs, named in a failed sampling request. */
+  model?: { providerID: string; modelID: string }
+  callTimeout?: number
 }): Promise<Handle> {
   const uv = Bun.which("uv")
   if (!uv)
@@ -131,6 +160,22 @@ export async function start(input: {
     )
   const script = await install()
   const stderr: string[] = []
+  // A memory directory Lunos can't write to is itself a failure the check reports; the log just goes.
+  const log = await stderrLog(input.root).catch(() => undefined)
+  let file = (() => {
+    try {
+      return log ? openSync(log, "w") : undefined
+    } catch {
+      return undefined
+    }
+  })()
+  const kept = file !== undefined ? log : undefined
+  const closeLog = () => {
+    try {
+      if (file !== undefined) closeSync(file)
+    } catch {}
+    file = undefined
+  }
   const transport = new StdioClientTransport({
     command: uv,
     args: ["run", "--quiet", "--locked", "--script", script],
@@ -141,44 +186,75 @@ export async function start(input: {
   transport.stderr?.on("data", (chunk: Buffer) => {
     stderr.push(chunk.toString())
     if (stderr.length > 200) stderr.shift()
+    try {
+      if (file !== undefined) writeSync(file, chunk)
+    } catch {}
   })
+  const label = input.model ?? { providerID: "unknown", modelID: "unknown" }
+  // Every sampling request and every failed one, so a failed call can say what its model did.
+  const sampling = { count: 0, failed: [] as (MemoryFailure.Sampling & { at: number })[] }
   const client = new Client({ name: "lunos-memory", version: InstallationVersion }, { capabilities: { sampling: {} } })
   client.setRequestHandler(CreateMessageRequestSchema, async (request) => {
     const text = request.params.messages
       .flatMap((message) => (Array.isArray(message.content) ? message.content : [message.content]))
       .map((part) => (part.type === "text" ? part.text : ""))
       .join("\n\n")
-    const reply = await input.sample({
-      system: request.params.systemPrompt,
-      text,
-      maxTokens: request.params.maxTokens,
-    })
+    sampling.count++
+    const reply = await input
+      .sample({ system: request.params.systemPrompt, text, maxTokens: request.params.maxTokens })
+      .catch((error: unknown) => {
+        sampling.failed.push({
+          at: sampling.count,
+          provider: label.providerID,
+          model: label.modelID,
+          message: MemoryFailure.summary(error),
+        })
+        if (sampling.failed.length > 20) sampling.failed.shift()
+        throw error
+      })
     return { role: "assistant", content: { type: "text", text: reply }, model: "lunos", stopReason: "endTurn" }
   })
   try {
     await client.connect(transport, { timeout: START_TIMEOUT })
   } catch (error) {
     await transport.close().catch(() => {})
+    closeLog()
     const tail = stderr.join("").trim().split("\n").slice(-5).join("\n")
     throw new UnavailableError(
-      `Memory could not start: ${error instanceof Error ? error.message : String(error)}${tail ? `\n${tail}` : ""}`,
+      `Memory could not start: ${MemoryFailure.summary(error)}${tail ? `\n${tail}` : ""}`,
+      kept,
     )
   }
   return {
     async call<T>(tool: string, args: Record<string, unknown>) {
-      const result = await client.callTool({ name: tool, arguments: args }, undefined, {
-        timeout: CALL_TIMEOUT,
-        resetTimeoutOnProgress: true,
+      // Calls can overlap, so a failure attaches every sampling failure since it started.
+      const count = sampling.count
+      const context = () => ({
+        sampling: sampling.failed.filter((item) => item.at > count).map(({ at: _, ...item }) => item),
+        sampled: sampling.count > count,
+        log: kept,
+        dir: input.root,
+        model: input.model ? `${input.model.providerID}/${input.model.modelID}` : undefined,
       })
+      const result = await client
+        .callTool({ name: tool, arguments: args }, undefined, {
+          timeout: input.callTimeout ?? CALL_TIMEOUT,
+          resetTimeoutOnProgress: true,
+        })
+        .catch((error: unknown) => {
+          throw new MemoryFailure.EngineError(tool, MemoryFailure.fromThrown(tool, error, context()))
+        })
+      const failure = MemoryFailure.fromToolResult(tool, result, context())
+      if (failure) throw new MemoryFailure.EngineError(tool, failure)
       const text = (result.content as { type: string; text?: string }[])
         .filter((part) => part.type === "text")
         .map((part) => part.text ?? "")
         .join("")
-      if (result.isError) throw new Error(`Memory ${tool} failed: ${text}`)
       return (result.structuredContent ?? JSON.parse(text)) as T
     },
     async close() {
       await client.close().catch(() => {})
+      closeLog()
     },
   }
 }

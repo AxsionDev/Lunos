@@ -39,11 +39,11 @@ export type Rail = {
 }
 
 /**
- * The sessions the rail lists. TODO(XCOD-265): once sessions can be archived, archived ones are
- * dropped here, and the rail header gets the Stop all / Clear list actions.
+ * The sessions the rail lists: none that were cleared from the list (archived, XCOD-265). The
+ * overview already leaves them out unless asked for them; this keeps the rail right either way.
  */
 export function railItems(sessions: readonly SessionOverviewItem[]) {
-  return sessions
+  return sessions.filter((item) => !item.archived)
 }
 
 function sectionOf(item: SessionOverviewItem): Section {

@@ -26,7 +26,11 @@ import {
   SessionGroupCreatePayload,
   SessionGroupMovePayload,
   SessionGroupUpdatePayload,
+  SessionBulkArchivePayload,
+  SessionBulkPayload,
+  SessionBulkStopPayload,
   SessionListQuery,
+  SessionOverviewQuery,
   ToolListQuery,
   WorktreeApiError,
 } from "../groups/experimental"
@@ -37,10 +41,12 @@ import { SessionPeers } from "@/session/peers"
 import { SessionPeerControl } from "@/session/peer-control"
 import { SessionOverview } from "@/session/overview"
 import { SessionPromptQueue } from "@/session/prompt-queue"
+import { SessionBulk } from "@/session/bulk"
 import { ExternalRegistry } from "@/external/registry"
 import { ExternalDetect } from "@/external/detect"
 import { ExternalPolicy } from "@/external/policy"
 import { ExternalRun } from "@/external/run"
+import { ExternalSession } from "@/external/session"
 import { GlobalBus } from "@/bus/global"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
 
@@ -261,8 +267,37 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return true
     })
 
-    const sessionOverview = Effect.fn("ExperimentalHttpApi.sessionOverview")(function* () {
-      return yield* SessionOverview.build().pipe(Effect.provideService(Session.Service, sessions))
+    const sessionOverview = Effect.fn("ExperimentalHttpApi.sessionOverview")(function* (ctx: {
+      query: typeof SessionOverviewQuery.Type
+    }) {
+      return yield* SessionOverview.build({ archived: ctx.query.archived }).pipe(
+        Effect.provideService(Session.Service, sessions),
+      )
+    })
+
+    // XCOD-265: Stop all, Clear list, Unarchive, Delete archived.
+    const sessionBulkStop = Effect.fn("ExperimentalHttpApi.sessionBulkStop")(function* (ctx: {
+      payload: typeof SessionBulkStopPayload.Type
+    }) {
+      return yield* SessionBulk.stop(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkArchive = Effect.fn("ExperimentalHttpApi.sessionBulkArchive")(function* (ctx: {
+      payload: typeof SessionBulkArchivePayload.Type
+    }) {
+      const run = ctx.payload.stop
+        ? SessionBulk.stopAndArchive(ctx.payload)
+        : SessionBulk.archive({ sessionIDs: ctx.payload.sessionIDs })
+      return yield* run.pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkUnarchive = Effect.fn("ExperimentalHttpApi.sessionBulkUnarchive")(function* (ctx: {
+      payload: typeof SessionBulkPayload.Type
+    }) {
+      return yield* SessionBulk.unarchive(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkDelete = Effect.fn("ExperimentalHttpApi.sessionBulkDelete")(function* (ctx: {
+      payload: typeof SessionBulkPayload.Type
+    }) {
+      return yield* SessionBulk.removeArchived(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
     })
 
     const sessionGroupList = Effect.fn("ExperimentalHttpApi.sessionGroupList")(function* () {
@@ -328,6 +363,43 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
           }),
         ),
       )
+    })
+
+    // XCOD-254: /models and its choice in a Claude Code / Codex session.
+    const externalMarker = Effect.fn("ExperimentalHttpApi.externalMarker")(function* (sessionID: string) {
+      const info = yield* sessions
+        .get(SessionID.make(sessionID))
+        .pipe(Effect.catch(() => Effect.fail(notFound(`Session ${sessionID} not found`))))
+      const marker = ExternalSession.of(info)
+      if (!marker) return yield* Effect.fail(new InvalidRequestError({ message: "Not a Claude Code or Codex session" }))
+      return marker
+    })
+
+    const externalModels = Effect.fn("ExperimentalHttpApi.externalModels")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      const marker = yield* externalMarker(ctx.params.sessionID)
+      const cfg = yield* config.get()
+      const instance = yield* InstanceState.context
+      const listed = yield* Effect.promise(() => ExternalSession.models(marker.tool, cfg, instance.directory))
+      return {
+        tool: marker.tool,
+        label: ExternalSession.label(marker.tool),
+        ...(marker.model ? { current: marker.model } : {}),
+        ...listed,
+      }
+    })
+
+    const externalModel = Effect.fn("ExperimentalHttpApi.externalModel")(function* (ctx: {
+      params: { sessionID: string }
+      payload: { model?: string }
+    }) {
+      yield* externalMarker(ctx.params.sessionID)
+      const model = ctx.payload.model?.trim() || undefined
+      const invalid = model ? ExternalSession.invalidModel(model) : undefined
+      if (invalid) return yield* Effect.fail(new InvalidRequestError({ message: invalid }))
+      yield* ExternalSession.setModel(sessions, SessionID.make(ctx.params.sessionID), model)
+      return true
     })
 
     // XCOD-234: sessions another Lunos process runs; that process does the work (and the audit).
@@ -451,6 +523,10 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("artifacts", artifacts)
       .handle("backgroundJobCancel", backgroundJobCancel)
       .handle("sessionOverview", sessionOverview)
+      .handle("sessionBulkStop", sessionBulkStop)
+      .handle("sessionBulkArchive", sessionBulkArchive)
+      .handle("sessionBulkUnarchive", sessionBulkUnarchive)
+      .handle("sessionBulkDelete", sessionBulkDelete)
       .handle("sessionGroupList", sessionGroupList)
       .handle("sessionGroupCreate", sessionGroupCreate)
       .handle("sessionGroupUpdate", sessionGroupUpdate)
@@ -458,6 +534,8 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionGroupMove", sessionGroupMove)
       .handle("externalStop", externalStop)
       .handle("externalTools", externalTools)
+      .handle("externalModels", externalModels)
+      .handle("externalModel", externalModel)
       .handle("peerStop", peerStop)
       .handle("peerAsks", peerAsks)
       .handle("peerPermissionReply", peerPermissionReply)

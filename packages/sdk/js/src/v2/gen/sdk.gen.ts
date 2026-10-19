@@ -56,6 +56,10 @@ import type {
   ExperimentalConsoleSwitchOrgResponses,
   ExperimentalControlPlaneMoveSessionErrors,
   ExperimentalControlPlaneMoveSessionResponses,
+  ExperimentalExternalModelErrors,
+  ExperimentalExternalModelResponses,
+  ExperimentalExternalModelsErrors,
+  ExperimentalExternalModelsResponses,
   ExperimentalExternalStopErrors,
   ExperimentalExternalStopResponses,
   ExperimentalExternalToolsErrors,
@@ -78,6 +82,14 @@ import type {
   ExperimentalResourceListResponses,
   ExperimentalSessionBackgroundErrors,
   ExperimentalSessionBackgroundResponses,
+  ExperimentalSessionBulkArchiveErrors,
+  ExperimentalSessionBulkArchiveResponses,
+  ExperimentalSessionBulkDeleteErrors,
+  ExperimentalSessionBulkDeleteResponses,
+  ExperimentalSessionBulkStopErrors,
+  ExperimentalSessionBulkStopResponses,
+  ExperimentalSessionBulkUnarchiveErrors,
+  ExperimentalSessionBulkUnarchiveResponses,
   ExperimentalSessionEnqueueErrors,
   ExperimentalSessionEnqueueResponses,
   ExperimentalSessionGroupCreateErrors,
@@ -186,7 +198,20 @@ import type {
   MemorySetupBackendResponses,
   MemorySetupCheckErrors,
   MemorySetupCheckResponses,
+  MemorySetupEnvironmentErrors,
+  MemorySetupEnvironmentResponses,
   MemorySetupInput,
+  MemorySetupMoveErrors,
+  MemorySetupMoveResponses,
+  MemorySetupTemplateApplyErrors,
+  MemorySetupTemplateApplyResponses,
+  MemorySetupTemplateInput,
+  MemorySetupTemplatePreviewErrors,
+  MemorySetupTemplatePreviewResponses,
+  MemorySetupTemplateStartErrors,
+  MemorySetupTemplateStartResponses,
+  MemorySetupTestErrors,
+  MemorySetupTestResponses,
   MemoryStatsErrors,
   MemoryStatsResponses,
   ModelRef,
@@ -973,12 +998,13 @@ export class Session extends HeyApiClient {
   /**
    * Sessions overview
    *
-   * Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups.
+   * Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups. Archived sessions are left out; with archived=true only they are listed, however old.
    */
   public overview<ThrowOnError extends boolean = false>(
     parameters?: {
       directory?: string
       workspace?: string
+      archived?: boolean | "true" | "false"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -989,6 +1015,7 @@ export class Session extends HeyApiClient {
           args: [
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "query", key: "archived" },
           ],
         },
       ],
@@ -1167,6 +1194,178 @@ export class Background extends HeyApiClient {
       url: "/experimental/background/{jobID}/cancel",
       ...options,
       ...params,
+    })
+  }
+}
+
+export class SessionBulk extends HeyApiClient {
+  /**
+   * Stop sessions
+   *
+   * Stop several sessions at once: Lunos sessions here or in another Lunos on this machine, and Claude Code / Codex sessions. Pending approvals are rejected with the reason first. Audited as session.stop.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      reason?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "reason" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkStopResponses,
+      ExperimentalSessionBulkStopErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/stop",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Archive sessions
+   *
+   * Hide sessions from every list without deleting anything. Running and waiting sessions are skipped unless stop is set, which stops them first. Audited as session.archive.
+   */
+  public archive<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      stop?: boolean
+      reason?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "stop" },
+            { in: "body", key: "reason" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkArchiveResponses,
+      ExperimentalSessionBulkArchiveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/archive",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Unarchive sessions
+   *
+   * Put archived sessions back in the lists. Audited as session.archive (unarchive).
+   */
+  public unarchive<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkUnarchiveResponses,
+      ExperimentalSessionBulkUnarchiveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/unarchive",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete archived sessions
+   *
+   * Delete archived sessions and their history for good. Sessions that aren't archived are skipped. Audited as session.delete.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkDeleteResponses,
+      ExperimentalSessionBulkDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/delete",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }
@@ -1444,6 +1643,85 @@ export class External extends HeyApiClient {
       url: "/experimental/external/{sessionID}/stop",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * External session models
+   *
+   * The models Claude Code or Codex offers for an external session, asked from the tool without a prompt (no model is called), and the one chosen for the session.
+   */
+  public models<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalExternalModelsResponses,
+      ExperimentalExternalModelsErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/models",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Choose an external session's model
+   *
+   * Save the model Claude Code or Codex uses in an external session from its next turn on (resumes included). Omit it to go back to the tool's default.
+   */
+  public model<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      model?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "model" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalModelResponses,
+      ExperimentalExternalModelErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/model",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }
@@ -2080,6 +2358,11 @@ export class Experimental extends HeyApiClient {
   private _background?: Background
   get background(): Background {
     return (this._background ??= new Background({ client: this.client }))
+  }
+
+  private _sessionBulk?: SessionBulk
+  get sessionBulk(): SessionBulk {
+    return (this._sessionBulk ??= new SessionBulk({ client: this.client }))
   }
 
   private _sessionGroup?: SessionGroup
@@ -4227,6 +4510,237 @@ export class Setup extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<MemorySetupBackendResponses, MemorySetupBackendErrors, ThrowOnError>({
       url: "/memory/setup/backend",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Memory storage facts
+   *
+   * What the storage step shows about this machine: the memory paths, the model that extracts facts and its region, whether Docker or Podman is installed, local model providers, and the memory templates to offer (built-in and from managed config).
+   */
+  public environment<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      MemorySetupEnvironmentResponses,
+      MemorySetupEnvironmentErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/environment",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Test a memory database connection
+   *
+   * Run the checks Lunos makes before connecting, then connect, write, read and delete a probe in a namespace of its own. Never touches stored facts.
+   */
+  public test<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupTestResponses, MemorySetupTestErrors, ThrowOnError>({
+      url: "/memory/setup/test",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview a memory template
+   *
+   * Everything a memory template would write, in full, without writing it. A generated password is shown masked.
+   */
+  public templatePreview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplatePreviewResponses,
+      MemorySetupTemplatePreviewErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/preview",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Write a memory template's files
+   *
+   * Write a Docker template's compose file, .env (0600, holding the generated password) and .env.example. An existing file is replaced only when named in overwrite. Starts nothing.
+   */
+  public templateApply<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplateApplyResponses,
+      MemorySetupTemplateApplyErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/apply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Start a memory template's database
+   *
+   * Run docker compose up -d for a written Docker template, then wait up to two minutes for its healthcheck. Call only after the user confirmed the command.
+   */
+  public templateStart<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplateStartResponses,
+      MemorySetupTemplateStartErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/start",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Move facts to new memory storage
+   *
+   * Switching storage, "Move my facts": export every fact from the storage in use now and import it into the proposed one, keeping each fact's provenance. The old copy is left as it is.
+   */
+  public move<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupMoveResponses, MemorySetupMoveErrors, ThrowOnError>({
+      url: "/memory/setup/move",
       ...options,
       ...params,
       headers: {

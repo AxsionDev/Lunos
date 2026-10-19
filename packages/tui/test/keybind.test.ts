@@ -50,3 +50,56 @@ test("agent_monitor's default collides with no other default keybind", () => {
   expect(clashes).toEqual([])
   expect(TuiKeybind.CommandMap.agent_monitor).toBe("agent.monitor")
 })
+
+// XCOD-265: what is live while /sessions is open: its own actions, the list's keys and the leader.
+// Stop all and Clear ship unbound (ctrl+x is the leader); whatever defaults they get later, none
+// may shadow another key in that view.
+test("no default in the Sessions view collides with another of its keys or with the leader", () => {
+  const names = (Object.keys(TuiKeybind.Definitions) as (keyof typeof TuiKeybind.Definitions)[]).filter(
+    (name) => name.startsWith("dialog.sessions.") || name.startsWith("dialog.select."),
+  )
+  const keys = names.flatMap((name) => {
+    const value = TuiKeybind.defaultValue(name)
+    if (!value || value === "none") return []
+    return String(value)
+      .split(",")
+      .map((key) => ({ name, key: key.trim() }))
+  })
+  for (const { name, key } of keys) {
+    if (!name.startsWith("dialog.sessions.")) continue
+    // Tab / Shift+Tab move through the view's actions and Esc closes it (DialogSelect's own keys).
+    const reserved = [TuiKeybind.LeaderDefault, "tab", "shift+tab", "escape"]
+    expect({ name, key: reserved.includes(key) || key.startsWith("<leader>") }).toEqual({ name, key: false })
+    const others = keys.filter((other) => other.key === key && other.name !== name).map((other) => other.name)
+    expect({ name, key, others }).toEqual({ name, key, others: [] })
+  }
+  expect(TuiKeybind.defaultValue("dialog.sessions.stop_all")).toBe("none")
+  expect(TuiKeybind.defaultValue("dialog.sessions.clear")).toBe("none")
+})
+
+// XCOD-262 + XCOD-265: the Agent Monitor's own keys are live together while its rail is focused, and
+// Stop all / Clear ship unbound in both views. None may shadow another monitor key or the leader.
+test("the Agent Monitor's keys collide with neither each other, the leader nor XCOD-265's actions", () => {
+  const names = (Object.keys(TuiKeybind.Definitions) as (keyof typeof TuiKeybind.Definitions)[]).filter(
+    (name) => name.startsWith("monitor.") || name.startsWith("dialog.sessions."),
+  )
+  const keys = names.flatMap((name) => {
+    const value = TuiKeybind.defaultValue(name)
+    if (!value || value === "none") return []
+    return String(value)
+      .split(",")
+      .map((key) => ({ name, key: key.trim() }))
+  })
+  for (const { name, key } of keys.filter((entry) => entry.name.startsWith("monitor."))) {
+    expect({ name, key: key === TuiKeybind.LeaderDefault || key.startsWith("<leader>") }).toEqual({ name, key: false })
+    const others = keys.filter((other) => other.key === key && other.name !== name).map((other) => other.name)
+    expect({ name, key, others }).toEqual({ name, key, others: [] })
+  }
+  for (const name of [
+    "monitor.stop_all",
+    "monitor.clear",
+    "dialog.sessions.stop_all",
+    "dialog.sessions.clear",
+  ] as const)
+    expect(TuiKeybind.defaultValue(name)).toBe("none")
+})

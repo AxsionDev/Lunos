@@ -86,6 +86,11 @@ export const EVENTS = [
   "cloud.dispatch",
   "cloud.finish",
   "cloud.denied",
+  // XCOD-265: sessions stopped, archived (cleared from the lists) or restored, or archived sessions
+  // deleted for good, many at once (origin "bulk"): count and session ids. Never titles or content.
+  "session.stop",
+  "session.archive",
+  "session.delete",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

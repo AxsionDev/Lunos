@@ -2,13 +2,14 @@
 // shared with the desktop/web Sessions window through the same server API.
 import { TextAttributes } from "@opentui/core"
 import type { SessionGroup, SessionOverviewItem } from "@opencode-ai/sdk/v2"
-import { batch, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { useDialog } from "../ui/dialog"
 import { DialogSelect, type DialogSelectOption, type DialogSelectRef } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { useRoute } from "../context/route"
 import { useSDK } from "../context/sdk"
+import { useProject } from "../context/project"
 import { useEvent } from "../context/event"
 import { useTheme } from "../context/theme"
 import { useToast } from "../ui/toast"
@@ -22,14 +23,22 @@ import {
   STATE_GLYPH,
   ago,
   build,
+  clearPlan,
+  clearQuestion,
   groupKey,
+  inView,
   kindLabel,
   money,
   nextStateFilter,
   projectName,
   stateLabel,
+  stopAndClearQuestion,
+  stopPlan,
+  stopQuestion,
+  stopSummary,
   stoppable,
   toolOnly,
+  topLevel,
   waiting,
   type Line,
   type StateFilter,
@@ -57,6 +66,12 @@ const REFRESH_ON = new Set([
 // Kept across re-opening the view (a rename or "move to group" prompt replaces it for a moment).
 const [stateFilter, setStateFilter] = createSignal<StateFilter>("all")
 const [ungroupedCollapsed, setUngroupedCollapsed] = createSignal(false)
+// XCOD-265: the last Clear, for Undo, and the rows Stop all couldn't stop (with why). Kept here, not in
+// the view, because every confirmation replaces the view and re-creates it.
+const [lastClear, setLastClear] = createSignal<{ ids: string[]; at: number }>()
+const [failedStops, setFailedStops] = createSignal<Record<string, string>>({})
+/** How long Undo stays offered after a Clear. */
+const UNDO_MS = 2 * 60 * 1000
 
 export function DialogSessions(props: { select?: string }) {
   const dialog = useDialog()
@@ -76,6 +91,8 @@ export function DialogSessions(props: { select?: string }) {
           : undefined
   const startExternal = useStartExternal()
   const deleteHint = useCommandShortcut("dialog.sessions.group.delete")
+  const project = useProject()
+  const archivedView = () => stateFilter() === "archived"
 
   const [data, setData] = createStore({
     groups: [] as SessionGroup[],
@@ -98,7 +115,9 @@ export function DialogSessions(props: { select?: string }) {
     }
     inflight = true
     try {
-      const result = await sdk.client.experimental.session.overview(undefined, { throwOnError: true })
+      const result = await sdk.client.experimental.session.overview(archivedView() ? { archived: true } : undefined, {
+        throwOnError: true,
+      })
       batch(() => {
         setData("groups", reconcile(result.data.groups, { key: "id" }))
         setData("sessions", reconcile(result.data.sessions, { key: "id" }))
@@ -130,6 +149,8 @@ export function DialogSessions(props: { select?: string }) {
     dialog.setSize("xlarge")
     void load()
   })
+  // XCOD-265: Show archived reads a different list.
+  createEffect(on(archivedView, () => void load(), { defer: true }))
   // Groups changed in the desktop app, the web UI or another TUI arrive as session.group.updated.
   onCleanup(event.subscribe((item) => REFRESH_ON.has(item.type) && refresh()))
   // Cost and "last activity" move without events from other processes; a slow poll keeps them honest.
@@ -214,7 +235,8 @@ export function DialogSessions(props: { select?: string }) {
           titleWidth: 40,
           description: [projectName(item), kind].filter(Boolean).join(" · "),
           footer: [
-            stateLabel(item),
+            failedStops()[item.id] && stoppable(item) ? `couldn't stop: ${failedStops()[item.id]}` : undefined,
+            item.archived ? `archived ${ago(item.archived, now())}` : stateLabel(item),
             item.agent,
             item.model ? Locale.truncateMiddle(item.model, 24) : undefined,
             ago(item.updated, now()),
@@ -412,10 +434,177 @@ export function DialogSessions(props: { select?: string }) {
     refresh()
   }
 
+  /** XCOD-265: the rows Stop all and Clear list act on (state filter and search; collapsed groups count). */
+  const viewItems = () =>
+    inView({ groups: data.groups, sessions: data.sessions, search: search(), state: stateFilter() })
+
+  /** Asks once; the first option is the default and Esc cancels. */
+  function confirm<T extends string>(message: string, options: { value: T; title: string }[]) {
+    return new Promise<T | undefined>((resolve) =>
+      dialog.replace(
+        () => (
+          <DialogSelect<T | "cancel">
+            title={message}
+            titleView={
+              <box flexShrink={1} paddingRight={2}>
+                <text fg={theme.text} wrapMode="word">
+                  {message}
+                </text>
+              </box>
+            }
+            renderFilter={false}
+            options={[...options, { value: "cancel" as const, title: "Cancel" }]}
+            onSelect={(option) => resolve(option.value === "cancel" ? undefined : (option.value as T))}
+          />
+        ),
+        () => resolve(undefined),
+      ),
+    )
+  }
+
+  async function stopAll() {
+    const plan = stopPlan(viewItems())
+    if (plan.targets.length === 0)
+      return toast.show({ variant: "info", message: "Nothing in this view is running or waiting." })
+    const here = (item: SessionOverviewItem) => !!item.project && item.project.id === project.project()
+    const local = plan.targets.filter(here)
+    const choice = await confirm(stopQuestion(plan), [
+      { value: "all", title: `Stop ${plan.targets.length}` },
+      // XCOD-265: the view spans several projects; this Lunos's project alone is offered too.
+      ...(plan.projects.length > 1 && local.length > 0
+        ? [{ value: "project" as const, title: `Stop all in this project only (${local.length})` }]
+        : []),
+    ])
+    if (!choice) return reopen()
+    const targets = choice === "project" ? local : plan.targets
+    setFailedStops({})
+    const result = await sdk.client.experimental.sessionBulk
+      .stop({ sessionIDs: targets.map((item) => item.id) }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result) {
+      setFailedStops(Object.fromEntries(result.failed.map((item) => [item.id, item.reason])))
+      toast.show({ variant: result.failed.length ? "warning" : "success", message: stopSummary(result) })
+    }
+    reopen()
+  }
+
+  function cleared(ids: string[], prefix = "") {
+    setLastClear({ ids, at: Date.now() })
+    toast.show({
+      variant: "success",
+      message: `${prefix}Cleared ${ids.length} from the list · "undo" brings ${ids.length === 1 ? "it" : "them"} back`,
+      duration: 8000,
+    })
+  }
+
+  async function clearList() {
+    const plan = clearPlan(viewItems())
+    const running = stopPlan(plan.staying).targets.length
+    if (plan.targets.length === 0 && running === 0)
+      return toast.show({ variant: "info", message: "Nothing in this view to clear." })
+    const choice =
+      plan.targets.length === 0
+        ? await confirm(clearQuestion(plan), [{ value: "stop" as const, title: "Stop all & clear" }])
+        : await confirm(clearQuestion(plan), [
+            { value: "clear" as const, title: `Clear ${plan.targets.length}` },
+            ...(running ? [{ value: "stop" as const, title: "Stop all & clear" }] : []),
+          ])
+    if (!choice) return reopen()
+    if (choice === "stop") return stopAllAndClear(true)
+    const result = await sdk.client.experimental.sessionBulk
+      .archive({ sessionIDs: plan.targets.map((item) => item.id) }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result) cleared(result.archived)
+    reopen()
+  }
+
+  async function stopAllAndClear(confirmed = false) {
+    const items = viewItems()
+    const stop = stopPlan(items).targets
+    const clear = clearPlan(items).targets
+    if (stop.length + clear.length === 0)
+      return toast.show({ variant: "info", message: "Nothing in this view to stop or clear." })
+    if (!confirmed) {
+      const choice = await confirm(stopAndClearQuestion(items), [
+        { value: "go" as const, title: `Stop ${stop.length} and clear ${stop.length + clear.length}` },
+      ])
+      if (!choice) return reopen()
+    }
+    setFailedStops({})
+    const result = await sdk.client.experimental.sessionBulk
+      .archive({ sessionIDs: [...stop, ...clear].map((item) => item.id), stop: true }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result) {
+      const failed = result.failed ?? []
+      setFailedStops(Object.fromEntries(failed.map((item) => [item.id, item.reason])))
+      cleared(result.archived, `${stopSummary({ stopped: result.stopped ?? [], failed })} · `)
+    }
+    reopen()
+  }
+
+  const undoable = () => {
+    const last = lastClear()
+    return !!last && last.ids.length > 0 && Date.now() - last.at < UNDO_MS
+  }
+
+  async function undo() {
+    const last = lastClear()
+    if (!last) return
+    setLastClear(undefined)
+    const result = await sdk.client.experimental.sessionBulk
+      .unarchive({ sessionIDs: last.ids }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result) toast.show({ variant: "success", message: `Brought back ${result.archived.length}` })
+    refresh()
+  }
+
+  async function unarchive(item: SessionOverviewItem) {
+    const result = await sdk.client.experimental.sessionBulk
+      .unarchive({ sessionIDs: [item.id] }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result?.archived.length)
+      toast.show({ variant: "success", message: `"${Locale.truncate(item.title, 40)}" is back in the list` })
+    refresh()
+  }
+
+  /** XCOD-265: permanent, so the count is typed back, as Forget all in the memory browser. */
+  async function deleteArchived() {
+    const items = topLevel(viewItems().filter((item) => !!item.archived))
+    if (items.length === 0) return toast.show({ variant: "info", message: "No archived sessions in this view." })
+    const projects = [...new Set(items.map((item) => projectName(item)))].join(", ")
+    const count = items.length
+    const typed = await DialogPrompt.show(dialog, `Delete ${count} archived ${count === 1 ? "session" : "sessions"}?`, {
+      placeholder: `type ${count} to confirm`,
+      description: () => (
+        <text fg={theme.textMuted} wrapMode="word">
+          Their history is deleted for good; this can't be undone. Projects: {projects}
+        </text>
+      ),
+    })
+    if (typed?.trim() !== String(count)) {
+      if (typed !== null) toast.show({ variant: "warning", message: "Nothing was deleted: the count didn't match." })
+      return reopen()
+    }
+    const result = await sdk.client.experimental.sessionBulk
+      .delete({ sessionIDs: items.map((item) => item.id) }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result) {
+      const skipped = result.skipped.length ? ` · ${result.skipped.length} skipped` : ""
+      toast.show({ variant: "success", message: `Deleted ${result.deleted.length} for good${skipped}` })
+    }
+    reopen()
+  }
+
   const waitingCount = createMemo(() => waiting(data.sessions))
   const titleView = (
     <text fg={theme.text} attributes={TextAttributes.BOLD}>
-      Sessions — all projects
+      {archivedView() ? "Archived sessions — all projects" : "Sessions — all projects"}
       <span style={{ fg: theme.textMuted }}>
         {" · "}
         {data.sessions.length} {data.sessions.length === 1 ? "session" : "sessions"}
@@ -451,9 +640,11 @@ export function DialogSessions(props: { select?: string }) {
               ? `Couldn't load sessions: ${error()}`
               : !data.loaded
                 ? "Loading sessions…"
-                : search() || stateFilter() !== "all"
+                : search() || (stateFilter() !== "all" && !archivedView())
                   ? "No sessions match"
-                  : "No sessions yet"}
+                  : archivedView()
+                    ? "No archived sessions"
+                    : "No sessions yet"}
           </text>
         </box>
       }
@@ -467,6 +658,7 @@ export function DialogSessions(props: { select?: string }) {
       actions={[
         {
           command: "dialog.sessions.move",
+          hidden: archivedView(),
           title: "move",
           disabled: (option) => !sessionOf(option),
           onTrigger: (option) => {
@@ -476,12 +668,14 @@ export function DialogSessions(props: { select?: string }) {
         },
         {
           command: "dialog.sessions.group.new",
+          hidden: archivedView(),
           title: "new group",
           withoutSelection: true,
           onTrigger: (option) => void createGroup(option?.value),
         },
         {
           command: "dialog.sessions.rename",
+          hidden: archivedView(),
           title: "rename",
           disabled: (option) => {
             const entry = line(option)
@@ -492,12 +686,14 @@ export function DialogSessions(props: { select?: string }) {
         },
         {
           command: "dialog.sessions.group.delete",
+          hidden: archivedView(),
           title: "delete",
           disabled: (option) => !groupOf(option)?.group,
           onTrigger: (option) => void removeGroup(option),
         },
         {
           command: "dialog.sessions.stop",
+          hidden: archivedView(),
           title: "stop",
           disabled: (option) => {
             const item = sessionOf(option)
@@ -513,6 +709,65 @@ export function DialogSessions(props: { select?: string }) {
           title: "state",
           withoutSelection: true,
           onTrigger: () => setStateFilter((value) => nextStateFilter(value)),
+        },
+        // XCOD-265: unbound by default, so `menu` keeps them in the footer and the Tab menu.
+        {
+          command: "dialog.sessions.stop_all",
+          title: "stop all",
+          menu: true,
+          hidden: archivedView(),
+          withoutSelection: true,
+          onTrigger: () => void stopAll(),
+        },
+        {
+          command: "dialog.sessions.clear",
+          title: "clear list",
+          menu: true,
+          hidden: archivedView(),
+          withoutSelection: true,
+          onTrigger: () => void clearList(),
+        },
+        {
+          command: "dialog.sessions.stop_all_clear",
+          title: "stop all & clear",
+          menu: true,
+          hidden: archivedView(),
+          withoutSelection: true,
+          onTrigger: () => void stopAllAndClear(),
+        },
+        {
+          command: "dialog.sessions.undo",
+          title: "undo",
+          menu: true,
+          hidden: archivedView() || !undoable(),
+          withoutSelection: true,
+          onTrigger: () => void undo(),
+        },
+        {
+          command: "dialog.sessions.unarchive",
+          title: "unarchive",
+          menu: true,
+          hidden: !archivedView(),
+          disabled: (option) => !sessionOf(option)?.archived,
+          onTrigger: (option) => {
+            const item = sessionOf(option)
+            if (item) void unarchive(item)
+          },
+        },
+        {
+          command: "dialog.sessions.delete_archived",
+          title: "delete archived",
+          menu: true,
+          hidden: !archivedView(),
+          withoutSelection: true,
+          onTrigger: () => void deleteArchived(),
+        },
+        {
+          command: "dialog.sessions.archived",
+          title: archivedView() ? "back to list" : "show archived",
+          menu: true,
+          withoutSelection: true,
+          onTrigger: () => setStateFilter(archivedView() ? "all" : "archived"),
         },
       ]}
     />

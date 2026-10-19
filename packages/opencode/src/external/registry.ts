@@ -22,6 +22,8 @@ export interface Entry {
   pid?: number
   costUSD?: number
   turns?: number
+  /** XCOD-265: when it was cleared from /sessions (hidden, restorable). */
+  archived?: string
 }
 
 const dir = () => path.join(Global.Path.data, "external")
@@ -71,4 +73,18 @@ export async function stop(id: string) {
   process.kill(entry.pid!, "SIGINT")
   await save({ ...entry, status: "stopped", updated: new Date().toISOString() })
   return { ok: true as const }
+}
+
+/** XCOD-265: hides (time) or restores (undefined) an entry in /sessions. False when there is none. */
+export async function setArchived(id: string, time: Date | undefined) {
+  const entry = await get(id)
+  if (!entry) return false
+  const { archived: _, ...rest } = entry
+  await save(time ? { ...rest, archived: time.toISOString() } : rest)
+  return true
+}
+
+/** XCOD-265: forgets an entry. The tool's own transcript (e.g. under ~/.claude) is left alone. */
+export async function remove(id: string) {
+  await fs.rm(file(id), { force: true })
 }

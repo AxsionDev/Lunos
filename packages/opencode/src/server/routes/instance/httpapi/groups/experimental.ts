@@ -139,6 +139,31 @@ export const ExternalToolStatus = Schema.Struct({
   permissionModes: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
 }).annotate({ identifier: "ExternalToolStatus" })
 
+// XCOD-254: /models in a Claude Code or Codex session lists the tool's models.
+export const ExternalModel = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  default: Schema.optional(Schema.Boolean),
+}).annotate({ identifier: "ExternalModel" })
+
+export const ExternalModels = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  label: Schema.String,
+  /** The model chosen for this session, if one was. */
+  current: Schema.optional(Schema.String),
+  models: Schema.mutable(Schema.Array(ExternalModel)),
+  /** The tool didn't list its models; these are its aliases. */
+  fallback: Schema.Boolean,
+  /** Why the tool's models can't be listed (not installed, refused by policy, no answer). */
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "ExternalModels" })
+
+export const ExternalModelPayload = Schema.Struct({
+  /** Omitted goes back to the tool's default. */
+  model: Schema.optional(Schema.String),
+})
+
 // XCOD-205: one row of the Sessions window.
 export const SessionOverviewItem = Schema.Struct({
   id: Schema.String,
@@ -160,7 +185,14 @@ export const SessionOverviewItem = Schema.Struct({
   questions: NonNegativeInt,
   queued: Schema.optional(NonNegativeInt),
   groupID: Schema.optional(Schema.String),
+  archived: Schema.optional(Schema.Finite),
 }).annotate({ identifier: "SessionOverviewItem" })
+
+// XCOD-265: "Show archived" lists only the sessions cleared from the list.
+export const SessionOverviewQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  archived: Schema.optional(QueryBoolean),
+})
 
 export const SessionOverviewResponse = Schema.Struct({
   groups: Schema.mutable(Schema.Array(SessionGroupInfo)),
@@ -185,6 +217,39 @@ export const SessionGroupMovePayload = Schema.Struct({
   groupID: Schema.optional(Schema.String),
 })
 
+// XCOD-265: Stop all, Clear list (archive), Unarchive and Delete archived.
+export const SessionBulkPayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+})
+export const SessionBulkStopPayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** What the sessions' pending approvals are rejected with. Defaults to "Stopped from /sessions". */
+  reason: Schema.optional(Schema.String),
+})
+export const SessionBulkArchivePayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** "Stop all & clear": stop the running and waiting ones first, then archive everything stopped. */
+  stop: Schema.optional(Schema.Boolean),
+  reason: Schema.optional(Schema.String),
+})
+const SessionBulkFailure = Schema.Struct({ id: Schema.String, reason: Schema.String }).annotate({
+  identifier: "SessionBulkFailure",
+})
+export const SessionBulkStopResult = Schema.Struct({
+  stopped: Schema.mutable(Schema.Array(Schema.String)),
+  failed: Schema.mutable(Schema.Array(SessionBulkFailure)),
+}).annotate({ identifier: "SessionBulkStopResult" })
+export const SessionBulkArchiveResult = Schema.Struct({
+  archived: Schema.mutable(Schema.Array(Schema.String)),
+  skipped: Schema.mutable(Schema.Array(SessionBulkFailure)),
+  stopped: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  failed: Schema.optional(Schema.mutable(Schema.Array(SessionBulkFailure))),
+}).annotate({ identifier: "SessionBulkArchiveResult" })
+export const SessionBulkDeleteResult = Schema.Struct({
+  deleted: Schema.mutable(Schema.Array(Schema.String)),
+  skipped: Schema.mutable(Schema.Array(SessionBulkFailure)),
+}).annotate({ identifier: "SessionBulkDeleteResult" })
+
 export const ExperimentalPaths = {
   capabilities: "/experimental/capabilities",
   console: "/experimental/console",
@@ -204,8 +269,14 @@ export const ExperimentalPaths = {
   sessionGroups: "/experimental/session-group",
   sessionGroup: "/experimental/session-group/:groupID",
   sessionGroupMove: "/experimental/session-group/move",
+  sessionBulkStop: "/experimental/session-bulk/stop",
+  sessionBulkArchive: "/experimental/session-bulk/archive",
+  sessionBulkUnarchive: "/experimental/session-bulk/unarchive",
+  sessionBulkDelete: "/experimental/session-bulk/delete",
   externalStop: "/experimental/external/:sessionID/stop",
   externalTools: "/experimental/external/tools",
+  externalModels: "/experimental/external/:sessionID/models",
+  externalModel: "/experimental/external/:sessionID/model",
   peerStop: "/experimental/peer/:sessionID/stop",
   peerAsks: "/experimental/peer/:sessionID/asks",
   peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
@@ -417,14 +488,61 @@ export const ExperimentalApi = HttpApi.make("experimental")
           }),
         ),
         HttpApiEndpoint.get("sessionOverview", ExperimentalPaths.sessionOverview, {
-          query: WorkspaceRoutingQuery,
+          query: SessionOverviewQuery,
           success: described(SessionOverviewResponse, "Sessions on this machine, with their groups"),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "experimental.session.overview",
             summary: "Sessions overview",
             description:
-              "Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups.",
+              "Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups. Archived sessions are left out; with archived=true only they are listed, however old.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkStop", ExperimentalPaths.sessionBulkStop, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkStopPayload,
+          success: described(SessionBulkStopResult, "Which sessions stopped, and why the others didn't"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.stop",
+            summary: "Stop sessions",
+            description:
+              "Stop several sessions at once: Lunos sessions here or in another Lunos on this machine, and Claude Code / Codex sessions. Pending approvals are rejected with the reason first. Audited as session.stop.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkArchive", ExperimentalPaths.sessionBulkArchive, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkArchivePayload,
+          success: described(SessionBulkArchiveResult, "Which sessions were archived"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.archive",
+            summary: "Archive sessions",
+            description:
+              "Hide sessions from every list without deleting anything. Running and waiting sessions are skipped unless stop is set, which stops them first. Audited as session.archive.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkUnarchive", ExperimentalPaths.sessionBulkUnarchive, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkPayload,
+          success: described(SessionBulkArchiveResult, "Which sessions were restored"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.unarchive",
+            summary: "Unarchive sessions",
+            description: "Put archived sessions back in the lists. Audited as session.archive (unarchive).",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkDelete", ExperimentalPaths.sessionBulkDelete, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkPayload,
+          success: described(SessionBulkDeleteResult, "Which archived sessions were deleted"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.delete",
+            summary: "Delete archived sessions",
+            description:
+              "Delete archived sessions and their history for good. Sessions that aren't archived are skipped. Audited as session.delete.",
           }),
         ),
         HttpApiEndpoint.get("sessionGroupList", ExperimentalPaths.sessionGroups, {
@@ -509,6 +627,33 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Stop an external session",
             description:
               "Stop a running Claude Code or Codex session Lunos started (as lunos external stop), from any Lunos process on this machine.",
+          }),
+        ),
+        HttpApiEndpoint.get("externalModels", ExperimentalPaths.externalModels, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(ExternalModels, "The tool's models"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.models",
+            summary: "External session models",
+            description:
+              "The models Claude Code or Codex offers for an external session, asked from the tool without a prompt (no model is called), and the one chosen for the session.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalModel", ExperimentalPaths.externalModel, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ExternalModelPayload,
+          success: described(Schema.Boolean, "Model saved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.model",
+            summary: "Choose an external session's model",
+            description:
+              "Save the model Claude Code or Codex uses in an external session from its next turn on (resumes included). Omit it to go back to the tool's default.",
           }),
         ),
         HttpApiEndpoint.post("peerStop", ExperimentalPaths.peerStop, {

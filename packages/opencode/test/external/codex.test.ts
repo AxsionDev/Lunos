@@ -134,3 +134,34 @@ describe("ExternalCodex (XCOD-204)", () => {
     ).toThrow(/thread id/)
   })
 })
+
+describe("Codex's models (XCOD-254)", () => {
+  test("listed through model/list, every page, without starting a thread", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-codex-"))
+    process.env.FAKE_CODEX_LOG = path.join(dir, "host.log")
+    const models = await ExternalCodex.models({ executable: FAKE, cwd: dir })
+    delete process.env.FAKE_CODEX_LOG
+    expect(models).toEqual([
+      { id: "gpt-5.5", name: "GPT-5.5", description: "Latest frontier model", default: true },
+      { id: "gpt-5.5-mini", name: "GPT-5.5 mini", description: "Faster, cheaper" },
+    ])
+    const sent = (await fs.readFile(path.join(dir, "host.log"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    expect(sent.filter((m) => m.method === "model/list").map((m) => m.params)).toEqual([{}, { cursor: "page-2" }])
+    expect(sent.some((m) => m.method === "thread/start" || m.method === "turn/start")).toBe(false)
+    expect(await ExternalCodex.models({ executable: "/nonexistent/codex", cwd: dir })).toEqual([])
+  })
+
+  test("the chosen model goes on the thread, on resume too, and the turn's init names it", async () => {
+    const started = await run(async () => ({ allow: true }), { model: "gpt-5.5-mini" })
+    expect(started.sent.find((m) => m.method === "thread/start").params.model).toBe("gpt-5.5-mini")
+    expect(started.events[0]).toMatchObject({ type: "init", model: "gpt-5.5-mini" })
+    const resumed = await run(async () => ({ allow: true }), {
+      model: "gpt-5.5-mini",
+      resume: "01a116f2-5e88-79d3-afb9-db1da07c9fcd",
+    })
+    expect(resumed.sent.find((m) => m.method === "thread/resume").params.model).toBe("gpt-5.5-mini")
+  })
+})

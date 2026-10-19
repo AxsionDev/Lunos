@@ -1,3 +1,4 @@
+import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import type { SettingRow } from "@opencode-ai/sdk/v2"
 
 // XCOD-259: /settings opens on a list of sections, each a window of its own with sub-tabs where it
@@ -93,7 +94,11 @@ export function summary(category: string, rows: readonly Pick<SettingRow, "key" 
               value("share") ? `share ${value("share")}` : undefined,
             ]
           : category === "Memory"
-            ? [value("memory.enabled") === "true" ? "on" : "off", set("memory.backend.type")]
+            ? [
+                value("memory.enabled") === "true" ? "on" : "off",
+                // XCOD-264: plain words, never the config value "embedded".
+                set("memory.backend.type") ? MemoryStorage.short({ type: set("memory.backend.type") }) : undefined,
+              ]
             : category === "Marketplace & plugins"
               ? [
                   set("marketplace") ? "marketplaces added" : "built-in marketplace",

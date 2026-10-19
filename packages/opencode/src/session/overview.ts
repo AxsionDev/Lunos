@@ -47,6 +47,8 @@ export interface Item {
   /** XCOD-262: prompts the process that runs it holds until its turn ends. */
   queued?: number
   groupID?: string
+  /** XCOD-265: when it was cleared from the list. Only archived listings (`archived: true`) have these. */
+  archived?: number
 }
 
 export interface Overview {
@@ -135,18 +137,26 @@ const lastMessages = Effect.fn("SessionOverview.lastMessages")(function* (ids: s
   return result
 })
 
-export const build = Effect.fn("SessionOverview.build")(function* (input?: { now?: number }) {
+/**
+ * XCOD-265: `archived` lists only the sessions cleared from the list ("Show archived"), however old;
+ * otherwise archived sessions are left out. This is the one place every surface (TUI /sessions, the
+ * desktop/web Sessions window, the Agent Monitor) gets that rule from.
+ */
+export const build = Effect.fn("SessionOverview.build")(function* (input?: { now?: number; archived?: boolean }) {
   const now = input?.now ?? Date.now()
+  const archived = input?.archived === true
   const sessions = yield* Session.Service
   const groups = yield* Effect.promise(() => SessionGroups.read())
 
-  const recent = yield* sessions.listGlobal({ start: now - WINDOW, limit: LIMIT })
+  const recent = yield* sessions.listGlobal(
+    archived ? { archived: "only", limit: LIMIT } : { start: now - WINDOW, limit: LIMIT },
+  )
   const seen = new Set(recent.map((item) => item.id))
   // XCOD-234: other Lunos processes' running and waiting sessions, listed however old they are.
   const peers = SessionPeers.read({ now })
   const livePeers = [...peers].filter(([, peer]) => peer.fresh).map(([id]) => id)
   const older = yield* Effect.forEach(
-    [...new Set([...SessionLive.active(), ...livePeers])].filter((id) => !seen.has(id as SessionID)),
+    (archived ? [] : [...new Set([...SessionLive.active(), ...livePeers])]).filter((id) => !seen.has(id as SessionID)),
     (id) =>
       sessions.get(id as SessionID).pipe(
         Effect.map((info) => ({ ...info, project: null }) as Session.GlobalInfo),
@@ -193,6 +203,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       questions: activity.questions,
       ...(activity.queued ? { queued: activity.queued } : {}),
       ...(group ? { groupID: group } : {}),
+      ...(session.time.archived ? { archived: session.time.archived } : {}),
     }
   })
 
@@ -200,7 +211,8 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
   const external = yield* Effect.promise(() => ExternalRegistry.list().catch(() => [] as ExternalRegistry.Entry[]))
   for (const entry of external) {
     const updated = Date.parse(entry.updated) || 0
-    if (entry.status !== "running" && now - updated > WINDOW) continue
+    if (archived !== !!entry.archived) continue
+    if (!archived && entry.status !== "running" && now - updated > WINDOW) continue
     if (linked.has(entry.sessionID)) continue
     const id = `external:${entry.sessionID}`
     const group = groups.assignments[id]
@@ -224,6 +236,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       permissions: 0,
       questions: 0,
       ...(group ? { groupID: group } : {}),
+      ...(entry.archived ? { archived: Date.parse(entry.archived) || updated } : {}),
     })
   }
 

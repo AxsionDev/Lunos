@@ -20,7 +20,8 @@ import { ExternalDetect } from "./detect"
 import { ExternalPolicy } from "./policy"
 import { ExternalRegistry } from "./registry"
 import { ExternalRun } from "./run"
-import type { ExternalClaude } from "./claude"
+import { ExternalClaude } from "./claude"
+import { ExternalCodex } from "./codex"
 
 /**
  * XCOD-218: a Lunos session whose replies come from the user's own Claude Code or Codex CLI
@@ -39,6 +40,8 @@ export interface Marker {
   session?: string
   /** The tool's own slash commands, as it reported them on its last start. */
   commands?: string[]
+  /** XCOD-254: the tool's model chosen with /models, passed on every turn; unset uses the tool's default. */
+  model?: string
 }
 
 export function of(info: { metadata?: Record<string, any> }): Marker | undefined {
@@ -80,6 +83,54 @@ export function refused(tool: ExternalDetect.Tool, config: Parameters<typeof Ext
     return error instanceof Error ? error.message : String(error)
   }
 }
+
+/**
+ * XCOD-254: the tool's models for /models. Claude Code lists them in its answer to `initialize`,
+ * Codex through `model/list`; both are asked without a prompt, so no model is called. When Claude
+ * Code lists none, its aliases are offered instead (`fallback`). The tool is started only when a
+ * turn could start it: allowed by policy, installed, current and signed in.
+ */
+export async function models(
+  tool: ExternalDetect.Tool,
+  config: Parameters<typeof ExternalPolicy.check>[1] & { external?: Record<string, any> },
+  cwd: string,
+): Promise<{ models: ExternalClaude.Model[]; fallback: boolean; error?: string }> {
+  // Asking isn't starting: a refusal is reported without an `external.denied` audit, as for /claude's state.
+  const refusal = ExternalPolicy.evaluate(tool, config)
+  if (refusal) return { models: [], fallback: false, error: refusal.message }
+  const status = await ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, config))
+  if (!status.installed || status.outdated || status.loggedIn === false || !status.path)
+    return { models: [], fallback: false, error: status.hint ?? `${label(tool)} isn't usable here` }
+  const listed = await (tool === "claude" ? ExternalClaude : ExternalCodex).models({ executable: status.path, cwd })
+  if (listed.length) return { models: listed, fallback: false }
+  if (tool === "claude") return { models: ExternalClaude.FALLBACK_MODELS, fallback: true }
+  return { models: [], fallback: false, error: `${label(tool)} didn't list its models` }
+}
+
+/** Why `model` can't be passed to the tool, if it can't (it reaches Claude Code's command line). */
+export function invalidModel(model: string) {
+  return ExternalClaude.MODEL_ID.test(model) ? undefined : `"${model}" isn't a model name`
+}
+
+/**
+ * XCOD-254: save the model a turn passes to the tool (`undefined` goes back to the tool's default).
+ * Reads the latest marker right before writing, as a turn's own updates do, so neither loses the other's.
+ */
+export const setModel = Effect.fn("ExternalSession.setModel")(function* (
+  sessions: Session.Interface,
+  sessionID: SessionID,
+  model: string | undefined,
+) {
+  const latest = yield* sessions.get(sessionID).pipe(Effect.orDie)
+  const marker = of(latest)
+  if (!marker) return undefined
+  const { model: _, ...rest } = marker
+  yield* sessions.setMetadata({
+    sessionID,
+    metadata: { ...latest.metadata, external: model ? { ...rest, model } : rest },
+  })
+  return { ...rest, ...(model ? { model } : {}) } satisfies Marker
+})
 
 export interface Deps {
   sessions: Session.Interface
@@ -185,6 +236,9 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
       prompt,
       resume: marker.session,
       ...ConfigExternal.launch(tool, cfg.external),
+      // XCOD-254: each turn is a fresh start of the tool, so the model chosen with /models applies
+      // from the next turn on (`--model` / Codex's thread `model`), resumes included.
+      ...(marker.model ? { model: marker.model } : {}),
       executable: status.path,
       onEvent: (event) => {
         if (event.type === "init") {

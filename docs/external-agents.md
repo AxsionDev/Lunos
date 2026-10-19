@@ -89,7 +89,15 @@ Claude Code is a product of Anthropic; Codex is a product of OpenAI. Lunos is no
 
 The prompt's `/` list shows the tool's own commands ("Claude Code command") and your Lunos custom commands and MCP prompts ("Lunos command"). A Lunos command is expanded by Lunos (its template, arguments and `@file` references) and the text it makes goes to the tool. When both have a command of the same name, the tool's keeps the bare name and Lunos's is `/<name>:lunos`, so `/review` in Codex is Codex's and `/review:lunos` is yours.
 
-Lunos commands that switch a Lunos agent, mode or model (`/agents`, `/modes`, `/models`, `/providers`, `/variants`) are shown greyed out with "Not available in a Claude Code session" and never sent to the tool. Lunos's own screens (`/settings`, `/marketplace`, `/memory`, `/help`, …) work as usual.
+Lunos commands that switch a Lunos agent, mode or model provider (`/agents`, `/modes`, `/providers`, `/variants`) are shown greyed out with "Not available in a Claude Code session" and never sent to the tool. Lunos's own screens (`/settings`, `/marketplace`, `/memory`, `/help`, …) work as usual.
+
+### The tool's model, `/compact` and `/cost`
+
+In the terminal app, some Lunos commands act on the tool's session instead:
+
+- **`/models`** lists the tool's models under "Claude Code models" or "Codex models", never Lunos's. Lunos asks the tool itself without sending a prompt, so no model is called: Claude Code lists them when Lunos starts it, and Codex through its app server's model list. If Claude Code doesn't list them, its aliases (Opus, Sonnet, Haiku) are offered. The model you choose is saved on the session and used from your next message on, also after a Lunos restart or a resume, and the prompt shows it (`Lunos · Claude Code · sonnet`). Choose Default to go back to the tool's own default.
+- **`/compact`** has the tool compact its own session: Claude Code's `/compact`, or Codex's compaction. No Lunos model sees the conversation.
+- **`/cost`** shows the cost Claude Code reported for the session. Codex reports tokens, not money, so its cost shows as "not reported", with the tokens used so far.
 
 ## Handing a task from a Lunos agent
 

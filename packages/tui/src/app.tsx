@@ -3,7 +3,7 @@ import { animationsEnabled } from "./util/motion"
 import { DialogArtifacts } from "./component/dialog-artifacts"
 import { DialogBackground } from "./component/dialog-background"
 import { DialogExternal, useExternalCommand } from "./component/dialog-external"
-import { EXTERNAL_LABEL, toolUnavailable, toolsWanted } from "./util/external"
+import { EXTERNAL_LABEL, externalOf, toolUnavailable, toolsWanted } from "./util/external"
 import type { ExternalToolStatus } from "@opencode-ai/sdk/v2"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
@@ -55,6 +55,7 @@ import { LocationProvider } from "./context/location"
 import { LocalProvider, useLocal } from "./context/local"
 import { PermissionProvider } from "./context/permission"
 import { DialogModel } from "./component/dialog-model"
+import { DialogExternalModel } from "./component/dialog-external-model"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogStatus } from "./component/dialog-status"
@@ -118,6 +119,7 @@ import {
   type Restarted,
 } from "./util/restart"
 import { DialogSelect } from "./ui/dialog-select"
+import { listed } from "./util/sessions-overview"
 
 registerOpencodeSpinner()
 
@@ -611,7 +613,7 @@ function App(props: {
     if (continued || sync.status === "loading" || !args.continue) return
     const match = sync.data.session
       .toSorted((a, b) => b.time.updated - a.time.updated)
-      .find((x) => x.parentID === undefined)?.id
+      .find((x) => x.parentID === undefined && listed(x))?.id
     if (match) {
       continued = true
       if (args.fork) {
@@ -969,6 +971,12 @@ function App(props: {
         // Bias /mo toward /models over /move without changing global fuzzy scoring.
         slashAliases: ["mo"],
         run: () => {
+          // XCOD-254: in a Claude Code / Codex session, the tool's models; Lunos's aren't offered there.
+          const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
+          if (sessionID && externalOf(sync.session.get(sessionID))) {
+            dialog.replace(() => <DialogExternalModel sessionID={sessionID} />)
+            return
+          }
           dialog.replace(() => <DialogModel />)
         },
       },
