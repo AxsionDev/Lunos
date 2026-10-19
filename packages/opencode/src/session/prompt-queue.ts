@@ -33,6 +33,14 @@ export const MAX_TEXT = SessionPeerControl.MAX_PROMPT
 
 export type Delivery = "now" | "queued" | "interrupted" | "answered"
 
+/**
+ * XCOD-267: a prompt typed in the session view while a closed Lunos still held prompts for it: the
+ * exact request the view would have made (a prompt with its files and agent, a /command or a shell
+ * command), run once the taken-over prompts have. Kept in memory: the peer file holds its text.
+ */
+export type Request = { kind: "prompt" | "command" | "shell"; body: Record<string, unknown> }
+const PATHS: Record<Request["kind"], string> = { prompt: "prompt_async", command: "command", shell: "shell" }
+
 export type Entry = {
   /** Names the prompt in the peer file and in the audit, never its text. */
   id: string
@@ -43,6 +51,8 @@ export type Entry = {
   /** A session the monitor just started: the model picked there. */
   model?: { providerID: string; modelID: string }
   variant?: string
+  /** XCOD-267: sent as is instead of `text`; a take-over after a crash sends only the text. */
+  request?: Request
 }
 
 /** A pending question, as the session's own question route lists it. */
@@ -103,6 +113,18 @@ async function expect(response: Response, what: string) {
 }
 
 async function send(entry: Entry) {
+  if (entry.request) {
+    // Its message id (if the view made one) would sort it before the prompts taken over ahead of it.
+    const { messageID: _, ...body } = entry.request.body
+    await expect(
+      await SessionPeerControl.api(`/session/${entry.sessionID}/${PATHS[entry.request.kind]}`, entry.directory, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+      "Sending the prompt",
+    )
+    return
+  }
   await expect(
     await SessionPeerControl.api(`/session/${entry.sessionID}/prompt_async`, entry.directory, {
       method: "POST",
@@ -246,10 +268,16 @@ export async function submit(input: Omit<Entry, "id"> & { interrupt?: boolean; v
 /** Tests: a hook after each prompt leaves a stopped process's file, to stand in for a crash there. */
 export const testing: { moved?: (id: string) => void } = {}
 
+/** XCOD-267: how many prompts stopped processes hold for the session, which only a take-over moves. */
+export function orphaned(sessionID: string) {
+  return SessionPeers.orphans().get(sessionID) ?? 0
+}
+
 /**
  * XCOD-262: takes over a session whose Lunos stopped with prompts queued for it, after the user
  * confirmed it. `queued: "send"` runs them here first, in the order they were queued, one per turn,
- * then `text` (the prompt being sent, if any); "discard" drops them. Refused while the process that
+ * then `text` (the prompt being sent, if any); "discard" drops them. XCOD-267: from the session
+ * view (`origin: "session"`), `request` is the prompt as the view would have sent it. Refused while the process that
  * queued them still exists (stopped or suspended, it could still send them itself).
  *
  * Each prompt is removed from the old file before it joins this process's queue (and file), so a
@@ -262,8 +290,11 @@ export async function takeover(input: {
   queued: "send" | "discard"
   text?: string
   agent?: string
+  request?: Request
+  origin?: "monitor" | "session"
 }) {
   start()
+  const origin = input.origin ?? "monitor"
   const release = SessionPeers.lockTakeover(input.sessionID)
   try {
     const held = SessionPeers.orphaned(input.sessionID)
@@ -292,7 +323,7 @@ export async function takeover(input: {
     const sent = input.queued === "send" ? ids.length : 0
     AuditLog.emit("session.takeover", {
       session: input.sessionID,
-      origin: "monitor",
+      origin,
       queued: input.queued,
       sent,
       discarded: ids.length - sent,
@@ -310,13 +341,14 @@ export async function takeover(input: {
         sessionID: input.sessionID,
         directory: input.directory,
         text: input.text,
-        ...(input.agent ? { agent: input.agent } : {}),
+        ...(input.agent && !input.request ? { agent: input.agent } : {}),
+        ...(input.request ? { request: input.request } : {}),
       })
       queues.set(input.sessionID, queue)
       // Its place once the head (when nothing runs) has gone.
       position = delivery === "queued" ? queue.length - (busy ? 0 : 1) : undefined
       changed(input.sessionID, input.directory)
-      AuditLog.emit("session.prompt", { session: input.sessionID, origin: "monitor", delivery, via: "local" })
+      AuditLog.emit("session.prompt", { session: input.sessionID, origin, delivery, via: "local" })
     }
     // Nobody runs the session now: its first prompt goes now, the rest as each turn ends.
     if (!SessionLive.get(input.sessionID).status) await next(input.sessionID)

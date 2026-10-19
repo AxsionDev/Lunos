@@ -388,4 +388,136 @@ describe("durable queue (XCOD-262)", () => {
       delivery: "now",
     })
   })
+
+  // XCOD-268: Take over on the row has no prompt of its own.
+  test("take-over with no new prompt sends just the queued ones, in order", async () => {
+    await leftBehind({ sessionID: "ses_a", texts: ["one", "two"] })
+    const result = await SessionPromptQueue.takeover({ sessionID: "ses_a", directory: "/work/a", queued: "send" })
+    expect(result).toEqual({ sent: 2, discarded: 0 })
+    expect(sent()).toEqual(["one"])
+    status("ses_a", "busy")
+    status("ses_a", "idle")
+    await settle()
+    status("ses_a", "busy")
+    status("ses_a", "idle")
+    await settle()
+    expect(sent()).toEqual(["one", "two"])
+    expect(calls.filter((call) => call.path.endsWith("/prompt_async"))).toHaveLength(2)
+    expect(SessionPromptQueue.orphaned("ses_a")).toBe(0)
+  })
+})
+
+describe("the session view asks first (XCOD-267)", () => {
+  test("the count of prompts a closed Lunos holds for a session, never their text", async () => {
+    expect(SessionPromptQueue.orphaned("ses_a")).toBe(0)
+    await leftBehind({ sessionID: "ses_a", texts: ["one", "two"] })
+    expect(SessionPromptQueue.orphaned("ses_a")).toBe(2)
+    expect(SessionPromptQueue.orphaned("ses_b")).toBe(0)
+  })
+
+  test("the typed prompt runs last, as the exact request the view would have made, without its message id", async () => {
+    await leftBehind({ sessionID: "ses_a", texts: ["one", "two"] })
+    const body = {
+      messageID: "msg_early",
+      agent: "plan",
+      model: { providerID: "fake", modelID: "fake-1" },
+      parts: [
+        { type: "text", text: "typed" },
+        { type: "file", mime: "text/plain", url: "file:///work/a/x.ts", filename: "x.ts" },
+      ],
+    }
+    const result = await SessionPromptQueue.takeover({
+      sessionID: "ses_a",
+      directory: "/work/a",
+      queued: "send",
+      text: "typed",
+      agent: "build",
+      origin: "session",
+      request: { kind: "prompt", body },
+    })
+    expect(result).toEqual({ sent: 2, discarded: 0, delivery: "queued", position: 2 })
+    // The file keeps the readable text only.
+    expect((await ownFile()).queue?.ses_a).toEqual([
+      expect.objectContaining({ text: "two" }),
+      expect.objectContaining({ text: "typed" }),
+    ])
+    for (const _ of [1, 2]) {
+      status("ses_a", "busy")
+      status("ses_a", "idle")
+      await settle()
+    }
+    const prompts = calls.filter((call) => call.path.endsWith("/prompt_async"))
+    expect(prompts.map((call) => call.body.parts[0].text)).toEqual(["one", "two", "typed"])
+    const { messageID: _, ...rest } = body
+    expect(prompts[2]!.body).toEqual(rest)
+  })
+
+  test("a typed /command or shell command goes to its own route, after the queued ones", async () => {
+    for (const [kind, route, body] of [
+      ["command", "/session/ses_a/command", { command: "review", arguments: "src", agent: "build" }],
+      ["shell", "/session/ses_a/shell", { command: "ls", agent: "build", model: { providerID: "f", modelID: "m" } }],
+    ] as const) {
+      calls = []
+      await leftBehind({ sessionID: "ses_a", texts: ["one"] })
+      await SessionPromptQueue.takeover({
+        sessionID: "ses_a",
+        directory: "/work/a",
+        queued: "send",
+        text: kind === "command" ? "/review src" : "ls",
+        origin: "session",
+        request: { kind, body },
+      })
+      status("ses_a", "busy")
+      status("ses_a", "idle")
+      await settle()
+      expect(calls.filter((call) => call.path.startsWith("/session/")).map((call) => call.path)).toEqual([
+        "/session/ses_a/prompt_async",
+        route,
+      ])
+      expect(calls.at(-1)!.body).toEqual(body)
+      SessionPromptQueue.reset()
+    }
+  })
+
+  test("audited once as session.takeover with origin session, counts and ids, never the text", async () => {
+    await leftBehind({ sessionID: "ses_a", texts: ["secret one", "secret two"] })
+    const file = path.join(Global.Path.data, "takeover-session-audit.log")
+    await fs.rm(file, { force: true })
+    AuditLog.activate({ enabled: true, file, redact: [] })
+    try {
+      await SessionPromptQueue.takeover({
+        sessionID: "ses_a",
+        directory: "/work/a",
+        queued: "send",
+        text: "secret typed",
+        origin: "session",
+        request: { kind: "prompt", body: { parts: [{ type: "text", text: "secret typed" }] } },
+      })
+      await Audit.flush()
+    } finally {
+      AuditLog.activate({ enabled: false, file, redact: [] })
+    }
+    const log = await fs.readFile(file, "utf8")
+    await fs.rm(file, { force: true })
+    expect(log).not.toContain("secret")
+    const lines = log
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    expect(lines.filter((line) => line.event === "session.takeover")).toEqual([
+      expect.objectContaining({
+        session: "ses_a",
+        origin: "session",
+        queued: "send",
+        sent: 2,
+        discarded: 0,
+        ids: ["qp_1", "qp_2"],
+      }),
+    ])
+    expect(lines.findLast((line) => line.event === "session.prompt")).toMatchObject({
+      session: "ses_a",
+      origin: "session",
+      delivery: "queued",
+    })
+  })
 })

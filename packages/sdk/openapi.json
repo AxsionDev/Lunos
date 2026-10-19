@@ -4022,6 +4022,24 @@
                   },
                   "text": {
                     "type": "string"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": ["monitor", "session"]
+                  },
+                  "request": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": ["prompt", "command", "shell"]
+                      },
+                      "body": {
+                        "type": "object"
+                      }
+                    },
+                    "required": ["kind", "body"],
+                    "additionalProperties": false
                   }
                 },
                 "required": ["queued"],
@@ -4034,6 +4052,85 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.session.takeover({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/session/{sessionID}/queued": {
+      "get": {
+        "tags": ["experimental"],
+        "operationId": "experimental.session.queued",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsent prompts held for the session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionQueued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "description": "How many prompts a Lunos process that stopped still holds for the session, never their text. While there are any, a prompt typed in the session asks to take it over first (experimental.session.takeover).",
+        "summary": "Prompts held for a session",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.session.queued({\n  ...\n})"
           }
         ]
       }
@@ -28165,6 +28262,17 @@
           }
         },
         "required": ["sent", "discarded"],
+        "additionalProperties": false
+      },
+      "SessionQueued": {
+        "type": "object",
+        "properties": {
+          "orphaned": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["orphaned"],
         "additionalProperties": false
       },
       "McpResource": {

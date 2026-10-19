@@ -78,11 +78,11 @@ Tag several sessions to send the same prompt to each. You confirm first ("Send t
 
 The Lunos that runs a session keeps the prompts queued for it in a file under your data directory that only your OS user can read, so they aren't lost when that Lunos quits, crashes or is killed. The prompt text is kept only there: it isn't written to any log, and the audit log records counts and ids, never the text.
 
-When that Lunos has closed, its session shows **2 queued (owner closed)**. Nothing sends those prompts on its own. When you next send a prompt to the session, you're asked "Take over this session here?", with how many prompts are queued and a choice:
+When that Lunos has closed, its session shows **2 queued (owner closed)**. Nothing sends those prompts on its own. When you next send a prompt to the session, from the Agent Monitor or typed in the session itself (in the terminal, the desktop app or the web UI), you're asked "Take over this session here?", with how many prompts are queued and a choice:
 
 - **Send them first**: they run in this Lunos, one turn each, in the order they were queued, and then your prompt.
 - **Discard them**: they're deleted, and only your prompt runs.
-- **Cancel**: nothing is sent, and the prompts stay queued.
+- **Cancel**: nothing is sent, the prompts stay queued, and what you typed stays in the prompt.
 
 To send just the queued prompts, without a prompt of your own, select the session in the list and press `t` (**Take over** on the row in the desktop app and the web UI). You choose **Send 2 queued prompts** (the default) or **Discard them**, or cancel. Sent, they run in this Lunos in the order they were queued, and the session is run by this Lunos from then on. The key is `monitor.takeover` in your keybinds.
 

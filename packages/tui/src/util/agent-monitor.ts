@@ -199,6 +199,11 @@ export function takeoverChoices(count: number) {
   ]
 }
 
+/** The take-over question when a prompt is sent to a session whose Lunos closed with prompts queued. */
+export function takeoverQuestion(title: string, count: number) {
+  return `Take over this session here? The Lunos that ran "${title}" closed with ${count === 1 ? "1 prompt" : `${count} prompts`} queued for it, never sent. Sent first, they run in order before yours.`
+}
+
 /** XCOD-268: a row whose Lunos closed with prompts queued for it, which Take over can send or discard. */
 export function canTakeOver(item: Pick<SessionOverviewItem, "id" | "queued" | "ownerClosed" | "elsewhere">) {
   return !!item.ownerClosed && (item.queued ?? 0) > 0 && !item.elsewhere && !toolOnly(item)

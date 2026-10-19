@@ -35,6 +35,7 @@ import {
   route as deliveryRoute,
   tags,
   takeoverChoices,
+  takeoverQuestion,
   takeoverOnlyChoices,
   canTakeOver,
   type Row,
@@ -312,10 +313,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       // XCOD-262: prompts its Lunos queued are sent or discarded only here, as the user chooses.
       const held = item.ownerClosed ? (item.queued ?? 0) : 0
       const queued = held
-        ? await choose(
-            `Take over this session here? The Lunos that ran "${title}" closed with ${held === 1 ? "1 prompt" : `${held} prompts`} queued for it, never sent. Sent first, they run in order before yours.`,
-            takeoverChoices(held),
-          )
+        ? await choose(takeoverQuestion(title, held), takeoverChoices(held))
         : (await confirm(
               "Take over this session here?",
               `The Lunos that ran "${title}" stopped before its turn finished. Run your prompt in this Lunos instead?`,

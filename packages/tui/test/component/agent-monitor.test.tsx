@@ -109,7 +109,10 @@ const PROVIDER = {
 type Call = { path: string; body?: any }
 
 /** A fake server: the overview, the waiting sessions' asks, and every route the monitor sends to. */
-function fakeServer(input: { sessions: SessionOverviewItem[]; extra?: (url: URL) => Response | undefined }) {
+function fakeServer(input: {
+  sessions: SessionOverviewItem[]
+  extra?: (url: URL, request: Request) => Response | undefined | Promise<Response | undefined>
+}) {
   const sessions = input.sessions
   const calls: Call[] = []
   const permissions = [
@@ -122,7 +125,7 @@ function fakeServer(input: { sessions: SessionOverviewItem[]; extra?: (url: URL)
     questions: [],
   }
   const handler = async (url: URL, request: Request) => {
-    const extra = input.extra?.(url)
+    const extra = await input.extra?.(url, request)
     if (extra) return extra
     const method = request.method
     if (url.pathname === "/experimental/session-overview") return json({ groups: [], sessions })
@@ -680,11 +683,15 @@ async function promptOn(input: {
   route?: { type: "session"; sessionID: string }
   sessions?: unknown[]
   config?: Record<string, unknown>
+  extra?: (url: URL, request: Request) => Response | undefined | Promise<Response | undefined>
 }) {
   const opened: string[] = []
   const server = fakeServer({
     sessions: [],
-    extra: (url) => (url.pathname === "/session" && input.sessions ? json(input.sessions) : undefined),
+    extra: (url, request) =>
+      url.pathname === "/session" && request.method === "GET" && input.sessions
+        ? json(input.sessions)
+        : input.extra?.(url, request),
   })
   const { Prompt } = await import("../../src/component/prompt")
   const ui = await mount({
@@ -759,3 +766,104 @@ test('opening: ← does nothing new with "left_opens_monitor": false, or in a su
     await parent.cleanup()
   }
 })
+
+// XCOD-267: the full session view asks the same take-over question before the first prompt in a
+// session a closed Lunos left prompts queued for; a session without any is sent to as before.
+async function sessionView(orphaned: number) {
+  const session = {
+    id: "ses_q",
+    slug: "q",
+    projectID: "proj_test",
+    directory,
+    title: "queued work",
+    version: "1",
+    time: { created: 1, updated: 1 },
+  }
+  const sent: Call[] = []
+  const ui = await promptOn({
+    route: { type: "session", sessionID: "ses_q" },
+    sessions: [session],
+    extra: async (url, request) => {
+      if (url.pathname === "/experimental/session/ses_q/queued") return json({ orphaned })
+      if (request.method !== "POST") return undefined
+      if (url.pathname === "/experimental/session/ses_q/takeover" || url.pathname === "/session/ses_q/message") {
+        const text = await request.clone().text()
+        sent.push({ path: url.pathname, ...(text ? { body: JSON.parse(text) } : {}) })
+        return json(url.pathname.endsWith("takeover") ? { sent: 2, discarded: 0, delivery: "queued", position: 2 } : {})
+      }
+      return undefined
+    },
+  })
+  return { ...ui, sent }
+}
+
+const typed = { agent: "build", model: { providerID: "fake", modelID: "fake-1" } }
+
+test("XCOD-267: in the session view, a closed Lunos's queued prompts are asked about first; Cancel keeps the text", async () => {
+  const ui = await sessionView(2)
+  try {
+    await Bun.sleep(150)
+    await ui.send("carry on")
+    await wait(() => ui.frame().includes("closed with 2 prompts queued"))
+    expect(ui.frame()).toContain("Take over, send the 2 queued prompts first")
+    expect(ui.frame()).toContain("Take over, discard all 2")
+    expect(ui.frame()).toContain("Cancel")
+    await ui.escape()
+    await Bun.sleep(150)
+    expect(ui.sent).toHaveLength(0)
+    expect(ui.frame()).toContain("carry on")
+
+    // Send them first (the default): the prompt goes with the take-over, as the request the view makes.
+    await ui.enter()
+    await wait(() => ui.frame().includes("closed with 2 prompts queued"))
+    await ui.enter()
+    await wait(() => ui.sent.length === 1)
+    expect(ui.sent[0]).toEqual({
+      path: "/experimental/session/ses_q/takeover",
+      body: {
+        queued: "send",
+        origin: "session",
+        text: "carry on",
+        request: { kind: "prompt", body: { ...typed, parts: [{ type: "text", text: "carry on" }] } },
+      },
+    })
+    await Bun.sleep(150)
+    expect(ui.sent).toHaveLength(1)
+    expect(ui.frame()).not.toContain("carry on")
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
+
+test("XCOD-267: Discard drops the queued prompts, then the typed one is sent as usual", async () => {
+  const ui = await sessionView(2)
+  try {
+    await Bun.sleep(150)
+    await ui.send("start over")
+    await wait(() => ui.frame().includes("closed with 2 prompts queued"))
+    await ui.arrow("down")
+    await ui.enter()
+    await wait(() => ui.sent.length === 2)
+    expect(ui.sent[0]).toEqual({
+      path: "/experimental/session/ses_q/takeover",
+      body: { queued: "discard", origin: "session" },
+    })
+    expect(ui.sent[1]!.path).toBe("/session/ses_q/message")
+    expect(ui.sent[1]!.body.parts).toEqual([{ type: "text", text: "start over" }])
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
+
+test("XCOD-267: a session with nothing queued by a closed Lunos is sent to with no question", async () => {
+  const ui = await sessionView(0)
+  try {
+    await Bun.sleep(150)
+    await ui.send("just go")
+    await wait(() => ui.sent.length === 1)
+    expect(ui.sent[0]!.path).toBe("/session/ses_q/message")
+    expect(ui.frame()).not.toContain("Take over this session here?")
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
