@@ -213,7 +213,7 @@ export function useMemorySetup() {
               onSelect={() => void cards()}
             />
             <Below>
-              <Lines lines={MemoryStorage.compareLines(machine as MemoryStorage.Environment, 28)} />
+              <Lines lines={MemoryStorage.compareLines(machine as MemoryStorage.Environment, 26)} />
             </Below>
           </box>
         ),

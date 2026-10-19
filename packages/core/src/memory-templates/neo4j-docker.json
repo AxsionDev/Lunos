@@ -39,7 +39,7 @@
     "    volumes:",
     "      - data:/data",
     "    healthcheck:",
-    "      test: [\"CMD-SHELL\", \"cypher-shell -u neo4j -p \\\"$$LUNOS_HEALTHCHECK_PASSWORD\\\" 'RETURN 1' >/dev/null 2>&1\"]",
+    "      test: [\"CMD-SHELL\", 'cypher-shell -u neo4j -p \"$$LUNOS_HEALTHCHECK_PASSWORD\" ''RETURN 1'' >/dev/null 2>&1']",
     "      interval: 5s",
     "      timeout: 10s",
     "      retries: 24",

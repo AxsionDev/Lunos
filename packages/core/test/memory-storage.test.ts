@@ -178,3 +178,12 @@ test("labels", () => {
   expect(MemoryStorage.short({ type: "postgres", host: "db", jurisdiction: "EU-DE" })).toBe("PostgreSQL at db (EU-DE)")
   expect(MemoryStorage.short(undefined)).toBe("on this computer")
 })
+
+test("the Memory templates page shows each Docker template's compose file as generated", async () => {
+  const page = await Bun.file(new URL("../../../docs/memory-templates.md", import.meta.url)).text()
+  for (const name of ["neo4j-docker", "postgres-docker"]) {
+    const item = MemoryStorage.BUILTIN.find((entry) => entry.name === name)!
+    const files = MemoryStorage.files(item, { password: "<generated>", project: `lunos-memory-${name}` })
+    expect(page).toContain(files.compose)
+  }
+})

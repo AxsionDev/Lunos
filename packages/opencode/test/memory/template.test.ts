@@ -83,3 +83,8 @@ describe("docker templates", () => {
     expect(await MemoryTemplate.detect(() => null)).toBeUndefined()
   })
 })
+
+test("Move's child process runs in the project, not in a dev run's --cwd", async () => {
+  const { MemoryMove } = await import("../../src/memory/move")
+  expect(MemoryMove.withoutCwd(["--cwd", "/lunos/packages/opencode", "--smol", "--cwd=/x"])).toEqual(["--smol"])
+})

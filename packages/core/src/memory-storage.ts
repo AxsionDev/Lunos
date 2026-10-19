@@ -170,16 +170,36 @@ export function compare(env: Environment) {
   return { rows: [...COMPARE_ROWS], columns }
 }
 
-/** Compare as fixed-width text lines, for the CLI and the TUI. */
+/** Compare as fixed-width text lines, for the CLI and the TUI. A cell too long for its column wraps. */
 export function compareLines(env: Environment, width = 26) {
   const table = compare(env)
-  const cell = (text: string, size: number) => (text.length > size ? text.slice(0, size - 1) + "…" : text.padEnd(size))
-  const head = 24
-  const lines = [cell("", head) + table.columns.map((column) => cell(column.title, width)).join(" ")]
-  table.rows.forEach((row, index) =>
-    lines.push(cell(row, head) + table.columns.map((column) => cell(column.values[index] ?? "", width)).join(" ")),
-  )
-  return lines.map((line) => line.trimEnd())
+  const head = 25
+  const wrap = (text: string, size: number) => {
+    const out: string[] = []
+    let line = ""
+    for (const word of text.split(" ")) {
+      if (line && line.length + 1 + word.length > size) {
+        out.push(line)
+        line = word
+      } else line = line ? `${line} ${word}` : word
+    }
+    return [...out, line]
+  }
+  const row = (cells: string[][]) => {
+    const height = Math.max(...cells.map((cell) => cell.length))
+    return Array.from({ length: height }, (_, index) =>
+      cells
+        .map((cell, column) => (cell[index] ?? "").padEnd(column === 0 ? head : width))
+        .join(" ")
+        .trimEnd(),
+    )
+  }
+  return [
+    ...row([[""], ...table.columns.map((column) => wrap(column.title, width))]),
+    ...table.rows.flatMap((name, index) =>
+      row([wrap(name, head), ...table.columns.map((column) => wrap(column.values[index] ?? "", width))]),
+    ),
+  ]
 }
 
 export const HELP_QUESTIONS = {

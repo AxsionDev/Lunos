@@ -11,6 +11,24 @@ import { MemorySetupCheck } from "./setup-check"
 
 const TIMEOUT = 11 * 60_000
 
+/**
+ * A dev run (`bun run --cwd packages/opencode src/index.ts <project>`) carries `--cwd` in execArgv;
+ * passed on, it would start the child in the Lunos checkout, so the facts would land in that
+ * repository's namespace instead of the project's. The compiled binary has no execArgv.
+ */
+export function withoutCwd(execArgv: readonly string[]) {
+  const out: string[] = []
+  for (let i = 0; i < execArgv.length; i++) {
+    if (execArgv[i] === "--cwd") {
+      i++
+      continue
+    }
+    if (execArgv[i].startsWith("--cwd=")) continue
+    out.push(execArgv[i])
+  }
+  return out
+}
+
 export type Result = { ok: boolean; output: string; facts?: number; error?: string }
 
 export async function run(input: {
@@ -23,7 +41,7 @@ export async function run(input: {
   const command = resolveCommand({
     execPath: process.execPath,
     argv: MemorySetupCheck.entry(process.argv),
-    execArgv: process.execArgv,
+    execArgv: withoutCwd(process.execArgv),
     args: ["memory", "migrate", "--to", input.to, "--from-bundle", input.bundle, "--yes"],
     upgraded: false,
     platform: process.platform,
