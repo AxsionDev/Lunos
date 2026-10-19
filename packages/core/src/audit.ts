@@ -76,6 +76,9 @@ export const EVENTS = [
   // delivery (now, queued, interrupted, answered) and whether another Lunos process forwarded it.
   // Never the prompt.
   "session.prompt",
+  // XCOD-262: a session taken over from a Lunos that stopped with prompts queued for it: session,
+  // origin, whether they were sent or discarded, the counts and the prompts' ids. Never the text.
+  "session.takeover",
   // XCOD-204: a Claude Code / Codex CLI session Lunos started (tool, provider, session id, outcome,
   // cost), or one refused before it started (residency or policy). Never the prompt or output.
   "external.session",

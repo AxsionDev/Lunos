@@ -1302,6 +1302,7 @@ export const dict = {
   "sessions.monitor.view.groups": "그룹별",
   "sessions.monitor.tag": "프롬프트에서 {{session}} 태그",
   "sessions.monitor.queuedCount": "대기열: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "대기열: {{count}} (소유 Lunos 종료됨)",
   "sessions.monitor.ask.permission": "승인: {{request}}",
   "sessions.monitor.ask.question": "질문: {{question}}",
   "sessions.monitor.approve": "승인",
@@ -1325,6 +1326,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     '"{{title}}"을(를) 실행하던 Lunos가 턴이 끝나기 전에 멈췄습니다. 대신 이 Lunos에서 프롬프트를 실행할까요?',
   "sessions.monitor.takeover.confirm": "넘겨받기",
+  "sessions.monitor.takeover.queuedBody":
+    '"{{title}}"을(를) 실행하던 Lunos가 대기 중인 프롬프트를 남긴 채 종료되었습니다. 대기열: {{count}}. 프롬프트는 이 Lunos에서 실행되며, 보내기를 선택하면 그 뒤에 실행됩니다.',
+  "sessions.monitor.takeover.queuedLabel": "대기 중인 프롬프트",
+  "sessions.monitor.takeover.queuedSend": "먼저 순서대로 보내기 ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "버리기 ({{count}})",
   "sessions.monitor.send.question.one": "세션 {{count}}개에 보낼까요?",
   "sessions.monitor.send.question.other": "세션 {{count}}개에 보낼까요?",
   "sessions.monitor.sent": '"{{title}}"에 보냄',

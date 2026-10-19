@@ -1298,6 +1298,7 @@ export const dict = {
   "sessions.monitor.view.groups": "گروپ کے لحاظ سے",
   "sessions.monitor.tag": "پرامپٹ میں {{session}} کو ٹیگ کریں",
   "sessions.monitor.queuedCount": "قطار میں: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "قطار میں: {{count}} (مالک بند ہو گیا)",
   "sessions.monitor.ask.permission": "منظور کریں: {{request}}",
   "sessions.monitor.ask.question": "پوچھ رہا ہے: {{question}}",
   "sessions.monitor.approve": "منظور کریں",
@@ -1321,6 +1322,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'جو Lunos "{{title}}" چلا رہا تھا وہ باری ختم ہونے سے پہلے رک گیا۔ اس کے بجائے اپنا پرامپٹ اس Lunos میں چلائیں؟',
   "sessions.monitor.takeover.confirm": "سنبھالیں",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” چلانے والا Lunos قطار میں موجود پرامپٹس کے ساتھ بند ہو گیا۔ قطار میں: {{count}}۔ آپ کا پرامپٹ اس Lunos میں چلے گا، اگر آپ انہیں بھیجیں تو ان کے بعد۔",
+  "sessions.monitor.takeover.queuedLabel": "قطار میں پرامپٹس",
+  "sessions.monitor.takeover.queuedSend": "پہلے ترتیب سے بھیجیں ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "رد کریں ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} سیشن کو بھیجیں؟",
   "sessions.monitor.send.question.other": "{{count}} سیشنز کو بھیجیں؟",
   "sessions.monitor.sent": '"{{title}}" کو بھیج دیا',

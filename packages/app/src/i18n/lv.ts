@@ -1302,6 +1302,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Pēc grupas",
   "sessions.monitor.tag": "Atzīmēt {{session}} uzvednē",
   "sessions.monitor.queuedCount": "Rindā: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Rindā: {{count}} (īpašnieks aizvērts)",
   "sessions.monitor.ask.permission": "Apstiprināt: {{request}}",
   "sessions.monitor.ask.question": "Jautā: {{question}}",
   "sessions.monitor.approve": "Apstiprināt",
@@ -1326,6 +1327,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, kurā darbojās “{{title}}”, apstājās pirms gājiena beigām. Izpildīt jūsu uzvedni šajā Lunos?",
   "sessions.monitor.takeover.confirm": "Pārņemt",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, kurā darbojās “{{title}}”, aizvērās ar uzvednēm, kas vēl gaidīja rindā. Rindā: {{count}}. Jūsu uzvedne darbosies šajā Lunos, pēc tām, ja tās nosūtīsiet.",
+  "sessions.monitor.takeover.queuedLabel": "Uzvednes rindā",
+  "sessions.monitor.takeover.queuedSend": "Vispirms nosūtīt, pēc kārtas ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Atmest tās ({{count}})",
   "sessions.monitor.send.question.one": "Sūtīt {{count}} sesijai?",
   "sessions.monitor.send.question.zero": "Sūtīt {{count}} sesijām?",
   "sessions.monitor.send.question.other": "Sūtīt {{count}} sesijām?",

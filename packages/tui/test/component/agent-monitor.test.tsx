@@ -156,6 +156,10 @@ function fakeServer(input: { sessions: SessionOverviewItem[]; extra?: (url: URL)
       const busy = sessions.find((each) => each.id === id)?.state === "running"
       return json({ delivery: busy ? (call.body?.interrupt ? "interrupted" : "queued") : "now" })
     }
+    if (/^\/experimental\/session\/[^/]+\/takeover$/.test(url.pathname)) {
+      calls.push(call)
+      return json({ sent: call.body?.queued === "send" ? 2 : 0, discarded: 0, delivery: "now" })
+    }
     if (
       url.pathname.startsWith("/experimental/peer/") ||
       /^\/(permission|question)\/[^/]+\/(reply|reject)$/.test(url.pathname) ||
@@ -545,9 +549,50 @@ test("a session whose Lunos stopped asks to take it over first", async () => {
     await ui.enter()
     await wait(() => ui.calls.length === 1)
     expect(ui.calls[0]).toEqual({
-      path: "/experimental/session/s1/enqueue",
-      body: { text: "carry on", interrupt: false },
+      path: "/experimental/session/s1/takeover",
+      body: { queued: "send", text: "carry on" },
     })
+  } finally {
+    await ui.cleanup()
+  }
+})
+
+test("XCOD-262: prompts a closed Lunos queued show on the row, and go only with the take-over the user picks", async () => {
+  const sessions = () => [
+    row("w1", { state: "waiting", permissions: 1, updated: NOW - 1000 }),
+    row("q1", { state: "idle", queued: 2, ownerClosed: true, updated: NOW - 2000 }),
+  ]
+  for (const [choice, keys] of [
+    ["send", []],
+    ["discard", ["down"]],
+  ] as const) {
+    const ui = await monitor(sessions())
+    try {
+      await wait(() => ui.frame().includes("2 queued (owner closed)"))
+      await ui.send("@2 carry on")
+      await wait(() => ui.frame().includes("closed with 2 prompts queued"))
+      expect(ui.frame()).toContain("Take over, send the 2 queued prompts first")
+      expect(ui.frame()).toContain("Take over, discard all 2")
+      for (const key of keys) await ui.arrow(key)
+      await ui.enter()
+      await wait(() => ui.calls.length === 1)
+      // Never enqueued directly: the take-over carries the prompt, behind the queued ones.
+      expect(ui.calls[0]).toEqual({
+        path: "/experimental/session/q1/takeover",
+        body: { queued: choice, text: "carry on" },
+      })
+    } finally {
+      await ui.cleanup()
+    }
+  }
+  // Cancel sends nothing, and takes nothing over.
+  const ui = await monitor(sessions())
+  try {
+    await ui.send("@2 carry on")
+    await wait(() => ui.frame().includes("closed with 2 prompts queued"))
+    await ui.escape()
+    await Bun.sleep(100)
+    expect(ui.calls).toHaveLength(0)
   } finally {
     await ui.cleanup()
   }

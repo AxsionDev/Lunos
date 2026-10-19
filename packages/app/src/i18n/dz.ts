@@ -1317,6 +1317,7 @@ export const dict: Record<string, string> = {
   "sessions.monitor.view.groups": "སྡེ་ཚན་ལྟར",
   "sessions.monitor.tag": "འགྲུལ་བཀོད་ནང་ {{session}} ལུ་ཁ་ཡིག་སྦྱར",
   "sessions.monitor.queuedCount": "གྲལ་རིམ་ནང་: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "གྲལ་རིམ་ནང་: {{count}} (བདག་པོ་ཁ་བསྡམས)",
   "sessions.monitor.ask.permission": "གནང་བ་བྱིན: {{request}}",
   "sessions.monitor.ask.question": "འདྲི་དོ: {{question}}",
   "sessions.monitor.approve": "གནང་བ་བྱིན",
@@ -1342,6 +1343,11 @@ export const dict: Record<string, string> = {
   "sessions.monitor.takeover.body":
     '"{{title}}" གཡོག་བཀོལ་མི་ Lunos འདི་ རེས་མཇུག་མ་བསྡུ་བའི་ཧེ་མ་ར་ བཀག་ཡོདཔ་ཨིན། དེ་གི་ཚབ་ལུ་ ཁྱོད་ཀྱི་འགྲུལ་བཀོད་ Lunos འདི་ནང་ གཡོག་བཀོལ་ནི་ཨིན་ན?',
   "sessions.monitor.takeover.confirm": "འཛིན",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” གཡོག་བཀོལ་མི་ Lunos དེ་ གྲལ་རིམ་ནང་ལུ་ བཀོད་རྒྱ་ཚུ་ཡོད་པའི་བར་ན་ ཁ་བསྡམས་ཡི། གྲལ་རིམ་ནང་: {{count}}། ཁྱོད་ཀྱི་བཀོད་རྒྱ་ Lunos འདི་ནང་ གཡོག་བཀོལ་འོང་།",
+  "sessions.monitor.takeover.queuedLabel": "གྲལ་རིམ་ནང་གི་བཀོད་རྒྱ",
+  "sessions.monitor.takeover.queuedSend": "དང་པ་ གོ་རིམ་བཞིན་ བཏང་ ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "བཏོན་གཏང་ ({{count}})",
   "sessions.monitor.send.question.one": "ལཱ་ཡུན་ཚུ་ལུ་གཏང་ནི་ཨིན་ན? ({{count}})",
   "sessions.monitor.send.question.other": "ལཱ་ཡུན་ཚུ་ལུ་གཏང་ནི་ཨིན་ན? ({{count}})",
   "sessions.monitor.sent": '"{{title}}" ལུ་བཏང་ཡོད',

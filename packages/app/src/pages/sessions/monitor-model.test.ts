@@ -8,6 +8,7 @@ import {
   number,
   rail,
   RECENT_MS,
+  orphanedQueue,
   route,
   tags,
   untag,
@@ -179,6 +180,10 @@ describe("delivery (XCOD-262)", () => {
     expect(route(item("ses_a"))).toEqual({ type: "local" })
     expect(route(item("ses_a", { elsewhere: true, state: "running" }))).toEqual({ type: "peer" })
     expect(route(item("ses_a", { stale: true }))).toEqual({ type: "takeover" })
+    // XCOD-262: prompts a closed Lunos queued are only sent through a take-over.
+    expect(route(item("ses_a", { queued: 2, ownerClosed: true }))).toEqual({ type: "takeover" })
+    expect(orphanedQueue(item("ses_a", { queued: 2, ownerClosed: true }))).toBe(2)
+    expect(orphanedQueue(item("ses_a", { queued: 2 }))).toBe(0)
     expect(route(item("external:abc", { kind: "external", tool: "claude" }))).toEqual({ type: "tool-only" })
   })
 

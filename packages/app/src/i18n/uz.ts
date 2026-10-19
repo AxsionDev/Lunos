@@ -1308,6 +1308,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Guruh bo'yicha",
   "sessions.monitor.tag": "So'rovda {{session}} ni belgilash",
   "sessions.monitor.queuedCount": "Navbatda: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Navbatda: {{count}} (egasi yopildi)",
   "sessions.monitor.ask.permission": "Tasdiqlash: {{request}}",
   "sessions.monitor.ask.question": "So'ramoqda: {{question}}",
   "sessions.monitor.approve": "Tasdiqlash",
@@ -1332,6 +1333,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "«{{title}}» ni ishga tushirgan Lunos navbat tugamasdan to'xtadi. So'rovingiz o'rniga shu Lunos'da ishga tushirilsinmi?",
   "sessions.monitor.takeover.confirm": "Zimmaga olish",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}”ni ishlatgan Lunos navbatda hali so‘rovlar turganida yopildi. Navbatda: {{count}}. So‘rovingiz shu Lunosda ishlaydi, ularni yuborsangiz, ulardan keyin.",
+  "sessions.monitor.takeover.queuedLabel": "Navbatdagi so‘rovlar",
+  "sessions.monitor.takeover.queuedSend": "Avval tartib bilan yuborish ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Ularni bekor qilish ({{count}})",
   "sessions.monitor.send.question.one": "Sessiyalarga yuborilsinmi? Soni: {{count}}",
   "sessions.monitor.send.question.other": "Sessiyalarga yuborilsinmi? Soni: {{count}}",
   "sessions.monitor.sent": "«{{title}}» ga yuborildi",

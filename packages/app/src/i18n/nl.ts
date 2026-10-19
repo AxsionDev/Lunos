@@ -1306,6 +1306,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Op groep",
   "sessions.monitor.tag": "{{session}} taggen in de prompt",
   "sessions.monitor.queuedCount": "In de wachtrij: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "In de wachtrij: {{count}} (eigenaar gesloten)",
   "sessions.monitor.ask.permission": "Goedkeuren: {{request}}",
   "sessions.monitor.ask.question": "Vraagt: {{question}}",
   "sessions.monitor.approve": "Goedkeuren",
@@ -1331,6 +1332,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'De Lunos die "{{title}}" uitvoerde, stopte voordat de beurt klaar was. Je prompt in plaats daarvan in deze Lunos uitvoeren?',
   "sessions.monitor.takeover.confirm": "Overnemen",
+  "sessions.monitor.takeover.queuedBody":
+    'De Lunos waarin "{{title}}" draaide, is gesloten met prompts die nog in de wachtrij stonden. In de wachtrij: {{count}}. Je prompt draait in deze Lunos, na die prompts als je ze verstuurt.',
+  "sessions.monitor.takeover.queuedLabel": "Prompts in de wachtrij",
+  "sessions.monitor.takeover.queuedSend": "Eerst versturen, op volgorde ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Weggooien ({{count}})",
   "sessions.monitor.send.question.one": "Naar {{count}} sessie sturen?",
   "sessions.monitor.send.question.other": "Naar {{count}} sessies sturen?",
   "sessions.monitor.sent": 'Verstuurd naar "{{title}}"',

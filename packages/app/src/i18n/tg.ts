@@ -1302,6 +1302,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Аз рӯи гурӯҳ",
   "sessions.monitor.tag": "Қайд кардани {{session}} дар дархост",
   "sessions.monitor.queuedCount": "Дар навбат: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Дар навбат: {{count}} (соҳиб баста шуд)",
   "sessions.monitor.ask.permission": "Тасдиқ: {{request}}",
   "sessions.monitor.ask.question": "Мепурсад: {{question}}",
   "sessions.monitor.approve": "Тасдиқ кардан",
@@ -1326,6 +1327,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, ки «{{title}}»-ро иҷро мекард, пеш аз анҷоми навбат қатъ шуд. Дархости шуморо ба ҷояш дар ин Lunos иҷро кунем?",
   "sessions.monitor.takeover.confirm": "Ба ӯҳда гирифтан",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, ки «{{title}}»-ро иҷро мекард, бо дархостҳои ҳанӯз дар навбат баста шуд. Дар навбат: {{count}}. Дархости шумо дар ҳамин Lunos иҷро мешавад, агар онҳоро фиристед, баъд аз онҳо.",
+  "sessions.monitor.takeover.queuedLabel": "Дархостҳои дар навбат",
+  "sessions.monitor.takeover.queuedSend": "Аввал бо тартиб фиристодан ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Рад кардан ({{count}})",
   "sessions.monitor.send.question.one": "Ба {{count}} сеанс фиристем?",
   "sessions.monitor.send.question.other": "Ба {{count}} сеанс фиристем?",
   "sessions.monitor.sent": "Ба «{{title}}» фиристода шуд",

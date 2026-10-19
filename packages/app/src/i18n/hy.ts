@@ -1302,6 +1302,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Ըստ խմբի",
   "sessions.monitor.tag": "Նշել {{session}}-ը հարցման մեջ",
   "sessions.monitor.queuedCount": "Հերթում՝ {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Հերթում՝ {{count}} (տերը փակվել է)",
   "sessions.monitor.ask.permission": "Հաստատել՝ {{request}}",
   "sessions.monitor.ask.question": "Հարցնում է՝ {{question}}",
   "sessions.monitor.approve": "Հաստատել",
@@ -1326,6 +1327,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos-ը, որը գործարկում էր «{{title}}»-ը, կանգ առավ մինչև քայլի ավարտը։ Գործարկե՞լ ձեր հարցումն այս Lunos-ում",
   "sessions.monitor.takeover.confirm": "Ստանձնել",
+  "sessions.monitor.takeover.queuedBody":
+    "«{{title}}»-ը գործարկող Lunos-ը փակվեց՝ հերթում դեռ հուշումներ ունենալով։ Հերթում՝ {{count}}։ Ձեր հուշումը կաշխատի այս Lunos-ում, դրանցից հետո, եթե դրանք ուղարկեք։",
+  "sessions.monitor.takeover.queuedLabel": "Հերթում գտնվող հուշումներ",
+  "sessions.monitor.takeover.queuedSend": "Նախ ուղարկել, հերթականությամբ ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Չեղարկել դրանք ({{count}})",
   "sessions.monitor.send.question.one": "Ուղարկե՞լ {{count}} նիստի",
   "sessions.monitor.send.question.other": "Ուղարկե՞լ {{count}} նիստերի",
   "sessions.monitor.sent": "Ուղարկվեց «{{title}}»-ին",

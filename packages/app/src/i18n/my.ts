@@ -1312,6 +1312,7 @@ export const dict = {
   "sessions.monitor.view.groups": "အုပ်စုအလိုက်",
   "sessions.monitor.tag": "ပရွမ့်တွင် {{session}} ကို တဂ်လုပ်ပါ",
   "sessions.monitor.queuedCount": "တန်းစီထားသည်: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "တန်းစီထားသည်: {{count}} (ပိုင်ရှင် ပိတ်သွားပြီ)",
   "sessions.monitor.ask.permission": "ခွင့်ပြုပါ: {{request}}",
   "sessions.monitor.ask.question": "မေးနေသည်: {{question}}",
   "sessions.monitor.approve": "ခွင့်ပြုပါ",
@@ -1336,6 +1337,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     '"{{title}}" ကို run နေသော Lunos သည် အလှည့်မပြီးမီ ရပ်သွားသည်။ သင့်ပရွမ့်ကို ဤ Lunos တွင် အစား run မလား။',
   "sessions.monitor.takeover.confirm": "လွှဲယူပါ",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” ကို လုပ်ဆောင်ခဲ့သော Lunos သည် တန်းစီထားသော prompt များ ကျန်နေစဉ် ပိတ်သွားခဲ့သည်။ တန်းစီထားသည်: {{count}}။ သင့် prompt ကို ဤ Lunos တွင် လုပ်ဆောင်မည်ဖြစ်ပြီး ပို့ပါက ၎င်းတို့နောက်တွင် လုပ်ဆောင်မည်။",
+  "sessions.monitor.takeover.queuedLabel": "တန်းစီထားသော prompt များ",
+  "sessions.monitor.takeover.queuedSend": "ဦးစွာ အစဉ်လိုက် ပို့ပါ ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "ပယ်ဖျက်ပါ ({{count}})",
   "sessions.monitor.send.question.one": "စက်ရှင် {{count}} ခုသို့ ပို့မလား။",
   "sessions.monitor.send.question.other": "စက်ရှင် {{count}} ခုသို့ ပို့မလား။",
   "sessions.monitor.sent": '"{{title}}" သို့ ပို့ပြီး',

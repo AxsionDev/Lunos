@@ -1312,6 +1312,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Po skupini",
   "sessions.monitor.tag": "Označi {{session}} v pozivu",
   "sessions.monitor.queuedCount": "V čakalni vrsti: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "V čakalni vrsti: {{count}} (lastnik zaprt)",
   "sessions.monitor.ask.permission": "Odobri: {{request}}",
   "sessions.monitor.ask.question": "Sprašuje: {{question}}",
   "sessions.monitor.approve": "Odobri",
@@ -1336,6 +1337,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, ki je izvajal »{{title}}«, se je ustavil pred koncem poteze. Želite poziv namesto tega izvesti v tem Lunos?",
   "sessions.monitor.takeover.confirm": "Prevzemi",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, ki je izvajal »{{title}}«, se je zaprl s pozivi, ki še čakajo v vrsti. V čakalni vrsti: {{count}}. Vaš poziv se izvede v tem Lunos, za njimi, če jih pošljete.",
+  "sessions.monitor.takeover.queuedLabel": "Pozivi v čakalni vrsti",
+  "sessions.monitor.takeover.queuedSend": "Najprej jih pošlji, po vrsti ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Zavrzi jih ({{count}})",
   "sessions.monitor.send.question.one": "Pošljem {{count}} seji?",
   "sessions.monitor.send.question.two": "Pošljem {{count}} sejama?",
   "sessions.monitor.send.question.few": "Pošljem {{count}} sejam?",

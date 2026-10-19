@@ -1340,6 +1340,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Par groupe",
   "sessions.monitor.tag": "Mentionner {{session}} dans le prompt",
   "sessions.monitor.queuedCount": "En file d'attente : {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "En file d'attente : {{count}} (le Lunos propriétaire s'est fermé)",
   "sessions.monitor.ask.permission": "Approuver : {{request}}",
   "sessions.monitor.ask.question": "Demande : {{question}}",
   "sessions.monitor.approve": "Approuver",
@@ -1365,6 +1366,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Le Lunos qui exécutait « {{title}} » s'est arrêté avant la fin de son tour. Exécuter votre prompt dans ce Lunos à la place ?",
   "sessions.monitor.takeover.confirm": "Reprendre",
+  "sessions.monitor.takeover.queuedBody":
+    "Le Lunos qui exécutait « {{title}} » s'est fermé avec des prompts encore en file d'attente. En file d'attente : {{count}}. Votre prompt s'exécute dans ce Lunos, après eux si vous les envoyez.",
+  "sessions.monitor.takeover.queuedLabel": "Prompts en file d'attente",
+  "sessions.monitor.takeover.queuedSend": "Les envoyer d'abord, dans l'ordre ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Les abandonner ({{count}})",
   "sessions.monitor.send.question.one": "Envoyer à {{count}} session ?",
   "sessions.monitor.send.question.many": "Envoyer à {{count}} de sessions ?",
   "sessions.monitor.send.question.other": "Envoyer à {{count}} sessions ?",

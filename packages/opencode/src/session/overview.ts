@@ -46,6 +46,11 @@ export interface Item {
   questions: number
   /** XCOD-262: prompts the process that runs it holds until its turn ends. */
   queued?: number
+  /**
+   * XCOD-262: `queued` are held by a Lunos that stopped: "N queued (owner closed)". They are sent
+   * (or discarded) only when the session is taken over.
+   */
+  ownerClosed?: boolean
   groupID?: string
   /** XCOD-265: when it was cleared from the list. Only archived listings (`archived: true`) have these. */
   archived?: number
@@ -155,8 +160,12 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
   // XCOD-234: other Lunos processes' running and waiting sessions, listed however old they are.
   const peers = SessionPeers.read({ now })
   const livePeers = [...peers].filter(([, peer]) => peer.fresh).map(([id]) => id)
+  // XCOD-262: prompts queued by a Lunos that stopped, listed until the session is taken over.
+  const orphans = SessionPeers.orphans({ now })
   const older = yield* Effect.forEach(
-    (archived ? [] : [...new Set([...SessionLive.active(), ...livePeers])]).filter((id) => !seen.has(id as SessionID)),
+    (archived ? [] : [...new Set([...SessionLive.active(), ...livePeers, ...orphans.keys()])]).filter(
+      (id) => !seen.has(id as SessionID),
+    ),
     (id) =>
       sessions.get(id as SessionID).pipe(
         Effect.map((info) => ({ ...info, project: null }) as Session.GlobalInfo),
@@ -176,6 +185,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
     const peer = peers.get(session.id)
     const derived = state({ activity: local, peer, last: message })
     const activity = derived.elsewhere && peer ? peer : local
+    const orphaned = activity.queued ? 0 : (orphans.get(session.id) ?? 0)
     const model = session.model
       ? `${session.model.providerID}/${session.model.id}`
       : message?.providerID && message.modelID
@@ -202,6 +212,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       permissions: activity.permissions,
       questions: activity.questions,
       ...(activity.queued ? { queued: activity.queued } : {}),
+      ...(orphaned ? { queued: orphaned, ownerClosed: true } : {}),
       ...(group ? { groupID: group } : {}),
       ...(session.time.archived ? { archived: session.time.archived } : {}),
     }

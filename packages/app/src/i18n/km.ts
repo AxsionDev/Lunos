@@ -1286,6 +1286,7 @@ export const dict = {
   "sessions.monitor.view.groups": "តាមក្រុម",
   "sessions.monitor.tag": "ដាក់ស្លាក {{session}} ក្នុងប្រអប់បញ្ចូល",
   "sessions.monitor.queuedCount": "ក្នុងជួរ: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "ក្នុងជួរ: {{count}} (ម្ចាស់បានបិទ)",
   "sessions.monitor.ask.permission": "អនុម័ត: {{request}}",
   "sessions.monitor.ask.question": "សួរ: {{question}}",
   "sessions.monitor.approve": "អនុម័ត",
@@ -1309,6 +1310,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'Lunos ដែលដំណើរការ "{{title}}" បានឈប់មុនវេនចប់។ ដំណើរការសំណើរបស់អ្នកក្នុង Lunos នេះជំនួសវិញ?',
   "sessions.monitor.takeover.confirm": "យកមកគ្រប់គ្រង",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos ដែលដំណើរការ «{{title}}» បានបិទ ខណៈមានសំណើនៅក្នុងជួរនៅឡើយ។ ក្នុងជួរ: {{count}}។ សំណើរបស់អ្នកដំណើរការក្នុង Lunos នេះ បន្ទាប់ពីពួកវា ប្រសិនបើអ្នកផ្ញើវា។",
+  "sessions.monitor.takeover.queuedLabel": "សំណើក្នុងជួរ",
+  "sessions.monitor.takeover.queuedSend": "ផ្ញើមុន តាមលំដាប់ ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "បោះបង់ ({{count}})",
   "sessions.monitor.send.question.one": "ផ្ញើទៅ {{count}} សម័យ?",
   "sessions.monitor.send.question.other": "ផ្ញើទៅ {{count}} សម័យ?",
   "sessions.monitor.sent": 'បានផ្ញើទៅ "{{title}}"',

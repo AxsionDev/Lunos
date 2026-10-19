@@ -1321,6 +1321,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Pagal grupę",
   "sessions.monitor.tag": "Pažymėti {{session}} užklausoje",
   "sessions.monitor.queuedCount": "Eilėje: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Eilėje: {{count}} (savininkas uždarytas)",
   "sessions.monitor.ask.permission": "Patvirtinti: {{request}}",
   "sessions.monitor.ask.question": "Klausia: {{question}}",
   "sessions.monitor.approve": "Patvirtinti",
@@ -1346,6 +1347,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, kuriame veikė „{{title}}“, sustojo nepabaigęs ėjimo. Vykdyti jūsų užklausą šiame Lunos?",
   "sessions.monitor.takeover.confirm": "Perimti",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, kuriame veikė „{{title}}“, užsidarė su raginimais, vis dar laukiančiais eilėje. Eilėje: {{count}}. Jūsų raginimas vykdomas šiame Lunos, po jų, jei juos išsiųsite.",
+  "sessions.monitor.takeover.queuedLabel": "Raginimai eilėje",
+  "sessions.monitor.takeover.queuedSend": "Pirmiausia išsiųsti, iš eilės ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Atmesti juos ({{count}})",
   "sessions.monitor.send.question.one": "Siųsti {{count}} seansui?",
   "sessions.monitor.send.question.few": "Siųsti {{count}} seansams?",
   "sessions.monitor.send.question.many": "Siųsti {{count}} seanso?",

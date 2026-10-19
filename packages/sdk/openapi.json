@@ -3939,6 +3939,105 @@
         ]
       }
     },
+    "/experimental/session/{sessionID}/takeover": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.session.takeover",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What was sent and discarded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTakeoverResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Run a session here whose Lunos process stopped, after the user confirmed it. The prompts that process had queued for it are sent first, in order (queued: send), or dropped (queued: discard); then text, if given. Refused while another Lunos runs the session, or while the process that queued them still exists. Audited as session.takeover, without the text.",
+        "summary": "Take over a session whose Lunos stopped",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "queued": {
+                    "type": "string",
+                    "enum": ["send", "discard"]
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": ["queued"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.session.takeover({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/experimental/peer/{sessionID}/prompt": {
       "post": {
         "tags": ["experimental"],
@@ -27701,6 +27800,9 @@
             "type": "integer",
             "minimum": 0
           },
+          "ownerClosed": {
+            "type": "boolean"
+          },
           "groupID": {
             "type": "string"
           },
@@ -28040,6 +28142,29 @@
           }
         },
         "required": ["delivery"],
+        "additionalProperties": false
+      },
+      "SessionTakeoverResult": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "discarded": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "delivery": {
+            "type": "string",
+            "enum": ["now", "queued", "interrupted", "answered"]
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["sent", "discarded"],
         "additionalProperties": false
       },
       "McpResource": {

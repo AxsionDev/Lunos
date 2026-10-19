@@ -36,6 +36,12 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   starts a new session in the project you pick, or sends to the sessions you tag with `@2` or `@`
   and part of a name, shown as chips; sending to several asks first. "By group" still shows your
   groups. <!-- XCOD-262 -->
+- **Prompts you queued for a busy session survive its Lunos closing.** If the Lunos running a
+  session quits or crashes with prompts still queued for it, the session shows "2 queued (owner
+  closed)" in the Agent Monitor and the Sessions window. Nothing sends them until you take the
+  session over: the confirmation says how many there are, and offers to send them first, in order,
+  or discard them. A prompt is never sent twice. The Sessions window also remembers whether you
+  last arranged the list by status or by group. <!-- XCOD-262 -->
 - **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory, if you
   agree.** The first time per tool and project, Lunos asks: Share, Not now, or Never for this tool.
   Their results are sent to Anthropic or OpenAI with your prompts, so nothing is offered until you

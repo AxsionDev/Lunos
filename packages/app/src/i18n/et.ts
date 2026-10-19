@@ -1286,6 +1286,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Grupi järgi",
   "sessions.monitor.tag": "Märgi {{session}} viibas",
   "sessions.monitor.queuedCount": "Järjekorras: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Järjekorras: {{count}} (omanik suleti)",
   "sessions.monitor.ask.permission": "Kinnita: {{request}}",
   "sessions.monitor.ask.question": "Küsib: {{question}}",
   "sessions.monitor.approve": "Kinnita",
@@ -1309,6 +1310,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, mis käitas seanssi „{{title}}“, peatus enne käigu lõppu. Kas käitada sinu viip selle asemel selles Lunoses?",
   "sessions.monitor.takeover.confirm": "Võta üle",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, milles „{{title}}“ töötas, suleti, kui järjekorras olid veel viibad. Järjekorras: {{count}}. Sinu viip käivitub selles Lunoses, nende järel, kui need saadad.",
+  "sessions.monitor.takeover.queuedLabel": "Järjekorras viibad",
+  "sessions.monitor.takeover.queuedSend": "Saada need esmalt, järjekorras ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Loobu neist ({{count}})",
   "sessions.monitor.send.question.one": "Kas saata {{count}} seansile?",
   "sessions.monitor.send.question.other": "Kas saata {{count}} seansile?",
   "sessions.monitor.sent": "Saadetud seansile „{{title}}“",

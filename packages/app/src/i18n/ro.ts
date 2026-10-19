@@ -1304,6 +1304,7 @@ export const dict = {
   "sessions.monitor.view.groups": "După grup",
   "sessions.monitor.tag": "Etichetează {{session}} în prompt",
   "sessions.monitor.queuedCount": "În coadă: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "În coadă: {{count}} (proprietarul s-a închis)",
   "sessions.monitor.ask.permission": "Aprobă: {{request}}",
   "sessions.monitor.ask.question": "Întreabă: {{question}}",
   "sessions.monitor.approve": "Aprobă",
@@ -1329,6 +1330,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos-ul care rula „{{title}}” s-a oprit înainte de finalul turei. Rulezi promptul tău în acest Lunos?",
   "sessions.monitor.takeover.confirm": "Preia",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos-ul care rula „{{title}}” s-a închis cu prompturi încă în coadă. În coadă: {{count}}. Promptul tău rulează în acest Lunos, după ele dacă le trimiți.",
+  "sessions.monitor.takeover.queuedLabel": "Prompturi în coadă",
+  "sessions.monitor.takeover.queuedSend": "Trimite-le întâi, în ordine ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Renunță la ele ({{count}})",
   "sessions.monitor.send.question.one": "Trimiți la {{count}} sesiune?",
   "sessions.monitor.send.question.few": "Trimiți la {{count}} sesiuni?",
   "sessions.monitor.send.question.other": "Trimiți la {{count}} de sesiuni?",

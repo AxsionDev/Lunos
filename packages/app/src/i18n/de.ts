@@ -1320,6 +1320,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Nach Gruppe",
   "sessions.monitor.tag": "{{session}} im Prompt markieren",
   "sessions.monitor.queuedCount": "In der Warteschlange: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "In der Warteschlange: {{count}} (Besitzer geschlossen)",
   "sessions.monitor.ask.permission": "Genehmigen: {{request}}",
   "sessions.monitor.ask.question": "Fragt: {{question}}",
   "sessions.monitor.approve": "Genehmigen",
@@ -1345,6 +1346,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Das Lunos, in dem „{{title}}“ lief, wurde beendet, bevor der Durchgang fertig war. Deinen Prompt stattdessen in diesem Lunos ausführen?",
   "sessions.monitor.takeover.confirm": "Übernehmen",
+  "sessions.monitor.takeover.queuedBody":
+    "Das Lunos, in dem „{{title}}“ lief, wurde mit noch wartenden Prompts beendet. In der Warteschlange: {{count}}. Dein Prompt läuft in diesem Lunos, nach ihnen, wenn du sie sendest.",
+  "sessions.monitor.takeover.queuedLabel": "Wartende Prompts",
+  "sessions.monitor.takeover.queuedSend": "Zuerst senden, der Reihe nach ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Verwerfen ({{count}})",
   "sessions.monitor.send.question.one": "An {{count}} Sitzung senden?",
   "sessions.monitor.send.question.other": "An {{count}} Sitzungen senden?",
   "sessions.monitor.sent": "An „{{title}}“ gesendet",

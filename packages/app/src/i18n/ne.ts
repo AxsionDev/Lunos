@@ -1293,6 +1293,7 @@ export const dict: Record<string, string> = {
   "sessions.monitor.view.groups": "समूह अनुसार",
   "sessions.monitor.tag": "प्रम्प्टमा {{session}} ट्याग गर्नुहोस्",
   "sessions.monitor.queuedCount": "लाइनमा: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "लाइनमा: {{count}} (मालिक बन्द भयो)",
   "sessions.monitor.ask.permission": "स्वीकृत गर्नुहोस्: {{request}}",
   "sessions.monitor.ask.question": "सोध्दैछ: {{question}}",
   "sessions.monitor.approve": "स्वीकृत गर्नुहोस्",
@@ -1316,6 +1317,11 @@ export const dict: Record<string, string> = {
   "sessions.monitor.takeover.body":
     '"{{title}}" चलाइरहेको Lunos पालो सकिनुअघि नै रोकियो। बरु तपाईंको प्रम्प्ट यो Lunos मा चलाउने हो?',
   "sessions.monitor.takeover.confirm": "लिनुहोस्",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” चलाउने Lunos लाइनमा प्रम्प्टहरू बाँकी रहँदै बन्द भयो। लाइनमा: {{count}}। तपाईंको प्रम्प्ट यो Lunos मा चल्छ, पठाउनुभयो भने तिनीहरूपछि।",
+  "sessions.monitor.takeover.queuedLabel": "लाइनमा रहेका प्रम्प्टहरू",
+  "sessions.monitor.takeover.queuedSend": "पहिले क्रमैसँग पठाउनुहोस् ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "हटाउनुहोस् ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} सत्रमा पठाउने हो?",
   "sessions.monitor.send.question.other": "{{count}} सत्रहरूमा पठाउने हो?",
   "sessions.monitor.sent": '"{{title}}" मा पठाइयो',

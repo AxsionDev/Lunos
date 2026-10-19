@@ -1296,6 +1296,7 @@ export const dict = {
   "sessions.monitor.view.groups": "گروپ موجب",
   "sessions.monitor.tag": "پرامپٹ وچ {{session}} نوں ٹیگ کرو",
   "sessions.monitor.queuedCount": "قطار وچ: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "قطار وچ: {{count}} (مالک بند ہو گیا)",
   "sessions.monitor.ask.permission": "منظور کرو: {{request}}",
   "sessions.monitor.ask.question": "پچھ رہیا اے: {{question}}",
   "sessions.monitor.approve": "منظور کرو",
@@ -1319,6 +1320,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'جیہڑا Lunos "{{title}}" چلا رہیا سی اوہ واری مکن توں پہلاں رک گیا۔ اوہدی تھاں اپنا پرامپٹ ایس Lunos وچ چلاؤ؟',
   "sessions.monitor.takeover.confirm": "سنبھالو",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” چلان والا Lunos قطار وچ پرامپٹاں ہوندیاں بند ہو گیا۔ قطار وچ: {{count}}۔ تہاڈا پرامپٹ ایس Lunos وچ چلے گا، جے تسیں اوہناں نوں گھلو تے اوہناں توں بعد۔",
+  "sessions.monitor.takeover.queuedLabel": "قطار وچ پرامپٹ",
+  "sessions.monitor.takeover.queuedSend": "پہلاں ترتیب نال گھلو ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "رد کرو ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} سیشن نوں بھیجو؟",
   "sessions.monitor.send.question.other": "{{count}} سیشناں نوں بھیجو؟",
   "sessions.monitor.sent": '"{{title}}" نوں بھیج دتا',

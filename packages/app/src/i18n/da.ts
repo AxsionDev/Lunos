@@ -1382,6 +1382,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Efter gruppe",
   "sessions.monitor.tag": "Tag {{session}} i prompten",
   "sessions.monitor.queuedCount": "I kø: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "I kø: {{count}} (ejeren er lukket)",
   "sessions.monitor.ask.permission": "Godkend: {{request}}",
   "sessions.monitor.ask.question": "Spørger: {{question}}",
   "sessions.monitor.approve": "Godkend",
@@ -1405,6 +1406,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'Den Lunos, der kørte "{{title}}", stoppede, før turen var færdig. Kør din prompt i denne Lunos i stedet?',
   "sessions.monitor.takeover.confirm": "Overtag",
+  "sessions.monitor.takeover.queuedBody":
+    'Den Lunos, der kørte "{{title}}", lukkede med prompts stadig i kø. I kø: {{count}}. Din prompt kører i denne Lunos, efter dem hvis du sender dem.',
+  "sessions.monitor.takeover.queuedLabel": "Prompts i kø",
+  "sessions.monitor.takeover.queuedSend": "Send dem først, i rækkefølge ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Kassér dem ({{count}})",
   "sessions.monitor.send.question.one": "Send til {{count}} session?",
   "sessions.monitor.send.question.other": "Send til {{count}} sessioner?",
   "sessions.monitor.sent": 'Sendt til "{{title}}"',

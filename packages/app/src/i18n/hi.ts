@@ -1298,6 +1298,7 @@ export const dict = {
   "sessions.monitor.view.groups": "समूह के अनुसार",
   "sessions.monitor.tag": "प्रॉम्प्ट में {{session}} को टैग करें",
   "sessions.monitor.queuedCount": "कतार में: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "कतार में: {{count}} (स्वामी बंद)",
   "sessions.monitor.ask.permission": "स्वीकृत करें: {{request}}",
   "sessions.monitor.ask.question": "पूछ रहा है: {{question}}",
   "sessions.monitor.approve": "स्वीकृत करें",
@@ -1321,6 +1322,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'जो Lunos "{{title}}" चला रहा था वह बारी खत्म होने से पहले रुक गया। इसके बजाय अपना प्रॉम्प्ट इस Lunos में चलाएँ?',
   "sessions.monitor.takeover.confirm": "संभालें",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” चलाने वाला Lunos कतार में बचे प्रॉम्प्ट के साथ बंद हो गया। कतार में: {{count}}। आपका प्रॉम्प्ट इस Lunos में चलेगा, भेजने पर उनके बाद।",
+  "sessions.monitor.takeover.queuedLabel": "कतार में प्रॉम्प्ट",
+  "sessions.monitor.takeover.queuedSend": "पहले क्रम से भेजें ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "हटा दें ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} सेशन को भेजें?",
   "sessions.monitor.send.question.other": "{{count}} सेशनों को भेजें?",
   "sessions.monitor.sent": '"{{title}}" को भेजा गया',

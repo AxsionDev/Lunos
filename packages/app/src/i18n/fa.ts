@@ -1290,6 +1290,7 @@ export const dict = {
   "sessions.monitor.view.groups": "بر اساس گروه",
   "sessions.monitor.tag": "برچسب زدن {{session}} در پیام",
   "sessions.monitor.queuedCount": "در صف: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "در صف: {{count}} (Lunos مالک بسته شد)",
   "sessions.monitor.ask.permission": "تأیید: {{request}}",
   "sessions.monitor.ask.question": "می‌پرسد: {{question}}",
   "sessions.monitor.approve": "تأیید",
@@ -1314,6 +1315,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunosی که «{{title}}» را اجرا می‌کرد پیش از پایان نوبت متوقف شد. پیام شما به‌جای آن در این Lunos اجرا شود؟",
   "sessions.monitor.takeover.confirm": "در دست گرفتن",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos ای که «{{title}}» را اجرا می‌کرد با پرامپت‌هایی که هنوز در صف بودند بسته شد. در صف: {{count}}. پرامپت شما در این Lunos اجرا می‌شود، اگر آن‌ها را بفرستید پس از آن‌ها.",
+  "sessions.monitor.takeover.queuedLabel": "پرامپت‌های در صف",
+  "sessions.monitor.takeover.queuedSend": "اول به‌ترتیب ارسال شوند ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "دور ریختن آن‌ها ({{count}})",
   "sessions.monitor.send.question.one": "به {{count}} جلسه فرستاده شود؟",
   "sessions.monitor.send.question.other": "به {{count}} جلسه فرستاده شود؟",
   "sessions.monitor.sent": "به «{{title}}» فرستاده شد",

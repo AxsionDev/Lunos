@@ -1397,6 +1397,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Gruba göre",
   "sessions.monitor.tag": "{{session}} oturumunu istemde etiketle",
   "sessions.monitor.queuedCount": "Sırada: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Sırada: {{count}} (sahibi kapandı)",
   "sessions.monitor.ask.permission": "Onayla: {{request}}",
   "sessions.monitor.ask.question": "Soruyor: {{question}}",
   "sessions.monitor.approve": "Onayla",
@@ -1421,6 +1422,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     '"{{title}}" oturumunu çalıştıran Lunos, tur bitmeden durdu. İsteminiz bunun yerine bu Lunos\'ta çalıştırılsın mı?',
   "sessions.monitor.takeover.confirm": "Devral",
+  "sessions.monitor.takeover.queuedBody":
+    '"{{title}}" oturumunu çalıştıran Lunos, sırada bekleyen istemlerle kapandı. Sırada: {{count}}. İsteminiz bu Lunos\'ta çalışır, gönderirseniz onlardan sonra.',
+  "sessions.monitor.takeover.queuedLabel": "Sıradaki istemler",
+  "sessions.monitor.takeover.queuedSend": "Önce sırayla gönder ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Onları at ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} oturuma gönderilsin mi?",
   "sessions.monitor.send.question.other": "{{count}} oturuma gönderilsin mi?",
   "sessions.monitor.sent": '"{{title}}" oturumuna gönderildi',

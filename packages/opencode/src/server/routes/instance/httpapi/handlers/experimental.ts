@@ -23,6 +23,7 @@ import {
   PeerAsks,
   ConsoleSwitchPayload,
   SessionEnqueuePayload,
+  SessionTakeoverPayload,
   SessionGroupCreatePayload,
   SessionGroupMovePayload,
   SessionGroupUpdatePayload,
@@ -476,6 +477,25 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       text.trim() && text.length <= SessionPromptQueue.MAX_TEXT
         ? Effect.succeed(text)
         : Effect.fail(new InvalidRequestError({ message: "A prompt is non-empty text of at most 100,000 characters." }))
+    const notDrivenElsewhere = (sessionID: string) => {
+      const peer = SessionPeers.read().get(sessionID)
+      return peer?.fresh && (peer.status || peer.permissions > 0 || peer.questions > 0 || peer.queued)
+        ? Effect.fail(
+            new InvalidRequestError({
+              message: "Another Lunos on this computer runs that session; the prompt goes to it.",
+            }),
+          )
+        : Effect.void
+    }
+    const agentOf = Effect.fn("ExperimentalHttpApi.agentOf")(function* (info: Session.Info) {
+      const lastUser = yield* sessions
+        .findMessage(info.id, (message) => message.info.role === "user")
+        .pipe(Effect.orElseSucceed(() => Option.none()))
+      return SessionPromptQueue.agentFor(
+        info,
+        Option.isSome(lastUser) ? (lastUser.value.info as { agent?: string }).agent : undefined,
+      )
+    })
     const sessionEnqueue = Effect.fn("ExperimentalHttpApi.sessionEnqueue")(function* (ctx: {
       params: { sessionID: string }
       payload: typeof SessionEnqueuePayload.Type
@@ -483,18 +503,14 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       const text = yield* promptText(ctx.payload.text)
       const sessionID = SessionID.make(ctx.params.sessionID)
       const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.fail(notFound("No such session."))))
-      const peer = SessionPeers.read().get(sessionID)
-      if (peer?.fresh && (peer.status || peer.permissions > 0 || peer.questions > 0 || peer.queued))
+      yield* notDrivenElsewhere(sessionID)
+      // Prompts a stopped Lunos queued for it go first, and only once the user has taken it over.
+      const orphaned = SessionPeers.orphans().get(sessionID)
+      if (orphaned)
         return yield* new InvalidRequestError({
-          message: "Another Lunos on this computer runs that session; the prompt goes to it.",
+          message: `A Lunos that closed queued ${orphaned} prompt(s) for this session that haven't been sent. Take the session over first, sending or discarding them.`,
         })
-      const lastUser = yield* sessions
-        .findMessage(sessionID, (message) => message.info.role === "user")
-        .pipe(Effect.orElseSucceed(() => Option.none()))
-      const agent = SessionPromptQueue.agentFor(
-        info,
-        Option.isSome(lastUser) ? (lastUser.value.info as { agent?: string }).agent : undefined,
-      )
+      const agent = yield* agentOf(info)
       return yield* Effect.tryPromise({
         try: () =>
           SessionPromptQueue.submit({
@@ -506,6 +522,29 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
             ...(ctx.payload.variant ? { variant: ctx.payload.variant } : {}),
             interrupt: ctx.payload.interrupt === true,
             via: ctx.payload.via ?? "local",
+          }),
+        catch: (error) => new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+    })
+    // XCOD-262: the user confirmed "Take over this session here?"; the prompts its stopped Lunos
+    // queued are sent or discarded, then the new prompt runs.
+    const sessionTakeover = Effect.fn("ExperimentalHttpApi.sessionTakeover")(function* (ctx: {
+      params: { sessionID: string }
+      payload: typeof SessionTakeoverPayload.Type
+    }) {
+      const text = ctx.payload.text === undefined ? undefined : yield* promptText(ctx.payload.text)
+      const sessionID = SessionID.make(ctx.params.sessionID)
+      const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.fail(notFound("No such session."))))
+      yield* notDrivenElsewhere(sessionID)
+      const agent = yield* agentOf(info)
+      return yield* Effect.tryPromise({
+        try: () =>
+          SessionPromptQueue.takeover({
+            sessionID,
+            directory: info.directory,
+            queued: ctx.payload.queued,
+            ...(text !== undefined ? { text } : {}),
+            ...(agent ? { agent } : {}),
           }),
         catch: (error) => new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
       })
@@ -566,6 +605,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("peerQuestionReply", peerQuestionReply)
       .handle("peerQuestionReject", peerQuestionReject)
       .handle("sessionEnqueue", sessionEnqueue)
+      .handle("sessionTakeover", sessionTakeover)
       .handle("peerPrompt", peerPrompt)
       .handle("resource", resource)
   }),

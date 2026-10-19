@@ -1307,6 +1307,7 @@ export const dict = {
   "sessions.monitor.view.groups": "По група",
   "sessions.monitor.tag": "Отбележи {{session}} в заявката",
   "sessions.monitor.queuedCount": "На опашка: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "На опашка: {{count}} (собственикът е затворен)",
   "sessions.monitor.ask.permission": "Одобри: {{request}}",
   "sessions.monitor.ask.question": "Пита: {{question}}",
   "sessions.monitor.approve": "Одобри",
@@ -1330,6 +1331,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, в който работеше „{{title}}“, спря преди края на хода. Да се изпълни ли заявката ви в този Lunos?",
   "sessions.monitor.takeover.confirm": "Поеми",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, в който вървеше „{{title}}“, се затвори с подкани, още чакащи на опашка. На опашка: {{count}}. Вашата подкана ще се изпълни в този Lunos, след тях, ако ги изпратите.",
+  "sessions.monitor.takeover.queuedLabel": "Подкани на опашка",
+  "sessions.monitor.takeover.queuedSend": "Първо ги изпрати, по ред ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Отхвърли ги ({{count}})",
   "sessions.monitor.send.question.one": "Да се изпрати ли до {{count}} сесия?",
   "sessions.monitor.send.question.other": "Да се изпрати ли до {{count}} сесии?",
   "sessions.monitor.sent": "Изпратено до „{{title}}“",

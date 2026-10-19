@@ -1303,6 +1303,7 @@ export const dict = {
   "sessions.monitor.view.groups": "По групи",
   "sessions.monitor.tag": "Означи {{session}} у упиту",
   "sessions.monitor.queuedCount": "На чекању: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "На чекању: {{count}} (власник затворен)",
   "sessions.monitor.ask.permission": "Одобри: {{request}}",
   "sessions.monitor.ask.question": "Пита: {{question}}",
   "sessions.monitor.approve": "Одобри",
@@ -1326,6 +1327,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos који је извршавао „{{title}}“ зауставио се пре краја потеза. Покренути ваш упит уместо тога у овом Lunos-у?",
   "sessions.monitor.takeover.confirm": "Преузми",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos који је извршавао „{{title}}“ затворен је са упитима који још чекају. На чекању: {{count}}. Ваш упит се извршава у овом Lunos-у, после њих ако их пошаљете.",
+  "sessions.monitor.takeover.queuedLabel": "Упити на чекању",
+  "sessions.monitor.takeover.queuedSend": "Прво их пошаљи, редом ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Одбаци их ({{count}})",
   "sessions.monitor.send.question.one": "Послати {{count}} сесији?",
   "sessions.monitor.send.question.few": "Послати на {{count}} сесије?",
   "sessions.monitor.send.question.other": "Послати на {{count}} сесија?",
