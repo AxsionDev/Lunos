@@ -64,12 +64,14 @@ import { parseRestartSlash } from "../../util/restart"
 import { parseSettingsSlash } from "../../util/settings"
 import {
   EXTERNAL_BADGE,
+  EXTERNAL_LABEL,
   externalAccent,
   externalBadge,
   externalOf,
   parseExternalSlash,
   parseToolSlash,
 } from "../../util/external"
+import { lunosCommand, UNAVAILABLE } from "../../util/external-commands"
 import * as Sections from "../../util/settings-sections"
 import { requestSettings } from "../../util/settings-sections"
 import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
@@ -1147,15 +1149,35 @@ export function Prompt(props: PromptProps) {
     const external = props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined
     if (props.sessionID && external) {
       const text = store.prompt.input
-      sdk.client.session
-        .prompt(
-          // No agent: the current mode (plan, say) mustn't refuse every approval the tool asks for.
-          { sessionID: props.sessionID, parts: [{ type: "text", text }] },
-          { throwOnError: true },
-        )
-        .catch((error) =>
-          toast.show({ title: "Failed to send prompt", message: errorMessage(error), variant: "error" }),
-        )
+      // XCOD-254: a Lunos command (`/name`, or `/name:lunos` on a clash) is expanded by Lunos, and the
+      // text it makes goes to the tool; anything else goes as typed.
+      const command = lunosCommand(
+        text,
+        external.commands ?? [],
+        sync.data.command.filter((item) => item.source !== "skill").map((item) => item.name),
+      )
+      const name = command?.name
+      const unavailable = !command && text.startsWith("/") ? text.slice(1).split(/\s/)[0]! : undefined
+      if (unavailable && UNAVAILABLE.has(unavailable) && !(external.commands ?? []).includes(unavailable)) {
+        toast.show({
+          variant: "info",
+          message: `/${unavailable} isn't available in a ${EXTERNAL_LABEL[external.tool]} session`,
+        })
+        return false
+      }
+      ;(name
+        ? sdk.client.session.command(
+            { sessionID: props.sessionID, command: name, arguments: command!.args },
+            { throwOnError: true },
+          )
+        : sdk.client.session.prompt(
+            // No agent: the current mode (plan, say) mustn't refuse every approval the tool asks for.
+            { sessionID: props.sessionID, parts: [{ type: "text", text }] },
+            { throwOnError: true },
+          )
+      ).catch((error: unknown) =>
+        toast.show({ title: "Failed to send prompt", message: errorMessage(error), variant: "error" }),
+      )
       history.append({ ...store.prompt, mode: store.mode })
       input.extmarks.clear()
       setStore("prompt", { input: "", parts: [] })

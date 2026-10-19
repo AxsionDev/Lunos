@@ -85,6 +85,12 @@ A Claude Code or Codex session looks different from a Lunos one, so you don't se
 
 Claude Code is a product of Anthropic; Codex is a product of OpenAI. Lunos is not affiliated with either, and uses the products' plain names next to its own.
 
+### Your Lunos commands in a Claude Code or Codex session
+
+The prompt's `/` list shows the tool's own commands ("Claude Code command") and your Lunos custom commands and MCP prompts ("Lunos command"). A Lunos command is expanded by Lunos (its template, arguments and `@file` references) and the text it makes goes to the tool. When both have a command of the same name, the tool's keeps the bare name and Lunos's is `/<name>:lunos`, so `/review` in Codex is Codex's and `/review:lunos` is yours.
+
+Lunos commands that switch a Lunos agent, mode or model (`/agents`, `/modes`, `/models`, `/providers`, `/variants`) are shown greyed out with "Not available in a Claude Code session" and never sent to the tool. Lunos's own screens (`/settings`, `/marketplace`, `/memory`, `/help`, …) work as usual.
+
 ## Handing a task from a Lunos agent
 
 To let Lunos agents hand a task to Claude Code or Codex CLI, turn on the `external_agent` tool:

@@ -63,6 +63,7 @@ import { DialogSettings } from "./component/dialog-settings"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
+import { DialogLsp } from "./component/dialog-lsp"
 import { DialogMode } from "./component/dialog-mode"
 import { DialogAgentList } from "./component/dialog-agent-settings"
 import { DialogSessionList } from "./component/dialog-session-list"
@@ -1165,6 +1166,16 @@ function App(props: {
           if (locked()) unlock()
           else lock()
           dialog.clear()
+        },
+        category: "System",
+      },
+      {
+        // XCOD-257: whether LSP works, each server's state and why one failed.
+        name: "lsp.panel",
+        title: "Language servers (LSP)",
+        slashName: "lsp",
+        run: () => {
+          dialog.replace(() => <DialogLsp />)
         },
         category: "System",
       },

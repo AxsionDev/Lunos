@@ -135,8 +135,14 @@ import type {
   InstanceDisposeErrors,
   InstanceDisposeResponses,
   LocationRef,
+  LspLogErrors,
+  LspLogResponses,
+  LspServersErrors,
+  LspServersResponses,
   LspStatusErrors,
   LspStatusResponses,
+  LspStopErrors,
+  LspStopResponses,
   McpAddErrors,
   McpAddResponses,
   McpAuthAuthenticateErrors,
@@ -3114,6 +3120,107 @@ export class Lsp extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<LspStatusResponses, LspStatusErrors, ThrowOnError>({
       url: "/lsp",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List LSP servers
+   *
+   * XCOD-257: every built-in and custom language server with its state (running, starting, failed with the reason, not started, off), source, PID and diagnostics count, and whether LSP and downloads are on.
+   */
+  public servers<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<LspServersResponses, LspServersErrors, ThrowOnError>({
+      url: "/lsp/servers",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Stop or restart an LSP server
+   *
+   * Stops the server's running clients. With restart, a recorded failure is forgotten too, so the next matching file starts it again.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      serverID: string
+      directory?: string
+      workspace?: string
+      restart?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "serverID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "restart" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<LspStopResponses, LspStopErrors, ThrowOnError>({
+      url: "/lsp/{serverID}/stop",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * LSP server log
+   *
+   * The last 200 lines the server wrote to stderr in this session.
+   */
+  public log<ThrowOnError extends boolean = false>(
+    parameters: {
+      serverID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "serverID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<LspLogResponses, LspLogErrors, ThrowOnError>({
+      url: "/lsp/{serverID}/log",
       ...options,
       ...params,
     })
