@@ -1,0 +1,16 @@
+{"from":"argv","argv":["app-server"]}
+{"from":"host","message":{"id":1,"method":"initialize","params":{"clientInfo":{"name":"lunos","version":"1"}}}}
+{"from":"tool","message":{"id":1,"result":{"userAgent":"codex/0.160.1"}}}
+{"from":"host","message":{"method":"initialized"}}
+{"from":"host","message":{"id":2,"method":"thread/resume","params":{"threadId":"01a116f2-5e88-79d3-afb9-db1da07c9fcd","cwd":"<project>","sandbox":"read-only","approvalPolicy":"untrusted"}}}
+{"from":"tool","message":{"id":2,"result":{"thread":{"id":"01a116f2-5e88-79d3-afb9-db1da07c9fcd"},"model":"gpt-5.5"}}}
+{"from":"host","message":{"id":3,"method":"thread/compact/start","params":{"threadId":"01a116f2-5e88-79d3-afb9-db1da07c9fcd"}}}
+{"from":"tool","message":{"id":3,"result":{}}}
+{"from":"tool","message":{"method":"thread/status/changed","params":{"threadId":"01a11e7b-a4ae-78f1-af08-ff87792c2301","status":{"type":"active","activeFlags":[]}},"emittedAtMs":1791512798895}}
+{"from":"tool","message":{"method":"turn/started","params":{"threadId":"01a11e7b-a4ae-78f1-af08-ff87792c2301","turn":{"id":"01a11e7b-e6a1-7623-ba39-5bcbdebac645","items":[],"itemsView":"notLoaded","status":"inProgress","error":null,"startedAt":1791512798,"completedAt":null,"durationMs":null}},"emittedAtMs":1791512798895}}
+{"from":"tool","message":{"method":"item/started","params":{"item":{"type":"contextCompaction","id":"01a11e7b-e6af-7672-882c-d9c02cb7aaae"},"threadId":"01a11e7b-a4ae-78f1-af08-ff87792c2301","turnId":"01a11e7b-e6a1-7623-ba39-5bcbdebac645","startedAtMs":1791512798895},"emittedAtMs":1791512798896}}
+{"from":"tool","message":{"method":"thread/tokenUsage/updated","params":{"threadId":"01a11e7b-a4ae-78f1-af08-ff87792c2301","turnId":"01a11e7b-e6a1-7623-ba39-5bcbdebac645","tokenUsage":{"total":{"totalTokens":0,"inputTokens":0,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":0,"reasoningOutputTokens":0},"last":{"totalTokens":5827,"inputTokens":0,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":0,"reasoningOutputTokens":0},"modelContextWindow":258400}},"emittedAtMs":1791512804159}}
+{"from":"tool","message":{"method":"item/completed","params":{"item":{"type":"contextCompaction","id":"01a11e7b-e6af-7672-882c-d9c02cb7aaae"},"threadId":"01a11e7b-a4ae-78f1-af08-ff87792c2301","turnId":"01a11e7b-e6a1-7623-ba39-5bcbdebac645","completedAtMs":1791512804159},"emittedAtMs":1791512804159}}
+{"from":"tool","message":{"method":"thread/status/changed","params":{"threadId":"01a11e7b-a4ae-78f1-af08-ff87792c2301","status":{"type":"idle"}},"emittedAtMs":1791512804161}}
+{"from":"tool","message":{"method":"turn/completed","params":{"threadId":"01a11e7b-a4ae-78f1-af08-ff87792c2301","turn":{"id":"01a11e7b-e6a1-7623-ba39-5bcbdebac645","items":[],"itemsView":"notLoaded","status":"completed","error":null,"startedAt":1791512798,"completedAt":1791512804,"durationMs":5277}},"emittedAtMs":1791512804161}}
+{"from":"exit","code":0,"signal":null}

@@ -1,0 +1,9 @@
+{"from":"argv","argv":["app-server"]}
+{"from":"host","message":{"id":1,"method":"initialize","params":{"clientInfo":{"name":"lunos","version":"1"}}}}
+{"from":"tool","message":{"id":1,"result":{"userAgent":"codex/0.160.1"}}}
+{"from":"host","message":{"method":"initialized"}}
+{"from":"host","message":{"id":2,"method":"model/list","params":{}}}
+{"from":"tool","message":{"id":2,"result":{"data":[{"id":"gpt-5.5","model":"gpt-5.5","displayName":"GPT-5.5","description":"Latest frontier model","isDefault":true}],"nextCursor":"page-2"}}}
+{"from":"host","message":{"id":3,"method":"model/list","params":{"cursor":"page-2"}}}
+{"from":"tool","message":{"id":3,"result":{"data":[{"id":"gpt-5.5-mini","model":"gpt-5.5-mini","displayName":"GPT-5.5 mini","description":"Faster, cheaper","isDefault":false}],"nextCursor":null}}}
+{"from":"exit","code":null,"signal":"SIGTERM"}
