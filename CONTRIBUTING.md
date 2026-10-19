@@ -333,6 +333,26 @@ These are not strictly enforced, they are just general guidelines:
 - **Naming:** Choose concise single-word identifiers when they remain descriptive.
 - **Runtime APIs:** Use Bun helpers such as `Bun.file()` when they fit the use case.
 
+### Writing CHANGELOG.md entries
+
+`CHANGELOG.md` is what users read: in the TUI's "What's new" panel, `/whatsnew`, `lunos update`,
+`lunos changelog` and the GitHub Release. Add one entry under `[Unreleased]` for each change a user
+will notice.
+
+- **No ticket ids in the text.** The tracker is private, so `XCOD-123` means nothing to a reader. Put
+  it in a trailing HTML comment, which a rendered page hides and Lunos strips: `<!-- XCOD-123 -->`.
+- **The bold lead says what the user gets, not what was built.** The summary shows only the lead.
+  - Good: `- **Press Esc twice to clear the prompt** and start again. …`
+  - Not: `- **Double-escape handler in the prompt component.** …`
+- **Mark internal entries `<!-- internal -->`:** audit fields, CI, refactors, dependency bumps with
+  no visible effect, docs-only and test changes. They stay in the file for the record, and only
+  `lunos changelog --full` shows them.
+- **Highlight at most two entries per release** with `<!-- highlight -->`. They lead their section.
+- Fixes go under `### Fixed` and don't need a bold lead; the summary counts them.
+
+`bun script/check-changelog.ts --lint` (run on every pull request) fails on a ticket id outside a
+comment, or a user-facing entry without a bold lead.
+
 ## Feature Requests
 
 For net-new functionality, start with a design conversation. Open an issue describing the problem, your proposed approach (optional), and why it belongs in Lunos. The core team will help decide whether it should move forward; please wait for that approval instead of opening a feature PR directly.

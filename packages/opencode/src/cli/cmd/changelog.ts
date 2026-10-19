@@ -33,7 +33,8 @@ export const ChangelogCommand = {
               version: entry.version,
               section: entry.section,
               text: entry.text,
-              tickets: entry.tickets,
+              // XCOD-253: no ticket ids on anything users read; `tickets` was dropped.
+              internal: entry.internal,
             })),
           ),
           null,
