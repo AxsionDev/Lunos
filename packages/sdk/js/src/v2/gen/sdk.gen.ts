@@ -56,6 +56,8 @@ import type {
   ExperimentalConsoleSwitchOrgResponses,
   ExperimentalControlPlaneMoveSessionErrors,
   ExperimentalControlPlaneMoveSessionResponses,
+  ExperimentalExternalConsentErrors,
+  ExperimentalExternalConsentResponses,
   ExperimentalExternalModelErrors,
   ExperimentalExternalModelResponses,
   ExperimentalExternalModelsErrors,
@@ -1657,6 +1659,49 @@ export class External extends HeyApiClient {
       ThrowOnError
     >({
       url: "/experimental/external/{sessionID}/model",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Share Lunos with Claude Code or Codex
+   *
+   * Whether Lunos's MCP servers, skills and memory are offered to Claude Code or Codex sessions in this project (share), never offered without asking (never), or asked about in the next session (ask). Kept on this machine, never in config. Audited as external.consent.
+   */
+  public consent<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      tool?: "claude" | "codex"
+      answer?: "share" | "never" | "ask"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "tool" },
+            { in: "body", key: "answer" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalConsentResponses,
+      ExperimentalExternalConsentErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/consent",
       ...options,
       ...params,
       headers: {

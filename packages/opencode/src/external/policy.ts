@@ -32,7 +32,11 @@ function auditFile(config: Config) {
   return settings.enabled ? settings.file : undefined
 }
 
-export function record(config: Config, event: "external.session" | "external.denied", fields: Audit.Fields) {
+export function record(
+  config: Config,
+  event: "external.session" | "external.denied" | "external.bridge" | "external.consent",
+  fields: Audit.Fields,
+) {
   const file = auditFile(config)
   if (file) void Audit.write({ file }, event, fields)
 }

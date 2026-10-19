@@ -1798,6 +1798,13 @@ export type ExternalConfig = {
     approval_policy?: "untrusted" | "on-request" | "never" | BlankString
     permission_mode?: string
   }
+  share?: {
+    mcp?: boolean
+    skills?: boolean
+    memory?: boolean
+    commands?: boolean
+    hooks?: boolean
+  }
 }
 
 export type CloudConfig = {
@@ -2765,6 +2772,7 @@ export type ExternalToolStatus = {
     message: string
   }
   permissionModes?: Array<string>
+  consent?: "share" | "never"
 }
 
 export type ExternalModel = {
@@ -9664,6 +9672,39 @@ export type ExperimentalExternalModelResponses = {
 
 export type ExperimentalExternalModelResponse =
   ExperimentalExternalModelResponses[keyof ExperimentalExternalModelResponses]
+
+export type ExperimentalExternalConsentData = {
+  body?: {
+    tool: "claude" | "codex"
+    answer: "share" | "never" | "ask"
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/consent"
+}
+
+export type ExperimentalExternalConsentErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalExternalConsentError =
+  ExperimentalExternalConsentErrors[keyof ExperimentalExternalConsentErrors]
+
+export type ExperimentalExternalConsentResponses = {
+  /**
+   * Answer saved
+   */
+  200: boolean
+}
+
+export type ExperimentalExternalConsentResponse =
+  ExperimentalExternalConsentResponses[keyof ExperimentalExternalConsentResponses]
 
 export type ExperimentalPeerStopData = {
   body?: never

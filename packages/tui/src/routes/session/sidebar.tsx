@@ -9,7 +9,7 @@ import { usePluginRuntime } from "../../plugin/runtime"
 
 import { getScrollAcceleration } from "../../util/scroll"
 import { WorkspaceLabel } from "../../component/workspace-label"
-import { EXTERNAL_BADGE, externalAccent, externalOf } from "../../util/external"
+import { bridgeLine, EXTERNAL_BADGE, externalAccent, externalOf } from "../../util/external"
 
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const pluginRuntime = usePluginRuntime()
@@ -83,9 +83,14 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                       >
                         ●{" "}
                       </span>
-                      <span style={{ fg: theme.textMuted }}>{EXTERNAL_BADGE[marker().tool]} session</span>
+                      <span style={{ fg: theme.textMuted }}>
+                        {EXTERNAL_BADGE[marker().tool]} session{marker().model ? ` · ${marker().model}` : ""}
+                      </span>
                     </text>
                   )}
+                </Show>
+                <Show when={bridgeLine(externalOf(session())?.bridge)}>
+                  {(line) => <text fg={line().warning ? theme.warning : theme.textMuted}>{line().text}</text>}
                 </Show>
                 <Show when={InstallationChannel !== "latest"}>
                   <text fg={theme.textMuted}>{props.sessionID}</text>

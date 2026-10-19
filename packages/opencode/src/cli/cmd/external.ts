@@ -12,6 +12,12 @@ import { ExternalPolicy } from "@/external/policy"
 import { ExternalClaude } from "@/external/claude"
 import { ExternalRegistry } from "@/external/registry"
 import { ExternalRun } from "@/external/run"
+import { ExternalBridge } from "@/external/bridge"
+import { ExternalBridgeTools } from "@/external/bridge-tools"
+import { ExternalConsent } from "@/external/consent"
+import { InstanceState } from "@/effect/instance-state"
+import { Skill } from "@/skill"
+import { Memory } from "@/memory"
 
 // XCOD-204: `lunos external` drives the user's own Claude Code (and, once wired, Codex CLI).
 // Approvals follow `lunos run`'s rule: asked on a terminal, refused when not attached to one
@@ -21,11 +27,15 @@ const out = (line: string) => process.stdout.write(line + EOL)
 
 const ListCommand = effectCmd({
   command: "list",
-  describe: "show which external coding tools are installed, their versions and login state",
-  instance: false,
+  describe:
+    "show which external coding tools are installed, their versions and login state, and what Lunos shares with them here",
   handler: Effect.fn("Cli.external.list")(function* () {
+    const config = yield* Config.Service.use((cfg) => cfg.get())
+    const ctx = yield* InstanceState.context
+    const skills = (yield* Skill.Service.use((skill) => skill.available())).length
+    const memory = (yield* Memory.Service.use((item) => item.decision())).on
     for (const tool of ["claude", "codex"] as const) {
-      const status = yield* Effect.promise(() => ExternalDetect.detect(tool))
+      const status = yield* Effect.promise(() => ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, config)))
       const state = !status.installed
         ? "not installed"
         : status.outdated
@@ -33,7 +43,64 @@ const ListCommand = effectCmd({
           : `${status.version}, ${status.loggedIn === true ? "logged in" : status.loggedIn === false ? "not logged in" : "login state unknown"}`
       out(`${status.label.padEnd(12)} ${state}`)
       if (status.hint) out(`${" ".repeat(13)}${status.hint}`)
+      // XCOD-254: what the Lunos bridge would carry into this tool's sessions in this project.
+      const consent = yield* Effect.promise(() => ExternalConsent.get(ExternalConsent.project(ctx), tool))
+      const refusal = ExternalPolicy.evaluate(tool, config)
+      const bridge = ExternalBridgeTools.preview({
+        tool,
+        config: config as ExternalBridgeTools.Input["config"],
+        skills,
+        memory,
+        consent,
+        ...(status.installed && tool === "claude" ? { mcpConfig: status.mcpConfig === true } : {}),
+        ...(refusal
+          ? {
+              refused:
+                refusal.reason === "residency" ? "the residency policy refuses this tool" : "external sessions are off",
+            }
+          : {}),
+      })
+      out(`${" ".repeat(13)}${ExternalBridge.line(bridge)}`)
     }
+  }),
+})
+
+/**
+ * XCOD-254: the answer to "Share Lunos tools, skills and memory with …?" for this project, as
+ * /settings → External sessions changes it: share, never, or ask (forget the answer).
+ */
+const ShareCommand = effectCmd({
+  command: "share <tool> <answer>",
+  describe: "share Lunos's MCP servers, skills and memory with Claude Code or Codex in this project, or stop",
+  builder: (yargs) =>
+    yargs
+      .positional("tool", { type: "string", choices: ["claude", "codex"], demandOption: true })
+      .positional("answer", {
+        type: "string",
+        choices: ["share", "never", "ask"],
+        demandOption: true,
+        describe: "share: offer them; never: don't, and don't ask; ask: ask again in the next session",
+      }),
+  handler: Effect.fn("Cli.external.share")(function* (args) {
+    const tool = args.tool as ExternalDetect.Tool
+    const answer = args.answer === "ask" ? undefined : (args.answer as ExternalConsent.Answer)
+    const ctx = yield* InstanceState.context
+    const config = yield* Config.Service.use((cfg) => cfg.get())
+    yield* Effect.promise(() => ExternalConsent.set(ExternalConsent.project(ctx), tool, answer))
+    ExternalPolicy.record(config, "external.consent", {
+      tool,
+      provider: ExternalDetect.TOOLS[tool].provider,
+      answer: args.answer as string,
+      origin: "cli",
+    })
+    const label = ExternalDetect.TOOLS[tool].label
+    out(
+      answer === "share"
+        ? `Lunos's MCP servers, skills and memory are offered to ${label} in this project. Their results are sent to ${tool === "claude" ? "Anthropic" : "OpenAI"} with your prompts.`
+        : answer === "never"
+          ? `Nothing from Lunos is offered to ${label} in this project, and you won't be asked.`
+          : `You'll be asked in the next ${label} session in this project.`,
+    )
   }),
 })
 
@@ -233,6 +300,7 @@ export const ExternalCommand = cmd({
       .command(ResumeCommand)
       .command(SessionsCommand)
       .command(StopCommand)
+      .command(ShareCommand)
       .demandCommand(),
   handler: () => {},
 })

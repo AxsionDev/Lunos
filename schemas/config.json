@@ -519,6 +519,33 @@
           },
           "additionalProperties": false,
           "description": "Codex CLI"
+        },
+        "share": {
+          "type": "object",
+          "properties": {
+            "mcp": {
+              "type": "boolean",
+              "description": "Offer Lunos's MCP servers to Claude Code / Codex through the Lunos bridge (default true)"
+            },
+            "skills": {
+              "type": "boolean",
+              "description": "Offer Lunos's skills to Claude Code / Codex through the Lunos bridge (default true)"
+            },
+            "memory": {
+              "type": "boolean",
+              "description": "Let Claude Code / Codex search and add to Lunos memory through the Lunos bridge, while memory is on (default true)"
+            },
+            "commands": {
+              "type": "boolean",
+              "description": "List Lunos's custom commands, skills and MCP prompts in a Claude Code / Codex session (default true)"
+            },
+            "hooks": {
+              "type": "boolean",
+              "description": "Run Lunos plugin hooks on Claude Code / Codex sessions' events (default true; not used yet)"
+            }
+          },
+          "additionalProperties": false,
+          "description": "What Claude Code / Codex sessions may use from Lunos, after you agree to share it with that tool. Their results are sent to Anthropic or OpenAI with your prompts"
         }
       },
       "additionalProperties": false

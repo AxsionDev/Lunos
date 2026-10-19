@@ -36,6 +36,7 @@ const commands: Record<string, { result: unknown; replay: any[] }> = {
 const thread = recorded.find((m) => m.method === "thread/started")?.params.thread.id
 const send = (m: unknown) => console.log(JSON.stringify(m))
 const answers = new Map<number, (m: any) => void>()
+let bridge: any
 const turn = recorded.filter((m) => m.method && !["thread/started"].includes(m.method))
 
 createInterface({ input: process.stdin }).on("line", async (line) => {
@@ -44,11 +45,17 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   if (m.id !== undefined && !m.method) return answers.get(m.id)?.(m)
   if (m.method === "initialize") return send({ id: m.id, result: { userAgent: "codex/0.160.1" } })
   // XCOD-254: the thread runs the model the host asked for, as Codex's does.
-  if (m.method === "thread/start" || m.method === "thread/resume")
+  if (m.method === "thread/start" || m.method === "thread/resume") {
+    // XCOD-254: not recorded. FAKE_CODEX_REFUSE_CONFIG=1 refuses config overrides, as a Codex
+    // without them might; otherwise the Lunos bridge it carries is kept for the turn.
+    if (m.params.config && process.env.FAKE_CODEX_REFUSE_CONFIG === "1")
+      return send({ id: m.id, error: { code: -32602, message: "unknown field `config`" } })
+    bridge = m.params.config?.["mcp_servers.lunos"]
     return send({
       id: m.id,
       result: { thread: { id: m.params.threadId ?? thread }, model: m.params.model ?? "gpt-5.5" },
     })
+  }
   // XCOD-254: not recorded; shaped as the app server's v2 `model/list` (`data`, `nextCursor`), two
   // pages so the host's paging is exercised.
   if (m.method === "model/list")
@@ -88,6 +95,31 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   }
   if (m.method !== "turn/start") return
   send({ id: m.id, result: { turn: { id: "turn-1", status: "inProgress" } } })
+  // XCOD-254: with the Lunos bridge, list its tools (logged); with FAKE_CODEX_BRIDGE_CALL=<tool>,
+  // call it as an MCP tool call item and end the turn there instead of replaying the recording.
+  if (bridge) {
+    const { useBridge } = await import("./bridge-client")
+    const name = process.env.FAKE_CODEX_BRIDGE_CALL
+    const args = JSON.parse(process.env.FAKE_CODEX_BRIDGE_ARGS ?? "{}")
+    if (name) {
+      const item = {
+        id: "mcp-1",
+        type: "mcpToolCall",
+        server: "lunos",
+        tool: name,
+        arguments: args,
+        status: "inProgress",
+      }
+      send({ method: "item/started", params: { item } })
+      const used = await useBridge(bridge, { name, arguments: args })
+      record(JSON.stringify({ bridge: used }))
+      send({ method: "item/completed", params: { item: { ...item, status: "completed", result: used.result } } })
+      send({ method: "item/completed", params: { item: { id: "msg-1", type: "agentMessage", text: "Done." } } })
+      send({ method: "turn/completed", params: { turn: { id: "turn-1", status: "completed" } } })
+      return
+    }
+    record(JSON.stringify({ bridge: await useBridge(bridge) }))
+  }
   for (const message of turn) {
     if (message.id !== undefined) {
       // An approval request: wait for the answer, then act on it.

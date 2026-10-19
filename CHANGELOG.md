@@ -23,6 +23,17 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory, if you
+  agree.** The first time per tool and project, Lunos asks: Share, Not now, or Never for this tool.
+  Their results are sent to Anthropic or OpenAI with your prompts, so nothing is offered until you
+  choose Share. Each call asks in Lunos unless your permission rules allow that tool by name, and
+  follows your residency policy and plugin hooks. Every call is written to the audit log. The
+  session's header and prompt show what's offered ("Lunos bridge: 2 servers, 3 skills, memory on")
+  and warn when the tool didn't connect; `lunos external list` shows the same line. Change your
+  answer in `/settings` → External sessions or with `lunos external share`. `external.share.*`
+  chooses what's shared, and an organisation can lock it. Your `~/.claude` and `~/.codex` settings
+  are never changed.
+  <!-- XCOD-254 -->
 - **Memory setup explains where your memory is stored, and lets you keep it in PostgreSQL.** The
   "Where should memory be stored?" step shows each option as a card, with a "What this means" panel
   that uses your real memory folder, model and region. The panel says what is stored where, what
