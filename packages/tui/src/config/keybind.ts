@@ -223,6 +223,8 @@ export const Definitions = {
   "dialog.memory.forget_all": keybind("ctrl+k", "Forget every fact a drill-down lists, after typing their count"),
   "dialog.memory.import.all": keybind("ctrl+a", "Approve or reject every importable row in the import preview"),
   "dialog.memory.import.apply": keybind("ctrl+s", "Write the approved rows of the import preview"),
+  "dialog.memory.setup.compare": keybind("c", "Compare the storage options side by side in memory setup"),
+  "dialog.memory.setup.help": keybind("?", "Help me choose where memory is stored, in memory setup"),
   "dialog.sessions.group.new": keybind("ctrl+g", "New session group in the Sessions view"),
   "dialog.sessions.move": keybind("ctrl+o", "Move the selected session to a group in the Sessions view"),
   "dialog.sessions.rename": keybind("ctrl+r", "Rename the selected session or group in the Sessions view"),

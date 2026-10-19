@@ -7557,6 +7557,375 @@
         ]
       }
     },
+    "/memory/setup/environment": {
+      "get": {
+        "tags": ["memory"],
+        "operationId": "memory.setup.environment",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "This machine's memory paths, model, Docker, and the templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySetupEnvironment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "What the storage step shows about this machine: the memory paths, the model that extracts facts and its region, whether Docker or Podman is installed, local model providers, and the memory templates to offer (built-in and from managed config).",
+        "summary": "Memory storage facts",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.setup.environment({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/setup/test": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.setup.test",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the database could be used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySetupTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Run the checks Lunos makes before connecting, then connect, write, read and delete a probe in a namespace of its own. Never touches stored facts.",
+        "summary": "Test a memory database connection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySetupInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.setup.test({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/setup/template/preview": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.setup.templatePreview",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The files and config the template would write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySetupTemplatePlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Everything a memory template would write, in full, without writing it. A generated password is shown masked.",
+        "summary": "Preview a memory template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySetupTemplateInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.setup.templatePreview({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/setup/template/apply": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.setup.templateApply",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The files written",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySetupTemplatePlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Write a Docker template's compose file, .env (0600, holding the generated password) and .env.example. An existing file is replaced only when named in overwrite. Starts nothing.",
+        "summary": "Write a memory template's files",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySetupTemplateInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.setup.templateApply({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/setup/template/start": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.setup.templateStart",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the database started and became healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySetupStartResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Run docker compose up -d for a written Docker template, then wait up to two minutes for its healthcheck. Call only after the user confirmed the command.",
+        "summary": "Start a memory template's database",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySetupTemplateInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.setup.templateStart({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/setup/move": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.setup.move",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How many facts were moved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySetupMoveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Switching storage, \"Move my facts\": export every fact from the storage in use now and import it into the proposed one, keeping each fact's provenance. The old copy is left as it is.",
+        "summary": "Move facts to new memory storage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySetupInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.setup.move({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/memory/setup/check": {
       "post": {
         "tags": ["memory"],
@@ -23775,7 +24144,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["embedded", "neo4j", "memgraph"]
+            "enum": ["embedded", "neo4j", "postgres", "memgraph"]
           },
           "url": {
             "type": "string"
@@ -23800,6 +24169,50 @@
           },
           "user": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemoryTemplateConfig": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Short id, used by lunos memory setup --template"
+          },
+          "title": {
+            "type": "string",
+            "description": "What the setup wizard shows"
+          },
+          "description": {
+            "type": "string"
+          },
+          "leaves": {
+            "type": "string",
+            "description": "What leaves the computer, in plain words (\"the fact text, to …\")"
+          },
+          "memory": {
+            "type": "object",
+            "description": "The memory block the template sets (backend, model, encryption, …). Credentials as {env:} references"
+          }
+        },
+        "required": ["name", "title", "leaves", "memory"],
+        "additionalProperties": false
+      },
+      "MemoryTemplatesConfig": {
+        "type": "object",
+        "properties": {
+          "custom": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryTemplateConfig"
+            }
+          },
+          "hide": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false
@@ -23873,6 +24286,9 @@
           },
           "backend": {
             "$ref": "#/components/schemas/MemoryBackendConfig"
+          },
+          "templates": {
+            "$ref": "#/components/schemas/MemoryTemplatesConfig"
           }
         },
         "additionalProperties": false
@@ -28725,6 +29141,21 @@
           "memory": {
             "type": "object",
             "description": "The memory block the wizard would save (memory.enabled, model, backend, retention, encryption)"
+          },
+          "template": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string",
+                "enum": ["user", "project"]
+              }
+            },
+            "required": ["name", "scope"],
+            "additionalProperties": false,
+            "description": "XCOD-264: a Docker template whose .env holds the variables the block's {env:} references need"
           }
         },
         "required": ["memory"],
@@ -28747,6 +29178,385 @@
           }
         },
         "required": ["ok", "warnings"],
+        "additionalProperties": false
+      },
+      "MemorySetupTemplate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "leaves": {
+            "type": "string"
+          },
+          "requires": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ask": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "memory": {
+            "type": "object"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "licence": {
+            "type": "string"
+          },
+          "organisation": {
+            "type": "boolean"
+          },
+          "unavailable": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "title", "leaves", "memory"],
+        "additionalProperties": false
+      },
+      "MemorySetupEnvironment": {
+        "type": "object",
+        "properties": {
+          "environment": {
+            "type": "object",
+            "properties": {
+              "paths": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string"
+                  },
+                  "user": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "model": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "region": {
+                    "type": "string"
+                  }
+                },
+                "required": ["id"],
+                "additionalProperties": false
+              },
+              "docker": {
+                "type": "object",
+                "properties": {
+                  "tool": {
+                    "type": "string",
+                    "enum": ["docker", "podman"]
+                  },
+                  "compose": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["tool", "compose"],
+                "additionalProperties": false
+              },
+              "localModels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["paths", "localModels"],
+            "additionalProperties": false
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemorySetupTemplate"
+            }
+          }
+        },
+        "required": ["environment", "templates"],
+        "additionalProperties": false
+      },
+      "MemorySetupError": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "fix": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "message", "stage"],
+        "additionalProperties": false
+      },
+      "MemorySetupTestResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "server": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/MemorySetupError"
+          }
+        },
+        "required": ["ok"],
+        "additionalProperties": false
+      },
+      "MemorySetupTemplateInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["user", "project"]
+          },
+          "values": {
+            "type": "object",
+            "properties": {
+              "vendor": {
+                "type": "string",
+                "enum": ["neo4j", "postgres"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "jurisdiction": {
+                "type": "string"
+              },
+              "localModel": {
+                "type": "string"
+              },
+              "port": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "overwrite": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["name", "scope"],
+        "additionalProperties": false
+      },
+      "MemorySetupTemplatePlan": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          },
+          "dir": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "exists": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["name", "path", "content", "exists"],
+              "additionalProperties": false
+            }
+          },
+          "memory": {
+            "type": "object"
+          },
+          "command": {
+            "type": "string"
+          },
+          "licence": {
+            "type": "string"
+          }
+        },
+        "required": ["ok", "dir", "files", "memory", "command"],
+        "additionalProperties": false
+      },
+      "MemorySetupStartResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "error": {
+            "$ref": "#/components/schemas/MemorySetupError"
+          }
+        },
+        "required": ["ok"],
+        "additionalProperties": false
+      },
+      "MemorySetupMoveResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "facts": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "output": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": ["ok"],
         "additionalProperties": false
       },
       "MemorySetupCheckResult": {

@@ -417,7 +417,7 @@ const layer = Layer.effect(
         const { retention } = yield* policy()
         const scope = input.scope
         const starting = (async () => {
-          const store = await MemoryExternal.neo4j({ checked, scope, worktree: s.worktree, limits, retention })
+          const store = await MemoryExternal.open({ checked, scope, worktree: s.worktree, limits, retention })
           try {
             const swept = await store.sweep(MemoryLifecycle.now())
             if (swept.purged.length)
