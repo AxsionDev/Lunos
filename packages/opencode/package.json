@@ -2,10 +2,10 @@
   "$schema": "https://json.schemastore.org/package.json",
   "version": "1.18.50",
   "lunos": {
-    "upstreamVersion": "1.19.0",
+    "upstreamVersion": "1.19.3",
     "upstreamSync": {
-      "commit": "733b2c627e5aec39cb33cc22373bdce33053ef2c",
-      "measuredAt": "2026-10-13",
+      "commit": "e3c4eb242585dcd77be1a867391b7c25fd47ce52",
+      "measuredAt": "2026-10-19",
       "daysBehind": 0,
       "commitsBehind": 0
     }

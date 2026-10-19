@@ -197,10 +197,10 @@ else
         url="https://github.com/AxsionDev/Lunos/releases/download/v${requested_version}/$filename"
         specific_version=$requested_version
 
-        # Verify the release exists before downloading
-        http_status=$(curl -sI -o /dev/null -w "%{http_code}" "https://github.com/AxsionDev/Lunos/releases/tag/v${requested_version}")
+        # Verify the release asset exists before downloading. A release that is still publishing has none yet.
+        http_status=$(curl -sIL -o /dev/null -w "%{http_code}" "$url" || true)
         if [ "$http_status" = "404" ]; then
-            echo -e "${RED}Error: Release v${requested_version} not found${NC}"
+            echo -e "${RED}Error: Release v${requested_version} not found. If it was just released, try again in a few minutes.${NC}"
             echo -e "${MUTED}Available releases: https://github.com/AxsionDev/Lunos/releases${NC}"
             exit 1
         fi

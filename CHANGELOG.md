@@ -85,6 +85,9 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Memory names where it's stored in plain words.** Setup, settings, `lunos memory status`,
   `/memory` and the status line say "On this computer" or "Team database: PostgreSQL". Each of them
   also repeats what leaves your computer. Your config file is unchanged. <!-- XCOD-264 -->
+- Merged upstream opencode up to 1.19.3 (`/status` shows `based on opencode 1.19.3`). Lunos keeps
+  its own session sharing, update check and install script; upstream's removal of session sharing
+  and its OpenCode 1 update pinning are not included. <!-- internal -->
 
 ### Fixed
 
