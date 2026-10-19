@@ -1531,7 +1531,11 @@ const layer = Layer.effect(
       // XCOD-219: under a locked model a command's own `model` (or its agent's) is ignored, like an
       // agent's own model is. A model the caller asked for still goes through, to be refused.
       const commandLock = ConfigPolicy.lockedModel(yield* config.get(), agentName)
+      // XCOD-254: in a Claude Code / Codex session Lunos expands the command and the tool answers;
+      // no Lunos model is involved (as in the prompt loop), so none is looked up or required.
+      const external = ExternalSession.of(yield* sessions.get(input.sessionID).pipe(Effect.orDie))
       const taskModel = yield* Effect.gen(function* () {
+        if (external) return ExternalSession.model(external.tool)
         if (commandLock) return Provider.parseModel(input.model ?? commandLock.model)
         if (cmd.model) return Provider.parseModel(cmd.model)
         if (cmd.agent) {
@@ -1542,7 +1546,7 @@ const layer = Layer.effect(
         return yield* currentModel(input.sessionID)
       })
 
-      yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
+      if (!external) yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
 
       const agent = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
       if (!agent) {
@@ -1573,7 +1577,8 @@ const layer = Layer.effect(
       const uniqueTemplateParts = templateParts.filter(
         (part) => part.type !== "file" || !inputFiles.has(fileURLToPath(part.url)),
       )
-      const isSubtask = (agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true
+      // A subtask would run a Lunos subagent; in an external session the text goes to the tool instead.
+      const isSubtask = !external && ((agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true)
       const parts = isSubtask
         ? [
             {
