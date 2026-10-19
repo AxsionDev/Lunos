@@ -120,3 +120,43 @@ test("an action that doesn't need a row still fires on an empty list", async () 
     await select.cleanup()
   }
 })
+
+// XCOD-265: /sessions' "stop all" and "clear list" ship with no key. `menu` keeps such an action in
+// the footer and the Tab menu; an unbound action without it stays out, as before.
+test("an unbound menu action is in the footer and runs from the Tab menu", async () => {
+  await using tmp = await tmpdir()
+  const fired: string[] = []
+  const select = await mountSelect({
+    root: tmp.path,
+    keybinds: { "dialog.sessions.stop_all": "none", "dialog.sessions.clear": "none" },
+    actions: [
+      {
+        title: "stop all",
+        command: "dialog.sessions.stop_all",
+        menu: true,
+        withoutSelection: true,
+        onTrigger: () => fired.push("stop all"),
+      },
+      {
+        title: "clear list",
+        command: "dialog.sessions.clear",
+        withoutSelection: true,
+        onTrigger: () => fired.push("clear"),
+      },
+    ],
+  })
+
+  try {
+    await Bun.sleep(100)
+    const frame = select.app.captureCharFrame()
+    expect(frame).toContain("stop all")
+    expect(frame).not.toContain("clear list")
+    select.app.mockInput.pressTab()
+    await Bun.sleep(50)
+    select.app.mockInput.pressEnter()
+    await wait(() => fired.length > 0)
+    expect(fired).toEqual(["stop all"])
+  } finally {
+    await select.cleanup()
+  }
+})

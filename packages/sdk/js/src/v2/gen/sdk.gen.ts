@@ -76,6 +76,14 @@ import type {
   ExperimentalResourceListResponses,
   ExperimentalSessionBackgroundErrors,
   ExperimentalSessionBackgroundResponses,
+  ExperimentalSessionBulkArchiveErrors,
+  ExperimentalSessionBulkArchiveResponses,
+  ExperimentalSessionBulkDeleteErrors,
+  ExperimentalSessionBulkDeleteResponses,
+  ExperimentalSessionBulkStopErrors,
+  ExperimentalSessionBulkStopResponses,
+  ExperimentalSessionBulkUnarchiveErrors,
+  ExperimentalSessionBulkUnarchiveResponses,
   ExperimentalSessionGroupCreateErrors,
   ExperimentalSessionGroupCreateResponses,
   ExperimentalSessionGroupDeleteErrors,
@@ -969,12 +977,13 @@ export class Session extends HeyApiClient {
   /**
    * Sessions overview
    *
-   * Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups.
+   * Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups. Archived sessions are left out; with archived=true only they are listed, however old.
    */
   public overview<ThrowOnError extends boolean = false>(
     parameters?: {
       directory?: string
       workspace?: string
+      archived?: boolean | "true" | "false"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -985,6 +994,7 @@ export class Session extends HeyApiClient {
           args: [
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "query", key: "archived" },
           ],
         },
       ],
@@ -1109,6 +1119,178 @@ export class Background extends HeyApiClient {
       url: "/experimental/background/{jobID}/cancel",
       ...options,
       ...params,
+    })
+  }
+}
+
+export class SessionBulk extends HeyApiClient {
+  /**
+   * Stop sessions
+   *
+   * Stop several sessions at once: Lunos sessions here or in another Lunos on this machine, and Claude Code / Codex sessions. Pending approvals are rejected with the reason first. Audited as session.stop.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      reason?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "reason" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkStopResponses,
+      ExperimentalSessionBulkStopErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/stop",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Archive sessions
+   *
+   * Hide sessions from every list without deleting anything. Running and waiting sessions are skipped unless stop is set, which stops them first. Audited as session.archive.
+   */
+  public archive<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      stop?: boolean
+      reason?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "stop" },
+            { in: "body", key: "reason" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkArchiveResponses,
+      ExperimentalSessionBulkArchiveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/archive",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Unarchive sessions
+   *
+   * Put archived sessions back in the lists. Audited as session.archive (unarchive).
+   */
+  public unarchive<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkUnarchiveResponses,
+      ExperimentalSessionBulkUnarchiveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/unarchive",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete archived sessions
+   *
+   * Delete archived sessions and their history for good. Sessions that aren't archived are skipped. Audited as session.delete.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkDeleteResponses,
+      ExperimentalSessionBulkDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/delete",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }
@@ -1977,6 +2159,11 @@ export class Experimental extends HeyApiClient {
   private _background?: Background
   get background(): Background {
     return (this._background ??= new Background({ client: this.client }))
+  }
+
+  private _sessionBulk?: SessionBulk
+  get sessionBulk(): SessionBulk {
+    return (this._sessionBulk ??= new SessionBulk({ client: this.client }))
   }
 
   private _sessionGroup?: SessionGroup

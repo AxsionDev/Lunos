@@ -6,12 +6,19 @@ import {
   UNGROUPED_KEY,
   ago,
   build,
+  clearPlan,
+  clearQuestion,
   groupKey,
+  inView,
   kindLabel,
   money,
   nextStateFilter,
   projectName,
   stateLabel,
+  stopAndClearQuestion,
+  stopPlan,
+  stopQuestion,
+  stopSummary,
   stoppable,
   toolOnly,
   waiting,
@@ -186,5 +193,88 @@ describe("TUI /sessions model (XCOD-205)", () => {
     expect(stateLabel({ state: "waiting", elsewhere: true })).toBe("waiting in another Lunos")
     expect(stateLabel({ state: "running", elsewhere: true })).toBe("running in another Lunos")
     expect(stateLabel({ state: "idle", stale: true })).toBe("not responding (its Lunos closed)")
+  })
+})
+
+describe("Stop all and Clear list (XCOD-265)", () => {
+  // The acceptance fixture: 3 running, 2 waiting, 1 Claude Code, 1 in another Lunos and 4 finished.
+  const fixture = [
+    item("r1", { state: "running" }),
+    item("r2", { state: "running" }),
+    item("r3", { state: "running", project: { id: "prj_b", name: "beta", worktree: "/work/beta" } }),
+    item("w1", { state: "waiting", permissions: 1 }),
+    item("w2", { state: "waiting", questions: 1 }),
+    item("external:cc", { kind: "external", tool: "claude", state: "running" }),
+    item("e1", { state: "running", elsewhere: true }),
+    item("f1", { state: "finished" }),
+    item("f2", { state: "finished" }),
+    item("f3", { state: "idle" }),
+    item("f4", { state: "failed" }),
+  ]
+  const all = (state: Parameters<typeof inView>[0]["state"] = "all", search = "") =>
+    inView({ groups: [], sessions: fixture, search, state })
+
+  test("Stop all asks once with the right counts", () => {
+    const plan = stopPlan(all())
+    expect(plan.targets.map((row) => row.id)).toEqual(["r1", "r2", "r3", "w1", "w2", "external:cc", "e1"])
+    expect(stopQuestion(plan)).toBe(
+      "Stop 7 sessions? 4 running, 2 waiting for an answer, 1 Claude Code. 1 of them runs in another Lunos window.",
+    )
+    expect(plan.projects).toEqual(["alpha", "beta"])
+  })
+
+  test("with the filter on waiting, only the waiting sessions are stopped", () => {
+    const plan = stopPlan(all("waiting"))
+    expect(plan.targets.map((row) => row.id)).toEqual(["w1", "w2"])
+    expect(stopQuestion(plan)).toBe("Stop 2 sessions? 2 waiting for an answer.")
+  })
+
+  test("the search narrows the view, and matches group names; collapsed groups still count", () => {
+    const sessions = [
+      item("a", { state: "running", groupID: "g1" }),
+      item("b", { state: "running" }),
+      item("kid", { state: "running", parentID: "a" }),
+    ]
+    const groups = [group("g1", "Client A", true)]
+    expect(inView({ groups, sessions, search: "client a", state: "all" }).map((row) => row.id)).toEqual(["a", "kid"])
+    expect(inView({ groups, sessions, search: "", state: "all" }).map((row) => row.id)).toEqual(["a", "b", "kid"])
+  })
+
+  test("Clear archives only finished, idle and failed rows; the confirmation says what stays", () => {
+    const plan = clearPlan(all())
+    expect(plan.targets.map((row) => row.id)).toEqual(["f1", "f2", "f3", "f4"])
+    expect(plan.staying).toHaveLength(7)
+    expect(clearQuestion(plan)).toBe(
+      "Clear 4 sessions from the list? They're archived, not deleted: Show archived brings them back. 7 running sessions stay; stop them first, or use Stop all & clear.",
+    )
+    expect(clearQuestion(clearPlan(all("finished")))).toBe(
+      "Clear 2 sessions from the list? They're archived, not deleted: Show archived brings them back.",
+    )
+  })
+
+  test("Stop all & clear lists both steps in one confirmation", () => {
+    expect(stopAndClearQuestion(all())).toBe(
+      "Stop 7 sessions and clear 11 from the list? 1. Stop 4 running, 2 waiting for an answer, 1 Claude Code (1 in another Lunos window). 2. Archive all 11: they're hidden, not deleted, and Show archived brings them back.",
+    )
+  })
+
+  test("the result toast counts what stopped and why the rest didn't", () => {
+    expect(stopSummary({ stopped: ["a", "b"], failed: [] })).toBe("Stopped 2")
+    expect(
+      stopSummary({
+        stopped: ["a", "b", "c", "d", "e", "f", "g"],
+        failed: [{ id: "x", reason: "another Lunos didn't respond" }],
+      }),
+    ).toBe("Stopped 7 · 1 couldn't be stopped (another Lunos didn't respond)")
+  })
+
+  test("the archived view lists archived rows whatever their state, without group headings for filtering", () => {
+    const sessions = [item("old", { state: "finished", archived: 5 }), item("older", { state: "failed", archived: 4 })]
+    expect(inView({ groups: [], sessions, search: "", state: "archived" })).toHaveLength(2)
+    expect(view(build({ groups: [], sessions, search: "", state: "archived" }))).toEqual([
+      "[Ungrouped 2]",
+      "old",
+      "older",
+    ])
   })
 })

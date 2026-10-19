@@ -2689,11 +2689,34 @@ export type SessionOverviewItem = {
   permissions: number
   questions: number
   groupID?: string
+  archived?: number
 }
 
 export type SessionOverview = {
   groups: Array<SessionGroup>
   sessions: Array<SessionOverviewItem>
+}
+
+export type SessionBulkFailure = {
+  id: string
+  reason: string
+}
+
+export type SessionBulkStopResult = {
+  stopped: Array<string>
+  failed: Array<SessionBulkFailure>
+}
+
+export type SessionBulkArchiveResult = {
+  archived: Array<string>
+  skipped: Array<SessionBulkFailure>
+  stopped?: Array<string>
+  failed?: Array<SessionBulkFailure>
+}
+
+export type SessionBulkDeleteResult = {
+  deleted: Array<string>
+  skipped: Array<SessionBulkFailure>
 }
 
 export type NotFoundError = {
@@ -9020,6 +9043,7 @@ export type ExperimentalSessionOverviewData = {
   query?: {
     directory?: string
     workspace?: string
+    archived?: boolean | "true" | "false"
   }
   url: "/experimental/session-overview"
 }
@@ -9043,6 +9067,137 @@ export type ExperimentalSessionOverviewResponses = {
 
 export type ExperimentalSessionOverviewResponse =
   ExperimentalSessionOverviewResponses[keyof ExperimentalSessionOverviewResponses]
+
+export type ExperimentalSessionBulkStopData = {
+  body?: {
+    sessionIDs: Array<string>
+    reason?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/stop"
+}
+
+export type ExperimentalSessionBulkStopErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkStopError =
+  ExperimentalSessionBulkStopErrors[keyof ExperimentalSessionBulkStopErrors]
+
+export type ExperimentalSessionBulkStopResponses = {
+  /**
+   * Which sessions stopped, and why the others didn't
+   */
+  200: SessionBulkStopResult
+}
+
+export type ExperimentalSessionBulkStopResponse =
+  ExperimentalSessionBulkStopResponses[keyof ExperimentalSessionBulkStopResponses]
+
+export type ExperimentalSessionBulkArchiveData = {
+  body?: {
+    sessionIDs: Array<string>
+    stop?: boolean
+    reason?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/archive"
+}
+
+export type ExperimentalSessionBulkArchiveErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkArchiveError =
+  ExperimentalSessionBulkArchiveErrors[keyof ExperimentalSessionBulkArchiveErrors]
+
+export type ExperimentalSessionBulkArchiveResponses = {
+  /**
+   * Which sessions were archived
+   */
+  200: SessionBulkArchiveResult
+}
+
+export type ExperimentalSessionBulkArchiveResponse =
+  ExperimentalSessionBulkArchiveResponses[keyof ExperimentalSessionBulkArchiveResponses]
+
+export type ExperimentalSessionBulkUnarchiveData = {
+  body?: {
+    sessionIDs: Array<string>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/unarchive"
+}
+
+export type ExperimentalSessionBulkUnarchiveErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkUnarchiveError =
+  ExperimentalSessionBulkUnarchiveErrors[keyof ExperimentalSessionBulkUnarchiveErrors]
+
+export type ExperimentalSessionBulkUnarchiveResponses = {
+  /**
+   * Which sessions were restored
+   */
+  200: SessionBulkArchiveResult
+}
+
+export type ExperimentalSessionBulkUnarchiveResponse =
+  ExperimentalSessionBulkUnarchiveResponses[keyof ExperimentalSessionBulkUnarchiveResponses]
+
+export type ExperimentalSessionBulkDeleteData = {
+  body?: {
+    sessionIDs: Array<string>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/delete"
+}
+
+export type ExperimentalSessionBulkDeleteErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkDeleteError =
+  ExperimentalSessionBulkDeleteErrors[keyof ExperimentalSessionBulkDeleteErrors]
+
+export type ExperimentalSessionBulkDeleteResponses = {
+  /**
+   * Which archived sessions were deleted
+   */
+  200: SessionBulkDeleteResult
+}
+
+export type ExperimentalSessionBulkDeleteResponse =
+  ExperimentalSessionBulkDeleteResponses[keyof ExperimentalSessionBulkDeleteResponses]
 
 export type ExperimentalSessionGroupListData = {
   body?: never

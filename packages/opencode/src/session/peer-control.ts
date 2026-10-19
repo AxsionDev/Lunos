@@ -75,6 +75,43 @@ async function forward(response: Response) {
   })
 }
 
+/** XCOD-265: what a stopped session's pending approvals are rejected with, unless the caller says otherwise. */
+export const STOP_REASON = "Stopped from /sessions"
+
+async function pending(path: "/permission" | "/question", sessionID: string, directory: string) {
+  const response = await inner(path, directory)
+  const list = response.ok ? ((await response.json()) as Array<{ id?: string; sessionID?: string }>) : []
+  return list.filter((item) => item.sessionID === sessionID && typeof item.id === "string") as { id: string }[]
+}
+
+/**
+ * XCOD-265: rejects the session's pending approvals and questions first, so no tool is left waiting
+ * on an answer that can't come, then aborts the turn (background subagents stop with it). Aborting
+ * alone would drop the asks without a reply event.
+ */
+async function stopIn(sessionID: string, directory: string, reason: string) {
+  // One rejection with a message rejects the session's other pending approvals too.
+  const [permission] = await pending("/permission", sessionID, directory)
+  if (permission)
+    await inner(`/permission/${permission.id}/reply`, directory, {
+      method: "POST",
+      body: JSON.stringify({ reply: "reject", message: reason }),
+    })
+  // A question can't carry a reason: it is rejected as "dismissed".
+  for (const question of await pending("/question", sessionID, directory))
+    await inner(`/question/${question.id}/reject`, directory, { method: "POST", body: "null" })
+  return inner(`/session/${sessionID}/abort`, directory, { method: "POST" })
+}
+
+/** XCOD-265: stops a session this process runs. Throws PeerError(404) when it runs none by that id. */
+export async function stopHere(sessionID: string, reason = STOP_REASON) {
+  const directory = SessionLive.directoryOf(sessionID)
+  if (!directory) throw new PeerError(404, "This process isn't running that session.")
+  const response = await stopIn(sessionID, directory, reason)
+  if (!response.ok) throw new PeerError(response.status, (await response.text()) || `${response.status}`)
+  return true
+}
+
 /** The routes another process may call. Anything else is a 404. */
 export async function serve(request: Request): Promise<Response> {
   const url = new URL(request.url)
@@ -89,8 +126,11 @@ export async function serve(request: Request): Promise<Response> {
   const directory = SessionLive.directoryOf(sessionID)
   if (!directory) return json(404, { error: "This process isn't running that session." })
 
-  if (rest === "/stop" && request.method === "POST")
-    return forward(await inner(`/session/${sessionID}/abort`, directory, { method: "POST" }))
+  if (rest === "/stop" && request.method === "POST") {
+    const body = (await request.json().catch(() => undefined)) as { reason?: unknown } | undefined
+    const reason = typeof body?.reason === "string" && body.reason.trim() ? body.reason.slice(0, 200) : STOP_REASON
+    return forward(await stopIn(sessionID, directory, reason))
+  }
   if (rest === "/asks" && request.method === "GET") {
     const [permissions, questions] = await Promise.all(
       ["/permission", "/question"].map(async (path) => {

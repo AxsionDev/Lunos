@@ -25,7 +25,11 @@ import {
   SessionGroupCreatePayload,
   SessionGroupMovePayload,
   SessionGroupUpdatePayload,
+  SessionBulkArchivePayload,
+  SessionBulkPayload,
+  SessionBulkStopPayload,
   SessionListQuery,
+  SessionOverviewQuery,
   ToolListQuery,
   WorktreeApiError,
 } from "../groups/experimental"
@@ -35,6 +39,7 @@ import { SessionLive } from "@/session/live"
 import { SessionPeers } from "@/session/peers"
 import { SessionPeerControl } from "@/session/peer-control"
 import { SessionOverview } from "@/session/overview"
+import { SessionBulk } from "@/session/bulk"
 import { ExternalRegistry } from "@/external/registry"
 import { ExternalDetect } from "@/external/detect"
 import { ExternalPolicy } from "@/external/policy"
@@ -259,8 +264,37 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return true
     })
 
-    const sessionOverview = Effect.fn("ExperimentalHttpApi.sessionOverview")(function* () {
-      return yield* SessionOverview.build().pipe(Effect.provideService(Session.Service, sessions))
+    const sessionOverview = Effect.fn("ExperimentalHttpApi.sessionOverview")(function* (ctx: {
+      query: typeof SessionOverviewQuery.Type
+    }) {
+      return yield* SessionOverview.build({ archived: ctx.query.archived }).pipe(
+        Effect.provideService(Session.Service, sessions),
+      )
+    })
+
+    // XCOD-265: Stop all, Clear list, Unarchive, Delete archived.
+    const sessionBulkStop = Effect.fn("ExperimentalHttpApi.sessionBulkStop")(function* (ctx: {
+      payload: typeof SessionBulkStopPayload.Type
+    }) {
+      return yield* SessionBulk.stop(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkArchive = Effect.fn("ExperimentalHttpApi.sessionBulkArchive")(function* (ctx: {
+      payload: typeof SessionBulkArchivePayload.Type
+    }) {
+      const run = ctx.payload.stop
+        ? SessionBulk.stopAndArchive(ctx.payload)
+        : SessionBulk.archive({ sessionIDs: ctx.payload.sessionIDs })
+      return yield* run.pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkUnarchive = Effect.fn("ExperimentalHttpApi.sessionBulkUnarchive")(function* (ctx: {
+      payload: typeof SessionBulkPayload.Type
+    }) {
+      return yield* SessionBulk.unarchive(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkDelete = Effect.fn("ExperimentalHttpApi.sessionBulkDelete")(function* (ctx: {
+      payload: typeof SessionBulkPayload.Type
+    }) {
+      return yield* SessionBulk.removeArchived(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
     })
 
     const sessionGroupList = Effect.fn("ExperimentalHttpApi.sessionGroupList")(function* () {
@@ -394,6 +428,10 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("artifacts", artifacts)
       .handle("backgroundJobCancel", backgroundJobCancel)
       .handle("sessionOverview", sessionOverview)
+      .handle("sessionBulkStop", sessionBulkStop)
+      .handle("sessionBulkArchive", sessionBulkArchive)
+      .handle("sessionBulkUnarchive", sessionBulkUnarchive)
+      .handle("sessionBulkDelete", sessionBulkDelete)
       .handle("sessionGroupList", sessionGroupList)
       .handle("sessionGroupCreate", sessionGroupCreate)
       .handle("sessionGroupUpdate", sessionGroupUpdate)
