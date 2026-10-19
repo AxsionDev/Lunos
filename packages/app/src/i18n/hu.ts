@@ -628,6 +628,8 @@ export const dict = {
   "toast.session.share.success.description": "Megosztás URL vágólapra másolva!",
   "toast.session.share.failed.title": "Nem sikerült megosztani a munkamenetet",
   "toast.session.share.failed.description": "Hiba történt a munkamenet megosztása közben",
+  "toast.session.share.noTarget.description":
+    'A megosztáshoz a konfigurációban megadott enterprise.url szükséges, vagy "share": "cloud" a szervezete Lunos-konzoljával való megosztáshoz (a lunos login után).',
   "toast.session.unshare.success.title": "Munkamenet megosztása visszavonva",
   "toast.session.unshare.success.description": "A munkamenet megosztása sikeresen visszavonva!",
   "toast.session.unshare.failed.title": "Nem sikerült megszüntetni a munkamenet megosztását",

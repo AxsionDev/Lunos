@@ -624,6 +624,8 @@ export const dict = {
   "toast.session.share.success.description": "Дељење URL копирано у међуспремник!",
   "toast.session.share.failed.title": "Дељење сесије није успело",
   "toast.session.share.failed.description": "Дошло је до грешке приликом дељења сесије",
+  "toast.session.share.noTarget.description":
+    'За дељење је потребан enterprise.url у конфигурацији или "share": "cloud" за дељење са Lunos конзолом ваше организације (после lunos login).',
   "toast.session.unshare.success.title": "сесија није дељена",
   "toast.session.unshare.success.description": "Дељење сесије је успешно!",
   "toast.session.unshare.failed.title": "опозив дељења сесије није успео",

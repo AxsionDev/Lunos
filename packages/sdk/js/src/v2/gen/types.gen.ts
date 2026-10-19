@@ -3549,6 +3549,7 @@ export type ForbiddenError = {
 export type ShareDisabledError = {
   _tag: "ShareDisabledError"
   message: string
+  reason?: "no-target"
 }
 
 export type SessionShareConsoleInput = {

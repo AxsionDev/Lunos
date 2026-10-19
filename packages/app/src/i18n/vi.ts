@@ -633,6 +633,8 @@ export const dict = {
   "toast.session.share.success.description": "Đã sao chép URL chia sẻ vào bảng tạm!",
   "toast.session.share.failed.title": "Không thể chia sẻ phiên",
   "toast.session.share.failed.description": "Đã xảy ra lỗi khi chia sẻ phiên",
+  "toast.session.share.noTarget.description":
+    'Chia sẻ cần enterprise.url trong cấu hình, hoặc "share": "cloud" để chia sẻ với bảng điều khiển Lunos của tổ chức bạn (sau lunos login).',
   "toast.session.unshare.success.title": "Đã ngừng chia sẻ phiên",
   "toast.session.unshare.success.description": "Đã hủy chia sẻ phiên thành công!",
   "toast.session.unshare.failed.title": "Không hủy chia sẻ được phiên",

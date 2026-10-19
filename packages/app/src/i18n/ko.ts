@@ -422,6 +422,8 @@ export const dict = {
   "toast.session.share.success.description": "공유 URL이 클립보드에 복사되었습니다!",
   "toast.session.share.failed.title": "세션 공유 실패",
   "toast.session.share.failed.description": "세션을 공유하는 동안 오류가 발생했습니다",
+  "toast.session.share.noTarget.description":
+    '공유하려면 설정에 enterprise.url이 필요하거나, 조직의 Lunos 콘솔과 공유하려면 "share": "cloud"가 필요합니다(lunos login 후).',
   "toast.session.unshare.success.title": "세션 공유 해제됨",
   "toast.session.unshare.success.description": "세션 공유가 성공적으로 해제되었습니다!",
   "toast.session.unshare.failed.title": "세션 공유 해제 실패",

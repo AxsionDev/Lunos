@@ -623,6 +623,8 @@ export const dict = {
   "toast.session.share.success.description": "URL-ul de partajare a fost copiat în clipboard!",
   "toast.session.share.failed.title": "Nu s-a putut partaja sesiunea",
   "toast.session.share.failed.description": "A apărut o eroare la partajarea sesiunii",
+  "toast.session.share.noTarget.description":
+    'Partajarea necesită enterprise.url în configurație sau "share": "cloud" pentru a partaja cu consola Lunos a organizației tale (după lunos login).',
   "toast.session.unshare.success.title": "Sesiune nepartajată",
   "toast.session.unshare.success.description": "Sesiunea a fost nepartajată cu succes!",
   "toast.session.unshare.failed.title": "Nu s-a putut anula partajarea sesiunii",

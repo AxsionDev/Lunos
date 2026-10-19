@@ -92,6 +92,19 @@ export class ResidencyDeniedError extends Schema.TaggedErrorClass<ResidencyDenie
   message: Schema.String,
 }) {}
 
+/**
+ * XCOD-266: upstream shut its hosted share service down in v1.19.3, so there is no default host
+ * any more. Without an organisation's console or `enterprise.url` nothing is uploaded.
+ */
+export const NO_TARGET_MESSAGE = `Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation's Lunos console (after lunos login).`
+
+/** Sharing is on, but there is nowhere to upload to (XCOD-266). A plain refusal, not a fault. */
+export class NoTargetError extends Schema.TaggedErrorClass<NoTargetError>()("ShareNoTargetError", {
+  message: Schema.String,
+}) {}
+
+export const isNoTarget = (error: unknown): error is NoTargetError => error instanceof NoTargetError
+
 export const use = serviceUse(Service)
 
 function api(resource: string): Api {
@@ -246,9 +259,9 @@ const layer = Layer.effect(
       const active = yield* account.active()
       if (Option.isNone(active) || !active.value.active_org_id) {
         const enterprise = (yield* cfg.get()).enterprise?.url
-        const baseUrl = enterprise ?? "https://opncd.ai"
-        yield* enforce(enterprise ? Jurisdiction.SHARE_ENTERPRISE : Jurisdiction.SHARE_OPNCD, baseUrl)
-        return { headers, api: legacyApi, baseUrl } satisfies Req
+        if (!enterprise) return yield* new NoTargetError({ message: NO_TARGET_MESSAGE })
+        yield* enforce(Jurisdiction.SHARE_ENTERPRISE, enterprise)
+        return { headers, api: legacyApi, baseUrl: enterprise } satisfies Req
       }
       yield* enforce(Jurisdiction.SHARE_OPNCD, active.value.url)
 
@@ -296,7 +309,9 @@ const layer = Layer.effect(
       const share = yield* getCached(sessionID)
       if (!share) return
 
-      const req = yield* request()
+      // A share made before XCOD-266 may point at upstream's closed service: with no host left, skip it.
+      const req = yield* request().pipe(Effect.catchIf(isNoTarget, () => Effect.succeed(undefined)))
+      if (!req) return
       const res = yield* HttpClientRequest.post(`${req.baseUrl}${req.api.sync(share.id)}`).pipe(
         HttpClientRequest.setHeaders(req.headers),
         HttpClientRequest.bodyJson({ secret: share.secret, data: Array.from(queued.values()) }),
@@ -387,12 +402,15 @@ const layer = Layer.effect(
         return
       }
 
-      const req = yield* request()
-      yield* HttpClientRequest.delete(`${req.baseUrl}${req.api.remove(share.id)}`).pipe(
-        HttpClientRequest.setHeaders(req.headers),
-        HttpClientRequest.bodyJson({ secret: share.secret }),
-        Effect.flatMap((r) => httpOk.execute(r)),
-      )
+      const req = yield* request().pipe(Effect.catchIf(isNoTarget, () => Effect.succeed(undefined)))
+      // No host to tell (a share on upstream's closed service, XCOD-266): forget it here all the same,
+      // so it can still be unshared.
+      if (req)
+        yield* HttpClientRequest.delete(`${req.baseUrl}${req.api.remove(share.id)}`).pipe(
+          HttpClientRequest.setHeaders(req.headers),
+          HttpClientRequest.bodyJson({ secret: share.secret }),
+          Effect.flatMap((r) => httpOk.execute(r)),
+        )
 
       yield* db.delete(SessionShareTable).where(eq(SessionShareTable.session_id, sessionID)).run().pipe(Effect.orDie)
       s.shared.delete(sessionID)

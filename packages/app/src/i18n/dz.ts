@@ -632,6 +632,8 @@ export const dict: Record<string, string> = {
   "toast.session.share.success.description": "བརྗེ་སོར་ URLའཛིན་པང་ལུ་འདྲ་བཤུས་རྐྱབས་ནུག་!",
   "toast.session.share.failed.title": "ལཱ་ཡུན་རུབ་སྤྱོད་འབད་ནི་ལུ་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",
   "toast.session.share.failed.description": "ལཱ་ཡུན་བརྗེ་སོར་འབད་བའི་སྐབས་ འཛོལ་བ་ཅིག་བྱུང་ཡོདཔ།",
+  "toast.session.share.noTarget.description":
+    'བགོ་བཤའ་རྐྱབ་ནིའི་དོན་ལུ་ རིམ་སྒྲིག་ནང་ enterprise.url དགོཔ་ཨིན། ཡང་ན་ ཁྱོད་ཀྱི་ཚོགས་སྡེའི་ Lunos ཀོན་སོལ་དང་གཅིག་ཁར་བགོ་བཤའ་རྐྱབ་ནིའི་དོན་ལུ་ "share": "cloud" (lunos login གི་ཤུལ་ལས)།',
   "toast.session.unshare.success.title": "ལཱ་ཡུན་བརྗེ་སོར་མ་འབད་བ།",
   "toast.session.unshare.success.description": "ལཱ་ཡུན་འདི་ མཐར་འཁྱོལ་ཅན་སྦེ་ བརྗེ་སོར་མ་འབད་བས།",
   "toast.session.unshare.failed.title": "ལཱ་ཡུན་བགོ་བཤའ་རྐྱབ་ནི་འཐུས་ཤོར་འབྱུང་ཡོདཔ།",

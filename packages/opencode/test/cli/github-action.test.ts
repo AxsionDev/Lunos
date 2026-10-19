@@ -1,5 +1,8 @@
 import { test, expect, describe } from "bun:test"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { Effect, Exit } from "effect"
+import { shareLink } from "../../src/cli/cmd/github.shared"
+import { ShareNext } from "../../src/share/share-next"
 import { extractResponseText, formatPromptTooLargeError } from "../../src/cli/cmd/github"
 import type { MessageV2 } from "../../src/session/message-v2"
 import { SessionID, MessageID, PartID } from "../../src/session/schema"
@@ -195,5 +198,32 @@ describe("formatPromptTooLargeError", () => {
     expect(result).toInclude("img1.png (3 KB)")
     expect(result).toInclude("img2.jpg (6 KB)")
     expect(result).toInclude("img3.gif (9 KB)")
+  })
+})
+
+// XCOD-266: `share: true` with nowhere to share to logs why and carries on; other failures still fail.
+describe("shareLink", () => {
+  test("returns the share URL", async () => {
+    const warned: string[] = []
+    const url = await Effect.runPromise(
+      shareLink(Effect.succeed({ url: "https://s.example/share/a" }), (m) => warned.push(m)),
+    )
+    expect(url).toBe("https://s.example/share/a")
+    expect(warned).toEqual([])
+  })
+
+  test("warns and continues without a link when there's no share target", async () => {
+    const warned: string[] = []
+    const message = `Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation's Lunos console (after lunos login).`
+    const url = await Effect.runPromise(
+      shareLink(Effect.fail(new ShareNext.NoTargetError({ message })), (m) => warned.push(m)),
+    )
+    expect(url).toBeUndefined()
+    expect(warned).toEqual([message])
+  })
+
+  test("still fails on any other error", async () => {
+    const exit = await Effect.runPromiseExit(shareLink(Effect.fail(new Error("boom")), () => {}))
+    expect(Exit.isFailure(exit)).toBe(true)
   })
 })

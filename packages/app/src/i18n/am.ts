@@ -611,6 +611,8 @@ export const dict = {
   "toast.session.share.success.description": "አጋራ URL ወደ ቅንጥብ ሰሌዳ ተቀድቷል!",
   "toast.session.share.failed.title": "ክፍለ ጊዜን ማጋራት አልተሳካም",
   "toast.session.share.failed.description": "ክፍለ-ጊዜውን በማጋራት ላይ ስህተት ተፈጥሯል",
+  "toast.session.share.noTarget.description":
+    'ማጋራት በውቅሩ ውስጥ enterprise.url ያስፈልገዋል፣ ወይም ከድርጅትዎ Lunos ኮንሶል ጋር ለማጋራት "share": "cloud" (ከ lunos login በኋላ)።',
   "toast.session.unshare.success.title": "ክፍል ያልተጋራ",
   "toast.session.unshare.success.description": "ክፍለ ጊዜው በተሳካ ሁኔታ አልተጋራም!",
   "toast.session.unshare.failed.title": "ክፍለ ጊዜን አለማጋራት",

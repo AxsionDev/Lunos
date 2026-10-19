@@ -575,6 +575,8 @@ export const dict = {
   "toast.session.share.success.description": "Share URL copied to clipboard!",
   "toast.session.share.failed.title": "Failed to share session",
   "toast.session.share.failed.description": "An error occurred while sharing the session",
+  "toast.session.share.noTarget.description":
+    'Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation\'s Lunos console (after lunos login).',
 
   "toast.session.unshare.success.title": "Session unshared",
   "toast.session.unshare.success.description": "Session unshared successfully!",

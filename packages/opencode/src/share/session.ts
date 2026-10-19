@@ -6,6 +6,10 @@ import { Config } from "@/config/config"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ShareNext } from "./share-next"
 import { ConfigPolicy } from "@/config/policy"
+import { EventV2Bridge } from "@/event-v2-bridge"
+import { InstanceState } from "@/effect/instance-state"
+import { TuiEvent } from "@/server/tui-event"
+import { ShareNotice } from "./notice"
 
 export const DISABLED_MESSAGE =
   'Session sharing is disabled. To share without uploading anything, use /export to save the transcript as a file. To enable /share, set "share": "manual" in your Lunos config.'
@@ -35,6 +39,7 @@ const layer = Layer.effect(
     const shareNext = yield* ShareNext.Service
     const scope = yield* Scope.Scope
     const flags = yield* RuntimeFlags.Service
+    const events = yield* EventV2Bridge.Service
 
     const share = Effect.fn("SessionShare.share")(function* (sessionID: SessionID) {
       const conf = yield* cfg.get()
@@ -68,7 +73,21 @@ const layer = Layer.effect(
         return result
       }
       if (!(flags.autoShare || conf.share === "auto")) return result
-      yield* share(result.id).pipe(Effect.ignore, Effect.forkIn(scope))
+      // XCOD-266: with nowhere to upload to, say so once per project, not on every new session.
+      const key = ShareNotice.project(yield* InstanceState.context)
+      yield* share(result.id).pipe(
+        Effect.catchIf(ShareNext.isNoTarget, (error) =>
+          Effect.promise(() => ShareNotice.once(`tui:${key}`).catch(() => false)).pipe(
+            Effect.flatMap((first) =>
+              first
+                ? events.publish(TuiEvent.ToastShow, { message: error.message, variant: "warning", duration: 8000 })
+                : Effect.void,
+            ),
+          ),
+        ),
+        Effect.ignore,
+        Effect.forkIn(scope),
+      )
       return result
     })
 
@@ -79,7 +98,7 @@ const layer = Layer.effect(
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [Config.node, Session.node, ShareNext.node, RuntimeFlags.node],
+  deps: [Config.node, Session.node, ShareNext.node, RuntimeFlags.node, EventV2Bridge.node],
 })
 
 export * as SessionShare from "./session"

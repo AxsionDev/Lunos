@@ -30708,6 +30708,10 @@
           },
           "message": {
             "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["no-target"]
           }
         },
         "required": ["_tag", "message"],

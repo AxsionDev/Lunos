@@ -635,6 +635,8 @@ export const dict = {
   "toast.session.share.success.description": "اشتراک کا URL کلپ بورڈ پر کاپی ہو گیا!",
   "toast.session.share.failed.title": "سیشن کا اشتراک کرنے میں ناکام",
   "toast.session.share.failed.description": "سیشن کا اشتراک کرتے وقت ایک خرابی پیش آگئی",
+  "toast.session.share.noTarget.description":
+    'شیئر کرنے کے لیے کنفیگ میں enterprise.url درکار ہے، یا اپنی تنظیم کے Lunos کنسول کے ساتھ شیئر کرنے کے لیے "share": "cloud" (lunos login کے بعد)۔',
   "toast.session.unshare.success.title": "سیشن کا اشتراک ختم کر دیا گیا۔",
   "toast.session.unshare.success.description": "سیشن کا اشتراک کامیابی سے ختم ہو گیا!",
   "toast.session.unshare.failed.title": "سیشن کا اشتراک ختم کرنے میں ناکام",

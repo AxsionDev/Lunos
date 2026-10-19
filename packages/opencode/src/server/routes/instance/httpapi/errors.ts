@@ -214,6 +214,8 @@ export class ShareDisabledApiError extends Schema.TaggedErrorClass<ShareDisabled
   "ShareDisabledError",
   {
     message: Schema.String,
+    /** "no-target": sharing is on, but there's no organisation console or enterprise.url (XCOD-266). */
+    reason: Schema.optional(Schema.Literal("no-target")),
   },
   { httpApiStatus: 403 },
 ) {}

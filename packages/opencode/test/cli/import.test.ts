@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test"
 import {
   formatImportFileError,
+  isDiscontinuedShareUrl,
   parseShareUrl,
   shouldAttachShareAuthHeaders,
   transformShareData,
@@ -87,4 +88,16 @@ test("returns null for invalid share data", () => {
   expect(transformShareData([])).toBeNull()
   expect(transformShareData([{ type: "message", data: {} as any }])).toBeNull()
   expect(transformShareData([{ type: "session", data: { id: "s" } as any }])).toBeNull() // no messages
+})
+
+// XCOD-266: upstream's share service is gone; its links are refused by host, whatever the path.
+test("recognises links to upstream's discontinued share service", () => {
+  expect(isDiscontinuedShareUrl("https://opncd.ai/s/abc")).toBe(true)
+  expect(isDiscontinuedShareUrl("https://opncd.ai/share/abc")).toBe(true)
+  expect(isDiscontinuedShareUrl("https://dev.opncd.ai/s/abc")).toBe(true)
+  expect(isDiscontinuedShareUrl("https://OPNCD.AI/share/abc")).toBe(true)
+  expect(isDiscontinuedShareUrl("https://console.example.com/share/abc")).toBe(false)
+  expect(isDiscontinuedShareUrl("https://notopncd.ai/share/abc")).toBe(false)
+  expect(isDiscontinuedShareUrl("https://opncd.ai.example.com/share/abc")).toBe(false)
+  expect(isDiscontinuedShareUrl("not-a-url")).toBe(false)
 })

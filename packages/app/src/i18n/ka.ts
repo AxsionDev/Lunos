@@ -623,6 +623,8 @@ export const dict = {
   "toast.session.share.success.description": "გააზიარეთ URL კოპირებულია ბუფერში!",
   "toast.session.share.failed.title": "სესიის გაზიარება ვერ მოხერხდა",
   "toast.session.share.failed.description": "მოხდა შეცდომა სესიის გაზიარებისას",
+  "toast.session.share.noTarget.description":
+    'გაზიარებისთვის საჭიროა enterprise.url კონფიგურაციაში, ან "share": "cloud" თქვენი ორგანიზაციის Lunos-ის კონსოლთან გასაზიარებლად (lunos login-ის შემდეგ).',
   "toast.session.unshare.success.title": "სესია გაუზიარებელი",
   "toast.session.unshare.success.description": "სესია წარმატებით გაუზიარეს!",
   "toast.session.unshare.failed.title": "ვერ მოხერხდა სესიის გაზიარების გაუქმება",

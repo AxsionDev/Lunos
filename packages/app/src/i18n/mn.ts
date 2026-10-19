@@ -627,6 +627,8 @@ export const dict = {
   "toast.session.share.success.description": "Хуваалцах URL санах ойд хуулсан!",
   "toast.session.share.failed.title": "Сешн хуваалцаж чадсангүй",
   "toast.session.share.failed.description": "Сешн хуваалцах явцад алдаа гарлаа",
+  "toast.session.share.noTarget.description":
+    'Хуваалцахын тулд тохиргоонд enterprise.url, эсвэл байгууллагынхаа Lunos консолтой хуваалцахын тулд "share": "cloud" хэрэгтэй (lunos login хийсний дараа).',
   "toast.session.unshare.success.title": "Сешн хуваалцаагүй",
   "toast.session.unshare.success.description": "Харилцан хуваалцалтыг амжилттай болиуллаа!",
   "toast.session.unshare.failed.title": "Сешн хуваалцахыг болиулж чадсангүй",

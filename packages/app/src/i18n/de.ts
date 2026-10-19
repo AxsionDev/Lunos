@@ -513,6 +513,8 @@ export const dict = {
   "toast.session.share.success.description": "URL zum Teilen in die Zwischenablage kopiert!",
   "toast.session.share.failed.title": "Sitzung konnte nicht geteilt werden",
   "toast.session.share.failed.description": "Beim Teilen der Sitzung ist ein Fehler aufgetreten",
+  "toast.session.share.noTarget.description":
+    'Zum Teilen wird enterprise.url in der Konfiguration benötigt, oder "share": "cloud", um mit der Lunos-Konsole Ihrer Organisation zu teilen (nach lunos login).',
   "toast.session.unshare.success.title": "Teilen der Sitzung aufgehoben",
   "toast.session.unshare.success.description": "Teilen der Sitzung erfolgreich aufgehoben!",
   "toast.session.unshare.failed.title": "Aufheben des Teilens fehlgeschlagen",

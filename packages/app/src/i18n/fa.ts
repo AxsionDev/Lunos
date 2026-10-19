@@ -623,6 +623,8 @@ export const dict = {
   "toast.session.share.success.description": "اشتراک گذاری URL کپی شده در کلیپ بورد!",
   "toast.session.share.failed.title": "جلسه اشتراک گذاری نشد",
   "toast.session.share.failed.description": "هنگام اشتراک‌گذاری جلسه خطایی روی داد",
+  "toast.session.share.noTarget.description":
+    'اشتراک‌گذاری به enterprise.url در پیکربندی نیاز دارد، یا "share": "cloud" برای اشتراک با کنسول Lunos سازمان شما (پس از lunos login).',
   "toast.session.unshare.success.title": "جلسه لغو اشتراک‌گذاری شد",
   "toast.session.unshare.success.description": "جلسه با موفقیت لغو اشتراک گذاری شد!",
   "toast.session.unshare.failed.title": "لغو اشتراک‌گذاری جلسه انجام نشد",

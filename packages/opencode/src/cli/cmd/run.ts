@@ -28,6 +28,7 @@ import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
 import { RunBudget } from "@/agent/run-budget"
 import { RunEnding } from "./run/ending"
+import { ShareNotice } from "@/share/notice"
 
 const isAbort = (error: unknown) =>
   !!error && typeof error === "object" && (error as { name?: unknown }).name === "MessageAbortedError"
@@ -672,17 +673,32 @@ export const RunCommand = effectCmd({
         }
       }
 
+      const warned = new Set<string>()
       async function share(sdk: OpencodeClient, sessionID: string) {
         const cfg = await sdk.config.get()
         if (!cfg.data) return
         if (cfg.data.share !== "auto" && !flags.autoShare && !args.share) return
         const res = await sdk.session.share({ sessionID }).catch((error) => ({ error }))
-        const refusal = res.error as { _tag?: string; message?: string } | undefined
+        const refusal = res.error as { _tag?: string; message?: string; reason?: string } | undefined
+        // XCOD-266: nowhere to share to. Asked for with --share, always say so; from "auto", once
+        // per project, or every run would repeat it.
+        const quiet =
+          refusal?.reason === "no-target" &&
+          !args.share &&
+          !(await sdk.project
+            .current()
+            .then((project) =>
+              ShareNotice.once(
+                `cli:${ShareNotice.project({ project: project.data ?? { id: "global" }, directory: directory ?? root })}`,
+              ),
+            )
+            .catch(() => true))
         if (
-          refusal?._tag === "ShareDisabledError" ||
-          (refusal instanceof Error && refusal.message.includes("disabled"))
+          !quiet &&
+          (refusal?._tag === "ShareDisabledError" || (refusal instanceof Error && refusal.message.includes("disabled")))
         ) {
           UI.println(UI.Style.TEXT_WARNING_BOLD + "!  " + refusal.message)
+          if (refusal.message) warned.add(refusal.message)
         }
         if (!res.error && "data" in res && res.data?.share?.url) {
           UI.println(UI.Style.TEXT_INFO_BOLD + "~  " + res.data.share.url)
@@ -945,6 +961,8 @@ export const RunCommand = effectCmd({
             // XCOD-214: warnings the TUI would show as a toast, e.g. a --model that isn't available here
             // and was replaced by the next best one.
             if (event.type === "tui.toast.show" && event.properties.variant === "warning") {
+              // XCOD-266: "auto" share's notice can arrive here too, after share() already said it.
+              if (warned.has(event.properties.message)) continue
               if (emit("warning", { message: event.properties.message })) continue
               UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL + event.properties.message)
               continue

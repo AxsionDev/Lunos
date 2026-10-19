@@ -622,6 +622,8 @@ export const dict = {
   "toast.session.share.success.description": "ចែករំលែក URL ដែលបានចម្លងទៅក្ដារតម្បៀតខ្ទាស់!",
   "toast.session.share.failed.title": "បរាជ័យក្នុងការចែករំលែកសម័យ",
   "toast.session.share.failed.description": "កំហុសបានកើតឡើងខណៈពេលចែករំលែកសម័យ",
+  "toast.session.share.noTarget.description":
+    'ការចែករំលែកត្រូវការ enterprise.url នៅក្នុងការកំណត់ ឬ "share": "cloud" ដើម្បីចែករំលែកជាមួយកុងសូល Lunos របស់ស្ថាប័នអ្នក (បន្ទាប់ពី lunos login)។',
   "toast.session.unshare.success.title": "សម័យមិនត្រូវបានចែករំលែក",
   "toast.session.unshare.success.description": "សម័យបានឈប់ចែករំលែកដោយជោគជ័យ!",
   "toast.session.unshare.failed.title": "បានបរាជ័យក្នុងការឈប់ចែករំលែកសម័យ",

@@ -33,7 +33,7 @@ import { Process } from "@/util/process"
 import { parseGitHubRemote } from "@/util/repository"
 import { Effect } from "effect"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
-import { extractResponseText, formatPromptTooLargeError } from "./github.shared"
+import { extractResponseText, formatPromptTooLargeError, shareLink } from "./github.shared"
 
 type GitHubAuthor = {
   login: string
@@ -472,7 +472,9 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       await subscribeSessionEvents()
       // XCOD-174: share only when asked (SHARE=true), and link to wherever the share service put it.
       // Upstream shared public repos by default and linked to its own share site.
-      shareUrl = share === true ? (await runLocalEffect(sessionShare.share(session.id))).url : undefined
+      // XCOD-266: with nowhere to share to, the log says why and the run carries on without a link.
+      shareUrl =
+        share === true ? await runLocalEffect(shareLink(sessionShare.share(session.id), core.warning)) : undefined
       console.log("opencode session", session.id)
 
       // Handle event types:

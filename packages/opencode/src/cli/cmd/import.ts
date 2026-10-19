@@ -24,7 +24,21 @@ export type ShareData =
   | { type: "session_diff"; data: unknown }
   | { type: "model"; data: unknown }
 
-/** Extract share ID from a share URL like https://opncd.ai/share/abc123 */
+/**
+ * XCOD-266: upstream shut its share service down in v1.19.3, so its links have nothing left to fetch.
+ * Refused by host (any subdomain too), whatever the path.
+ */
+export const DISCONTINUED_MESSAGE = "opncd.ai sharing was discontinued upstream; this link can't be imported."
+
+export function isDiscontinuedShareUrl(url: string) {
+  try {
+    return /(^|\.)opncd\.ai$/i.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Extract share ID from a share URL like https://console.example.com/share/abc123 */
 export function parseShareUrl(url: string): string | null {
   const match = url.match(/^https?:\/\/[^/]+\/share\/([a-zA-Z0-9_-]+)$/)
   return match ? match[1] : null
@@ -96,7 +110,7 @@ export const ImportCommand = effectCmd({
   describe: "import session data from JSON file or URL",
   builder: (yargs) =>
     yargs.positional("file", {
-      describe: "path to JSON file or share URL",
+      describe: "path to JSON file, or a share URL from your organisation's console or enterprise.url",
       type: "string",
       demandOption: true,
     }),
@@ -117,17 +131,21 @@ const runImport = Effect.fn("Cli.import.body")(function* (file: string, ctx: Ins
   const isUrl = file.startsWith("http://") || file.startsWith("https://")
 
   if (isUrl) {
+    if (isDiscontinuedShareUrl(file)) return yield* new CliError({ message: DISCONTINUED_MESSAGE })
+    // Without an organisation or enterprise.url a link still imports from its own host, unsigned
+    // (XCOD-266).
+    const req = yield* Effect.orDie(
+      share.request().pipe(Effect.catchIf(ShareNext.isNoTarget, () => Effect.succeed(undefined))),
+    )
     const slug = parseShareUrl(file)
     if (!slug) {
-      const baseUrl = yield* Effect.orDie(share.url())
-      process.stdout.write(`Invalid URL format. Expected: ${baseUrl}/share/<slug>`)
+      process.stdout.write(`Invalid URL format. Expected: ${req?.baseUrl ?? "https://<share host>"}/share/<slug>`)
       process.stdout.write(EOL)
       return
     }
 
     const baseUrl = new URL(file).origin
-    const req = yield* Effect.orDie(share.request())
-    const headers = shouldAttachShareAuthHeaders(file, req.baseUrl) ? req.headers : {}
+    const headers = req && shouldAttachShareAuthHeaders(file, req.baseUrl) ? req.headers : {}
 
     const tryFetch = (url: string) =>
       Effect.tryPromise({
@@ -138,7 +156,7 @@ const runImport = Effect.fn("Cli.import.body")(function* (file: string, ctx: Ins
           }),
       })
 
-    const dataPath = req.api.data(slug)
+    const dataPath = req?.api.data(slug) ?? `/api/share/${slug}/data`
     let response = yield* tryFetch(`${baseUrl}${dataPath}`)
 
     if (!response.ok && dataPath !== `/api/share/${slug}/data`) {

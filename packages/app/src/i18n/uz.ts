@@ -626,6 +626,8 @@ export const dict = {
   "toast.session.share.success.description": "Buferga nusxalangan URL bilan baham ko'ring!",
   "toast.session.share.failed.title": "Seansni ulashib boʻlmadi",
   "toast.session.share.failed.description": "Seansni ulashishda xatolik yuz berdi",
+  "toast.session.share.noTarget.description":
+    'Ulashish uchun sozlamalarda enterprise.url yoki tashkilotingiz Lunos konsoli bilan ulashish uchun "share": "cloud" kerak (lunos login dan keyin).',
   "toast.session.unshare.success.title": "Seans ulashilmadi",
   "toast.session.unshare.success.description": "Seans muvaffaqiyatli bekor qilindi!",
   "toast.session.unshare.failed.title": "Seansni taqsimlab boʻlmadi",

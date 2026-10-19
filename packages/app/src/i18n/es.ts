@@ -669,6 +669,8 @@ export const dict = {
   "toast.session.share.success.description": "Enlace para compartir copiado al portapapeles.",
   "toast.session.share.failed.title": "Fallo al compartir sesión",
   "toast.session.share.failed.description": "Ocurrió un error al compartir la sesión",
+  "toast.session.share.noTarget.description":
+    'Para compartir se necesita enterprise.url en la configuración, o "share": "cloud" para compartir con la consola de Lunos de tu organización (después de lunos login).',
 
   "toast.session.unshare.success.title": "La sesión dejó de compartirse",
   "toast.session.unshare.success.description": "La sesión dejó de compartirse correctamente.",

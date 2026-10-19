@@ -49,7 +49,11 @@ export const PATCHES: Record<string, Patch[]> = {
     ],
     ["Alternatively, you can select one of the other providers.", "Lunos works with many other providers too."],
   ],
-  cli: [[/#### install\n[\s\S]*?(?=#### run)/, ""]],
+  cli: [
+    [/#### install\n[\s\S]*?(?=#### run)/, ""],
+    // XCOD-266: upstream's share service is gone, and Lunos refuses its links.
+    ["opencode import https://opncd.ai/s/abc123", "opencode import https://share.example.com/share/abc123"],
+  ],
   agents: [[ZEN_EXAMPLE, EU_EXAMPLE]],
   models: [[ZEN_EXAMPLE, EU_EXAMPLE]],
   config: [

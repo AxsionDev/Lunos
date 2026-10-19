@@ -517,6 +517,8 @@ export const dict = {
   "toast.session.share.success.description": "Jakolinkki kopioitu leikepöydälle!",
   "toast.session.share.failed.title": "Istunnon jakaminen epäonnistui",
   "toast.session.share.failed.description": "Istunnon jakamisessa tapahtui virhe",
+  "toast.session.share.noTarget.description":
+    'Jakaminen vaatii enterprise.url-asetuksen määrityksissä tai "share": "cloud", jotta voit jakaa organisaatiosi Lunos-konsoliin (lunos login -kirjautumisen jälkeen).',
   "toast.session.unshare.success.title": "Istunnon jako peruttu",
   "toast.session.unshare.success.description": "Istunnon jakaminen peruutettu onnistuneesti!",
   "toast.session.unshare.failed.title": "Istunnon jakamisen peruuttaminen epäonnistui",

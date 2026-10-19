@@ -78,6 +78,7 @@ import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { createTimelineProjection } from "./projection"
 import { MessageComment, SummaryDiff, TimelineRow, TimelineRowMap } from "./rows"
 import { filterVirtualIndexes } from "./virtual-items"
+import { shareRefusalKey } from "../share-refusal"
 
 const emptyMessages: MessageType[] = []
 const emptyParts: PartType[] = []
@@ -663,6 +664,14 @@ export function MessageTimeline(props: {
     mutationFn: (id: string) => serverSDK().client.session.share({ sessionID: id }),
     onError: (err) => {
       console.error("Failed to share session", err)
+      // XCOD-266: nowhere to share to is something the user can fix, so say what to set up.
+      const key = shareRefusalKey(err)
+      if (key)
+        showToast({
+          title: language.t("toast.session.share.failed.title"),
+          description: language.t(key),
+          variant: "error",
+        })
     },
   }))
 

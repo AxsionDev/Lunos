@@ -680,6 +680,8 @@ export const dict = {
   "toast.session.share.success.description": "Посилання скопійовано в буфер обміну!",
   "toast.session.share.failed.title": "Не вдалося опублікувати сесію",
   "toast.session.share.failed.description": "Під час публікації сесії сталася помилка",
+  "toast.session.share.noTarget.description":
+    'Для поширення потрібен enterprise.url у конфігурації або "share": "cloud", щоб ділитися з консоллю Lunos вашої організації (після lunos login).',
 
   "toast.session.unshare.success.title": "Поширення сесії припинено",
   "toast.session.unshare.success.description": "Поширення сесії успішно припинено!",
