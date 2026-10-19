@@ -10,7 +10,7 @@ import { ConfigMemorySource } from "./memory-source"
 export const Backend = Schema.Struct({
   type: Schema.Literals(["embedded", "neo4j", "postgres", "memgraph"]).pipe(Schema.optional).annotate({
     description:
-      '"embedded" (the default: memory on this computer), "neo4j", "postgres" (XCOD-264), or "memgraph" (not supported yet: refused when memory starts)',
+      'Where memory is stored: on this computer (the default), "neo4j", "postgres", or "memgraph" (not supported yet: refused when memory starts)',
   }),
   url: Schema.String.pipe(Schema.optional).annotate({
     description:
@@ -127,11 +127,11 @@ export const Info = Schema.Struct({
   }),
   backend: Backend.pipe(Schema.optional).annotate({
     description:
-      'Where memory is stored (XCOD-134): "embedded" (the default; on this computer) or a team database (Neo4j or PostgreSQL)',
+      "Where memory is stored (XCOD-134): on this computer (the default), or a team database (Neo4j or PostgreSQL)",
   }),
   templates: Templates.pipe(Schema.optional).annotate({
     description:
-      "Memory setup templates (XCOD-264): your organisation's own, and built-in ones to hide. Usually set in managed config",
+      "Memory setup templates (XCOD-264): your organisation's own, and built-in ones to hide. Read from managed config only, as written: {env:} references in a template stay references",
   }),
 }).annotate({ identifier: "MemoryConfig" })
 export type Info = Schema.Schema.Type<typeof Info>

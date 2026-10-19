@@ -134,11 +134,11 @@ export function gate(input: {
   residency: Residency.Resolved | undefined
 }): Checked {
   const block = configured(input.memory)
-  if (!block) throw new ConfigError("memory.backend is embedded; there is no external database to connect to")
+  if (!block) throw new ConfigError("memory is stored on this computer; there is no team database to connect to")
   const kind = block.type as Kind
   if (kind === "memgraph")
     throw new ConfigError(
-      'memory.backend.type "memgraph" is not supported yet: it fails the external memory contract tests. Use "neo4j", "postgres" or "embedded"',
+      'memory.backend.type "memgraph" is not supported yet: it fails the external memory contract tests. Use "neo4j" or "postgres", or keep memory on this computer',
     )
   if (input.memory?.encryption === "os-keychain")
     throw new ConfigError(
@@ -273,7 +273,7 @@ export async function projectID(worktree: string) {
     })
   if (!remote)
     throw new ConfigError(
-      "Project memory in an external database is keyed by the repository's git remote, and this project has none. Add one (git remote add origin <url>), or keep project memory embedded",
+      "Project memory in an external database is keyed by the repository's git remote, and this project has none. Add one (git remote add origin <url>), or keep project memory on this computer",
     )
   return hash("lunos-project", normalizeRemote(remote))
 }

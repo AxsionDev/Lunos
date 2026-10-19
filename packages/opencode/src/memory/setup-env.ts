@@ -1,10 +1,12 @@
 export * as MemorySetupEnv from "./setup-env"
 
-import { Effect } from "effect"
-import type { ConfigMemory } from "@opencode-ai/core/config/memory"
+import { Effect, Option, Schema } from "effect"
+import { ConfigMemory } from "@opencode-ai/core/config/memory"
 import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import { Config } from "@/config/config"
+import { ConfigManaged } from "@/config/managed"
+import { ConfigMemoryBackend } from "@/config/memory-backend"
 import { InstanceState } from "@/effect/instance-state"
 import { Provider } from "@/provider/provider"
 import { MemoryExternal } from "./external"
@@ -46,6 +48,32 @@ export function localModels(providers: readonly Provider.Info[]) {
   return out
 }
 
+/**
+ * The organisation's templates and the built-ins it hides, from managed config as written. Read raw,
+ * not from the loaded config: loading expands {env:}/{file:} references, so a template's
+ * `{env:NEO4J_PASSWORD}` would arrive as the password, be listed by `lunos memory templates --json`
+ * and be written into lunos.json when applied. A template with a literal credential is left out.
+ */
+export async function organisation(): Promise<{ custom: MemoryStorage.Template[]; hide: string[] }> {
+  const docs = await ConfigManaged.readManagedDocs().catch(() => [] as unknown[])
+  const custom: MemoryStorage.Template[] = []
+  const hide = new Set<string>()
+  const decode = Schema.decodeUnknownOption(ConfigMemory.Template)
+  // In precedence order: the first document that names a template wins.
+  for (const doc of docs) {
+    const block = (doc as { memory?: { templates?: { custom?: unknown; hide?: unknown } } } | undefined)?.memory
+      ?.templates
+    for (const name of Array.isArray(block?.hide) ? block.hide : []) if (typeof name === "string") hide.add(name)
+    for (const raw of Array.isArray(block?.custom) ? block.custom : []) {
+      const item = decode(raw)
+      if (Option.isNone(item) || custom.some((entry) => entry.name === item.value.name)) continue
+      if (ConfigMemoryBackend.credentialProblems({ memory: item.value.memory }).length) continue
+      custom.push(item.value as MemoryStorage.Template)
+    }
+  }
+  return { custom, hide: [...hide] }
+}
+
 export const environment = Effect.fn("MemorySetupEnv.environment")(function* (input?: { memory?: ConfigMemory.Info }) {
   const config = yield* Config.Service
   const cfg = yield* config.get()
@@ -81,6 +109,6 @@ export const environment = Effect.fn("MemorySetupEnv.environment")(function* (in
     ...(docker ? { docker } : {}),
     localModels: locals,
   }
-  const templates = MemoryStorage.templates(environment, cfg.memory?.templates as never)
+  const templates = MemoryStorage.templates(environment, yield* Effect.promise(organisation))
   return { environment, templates }
 })

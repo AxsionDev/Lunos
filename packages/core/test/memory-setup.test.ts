@@ -134,4 +134,19 @@ describe("memory storage choice (XCOD-264)", () => {
       model: "ollama/qwen3:4b",
     })
   })
+
+  test("the block names this computer explicitly, so it wins over a team database in the config files", () => {
+    expect(MemorySetup.block(MemorySetup.initial(undefined)).backend).toEqual({ type: "embedded" })
+  })
+
+  test("another database doesn't inherit allow_insecure or a Neo4j database name", () => {
+    const memory = {
+      enabled: true,
+      encryption: "off" as const,
+      backend: { type: "neo4j", url: "bolt://g.example.eu:7687", database: "lunos", allow_insecure: true },
+    }
+    const writes = MemorySetup.writes({ ...MemorySetup.initial(memory), backend: pg }, memory, [])
+    expect(writes).toContainEqual({ key: "memory.backend.allow_insecure", unset: true })
+    expect(writes).toContainEqual({ key: "memory.backend.database", unset: true })
+  })
 })

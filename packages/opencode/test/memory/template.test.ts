@@ -88,3 +88,56 @@ test("Move's child process runs in the project, not in a dev run's --cwd", async
   const { MemoryMove } = await import("../../src/memory/move")
   expect(MemoryMove.withoutCwd(["--cwd", "/lunos/packages/opencode", "--smol", "--cwd=/x"])).toEqual(["--smol"])
 })
+
+describe("organisation templates (managed config)", () => {
+  let managed: string
+  let before: string | undefined
+  beforeEach(async () => {
+    managed = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-managed-"))
+    before = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+    process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = managed
+  })
+  afterEach(async () => {
+    if (before === undefined) delete process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR
+    else process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR = before
+    await fs.rm(managed, { recursive: true, force: true })
+  })
+
+  test("are read as written: {env:} stays a reference; a literal credential leaves the template out", async () => {
+    const backend = { type: "neo4j", url: "bolt+s://g.acme.eu:7687", jurisdiction: "EU-DE" }
+    await fs.writeFile(
+      path.join(managed, "managed.json"),
+      JSON.stringify({
+        memory: {
+          templates: {
+            custom: [
+              {
+                name: "acme",
+                title: "Our team Neo4j",
+                leaves: "the fact text, to Acme's Neo4j",
+                memory: { backend: { ...backend, username: "{env:USER}", password: "{env:HOME}" } },
+              },
+              {
+                name: "leaky",
+                title: "Leaky",
+                leaves: "x",
+                memory: { backend: { ...backend, username: "neo4j", password: "hunter2" } },
+              },
+              { name: "broken" },
+            ],
+            hide: ["neo4j-docker"],
+          },
+        },
+      }),
+    )
+    const { MemorySetupEnv } = await import("../../src/memory/setup-env")
+    const found = await MemorySetupEnv.organisation()
+    expect(found.custom.map((item) => item.name)).toEqual(["acme"])
+    expect(found.custom[0].memory.backend).toMatchObject({ username: "{env:USER}", password: "{env:HOME}" })
+    expect(found.hide).toEqual(["neo4j-docker"])
+    const env = { paths: {}, localModels: [], docker: { tool: "docker" as const, compose: true } }
+    const list = MemoryStorage.templates(env, found)
+    expect(list[0].name).toBe("acme")
+    expect(list.map((item) => item.name)).not.toContain("neo4j-docker")
+  })
+})

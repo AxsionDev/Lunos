@@ -46,9 +46,9 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Changed
 
-- **Memory says "On this computer" instead of "embedded"** in setup, settings, `lunos memory
-status`, `/memory` and the status line, and repeats what leaves your computer in each of them.
-  The config value is unchanged. <!-- XCOD-264 -->
+- **Memory names where it's stored in plain words.** Setup, settings, `lunos memory status`,
+  `/memory` and the status line say "On this computer" or "Team database: PostgreSQL". Each of them
+  also repeats what leaves your computer. Your config file is unchanged. <!-- XCOD-264 -->
 
 ### Fixed
 

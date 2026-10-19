@@ -42,7 +42,15 @@ export type Row = { key: string; value?: unknown; locked?: boolean; source?: str
 type MemoryConfig = {
   enabled?: boolean
   model?: string
-  backend?: { type?: string; url?: string; username?: string; password?: string; jurisdiction?: string }
+  backend?: {
+    type?: string
+    url?: string
+    username?: string
+    password?: string
+    jurisdiction?: string
+    database?: string
+    allow_insecure?: boolean
+  }
   retention?: { days?: number }
   encryption?: "os-keychain" | "off"
 }
@@ -87,7 +95,9 @@ export function block(draft: Draft): Record<string, unknown> {
   return {
     enabled: draft.enabled,
     ...(draft.model ? { model: draft.model } : {}),
-    ...(draft.backend.type !== "embedded" ? { backend: draft.backend } : {}),
+    // Explicit for this computer too: the block is layered over the config files (the check, Move),
+    // where a team database may still be set.
+    backend: draft.backend,
     ...(draft.retentionDays ? { retention: { days: draft.retentionDays } } : {}),
     encryption: draft.encryption,
   }
@@ -117,6 +127,12 @@ export function writes(draft: Draft, memory: MemoryConfig | undefined, rows: rea
     set("memory.backend.username", draft.backend.username, memory?.backend?.username)
     set("memory.backend.password", draft.backend.password, memory?.backend?.password)
     set("memory.backend.jurisdiction", draft.backend.jurisdiction, memory?.backend?.jurisdiction)
+    // XCOD-264: another database doesn't inherit the old one's exceptions: an unencrypted connection
+    // allowed to one host isn't allowed to the next, and a Neo4j database name means nothing to PostgreSQL.
+    if (memory?.backend?.url !== draft.backend.url)
+      set("memory.backend.allow_insecure", undefined, memory?.backend?.allow_insecure)
+    if (memory?.backend?.type !== draft.backend.type)
+      set("memory.backend.database", undefined, memory?.backend?.database)
   } else if (memory?.backend?.type && memory.backend.type !== "embedded") {
     set("memory.backend.type", "embedded", memory.backend.type)
   }

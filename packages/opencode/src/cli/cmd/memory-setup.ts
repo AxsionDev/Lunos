@@ -273,6 +273,23 @@ export const MemorySetupCommand = effectCmd({
         )
     }
     for (const line of MemorySetup.conflicts(rows, scope)) yield* say(`Warning: ${line}`)
+    // XCOD-264: switching storage asks what happens to the facts already stored, before saving. With
+    // --yes the new storage starts empty and the old facts stay where they are.
+    let how: unknown = undefined
+    if (MemorySetup.switching(memory, draft) && writes.length) {
+      how = args.yes
+        ? "empty"
+        : yield* ask(() =>
+            prompts.select({
+              message: "You're switching storage. What happens to the facts you have?",
+              options: [
+                { value: "move", label: "Move my facts", hint: MemorySetup.MOVE.replace(/^Move my facts: /, "") },
+                { value: "empty", label: "Start empty", hint: "the old facts stay where they are" },
+              ],
+            }),
+          )
+      if (cancelled(how)) return yield* quit()
+    }
     if (!args.yes && writes.length) {
       const save = yield* ask(() =>
         prompts.confirm({
@@ -280,6 +297,12 @@ export const MemorySetupCommand = effectCmd({
         }),
       )
       if (cancelled(save) || save !== true) return yield* quit()
+    }
+    if (how === "empty") yield* say(MemorySetup.START_EMPTY)
+    if (how === "move") {
+      const moved = yield* moveFacts(MemorySetup.block(draft), template?.env)
+      if (!moved.ok) return yield* fail(`Your facts weren't moved, and nothing was saved: ${moved.error}`)
+      yield* say(`Moved ${moved.facts ?? 0} fact(s), each with where it came from. The old copy is unchanged.`)
     }
     for (const write of writes) {
       // The same validation and locks as `lunos settings set`; a refusal stops before the next key.
@@ -318,3 +341,44 @@ function hostOf(url: string) {
     return undefined
   }
 }
+
+/** Move my facts: export from the storage in use now, import into the new one in a fresh process. */
+const moveFacts = Effect.fn("Cli.memory.setup.move")(function* (
+  block: Record<string, unknown>,
+  env: Record<string, string> | undefined,
+) {
+  const fs = yield* Effect.promise(() => import("node:fs/promises"))
+  const os = yield* Effect.promise(() => import("node:os"))
+  const path = yield* Effect.promise(() => import("node:path"))
+  const { MemoryExport } = yield* Effect.promise(() => import("@/memory/export"))
+  const { MemoryMove } = yield* Effect.promise(() => import("@/memory/move"))
+  const { MemoryExternal } = yield* Effect.promise(() => import("@/memory/external"))
+  const memory = yield* Memory.Service
+  const dir = yield* Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), "lunos-move-")))
+  const bundle = path.join(dir, "bundle")
+  return yield* Effect.gen(function* () {
+    const exported = yield* MemoryExport.run({
+      scopes: yield* memory.scopes(),
+      graph: false,
+      includeIndex: false,
+      zip: false,
+      out: bundle,
+      directory: dir,
+    }).pipe(Effect.result)
+    if (exported._tag === "Failure")
+      return { ok: false, error: `could not read the facts to move: ${exported.failure.message}` }
+    if (!exported.success.manifest.counts.facts.total) return { ok: true, facts: 0 }
+    yield* print(`Moving ${exported.success.manifest.counts.facts.total} fact(s)…`)
+    return yield* Effect.promise(() =>
+      MemoryMove.run({
+        directory: process.cwd(),
+        memory: block,
+        to: MemoryExternal.type(block as never),
+        bundle,
+        env,
+      }),
+    )
+  }).pipe(Effect.ensuring(Effect.promise(() => fs.rm(dir, { recursive: true, force: true }))))
+})
+
+const print = (text: string) => writeStdoutEffect(text + EOL)

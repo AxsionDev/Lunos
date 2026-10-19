@@ -184,7 +184,7 @@
         "type": {
           "type": "string",
           "enum": ["embedded", "neo4j", "postgres", "memgraph"],
-          "description": "\"embedded\" (the default: memory on this computer), \"neo4j\", \"postgres\" (XCOD-264), or \"memgraph\" (not supported yet: refused when memory starts)"
+          "description": "Where memory is stored: on this computer (the default), \"neo4j\", \"postgres\", or \"memgraph\" (not supported yet: refused when memory starts)"
         },
         "url": {
           "type": "string",
@@ -356,11 +356,11 @@
         },
         "backend": {
           "$ref": "#/$defs/MemoryBackendConfig",
-          "description": "Where memory is stored (XCOD-134): \"embedded\" (the default; on this computer) or a team database (Neo4j or PostgreSQL)"
+          "description": "Where memory is stored (XCOD-134): on this computer (the default), or a team database (Neo4j or PostgreSQL)"
         },
         "templates": {
           "$ref": "#/$defs/MemoryTemplatesConfig",
-          "description": "Memory setup templates (XCOD-264): your organisation's own, and built-in ones to hide. Usually set in managed config"
+          "description": "Memory setup templates (XCOD-264): your organisation's own, and built-in ones to hide. Read from managed config only, as written: {env:} references in a template stay references"
         }
       },
       "additionalProperties": false
