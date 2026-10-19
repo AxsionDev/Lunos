@@ -40,6 +40,16 @@ export interface Status {
   outdated?: string
   /** What to do when it isn't usable. */
   hint?: string
+  /** XCOD-256: the `--permission-mode` choices this Claude Code's `--help` lists. */
+  permissionModes?: string[]
+}
+
+/** `(choices: "acceptEdits", "auto", …)` after `--permission-mode`, which `--help` wraps across lines. */
+export function permissionModes(help: string) {
+  const block = /--permission-mode[\s\S]*?\(choices:([^)]*)\)/.exec(help)?.[1]
+  if (!block) return undefined
+  const modes = [...block.matchAll(/"([A-Za-z]+)"/g)].map((match) => match[1]!)
+  return modes.length ? modes : undefined
 }
 
 /** The environment a tool runs with: the user's, minus what a parent Claude Code session injects. */
@@ -112,6 +122,8 @@ export async function detect(tool: Tool, configured?: string): Promise<Status> {
       : {}),
   }
   if (tool === "claude") {
+    const modes = permissionModes(help.stdout)
+    if (modes) status.permissionModes = modes
     const auth = await run(file, ["auth", "status"])
     try {
       const parsed = JSON.parse(auth.stdout) as { loggedIn?: boolean; authMethod?: string }

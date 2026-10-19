@@ -1,9 +1,34 @@
 import { createSignal } from "solid-js"
+import { prefersReducedMotion } from "./motion"
 // XCOD-218: external sessions (Claude Code / Codex driven from Lunos) in the TUI.
 
 export type ExternalTool = "claude" | "codex"
 
 export const EXTERNAL_LABEL: Record<ExternalTool, string> = { claude: "Claude Code", codex: "Codex CLI" }
+
+/**
+ * XCOD-260: how an external session names its tool: "▸ Claude Code" before the prompt and
+ * "Lunos · Claude Code" bottom right. The products' plain names next to ours, never one co-branded name.
+ */
+export const EXTERNAL_BADGE: Record<ExternalTool, string> = { claude: "Claude Code", codex: "Codex" }
+
+export function externalBadge(tool: ExternalTool, model?: string) {
+  return ["Lunos", EXTERNAL_BADGE[tool], model].filter(Boolean).join(" · ")
+}
+
+/**
+ * The tool's accent, or undefined to keep the theme's colours: with `tui.external_accent: false`, or
+ * under NO_COLOR / TERM=dumb, where the badge and the ▸ label carry the meaning on their own.
+ */
+export function externalAccent<T>(
+  theme: { externalClaude: T; externalCodex: T },
+  tool: ExternalTool,
+  enabled: boolean,
+  env: Record<string, string | undefined> = process.env,
+) {
+  if (!enabled || prefersReducedMotion(env)) return undefined
+  return tool === "claude" ? theme.externalClaude : theme.externalCodex
+}
 
 export type ExternalMarker = { tool: ExternalTool; session?: string; commands?: string[] }
 

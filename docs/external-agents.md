@@ -74,6 +74,17 @@ They're listed only while external sessions are on (`external.enabled` isn't `fa
 
 If you have your own command, skill or agent command named `claude` or `codex`, yours runs, and Lunos says once that its own is `/external claude` / `/external codex`.
 
+### Knowing where your prompt goes
+
+A Claude Code or Codex session looks different from a Lunos one, so you don't send a prompt to Anthropic or OpenAI by mistake:
+
+- **Label and badge:** `▸ Claude Code` (or `▸ Codex`) sits where the agent and model are in a Lunos session, and `Lunos · Claude Code` (or `Lunos · Codex`) is at the bottom right, with the tool's model once it reports one. These are text, so they show with `NO_COLOR` and on a monochrome terminal.
+- **Accent:** the prompt border, cursor, spinner and the tool's reply markers use the tool's colour, a warm terracotta for Claude Code and a green-tinted graphite for Codex. Text, code and diffs keep your theme. A theme can set its own as `externalClaude` / `externalCodex`; the built-in ones reach 4.5:1 on every built-in theme's background. `"external_accent": false` in `tui.json` keeps your theme's colours (the label and badge stay).
+- **Session list and sidebar:** these sessions have an accent dot and the tool's name.
+- **Desktop and web:** the prompt has the accent border and the same badge.
+
+Claude Code is a product of Anthropic; Codex is a product of OpenAI. Lunos is not affiliated with either, and uses the products' plain names next to its own.
+
 ### Your Lunos commands in a Claude Code or Codex session
 
 The prompt's `/` list shows the tool's own commands ("Claude Code command") and your Lunos custom commands and MCP prompts ("Lunos command"). A Lunos command is expanded by Lunos (its template, arguments and `@file` references) and the text it makes goes to the tool. When both have a command of the same name, the tool's keeps the bare name and Lunos's is `/<name>:lunos`, so `/review` in Codex is Codex's and `/review:lunos` is yours.
@@ -109,7 +120,21 @@ Each approval request a tool makes comes to Lunos:
 
 Review those rules if you rely on Lunos to see every edit.
 
-Settings that skip approval or the sandbox are refused unless you ask for one explicitly for that run, for example `--permission-mode bypassPermissions --unsafe`. That covers Claude Code's `bypassPermissions`, and Codex's `danger-full-access` and `never`. They can't be set in config. For Codex, `--permission-mode` takes either a sandbox (`read-only`, `workspace-write`) or an approval policy (`untrusted`, `on-request`).
+Settings that skip approval or the sandbox are refused unless you ask for one explicitly for that run, for example `--permission-mode bypassPermissions --unsafe`. That covers Claude Code's `bypassPermissions`, and Codex's `danger-full-access` and `never`. They can't be saved to config, and one already in a config file is ignored (the safe default is used) and flagged in `/settings`. For Codex, `--permission-mode` takes either a sandbox (`read-only`, `workspace-write`) or an approval policy (`untrusted`, `on-request`).
+
+### Choosing the settings for every run
+
+`/settings` → Models & agents lists each one as a choice, with what it does. Manual approval (the safe default above) is selected when nothing is set; choosing it writes nothing, or removes the key if one is set. The unsafe values are listed greyed out with how to pass them for one run.
+
+| Key                               | Values                                                                                       | Default     |
+| --------------------------------- | -------------------------------------------------------------------------------------------- | ----------- |
+| `external.claude.permission_mode` | `default`, `acceptEdits`, `plan`, `auto`, `dontAsk` (what your Claude Code's `--help` lists) | `default`   |
+| `external.codex.sandbox`          | `read-only`, `workspace-write`                                                               | `read-only` |
+| `external.codex.approval_policy`  | `untrusted`, `on-request`                                                                    | `untrusted` |
+
+An empty value means the default. `auto` lets Claude Code's own classifier approve routine actions, so those don't come to Lunos.
+
+`external.codex.permission_mode` (one field for either a sandbox or an approval policy) still works while the new keys are unset. Saving either new key moves it: its value goes to whichever of the two it names.
 
 ## Data residency and policy
 

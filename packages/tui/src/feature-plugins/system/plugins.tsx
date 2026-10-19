@@ -9,9 +9,11 @@ import type { BuiltinTuiPlugin } from "../builtins"
 import { useTerminalDimensions } from "@opentui/solid"
 import { fileURLToPath } from "url"
 import { DialogSelect, type DialogSelectOption } from "../../ui/dialog-select"
-import { Show, createEffect, createMemo, createSignal } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js"
+import { TextAttributes } from "@opentui/core"
 import { useBindings } from "../../keymap"
 import { takeDiscoverRequest, type DiscoverRequest } from "../../util/marketplace"
+import * as MarketplaceTabs from "../../util/marketplace-tabs"
 
 const id = "internal:plugin-manager"
 
@@ -139,8 +141,6 @@ function Install(props: { api: TuiPluginApi }) {
   )
 }
 
-const KINDS: readonly TuiMarketplaceKind[] = ["plugin", "skill", "hook", "mcp"]
-const KIND_TITLE: Record<TuiMarketplaceKind, string> = { plugin: "Plugins", skill: "Skills", hook: "Hooks", mcp: "MCP" }
 const KIND_NOUN: Record<TuiMarketplaceKind, string> = {
   plugin: "plugins",
   skill: "skill sources",
@@ -148,35 +148,12 @@ const KIND_NOUN: Record<TuiMarketplaceKind, string> = {
   mcp: "MCP servers",
 }
 
-// One strip for all four kinds, the active one bracketed, so the title doubles as the tab bar. A
-// search (`/marketplace <words>`) starts on "All", so a match is found whatever kind it is.
-function tabTitle(kind: TuiMarketplaceKind | "all", withAll: boolean) {
-  const tabs = [...(withAll ? (["all"] as const) : []), ...KINDS]
-  const title = (k: (typeof tabs)[number]) => (k === "all" ? "All" : KIND_TITLE[k])
-  return `Discover  ${tabs.map((k) => (k === kind ? `[${title(k)}]` : title(k))).join("  ")}`
-}
-
-function discoverRow(
-  api: TuiPluginApi,
-  item: TuiMarketplaceEntry,
-  withKind: boolean,
-): DialogSelectOption<TuiMarketplaceEntry> {
+function statusOf(api: TuiPluginApi, item: TuiMarketplaceEntry) {
   const theme = api.theme.current
-  const status =
-    item.installed === "update" ? (
-      <span style={{ fg: theme.warning }}>update available</span>
-    ) : item.installed === "installed" ? (
-      <span style={{ fg: theme.success }}>installed</span>
-    ) : item.review === "verified" ? (
-      <span style={{ fg: theme.textMuted }}>verified</span>
-    ) : undefined
-  return {
-    title: item.name,
-    value: item,
-    category: item.marketplace,
-    description: withKind ? [KIND_TITLE[item.kind], item.description].filter(Boolean).join(" · ") : item.description,
-    footer: status,
-  }
+  if (item.installed === "update") return <span style={{ fg: theme.warning }}>update available</span>
+  if (item.installed === "installed") return <span style={{ fg: theme.success }}>installed</span>
+  if (item.review === "verified") return <span style={{ fg: theme.textMuted }}>verified</span>
+  return undefined
 }
 
 // The oldest copy shown, so the notice never claims a catalogue is fresher than it is.
@@ -185,10 +162,23 @@ function cachedSince(marketplaces: readonly { fetchedAt: number }[]) {
   return new Date(oldest).toLocaleString()
 }
 
+const LAST_TAB = "marketplace_tab"
+
 function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
-  const withAll = Boolean(props.search)
-  const [kind, setKind] = createSignal<TuiMarketplaceKind | "all">(props.kind ?? (withAll ? "all" : "plugin"))
-  const [offline, setOffline] = createSignal(false)
+  const theme = () => props.api.theme.current
+  // XCOD-258: a search opens on All; otherwise the tab asked for, else the last one used, else Plugins.
+  const [tab, setTabState] = createSignal<MarketplaceTabs.Tab>(
+    props.installed
+      ? "installed"
+      : (props.kind ?? (props.search ? "all" : props.api.kv.get<string>(LAST_TAB, "plugin"))),
+  )
+  const setTab = (next: MarketplaceTabs.Tab) => {
+    setTabState(next)
+    props.api.kv.set(LAST_TAB, next)
+  }
+  const [query, setQuery] = createSignal(props.search ?? "")
+  const [global, setGlobal] = createSignal(false)
+  const [offline, setOffline] = createSignal<string>()
   const [items, setItems] = createSignal<TuiMarketplaceEntry[]>()
   const [marketplaceCount, setMarketplaceCount] = createSignal(0)
   const [installing, setInstalling] = createSignal(false)
@@ -197,12 +187,7 @@ function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
   props.api.marketplace.discover().then((out) => {
     setMarketplaceCount(out.marketplaceCount)
     setItems([...out.items])
-    setOffline(Boolean(out.offline))
-    if (out.offline && out.marketplaces.length)
-      props.api.ui.toast({
-        variant: "info",
-        message: `Offline — showing cached catalogue from ${cachedSince(out.marketplaces)}`,
-      })
+    if (out.offline) setOffline(out.marketplaces.length ? cachedSince(out.marketplaces) : "")
     // A source that's fallen back to a stale cache still lists its entries (last-known-good), but
     // the toast makes that visible rather than presenting it as a fully healthy marketplace.
     for (const marketplace of out.marketplaces) {
@@ -214,23 +199,32 @@ function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
     }
   })
 
+  const allTabs = createMemo(() => MarketplaceTabs.tabs(items() ?? []))
+  const counts = createMemo(() => MarketplaceTabs.counts(items() ?? [], query()))
+  const shown = createMemo(() => MarketplaceTabs.rows(items() ?? [], tab(), query()))
+  const byKey = createMemo(() => new Map(shown().map((item) => [MarketplaceTabs.key(item), item])))
   const rows = createMemo(() =>
-    (items() ?? [])
-      .filter((item) => (props.installed ? item.installed !== undefined : kind() === "all" || item.kind === kind()))
-      .map((item) => discoverRow(props.api, item, Boolean(props.installed) || kind() === "all")),
+    shown().map(
+      (item): DialogSelectOption<string> => ({
+        title: item.name,
+        value: MarketplaceTabs.key(item),
+        category: tab() === "installed" ? MarketplaceTabs.title(item.kind) : item.marketplace,
+        description: MarketplaceTabs.describe(item, tab() === "all" || tab() === "installed"),
+        footer: statusOf(props.api, item),
+      }),
+    ),
   )
   const loading = createMemo(() => items() === undefined)
-  const cycle = () =>
-    setKind((current) => {
-      const tabs: (TuiMarketplaceKind | "all")[] = withAll ? ["all", ...KINDS] : [...KINDS]
-      return tabs[(tabs.indexOf(current) + 1) % tabs.length]!
-    })
+  const move = (step: number) => {
+    const list = allTabs()
+    setTab(list[(list.indexOf(tab()) + step + list.length) % list.length]!)
+  }
 
-  const installPlugin = (spec: string, replace: boolean) => {
+  const installPlugin = (item: TuiMarketplaceEntry, spec: string, replace: boolean) => {
     if (installing()) return
     setInstalling(true)
     void props.api.plugins
-      .install(spec, { replace })
+      .install(spec, { replace, global: global() })
       .then((out) => {
         if (!out.ok) {
           props.api.ui.toast({ variant: "error", message: out.message })
@@ -266,9 +260,16 @@ function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
       })
       .finally(() => {
         setInstalling(false)
-        show(props.api)
+        // XCOD-258: back to the same tab and row, with the installed state refreshed.
+        showDiscover(props.api, back(item))
       })
   }
+
+  const back = (item: TuiMarketplaceEntry): DiscoverRequest => ({
+    ...(tab() === "installed" ? { installed: true } : tab() === "all" ? {} : { kind: tab() as TuiMarketplaceKind }),
+    ...(query() ? { search: query() } : {}),
+    focus: MarketplaceTabs.key(item),
+  })
 
   // Skill sources, hooks and MCP servers never install on a bare Enter: a hook runs on every
   // matching event with no per-run consent, and a local MCP server executes third-party code, so
@@ -276,6 +277,7 @@ function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
   const confirmConfigItem = (item: TuiMarketplaceEntry & { kind: Exclude<TuiMarketplaceKind, "plugin"> }) => {
     if (installing()) return
     setInstalling(true)
+    const request = back(item)
     void props.api.marketplace.plan(item.kind, item.marketplace, item.name).then((plan) => {
       setInstalling(false)
       if (!plan.ok) {
@@ -299,10 +301,10 @@ function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
                   ? { variant: "success", message: `Added ${item.name} to ${out.configPath}. Restart to load it.` }
                   : { variant: "error", message: out.message },
               )
-              showDiscover(props.api, { kind: item.kind })
+              showDiscover(props.api, request)
             })
           }}
-          onCancel={() => showDiscover(props.api, { kind: item.kind })}
+          onCancel={() => showDiscover(props.api, request)}
         />
       ))
     })
@@ -310,54 +312,92 @@ function Discover(props: { api: TuiPluginApi } & DiscoverRequest) {
 
   const select = (item: TuiMarketplaceEntry) => {
     // An update replaces the configured version; otherwise an install never touches one.
-    if (item.kind === "plugin") return item.spec && installPlugin(item.spec, item.installed === "update")
+    if (item.kind === "plugin") return item.spec && installPlugin(item, item.spec, item.installed === "update")
     confirmConfigItem(item as TuiMarketplaceEntry & { kind: Exclude<TuiMarketplaceKind, "plugin"> })
   }
 
   const emptyView = createMemo(() => {
-    if (loading()) return <text fg={props.api.theme.current.textMuted}>Loading marketplaces…</text>
-    if (offline() && marketplaceCount() > 0 && !items()?.length)
-      return (
-        <text fg={props.api.theme.current.textMuted}>
-          {
-            "Offline (LUNOS_OFFLINE) and no cached catalogue yet. Open /marketplace once with network access; after that it works offline."
-          }
-        </text>
+    const muted = (text: string) => (
+      <box paddingLeft={4} paddingRight={4} paddingTop={1}>
+        <text fg={theme().textMuted}>{text}</text>
+      </box>
+    )
+    if (loading()) return muted("Loading marketplaces…")
+    if (offline() === "" && marketplaceCount() > 0 && !items()?.length)
+      return muted(
+        "Offline (LUNOS_OFFLINE) and no cached catalogue yet. Open /marketplace once with network access; after that it works offline.",
       )
     if (marketplaceCount() === 0)
-      return (
-        <text fg={props.api.theme.current.textMuted}>
-          {"No marketplaces added. Run: lunos marketplace add <owner/repo | url | path>"}
-        </text>
-      )
+      return muted("No marketplaces added. Run: lunos marketplace add <owner/repo | url | path>")
     if (rows().length) return undefined
-    if (props.installed)
-      return <text fg={props.api.theme.current.textMuted}>Nothing from the added marketplaces is installed.</text>
-    const current = kind()
-    return (
-      <text fg={props.api.theme.current.textMuted}>
-        {current === "all" ? "Nothing in added marketplaces." : `No ${KIND_NOUN[current]} in added marketplaces.`}
-      </text>
-    )
+    if (query()) return muted(`Nothing on ${MarketplaceTabs.title(tab())} matches "${query()}".`)
+    return muted(MarketplaceTabs.empty(tab()))
   })
+
+  // XCOD-258: a real tab bar under the title, with counts; the active tab is bracketed and bold, not
+  // only coloured, and every tab is clickable.
+  const titleView = () => (
+    <box flexDirection="column" flexShrink={1}>
+      <text fg={theme().text} attributes={TextAttributes.BOLD}>
+        Marketplace
+        <Show when={offline()}>
+          <span style={{ fg: theme().textMuted }}> · offline, cached {offline()}</span>
+        </Show>
+      </text>
+      <box flexDirection="row" gap={2} flexWrap="wrap">
+        <For each={allTabs()}>
+          {(item) => {
+            const active = () => item === tab()
+            const label = () => `${MarketplaceTabs.title(item)} ${counts()[item] ?? 0}`
+            return (
+              <text
+                fg={active() ? theme().primary : theme().textMuted}
+                attributes={active() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : undefined}
+                onMouseUp={() => setTab(item)}
+              >
+                {active() ? `[${label()}]` : label()}
+              </text>
+            )
+          }}
+        </For>
+      </box>
+    </box>
+  )
 
   return (
     <DialogSelect
-      title={props.installed ? "Installed from marketplaces" : tabTitle(kind(), withAll)}
+      title="Marketplace"
+      titleView={titleView()}
       options={rows()}
       initialFilter={props.search}
+      skipFilter
+      onFilter={setQuery}
+      current={props.focus}
       locked={loading() || installing()}
       emptyView={emptyView()}
-      onSelect={(item) => select(item.value)}
+      onSelect={(option) => {
+        const item = byKey().get(option.value)
+        if (item) select(item)
+      }}
+      tabCyclesActions={false}
+      bindings={[
+        { key: "tab", desc: "Next tab", group: "Marketplace", cmd: () => move(1) },
+        { key: "shift+tab", desc: "Previous tab", group: "Marketplace", cmd: () => move(-1) },
+        { key: "ctrl+g", desc: "Install scope", group: "Marketplace", cmd: () => setGlobal((value) => !value) },
+      ]}
+      footerHints={[
+        { title: "tabs", label: "tab" },
+        { title: `plugin scope: ${global() ? "global" : "project"}`, label: "ctrl+g" },
+      ]}
       actions={[
         {
           title: "next tab",
           command: "dialog.plugins.discover.next_kind",
-          hidden: loading() || installing() || props.installed,
+          hidden: loading() || installing(),
           // A tab can be empty (the community marketplace ships no skills); without this the user
           // would be stuck on it, unable to cycle on to the MCP tab.
           withoutSelection: true,
-          onTrigger: cycle,
+          onTrigger: () => move(1),
         },
         {
           title: "back",

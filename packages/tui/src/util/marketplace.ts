@@ -5,7 +5,13 @@ import type { TuiMarketplaceKind } from "@opencode-ai/plugin/tui"
  * The Discover view lives in the internal plugins feature; the prompt only parses what was typed
  * and leaves it here for the `plugins.discover` command to pick up when it opens the view.
  */
-export type DiscoverRequest = { kind?: TuiMarketplaceKind; search?: string; installed?: boolean }
+export type DiscoverRequest = {
+  kind?: TuiMarketplaceKind
+  search?: string
+  installed?: boolean
+  /** XCOD-258: the row to come back to after an install (`kind:marketplace:name`). */
+  focus?: string
+}
 
 const TABS: Record<string, TuiMarketplaceKind> = {
   plugin: "plugin",
