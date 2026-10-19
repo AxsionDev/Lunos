@@ -16,8 +16,8 @@ import { MemoryLifecycle } from "./lifecycle"
 import { MemoryStore } from "./store"
 
 /**
- * Memory in an external graph database (XCOD-134). Neo4j first; Memgraph is accepted in config but
- * refused when memory starts, since it hasn't been run against.
+ * Memory in an external database (XCOD-134): Neo4j, and PostgreSQL since XCOD-264. Memgraph is
+ * accepted in config but refused when memory starts: it fails the contract tests (see the docs).
  *
  * - **The database is the ledger.** Cognee can put its graph in Neo4j, but its dataset records stay
  *   in a local SQLite file and its vectors in a local LanceDB, so a second machine pointed at the
@@ -35,7 +35,7 @@ import { MemoryStore } from "./store"
  *   host that isn't this machine. The driver is only imported after that.
  */
 
-export type Kind = "neo4j" | "memgraph"
+export type Kind = "neo4j" | "postgres" | "memgraph"
 
 export interface Settings {
   type: Kind
@@ -88,6 +88,10 @@ export const credentialProblems = ConfigMemoryBackend.credentialProblems
 // The checks that run before any connection.
 
 const SCHEMES = new Set(["bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc"])
+const POSTGRES_SCHEMES = new Set(["postgres", "postgresql"])
+
+/** The jurisdiction a database on this computer declares (the Docker templates): nothing leaves it. */
+export const LOCAL = "local"
 
 // "EU-only" means the EU and the EEA (PO, 2026-10-14): the 27 member states plus Iceland, Liechtenstein
 // and Norway. Switzerland and the UK are not in it.
@@ -130,58 +134,76 @@ export function gate(input: {
   residency: Residency.Resolved | undefined
 }): Checked {
   const block = configured(input.memory)
-  if (!block) throw new ConfigError("memory.backend is embedded; there is no external database to connect to")
+  if (!block) throw new ConfigError("memory is stored on this computer; there is no team database to connect to")
   const kind = block.type as Kind
   if (kind === "memgraph")
     throw new ConfigError(
-      'memory.backend.type "memgraph" is not supported yet: only "neo4j" has been run against. Use "neo4j", or "embedded"',
+      'memory.backend.type "memgraph" is not supported yet: it fails the external memory contract tests. Use "neo4j" or "postgres", or keep memory on this computer',
     )
   if (input.memory?.encryption === "os-keychain")
     throw new ConfigError(
       'memory.encryption "os-keychain" can\'t be used with an external memory database: the key is in one person\'s keychain, and the database is shared. Encrypt the database at rest on the server, and set memory.encryption to "off"',
     )
+  const example = kind === "postgres" ? "postgres://db.internal:5432/lunos" : "bolt+s://graph.internal:7687"
   if (!block.url) throw new ConfigError(`memory.backend.url is required for a ${kind} backend (see ${DOCS})`)
   let url: URL
   try {
     url = new URL(block.url)
   } catch {
-    throw new ConfigError(`memory.backend.url is not a valid URL (expected e.g. bolt+s://graph.internal:7687)`)
+    throw new ConfigError(`memory.backend.url is not a valid URL (expected e.g. ${example})`)
   }
   const scheme = url.protocol.replace(/:$/, "").toLowerCase()
-  if (!SCHEMES.has(scheme))
+  if (kind === "postgres" ? !POSTGRES_SCHEMES.has(scheme) : !SCHEMES.has(scheme))
     throw new ConfigError(
-      `memory.backend.url must use bolt+s://, neo4j+s:// (TLS) or, to this machine, bolt:// / neo4j://; got ${scheme}://`,
+      kind === "postgres"
+        ? `memory.backend.url must use postgres:// or postgresql:// for a postgres backend; got ${scheme}://`
+        : `memory.backend.url must use bolt+s://, neo4j+s:// (TLS) or, to this machine, bolt:// / neo4j://; got ${scheme}://`,
     )
   if (url.username || url.password)
     throw new ConfigError(
       "memory.backend.url must not contain credentials; use memory.backend.username and password as {env:} or {file:} references",
     )
+  const host = url.hostname
   const jurisdiction = block.jurisdiction?.trim()
   if (!jurisdiction)
     throw new ConfigError(
-      `memory.backend.jurisdiction is required for an external memory database: say where it runs, e.g. "EU-DE" (see ${DOCS})`,
+      `memory.backend.jurisdiction is required for an external memory database: say where it runs, e.g. "EU-DE", or "local" for a database on this computer (see ${DOCS})`,
     )
-  if (!/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(jurisdiction))
+  const local = jurisdiction.toLowerCase() === LOCAL
+  if (local && !loopback(host))
+    throw new ConfigError(
+      `memory.backend.jurisdiction "local" is only for a database on this computer (localhost), and ${host} isn't. Say where it runs, e.g. "EU-DE"`,
+    )
+  if (!local && !/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(jurisdiction))
     throw new ConfigError(`memory.backend.jurisdiction should look like "EU-DE", "EU" or "US"; got "${jurisdiction}"`)
-  const host = url.hostname
   const warnings: string[] = []
-  const tls = scheme.endsWith("+s") ? "verified" : scheme.endsWith("+ssc") ? "unverified" : "none"
+  const tls =
+    kind === "postgres"
+      ? postgresTls(url)
+      : scheme.endsWith("+s")
+        ? "verified"
+        : scheme.endsWith("+ssc")
+          ? "unverified"
+          : "none"
+  const shown =
+    kind === "postgres" ? `${scheme}:// (sslmode ${url.searchParams.get("sslmode") ?? "unset"})` : `${scheme}://`
   if (tls === "unverified")
     warnings.push(
-      `memory.backend.url uses ${scheme}://: the connection is encrypted, but the server's certificate is not verified`,
+      `memory.backend.url uses ${shown}: the connection is encrypted, but the server's certificate is not fully verified`,
     )
   if (tls === "none" && !loopback(host)) {
     if (!block.allow_insecure)
       throw new ConfigError(
-        `memory.backend.url is plain ${scheme}:// to ${host}, which isn't this machine: facts and credentials would cross the network unencrypted. Use ${scheme}+s://, or set memory.backend.allow_insecure: true to accept that`,
+        kind === "postgres"
+          ? `memory.backend.url is unencrypted (${shown}) to ${host}, which isn't this machine: facts and credentials would cross the network unencrypted. Remove sslmode or use sslmode=verify-full, or set memory.backend.allow_insecure: true to accept that`
+          : `memory.backend.url is plain ${scheme}:// to ${host}, which isn't this machine: facts and credentials would cross the network unencrypted. Use ${scheme}+s://, or set memory.backend.allow_insecure: true to accept that`,
       )
-    warnings.push(
-      `memory.backend.allow_insecure is set: facts and credentials go to ${host} unencrypted (${scheme}://)`,
-    )
+    warnings.push(`memory.backend.allow_insecure is set: facts and credentials go to ${host} unencrypted (${shown})`)
   }
   const claimed = region(jurisdiction)
   const residency = input.residency
-  if (residency && residency.enforce !== false && !residency.policy.allow.includes(claimed)) {
+  // A database on this computer is where the residency policy already allows the data to be.
+  if (!local && residency && residency.enforce !== false && !residency.policy.allow.includes(claimed)) {
     const reason = `memory.backend declares jurisdiction "${jurisdiction}" (${claimed}), which the residency policy does not allow (${residency.policy.allow.join(", ")})`
     // Once per process for the same refusal: status, recall and each tool call all check again.
     const key = `${host}\n${jurisdiction}\n${residency.policy.allow.join(",")}`
@@ -251,7 +273,7 @@ export async function projectID(worktree: string) {
     })
   if (!remote)
     throw new ConfigError(
-      "Project memory in an external database is keyed by the repository's git remote, and this project has none. Add one (git remote add origin <url>), or keep project memory embedded",
+      "Project memory in an external database is keyed by the repository's git remote, and this project has none. Add one (git remote add origin <url>), or keep project memory on this computer",
     )
   return hash("lunos-project", normalizeRemote(remote))
 }
@@ -272,7 +294,7 @@ export async function namespace(scope: MemoryStore.Scope, input: { worktree: str
 }
 
 // ---------------------------------------------------------------------------------------------
-// The Neo4j backend.
+// The backend, the same for every database.
 
 export interface Health {
   facts: number
@@ -328,16 +350,7 @@ function factOf(row: Row, ns: string): { fact: MemoryStore.Fact; problem?: strin
 
 /** Lucene query from free text: words OR'd, every special character dropped. */
 export function textQuery(query: string) {
-  const words = [
-    ...new Set(
-      query
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}]+/gu, " ")
-        .split(" ")
-        .filter((word) => word.length > 1 && !["and", "or", "not", "to"].includes(word)),
-    ),
-  ].slice(0, 64)
-  return words.join(" OR ")
+  return queryWords(query).join(" OR ")
 }
 
 function overlap(query: string, text: string) {
@@ -349,61 +362,88 @@ function overlap(query: string, text: string) {
   return shared / want.size
 }
 
-export async function neo4j(input: {
+/**
+ * What a database has to do for external memory. Everything else (dedupe, limits, lifecycle,
+ * integrity) is the same for every vendor, in `open()`, so the contract tests hold for each.
+ */
+export interface Driver {
+  /** Every row in a namespace, oldest write first. */
+  rows(ns: string): Promise<Row[]>
+  /** Full-text matches for these words (any of them), best first; `score` is higher-is-closer. */
+  search(ns: string, words: string[], limit: number): Promise<(Row & { score: number })[]>
+  insert(props: Props): Promise<void>
+  update(ns: string, id: string, props: Props): Promise<void>
+  remove(ns: string, ids: string[]): Promise<number>
+  removeAll(ns: string): Promise<number>
+  lastWrite(ns: string): Promise<string | undefined>
+  server(): Promise<string>
+  close(): Promise<void>
+}
+
+type Props = {
+  id: string
+  ns: string
+  scope: string
+  text: string
+  status: string
+  record: string
+  hash: string
+  written: string
+}
+
+type OpenInput = {
   checked: Checked
   scope: MemoryStore.Scope
   worktree: string
   limits: MemoryBackend.Limits
   retention?: MemoryLifecycle.Retention
-  /** For tests: a namespace to use instead of the project's or user's. */
+  /** For tests and the connection probe: a namespace to use instead of the project's or user's. */
   namespace?: string
-}): Promise<External> {
+}
+
+/** The words a full-text query searches for: lowercased, punctuation and query syntax dropped. */
+export function queryWords(query: string) {
+  return [
+    ...new Set(
+      query
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .split(" ")
+        .filter((word) => word.length > 1 && !["and", "or", "not", "to"].includes(word)),
+    ),
+  ].slice(0, 64)
+}
+
+async function connect(checked: Checked): Promise<Driver> {
+  if (checked.settings.type === "postgres") return postgresDriver(checked)
+  return neo4jDriver(checked)
+}
+
+/** Open external memory for one scope, on whichever database `checked` names. */
+export async function open(input: OpenInput): Promise<External> {
   const { settings } = input.checked
   const ns = input.namespace ?? (await namespace(input.scope, { worktree: input.worktree, user: settings.user }))
+  const driver = await connect(input.checked)
+  return store(input, ns, driver)
+}
+
+/** @deprecated kept for callers from XCOD-134; use open(). */
+export const neo4j = open
+
+function store(input: OpenInput, ns: string, driver: Driver): External {
+  const { settings } = input.checked
   const policy = input.retention ?? { graceDays: MemoryLifecycle.DEFAULT_GRACE_DAYS }
   const { limits } = input
-  // Imported only now: nothing above opened a socket.
-  const lib = (await import("neo4j-driver")).default
-  const auth = settings.username ? lib.auth.basic(settings.username, settings.password ?? "") : undefined
-  const driver = lib.driver(settings.url, auth, { disableLosslessIntegers: true, logging: undefined })
-  const database = settings.database
-  const read = (query: string, params: Record<string, unknown> = {}) =>
-    driver.executeQuery(query, params, { database, routing: lib.routing.READ })
-  const write = (query: string, params: Record<string, unknown> = {}) => {
+  const writable = () => {
     if (settings.readOnly) throw new ReadOnlyError("memory.backend.read_only is set: external memory is recall-only")
-    return driver.executeQuery(query, params, { database, routing: lib.routing.WRITE })
   }
-  try {
-    await driver.verifyConnectivity({ database })
-    if (!settings.readOnly) {
-      await write(`CREATE CONSTRAINT lunos_memory_fact_id IF NOT EXISTS FOR (f:${LABEL}) REQUIRE f.id IS UNIQUE`)
-      await write(`CREATE INDEX lunos_memory_fact_ns IF NOT EXISTS FOR (f:${LABEL}) ON (f.ns)`)
-      // The English analyzer drops stop words and stems, so "who owns the invoices table" ranks
-      // the fact about invoices first rather than every fact that says "the".
-      await write(
-        `CREATE FULLTEXT INDEX ${TEXT_INDEX} IF NOT EXISTS FOR (f:${LABEL}) ON EACH [f.text] OPTIONS {indexConfig: {\`fulltext.analyzer\`: 'english'}}`,
-      )
-      await write(`CALL db.awaitIndexes(60)`)
-    }
-  } catch (error) {
-    await driver.close().catch(() => {})
-    const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Could not connect to the ${settings.type} memory database at ${input.checked.host}: ${message}`)
-  }
-
-  const rows = async (where = "", params: Record<string, unknown> = {}) => {
-    const result = await read(
-      `MATCH (f:${LABEL} {ns: $ns}) ${where} RETURN f.id AS id, f.ns AS ns, f.text AS text, f.record AS record, f.hash AS hash, f.written AS written ORDER BY f.written, f.id`,
-      { ns, ...params },
-    )
-    return result.records.map((record) => record.toObject() as Row)
-  }
-  const all = async () => (await rows()).map((row) => factOf(row, ns))
+  const all = async () => (await driver.rows(ns)).map((row) => factOf(row, ns))
   const facts = async () => (await all()).map((item) => item.fact)
 
   const put = async (fact: MemoryStore.Fact, create: boolean) => {
+    writable()
     const record = recordOf(fact)
-    const props = {
+    const props: Props = {
       id: fact.id,
       ns,
       scope: input.scope,
@@ -413,16 +453,16 @@ export async function neo4j(input: {
       hash: MemoryStore.hashOf(record),
       written: new Date().toISOString(),
     }
-    if (create) await write(`CREATE (f:${LABEL}) SET f = $props`, { props })
-    else await write(`MATCH (f:${LABEL} {ns: $ns, id: $id}) SET f = $props`, { ns, id: fact.id, props })
+    if (create) await driver.insert(props)
+    else await driver.update(ns, fact.id, props)
   }
 
-  const backend: External = {
+  return {
     kind: settings.type,
     namespace: ns,
     readOnly: settings.readOnly,
     async remember(text, provenance, extra) {
-      if (settings.readOnly) throw new ReadOnlyError("memory.backend.read_only is set: external memory is recall-only")
+      writable()
       const trimmed = text.trim()
       if (!trimmed) throw new Error("Nothing to remember")
       if (trimmed.length > limits.maxFactChars)
@@ -456,20 +496,12 @@ export async function neo4j(input: {
     async recall(query, limit, options) {
       const at = MemoryLifecycle.now()
       const out: MemoryBackend.Recalled[] = []
-      const q = textQuery(query)
-      if (q) {
-        const result = await read(
-          `CALL db.index.fulltext.queryNodes($index, $q) YIELD node, score
-           WHERE node.ns = $ns AND node.status = 'active'
-           RETURN node.id AS id, node.ns AS ns, node.text AS text, node.record AS record, node.hash AS hash, score
-           ORDER BY score DESC LIMIT $limit`,
-          { index: TEXT_INDEX, q, ns, limit: lib.int(limit + 50) },
-        )
-        for (const record of result.records) {
-          const row = record.toObject() as Row & { score: number }
+      const words = queryWords(query)
+      if (words.length) {
+        for (const row of await driver.search(ns, words, limit + 50)) {
           const { fact, problem } = factOf(row, ns)
           if (problem || !MemoryLifecycle.recallable(fact, policy, at)) continue
-          // Lucene's score is higher-is-closer; recall sorts lower-is-closer.
+          // The database's score is higher-is-closer; recall sorts lower-is-closer.
           out.push({ fact, score: 1 / (1 + row.score) })
           if (out.length >= limit) break
         }
@@ -486,11 +518,8 @@ export async function neo4j(input: {
       return { facts: out, graph: "" }
     },
     async forget(id) {
-      const result = await write(`MATCH (f:${LABEL} {ns: $ns, id: $id}) DETACH DELETE f RETURN count(*) AS n`, {
-        ns,
-        id,
-      })
-      return Number(result.records[0]?.get("n") ?? 0) > 0
+      writable()
+      return (await driver.remove(ns, [id])) > 0
     },
     async outdate(id, change) {
       const current = (await facts()).find((item) => item.id === id && !item.quarantined)
@@ -518,10 +547,10 @@ export async function neo4j(input: {
         else if (state === "expired") expired.push(fact)
       }
       if (purged.length)
-        await write(`MATCH (f:${LABEL} {ns: $ns}) WHERE f.id IN $ids DETACH DELETE f`, {
+        await driver.remove(
           ns,
-          ids: purged.map((fact) => fact.id),
-        })
+          purged.map((fact) => fact.id),
+        )
       return { expired, purged }
     },
     list: facts,
@@ -530,8 +559,8 @@ export async function neo4j(input: {
       return { nodes: [], edges: [] }
     },
     async purge() {
-      const result = await write(`MATCH (f:${LABEL} {ns: $ns}) DETACH DELETE f RETURN count(*) AS n`, { ns })
-      return Number(result.records[0]?.get("n") ?? 0)
+      writable()
+      return driver.removeAll(ns)
     },
     async rewrite(change) {
       const before = await facts()
@@ -541,20 +570,303 @@ export async function neo4j(input: {
     },
     async health() {
       const items = await all()
-      const written = await read(`MATCH (f:${LABEL} {ns: $ns}) RETURN max(f.written) AS last`, { ns })
-      const info = await driver.getServerInfo({ database })
       return {
         facts: items.length,
-        lastWrite: (written.records[0]?.get("last") as string | null) ?? undefined,
+        lastWrite: await driver.lastWrite(ns),
         problems: items.flatMap((item, index) =>
           item.problem ? [{ line: index + 1, id: item.fact.id, reason: item.problem }] : [],
         ),
-        server: `${info.agent ?? settings.type} at ${input.checked.host}`,
+        server: `${await driver.server()} at ${input.checked.host}`,
       }
+    },
+    close: () => driver.close(),
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Neo4j, over Bolt.
+
+async function neo4jDriver(checked: Checked): Promise<Driver> {
+  const { settings } = checked
+  // Imported only now: nothing before this opened a socket.
+  const lib = (await import("neo4j-driver")).default
+  const auth = settings.username ? lib.auth.basic(settings.username, settings.password ?? "") : undefined
+  const driver = lib.driver(settings.url, auth, { disableLosslessIntegers: true, logging: undefined })
+  const database = settings.database
+  const read = (query: string, params: Record<string, unknown> = {}) =>
+    driver.executeQuery(query, params, { database, routing: lib.routing.READ })
+  const write = (query: string, params: Record<string, unknown> = {}) =>
+    driver.executeQuery(query, params, { database, routing: lib.routing.WRITE })
+  try {
+    await driver.verifyConnectivity({ database })
+    if (!settings.readOnly) {
+      await write(`CREATE CONSTRAINT lunos_memory_fact_id IF NOT EXISTS FOR (f:${LABEL}) REQUIRE f.id IS UNIQUE`)
+      await write(`CREATE INDEX lunos_memory_fact_ns IF NOT EXISTS FOR (f:${LABEL}) ON (f.ns)`)
+      // The English analyzer drops stop words and stems, so "who owns the invoices table" ranks
+      // the fact about invoices first rather than every fact that says "the".
+      await write(
+        `CREATE FULLTEXT INDEX ${TEXT_INDEX} IF NOT EXISTS FOR (f:${LABEL}) ON EACH [f.text] OPTIONS {indexConfig: {\`fulltext.analyzer\`: 'english'}}`,
+      )
+      await write(`CALL db.awaitIndexes(60)`)
+    }
+  } catch (error) {
+    await driver.close().catch(() => {})
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Could not connect to the ${settings.type} memory database at ${checked.host}: ${message}`)
+  }
+  const count = (result: { records: { get(key: string): unknown }[] }) => Number(result.records[0]?.get("n") ?? 0)
+  return {
+    async rows(ns) {
+      const result = await read(
+        `MATCH (f:${LABEL} {ns: $ns}) RETURN f.id AS id, f.ns AS ns, f.text AS text, f.record AS record, f.hash AS hash, f.written AS written ORDER BY f.written, f.id`,
+        { ns },
+      )
+      return result.records.map((record) => record.toObject() as Row)
+    },
+    async search(ns, words, limit) {
+      const result = await read(
+        `CALL db.index.fulltext.queryNodes($index, $q) YIELD node, score
+         WHERE node.ns = $ns AND node.status = 'active'
+         RETURN node.id AS id, node.ns AS ns, node.text AS text, node.record AS record, node.hash AS hash, score
+         ORDER BY score DESC LIMIT $limit`,
+        { index: TEXT_INDEX, q: words.join(" OR "), ns, limit: lib.int(limit) },
+      )
+      return result.records.map((record) => record.toObject() as Row & { score: number })
+    },
+    async insert(props) {
+      await write(`CREATE (f:${LABEL}) SET f = $props`, { props })
+    },
+    async update(ns, id, props) {
+      await write(`MATCH (f:${LABEL} {ns: $ns, id: $id}) SET f = $props`, { ns, id, props })
+    },
+    async remove(ns, ids) {
+      return count(
+        await write(`MATCH (f:${LABEL} {ns: $ns}) WHERE f.id IN $ids DETACH DELETE f RETURN count(*) AS n`, {
+          ns,
+          ids,
+        }),
+      )
+    },
+    async removeAll(ns) {
+      return count(await write(`MATCH (f:${LABEL} {ns: $ns}) DETACH DELETE f RETURN count(*) AS n`, { ns }))
+    },
+    async lastWrite(ns) {
+      const result = await read(`MATCH (f:${LABEL} {ns: $ns}) RETURN max(f.written) AS last`, { ns })
+      return (result.records[0]?.get("last") as string | null) ?? undefined
+    },
+    async server() {
+      const info = await driver.getServerInfo({ database })
+      return info.agent ?? settings.type
     },
     async close() {
       await driver.close().catch(() => {})
     },
   }
-  return backend
+}
+
+// ---------------------------------------------------------------------------------------------
+// PostgreSQL (XCOD-264), through Bun's built-in client: no new dependency. One row per fact, the
+// same record and hash as a Neo4j node; search is PostgreSQL's own full-text search.
+
+const TABLE = "lunos_memory_fact"
+
+/** `postgres://` TLS from `sslmode`: verify-full checks the certificate and host; require/verify-ca don't fully. */
+export function postgresTls(url: URL): Checked["tls"] {
+  const mode = url.searchParams.get("sslmode")?.toLowerCase()
+  if (mode === "verify-full") return "verified"
+  if (mode === "require" || mode === "verify-ca") return "unverified"
+  if (mode === "disable" || mode === "allow" || mode === "prefer") return "none"
+  // No sslmode: TLS with a verified certificate, except to this computer.
+  return loopback(url.hostname) ? "none" : "verified"
+}
+
+type SQL = {
+  unsafe(query: string, params?: unknown[]): Promise<Record<string, unknown>[]>
+  begin<T>(run: (tx: SQL) => Promise<T>): Promise<T>
+  close(options?: { timeout?: number }): Promise<void>
+}
+
+async function postgresDriver(checked: Checked): Promise<Driver> {
+  const { settings } = checked
+  // Bun's built-in client, read from the global so bundles that can't import "bun" still load this file.
+  const Client = (globalThis as { Bun?: { SQL?: new (options: Record<string, unknown>) => SQL } }).Bun?.SQL
+  if (!Client) throw new Error("PostgreSQL memory needs the Lunos binary (Bun's built-in PostgreSQL client)")
+  const url = new URL(settings.url)
+  const tls = checked.tls
+  url.search = ""
+  const sql = new Client({
+    url: url.toString(),
+    username: settings.username,
+    password: settings.password ?? "",
+    tls: tls === "none" ? false : tls === "verified" ? true : { rejectUnauthorized: false },
+    max: 4,
+    idleTimeout: 30,
+    connectionTimeout: 15,
+  })
+  try {
+    await sql.unsafe("SELECT 1")
+    if (!settings.readOnly)
+      // Two machines starting at once would race on CREATE TABLE IF NOT EXISTS; the lock serialises them.
+      await sql.begin(async (tx) => {
+        await tx.unsafe(`SELECT pg_advisory_xact_lock(hashtext('${TABLE}'))`)
+        await tx.unsafe(
+          `CREATE TABLE IF NOT EXISTS ${TABLE} (
+             id text PRIMARY KEY,
+             ns text NOT NULL,
+             scope text NOT NULL,
+             text text NOT NULL,
+             status text NOT NULL,
+             record text NOT NULL,
+             hash text NOT NULL,
+             written text NOT NULL,
+             tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED
+           )`,
+        )
+        await tx.unsafe(`CREATE INDEX IF NOT EXISTS ${TABLE}_ns ON ${TABLE} (ns)`)
+        await tx.unsafe(`CREATE INDEX IF NOT EXISTS ${TABLE}_tsv ON ${TABLE} USING GIN (tsv)`)
+      })
+  } catch (error) {
+    await sql.close({ timeout: 0 }).catch(() => {})
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Could not connect to the postgres memory database at ${checked.host}: ${message}`)
+  }
+  const columns = "id, ns, text, record, hash, written"
+  return {
+    async rows(ns) {
+      return (await sql.unsafe(`SELECT ${columns} FROM ${TABLE} WHERE ns = $1 ORDER BY written, id`, [ns])) as Row[]
+    },
+    async search(ns, words, limit) {
+      // Any of the words, like Neo4j's OR'd Lucene query; the English config drops stop words and stems.
+      const rows = await sql.unsafe(
+        `SELECT ${columns}, ts_rank(tsv, q) AS score
+         FROM ${TABLE}, to_tsquery('english', $2) q
+         WHERE ns = $1 AND status = 'active' AND tsv @@ q
+         ORDER BY score DESC, id LIMIT $3`,
+        [ns, words.join(" | "), limit],
+      )
+      return rows.map((row) => ({ ...(row as Row), score: Number(row.score) }))
+    },
+    async insert(props) {
+      await sql.unsafe(
+        `INSERT INTO ${TABLE} (id, ns, scope, text, status, record, hash, written) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [props.id, props.ns, props.scope, props.text, props.status, props.record, props.hash, props.written],
+      )
+    },
+    async update(ns, id, props) {
+      await sql.unsafe(
+        `UPDATE ${TABLE} SET scope = $3, text = $4, status = $5, record = $6, hash = $7, written = $8 WHERE ns = $1 AND id = $2`,
+        [ns, id, props.scope, props.text, props.status, props.record, props.hash, props.written],
+      )
+    },
+    async remove(ns, ids) {
+      // One text parameter split on the unit separator: the client binds strings, not arrays.
+      const rows = await sql.unsafe(
+        `DELETE FROM ${TABLE} WHERE ns = $1 AND id = ANY(string_to_array($2::text, chr(31))) RETURNING id`,
+        [ns, ids.join("\x1f")],
+      )
+      return rows.length
+    },
+    async removeAll(ns) {
+      return (await sql.unsafe(`DELETE FROM ${TABLE} WHERE ns = $1 RETURNING id`, [ns])).length
+    },
+    async lastWrite(ns) {
+      const rows = await sql.unsafe(`SELECT max(written) AS last FROM ${TABLE} WHERE ns = $1`, [ns])
+      return (rows[0]?.last as string | null) ?? undefined
+    },
+    async server() {
+      const rows = await sql.unsafe("SHOW server_version")
+      return `PostgreSQL ${String(rows[0]?.server_version ?? "")}`.trim()
+    },
+    async close() {
+      await sql.close({ timeout: 5 }).catch(() => {})
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The setup wizard's "Test connection" (XCOD-264): connect, write, read and delete a probe, in a
+// namespace of its own so it never touches a real fact. The error shape matches XCOD-263's
+// structured memory-check errors: what failed, at which stage, and what to do.
+
+export type ProbeStage = "settings" | "residency" | "connect" | "write" | "read" | "delete"
+export type ProbeError = { type: string; message: string; stage: ProbeStage; fix?: string }
+export type ProbeResult =
+  | { ok: true; ms: number; server: string; warnings: string[] }
+  | { ok: false; error: ProbeError }
+
+/** What to do about a probe failure, by stage and message. */
+export function probeFix(stage: ProbeStage, message: string): string | undefined {
+  if (stage === "residency") return "Pick a database in a region your residency policy allows."
+  if (stage === "settings") return `Fix the setting named above (see ${DOCS}).`
+  if (/ECONNREFUSED|connection refused|ServiceUnavailable|Failed to connect/i.test(message))
+    return "Nothing answered at that address: check the URL and port, and that the database is running."
+  if (/password authentication|authentication failure|Unauthorized|credentials/i.test(message))
+    return "The user or password was refused: check the environment variables the config refers to."
+  if (/certificate|self[- ]signed|TLS|SSL/i.test(message))
+    return "The TLS connection failed: check the server's certificate, or the URL's TLS setting."
+  if (/ENOTFOUND|getaddrinfo/i.test(message)) return "That host name doesn't resolve: check the URL."
+  if (/permission denied|read_only|AccessMode|not allowed/i.test(message))
+    return "The user can connect but not write: grant it write access, or use a read-only setup."
+  return undefined
+}
+
+export async function probe(input: {
+  memory: ConfigMemory.Info | undefined
+  residency: Residency.Resolved | undefined
+}): Promise<ProbeResult> {
+  const fail = (stage: ProbeStage, error: unknown): ProbeResult => {
+    const message = error instanceof Error ? error.message : String(error)
+    const type = error instanceof DeniedError ? "residency" : error instanceof ConfigError ? "config" : stage
+    return { ok: false, error: { type, message, stage, fix: probeFix(stage, message) } }
+  }
+  let checked: Checked
+  try {
+    checked = gate(input)
+  } catch (error) {
+    return fail(error instanceof DeniedError ? "residency" : "settings", error)
+  }
+  const started = Date.now()
+  let driver: Driver
+  try {
+    driver = await connect(checked)
+  } catch (error) {
+    return fail("connect", error)
+  }
+  const ns = `probe:${crypto.randomUUID()}`
+  const id = crypto.randomUUID()
+  let stage: ProbeStage = "write"
+  try {
+    if (checked.settings.readOnly) {
+      stage = "read"
+      await driver.rows(ns)
+    } else {
+      const record = { id, text: "Lunos connection probe" }
+      await driver.insert({
+        id,
+        ns,
+        scope: "probe",
+        text: record.text,
+        status: "active",
+        record: JSON.stringify(record),
+        hash: MemoryStore.hashOf(record),
+        written: new Date().toISOString(),
+      })
+      stage = "read"
+      if (!(await driver.rows(ns)).some((row) => row.id === id))
+        throw new Error("the probe was written but not read back")
+      stage = "delete"
+      if ((await driver.remove(ns, [id])) !== 1) throw new Error("the probe could not be deleted")
+    }
+    return {
+      ok: true,
+      ms: Date.now() - started,
+      server: `${await driver.server()} at ${checked.host}`,
+      warnings: checked.warnings,
+    }
+  } catch (error) {
+    if (stage !== "delete") await driver.remove(ns, [id]).catch(() => {})
+    return fail(stage, error)
+  } finally {
+    await driver.close()
+  }
 }

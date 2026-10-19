@@ -23,7 +23,12 @@ export function entry(argv: readonly string[]) {
   return [argv[0]!, path.resolve(path.dirname(script), "..", "..", "index" + path.extname(script)), ...argv.slice(2)]
 }
 
-export async function run(input: { directory: string; memory: Record<string, unknown> }): Promise<Result> {
+export async function run(input: {
+  directory: string
+  memory: Record<string, unknown>
+  /** XCOD-264: variables a template's `.env` holds, for the block's `{env:}` references. */
+  env?: Record<string, string>
+}): Promise<Result> {
   const command = resolveCommand({
     execPath: process.execPath,
     argv: entry(process.argv),
@@ -39,7 +44,7 @@ export async function run(input: { directory: string; memory: Record<string, unk
     cwd: input.directory,
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, OPENCODE_CONFIG_CONTENT: JSON.stringify({ memory: input.memory }) },
+    env: { ...process.env, ...input.env, OPENCODE_CONFIG_CONTENT: JSON.stringify({ memory: input.memory }) },
   })
   const timer = setTimeout(() => proc.kill(), TIMEOUT)
   const [out, err, code] = await Promise.all([
