@@ -263,6 +263,13 @@ export const MemorySetupCheckResult = Schema.Struct({
   ms: Schema.optional(Schema.Number),
   error: Schema.optional(Schema.String),
   fix: Schema.optional(Schema.String),
+  // XCOD-263: why a failed check failed, and a redacted JSON block for a bug report.
+  stage: Schema.optional(Schema.NullOr(Schema.String)),
+  type: Schema.optional(Schema.NullOr(Schema.String)),
+  cause: Schema.optional(Schema.NullOr(Schema.String)),
+  model: Schema.optional(Schema.NullOr(Schema.String)),
+  log: Schema.optional(Schema.NullOr(Schema.String)),
+  diagnostics: Schema.optional(Schema.String),
 }).annotate({ identifier: "MemorySetupCheckResult" })
 
 export const MemoryApi = HttpApi.make("memory")

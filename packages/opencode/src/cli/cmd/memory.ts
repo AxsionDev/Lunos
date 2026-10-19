@@ -252,6 +252,14 @@ export const MemoryStatusCommand = effectCmd({
       `Encryption: ${encryption === "os-keychain" ? `the ledger is encrypted with a key in the OS keychain (${MemoryKey.describe()}); the engine's database files are not` : "off"}.`,
       ...healthLines(health, encryption, external),
     ]
+    // XCOD-263: the engine's logs (cognee's own, and the sidecar's stderr), for a bug report.
+    if (!external) {
+      const ctx = yield* InstanceState.context
+      for (const item of where.scopes)
+        lines.push(
+          `Logs (${item.scope}): ${path.join(MemoryStore.dir(item.scope, MemoryStore.projectRoot(ctx)), "logs")}`,
+        )
+    }
     yield* writeStdoutEffect(lines.join(EOL) + EOL)
   }),
 })

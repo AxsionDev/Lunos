@@ -18,9 +18,12 @@ Lunos sets the environment below before starting this script too; the defaults h
 line, so running the script by hand can't phone home either.
 """
 
+import functools
+import glob
 import os
 import re
 import sys
+import traceback
 
 ROOT = os.environ["LUNOS_MEMORY_DIR"]
 MODELS = os.environ.get("LUNOS_MEMORY_MODELS", os.path.join(ROOT, "models"))
@@ -72,6 +75,85 @@ def _quiet():
     return Quiet()
 
 
+# XCOD-263: where in a remember an exception came from, by the innermost cognee (or library) frame
+# that matches. Checked innermost first, so an embedding call made while writing the graph counts as
+# embedding. Lunos overrides this with "extraction" when one of its sampling requests failed.
+_STAGES = (
+    ("embedding", ("cognee/infrastructure/databases/vector/embeddings", "fastembed", "huggingface_hub")),
+    ("extraction", ("cognee/infrastructure/llm", "cognee/tasks/graph", "cognee/tasks/summarization", "instructor")),
+    ("graph", ("cognee/infrastructure/databases/graph", "cognee/tasks/storage", "kuzu")),
+    ("database", ("cognee/infrastructure/databases", "sqlalchemy", "sqlite3", "lancedb", "aiosqlite")),
+    ("add", ("cognee/tasks/ingestion", "cognee/api/v1/add", "cognee/modules/ingestion")),
+    ("setup", ("cognee/modules/engine",)),
+)
+
+
+def _chain(exc: BaseException) -> list:
+    out, seen = [], set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        out.append(exc)
+        exc = exc.__cause__ or exc.__context__
+    return out
+
+
+def _stage(exc: BaseException, default: str) -> str:
+    for item in _chain(exc):
+        for frame in reversed(traceback.extract_tb(item.__traceback__)):
+            name = frame.filename.replace(os.sep, "/")
+            for stage, parts in _STAGES:
+                if any(part in name for part in parts):
+                    return stage
+    return default
+
+
+def _message(exc: BaseException, secret: str) -> str:
+    """str(e), or repr(e) when that's empty. The fact text never leaves: it is cut out if echoed."""
+    text = str(exc).strip() or repr(exc)
+    if secret:
+        text = text.replace(secret, "<fact>")
+    return text[:500]
+
+
+def _log() -> str:
+    """The newest log in the memory's logs folder: cognee's own log for this run, if it wrote one."""
+    files = sorted(glob.glob(os.path.join(ROOT, "logs", "*.log")), key=os.path.getmtime)
+    return files[-1] if files else os.path.join(ROOT, "logs")
+
+
+def _structured(stage: str):
+    """XCOD-263: a tool's exception comes back as {"error": {...}} instead of FastMCP's bare str(e).
+
+    The error has the exception's type, its message (repr() when empty), the cause chain, the
+    pipeline stage it came from and the log file. Arguments are never included; a fact text echoed
+    in a message is cut out. The full traceback goes to stderr, which Lunos keeps in the logs folder.
+    """
+
+    def wrap(fn):
+        @functools.wraps(fn)
+        async def run(*args, **kwargs):
+            try:
+                return await fn(*args, **kwargs)
+            except Exception as exc:
+                traceback.print_exc(file=sys.stderr)
+                secret = str(kwargs.get("text") or "")
+                chain = _chain(exc)
+                return {
+                    "error": {
+                        "type": type(exc).__name__,
+                        "message": _message(exc, secret),
+                        "cause": [f"{type(item).__name__}: {_message(item, secret)}" for item in chain[1:6]],
+                        "stage": _stage(exc, stage),
+                        "log": _log(),
+                        "errno": getattr(next((e for e in chain if isinstance(e, OSError)), None), "errno", None),
+                    }
+                }
+
+        return run
+
+    return wrap
+
+
 _ready = False
 
 
@@ -92,6 +174,7 @@ async def _data_ids(dataset: str) -> set:
 
 
 @server.tool()
+@_structured("remember")
 async def remember(text: str, dataset: str) -> dict:
     """Store one fact. Extraction runs inside this request so it can use MCP sampling."""
     with _quiet():
@@ -106,6 +189,7 @@ async def remember(text: str, dataset: str) -> dict:
 
 
 @server.tool()
+@_structured("recall")
 async def recall(query: str, dataset: str, top_k: int = 10) -> dict:
     """Facts closest to the query, and the graph relationships around them. No LLM call."""
     with _quiet():
@@ -153,6 +237,7 @@ def _relations(context: str) -> list:
 
 
 @server.tool()
+@_structured("graph")
 async def graph(dataset: str) -> dict:
     """Every node and edge in the dataset's graph, for `lunos memory export` (XCOD-132). No LLM call.
 
@@ -190,6 +275,7 @@ async def graph(dataset: str) -> dict:
 
 
 @server.tool()
+@_structured("forget")
 async def forget(id: str, dataset_id: str) -> dict:
     """Remove one fact, and the graph nodes and edges derived only from it."""
     from uuid import UUID
