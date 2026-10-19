@@ -25,6 +25,18 @@ reasoning behind a change are published separately as **Lunos Notes**.
   it back right after, and ↑ finds it in history. While the agent is working, Esc still stops it and
   what you've typed stays. Turn it off with `"double_escape_clear": false` in `tui.json`.
 
+### Changed
+
+- **Claude Code's permission mode and Codex's sandbox and approval policy are chosen from a list**
+  in `/settings` → Models & agents, each with what it does. Manual approval is selected when
+  nothing is set, and an empty value now means the default instead of an error. Claude Code's list
+  matches what your installed version accepts.
+  - **Codex:** `external.codex.sandbox` and `external.codex.approval_policy` replace the single
+    `permission_mode`, which still works and is moved the first time either new key is saved.
+  - **Unsafe values** (`bypassPermissions`, `danger-full-access`, `never`) are listed greyed out
+    and can't be saved to config. One already in a config file is ignored, the safe default is
+    used, and `/settings` says so; previously the session failed to start.
+
 ## [1.18.49] - 2026-10-17
 
 ### Added
