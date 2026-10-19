@@ -102,6 +102,63 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   $locked: "Advanced / experimental",
 }
 
+/**
+ * XCOD-259: the sub-tabs inside each /settings section, in order. A section with one window has
+ * none. Memory's Overview holds the wizard and status, so it lists no keys of its own.
+ */
+export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
+  "Models & agents": ["Models", "Agents", "Providers", "External sessions"],
+  Permissions: ["Rules", "Tools", "Sandbox"],
+  "Residency & privacy": ["Residency", "Audit", "Sharing"],
+  Memory: ["Overview", "Settings", "Advanced"],
+  "Marketplace & plugins": ["Marketplaces", "Plugins", "Policy"],
+  Appearance: ["Theme", "Layout"],
+  Tools: ["LSP", "Formatters", "MCP", "Commands", "Skills", "Hooks", "Shell", "References"],
+}
+
+/** Top-level keys (or `tui.` keys) whose sub-tab isn't their section's first. */
+const SUBTAB: Record<string, string> = {
+  agent: "Agents",
+  agent_import: "Agents",
+  default_agent: "Agents",
+  mode: "Agents",
+  subagent_depth: "Agents",
+  provider: "Providers",
+  disabled_providers: "Providers",
+  enabled_providers: "Providers",
+  external: "External sessions",
+  tools: "Tools",
+  sandbox: "Sandbox",
+  audit: "Audit",
+  share: "Sharing",
+  autoshare: "Sharing",
+  plugin: "Plugins",
+  marketplace_allow: "Policy",
+  marketplace_default: "Policy",
+  marketplace_unreviewed: "Policy",
+  formatter: "Formatters",
+  mcp: "MCP",
+  command: "Commands",
+  skills: "Skills",
+  hooks: "Hooks",
+  shell: "Shell",
+  reference: "References",
+  references: "References",
+}
+
+/** Memory's everyday settings; the rest of `memory.*` is Advanced. */
+const MEMORY_SETTINGS = ["memory.enabled", "memory.backend", "memory.model", "memory.retention", "memory.encryption"]
+
+/** The sub-tab a key is listed under in its section, or undefined for a single-window section. */
+export function subtab(key: string, category: Category): string | undefined {
+  const tabs = SUBTABS[category]
+  if (!tabs) return undefined
+  if (category === "Memory")
+    return MEMORY_SETTINGS.some((item) => key === item || key.startsWith(item + ".")) ? "Settings" : "Advanced"
+  if (category === "Appearance") return key === "tui.theme" ? "Theme" : "Layout"
+  return SUBTAB[key.split(".")[0]!] ?? tabs[0]
+}
+
 /** Keys edited in an existing dialog rather than in place. */
 export type Dialog = "models" | "themes" | "mcps" | "providers" | "modes"
 const DIALOG: Record<string, Dialog> = {
@@ -210,6 +267,8 @@ export type Entry = {
   /** Enum values, in schema order. Booleans in a union (`autoupdate`) appear as `true`/`false`. */
   values?: (string | boolean)[]
   dialog?: Dialog
+  /** XCOD-259: the sub-tab inside its /settings section; undefined in a single-window section. */
+  sub?: string
   restart: boolean
   deprecated: boolean
   /** A top-level key: its nested leaves may also have entries of their own. */
@@ -315,6 +374,7 @@ function entry(key: string, target: Target, category: Category, ast: SchemaAST.A
     description,
     ...classified,
     dialog: DIALOG[key],
+    sub: subtab(key, category),
     restart: needsRestart(key),
     deprecated: description.startsWith("@deprecated"),
     top,
@@ -1232,6 +1292,7 @@ export const RowSchema = Schema.Struct({
   kind: Schema.Literals(["boolean", "enum", "string", "number", "list", "object"]),
   values: Schema.optional(Schema.Array(Schema.Union([Schema.String, Schema.Boolean]))),
   dialog: Schema.optional(Schema.Literals(["models", "themes", "mcps", "providers", "modes"])),
+  sub: Schema.optional(Schema.String),
   restart: Schema.Boolean,
   deprecated: Schema.Boolean,
   top: Schema.Boolean,

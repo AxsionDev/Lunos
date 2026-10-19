@@ -25010,6 +25010,9 @@
             "type": "string",
             "enum": ["models", "themes", "mcps", "providers", "modes"]
           },
+          "sub": {
+            "type": "string"
+          },
           "restart": {
             "type": "boolean"
           },

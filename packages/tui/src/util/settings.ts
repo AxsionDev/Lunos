@@ -25,12 +25,16 @@ export function nextTab(tab: Tab, direction: 1 | -1): Tab {
  * `/settings share=disabled` (or `/config ...`) sets one value. Bare `/settings` opens the screen,
  * which the slash list already does, so it isn't handled here.
  */
-export function parseSettingsSlash(input: string): { key: string; value: string } | { error: string } | undefined {
+export function parseSettingsSlash(
+  input: string,
+): { key: string; value: string } | { open: string } | { error: string } | undefined {
   const match = input.trim().match(/^\/(settings|config)\s+(.+)$/s)
   if (!match) return
   const rest = match[2].trim()
   const eq = rest.indexOf("=")
-  if (eq <= 0) return { error: `Use /${match[1]} key=value, e.g. /${match[1]} share=disabled` }
+  // XCOD-259: `/settings memory`, `/settings tools lsp` open that section (and sub-tab).
+  if (eq < 0) return { open: rest }
+  if (eq === 0) return { error: `Use /${match[1]} key=value, e.g. /${match[1]} share=disabled` }
   return { key: rest.slice(0, eq).trim(), value: rest.slice(eq + 1).trim() }
 }
 

@@ -69,6 +69,22 @@ describe("settings registry", () => {
     expect(ConfigSettings.find("plugin")?.restart).toBe(true)
   })
 
+  test("every key is in exactly one section and, where the section has them, one sub-tab (XCOD-259)", () => {
+    for (const item of ConfigSettings.entries()) {
+      const tabs = ConfigSettings.SUBTABS[item.category]
+      if (!tabs) expect({ key: item.key, sub: item.sub }).toEqual({ key: item.key, sub: undefined })
+      else
+        expect({ key: item.key, ok: tabs.includes(item.sub!) && item.sub !== "Overview" }).toEqual({
+          key: item.key,
+          ok: true,
+        })
+    }
+    expect(ConfigSettings.find("external.claude.permission_mode")?.sub).toBe("External sessions")
+    expect(ConfigSettings.find("memory.retention.days")?.sub).toBe("Settings")
+    expect(ConfigSettings.find("lsp")?.sub).toBe("LSP")
+    expect(ConfigSettings.find("tui.theme")?.sub).toBe("Theme")
+  })
+
   test("every category is one of the ticket's", () => {
     for (const entry of ConfigSettings.entries()) expect(ConfigSettings.CATEGORIES).toContain(entry.category)
   })

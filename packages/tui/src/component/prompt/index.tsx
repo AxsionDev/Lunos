@@ -72,6 +72,8 @@ import {
   parseToolSlash,
 } from "../../util/external"
 import { lunosCommand, UNAVAILABLE } from "../../util/external-commands"
+import * as Sections from "../../util/settings-sections"
+import { requestSettings } from "../../util/settings-sections"
 import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
 import { DialogExternal, useExternalCommand, useStartExternal } from "../dialog-external"
 
@@ -1071,6 +1073,11 @@ export function Prompt(props: PromptProps) {
       setStore("prompt", { input: "", parts: [] })
       if ("error" in settingsSlash) {
         toast.show({ variant: "warning", message: settingsSlash.error })
+        return false
+      }
+      if ("open" in settingsSlash) {
+        requestSettings(Sections.target(settingsSlash.open) ?? { unknown: settingsSlash.open })
+        keymap.dispatchCommand("settings.open")
         return false
       }
       void sdk.client.config

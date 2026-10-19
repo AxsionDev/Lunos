@@ -445,10 +445,30 @@ session. See [`lunos update`](/docs/cli#update) for when the check runs and how 
 **Status | Settings | Usage**. Tab and Shift+Tab switch tabs, Esc closes. `/status` opens the same
 dialog on the Status tab.
 
-The **Settings** tab lists every option in `opencode.json` and `tui.json`, grouped into Models &
-agents, Permissions, Residency & privacy, Memory, Marketplace & plugins, Appearance, Updates, Tools
-and Advanced / experimental. The list is generated from the config schema, so new options appear
-without a TUI update. Each row shows the current value and where it comes from:
+The **Settings** tab opens on a list of sections, each with a short summary of what's set and
+badges for settings changed from the default, locked by your organisation (🔒) and saved changes
+waiting for a restart (↻). Enter opens a section in its own window; where it has distinct parts,
+they're sub-tabs (Tab / Shift+Tab or a click switches):
+
+| Section               | Sub-tabs                                                                |
+| --------------------- | ----------------------------------------------------------------------- |
+| Models & agents       | Models · Agents · Providers · External sessions                         |
+| Permissions           | Rules · Tools · Sandbox                                                 |
+| Residency & privacy   | Residency · Audit · Sharing                                             |
+| Memory                | Overview (status, guided setup, analytics) · Settings · Advanced        |
+| Marketplace & plugins | Marketplaces · Plugins · Policy                                         |
+| Appearance            | Theme · Layout                                                          |
+| Tools                 | LSP · Formatters · MCP · Commands · Skills · Hooks · Shell · References |
+| Updates, Advanced     | one window each                                                         |
+
+The title shows where you are (`Settings › Memory › Advanced`); ← goes back a level. Typing on the
+home searches every setting, each result with where it lives, and Enter opens it there. Inside a
+section, typing searches that section. `/settings memory`, `/settings tools lsp` or
+`/settings models external` open a section or sub-tab directly.
+
+Every option in `opencode.json` and `tui.json` is in exactly one section, generated from the config
+schema, so new options appear without a TUI update. Each row shows the current value and where it
+comes from:
 
 | Badge        | Meaning                                                                             |
 | ------------ | ----------------------------------------------------------------------------------- |
@@ -468,7 +488,7 @@ restart note show below the list.
 | Enter  | Change the setting (see below)                                                       |
 | Space  | Toggle an on/off setting, or move an option setting to its next value                |
 | Ctrl+S | Switch where changes are saved: your **user** config (default) or this **project**'s |
-| Tab    | Next tab                                                                             |
+| Tab    | Next tab (inside a section: next sub-tab)                                            |
 | ←      | Back one level, to the row you came from (in a text field: from the start of it)     |
 | Esc    | Close the whole settings window from any screen in it; what you were typing is lost  |
 

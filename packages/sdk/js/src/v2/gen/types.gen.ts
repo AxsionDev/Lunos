@@ -2251,6 +2251,7 @@ export type SettingRow = {
   kind: "boolean" | "enum" | "string" | "number" | "list" | "object"
   values?: Array<string | boolean>
   dialog?: "models" | "themes" | "mcps" | "providers" | "modes"
+  sub?: string
   restart: boolean
   deprecated: boolean
   top: boolean

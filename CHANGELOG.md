@@ -49,6 +49,12 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Changed
 
+- **`/settings` opens on a list of sections instead of one long list.** Each section (Models &
+  agents, Permissions, Memory, Tools…) shows what's set and badges for changed, locked and
+  restart-needed settings; Enter opens it in its own window, with sub-tabs where it has distinct
+  parts (Memory: Overview · Settings · Advanced). Typing on the home still searches every setting
+  and Enter lands on it in its section. `/settings memory` or `/settings tools lsp` opens a section
+  or sub-tab directly.
 - **`/marketplace` has a real tab bar** (All · Plugins · Skills · Hooks · MCP · Installed) with a
   count on each tab that follows your search. `tab` / `shift+tab` or a click switches tabs, and it
   reopens on the one you used last. Each kind shows what matters for it: a hook's event and the
