@@ -86,6 +86,12 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   From scripts: `lunos session stop --all [--project]`, `lunos session archive --finished
 [--older-than 7d]` and `lunos session unarchive <id|--all>`, each with `--yes`. Bulk actions are
   written to the audit log as `session.stop`, `session.archive` and `session.delete`. <!-- XCOD-265 -->
+- **The same Stop all and Clear list in the desktop Sessions window and on the web.** The Sessions
+  window has Stop all, Clear list and Stop all & clear buttons, with the same counts and the same
+  confirmation as `/sessions`; when the sessions in view span several projects, Stop all can be kept
+  to one of them. Rows that couldn't be stopped say why. Undo brings back what Clear hid, Show
+  archived lists archived sessions with Unarchive on each, and Delete archived asks you to type the
+  count first. <!-- XCOD-265 -->
 
 ## [1.18.50] - 2026-10-19
 

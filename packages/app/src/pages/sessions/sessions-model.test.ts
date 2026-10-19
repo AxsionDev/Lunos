@@ -1,6 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionGroup, SessionOverviewItem } from "@opencode-ai/sdk/v2/client"
-import { build, money, projectName, UNGROUPED, waiting, type Filter } from "./sessions-model"
+import {
+  build,
+  clearPlan,
+  inView,
+  money,
+  projectName,
+  stopPlan,
+  topLevel,
+  UNGROUPED,
+  waiting,
+  type Filter,
+} from "./sessions-model"
 
 const all: Filter = { search: "", state: "all", group: "all" }
 
@@ -106,5 +117,92 @@ describe("money (XCOD-235)", () => {
     expect(money(0.00004, "en-US")).toBe("<$0.0001")
     expect(money(0.0001, "en-US")).toBe("$0.0001")
     expect(money(1.23456, "en-US")).toBe("$1.2346")
+  })
+})
+
+describe("bulk actions (XCOD-265)", () => {
+  // The acceptance mix: 3 running, 2 waiting, 1 Claude Code, 1 in another Lunos, 4 finished/idle/failed.
+  const mix = [
+    item("r1", { state: "running" }),
+    item("r2", { state: "running", groupID: "g1" }),
+    item("r3", { state: "running", project: { id: "prj_b", name: "beta", worktree: "/work/beta" } as any }),
+    item("w1", { state: "waiting" }),
+    item("w2", { state: "waiting", groupID: "g1" }),
+    item("external:cc", { kind: "external", tool: "claude", state: "running" }),
+    item("p1", { state: "running", elsewhere: true }),
+    item("f1", { state: "finished" }),
+    item("f2", { state: "idle" }),
+    item("f3", { state: "failed" }),
+    item("f4", { state: "finished", groupID: "g1" }),
+  ]
+  const groups = [group("g1", "Client A")]
+  const view = (filter: Partial<Filter> = {}) => inView({ groups, sessions: mix, filter: { ...all, ...filter } })
+
+  test("Stop all counts every running and waiting row by kind", () => {
+    const plan = stopPlan(view())
+    expect(plan.targets.map((row) => row.id).sort()).toEqual(["external:cc", "p1", "r1", "r2", "r3", "w1", "w2"])
+    expect([plan.running, plan.waiting, plan.tools, plan.elsewhere]).toEqual([
+      4,
+      2,
+      [{ name: "Claude Code", count: 1 }],
+      1,
+    ])
+    expect(plan.projects).toEqual([
+      { key: "/work/alpha", name: "alpha", count: 6 },
+      { key: "/work/beta", name: "beta", count: 1 },
+    ])
+  })
+
+  test("an external row with only its folder counts in the same project as the sessions there", () => {
+    const plan = stopPlan([
+      item("r", { state: "running" }),
+      item("external:x", { kind: "external", tool: "codex", state: "running", project: undefined }),
+      item("g", { state: "running", project: { id: "global", worktree: "/" } as any, directory: "/tmp/scratch" }),
+    ])
+    expect(plan.projects.map((project) => [project.key, project.name, project.count])).toEqual([
+      ["/work/alpha", "alpha", 2],
+      ["/tmp/scratch", "scratch", 1],
+    ])
+  })
+
+  test("the view's filters decide what Stop all reaches", () => {
+    expect(stopPlan(view({ state: "waiting" })).targets.map((row) => row.id)).toEqual(["w1", "w2"])
+    expect(stopPlan(view({ group: "g1" })).targets.map((row) => row.id)).toEqual(["r2", "w2"])
+    expect(stopPlan(view({ search: "client a" })).targets.map((row) => row.id)).toEqual(["r2", "w2"])
+    // A finished external row isn't stoppable; a waiting one never exists.
+    expect(stopPlan([item("external:x", { kind: "external", state: "finished" })]).targets).toEqual([])
+  })
+
+  test("Clear archives only finished, idle and failed rows, and counts what stays", () => {
+    const plan = clearPlan(view())
+    expect(plan.targets.map((row) => row.id)).toEqual(["f1", "f2", "f3", "f4"])
+    expect(plan.staying.length).toBe(7)
+  })
+
+  test("a subagent goes with its listed parent, and counts on its own under a state filter", () => {
+    const sessions = [
+      item("p", { state: "finished", groupID: "g1" }),
+      item("k", { kind: "subagent", parentID: "p", state: "finished" }),
+      item("kw", { kind: "subagent", parentID: "p", state: "waiting" }),
+    ]
+    expect(clearPlan(sessions).targets.map((row) => row.id)).toEqual(["p"])
+    expect(topLevel([sessions[1]!]).map((row) => row.id)).toEqual(["k"])
+    // In the parent's group for the group filter; on its own state for the state filter.
+    const waitingInGroup = inView({ groups, sessions, filter: { ...all, group: "g1", state: "waiting" } })
+    expect(waitingInGroup.map((row) => row.id)).toEqual(["kw"])
+  })
+
+  test("the archived view lists archived rows whatever their state", () => {
+    const sessions = [
+      item("a", { state: "failed", archived: 5, updated: 1 }),
+      item("b", { state: "finished", archived: 6, updated: 2 }),
+    ]
+    expect(inView({ groups: [], sessions, filter: { ...all, state: "archived" } }).map((row) => row.id)).toEqual([
+      "a",
+      "b",
+    ])
+    expect(
+      build({ groups: [], sessions, filter: { ...all, state: "archived" } })[0]!.rows.map((row) => row.item.id),
+    ).toEqual(["b", "a"])
   })
 })

@@ -142,6 +142,10 @@ for (const scheme of ["light", "dark"] as const) {
       await page.goto("/sessions")
       await expectAppVisible(page.getByText("Refactor parser", { exact: true }))
       await audit(page, info, "sessions")
+      // XCOD-265: the bulk confirmation.
+      await page.getByRole("button", { name: "Stop all", exact: true }).click()
+      await expectAppVisible(page.getByRole("heading", { name: "Stop 4 sessions?" }))
+      await audit(page, info, "sessions-stop-all")
     })
 
     for (const tab of ["General", "Shortcuts", "Servers", "Providers", "Models"]) {
