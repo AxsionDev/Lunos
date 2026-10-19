@@ -585,14 +585,14 @@ managed config, since building runs the repository's own steps on the developer'
 
 ### External memory database
 
-From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your team runs, instead of on each developer's machine. A team then shares project memory, backs it up with its normal database tooling, and decides where the data sits.
+From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your team runs, instead of on each developer's machine, and from XCOD-264 (unreleased) in PostgreSQL too. A team then shares project memory, backs it up with its normal database tooling, and decides where the data sits. [Where memory is stored](../memory-storage.md) compares the options and covers PostgreSQL. [Memory templates](../memory-templates.md) set one up in a step, including a database in Docker on this computer.
 
 ```jsonc
 "memory": {
   "enabled": true,
   "scope": ["project", "user"],
   "backend": {
-    "type": "neo4j",                              // "embedded" (the default) | "neo4j" | "memgraph" (refused: not supported yet)
+    "type": "neo4j",                              // "embedded" (the default: on this computer) | "neo4j" | "postgres" | "memgraph" (refused: not supported yet)
     "url": "bolt+s://graph.internal:7687",        // TLS; plain bolt:// only to localhost
     "username": "{env:LUNOS_MEMORY_DB_USER}",     // {env:} or {file:} only: a literal is refused at load
     "password": "{file:~/.config/lunos/neo4j-password}",
@@ -607,7 +607,7 @@ From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your t
 
 **Checked before anything connects.** When memory starts, Lunos refuses the backend, without opening a socket or loading the database driver, if:
 
-- no `jurisdiction` is declared;
+- no `jurisdiction` is declared (`"local"` is accepted only for a database on this computer, and isn't checked against the residency policy);
 - a residency policy is set and doesn't allow the jurisdiction's region (`EU`, `EU-DE` or an EU or EEA country code count as `eu`, `US` or `US-…` as `us`, anything else as `other`). The refusal names `memory.backend` and is written to the audit log as `memory.denied`;
 - the URL is plain `bolt://` or `neo4j://` to a host that isn't this machine, unless `allow_insecure` is set. `lunos memory status` then shows a warning. `+ssc` is encrypted but doesn't verify the certificate, and says so;
 - the URL has credentials in it, or `memory.encryption` is `"os-keychain"`. That key is in one person's keychain, and the database is shared, so encrypt at rest on the server instead.
@@ -630,7 +630,7 @@ From XCOD-134 (unreleased), long-term memory can live in a Neo4j database your t
 
 **Namespaces keep recall apart; they are not access control.** Anyone with the database's credentials, which in a team setup is usually everyone, can query the database directly and read every project's memory and every user's user memory. A hashed `user` value that is guessable (an email address) can be linked back to its person. There is no mixed mode that keeps user memory on the machine while project memory is external: with `memory.backend` set, both scopes are in the database. If user memory must stay private, leave `"user"` out of `memory.scope`, or give each person separate database credentials and a database only they can read.
 
-**Moving existing memory:** `lunos memory migrate --to neo4j` exports this machine's embedded memory as a bundle, then imports it into the database with the same preview and write guard as `lunos memory import`. Facts keep their ids and provenance. Run it once without `--yes` to see the preview. The embedded memory is left as it is; delete it with `lunos memory purge` once you have checked the database. `lunos memory status` shows the backend, whether it can be reached, and each scope's fact count and last write.
+**Moving existing memory:** `lunos memory migrate --to neo4j` (or `--to postgres`) exports this machine's embedded memory as a bundle, then imports it into the database with the same preview and write guard as `lunos memory import`. Facts keep their ids and provenance. Run it once without `--yes` to see the preview. The embedded memory is left as it is; delete it with `lunos memory purge` once you have checked the database. `lunos memory status` shows the backend, whether it can be reached, and each scope's fact count and last write.
 
 **Integrity.** Each node carries a SHA-256 of its record. A node whose record, text or namespace no longer matches is quarantined: listed by `lunos memory verify`, never recalled. Like the local ledger's hashes, these catch damage and naive edits, not someone with write access who recomputes them. Anyone with the database's credentials can write facts that every user of that project will recall. Treat database write access like commit access, and give readers `read_only: true`.
 

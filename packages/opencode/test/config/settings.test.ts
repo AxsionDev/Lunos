@@ -91,6 +91,18 @@ describe("settings registry", () => {
 })
 
 describe("settings set", () => {
+  // XCOD-264: a reference loads as what it refers to; the check that a value survives the schema
+  // compared the loaded value with the reference, so no {env:} reference could ever be saved.
+  test("an {env:} reference is saved as written, whether or not the variable is set", async () => {
+    for (const [key, value] of [
+      ["memory.backend.username", "{env:LUNOS_TEST_UNSET_USER}"],
+      ["memory.backend.password", "{env:HOME}"],
+    ] as const) {
+      await ConfigSettings.set({ key, value, scope: "user", ctx: ctx(), locked: [] })
+      expect(await read(userFile())).toContain(`"${key.split(".").at(-1)}": "${value}"`)
+    }
+  })
+
   test("writes the user config and keeps its comments", async () => {
     await fs.writeFile(userFile(), '{\n  // keep me\n  "$schema": "https://lunos.tech/config.json"\n}\n')
     const result = await ConfigSettings.set({ key: "share", value: "disabled", scope: "user", ctx: ctx(), locked: [] })
