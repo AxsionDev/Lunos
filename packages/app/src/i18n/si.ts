@@ -622,7 +622,7 @@ export const dict: Record<string, string> = {
   "toast.session.share.failed.title": "සැසිය බෙදා ගැනීමට අසමත් විය",
   "toast.session.share.failed.description": "සැසිය බෙදා ගැනීමේදී දෝෂයක් ඇති විය",
   "toast.session.share.noTarget.description":
-    "බෙදාගැනීමට Lunos සංවිධානයක් (lunos login) හෝ වින්‍යාසයේ enterprise.url අවශ්‍යයි.",
+    'බෙදාගැනීමට වින්‍යාසයේ enterprise.url අවශ්‍යයි, නැතහොත් ඔබේ සංවිධානයේ Lunos කොන්සෝලය සමඟ බෙදාගැනීමට "share": "cloud" (lunos login පසු).',
   "toast.session.unshare.success.title": "සැසිය බෙදා නොගන්නා ලදී",
   "toast.session.unshare.success.description": "සැසිය සාර්ථකව බෙදා නොගන්නා ලදී!",
   "toast.session.unshare.failed.title": "සැසිය බෙදා නොගැනීම අසාර්ථක විය",

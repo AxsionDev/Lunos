@@ -629,7 +629,7 @@ export const dict = {
   "toast.session.share.failed.title": "Det gick inte att dela sessionen",
   "toast.session.share.failed.description": "Ett fel uppstod när sessionen delades",
   "toast.session.share.noTarget.description":
-    "Delning kräver en Lunos-organisation (lunos login) eller enterprise.url i konfigurationen.",
+    'Delning kräver enterprise.url i konfigurationen, eller "share": "cloud" för att dela med din organisations Lunos-konsol (efter lunos login).',
   "toast.session.unshare.success.title": "Sessionen delas inte längre",
   "toast.session.unshare.success.description": "Delningen av sessionen har avslutats!",
   "toast.session.unshare.failed.title": "Det gick inte att avsluta delningen",

@@ -214,7 +214,7 @@ describe("shareLink", () => {
 
   test("warns and continues without a link when there's no share target", async () => {
     const warned: string[] = []
-    const message = "Sharing needs a Lunos organisation (lunos login) or enterprise.url in config."
+    const message = `Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation's Lunos console (after lunos login).`
     const url = await Effect.runPromise(
       shareLink(Effect.fail(new ShareNext.NoTargetError({ message })), (m) => warned.push(m)),
     )

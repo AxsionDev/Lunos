@@ -632,7 +632,7 @@ export const dict = {
   "toast.session.share.failed.title": "ޝެއާ ސެޝަން ނާކާމިޔާބުވި",
   "toast.session.share.failed.description": "ސެޝަން ހިއްސާ ކުރަމުން ދިޔައިރު ގޯހެއް ދިމާވިއެވެ",
   "toast.session.share.noTarget.description":
-    "ޝެއާކުރުމަށް Lunos ޖަމްޢިއްޔާއެއް (lunos login) ނުވަތަ ކޮންފިގްގައި enterprise.url ބޭނުންވޭ.",
+    'ޝެއާކުރުމަށް ކޮންފިގްގައި enterprise.url ބޭނުންވޭ، ނުވަތަ ތިބާގެ ޖަމްޢިއްޔާގެ Lunos ކޮންސޯލާ ޝެއާކުރުމަށް "share": "cloud" (lunos login ފަހުން).',
   "toast.session.unshare.success.title": "ސެޝަން އަންޝެއަރޑް",
   "toast.session.unshare.success.description": "ސެޝަން އަންޝެއަރ ކާމިޔާބުކަމާއެކު!",
   "toast.session.unshare.failed.title": "ސެޝަން އަންޝެއާ ކުރަން ފެއިލްވެއްޖެ",

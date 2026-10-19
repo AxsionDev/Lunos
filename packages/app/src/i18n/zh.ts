@@ -668,7 +668,8 @@ export const dict = {
   "toast.session.share.success.description": "分享链接已复制到剪贴板",
   "toast.session.share.failed.title": "分享会话失败",
   "toast.session.share.failed.description": "分享会话时发生错误",
-  "toast.session.share.noTarget.description": "共享需要 Lunos 组织（lunos login）或配置中的 enterprise.url。",
+  "toast.session.share.noTarget.description":
+    '共享需要在配置中设置 enterprise.url，或设置 "share": "cloud" 以共享到你组织的 Lunos 控制台（需先运行 lunos login）。',
   "toast.session.unshare.success.title": "已取消分享会话",
   "toast.session.unshare.success.description": "会话已成功取消分享",
   "toast.session.unshare.failed.title": "取消分享失败",

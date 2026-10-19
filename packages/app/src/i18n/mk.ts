@@ -627,7 +627,7 @@ export const dict = {
   "toast.session.share.failed.title": "Не успеа да се сподели сесијата",
   "toast.session.share.failed.description": "Настана грешка при споделувањето на сесијата",
   "toast.session.share.noTarget.description":
-    "За споделување е потребна Lunos организација (lunos login) или enterprise.url во конфигурацијата.",
+    'За споделување е потребен enterprise.url во конфигурацијата или "share": "cloud" за споделување со Lunos конзолата на вашата организација (по lunos login).',
   "toast.session.unshare.success.title": "Сесијата не е споделена",
   "toast.session.unshare.success.description": "Успешно отповикана сесија!",
   "toast.session.unshare.failed.title": "Не успеа да се откаже од споделувањето на сесијата",

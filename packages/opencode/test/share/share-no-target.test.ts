@@ -87,7 +87,7 @@ const toasts = Effect.gen(function* () {
   return seen
 })
 
-const NO_TARGET = "Sharing needs a Lunos organisation (lunos login) or enterprise.url in config."
+const NO_TARGET = `Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation's Lunos console (after lunos login).`
 
 describe("sharing with nowhere to share to (XCOD-266)", () => {
   it.live("share is on (the precondition the other tests rely on)", () =>

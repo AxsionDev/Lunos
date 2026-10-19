@@ -625,7 +625,7 @@ export const dict = {
   "toast.session.share.failed.title": "Falha ao compartilhar sessão",
   "toast.session.share.failed.description": "Ocorreu um erro ao compartilhar a sessão",
   "toast.session.share.noTarget.description":
-    "Evit rannañ ez eus ezhomm eus un aozadur Lunos (lunos login) pe eus enterprise.url er c'hefluniadur.",
+    'Evit rannañ ez eus ezhomm eus enterprise.url er c\'hefluniadur, pe eus "share": "cloud" evit rannañ gant konsol Lunos hoc\'h aozadur (goude lunos login).',
   "toast.session.unshare.success.title": "Sessão não compartilhada",
   "toast.session.unshare.success.description": "Sessão deixou de ser compartilhada com sucesso!",
   "toast.session.unshare.failed.title": "Falha ao parar de compartilhar sessão",

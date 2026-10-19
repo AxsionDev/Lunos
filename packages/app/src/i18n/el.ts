@@ -628,7 +628,7 @@ export const dict = {
   "toast.session.share.failed.title": "Αποτυχία κοινής χρήσης συνεδρίας",
   "toast.session.share.failed.description": "Παρουσιάστηκε σφάλμα κατά την κοινή χρήση της συνεδρίας",
   "toast.session.share.noTarget.description":
-    "Για κοινοποίηση χρειάζεται οργανισμός Lunos (lunos login) ή enterprise.url στις ρυθμίσεις.",
+    'Για κοινοποίηση χρειάζεται enterprise.url στις ρυθμίσεις ή "share": "cloud" για κοινοποίηση στην κονσόλα Lunos του οργανισμού σας (μετά το lunos login).',
   "toast.session.unshare.success.title": "Καταργήθηκε η κοινή χρήση της συνεδρίας",
   "toast.session.unshare.success.description": "Η κοινή χρήση της συνεδρίας καταργήθηκε με επιτυχία!",
   "toast.session.unshare.failed.title": "Αποτυχία κατάργησης κοινής χρήσης συνεδρίας",

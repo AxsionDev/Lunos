@@ -112,7 +112,7 @@ describe("ShareNext", () => {
           const error = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
           expect(ShareNext.isNoTarget(error)).toBe(true)
           expect((error as Error).message).toBe(
-            "Sharing needs a Lunos organisation (lunos login) or enterprise.url in config.",
+            `Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation's Lunos console (after lunos login).`,
           )
         }),
       ).pipe(Effect.provide(requestLayer(none))),

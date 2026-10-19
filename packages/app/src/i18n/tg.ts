@@ -627,7 +627,7 @@ export const dict = {
   "toast.session.share.failed.title": "Мубодилаи сеанс",
   "toast.session.share.failed.description": "Ҳангоми мубодилаи сессия хатогӣ рух дод",
   "toast.session.share.noTarget.description":
-    "Барои мубодила ташкилоти Lunos (lunos login) ё enterprise.url дар танзимот лозим аст.",
+    'Барои мубодила enterprise.url дар танзимот лозим аст, ё "share": "cloud" барои мубодила бо консоли Lunos-и ташкилоти шумо (пас аз lunos login).',
   "toast.session.unshare.success.title": "Сеанс тақсим нашудааст",
   "toast.session.unshare.success.description": "Сеанс бо муваффақият ҷудо карда шуд!",
   "toast.session.unshare.failed.title": "Сеансро ҷудо кардан натавонист",

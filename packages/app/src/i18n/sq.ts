@@ -626,7 +626,7 @@ export const dict = {
   "toast.session.share.failed.title": "Ndarja e sesionit dështoi",
   "toast.session.share.failed.description": "Ndodhi një gabim gjatë ndarjes së seancës",
   "toast.session.share.noTarget.description":
-    "Ndarja kërkon një organizatë Lunos (lunos login) ose enterprise.url në konfigurim.",
+    'Ndarja kërkon enterprise.url në konfigurim, ose "share": "cloud" për të ndarë me konsolën Lunos të organizatës suaj (pas lunos login).',
   "toast.session.unshare.success.title": "Sesioni u anulua",
   "toast.session.unshare.success.description": "Sesioni u anulua me sukses!",
   "toast.session.unshare.failed.title": "Shpërndarja e sesionit dështoi",

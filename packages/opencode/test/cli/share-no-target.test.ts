@@ -7,7 +7,7 @@ import fs from "fs/promises"
 import path from "path"
 import { cliIt } from "../lib/cli-process"
 
-const NO_TARGET = "Sharing needs a Lunos organisation (lunos login) or enterprise.url in config."
+const NO_TARGET = `Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation's Lunos console (after lunos login).`
 const DISCONTINUED = "opncd.ai sharing was discontinued upstream; this link can't be imported."
 
 const userConfig = (home: string, config: object) =>

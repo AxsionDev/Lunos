@@ -634,7 +634,7 @@ export const dict = {
   "toast.session.share.failed.title": "سیشن شیئر کرن چ ناکام رہیا",
   "toast.session.share.failed.description": "سیشن شیئر کردے ویلے کوئی غلطی ہو گئی",
   "toast.session.share.noTarget.description":
-    "ਸਾਂਝਾ ਕਰਨ ਲਈ Lunos ਸੰਸਥਾ (lunos login) ਜਾਂ ਕੌਂਫਿਗ ਵਿੱਚ enterprise.url ਚਾਹੀਦਾ ਹੈ।",
+    'ਸਾਂਝਾ ਕਰਨ ਲਈ ਕੌਂਫਿਗ ਵਿੱਚ enterprise.url ਚਾਹੀਦਾ ਹੈ, ਜਾਂ ਆਪਣੀ ਸੰਸਥਾ ਦੇ Lunos ਕੰਸੋਲ ਨਾਲ ਸਾਂਝਾ ਕਰਨ ਲਈ "share": "cloud" (lunos login ਤੋਂ ਬਾਅਦ)।',
   "toast.session.unshare.success.title": "سیشن شیئر کرنا بند ہو گیا",
   "toast.session.unshare.success.description": "سیشن دا شیئر کامیابی نال بند ہو گیا!",
   "toast.session.unshare.failed.title": "سیشن ان شیئر کرن چ ناکام رہیا",

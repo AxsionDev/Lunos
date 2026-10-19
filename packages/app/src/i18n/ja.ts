@@ -623,7 +623,7 @@ export const dict = {
   "toast.session.share.failed.title": "セッションの共有に失敗しました",
   "toast.session.share.failed.description": "セッションの共有中にエラーが発生しました",
   "toast.session.share.noTarget.description":
-    "共有するには Lunos の組織 (lunos login) か、設定の enterprise.url が必要です。",
+    '共有するには設定の enterprise.url が必要です。組織の Lunos コンソールと共有するには "share": "cloud" を設定してください（lunos login の後）。',
   "toast.session.unshare.success.title": "セッションの共有を解除しました",
   "toast.session.unshare.success.description": "セッションの共有解除に成功しました！",
   "toast.session.unshare.failed.title": "セッションの共有解除に失敗しました",

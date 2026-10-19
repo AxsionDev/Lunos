@@ -631,7 +631,7 @@ export const dict = {
   "toast.session.share.failed.title": "Sessiya paylaşıla bilmədi",
   "toast.session.share.failed.description": "Sessiyanı paylaşarkən xəta baş verdi",
   "toast.session.share.noTarget.description":
-    "Paylaşmaq üçün Lunos təşkilatı (lunos login) və ya konfiqurasiyada enterprise.url lazımdır.",
+    'Paylaşmaq üçün konfiqurasiyada enterprise.url, ya da təşkilatınızın Lunos konsolu ilə paylaşmaq üçün "share": "cloud" lazımdır (lunos login-dən sonra).',
   "toast.session.unshare.success.title": "Sessiyanın paylaşımı dayandırıldı",
   "toast.session.unshare.success.description": "Sessiyanın paylaşımı uğurla dayandırıldı!",
   "toast.session.unshare.failed.title": "Sessiyanın paylaşımı dayandırıla bilmədi",

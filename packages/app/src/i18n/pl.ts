@@ -625,7 +625,7 @@ export const dict = {
   "toast.session.share.failed.title": "Nie udało się udostępnić sesji",
   "toast.session.share.failed.description": "Wystąpił błąd podczas udostępniania sesji",
   "toast.session.share.noTarget.description":
-    "Udostępnianie wymaga organizacji Lunos (lunos login) lub enterprise.url w konfiguracji.",
+    'Udostępnianie wymaga enterprise.url w konfiguracji lub "share": "cloud", aby udostępniać w konsoli Lunos Twojej organizacji (po lunos login).',
   "toast.session.unshare.success.title": "Zatrzymano udostępnianie sesji",
   "toast.session.unshare.success.description": "Udostępnianie sesji zostało pomyślnie zatrzymane!",
   "toast.session.unshare.failed.title": "Nie udało się zatrzymać udostępniania sesji",

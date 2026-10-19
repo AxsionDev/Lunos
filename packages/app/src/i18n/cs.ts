@@ -625,7 +625,7 @@ export const dict = {
   "toast.session.share.failed.title": "Sdílení relace se nezdařilo",
   "toast.session.share.failed.description": "Při sdílení relace došlo k chybě",
   "toast.session.share.noTarget.description":
-    "Ke sdílení je potřeba organizace Lunos (lunos login) nebo enterprise.url v konfiguraci.",
+    'Ke sdílení je potřeba enterprise.url v konfiguraci, nebo "share": "cloud" pro sdílení s konzolí Lunos vaší organizace (po lunos login).',
   "toast.session.unshare.success.title": "Relace byla zrušena",
   "toast.session.unshare.success.description": "Sdílení relace bylo úspěšně zrušeno!",
   "toast.session.unshare.failed.title": "Zrušení sdílení relace se nezdařilo",

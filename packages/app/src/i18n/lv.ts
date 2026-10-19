@@ -624,7 +624,7 @@ export const dict = {
   "toast.session.share.failed.title": "Neizdevās kopīgot sesiju",
   "toast.session.share.failed.description": "Radās kļūda, kopīgojot sesiju",
   "toast.session.share.noTarget.description":
-    "Kopīgošanai nepieciešama Lunos organizācija (lunos login) vai enterprise.url konfigurācijā.",
+    'Kopīgošanai nepieciešams enterprise.url konfigurācijā vai "share": "cloud", lai kopīgotu ar jūsu organizācijas Lunos konsoli (pēc lunos login).',
   "toast.session.unshare.success.title": "Sesija atsaistīta",
   "toast.session.unshare.success.description": "Sesija veiksmīgi atsaistīta!",
   "toast.session.unshare.failed.title": "Neizdevās pārtraukt sesijas kopīgošanu",

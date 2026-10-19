@@ -630,7 +630,7 @@ export const dict = {
   "toast.session.share.failed.title": "Nepavyko bendrinti seanso",
   "toast.session.share.failed.description": "Bendrinant seansą įvyko klaida",
   "toast.session.share.noTarget.description":
-    "Bendrinimui reikia Lunos organizacijos (lunos login) arba enterprise.url konfigūracijoje.",
+    'Bendrinimui reikia enterprise.url konfigūracijoje arba "share": "cloud", kad bendrintumėte su savo organizacijos Lunos konsole (po lunos login).',
   "toast.session.unshare.success.title": "Seanso bendrinimas atšauktas",
   "toast.session.unshare.success.description": "Seanso bendrinimas sėkmingai atšauktas!",
   "toast.session.unshare.failed.title": "Nepavyko atšaukti seanso bendrinimo",

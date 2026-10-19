@@ -630,7 +630,7 @@ export const dict = {
   "toast.session.share.failed.title": "စက်ရှင်ကို မျှဝေရန် မအောင်မြင်ပါ။",
   "toast.session.share.failed.description": "စက်ရှင်အား မျှဝေနေစဉ် အမှားအယွင်းတစ်ခု ဖြစ်ပွားခဲ့သည်။",
   "toast.session.share.noTarget.description":
-    "မျှဝေရန် Lunos အဖွဲ့အစည်း (lunos login) သို့မဟုတ် ဆက်တင်တွင် enterprise.url လိုအပ်သည်။",
+    'မျှဝေရန် ဆက်တင်တွင် enterprise.url လိုအပ်သည်၊ သို့မဟုတ် သင့်အဖွဲ့အစည်း၏ Lunos ကွန်ဆိုးလ်နှင့် မျှဝေရန် "share": "cloud" (lunos login ပြီးနောက်)။',
   "toast.session.unshare.success.title": "ဆက်ရှင်ကို မျှဝေမထားပါ။",
   "toast.session.unshare.success.description": "ဆက်ရှင်ကို အောင်မြင်စွာ မျှဝေခြင်းမှ ဖယ်ရှားလိုက်ပါပြီ။",
   "toast.session.unshare.failed.title": "စက်ရှင်ကို မျှဝေခြင်းမှ ပြန်ဖြုတ်ရန် မအောင်မြင်ပါ။",

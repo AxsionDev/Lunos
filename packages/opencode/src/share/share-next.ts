@@ -96,7 +96,7 @@ export class ResidencyDeniedError extends Schema.TaggedErrorClass<ResidencyDenie
  * XCOD-266: upstream shut its hosted share service down in v1.19.3, so there is no default host
  * any more. Without an organisation's console or `enterprise.url` nothing is uploaded.
  */
-export const NO_TARGET_MESSAGE = "Sharing needs a Lunos organisation (lunos login) or enterprise.url in config."
+export const NO_TARGET_MESSAGE = `Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation's Lunos console (after lunos login).`
 
 /** Sharing is on, but there is nowhere to upload to (XCOD-266). A plain refusal, not a fault. */
 export class NoTargetError extends Schema.TaggedErrorClass<NoTargetError>()("ShareNoTargetError", {

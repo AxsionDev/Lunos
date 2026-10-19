@@ -628,7 +628,7 @@ export const dict = {
   "toast.session.share.failed.title": "Ekki tókst að deila setu",
   "toast.session.share.failed.description": "Villa kom upp þegar lotunni var deilt",
   "toast.session.share.noTarget.description":
-    "Deiling krefst Lunos-fyrirtækis (lunos login) eða enterprise.url í stillingum.",
+    'Deiling krefst enterprise.url í stillingum, eða "share": "cloud" til að deila með Lunos-stjórnborði fyrirtækisins (eftir lunos login).',
   "toast.session.unshare.success.title": "Ekki deilt lotu",
   "toast.session.unshare.success.description": "Lokað var við deilingu lotunnar!",
   "toast.session.unshare.failed.title": "Mistókst að hætta við deilingu lotu",
