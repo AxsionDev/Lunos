@@ -39,6 +39,7 @@ type PluralKey =
   | "sessions.bulk.clear.staying"
   | "sessions.bulk.stopAndClear.question"
   | "sessions.bulk.delete.question"
+  | "sessions.monitor.send.question"
 type Source = { dict: Record<string, string> }
 
 function cookie(locale: Locale) {
