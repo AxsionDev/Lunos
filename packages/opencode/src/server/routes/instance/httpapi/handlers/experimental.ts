@@ -393,12 +393,13 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
         return yield* new InvalidRequestError({
           message: "Another Lunos on this computer runs that session; the prompt goes to it.",
         })
-      // The session's own agent, as if the prompt were typed in it (prompt_async without one uses the default).
       const lastUser = yield* sessions
         .findMessage(sessionID, (message) => message.info.role === "user")
         .pipe(Effect.orElseSucceed(() => Option.none()))
-      const agent =
-        info.agent ?? (Option.isSome(lastUser) ? (lastUser.value.info as { agent?: string }).agent : undefined)
+      const agent = SessionPromptQueue.agentFor(
+        info,
+        Option.isSome(lastUser) ? (lastUser.value.info as { agent?: string }).agent : undefined,
+      )
       return yield* Effect.tryPromise({
         try: () =>
           SessionPromptQueue.submit({
@@ -406,6 +407,8 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
             directory: info.directory,
             text,
             ...(agent ? { agent } : {}),
+            ...(ctx.payload.model ? { model: ctx.payload.model } : {}),
+            ...(ctx.payload.variant ? { variant: ctx.payload.variant } : {}),
             interrupt: ctx.payload.interrupt === true,
             via: ctx.payload.via ?? "local",
           }),

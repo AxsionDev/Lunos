@@ -3,7 +3,9 @@ export * as SessionPromptQueue from "./prompt-queue"
 import { GlobalBus, type GlobalEvent } from "@/bus/global"
 import { AuditLog } from "@/audit/log"
 import { SessionLive } from "./live"
+import { SessionOverview } from "./overview"
 import { SessionPeerControl } from "./peer-control"
+import type { Session } from "./session"
 
 /**
  * XCOD-262: prompts the Agent Monitor sends to a session this process runs. A session that is idle
@@ -21,7 +23,15 @@ export const MAX_TEXT = SessionPeerControl.MAX_PROMPT
 
 export type Delivery = "now" | "queued" | "interrupted" | "answered"
 
-export type Entry = { sessionID: string; directory: string; text: string; agent?: string }
+export type Entry = {
+  sessionID: string
+  directory: string
+  text: string
+  agent?: string
+  /** A session the monitor just started: the model picked there. */
+  model?: { providerID: string; modelID: string }
+  variant?: string
+}
 
 /** A pending question, as the session's own question route lists it. */
 type PendingQuestion = { id: string; sessionID: string; questions: Array<{ custom?: boolean }> }
@@ -29,7 +39,8 @@ type PendingQuestion = { id: string; sessionID: string; questions: Array<{ custo
 /**
  * What to do with a prompt for a session in this state. Pure: the "never approves" rule lives here.
  *
- * - waiting on a permission: hold it. Answering it would mean approving or denying a tool call.
+ * - waiting on a permission: hold it, even with `interrupt`. Answering it would mean approving or
+ *   denying a tool call, and stopping the turn would drop it unanswered.
  * - waiting on one question that takes a typed answer: the prompt is the answer.
  * - busy: hold it, or with `interrupt`, stop the turn and send it first.
  * - idle: send it now.
@@ -40,10 +51,21 @@ export function decide(input: {
   question?: { questions: number; custom: boolean }
   interrupt?: boolean
 }): Delivery {
-  if (input.permissions > 0) return input.interrupt ? "interrupted" : "queued"
+  // Not even Ctrl+Enter: stopping the turn would drop the ask unanswered.
+  if (input.permissions > 0) return "queued"
   if (input.question && input.question.questions === 1 && input.question.custom) return "answered"
   if (!input.busy) return "now"
   return input.interrupt ? "interrupted" : "queued"
+}
+
+/**
+ * The agent a prompt runs with: the session's own, as if typed in it (prompt_async without one uses
+ * the default agent). None for a Claude Code / Codex session: a Lunos mode such as plan would refuse
+ * every approval the tool asks for, so its own window sends none either.
+ */
+export function agentFor(session: Pick<Session.Info, "agent" | "metadata">, lastUserAgent?: string) {
+  if (SessionOverview.externalOf(session)) return undefined
+  return session.agent ?? lastUserAgent
 }
 
 const queues = new Map<string, Entry[]>()
@@ -69,6 +91,8 @@ async function send(entry: Entry) {
       method: "POST",
       body: JSON.stringify({
         ...(entry.agent ? { agent: entry.agent } : {}),
+        ...(entry.model ? { model: entry.model } : {}),
+        ...(entry.variant ? { variant: entry.variant } : {}),
         parts: [{ type: "text", text: entry.text }],
       }),
     }),
@@ -138,6 +162,8 @@ export async function submit(input: Entry & { interrupt?: boolean; via?: "local"
     directory: input.directory,
     text: input.text,
     ...(input.agent ? { agent: input.agent } : {}),
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.variant ? { variant: input.variant } : {}),
   }
   let position: number | undefined
   if (delivery === "answered") {

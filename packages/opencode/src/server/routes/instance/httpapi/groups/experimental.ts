@@ -226,6 +226,9 @@ export const SessionEnqueuePayload = Schema.Struct({
   text: Schema.String,
   interrupt: Schema.optional(Schema.Boolean),
   via: Schema.optional(Schema.Literals(["local", "peer"])),
+  /** A session the monitor just started: the model picked there. Not forwarded by peer.prompt. */
+  model: Schema.optional(Schema.Struct({ providerID: Schema.String, modelID: Schema.String })),
+  variant: Schema.optional(Schema.String),
 })
 
 export const SessionEnqueueResult = Schema.Struct({

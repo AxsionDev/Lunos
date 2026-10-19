@@ -1097,25 +1097,6 @@ export function Prompt(props: PromptProps) {
     if (workspace.creating() || move.creating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
-    if (props.onIntercept) {
-      const text = expandTrackedPastedText(
-        store.prompt.input,
-        input.extmarks.getAllForTypeId(promptPartTypeId).flatMap((extmark) => {
-          const partIndex = store.extmarkToPartIndex.get(extmark.id)
-          const part = partIndex === undefined ? undefined : store.prompt.parts[partIndex]
-          if (part?.type !== "text") return []
-          return [{ start: extmark.start, end: extmark.end, text: part.text }]
-        }),
-      )
-      if (!(await props.onIntercept(text))) return false
-      history.append({ ...store.prompt, mode: store.mode })
-      input.extmarks.clear()
-      setStore("prompt", { input: "", parts: [] })
-      setStore("extmarkToPartIndex", new Map())
-      props.onSubmit?.()
-      input.clear()
-      return true
-    }
     // XCOD-94: bare /memory opens the memory browser, before any session is created.
     // `/memory off|on` has arguments and goes to the server like any other command.
     if (store.prompt.input.trim() === "/memory") {
@@ -1211,6 +1192,38 @@ export function Prompt(props: PromptProps) {
       setStore("prompt", { input: "", parts: [] })
       void runExternalCommand(toolSlash.tool, toolSlash.text)
       return false
+    }
+    // XCOD-262: the Agent Monitor sends the prompt itself, as text: to the sessions it tags, or as a
+    // new session it stays beside. The local commands above, and exit, still run here first.
+    if (props.onIntercept && !["exit", "quit", ":q"].includes(store.prompt.input.trim())) {
+      if (store.mode === "shell") {
+        toast.show({ variant: "info", message: "Shell commands run in a session: open one to use !" })
+        return false
+      }
+      if (store.prompt.parts.some((part) => part.type !== "text")) {
+        toast.show({
+          variant: "info",
+          message: "The Agent Monitor sends text only: open the session to attach files, images or agents",
+        })
+        return false
+      }
+      const text = expandTrackedPastedText(
+        store.prompt.input,
+        input.extmarks.getAllForTypeId(promptPartTypeId).flatMap((extmark) => {
+          const partIndex = store.extmarkToPartIndex.get(extmark.id)
+          const part = partIndex === undefined ? undefined : store.prompt.parts[partIndex]
+          if (part?.type !== "text") return []
+          return [{ start: extmark.start, end: extmark.end, text: part.text }]
+        }),
+      )
+      if (!(await props.onIntercept(text))) return false
+      history.append({ ...store.prompt, mode: store.mode })
+      input.extmarks.clear()
+      setStore("prompt", { input: "", parts: [] })
+      setStore("extmarkToPartIndex", new Map())
+      props.onSubmit?.()
+      input.clear()
+      return true
     }
     const agent = local.mode.current()
     if (!agent) return false

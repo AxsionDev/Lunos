@@ -372,15 +372,15 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       )
       .catch((cause) => (fail(cause), undefined))
     if (!created?.data) return false
-    await sdk.client.session
-      .promptAsync(
+    // Through the monitor's own route, so the first prompt is audited with origin "monitor" too.
+    await sdk.client.experimental.session
+      .enqueue(
         {
           sessionID: created.data.id,
           directory,
-          agent: agent.name,
-          model,
-          variant,
-          parts: [{ type: "text", text }],
+          text,
+          model: { providerID: model.providerID, modelID: model.modelID },
+          ...(variant ? { variant } : {}),
         },
         { throwOnError: true },
       )

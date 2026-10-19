@@ -9483,6 +9483,11 @@ export type ExperimentalSessionEnqueueData = {
     text: string
     interrupt?: boolean
     via?: "local" | "peer"
+    model?: {
+      providerID: string
+      modelID: string
+    }
+    variant?: string
   }
   path: {
     sessionID: string

@@ -45,9 +45,10 @@ const sent = () => calls.filter((call) => call.path.endsWith("/prompt_async")).m
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe("SessionPromptQueue.decide (XCOD-262)", () => {
-  test("a prompt never answers a permission: it is held, or stops the turn, but never replies", () => {
+  test("a prompt never answers a permission: it is held, even with Ctrl+Enter, and never replies", () => {
     expect(SessionPromptQueue.decide({ busy: true, permissions: 1 })).toBe("queued")
-    expect(SessionPromptQueue.decide({ busy: true, permissions: 2, interrupt: true })).toBe("interrupted")
+    // Stopping the turn would drop the ask unanswered, so interrupt doesn't apply either.
+    expect(SessionPromptQueue.decide({ busy: true, permissions: 2, interrupt: true })).toBe("queued")
     // Even with a question open next to it, the permission wins: the text isn't sent as any reply.
     expect(SessionPromptQueue.decide({ busy: true, permissions: 1, question: { questions: 1, custom: true } })).toBe(
       "queued",
@@ -72,6 +73,15 @@ describe("SessionPromptQueue.decide (XCOD-262)", () => {
     expect(SessionPromptQueue.decide({ busy: true, permissions: 0 })).toBe("queued")
     expect(SessionPromptQueue.decide({ busy: true, permissions: 0, interrupt: true })).toBe("interrupted")
   })
+})
+
+test("the prompt runs with the session's own agent; a Claude Code / Codex session gets none", () => {
+  expect(SessionPromptQueue.agentFor({ agent: "plan" }, "build")).toBe("plan")
+  expect(SessionPromptQueue.agentFor({}, "build")).toBe("build")
+  expect(SessionPromptQueue.agentFor({}, undefined)).toBeUndefined()
+  expect(
+    SessionPromptQueue.agentFor({ agent: "plan", metadata: { external: { tool: "claude", session: "abc" } } }, "plan"),
+  ).toBeUndefined()
 })
 
 describe("SessionPromptQueue.submit (XCOD-262)", () => {
@@ -152,6 +162,11 @@ describe("SessionPromptQueue.submit (XCOD-262)", () => {
       position: 1,
     })
     expect(calls.some((call) => call.path.startsWith("/permission"))).toBe(false)
+    // Ctrl+Enter doesn't stop the turn either: that would drop the ask unanswered.
+    expect(
+      await SessionPromptQueue.submit({ sessionID: "ses_a", directory: "/work/a", text: "now!", interrupt: true }),
+    ).toEqual({ delivery: "queued", position: 2 })
+    expect(calls.some((call) => call.path.endsWith("/abort") || call.path.startsWith("/permission"))).toBe(false)
   })
 
   test("waiting on a question: the prompt is its answer", async () => {

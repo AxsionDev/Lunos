@@ -1017,6 +1017,11 @@ export class Session extends HeyApiClient {
       text?: string
       interrupt?: boolean
       via?: "local" | "peer"
+      model?: {
+        providerID: string
+        modelID: string
+      }
+      variant?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1031,6 +1036,8 @@ export class Session extends HeyApiClient {
             { in: "body", key: "text" },
             { in: "body", key: "interrupt" },
             { in: "body", key: "via" },
+            { in: "body", key: "model" },
+            { in: "body", key: "variant" },
           ],
         },
       ],
