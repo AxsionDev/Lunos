@@ -17,6 +17,7 @@ import { Plugin } from "@/plugin"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Effect, Layer, Schema } from "effect"
 import { testEffect } from "../lib/effect"
+import { Memory } from "../../src/memory"
 
 const callID = "call-test"
 const sessionID = SessionID.make("ses_test")
@@ -61,7 +62,13 @@ const fakeTruncate = Truncate.Service.of({
   limits: () => Effect.succeed({ maxLines: 2000, maxBytes: 50 * 1024 }),
 } satisfies Truncate.Interface)
 
+// Memory is off here; test/memory covers the memory tools.
+const fakeMemory = Memory.Service.of({
+  decision: () => Effect.succeed({ on: false, by: "config", reason: "off" }),
+} as Partial<Memory.Interface> as Memory.Interface)
+
 const layer = Layer.mergeAll(
+  Layer.succeed(Memory.Service, fakeMemory),
   Layer.succeed(Plugin.Service, fakePlugin),
   Layer.succeed(Permission.Service, fakePermission),
   Layer.succeed(MCP.Service, fakeMcp()),

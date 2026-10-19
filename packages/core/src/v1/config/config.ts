@@ -16,6 +16,14 @@ import { ConfigPluginV1 } from "./plugin"
 import { ConfigProviderV1 } from "./provider"
 import { ConfigServerV1 } from "./server"
 import { ConfigSkillsV1 } from "./skills"
+import { ConfigHooks } from "../../config/hooks"
+import { ConfigResidency } from "../../config/residency"
+import { ConfigSubagent } from "../../config/subagent"
+import { ConfigCloud } from "../../config/cloud"
+import { ConfigSync } from "../../config/sync"
+import { ConfigExternal } from "../../config/external"
+import { ConfigMemory } from "../../config/memory"
+import { ConfigSandbox } from "../../config/sandbox"
 
 export type Layout = ConfigLayoutV1.Layout
 
@@ -33,15 +41,70 @@ export const Info = Schema.Struct({
   $schema: Schema.optional(Schema.String).annotate({
     description: "JSON schema reference for configuration validation",
   }),
+  $locked: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description:
+      "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)",
+  }),
   shell: Schema.optional(Schema.String).annotate({ description: "Default shell to use for terminal and bash tool" }),
   logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
   server: Schema.optional(ConfigServerV1.Server).annotate({
     description: "Server configuration for opencode serve and web commands",
   }),
   command: Schema.optional(Schema.Record(Schema.String, ConfigCommandV1.Info)).annotate({
-    description: "Command configuration, see https://opencode.ai/docs/commands",
+    description: "Command configuration, see https://docs.lunos.tech/docs/commands/",
   }),
   skills: Schema.optional(ConfigSkillsV1.Info).annotate({ description: "Additional skill folder paths" }),
+  hooks: Schema.optional(ConfigHooks.Info).annotate({
+    description: "Shell commands to run on tool, command, and session lifecycle events, without writing a plugin",
+  }),
+  // Declared here as well as in the v2 schema: without it, the live config path strips the key
+  // and the v1 provider (which enforces it for sessions) never sees a policy.
+  audit: Schema.optional(
+    Schema.Struct({
+      enabled: Schema.optional(Schema.Boolean).annotate({
+        description:
+          "Write the organisation audit trail: model calls, tool runs, permission decisions, MCP connections, marketplace installs, policy refusals and upgrades. Also on whenever a residency policy is set with audit on",
+      }),
+      path: Schema.optional(Schema.String).annotate({
+        description:
+          "Audit log path. Takes precedence over residency.auditPath. Default: residency-egress.log in the Lunos log directory",
+      }),
+      redact: Schema.optional(Schema.Array(Schema.String)).annotate({
+        description:
+          "Regular expressions whose matches are masked in recorded paths and command lines, on top of the built-in secret patterns",
+      }),
+      max_bytes: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))).annotate({
+        description: "Rotate the log when it reaches this size (default 10 MB)",
+      }),
+      max_age_days: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))).annotate({
+        description: "Delete rotated log files older than this (default 90)",
+      }),
+      forward: Schema.optional(
+        Schema.Struct({
+          syslog: Schema.optional(Schema.String).annotate({
+            description: "Forward every line to a syslog receiver, e.g. udp://siem.internal:514",
+          }),
+          otlp: Schema.optional(Schema.String).annotate({
+            description: "Forward every line as an OTLP log record, e.g. https://collector.internal:4318",
+          }),
+          region: Schema.optional(Schema.Literals(["eu", "us", "other"])).annotate({
+            description:
+              'Where the forwarding destinations process data, checked against residency.allow (without it they count as "unknown"). Your declaration: Lunos can\'t verify it. Set it in managed config and lock audit.forward so only an administrator can declare it',
+          }),
+        }),
+      ),
+    }),
+  ),
+  memory: Schema.optional(ConfigMemory.Info).annotate({
+    description: "Graph-based long-term memory, off by default",
+  }),
+  sandbox: Schema.optional(ConfigSandbox.Info).annotate({
+    description: "Sandboxed runs: the Lunos server and everything it spawns run in a Docker container",
+  }),
+  residency: Schema.optional(ConfigResidency.Info).annotate({
+    description:
+      "Data-residency policy restricting which provider jurisdictions this deployment may use, with an audit log of outbound model calls",
+  }),
   references: Schema.optional(ConfigReference.Info).annotate({
     description: "Named git or local directory references",
   }),
@@ -54,16 +117,16 @@ export const Info = Schema.Struct({
       "Enable or disable snapshot tracking. When false, filesystem snapshots are not recorded and undoing or reverting will not undo/redo file changes. Defaults to true.",
   }),
   plugin: Schema.optional(Schema.mutable(Schema.Array(ConfigPluginV1.Spec))),
-  share: Schema.optional(Schema.Literals(["manual", "auto", "disabled"])).annotate({
+  share: Schema.optional(Schema.Literals(["manual", "auto", "disabled", "cloud"])).annotate({
     description:
-      "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing",
+      "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing, 'cloud' shares only with your organisation's Lunos console (/share, lunos share, lunos memory share; never another share service)",
   }),
   autoshare: Schema.optional(Schema.Boolean).annotate({
     description: "@deprecated Use 'share' field instead. Share newly created sessions automatically",
   }),
   autoupdate: Schema.optional(Schema.Union([Schema.Boolean, Schema.Literal("notify")])).annotate({
     description:
-      "Check for new versions and show an update notice. Updates are never installed automatically; run /update or `opencode upgrade`. Set to false to disable update checks. true and 'notify' behave the same",
+      "Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications",
   }),
   disabled_providers: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
     description: "Disable providers that are loaded automatically",
@@ -77,9 +140,25 @@ export const Info = Schema.Struct({
   small_model: Schema.optional(Schema.String).annotate({
     description: "Small model to use for tasks like title generation in the format of provider/model",
   }),
+  recommended: Schema.optional(Schema.Record(Schema.String, Schema.String)).annotate({
+    description:
+      'Curated models the model pickers list under Recommended, as "provider/model": "why". Replaces Lunos\'s built-in list; lock it with $locked to set it for an organisation',
+  }),
   default_agent: Schema.optional(Schema.String).annotate({
     description:
       "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",
+  }),
+  external: Schema.optional(ConfigExternal.Info).annotate({
+    description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
+  }),
+  cloud: Schema.optional(ConfigCloud.Info).annotate({
+    description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",
+  }),
+  sync: Schema.optional(ConfigSync.Info).annotate({
+    description: "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }",
+  }),
+  subagent: Schema.optional(ConfigSubagent.Info).annotate({
+    description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
   }),
   subagent_depth: Schema.optional(NonNegativeInt).annotate({
     description: "Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents.",
@@ -106,7 +185,7 @@ export const Info = Schema.Struct({
       }),
       [Schema.Record(Schema.String, ConfigAgentV1.Info)],
     ),
-  ).annotate({ description: "Agent configuration, see https://opencode.ai/docs/agents" }),
+  ).annotate({ description: "Agent configuration, see https://docs.lunos.tech/docs/agents/" }),
   provider: Schema.optional(Schema.Record(Schema.String, ConfigProviderV1.Info)).annotate({
     description: "Custom provider configurations and model overrides",
   }),
@@ -119,7 +198,7 @@ export const Info = Schema.Struct({
   }),
   lsp: Schema.optional(ConfigLSPV1.Info).annotate({
     description:
-      "Enable or configure LSP servers. Omit or set to false to disable, true to enable built-ins, or an object to enable built-ins with overrides.",
+      "Enable or configure LSP servers. On by default; set to false to disable all, or an object to enable built-ins with overrides.",
   }),
   instructions: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
     description: "Additional instruction files or patterns to include",
@@ -129,6 +208,24 @@ export const Info = Schema.Struct({
   tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
   attachment: Schema.optional(ConfigAttachmentV1.Info).annotate({
     description: "Attachment processing configuration, including image size limits and resizing behavior",
+  }),
+  marketplace: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description: "Marketplace sources (manifest URL, owner/repo or path) to list and install from",
+  }),
+  marketplace_default: Schema.optional(Schema.Boolean).annotate({
+    description: "Whether the built-in lunos-community marketplace is used (default: true)",
+  }),
+  agent_import: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Whether `lunos agent import` may add agents from bundles and Claude Code files (default: true). Organisation policy: lock it in managed config to forbid imports",
+  }),
+  marketplace_unreviewed: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Organisation policy: false forbids installing marketplace entries that aren't verified (--allow-unreviewed), when locked in managed config",
+  }),
+  marketplace_allow: Schema.optional(Schema.Array(Schema.String)).annotate({
+    description:
+      "Organisation policy: the only marketplace sources that may be listed and installed from, when locked in managed config",
   }),
   enterprise: Schema.optional(
     Schema.Struct({ url: Schema.optional(Schema.String).annotate({ description: "Enterprise URL" }) }),

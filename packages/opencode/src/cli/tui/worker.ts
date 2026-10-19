@@ -4,6 +4,8 @@ import { Rpc } from "@/util/rpc"
 import { upgrade } from "@/cli/upgrade"
 import { Config } from "@/config/config"
 import { GlobalBus } from "@/bus/global"
+import { ConfigOrgPolicy } from "@/config/org-policy"
+import { TuiEvent } from "@/server/tui-event"
 import { ServerAuth } from "@/server/auth"
 import { writeHeapSnapshot } from "node:v8"
 import { Heap } from "@/cli/heap"
@@ -58,7 +60,18 @@ export const rpc = {
   },
   async checkUpgrade(input: { directory: string }) {
     await InstanceRuntime.load({ directory: input.directory })
-    return upgrade().catch(() => undefined)
+    // XCOD-241: once per start, when the TUI is listening: the organisation policy in use isn't
+    // the console's current copy (offline, signed out, or the fetch failed).
+    const notice = ConfigOrgPolicy.notice()
+    if (notice)
+      GlobalBus.emit("event", {
+        directory: "global",
+        payload: {
+          type: TuiEvent.ToastShow.type,
+          properties: { title: "Organisation policy", message: notice, variant: "warning", duration: 15000 },
+        },
+      })
+    await upgrade().catch(() => {})
   },
   async reload() {
     await AppRuntime.runPromise(

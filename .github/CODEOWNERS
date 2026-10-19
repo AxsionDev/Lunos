@@ -1,3 +1,9 @@
 # web + desktop packages
 packages/app/      @Hona @Brendonovich
 packages/desktop/  @Hona @Brendonovich
+
+# XCOD-198: marketplace entries become or stop being verified only with a named person's approval.
+# Approver: Petar Minev (decided 2026-10-04). Enforced when branch protection requires code-owner review.
+/marketplace.json            @pminevp
+/marketplace-reviews/        @pminevp
+/docs/marketplace-review.md  @pminevp

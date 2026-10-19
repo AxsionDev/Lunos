@@ -16,11 +16,19 @@ import { ConfigCompaction } from "./config/compaction"
 import { ConfigCommand } from "./config/command"
 import { ConfigExperimental } from "./config/experimental"
 import { ConfigFormatter } from "./config/formatter"
+import { ConfigHooks } from "./config/hooks"
 import { ConfigLSP } from "./config/lsp"
 import { ConfigMCP } from "./config/mcp"
 import { ConfigPlugin } from "./config/plugin"
 import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
+import { ConfigResidency } from "./config/residency"
+import { ConfigSubagent } from "./config/subagent"
+import { ConfigCloud } from "./config/cloud"
+import { ConfigSync } from "./config/sync"
+import { ConfigExternal } from "./config/external"
+import { ConfigMemory } from "./config/memory"
+import { ConfigSandbox } from "./config/sandbox"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
 import { ConfigV1 } from "./v1/config/config"
@@ -44,8 +52,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
     .annotate({
       description: "Automatically update or notify when a new version is available",
     }),
-  share: Schema.Literals(["manual", "auto", "disabled"]).pipe(Schema.optional).annotate({
-    description: "Control whether sessions may be shared manually, automatically, or not at all",
+  share: Schema.Literals(["manual", "auto", "disabled", "cloud"]).pipe(Schema.optional).annotate({
+    description:
+      "Control whether sessions may be shared manually, automatically, or not at all; 'cloud' shares only with your organisation's Lunos console (/share, lunos share, lunos memory share)",
   }),
   enterprise: Schema.Struct({
     url: Schema.String.pipe(Schema.optional),
@@ -73,7 +82,7 @@ export class Info extends Schema.Class<Info>("Config.Info")({
     description: "Enable built-in formatters or configure formatter overrides",
   }),
   lsp: ConfigLSP.Info.pipe(Schema.optional).annotate({
-    description: "Enable built-in language servers or configure server overrides",
+    description: "Built-in language servers (on by default; false disables all) or server overrides",
   }),
   attachments: ConfigAttachments.Info.pipe(Schema.optional).annotate({
     description: "Attachment processing configuration",
@@ -102,8 +111,37 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   plugins: ConfigPlugin.Plugins.pipe(Schema.optional).annotate({
     description: "Ordered external plugin packages to load",
   }),
+  hooks: ConfigHooks.Info.pipe(Schema.optional).annotate({
+    description: "Shell commands to run on tool, command, and session lifecycle events, without writing a plugin",
+  }),
   experimental: ConfigExperimental.Experimental.pipe(Schema.optional),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(Schema.optional),
+  recommended: Schema.Record(Schema.String, Schema.String).pipe(Schema.optional).annotate({
+    description:
+      'Curated models the model pickers list under Recommended, as "provider/model": "why". Replaces Lunos\'s built-in list; lock it with $locked to set it for an organisation',
+  }),
+  external: ConfigExternal.Info.pipe(Schema.optional).annotate({
+    description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
+  }),
+  cloud: ConfigCloud.Info.pipe(Schema.optional).annotate({
+    description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",
+  }),
+  sync: ConfigSync.Info.pipe(Schema.optional).annotate({
+    description: "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }",
+  }),
+  subagent: ConfigSubagent.Info.pipe(Schema.optional).annotate({
+    description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
+  }),
+  memory: ConfigMemory.Info.pipe(Schema.optional).annotate({
+    description: "Graph-based long-term memory, off by default",
+  }),
+  sandbox: ConfigSandbox.Info.pipe(Schema.optional).annotate({
+    description: "Sandboxed runs: the Lunos server and everything it spawns run in a Docker container",
+  }),
+  residency: ConfigResidency.Info.pipe(Schema.optional).annotate({
+    description:
+      "Data-residency policy restricting which provider jurisdictions this deployment may use, with an audit log of outbound model calls",
+  }),
 }) {}
 
 export class Document extends Schema.Class<Document>("Config.Document")({

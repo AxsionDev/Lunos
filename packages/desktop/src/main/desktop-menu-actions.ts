@@ -1,11 +1,24 @@
-import { BrowserWindow } from "electron"
+import { app, BrowserWindow, dialog, shell } from "electron"
+import path from "node:path"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
-import { createMainWindow, updateTitlebar } from "./windows"
+import { createMainWindow, openSessionsWindow, updateTitlebar } from "./windows"
 
 export type DesktopMenuActionHandlers = Partial<{
   checkForUpdates: () => void
   relaunch: () => void
+  licenses: () => void
 }>
+
+/**
+ * XCOD-177: open the licence notices packaged next to the app (resources/ when run from source).
+ * The .txt name gives it a default app on Windows and Linux; openPath reports failure as a string.
+ */
+export async function openLicenses() {
+  const name = "THIRD_PARTY_NOTICES.txt"
+  const file = app.isPackaged ? path.join(process.resourcesPath, name) : path.join(app.getAppPath(), "resources", name)
+  const error = await shell.openPath(file)
+  if (error) dialog.showErrorBox("Third-Party Licences", `Could not open ${file}: ${error}`)
+}
 
 export function runDesktopMenuAction(
   win: BrowserWindow | null,
@@ -19,8 +32,14 @@ export function runDesktopMenuAction(
     case "app.relaunch":
       handlers.relaunch?.()
       return
+    case "app.licenses":
+      handlers.licenses?.()
+      return
     case "window.new":
       createMainWindow()
+      return
+    case "window.sessions":
+      openSessionsWindow()
       return
     case "window.close":
       win?.close()

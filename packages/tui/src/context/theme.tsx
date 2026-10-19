@@ -62,6 +62,7 @@ export async function discoverThemes(directories: string[]) {
 
 export {
   DEFAULT_THEMES,
+  EXTERNAL_ACCENTS,
   addTheme,
   allThemes,
   generateSubtleSyntax,
@@ -93,7 +94,7 @@ const [store, setStore] = createStore<State>({
   themes: allThemes(),
   mode: "dark",
   lock: undefined,
-  active: "opencode",
+  active: "catppuccin",
   ready: false,
 })
 
@@ -118,8 +119,8 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         if (!lock && pick(kv.get("theme_mode")) !== undefined) kv.set("theme_mode", undefined)
         draft.mode = mode
         draft.lock = lock
-        const active = config.theme ?? kv.get("theme", "opencode")
-        draft.active = typeof active === "string" ? active : "opencode"
+        const active = config.theme ?? kv.get("theme", "catppuccin")
+        draft.active = typeof active === "string" ? active : "catppuccin"
         draft.ready = false
       }),
     )
@@ -140,7 +141,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
             }, {}),
           )
         })
-        .catch(() => setStore("active", "opencode"))
+        .catch(() => setStore("active", "catppuccin"))
     }
 
     onMount(() => {
@@ -159,7 +160,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
           if (!colors.palette[0]) {
             if (hasResolvedSystemTheme) return
             setSystemTheme(undefined)
-            if (store.active === "system") setStore("active", "opencode")
+            if (store.active === "system") setStore("active", "catppuccin")
             return
           }
           const next = store.lock ?? terminalMode(colors) ?? mode
@@ -174,7 +175,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         .catch(() => {
           if (hasResolvedSystemTheme) return
           setSystemTheme(undefined)
-          if (store.active === "system") setStore("active", "opencode")
+          if (store.active === "system") setStore("active", "catppuccin")
         })
     }
 
@@ -263,7 +264,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         if (theme) return resolveTheme(theme, store.mode)
       }
 
-      return resolveTheme(store.themes.opencode, store.mode)
+      return resolveTheme(store.themes.catppuccin, store.mode)
     })
 
     createEffect(() => renderer.setBackgroundColor(values().background))

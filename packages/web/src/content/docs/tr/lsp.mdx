@@ -47,7 +47,7 @@ OpenCode, popüler diller için çeşitli yerleşik LSP sunucularıyla birlikte 
 | yaml-ls            | .yaml, .yml                                                         | Red Hat yaml-language-server'ı otomatik olarak yükler                 |
 | zls                | .zig, .zon                                                          | `zig` komutu mevcut                                                   |
 
-LSP varsayılan olarak devre dışıdır. Etkinleştirildiğinde, yukarıdaki dosya uzantılarından biri tespit edilir ve gereksinimler karşılanırsa sunucular başlatılır.
+LSP varsayılan olarak etkindir. Yukarıdaki dosya uzantılarından biri tespit edilir ve gereksinimler karşılanırsa sunucular başlatılır.
 
 :::note
 `OPENCODE_DISABLE_LSP_DOWNLOAD` ortam değişkenini `true` olarak ayarlayarak otomatik LSP sunucu indirmelerini devre dışı bırakabilirsiniz.
@@ -154,7 +154,7 @@ Başlatma seçenekleri LSP sunucusuna göre değişir. Mevcut seçenekler için 
 
 ### LSP sunucularını devre dışı bırakma
 
-`lsp` atlanırsa tüm LSP sunucuları devre dışı kalır. Başka bir yapılandırma etkinleştirdikten sonra tüm LSP sunucularını devre dışı bırakmak için `lsp` değerini `false` olarak ayarlayın:
+`lsp` atlanırsa yerleşik LSP sunucuları etkin olur. Tüm LSP sunucularını devre dışı bırakmak için `lsp` değerini `false` olarak ayarlayın:
 
 ```json title="opencode.json" {3}
 {

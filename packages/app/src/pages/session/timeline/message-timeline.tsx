@@ -299,8 +299,7 @@ export function MessageTimeline(props: {
   const titleValue = createMemo(() => info()?.title)
   const titleLabel = createMemo(() => sessionTitle(titleValue()))
   const shareUrl = createMemo(() => info()?.share?.url)
-  // Session sharing was discontinued; keep the share menu and popover hidden.
-  const shareEnabled = () => false
+  const shareEnabled = createMemo(() => sync().data.config.share !== "disabled" && sync().data.config.share !== "cloud")
   const parentID = createMemo(() => info()?.parentID)
   const parent = createMemo(() => {
     const id = parentID()

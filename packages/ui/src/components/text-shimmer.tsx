@@ -43,16 +43,14 @@ export const TextShimmer = <T extends ValidComponent = "span">(props: {
       data-component="text-shimmer"
       data-active={active() ? "true" : "false"}
       class={props.class}
-      aria-label={text()}
       style={{
         "--text-shimmer-swap": `${swap}ms`,
         "--text-shimmer-index": `${offset()}`,
       }}
     >
       <span data-slot="text-shimmer-char">
-        <span data-slot="text-shimmer-char-base" aria-hidden="true">
-          {text()}
-        </span>
+        {/* The base copy is the accessible text; aria-label on a plain span is prohibited (XCOD-141). */}
+        <span data-slot="text-shimmer-char-base">{text()}</span>
         <span data-slot="text-shimmer-char-shimmer" data-run={run() ? "true" : "false"} aria-hidden="true">
           {text()}
         </span>

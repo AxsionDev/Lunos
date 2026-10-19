@@ -37,6 +37,7 @@ import type {
   SessionStatus,
 } from "@opencode-ai/sdk/v2"
 import { useLocal } from "../../context/local"
+import { EXTERNAL_BADGE, externalAccent, externalCost, externalOf } from "../../util/external"
 import { Locale } from "../../util/locale"
 import { webSearchProviderLabel } from "../../util/tool-display"
 import { Dynamic, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -65,6 +66,8 @@ import { useEpilogue } from "../../context/epilogue"
 import { normalizePath } from "../../util/path"
 import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
+import { createQuestionDismissal, type QuestionDismissal } from "./question-dismissal"
+import { isDismissedQuestion } from "../../util/dismiss"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
 import * as Model from "../../util/model"
 import { formatTranscript } from "../../util/transcript"
@@ -77,12 +80,16 @@ import { getScrollAcceleration } from "../../util/scroll"
 import { collapseToolOutput } from "../../util/collapse-tool-output"
 import { usePluginRuntime } from "../../plugin/runtime"
 import { DialogRetryAction } from "../../component/dialog-retry-action"
+import { shareToConsole } from "../../component/dialog-share-console"
 import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
 import { LocationProvider } from "../../context/location"
+import { Offline } from "@opencode-ai/core/offline"
 
-addDefaultParsers(parsers.parsers)
+// The grammars are fetched from GitHub on first use, so offline mode (XCOD-121) skips them and
+// code renders without syntax highlighting.
+if (!Offline.enabled()) addDefaultParsers(parsers.parsers)
 
 const GO_UPSELL_FREE_TIER_LAST_SEEN_AT = "go_upsell_last_seen_at"
 const GO_UPSELL_FREE_TIER_DONT_SHOW = "go_upsell_dont_show"
@@ -113,10 +120,12 @@ function goUpsellKeys(action: RetryAction) {
 }
 
 const sessionBindingCommands = [
+  "session.share",
   "session.rename",
   "session.timeline",
   "session.fork",
   "session.compact",
+  "session.unshare",
   "session.undo",
   "session.redo",
   "session.sidebar.toggle",
@@ -164,6 +173,7 @@ const context = createContext<{
   providers: () => ReadonlyMap<string, Provider>
   sync: ReturnType<typeof useSync>
   tui: ReturnType<typeof useTuiConfig>
+  dismissal: QuestionDismissal
 }>()
 
 function use() {
@@ -190,6 +200,21 @@ export function Session() {
   const kv = useKV()
   const { theme } = useTheme()
   const promptRef = usePromptRef()
+  const dismissal = createQuestionDismissal({
+    sessionID: () => route.sessionID,
+    sdk: useSDK(),
+    sync,
+    toast: useToast(),
+    config: tuiConfig,
+  })
+  // A held dismissal belongs to the session it was made in; switching away sends it.
+  createEffect(
+    on(
+      () => route.sessionID,
+      () => dismissal.flush(),
+      { defer: true },
+    ),
+  )
   const session = createMemo(() => sync.session.get(route.sessionID))
   const location = createMemo(() => {
     const current = session()
@@ -235,8 +260,10 @@ export function Session() {
     if (session()?.parentID) return []
     return children().flatMap((x) => sync.data.question[x.id] ?? [])
   })
-  const visible = createMemo(() => !session()?.parentID && permissions().length === 0 && questions().length === 0)
-  const disabled = createMemo(() => permissions().length > 0 || questions().length > 0)
+  const visible = createMemo(
+    () => !session()?.parentID && permissions().length === 0 && questions().length === 0 && !dismissal.answering(),
+  )
+  const disabled = createMemo(() => permissions().length > 0 || questions().length > 0 || !!dismissal.answering())
 
   const pending = createMemo(() => {
     const completed = messages().findLastIndex((message) => message.role === "assistant" && message.time.completed)
@@ -330,10 +357,10 @@ export function Session() {
     if (part.id === lastSwitch) return
 
     if (part.tool === "plan_exit") {
-      local.agent.set("build")
+      local.mode.set("build")
       lastSwitch = part.id
     } else if (part.tool === "plan_enter") {
-      local.agent.set("plan")
+      local.mode.set("plan")
       lastSwitch = part.id
     }
   })
@@ -462,6 +489,94 @@ export function Session() {
 
   const sessionCommandList = createMemo(() => [
     {
+      title: session()?.share?.url
+        ? "Copy share link"
+        : sync.data.config.share === "cloud"
+          ? "Share session with your organisation"
+          : sync.data.config.share === "disabled"
+            ? "Share session (disabled)"
+            : "Share session",
+      value: "session.share",
+      suggested: route.type === "session" && sync.data.config.share !== "disabled",
+      category: "Session",
+      slash: {
+        name: "share",
+      },
+      run: async () => {
+        // Stay registered while disabled so a typed /share gets a plain answer
+        // instead of being sent to the model as ordinary prompt text.
+        if (sync.data.config.share === "cloud") {
+          // XCOD-191: only to the organisation's Lunos console, as lunos share does; never upstream's
+          // share service, and the session isn't marked shared (that would offer upstream's unshare).
+          await shareToConsole({ dialog, sdk, toast, clipboard, sessionID: route.sessionID })
+          return
+        }
+        if (!session()?.share?.url && sync.data.config.share === "disabled") {
+          toast.show({
+            message:
+              'Session sharing is disabled. To share without uploading anything, use /export to save the transcript as a file. To enable /share, set "share": "manual" in your Lunos config.',
+            variant: "info",
+          })
+          dialog.clear()
+          return
+        }
+        const copy = (url: string) =>
+          clipboard
+            .write?.(url)
+            .then(() => toast.show({ message: "Share URL copied to clipboard!", variant: "success" }))
+            .catch(() => toast.show({ message: "Failed to copy URL to clipboard", variant: "error" }))
+        const url = session()?.share?.url
+        if (url) {
+          await copy(url)
+          dialog.clear()
+          return
+        }
+        if (!kv.get("share_consent", false)) {
+          const ok = await DialogConfirm.show(dialog, "Share Session", "Are you sure you want to share it?")
+          if (ok !== true) return
+          kv.set("share_consent", true)
+        }
+        await sdk.client.session
+          .share({
+            sessionID: route.sessionID,
+          })
+          .then((res) => {
+            // A refused share (sharing disabled, or the residency policy blocked the host) comes
+            // back as an error body with a message, not a thrown error (XCOD-80).
+            const url = res.data?.share?.url
+            if (url) return copy(url)
+            const body = res.error as { message?: unknown; data?: { message?: unknown } } | undefined
+            const message =
+              typeof body?.message === "string"
+                ? body.message
+                : typeof body?.data?.message === "string"
+                  ? body.data.message
+                  : "Failed to share session"
+            toast.show({ message, variant: "error" })
+          })
+          .catch((error) => {
+            toast.show({
+              message: error instanceof Error ? error.message : "Failed to share session",
+              variant: "error",
+            })
+          })
+        dialog.clear()
+      },
+    },
+    {
+      title: "Answer a dismissed question",
+      value: "session.answer",
+      category: "Session",
+      slash: {
+        name: "answer",
+      },
+      run: () => {
+        dialog.clear()
+        if (!dismissal.openLatest())
+          toast.show({ variant: "info", message: "There is no dismissed question to answer in this session." })
+      },
+    },
+    {
       title: "Rename session",
       value: "session.rename",
       category: "Session",
@@ -525,6 +640,25 @@ export function Session() {
         aliases: ["summarize"],
       },
       run: () => {
+        // XCOD-254: in a Claude Code / Codex session the tool compacts its own session (Claude Code's
+        // /compact, Codex's thread/compact/start); a Lunos model never sees the conversation.
+        const external = externalOf(session())
+        if (external) {
+          dialog.clear()
+          if (!external.session) {
+            toast.show({
+              variant: "info",
+              message: `Nothing to compact yet in this ${EXTERNAL_BADGE[external.tool]} session`,
+            })
+            return
+          }
+          void sdk.client.session
+            .prompt({ sessionID: route.sessionID, parts: [{ type: "text", text: "/compact" }] }, { throwOnError: true })
+            .catch((error: unknown) =>
+              toast.show({ variant: "error", message: error instanceof Error ? error.message : "Compacting failed" }),
+            )
+          return
+        }
         const selectedModel = local.model.current()
         if (!selectedModel) {
           toast.show({
@@ -539,6 +673,65 @@ export function Session() {
           modelID: selectedModel.modelID,
           providerID: selectedModel.providerID,
         })
+        dialog.clear()
+      },
+    },
+    {
+      // XCOD-254: the cost the tool reported for this session; only in a Claude Code / Codex session.
+      title: "Show cost",
+      value: "session.cost",
+      category: "Session",
+      hidden: !externalOf(session()),
+      slash: {
+        name: "cost",
+      },
+      run: () => {
+        dialog.clear()
+        const external = externalOf(session())
+        if (!external) return
+        const tool = EXTERNAL_BADGE[external.tool]
+        const reported = messages().some((item) => item.role === "assistant" && item.time.completed)
+        if (!reported) {
+          toast.show({ variant: "info", message: `${tool} hasn't reported anything in this session yet` })
+          return
+        }
+        if (external.tool === "claude") {
+          toast.show({
+            variant: "info",
+            message: `${externalCost(session()?.cost ?? 0)} for this session, as reported by ${tool}`,
+            duration: 8000,
+          })
+          return
+        }
+        const last = messages().findLast((item) => item.role === "assistant" && item.tokens.total)
+        const tokens = last?.role === "assistant" ? last.tokens.total : undefined
+        toast.show({
+          variant: "info",
+          message: `Cost: not reported (${tool} reports tokens, not money)${tokens ? ` · ${Locale.number(tokens)} tokens so far` : ""}`,
+          duration: 8000,
+        })
+      },
+    },
+    {
+      title: "Unshare session",
+      value: "session.unshare",
+      category: "Session",
+      enabled: !!session()?.share?.url,
+      slash: {
+        name: "unshare",
+      },
+      run: async () => {
+        await sdk.client.session
+          .unshare({
+            sessionID: route.sessionID,
+          })
+          .then(() => toast.show({ message: "Session unshared successfully", variant: "success" }))
+          .catch((error) => {
+            toast.show({
+              message: error instanceof Error ? error.message : "Failed to unshare session",
+              variant: "error",
+            })
+          })
         dialog.clear()
       },
     },
@@ -1107,6 +1300,7 @@ export function Session() {
           providers,
           sync,
           tui: tuiConfig,
+          dismissal,
         }}
       >
         <box flexDirection="row" flexGrow={1} minHeight={0}>
@@ -1236,10 +1430,26 @@ export function Session() {
                   />
                 </Show>
                 <Show when={permissions().length === 0 && questions().length > 0}>
-                  <QuestionPrompt
-                    request={questions()[0]}
-                    directory={sync.session.get(questions()[0].sessionID)?.directory}
-                  />
+                  <Show when={!dismissal.isHeld(questions()[0].id)} fallback={<DismissedQuestionBar />}>
+                    <QuestionPrompt
+                      request={questions()[0]}
+                      directory={sync.session.get(questions()[0].sessionID)?.directory}
+                      initial={dismissal.restoredDraft(questions()[0].id)}
+                      onDismiss={(draft) =>
+                        dismissal.dismiss(questions()[0], sync.session.get(questions()[0].sessionID)?.directory, draft)
+                      }
+                    />
+                  </Show>
+                </Show>
+                <Show when={permissions().length === 0 && questions().length === 0 && dismissal.answering()}>
+                  {(current) => (
+                    <QuestionPrompt
+                      request={current().request}
+                      initial={current().draft}
+                      onAnswer={(answers) => void dismissal.sendAnswer(answers)}
+                      onDismiss={() => dismissal.closeAnswer()}
+                    />
+                  )}
                 </Show>
                 <Show when={session()?.parentID}>
                   <SubagentFooter />
@@ -1320,7 +1530,7 @@ function UserMessage(props: {
   const { theme } = useTheme()
   const [hover, setHover] = createSignal(false)
   const queued = createMemo(() => props.pending !== undefined && props.index > props.pending)
-  const color = createMemo(() => local.agent.color(props.message.agent))
+  const color = createMemo(() => local.mode.color(props.message.agent))
   const queuedFg = createMemo(() => selectedForeground(theme, color()))
   const metadataVisible = createMemo(() => queued() || ctx.showTimestamps())
 
@@ -1408,6 +1618,13 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
   const sync = useSync()
   const messages = createMemo(() => sync.data.message[props.message.sessionID] ?? [])
   const model = createMemo(() => Model.name(ctx.providers(), props.message.providerID, props.message.modelID))
+  const tuiConfig = useTuiConfig()
+  // XCOD-260: the tool's messages carry its accent.
+  const externalMarkerColor = () => {
+    const marker =
+      props.message.providerID === "external" ? externalOf(sync.session.get(props.message.sessionID)) : undefined
+    return marker ? externalAccent(theme, marker.tool, tuiConfig.external_accent !== false) : undefined
+  }
 
   const final = createMemo(() => {
     return props.message.finish && !["tool-calls", "unknown"].includes(props.message.finish)
@@ -1489,15 +1706,35 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                   fg:
                     props.message.error?.name === "MessageAbortedError"
                       ? theme.textMuted
-                      : local.agent.color(props.message.agent),
+                      : (externalMarkerColor() ?? local.mode.color(props.message.agent)),
                 }}
               >
                 ▣{" "}
               </span>{" "}
               <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
+              <Show
+                when={
+                  props.message.providerID === "external" &&
+                  externalOf(sync.session.get(props.message.sessionID))?.session
+                }
+              >
+                {(id) => <span style={{ fg: theme.textMuted }}> {id().slice(0, 8)}</span>}
+              </Show>
               <span style={{ fg: theme.textMuted }}> · {model()}</span>
               <Show when={duration()}>
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
+              </Show>
+              <Show when={props.message.providerID === "external" && props.message.time.completed}>
+                {/* XCOD-218: the cost Claude Code reports for this turn, and the session's total so far.
+                    XCOD-254: Codex reports tokens, never money, so no $0 is shown for it. */}
+                <span style={{ fg: theme.textMuted }}>
+                  {" · "}
+                  {externalOf(sync.session.get(props.message.sessionID))?.tool === "codex"
+                    ? props.message.tokens.total
+                      ? `${Locale.number(props.message.tokens.total)} tokens (cost not reported)`
+                      : "cost not reported"
+                    : `${externalCost(props.message.cost)} this turn${props.last ? ` · ${externalCost(sync.session.get(props.message.sessionID)?.cost ?? 0)} total` : ""}`}
+                </span>
               </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>
                 <span style={{ fg: theme.textMuted }}> · interrupted</span>
@@ -2471,8 +2708,29 @@ function TodoWrite(props: ToolProps) {
   )
 }
 
+// Shown in the question's place while a dismissal can still be undone. The agent is still waiting.
+function DismissedQuestionBar() {
+  const { theme } = useTheme()
+  const ctx = use()
+  useBindings(() => ({
+    mode: OPENCODE_BASE_MODE,
+    enabled: ctx.dismissal.heldCount() > 0,
+    priority: 10,
+    bindings: [{ key: "ctrl+z", desc: "Undo question dismissal", group: "Question", cmd: () => ctx.dismissal.undo() }],
+  }))
+  return (
+    <box paddingLeft={2} paddingTop={1} paddingBottom={1} backgroundColor={theme.backgroundPanel}>
+      <text fg={theme.textMuted}>
+        Question dismissed · <span style={{ fg: theme.text }}>ctrl+z</span> undo
+      </text>
+    </box>
+  )
+}
+
 function Question(props: ToolProps) {
   const { theme } = useTheme()
+  const ctx = use()
+  const [hover, setHover] = createSignal(false)
   const questions = createMemo(() => parseQuestions(props.input.questions))
   const answers = createMemo(() => parseQuestionAnswers(props.metadata.answers))
   const count = createMemo(() => questions().length)
@@ -2484,6 +2742,20 @@ function Question(props: ToolProps) {
 
   return (
     <Switch>
+      <Match when={isDismissedQuestion(props.part)}>
+        <box
+          paddingLeft={3}
+          onMouseOver={() => setHover(true)}
+          onMouseOut={() => setHover(false)}
+          onMouseUp={() => ctx.dismissal.openAnswer(props.part)}
+        >
+          <text fg={theme.textMuted}>
+            ? Dismissed {count()} question{count() !== 1 ? "s" : ""} —{" "}
+            <span style={{ fg: hover() ? theme.accent : theme.warning }}>Answer now</span>
+            <span style={{ fg: theme.textMuted }}> (/answer)</span>
+          </text>
+        </box>
+      </Match>
       <Match when={answers()}>
         <BlockTool title="# Questions" part={props.part}>
           <box gap={1}>

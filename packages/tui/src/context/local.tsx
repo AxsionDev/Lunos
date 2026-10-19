@@ -13,6 +13,7 @@ import { useTheme } from "./theme"
 import { useToast } from "../ui/toast"
 import { useRoute } from "./route"
 import { usePermission } from "./permission"
+import { listed } from "../util/sessions-overview"
 
 export type LocalTheme = {
   secondary: RGBA
@@ -66,18 +67,26 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       return !!provider?.models[model.modelID]
     }
 
+    // XCOD-219: a model a locked `model` rules out can't be the current one, so a pick saved before
+    // the lock falls through to the configured (locked) model instead of every prompt being refused.
+    function isModelUsable(model: { providerID: string; modelID: string }) {
+      const provider = sync.data.provider.find((item) => item.id === model.providerID)
+      const info = provider?.models[model.modelID]
+      return !!info && info.blocked?.policy !== "locked"
+    }
+
     function getFirstValidModel(...modelFns: (() => { providerID: string; modelID: string } | undefined)[]) {
       for (const modelFn of modelFns) {
         const model = modelFn()
         if (!model) continue
-        if (isModelValid(model)) return model
+        if (isModelUsable(model)) return model
       }
     }
 
-    function createAgent() {
-      const agents = createMemo(() => sync.data.agent.filter((agent) => agent.mode !== "subagent" && !agent.hidden))
-      const visibleAgents = createMemo(() => sync.data.agent.filter((agent) => !agent.hidden))
-      const [agentStore, setAgentStore] = createStore({
+    function createMode() {
+      const modes = createMemo(() => sync.data.agent.filter((agent) => agent.mode !== "subagent" && !agent.hidden))
+      const visibleModes = createMemo(() => sync.data.agent.filter((agent) => !agent.hidden))
+      const [modeStore, setModeStore] = createStore({
         current: undefined as string | undefined,
       })
       const colors = createMemo(() => [
@@ -91,38 +100,38 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       ])
       return {
         list() {
-          return agents()
+          return modes()
         },
         current() {
-          return agents().find((x) => x.name === agentStore.current) ?? agents().at(0)
+          return modes().find((x) => x.name === modeStore.current) ?? modes().at(0)
         },
         set(name: string) {
-          if (!agents().some((x) => x.name === name))
+          if (!modes().some((x) => x.name === name))
             return toast.show({
               variant: "warning",
-              message: `Agent not found: ${name}`,
+              message: `Mode not found: ${name}`,
               duration: 3000,
             })
-          setAgentStore("current", name)
+          setModeStore("current", name)
         },
         move(direction: 1 | -1) {
           batch(() => {
             const current = this.current()
             if (!current) return
-            let next = agents().findIndex((x) => x.name === current.name) + direction
-            if (next < 0) next = agents().length - 1
-            if (next >= agents().length) next = 0
-            const value = agents()[next]
-            setAgentStore("current", value.name)
+            let next = modes().findIndex((x) => x.name === current.name) + direction
+            if (next < 0) next = modes().length - 1
+            if (next >= modes().length) next = 0
+            const value = modes()[next]
+            setModeStore("current", value.name)
           })
         },
         color(name: string) {
-          const index = visibleAgents().findIndex((x) => x.name === name)
+          const index = visibleModes().findIndex((x) => x.name === name)
           if (index === -1) return colors()[0]
-          const agent = visibleAgents()[index]
+          const mode = visibleModes()[index]
 
-          if (agent?.color) {
-            const color = agent.color
+          if (mode?.color) {
+            const color = mode.color
             if (color.startsWith("#")) return RGBA.fromHex(color)
             // already validated by config, just satisfying TS here
             return theme[color as keyof typeof theme] as RGBA
@@ -132,7 +141,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       }
     }
 
-    const agent = createAgent()
+    const mode = createMode()
 
     function createModel() {
       const [modelStore, setModelStore] = createStore<{
@@ -197,7 +206,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const fallbackModel = createMemo(() => {
         if (args.model) {
           const { providerID, modelID } = parseModel(args.model)
-          if (isModelValid({ providerID, modelID })) {
+          if (isModelUsable({ providerID, modelID })) {
             return {
               providerID,
               modelID,
@@ -207,7 +216,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
         if (sync.data.config.model) {
           const { providerID, modelID } = parseModel(sync.data.config.model)
-          if (isModelValid({ providerID, modelID })) {
+          if (isModelUsable({ providerID, modelID })) {
             return {
               providerID,
               modelID,
@@ -216,7 +225,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         }
 
         for (const item of modelStore.recent) {
-          if (isModelValid(item)) {
+          if (isModelUsable(item)) {
             return item
           }
         }
@@ -234,7 +243,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       })
 
       const currentModel = createMemo(() => {
-        const a = agent.current()
+        const a = mode.current()
         return (
           getFirstValidModel(
             () => a && modelStore.model[a.name],
@@ -283,12 +292,12 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           if (next >= recent.length) next = 0
           const val = recent[next]
           if (!val) return
-          const a = agent.current()
+          const a = mode.current()
           if (!a) return
           setModelStore("model", a.name, { ...val })
         },
         cycleFavorite(direction: 1 | -1) {
-          const favorites = modelStore.favorite.filter((item) => isModelValid(item))
+          const favorites = modelStore.favorite.filter((item) => isModelUsable(item))
           if (!favorites.length) {
             toast.show({
               variant: "info",
@@ -311,7 +320,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           }
           const next = favorites[index]
           if (!next) return
-          const a = agent.current()
+          const a = mode.current()
           if (!a) return
           setModelStore("model", a.name, { ...next })
           setModelStore("recent", recentModels(next, modelStore.recent))
@@ -327,7 +336,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               })
               return
             }
-            const a = agent.current()
+            const a = mode.current()
             if (!a) return
             setModelStore("model", a.name, model)
             if (options?.recent) {
@@ -450,7 +459,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         })
 
       const slots = createMemo(() => {
-        const existing = new Set(sync.data.session.filter((x) => x.parentID === undefined).map((x) => x.id))
+        const existing = new Set(
+          sync.data.session.filter((x) => x.parentID === undefined && listed(x)).map((x) => x.id),
+        )
         return sessionStore.pinned.filter((id) => existing.has(id)).slice(0, 9)
       })
 
@@ -520,19 +531,19 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     }
 
     createEffect(() => {
-      const value = agent.current()
+      const value = mode.current()
       if (!value?.model) return
       if (isModelValid(value.model)) return
       toast.show({
         variant: "warning",
-        message: `Agent ${value.name}'s configured model ${value.model.providerID}/${value.model.modelID} is not valid`,
+        message: `Mode ${value.name}'s configured model ${value.model.providerID}/${value.model.modelID} is not valid`,
         duration: 3000,
       })
     })
 
     const result = {
       model,
-      agent,
+      mode,
       mcp,
       session,
       permission,

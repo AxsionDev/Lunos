@@ -22,6 +22,8 @@ import { handleDocumentSearchKeydown } from "@/utils/search-keydown"
 import { createMenuDismissController } from "@/utils/menu-dismiss-controller"
 import { createEventListener } from "@solid-primitives/event-listener"
 import { matchesModelSearch } from "./dialog-select-model-search"
+import { showToast } from "@/utils/toast"
+import { matchesModelFilter, ModelFilterChips, useModelFilter, useModelFilterLabels } from "./model-filter"
 
 const isFree = (provider: string, cost: { input: number } | undefined) =>
   provider === "opencode" && (!cost || cost.input === 0)
@@ -30,9 +32,44 @@ type ModelState = ReturnType<typeof useLocal>["model"]
 type ModelItem = ReturnType<ModelState["list"]>[number]
 
 const modelKey = (model: ModelItem) => `${model.provider.id}:${model.id}`
+
+/** XCOD-219: "locked by your organisation" for a locked `model`, "blocked by policy" for residency. */
+const tagKey = (blocked: NonNullable<ModelItem["blocked"]>) =>
+  blocked.policy === "locked" ? ("model.tag.locked" as const) : ("model.tag.blocked" as const)
+
+/**
+ * XCOD-212: a model the residency policy would refuse (or, XCOD-219, a locked `model` rules out)
+ * can't be chosen. Says why instead, and returns false. Residency is decided per provider, so
+ * groups with blocked models are listed last.
+ */
+const allowSelect = (item: ModelItem | undefined, t: (key: ReturnType<typeof tagKey>) => string) => {
+  if (!item?.blocked) return true
+  showToast({
+    variant: "error",
+    title: `${item.provider.name} ${item.name}: ${t(tagKey(item.blocked))}`,
+    description:
+      item.blocked.policy === "locked" ? item.blocked.reason : `Data-residency policy: ${item.blocked.reason}`,
+  })
+  return false
+}
+const hasBlocked = (items: ModelItem[]) => items.some((item) => item.blocked)
+
+/**
+ * XCOD-213: under Recommended the curated models show even if hidden in "Manage models", since
+ * the list is the point; the other filters narrow the visible models.
+ */
+const filterModels = (
+  items: ModelItem[],
+  model: ModelState,
+  filter: ReturnType<ReturnType<typeof useModelFilter>["get"]>,
+) =>
+  items
+    .filter((m) => filter === "recommended" || model.visible({ modelID: m.id, providerID: m.provider.id }))
+    .filter((m) => matchesModelFilter(m, filter))
 const manageKey = "action:manage"
 
 const sortModelGroups = (a: { category: string; items: ModelItem[] }, b: { category: string; items: ModelItem[] }) => {
+  if (hasBlocked(a.items) !== hasBlocked(b.items)) return hasBlocked(a.items) ? 1 : -1
   const aIndex = popularProviders.indexOf(a.category)
   const bIndex = popularProviders.indexOf(b.category)
   const aPopular = aIndex >= 0
@@ -53,18 +90,28 @@ const ModelList: Component<{
 }> = (props) => {
   const model = props.model ?? useLocal().model
   const language = useLanguage()
+  const filter = useModelFilter()
+  const sizeLabel = useModelFilterLabels()
 
   const models = createMemo(() =>
-    model
-      .list()
-      .filter((m) => model.visible({ modelID: m.id, providerID: m.provider.id }))
-      .filter((m) => (props.provider ? m.provider.id === props.provider : true)),
+    filterModels(model.list(), model, filter.get()).filter((m) =>
+      props.provider ? m.provider.id === props.provider : true,
+    ),
   )
 
   return (
     <List
       class={`flex-1 px-3 min-h-0 [&_[data-slot=list-scroll]]:flex-1 [&_[data-slot=list-scroll]]:min-h-0 ${props.class ?? ""}`}
-      search={{ placeholder: language.t("dialog.model.search.placeholder"), autofocus: true, action: props.action }}
+      search={{
+        placeholder: language.t("dialog.model.search.placeholder"),
+        autofocus: true,
+        action: (
+          <>
+            <ModelFilterChips value={filter.get()} onChange={filter.set} />
+            {props.action}
+          </>
+        ),
+      }}
       emptyMessage={language.t("dialog.model.empty")}
       key={(x) => `${x.provider.id}:${x.id}`}
       items={models}
@@ -73,6 +120,7 @@ const ModelList: Component<{
       sortBy={(a, b) => a.name.localeCompare(b.name)}
       groupBy={(x) => x.provider.name}
       sortGroupsBy={(a, b) => {
+        if (hasBlocked(a.items) !== hasBlocked(b.items)) return hasBlocked(a.items) ? 1 : -1
         const aProvider = a.items[0].provider.id
         const bProvider = b.items[0].provider.id
         if (popularProviders.includes(aProvider) && !popularProviders.includes(bProvider)) return -1
@@ -91,6 +139,7 @@ const ModelList: Component<{
         </Tooltip>
       )}
       onSelect={(x) => {
+        if (!allowSelect(x, language.t)) return
         model.set(x ? { modelID: x.id, providerID: x.provider.id } : undefined, {
           recent: true,
         })
@@ -106,6 +155,8 @@ const ModelList: Component<{
           <Show when={i.latest}>
             <Tag>{language.t("model.tag.latest")}</Tag>
           </Show>
+          <Show when={i.size}>{(size) => <Tag>{sizeLabel(size())}</Tag>}</Show>
+          <Show when={i.blocked}>{(blocked) => <Tag>{language.t(tagKey(blocked()))}</Tag>}</Show>
         </div>
       )}
     </List>
@@ -242,6 +293,7 @@ export function ModelSelectorPopoverV2(props: {
       groups={controller.groups}
       current={controller.current}
       select={controller.select}
+      filter={controller.filter}
       onManage={() => {
         void import("./dialog-manage-models").then((module) => {
           void dialog.show(() => <module.DialogManageModelsV2 />)
@@ -258,14 +310,16 @@ function createModelSelectorController(input: {
   onSelect: () => void
 }) {
   const model = input.model ?? useLocal().model
+  const language = useLanguage()
+  const filter = useModelFilter()
   const allModels = createMemo(() =>
-    model
-      .list()
-      .filter((item) => model.visible({ modelID: item.id, providerID: item.provider.id }))
-      .filter((item) => (input.provider() ? item.provider.id === input.provider() : true)),
+    filterModels(model.list(), model, filter.get()).filter((item) =>
+      input.provider() ? item.provider.id === input.provider() : true,
+    ),
   )
 
   return {
+    filter,
     models: (search: string) => {
       const query = search.trim()
       const filtered = query
@@ -285,6 +339,7 @@ function createModelSelectorController(input: {
       return value ? modelKey(value) : undefined
     },
     select: (item: ModelItem) => {
+      if (!allowSelect(item, language.t)) return
       model.set({ modelID: item.id, providerID: item.provider.id }, { recent: true })
       input.onSelect()
     },
@@ -297,10 +352,12 @@ function ModelSelectorPopoverV2View(props: {
   groups: (models: ModelItem[]) => { category: string; items: ModelItem[] }[]
   current: () => string | undefined
   select: (item: ModelItem) => void
+  filter: ReturnType<typeof useModelFilter>
   onManage: () => void
   onClose: () => void
 }) {
   const language = useLanguage()
+  const sizeLabel = useModelFilterLabels()
   const [store, setStore] = createStore({ open: false, search: "", active: "" })
   let searchRef: HTMLInputElement | undefined
   let contentRef: HTMLDivElement | undefined
@@ -435,6 +492,7 @@ function ModelSelectorPopoverV2View(props: {
                 </button>
               </Show>
             </div>
+            <ModelFilterChips value={props.filter.get()} onChange={props.filter.set} />
           </div>
           <div class="h-px bg-v2-border-border-muted" />
           <ScrollView data-slot="model-selector-scroll" class="max-h-[220px] min-h-0">
@@ -488,6 +546,12 @@ function ModelSelectorPopoverV2View(props: {
                                 </Show>
                                 <Show when={item.latest}>
                                   <TagV2 class="shrink-0">{language.t("model.tag.latest")}</TagV2>
+                                </Show>
+                                <Show when={item.size}>
+                                  {(size) => <TagV2 class="shrink-0">{sizeLabel(size())}</TagV2>}
+                                </Show>
+                                <Show when={item.blocked}>
+                                  {(blocked) => <TagV2 class="shrink-0">{language.t(tagKey(blocked()))}</TagV2>}
                                 </Show>
                               </MenuV2.RadioItem>
                             </TooltipV2>

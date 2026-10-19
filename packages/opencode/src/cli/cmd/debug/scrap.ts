@@ -1,5 +1,6 @@
 import { EOL } from "os"
 import { cmd } from "../cmd"
+import { writeStdout } from "../../stdout"
 
 export const ScrapCommand = cmd({
   command: "scrap",
@@ -11,6 +12,6 @@ export const ScrapCommand = cmd({
     const { makeRuntime } = await import("@opencode-ai/core/effect/runtime")
     const runtime = makeRuntime(Project.Service, AppNodeBuilder.build(Project.node))
     const list = await runtime.runPromise((project) => project.list())
-    process.stdout.write(JSON.stringify(list, null, 2) + EOL)
+    await writeStdout(JSON.stringify(list, null, 2) + EOL)
   },
 })

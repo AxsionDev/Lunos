@@ -141,6 +141,9 @@ const lsp = Layer.succeed(
   LSP.Service.of({
     init: () => Effect.void,
     status: () => Effect.succeed([]),
+    overview: () => Effect.succeed({ enabled: true, downloads: true, servers: [] }),
+    stop: () => Effect.void,
+    log: () => Effect.succeed([]),
     hasClients: () => Effect.succeed(false),
     touchFile: () => Effect.void,
     diagnostics: () => Effect.succeed({}),
@@ -311,7 +314,7 @@ const writeText = Effect.fn("test.writeText")(function* (file: string, text: str
 const writeConfig = Effect.fn("test.writeConfig")(function* (dir: string, config: Partial<ConfigV1.Info>) {
   yield* writeText(
     path.join(dir, "opencode.json"),
-    JSON.stringify({ $schema: "https://opencode.ai/config.json", ...config }),
+    JSON.stringify({ $schema: "https://lunos.tech/config.json", ...config }),
   )
 })
 
@@ -917,6 +920,61 @@ it.instance("glob tool keeps instance context during prompt runs", () =>
   }),
 )
 
+// XCOD-98: a dismissed question keeps what the user had answered on the stored, rejected tool
+// part, so the TUI can reopen it after the turn ends. A reject without drafts is unchanged.
+for (const drafts of [{ answers: [["Blue"], []], custom: ["", "half-typed"] }, undefined]) {
+  it.instance(
+    `rejected question part ${drafts ? "keeps the drafts it was dismissed with" : "is unchanged without drafts"}`,
+    () =>
+      Effect.gen(function* () {
+        const { llm } = yield* useServerConfig(providerCfg)
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const question = yield* Question.Service
+        const session = yield* sessions.create({
+          title: "Dismissed question",
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        })
+        yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [{ type: "text", text: "ask me" }],
+        })
+        const questions = [
+          { question: "Colour?", header: "Colour", options: [{ label: "Blue", description: "blue" }] },
+          { question: "Name?", header: "Name", options: [{ label: "Ada", description: "ada" }] },
+        ]
+        yield* llm.tool("question", { questions })
+
+        const loop = yield* prompt.loop({ sessionID: session.id }).pipe(Effect.forkScoped)
+        const pending = yield* Effect.gen(function* () {
+          for (;;) {
+            const [item] = yield* question.list()
+            if (item) return item
+            yield* Effect.sleep("20 millis")
+          }
+        }).pipe(Effect.timeout("10 seconds"))
+        yield* question.reject(pending.id, drafts)
+        yield* Fiber.join(loop)
+
+        const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+        const part = msgs
+          .flatMap((msg) => msg.parts)
+          .find((item): item is SessionV1.ToolPart => item.type === "tool" && item.tool === "question")
+        expect(part?.state.status).toBe("error")
+        if (part?.state.status !== "error") return
+        expect(part.state.error).toContain("dismissed")
+        // The card is rendered from the input, which the part keeps either way.
+        expect(part.state.input).toEqual({ questions })
+        if (drafts) expect(part.state.metadata?.dismissed).toEqual(drafts)
+        else expect(part.state.metadata?.dismissed).toBeUndefined()
+        // The turn still ends on the rejection, as before.
+        expect(yield* llm.calls).toBe(1)
+      }),
+  )
+}
+
 it.instance("loop continues when finish is stop but assistant has tool parts", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)
@@ -963,13 +1021,16 @@ it.instance("failed subtask preserves metadata on error tool state", () =>
       prompt: "look into the cache key path",
       subagent_type: "general",
     })
+    // XCOD-214: the subagent's missing model is replaced by the next best one, so the subtask's own
+    // model call is what fails here.
+    yield* llm.error(400, { error: { message: "subtask failed" } })
     yield* llm.text("done")
     const msg = yield* user(chat.id, "hello")
     yield* addSubtask(chat.id, msg.id)
 
     const result = yield* prompt.loop({ sessionID: chat.id })
     expect(result.info.role).toBe("assistant")
-    expect(yield* llm.calls).toBe(2)
+    expect(yield* llm.calls).toBe(3)
 
     const msgs = yield* MessageV2.filterCompactedEffect(chat.id)
     const taskMsg = msgs.find((item) => item.info.role === "assistant" && item.info.agent === "general")

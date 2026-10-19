@@ -1,10 +1,23 @@
 import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
+import { animationsEnabled } from "./util/motion"
+import { DialogArtifacts } from "./component/dialog-artifacts"
+import { DialogBackground } from "./component/dialog-background"
+import { DialogExternal, useExternalCommand } from "./component/dialog-external"
+import { EXTERNAL_LABEL, externalOf, toolUnavailable, toolsWanted } from "./util/external"
+import type { ExternalToolStatus } from "@opencode-ai/sdk/v2"
 import { registerOpencodeSpinner } from "./component/register-spinner"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import {
+  InstallationVersion,
+  manualInstallCommand,
+  newVersionMessage,
+  updateRestartHint,
+  upgradeStepText,
+} from "@opencode-ai/core/installation/version"
+import { isVersionGreater } from "./util/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
@@ -26,9 +39,11 @@ import {
 } from "solid-js"
 import { TuiPathsProvider, TuiStartupProvider, TuiTerminalEnvironmentProvider, useTuiStartup } from "./context/runtime"
 import { DialogProvider, useDialog } from "./ui/dialog"
-import { DialogProvider as DialogProviderList } from "./component/dialog-provider"
+import { DialogProvider as DialogProviderConnect, DialogProviders } from "./component/dialog-provider"
 import { ErrorComponent } from "./component/error-component"
 import { PluginRouteMissing } from "./component/plugin-route-missing"
+import { UpdateNotice } from "./component/update-notice"
+import { UpdateProgress, type UpgradeProgress } from "./component/update-progress"
 import { ProjectProvider, useProject } from "./context/project"
 import { EditorContextProvider } from "./context/editor"
 import { useEvent } from "./context/event"
@@ -40,14 +55,21 @@ import { LocationProvider } from "./context/location"
 import { LocalProvider, useLocal } from "./context/local"
 import { PermissionProvider } from "./context/permission"
 import { DialogModel } from "./component/dialog-model"
+import { DialogExternalModel } from "./component/dialog-external-model"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
 import { DialogStatus } from "./component/dialog-status"
+import { takeSettingsRequest } from "./util/settings-sections"
+import { DialogSettings } from "./component/dialog-settings"
 import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
-import { DialogAgent } from "./component/dialog-agent"
+import { DialogLsp } from "./component/dialog-lsp"
+import { DialogMode } from "./component/dialog-mode"
+import { DialogAgentList } from "./component/dialog-agent-settings"
 import { DialogSessionList } from "./component/dialog-session-list"
+import { DialogSessions } from "./component/dialog-sessions"
+import { AgentMonitor, MONITOR_ROUTE } from "./routes/monitor"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
 import { ThemeProvider, useTheme } from "./context/theme"
@@ -56,10 +78,13 @@ import { Session } from "./routes/session"
 import { PromptHistoryProvider } from "./component/prompt/history"
 import { FrecencyProvider } from "./component/prompt/frecency"
 import { PromptStashProvider } from "./component/prompt/stash"
+import { DialogAlert } from "./ui/dialog-alert"
+import { Changelog } from "@opencode-ai/core/changelog"
+import { whatsNewOnStart } from "./util/whats-new"
+import { DialogConfirm } from "./ui/dialog-confirm"
 import { ToastProvider, useToast } from "./ui/toast"
 import { isDefaultTitle } from "./util/session"
 import { KVProvider, useKV } from "./context/kv"
-import { UpdateNotificationProvider, useUpdateNotification, type UpdateSource } from "./context/update-notification"
 import * as Model from "./util/model"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
 import { openUrl } from "@opencode-ai/core/open"
@@ -85,6 +110,16 @@ import * as TuiAudio from "./audio"
 import { win32DisableProcessedInput, win32FlushInputBuffer } from "./terminal-win32"
 import { destroyRenderer } from "./util/renderer"
 import { cliErrorMessage, errorFormat } from "./util/error"
+import {
+  restartBanner,
+  restartBusyMessage,
+  restartDraft,
+  type RestartChoice,
+  type RestartHost,
+  type Restarted,
+} from "./util/restart"
+import { DialogSelect } from "./ui/dialog-select"
+import { listed } from "./util/sessions-overview"
 
 registerOpencodeSpinner()
 
@@ -109,13 +144,13 @@ const appBindingCommands = [
   "model.cycle_recent_reverse",
   "model.cycle_favorite",
   "model.cycle_favorite_reverse",
-  "agent.list",
+  "mode.list",
   "mcp.list",
-  "agent.cycle",
-  "agent.cycle.reverse",
+  "mode.cycle",
+  "mode.cycle.reverse",
   "variant.cycle",
   "variant.list",
-  "provider.connect",
+  "provider.list",
   "console.org.switch",
   "opencode.status",
   "opencode.debug",
@@ -129,6 +164,7 @@ const appBindingCommands = [
   "app.debug",
   "app.console",
   "app.heap_snapshot",
+  "app.restart",
   "terminal.suspend",
   "terminal.title.toggle",
   "app.toggle.animations",
@@ -136,6 +172,7 @@ const appBindingCommands = [
   "app.toggle.diffwrap",
   "app.toggle.paste_summary",
   "app.toggle.session_directory_filter",
+  "agent.monitor",
 ] as const
 
 export type TuiInput = {
@@ -143,12 +180,19 @@ export type TuiInput = {
   args: Args
   config: TuiConfig.Resolved
   onSnapshot?: () => Promise<string[]>
+  /** Called once the app listens for server events, so one-off events sent after it aren't lost. */
+  onListening?: () => void
   directory?: string
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
   events?: EventSource
   pluginHost: TuiPluginHost
-  updater?: UpdateSource
+  /** XCOD-129: offers `/restart`, and receives the request once the user confirms it. */
+  restart?: RestartHost
+  /** XCOD-129: set when this process is the relaunch of a `/restart`. */
+  restarted?: Restarted & { sessionID?: string }
+  /** Called once the TUI has loaded its data: a relaunch counts as started from here. */
+  onStarted?: () => void
 }
 
 function errorMessage(error: unknown) {
@@ -168,7 +212,15 @@ function errorMessage(error: unknown) {
 
 export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
   const global = yield* Global.Service
-  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown }
+  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown, restarting: false }
+  // XCOD-129: a restart replaces this process, so the "continue with lunos -s" epilogue is noise.
+  const restartHost: RestartHost | undefined = input.restart && {
+    ...input.restart,
+    request: (request) => {
+      exit.restarting = true
+      input.restart?.request(request)
+    },
+  }
   const result = yield* Effect.scoped(
     Effect.gen(function* () {
       const renderer = yield* Effect.acquireRelease(
@@ -298,12 +350,14 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                               <PromptRefProvider>
                                                                 <EditorContextProvider>
                                                                   <LocationProvider>
-                                                                    <UpdateNotificationProvider updater={input.updater}>
-                                                                      <App
-                                                                        onSnapshot={input.onSnapshot}
-                                                                        pluginHost={input.pluginHost}
-                                                                      />
-                                                                    </UpdateNotificationProvider>
+                                                                    <App
+                                                                      onSnapshot={input.onSnapshot}
+                                                                      onListening={input.onListening}
+                                                                      pluginHost={input.pluginHost}
+                                                                      restart={restartHost}
+                                                                      restarted={input.restarted}
+                                                                      onStarted={input.onStarted}
+                                                                    />
                                                                   </LocationProvider>
                                                                 </EditorContextProvider>
                                                               </PromptRefProvider>
@@ -345,11 +399,18 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       process.stderr.write((cliErrorMessage(result.reason) ?? errorFormat(result.reason)) + "\n")
       process.exitCode = 1
     }
-    if (result.epilogue) process.stdout.write(result.epilogue + "\n")
+    if (result.epilogue && !exit.restarting) process.stdout.write(result.epilogue + "\n")
   })
 })
 
-function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPluginHost }) {
+function App(props: {
+  onSnapshot?: () => Promise<string[]>
+  onListening?: () => void
+  pluginHost: TuiPluginHost
+  restart?: RestartHost
+  restarted?: Restarted & { sessionID?: string }
+  onStarted?: () => void
+}) {
   const startup = useTuiStartup()
   const tuiConfig = useTuiConfig()
   const route = useRoute()
@@ -371,7 +432,6 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
   const pluginRuntime = usePluginRuntime()
   const attention = createTuiAttention({ renderer, config: tuiConfig, kv })
   const clipboard = useClipboard()
-  const update = useUpdateNotification()
 
   const api = createTuiApi(
     createTuiApiAdapters({
@@ -393,6 +453,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     }),
   )
   const [ready, setReady] = createSignal(false)
+  // XCOD-147: set only by this session's update check, never from persisted state, so the notice
+  // can't outlive a switch that turned checks off.
+  const [availableVersion, setAvailableVersion] = createSignal<string | undefined>()
+  const updateNotice = createMemo(() => {
+    const version = availableVersion()
+    return version && InstallationVersion !== "local" && isVersionGreater(version, InstallationVersion)
+      ? version
+      : undefined
+  })
   props.pluginHost
     .start({
       api,
@@ -442,14 +511,14 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
 
     if (route.data.type === "home") {
-      renderer.setTerminalTitle("OpenCode")
+      renderer.setTerminalTitle("Lunos")
       return
     }
 
     if (route.data.type === "session") {
       const session = sync.session.get(route.data.sessionID)
       if (!session || isDefaultTitle(session.title)) {
-        renderer.setTerminalTitle("OpenCode")
+        renderer.setTerminalTitle("Lunos")
         return
       }
 
@@ -465,8 +534,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
 
   const args = useArgs()
   onMount(() => {
+    for (const item of tuiConfig.deprecatedKeybinds) {
+      toast.show({
+        variant: "warning",
+        message: `Keybind "${item.legacy}" is deprecated, use "${item.canonical}" instead`,
+        duration: 5000,
+      })
+    }
     batch(() => {
-      if (args.agent) local.agent.set(args.agent)
+      if (args.mode) local.mode.set(args.mode)
       if (args.model) {
         const { providerID, modelID } = Model.parse(args.model)
         if (!providerID || !modelID)
@@ -481,9 +557,54 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         route.navigate({
           type: "session",
           sessionID: args.sessionID,
+          // XCOD-129: after /restart, the unsent prompt comes back with the session.
+          prompt: props.restarted?.draft,
         })
+      } else if (props.restarted?.draft) {
+        route.navigate({ type: "home", prompt: props.restarted.draft })
       }
     })
+    // XCOD-128: `lunos settings` starts on the settings screen.
+    if (args.settings) dialog.replace(() => <DialogSettings tab={args.settings} />)
+    if (props.restarted)
+      toast.show({
+        variant: "success",
+        message: restartBanner(props.restarted, InstallationVersion),
+        duration: 8000,
+      })
+    // XCOD-248: the first start of a newer version shows what changed since the one seen before.
+    const whatsNew = whatsNewOnStart({
+      current: InstallationVersion,
+      seen: kv.get("whats_new_seen"),
+      enabled: tuiConfig.whats_new !== false,
+    })
+    if (whatsNew.record) {
+      if (whatsNew.show) kv.set("whats_new_from", whatsNew.show.since)
+      kv.set("whats_new_seen", whatsNew.record)
+    }
+    if (whatsNew.show) setPendingWhatsNew(whatsNew.show.since)
+    if (whatsNew.hint)
+      toast.show({ variant: "info", message: "See what changed in each version: /whatsnew", duration: 6000 })
+  })
+
+  // Shown once nothing else is: a start-up dialog (connect a provider, `lunos settings`) would
+  // otherwise replace it, and the version already counts as seen.
+  const [pendingWhatsNew, setPendingWhatsNew] = createSignal<string>()
+
+  function showWhatsNew(since: string | undefined) {
+    const to = Changelog.current(InstallationVersion)
+    if (!to) return
+    const from = since ?? Changelog.previous(to)
+    const [title, ...lines] = Changelog.summary({ since: from, to })
+    void DialogAlert.show(dialog, title!, lines.join("\n"))
+  }
+
+  // XCOD-129: a relaunch has started once its data is loaded; a later error is an ordinary one.
+  let started = false
+  createEffect(() => {
+    if (started || sync.status !== "complete") return
+    started = true
+    props.onStarted?.()
   })
 
   let continued = false
@@ -492,7 +613,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (continued || sync.status === "loading" || !args.continue) return
     const match = sync.data.session
       .toSorted((a, b) => b.time.updated - a.time.updated)
-      .find((x) => x.parentID === undefined)?.id
+      .find((x) => x.parentID === undefined && listed(x))?.id
     if (match) {
       continued = true
       if (args.fork) {
@@ -531,10 +652,18 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       (isEmpty, wasEmpty) => {
         // only trigger when we transition into an empty-provider state
         if (!isEmpty || wasEmpty) return
-        dialog.replace(() => <DialogProviderList />)
+        dialog.replace(() => <DialogProviderConnect />)
       },
     ),
   )
+
+  // XCOD-248: after the effect above, so a "connect a provider" dialog opens first and the panel waits.
+  createEffect(() => {
+    const since = pendingWhatsNew()
+    if (!since || sync.status !== "complete" || dialog.stack.length > 0) return
+    setPendingWhatsNew(undefined)
+    showWhatsNew(since)
+  })
 
   const connected = useConnected()
   const currentWorktreeWorkspace = createMemo(() => {
@@ -544,6 +673,148 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     if (workspace?.type !== "worktree" || !workspace.directory) return
     return workspace
   })
+  // XCOD-129: /restart. Set by /update, so the restart runs the newly installed version.
+  const [upgradedTo, setUpgradedTo] = createSignal<string | undefined>()
+  // XCOD-247: the update this session is running, shown bottom-right until it ends.
+  const [upgrading, setUpgrading] = createSignal<UpgradeProgress>()
+  // While "wait for the current turn" is pending; running /restart again cancels it.
+  const [restartPending, setRestartPending] = createSignal<{ cancel: () => void } | undefined>()
+
+  const busySessionIDs = () =>
+    Object.entries(sync.data.session_status)
+      .filter(([, status]) => status && status.type !== "idle")
+      .map(([id]) => id)
+
+  // Every job, not only this session's: shutting the worker down stops all of them.
+  async function runningJobs() {
+    const result = await sdk.client.experimental.background.list().catch(() => undefined)
+    return (result?.data ?? []).filter((job) => job.status === "running")
+  }
+
+  async function settled(timeout: number | undefined, cancelled: () => boolean) {
+    const deadline = timeout === undefined ? undefined : Date.now() + timeout
+    while (!cancelled()) {
+      if (busySessionIDs().length === 0 && (await runningJobs()).length === 0) return true
+      if (deadline !== undefined && Date.now() > deadline) return false
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+    return false
+  }
+
+  async function restart(fresh: boolean) {
+    const host = props.restart
+    if (!host) {
+      toast.show({ variant: "warning", message: "Restart isn't available in this client." })
+      return
+    }
+    const pending = restartPending()
+    if (pending) {
+      pending.cancel()
+      toast.show({ variant: "info", message: "Restart cancelled." })
+      return
+    }
+    const cancelled: string[] = []
+
+    // Attached to a server this client doesn't own: the turn and its jobs run there and carry on.
+    if (!host.attach) {
+      const jobs = await runningJobs()
+      // A background job's own session is busy too; count it as the job, not as a turn.
+      const turns = () => busySessionIDs().filter((id) => !jobs.some((job) => job.sessionID === id))
+      const message = restartBusyMessage({ busySessions: turns().length, runningJobs: jobs.map((j) => j.id) })
+      if (message) {
+        const choice = await new Promise<RestartChoice>((resolve) => {
+          dialog.replace(
+            () => (
+              <DialogSelect<RestartChoice>
+                title="Restart Lunos?"
+                placeholder={message}
+                skipFilter
+                options={[
+                  { title: "Wait for the current turn, then restart", value: "wait" },
+                  { title: "Stop and restart (cancels running work)", value: "stop" },
+                  { title: "Cancel", value: "cancel" },
+                ]}
+                onSelect={(option) => {
+                  resolve(option.value)
+                  dialog.clear()
+                }}
+              />
+            ),
+            () => resolve("cancel"),
+          )
+        })
+        if (choice === "cancel") return
+        if (choice === "wait") {
+          let stop = false
+          setRestartPending({ cancel: () => (stop = true) })
+          toast.show({
+            variant: "info",
+            message: "Lunos will restart when the current work finishes. Run /restart again to cancel.",
+            duration: 8000,
+          })
+          const done = await settled(undefined, () => stop)
+          setRestartPending(undefined)
+          if (!done) return
+        }
+        if (choice === "stop") {
+          const busy = turns()
+          if (busy.length) cancelled.push(busy.length === 1 ? "the current turn" : `${busy.length} running turns`)
+          for (const job of jobs) cancelled.push(`background job ${job.title ?? job.id}`)
+          await Promise.all([
+            ...busy.map((sessionID) => sdk.client.session.abort({ sessionID }).catch(() => {})),
+            ...jobs.map((job) => sdk.client.experimental.background.cancel({ jobID: job.id }).catch(() => {})),
+          ])
+          // Never restart while a tool may still be writing: wait until the aborted work has
+          // actually stopped, and give up (without restarting) if it doesn't.
+          if (!(await settled(15_000, () => false))) {
+            toast.show({
+              variant: "error",
+              message: "The running work didn't stop within 15s, so Lunos didn't restart. Try /restart again.",
+              duration: 8000,
+            })
+            return
+          }
+        }
+      }
+    }
+
+    const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
+    // Read last: while waiting, the user may have typed more, or sent what was there.
+    const draft = restartDraft(promptRef.current?.current)
+    host.request({ sessionID: fresh ? undefined : sessionID, fresh, draft, cancelled, upgraded: upgradedTo() })
+    if (host.attach)
+      toast.show({
+        variant: "info",
+        message: `Restarting this client only; the server at ${host.attach} keeps running.`,
+      })
+    exit()
+  }
+
+  // XCOD-250: whether /claude and /codex can start here, asked once external sessions are known to be on.
+  const externalOn = createMemo(() => sync.data.config.external?.enabled !== false)
+  const [externalTools, setExternalTools] = createSignal<ExternalToolStatus[]>()
+  createEffect(() => {
+    if (!externalOn() || !toolsWanted() || sync.status !== "complete" || externalTools()) return
+    void sdk.client.experimental.external
+      .tools()
+      .then((result) => setExternalTools(result.data ?? []))
+      .catch(() => setExternalTools([]))
+  })
+  // Once per tool: the user's own /claude or /codex command shadows Lunos's.
+  createEffect(() => {
+    if (!externalOn() || sync.status !== "complete") return
+    for (const tool of ["claude", "codex"] as const) {
+      if (!sync.data.command.some((item) => item.name === tool) || kv.get(`external_shadowed_${tool}`)) continue
+      kv.set(`external_shadowed_${tool}`, true)
+      toast.show({
+        variant: "info",
+        message: `Your own /${tool} command runs, not Lunos's. Lunos's is /external ${tool}.`,
+        duration: 8000,
+      })
+    }
+  })
+  const runExternalCommand = useExternalCommand()
+
   const appCommands = createMemo(() =>
     [
       {
@@ -560,10 +831,56 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         title: "Switch session",
         category: "Session",
         suggested: sync.data.session.length > 0,
-        slashName: "sessions",
-        slashAliases: ["resume", "continue"],
+        // XCOD-205: /sessions is the all-projects view below; this project's switcher (pins, quick
+        // slots, delete) keeps its keybinding and /resume, /continue.
+        slashName: "resume",
+        slashAliases: ["continue"],
         run: () => {
           dialog.replace(() => <DialogSessionList />)
+        },
+      },
+      {
+        // XCOD-205: every session on this machine, across projects, in the groups shared with desktop/web.
+        name: "session.overview",
+        title: "Sessions in all projects and groups",
+        category: "Session",
+        slashName: "sessions",
+        run: () => {
+          dialog.replace(() => <DialogSessions />)
+        },
+      },
+      {
+        // XCOD-262: every session on this computer beside a prompt that starts or tags them.
+        name: "agent.monitor",
+        title: "Agent Monitor",
+        category: "Session",
+        slashName: "monitor",
+        run: () => {
+          if (route.data.type === "plugin" && route.data.id === MONITOR_ROUTE) return
+          const from =
+            route.data.type === "session" ? { type: "session", sessionID: route.data.sessionID } : { type: "home" }
+          dialog.clear()
+          route.navigate({ type: "plugin", id: MONITOR_ROUTE, data: { from } })
+        },
+      },
+      {
+        name: "artifact.list",
+        title: "Plans and research notes",
+        category: "Session",
+        slashName: "artifacts",
+        slashAliases: ["plans"],
+        run: () => {
+          dialog.replace(() => <DialogArtifacts />)
+        },
+      },
+      {
+        name: "background.list",
+        title: "Background subagents",
+        category: "Session",
+        slashName: "tasks",
+        slashAliases: ["background"],
+        run: () => {
+          dialog.replace(() => <DialogBackground />)
         },
       },
       {
@@ -580,6 +897,37 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           dialog.clear()
         },
       },
+      {
+        // XCOD-218: a Claude Code / Codex session in its own session view ("/external claude" etc. from the prompt).
+        name: "external.start",
+        title: "Start Claude Code or Codex session",
+        category: "Session",
+        slashName: "external",
+        run: () => {
+          dialog.replace(() => <DialogExternal />)
+        },
+      },
+      // XCOD-250: /claude and /codex, listed only while external sessions are on and the user has no
+      // command of that name (theirs wins; this one stays reachable as /external claude).
+      ...(["claude", "codex"] as const).map((tool) => {
+        const unavailable = toolUnavailable(
+          tool,
+          externalTools()?.find((item) => item.tool === tool),
+        )
+        return {
+          name: `external.${tool}`,
+          title: `Give ${EXTERNAL_LABEL[tool]} a task`,
+          desc: unavailable ?? `Give ${EXTERNAL_LABEL[tool]} a task: /${tool} <task>, or pick a session`,
+          category: "Session",
+          slashName: tool,
+          slashMuted: unavailable !== undefined,
+          hidden: !externalOn() || sync.data.command.some((item) => item.name === tool),
+          run: () => {
+            dialog.clear()
+            void runExternalCommand(tool, "")
+          },
+        }
+      }),
       {
         name: "workspace.copy_path",
         title: "Copy worktree path",
@@ -618,18 +966,24 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "model.list",
         title: "Switch model",
         suggested: true,
-        category: "Agent",
+        category: "Mode",
         slashName: "models",
         // Bias /mo toward /models over /move without changing global fuzzy scoring.
         slashAliases: ["mo"],
         run: () => {
+          // XCOD-254: in a Claude Code / Codex session, the tool's models; Lunos's aren't offered there.
+          const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
+          if (sessionID && externalOf(sync.session.get(sessionID))) {
+            dialog.replace(() => <DialogExternalModel sessionID={sessionID} />)
+            return
+          }
           dialog.replace(() => <DialogModel />)
         },
       },
       {
         name: "model.cycle_recent",
         title: "Model cycle",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycle(1)
@@ -638,7 +992,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_recent_reverse",
         title: "Model cycle reverse",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycle(-1)
@@ -647,7 +1001,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_favorite",
         title: "Favorite cycle",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycleFavorite(1)
@@ -656,43 +1010,53 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "model.cycle_favorite_reverse",
         title: "Favorite cycle reverse",
-        category: "Agent",
+        category: "Mode",
         hidden: true,
         run: () => {
           local.model.cycleFavorite(-1)
         },
       },
       {
-        name: "agent.list",
-        title: "Switch agent",
-        category: "Agent",
+        name: "mode.list",
+        title: "Switch mode",
+        category: "Mode",
+        slashName: "modes",
+        run: () => {
+          dialog.replace(() => <DialogMode />)
+        },
+      },
+      {
+        // XCOD-210: /agents edits agents. It used to be a deprecated alias of /modes (XCOD-40).
+        name: "agent.edit",
+        title: "Edit agents",
+        category: "Mode",
         slashName: "agents",
         run: () => {
-          dialog.replace(() => <DialogAgent />)
+          dialog.replace(() => <DialogAgentList />)
         },
       },
       {
         name: "mcp.list",
         title: "Toggle MCPs",
-        category: "Agent",
+        category: "Mode",
         slashName: "mcps",
         run: () => {
           dialog.replace(() => <DialogMcp />)
         },
       },
       {
-        name: "agent.cycle",
-        title: "Agent cycle",
-        category: "Agent",
+        name: "mode.cycle",
+        title: "Mode cycle",
+        category: "Mode",
         hidden: true,
         run: () => {
-          local.agent.move(1)
+          local.mode.move(1)
         },
       },
       {
         name: "variant.cycle",
         title: "Variant cycle",
-        category: "Agent",
+        category: "Mode",
         run: () => {
           local.model.variant.cycle()
         },
@@ -700,7 +1064,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       {
         name: "variant.list",
         title: "Switch model variant",
-        category: "Agent",
+        category: "Mode",
         hidden: local.model.variant.list().length === 0,
         slashName: "variants",
         run: () => {
@@ -715,23 +1079,36 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         },
       },
       {
-        name: "agent.cycle.reverse",
-        title: "Agent cycle reverse",
-        category: "Agent",
+        name: "mode.cycle.reverse",
+        title: "Mode cycle reverse",
+        category: "Mode",
         hidden: true,
         run: () => {
-          local.agent.move(-1)
+          local.mode.move(-1)
         },
       },
       {
-        name: "provider.connect",
-        title: "Connect provider",
+        name: "provider.list",
+        title: "Providers",
         suggested: !connected(),
-        slashName: "connect",
+        slashName: "providers",
+        // XCOD-130: the old slash name still resolves here, with a rename hint. Remove in 1.21.0.
+        slashAliases: ["connect"],
+        slashAliasHints: { connect: "/connect is now /providers" },
         run: () => {
-          dialog.replace(() => <DialogProviderList />)
+          dialog.replace(() => <DialogProviders />)
         },
         category: "Provider",
+      },
+      {
+        // XCOD-130: pre-rename command id, kept for plugins and /tui/execute-command callers.
+        name: "provider.connect",
+        title: "Providers",
+        category: "Provider",
+        hidden: true,
+        run: () => {
+          dialog.replace(() => <DialogProviders />)
+        },
       },
       ...(sync.data.console_state.switchableOrgCount > 1
         ? [
@@ -749,6 +1126,28 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           ]
         : []),
       {
+        // XCOD-128: every configuration option in one place; /config is Claude Code's name for it.
+        name: "settings.open",
+        title: "Settings",
+        slashName: "settings",
+        slashAliases: ["config"],
+        run: () => {
+          // XCOD-259: `/settings <section> [sub-tab]` lands there; an unknown name shows the home.
+          const request = takeSettingsRequest()
+          if (request && "unknown" in request)
+            toast.show({ variant: "warning", message: `No settings section "${request.unknown}"` })
+          const area = request && "category" in request ? request : undefined
+          dialog.replace(
+            () => <DialogSettings tab="settings" area={area?.category} sub={area?.sub} />,
+            undefined,
+            area
+              ? { back: () => dialog.replace(() => <DialogSettings tab="settings" focus={`+area:${area.category}`} />) }
+              : undefined,
+          )
+        },
+        category: "System",
+      },
+      {
         name: "opencode.status",
         title: "View status",
         slashName: "status",
@@ -757,17 +1156,6 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         },
         category: "System",
       },
-      ...(update.open
-        ? [
-            {
-              name: "opencode.update",
-              title: "Update OpenCode",
-              slashName: "update",
-              run: () => update.open?.(),
-              category: "System",
-            },
-          ]
-        : []),
       {
         name: "opencode.debug",
         title: "View debug info",
@@ -806,6 +1194,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "System",
       },
       {
+        // XCOD-257: whether LSP works, each server's state and why one failed.
+        name: "lsp.panel",
+        title: "Language servers (LSP)",
+        slashName: "lsp",
+        run: () => {
+          dialog.replace(() => <DialogLsp />)
+        },
+        category: "System",
+      },
+      {
         name: "help.show",
         title: "Help",
         slashName: "help",
@@ -818,11 +1216,58 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          openUrl("https://opencode.ai/docs").catch(() => {})
+          openUrl("https://docs.lunos.tech/docs/").catch(() => {})
           dialog.clear()
         },
         category: "System",
       },
+      {
+        name: "app.whatsnew",
+        title: "What's new",
+        desc: "What changed since your previous version",
+        slashName: "whatsnew",
+        run: () => {
+          dialog.clear()
+          showWhatsNew(kv.get("whats_new_from"))
+        },
+        category: "System",
+      },
+      {
+        name: "app.upgrade",
+        title: "Update Lunos",
+        slashName: "update",
+        // `/upgrade` was the name until XCOD-147; it keeps working.
+        slashAliases: ["upgrade"],
+        run: () => {
+          dialog.clear()
+          void runUpgrade(undefined)
+        },
+        category: "System",
+      },
+      ...(props.restart
+        ? [
+            {
+              name: "app.restart",
+              title: "Restart Lunos",
+              desc: props.restart.attach ? "Restart this client (the server keeps running)" : undefined,
+              slashName: "restart",
+              run: () => {
+                dialog.clear()
+                void restart(false)
+              },
+              category: "System",
+            },
+            {
+              name: "app.restart.fresh",
+              title: "Restart Lunos in a new session",
+              run: () => {
+                dialog.clear()
+                void restart(true)
+              },
+              category: "System",
+            },
+          ]
+        : []),
       {
         name: "app.exit",
         title: "Exit the app",
@@ -891,10 +1336,16 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       },
       {
         name: "app.toggle.animations",
-        title: kv.get("animations_enabled", true) ? "Disable animations" : "Enable animations",
+        title:
+          tuiConfig.reduced_motion === true
+            ? "Animations are off (reduced_motion in config)"
+            : animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled"))
+              ? "Disable animations"
+              : "Enable animations",
         category: "System",
         run: () => {
-          kv.set("animations_enabled", !kv.get("animations_enabled", true))
+          if (tuiConfig.reduced_motion !== true)
+            kv.set("animations_enabled", !animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled")))
           dialog.clear()
         },
       },
@@ -1027,9 +1478,90 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     })
   })
 
+  // One flow for the reminder dialog and /update. `target` undefined means "latest";
+  // the server resolves it from the lunos-ai registry entry.
+  async function runUpgrade(target: string | undefined) {
+    const running = upgrading()
+    if (running) {
+      // The package manager can't be stopped safely once it runs, so a second /update only says so.
+      toast.show({
+        variant: "info",
+        message: `An update is already running (${upgradeStepText(running.step, running.version || undefined)}). It can't be cancelled while installing.`,
+      })
+      return
+    }
+    const started = Date.now()
+    setUpgrading({ step: target ? "installing" : "checking", version: target ?? "", started, stepStarted: started })
+
+    const result = await sdk.client.global.upgrade({ target }).finally(() => setUpgrading(undefined))
+
+    if (result.error || !result.data?.success) {
+      // A refused upgrade comes back as a 400 whose body is `{ success: false, error }`.
+      const body = (result.error ?? result.data) as { error?: unknown } | undefined
+      const reason =
+        typeof body?.error === "string" ? body.error : result.error ? errorMessage(result.error) : "Update failed"
+      toast.show({
+        variant: "error",
+        title: "Update Failed",
+        // XCOD-111: always the full `npm i -g lunos-ai@<version> --allow-scripts=lunos-ai`, using
+        // the version the update check found when /update didn't name one.
+        message: `${reason}\nTo update manually, run: ${manualInstallCommand(target ?? updateNotice())}`,
+        duration: 15000,
+      })
+      return
+    }
+
+    setAvailableVersion(undefined)
+    setUpgradedTo(result.data.version)
+    // XCOD-129: the app stays open; /restart relaunches the new version back in this session.
+    await DialogAlert.show(
+      dialog,
+      "Update Complete",
+      `Updated to Lunos v${result.data.version}. ${updateRestartHint(result.data.version)}`,
+    )
+  }
+
+  event.on("installation.upgrade-progress", (evt) => {
+    const current = upgrading()
+    if (!current) return
+    const { step, version } = evt.properties
+    if (step === current.step && version === current.version) return
+    setUpgrading({ ...current, step, version, stepStarted: step === current.step ? current.stepStarted : Date.now() })
+  })
+
+  event.on("installation.update-available", async (evt) => {
+    const version = evt.properties.version
+    // Kept after the dialog is dismissed or skipped: the bottom-right notice stays until the
+    // update is installed.
+    setAvailableVersion(version)
+
+    const skipped = kv.get("skipped_version")
+    if (skipped && !isVersionGreater(version, skipped)) return
+
+    const choice = await DialogConfirm.show(
+      dialog,
+      `Update Available`,
+      `${newVersionMessage(version)} (you have ${InstallationVersion}), or /update here.\nRelease notes: https://github.com/AxsionDev/Lunos/releases/tag/v${version}\n\nUpdate now?`,
+      "skip",
+    )
+
+    // Once per new version: "skip" and Esc both mean "not now", and the bottom-right notice keeps
+    // saying the update exists. Without this the dialog blocked every start (XCOD-147).
+    if (choice !== true) {
+      kv.set("skipped_version", version)
+      return
+    }
+
+    await runUpgrade(version)
+  })
+  // The update check (XCOD-147) starts only once mounted, when the SDK's event subscription (set up
+  // in its provider's onMount, which runs first) and the handler above both exist.
+  onMount(() => props.onListening?.())
+
   const plugin = createMemo(() => {
     if (!ready()) return
     if (route.data.type !== "plugin") return
+    if (route.data.id === MONITOR_ROUTE) return <AgentMonitor params={route.data.data} />
     const render = pluginRuntime.routes.get(route.data.id)
     if (!render) return <PluginRouteMissing id={route.data.id} onHome={() => route.navigate({ type: "home" })} />
     return render({ params: route.data.data })
@@ -1072,6 +1604,9 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           </Switch>
           {plugin()}
         </box>
+        <Show when={upgrading()} fallback={<UpdateNotice version={updateNotice()} />}>
+          <UpdateProgress progress={upgrading()} />
+        </Show>
         <box flexShrink={0}>
           <pluginRuntime.Slot name="app_bottom" />
         </box>

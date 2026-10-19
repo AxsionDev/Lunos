@@ -1,11 +1,33 @@
 export * as ConfigMarkdown from "./markdown"
 
 import matter from "gray-matter"
+
+// XCOD-208: front matter is data, so only YAML (gray-matter's default) and JSON are accepted. Any
+// other front-matter language is refused, and the non-data engines are replaced as a backstop.
+const LANGUAGES = new Set(["", "yaml", "yml", "json"])
+
+function refuse(): never {
+  throw new Error("front matter must be YAML or JSON")
+}
+
+const OPTIONS = { engines: { js: refuse, javascript: refuse } } as const
+
+function language(content: string) {
+  const match = content.replace(/^\uFEFF/, "").match(/^---([^\r\n]*)/)
+  return match ? match[1].trim().toLowerCase() : ""
+}
+
+function read(content: string) {
+  const lang = language(content)
+  if (!LANGUAGES.has(lang)) throw new Error(`front matter must be YAML or JSON, not "${lang}"`)
+  return matter(content, OPTIONS)
+}
+
 export function parse(content: string) {
   try {
-    return matter(content)
+    return read(content)
   } catch {
-    return matter(sanitize(content))
+    return read(sanitize(content))
   }
 }
 

@@ -1,0 +1,1 @@
+When Lunos is one day behind upstream opencode, the README badge and the upstream-sync workflow say "1 days behind upstream". Fix the wording in `/app/lag.ts` so one day reads "1 day". Everything else these functions return must stay exactly as it is.

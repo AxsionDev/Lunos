@@ -163,6 +163,18 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### marketplace
+
+Просмотр и установка плагинов, навыков, хуков и MCP-серверов из ваших маркетплейсов. Добавьте имя вкладки (`plugins`, `skills`, `hooks`, `mcp`), чтобы открыть её, `installed`, чтобы увидеть установленное с отметкой доступных обновлений, или любые другие слова для поиска. _Псевдоним_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 Перечислите доступные модели.
@@ -187,6 +199,16 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### plugins
+
+Список установленных плагинов с возможностью включать и выключать их.
+
+```bash frame="none"
+/plugins
+```
+
+---
+
 ### redo
 
 Повторить ранее отмененное сообщение. Доступно только после использования `/undo`.
@@ -208,10 +230,20 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ### sessions
 
-Составляйте список и переключайтесь между сеансами. _Псевдонимы_: `/resume`, `/continue`
+Все сеансы на этом компьютере во всех проектах: состояние, проект, модель, последняя активность и стоимость, в ваших собственных группах.
 
 ```bash frame="none"
 /sessions
+```
+
+---
+
+### resume
+
+Список сеансов этого проекта и переключение между ними. _Псевдонимы_: `/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **Привязка клавиш:** `ctrl+x l`

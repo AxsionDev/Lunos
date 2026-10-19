@@ -1,61 +1,94 @@
 import { RGBA, TextAttributes } from "@opentui/core"
-import { For, type JSX } from "solid-js"
+import { useAnimationsEnabled } from "../context/motion"
+import { createMemo, For } from "solid-js"
 import { tint, useTheme } from "../context/theme"
-import { logo } from "../logo"
+import { useKV } from "../context/kv"
+import { createPulse } from "../util/signal"
+import { splash } from "../logo"
+
+// Fixed brand palette for the splash (Catppuccin Mocha values from the approved
+// mockup) — deliberately independent of the user's selected TUI theme, so the
+// splash reads the same regardless of which of the 30+ themes is active.
+function withAlpha(color: RGBA, alpha: number): RGBA {
+  return RGBA.fromValues(color.r, color.g, color.b, alpha)
+}
+
+const MOON_COLOR = RGBA.fromHex("#fdf3d0")
+const REFLECTION_COLOR = RGBA.fromHex("#c9bd93")
+const WATER_LIGHT = RGBA.fromHex("#8fb4dd")
+const WATER_COLOR = RGBA.fromHex("#5f8fc7")
+const WATER_DARK = RGBA.fromHex("#3d5f8f")
+const CLOUD_COLOR = withAlpha(RGBA.fromHex("#b7c2e0"), 0.75)
+
+// The reflection inset sits centered under the moon, woven into the water
+// row directly beneath it rather than rendered as a separate line.
+const WATER_SIDE_WIDTH = Math.floor((splash.waterWidth - splash.reflectionWidth) / 2)
+const WATER_SIDE_REMAINDER = splash.waterWidth - splash.reflectionWidth - WATER_SIDE_WIDTH
 
 export function Logo() {
   const { theme } = useTheme()
-
-  const renderLine = (line: string, fg: RGBA, bold: boolean): JSX.Element[] => {
-    const shadow = tint(theme.background, fg, 0.25)
-    const attrs = bold ? TextAttributes.BOLD : undefined
-    return Array.from(line).map((char) => {
-      if (char === "_") {
-        return (
-          <text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
-            {" "}
-          </text>
-        )
-      }
-      if (char === "^") {
-        return (
-          <text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
-            ▀
-          </text>
-        )
-      }
-      if (char === "~") {
-        return (
-          <text fg={shadow} attributes={attrs} selectable={false}>
-            ▀
-          </text>
-        )
-      }
-      if (char === ",") {
-        return (
-          <text fg={shadow} attributes={attrs} selectable={false}>
-            ▄
-          </text>
-        )
-      }
-      return (
-        <text fg={fg} attributes={attrs} selectable={false}>
-          {char}
-        </text>
-      )
-    })
-  }
+  const animationsEnabled = useAnimationsEnabled()
+  const reflectionAlpha = createPulse(animationsEnabled)
+  const glow = createMemo(() => tint(theme.background, MOON_COLOR, 0.12))
 
   return (
-    <box>
-      <For each={logo.left}>
-        {(line, index) => (
-          <box flexDirection="row" gap={1}>
-            <box flexDirection="row">{renderLine(line, theme.textMuted, false)}</box>
-            <box flexDirection="row">{renderLine(logo.right[index()], theme.text, true)}</box>
-          </box>
-        )}
-      </For>
+    <box alignItems="center">
+      <box backgroundColor={glow()} paddingLeft={1} paddingRight={1}>
+        <text fg={MOON_COLOR} attributes={TextAttributes.BOLD}>
+          {splash.wordmark}
+        </text>
+      </box>
+      <box flexDirection="row" alignItems="flex-end" gap={2}>
+        <box alignSelf="flex-start" flexDirection="column">
+          <For each={splash.cloud}>
+            {(line) => (
+              <text fg={CLOUD_COLOR} wrapMode="none">
+                {line}
+              </text>
+            )}
+          </For>
+        </box>
+        <box flexDirection="column">
+          <For each={splash.moon}>
+            {(line) => (
+              <text fg={MOON_COLOR} wrapMode="none">
+                {line}
+              </text>
+            )}
+          </For>
+        </box>
+        <box alignSelf="flex-start" flexDirection="column">
+          <For each={splash.cloud}>
+            {(line) => (
+              <text fg={CLOUD_COLOR} wrapMode="none">
+                {line}
+              </text>
+            )}
+          </For>
+        </box>
+      </box>
+      <box flexDirection="column">
+        <text fg={WATER_LIGHT} wrapMode="none">
+          {"~".repeat(splash.waterWidth)}
+        </text>
+        <box flexDirection="row">
+          <text fg={WATER_COLOR} wrapMode="none">
+            {"~".repeat(WATER_SIDE_WIDTH)}
+          </text>
+          <text fg={withAlpha(REFLECTION_COLOR, reflectionAlpha())} wrapMode="none">
+            {"≈".repeat(splash.reflectionWidth)}
+          </text>
+          <text fg={WATER_COLOR} wrapMode="none">
+            {"~".repeat(WATER_SIDE_REMAINDER)}
+          </text>
+        </box>
+        <text fg={WATER_COLOR} wrapMode="none">
+          {"~".repeat(splash.waterWidth)}
+        </text>
+        <text fg={WATER_DARK} wrapMode="none">
+          {"~".repeat(splash.waterWidth)}
+        </text>
+      </box>
     </box>
   )
 }

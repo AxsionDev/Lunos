@@ -140,7 +140,7 @@ const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: 
 }) {
   yield* input.plugin.trigger(
     "tool.execute.before",
-    { tool: input.entry.key, sessionID: input.ctx.sessionID, callID: input.callID },
+    { tool: input.entry.key, sessionID: input.ctx.sessionID, agent: input.ctx.agent, callID: input.callID },
     { args: input.args },
   )
   const result: CallToolResult = yield* Effect.gen(function* () {
@@ -179,7 +179,13 @@ const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: 
   )
   yield* input.plugin.trigger(
     "tool.execute.after",
-    { tool: input.entry.key, sessionID: input.ctx.sessionID, callID: input.callID, args: input.args },
+    {
+      tool: input.entry.key,
+      sessionID: input.ctx.sessionID,
+      agent: input.ctx.agent,
+      callID: input.callID,
+      args: input.args,
+    },
     result,
   )
   return result

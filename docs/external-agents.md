@@ -1,0 +1,164 @@
+# Claude Code and Codex CLI from Lunos
+
+If you also use Claude Code or Codex CLI, Lunos can start their sessions, send them prompts and their own commands, stream their output, pass their approval requests to you, and record what each session cost. Lunos uses **your own install and your own login**. It never stores, copies or proxies your Anthropic or OpenAI credentials, and it doesn't offer these tools through Lunos Cloud.
+
+> **Status:** Claude Code and Codex CLI both work from the command line and as a tool for Lunos agents. A dedicated TUI tab for these sessions is planned (XCOD-218).
+
+## Setup
+
+1. Install the tool and log in to it in a terminal, the way its vendor documents:
+   - Claude Code: `npm install -g @anthropic-ai/claude-code`, then `claude auth login`.
+   - Codex CLI: `npm install -g @openai/codex`, then `codex login`.
+2. Check what Lunos sees:
+
+   ```sh
+   lunos external list
+   ```
+
+   This prints each tool's version and login state. A missing tool, or a version without the headless options Lunos needs, is shown with what to do about it.
+
+If a tool isn't on your `PATH`, set its location with `external.claude.path` or `external.codex.path`.
+
+## Sessions
+
+```sh
+lunos external run claude "Fix the failing test in src/parse.ts"
+lunos external run claude "/review"                    # the tool's own commands and skills
+lunos external resume claude <session-id> "Now add a test for it"
+lunos external run codex "Add input validation to parse.ts" --model gpt-5.5
+lunos external sessions                                # what Lunos started, with status and cost
+lunos external stop <session-id>                       # end a running session
+```
+
+Commands and skills that Claude Code runs headless work as the prompt, for example `/review` or one of your own skills. Commands that only work in its interactive terminal, such as `/login`, don't. Claude Code then reports an error, and Lunos shows it.
+
+Codex CLI's own commands belong to its interactive terminal, so Lunos runs the two that Codex can do headless itself:
+
+| Command                                               | What it does                                                     |
+| ----------------------------------------------------- | ---------------------------------------------------------------- |
+| `/review`                                             | Codex reviews your uncommitted changes and returns its findings. |
+| `/review base <branch>`, `/review commit <sha>`       | Reviews the changes against a branch, or one commit.             |
+| `/review <instructions>`                              | A review that follows your instructions.                         |
+| `lunos external resume codex <session-id> "/compact"` | Compacts that session's context. It needs an existing session.   |
+
+Any other Codex command, such as `/init`, is refused before Codex starts, with the list above. Ask for it in words instead.
+
+`--model` picks the tool's model for one run; otherwise the tool's own default applies. If your Codex config names a model your account can't use, Codex reports that error and Lunos shows it. `--model` gets round it without editing the config.
+
+After each session Lunos shows what the tool reports:
+
+- **Claude Code** reports a cost (`total_cost_usd`). On a subscription plan this is an estimate, not a bill.
+- **Codex CLI** reports tokens, not money, so Lunos shows the token count.
+
+## In the TUI
+
+`/external claude` (or `/external codex`) opens a Claude Code (or Codex CLI) session in its own session view, next to your Lunos sessions. It's in the command palette too, as "Start Claude Code or Codex session". The session is listed as `Claude Code · <session id>`, so `/sessions` finds it again after a restart.
+
+- What you type goes to the tool as typed, its own `/commands` included. The prompt suggests the commands the tool reported.
+- Each approval the tool asks for appears in that view, through Lunos's approval prompt (`external` → `claude:Write src/app.ts`). "Reject" refuses the request and ends the tool's turn. Rejecting with a message passes the message on, and the tool carries on.
+- Each reply shows the cost the tool reported for that turn, and the session's total so far. For Codex, it shows tokens.
+- Press `esc` twice to stop the tool's turn, as in any session. A pending approval is refused.
+- `/external resume claude <session-id>` continues a session started elsewhere, for example with `lunos external run`.
+
+It's gated like `lunos external run`: under a residency policy that doesn't allow the vendor's region, it isn't started, the reason is shown, and the refusal is written to the audit log.
+
+### `/claude` and `/codex`
+
+The quick way in from the prompt:
+
+- `/claude <task>` (or `/codex <task>`) starts a new session of that tool with the task, in its own view, and switches to it. The task goes as typed, so `/codex /review` runs Codex's review.
+- `/claude` or `/codex` on its own opens a picker: a new session, or one of that tool's recent sessions in this project to continue.
+- Inside a Claude Code or Codex view, `/claude` and `/codex` start a new session; anything else still goes to the tool.
+
+They're listed only while external sessions are on (`external.enabled` isn't `false`). They show greyed out, with the reason, when the tool isn't installed or signed in ("see `lunos external list`"), or as "blocked by policy" under a residency policy that refuses the vendor. Choosing a greyed command says how to fix it and starts nothing; a policy refusal is written to the audit log (`external.denied`). Checking whether the commands are available writes nothing.
+
+If you have your own command, skill or agent command named `claude` or `codex`, yours runs, and Lunos says once that its own is `/external claude` / `/external codex`.
+
+### Knowing where your prompt goes
+
+A Claude Code or Codex session looks different from a Lunos one, so you don't send a prompt to Anthropic or OpenAI by mistake:
+
+- **Label and badge:** `▸ Claude Code` (or `▸ Codex`) sits where the agent and model are in a Lunos session, and `Lunos · Claude Code` (or `Lunos · Codex`) is at the bottom right, with the tool's model once it reports one. These are text, so they show with `NO_COLOR` and on a monochrome terminal.
+- **Accent:** the prompt border, cursor, spinner and the tool's reply markers use the tool's colour, a warm terracotta for Claude Code and a green-tinted graphite for Codex. Text, code and diffs keep your theme. A theme can set its own as `externalClaude` / `externalCodex`; the built-in ones reach 4.5:1 on every built-in theme's background. `"external_accent": false` in `tui.json` keeps your theme's colours (the label and badge stay).
+- **Session list and sidebar:** these sessions have an accent dot and the tool's name.
+- **Desktop and web:** the prompt has the accent border and the same badge.
+
+Claude Code is a product of Anthropic; Codex is a product of OpenAI. Lunos is not affiliated with either, and uses the products' plain names next to its own.
+
+### Your Lunos commands in a Claude Code or Codex session
+
+The prompt's `/` list shows the tool's own commands ("Claude Code command") and your Lunos custom commands and MCP prompts ("Lunos command"). A Lunos command is expanded by Lunos (its template, arguments and `@file` references) and the text it makes goes to the tool. When both have a command of the same name, the tool's keeps the bare name and Lunos's is `/<name>:lunos`, so `/review` in Codex is Codex's and `/review:lunos` is yours.
+
+Lunos commands that switch a Lunos agent, mode or model provider (`/agents`, `/modes`, `/providers`, `/variants`) are shown greyed out with "Not available in a Claude Code session" and never sent to the tool. Lunos's own screens (`/settings`, `/marketplace`, `/memory`, `/help`, …) work as usual.
+
+### The tool's model, `/compact` and `/cost`
+
+In the terminal app, some Lunos commands act on the tool's session instead:
+
+- **`/models`** lists the tool's models under "Claude Code models" or "Codex models", never Lunos's. Lunos asks the tool itself without sending a prompt, so no model is called: Claude Code lists them when Lunos starts it, and Codex through its app server's model list. If Claude Code doesn't list them, its aliases (Opus, Sonnet, Haiku) are offered. The model you choose is saved on the session and used from your next message on, also after a Lunos restart or a resume, and the prompt shows it (`Lunos · Claude Code · sonnet`). Choose Default to go back to the tool's own default.
+- **`/compact`** has the tool compact its own session: Claude Code's `/compact`, or Codex's compaction. No Lunos model sees the conversation.
+- **`/cost`** shows the cost Claude Code reported for the session. Codex reports tokens, not money, so its cost shows as "not reported", with the tokens used so far.
+
+### Your MCP servers, skills and memory
+
+After you agree, once per tool and project, Lunos can offer a Claude Code or Codex session your Lunos MCP servers, skills and memory through the Lunos bridge. Every call asks in Lunos unless your permission rules allow that tool by name, and is audited. Their results are sent to Anthropic or OpenAI with your prompts. See [External sessions: what Lunos adds](external-what-lunos-adds.md).
+
+## Handing a task from a Lunos agent
+
+To let Lunos agents hand a task to Claude Code or Codex CLI, turn on the `external_agent` tool:
+
+```json
+{ "external": { "delegate": true } }
+```
+
+It's off by default, and never offered in offline mode. When an agent uses it, you approve the delegation itself first. Then each edit or command the tool asks approval for comes to Lunos's own approval prompt as `external` → `<tool>:<Action> <target>`. For example: `claude:Write src/app.ts`, `claude:Bash npm test`, `codex:FileChange src/app.ts` or `codex:Bash npm test`. You can allow it once or always, like any other permission. "Always" covers one command for `Bash`, and the tool for file edits. Agents that can't edit (`plan`, `research`, `explore`) can't delegate either. The agent gets back the tool's answer, the files that changed (from `git status`), the cost or tokens the tool reported, and its session id, which you can continue with `lunos external resume`.
+
+## Approvals
+
+Both tools start in their safe settings:
+
+- **Claude Code:** permission mode `default`.
+- **Codex CLI:** sandbox `read-only` with approval policy `untrusted`, so every edit and command asks. Lunos drives Codex through `codex app-server`, the protocol that hands approvals to a client. OpenAI marks it experimental.
+
+Each approval request a tool makes comes to Lunos:
+
+- **on a terminal:** Lunos asks you, and passes your answer back;
+- **not on a terminal** (CI, scripts): the request is refused, the same rule as `lunos run`. `--auto` approves every request instead. Use it with care.
+
+**What doesn't come to Lunos:** anything a tool's own configuration already allows never asks, so Lunos never sees it.
+
+- **Claude Code:** reads, and anything allowed by rules in `~/.claude/settings.json`, the project's `.claude/settings.json`, or hooks.
+- **Codex CLI:** commands its own exec-policy rules mark as safe.
+
+Review those rules if you rely on Lunos to see every edit.
+
+Settings that skip approval or the sandbox are refused unless you ask for one explicitly for that run, for example `--permission-mode bypassPermissions --unsafe`. That covers Claude Code's `bypassPermissions`, and Codex's `danger-full-access` and `never`. They can't be saved to config, and one already in a config file is ignored (the safe default is used) and flagged in `/settings`. For Codex, `--permission-mode` takes either a sandbox (`read-only`, `workspace-write`) or an approval policy (`untrusted`, `on-request`).
+
+### Choosing the settings for every run
+
+`/settings` → Models & agents lists each one as a choice, with what it does. Manual approval (the safe default above) is selected when nothing is set; choosing it writes nothing, or removes the key if one is set. The unsafe values are listed greyed out with how to pass them for one run.
+
+| Key                               | Values                                                                                       | Default     |
+| --------------------------------- | -------------------------------------------------------------------------------------------- | ----------- |
+| `external.claude.permission_mode` | `default`, `acceptEdits`, `plan`, `auto`, `dontAsk` (what your Claude Code's `--help` lists) | `default`   |
+| `external.codex.sandbox`          | `read-only`, `workspace-write`                                                               | `read-only` |
+| `external.codex.approval_policy`  | `untrusted`, `on-request`                                                                    | `untrusted` |
+
+An empty value means the default. `auto` lets Claude Code's own classifier approve routine actions, so those don't come to Lunos.
+
+`external.codex.permission_mode` (one field for either a sandbox or an approval policy) still works while the new keys are unset. Saving either new key moves it: its value goes to whichever of the two it names.
+
+## Data residency and policy
+
+These tools send your code to their vendors: Claude Code to Anthropic, Codex CLI to OpenAI. Under a residency policy that doesn't allow the vendor's region (for example `"residency": { "allow": ["eu"] }`), Lunos **refuses to start** them, with a message saying why. This applies even if you've pointed the tool at another endpoint in its own settings, because Lunos can't see that configuration.
+
+An organisation can turn the feature off with `"external": { "enabled": false }` and lock it with `"$locked": ["external"]`.
+
+Every session Lunos starts is written to the [audit log](audit-log.md) as `external.session`, and every refusal as `external.denied`. Both record the tool and its provider.
+
+## What Lunos stores
+
+- **Stored:** for each session, the session id, tool, working directory, start and end time, status, and the cost and turn count the tool reported. This lives under Lunos's data directory, on this machine only, so that `sessions`, `resume` and `stop` work.
+- **Not stored** (`lunos external run` and the `external_agent` tool): your prompts, the tool's output and the transcript. The transcript is kept by the tool itself (Claude Code keeps it under `~/.claude`).
+- **A session in the TUI** is a Lunos session, so its prompts and the tool's replies are stored like any other session's, in Lunos's local database, and can be deleted like one.
+- **Never touched:** your credentials. The tool runs with your own environment and login.

@@ -95,6 +95,19 @@ test("resolves overrides without mutating input", () => {
   expect(input.keybinds).toEqual({ session_list: "ctrl+l" })
 })
 
+test("resolves a legacy agent_list keybind override to mode.list and reports it as deprecated", () => {
+  const config = resolve({ keybinds: { agent_list: "ctrl+a" } }, { terminalSuspend: true })
+
+  expect(config.keybinds.get("mode.list")).toMatchObject([{ key: "ctrl+a" }])
+  expect(config.deprecatedKeybinds).toEqual([{ legacy: "agent_list", canonical: "mode_list" }])
+})
+
+test("reports no deprecated keybinds when config uses only current names", () => {
+  const config = resolve({ keybinds: { session_list: "ctrl+l" } }, { terminalSuspend: true })
+
+  expect(config.deprecatedKeybinds).toEqual([])
+})
+
 test("resolves a session move keybind", () => {
   const config = resolve({ keybinds: { session_move: "ctrl+o" } }, { terminalSuspend: true })
 
@@ -139,4 +152,34 @@ test("provides resolved config through Solid context", async () => {
 
 test("requires the config provider", () => {
   expect(() => useTuiConfig()).toThrow("TuiConfigProvider is missing")
+})
+
+test("question dismissal guards decode through Info and resolve to defaults (XCOD-98)", () => {
+  const defaults = resolve(decodeInfo({}), { terminalSuspend: true })
+  expect(defaults.question).toEqual({ dismiss_window: 2000, undo_window: 5000 })
+
+  const legacy = resolve(decodeInfo({ question: { dismiss_window: 0, undo_window: 0 } }), { terminalSuspend: true })
+  expect(legacy.question).toEqual({ dismiss_window: 0, undo_window: 0 })
+
+  expect(() => decodeInfo({ question: { dismiss_window: -1 } })).toThrow()
+  expect(() => decodeInfo({ question: { undo_window: 1.5 } })).toThrow()
+})
+
+test("Esc Esc clears the prompt by default, with a 1000 ms window (XCOD-255)", () => {
+  const defaults = resolve(decodeInfo({}), { terminalSuspend: true })
+  expect(defaults.double_escape_clear).toBe(true)
+  expect(defaults.double_escape_ms).toBe(1000)
+
+  const off = resolve(decodeInfo({ double_escape_clear: false, double_escape_ms: 600 }), { terminalSuspend: true })
+  expect(off.double_escape_clear).toBe(false)
+  expect(off.double_escape_ms).toBe(600)
+
+  expect(() => decodeInfo({ double_escape_ms: 0 })).toThrow()
+  expect(() => decodeInfo({ double_escape_clear: "yes" })).toThrow()
+})
+
+test("reduced_motion decodes through Info and survives resolve (XCOD-107)", () => {
+  expect(resolve(decodeInfo({ reduced_motion: true }), { terminalSuspend: true }).reduced_motion).toBe(true)
+  expect(resolve(decodeInfo({}), { terminalSuspend: true }).reduced_motion).toBeUndefined()
+  expect(() => decodeInfo({ reduced_motion: "yes" })).toThrow()
 })

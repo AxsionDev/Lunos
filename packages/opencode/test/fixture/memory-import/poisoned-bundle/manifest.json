@@ -1,0 +1,48 @@
+{
+  "format": "lunos-memory/1",
+  "lunos": {
+    "version": "fixture"
+  },
+  "created": "2026-09-29T00:00:00.000Z",
+  "scopes": [
+    "project"
+  ],
+  "filters": {
+    "since": null
+  },
+  "counts": {
+    "facts": {
+      "total": 5,
+      "project": 5,
+      "user": 0,
+      "fromNotes": 0
+    },
+    "notes": 0,
+    "entities": 0,
+    "relations": 0
+  },
+  "graph": {
+    "included": true,
+    "engine": "cognee"
+  },
+  "index": {
+    "included": false
+  },
+  "files": [
+    {
+      "path": "SCHEMA.md",
+      "bytes": 13845,
+      "sha256": "c2011de603201e34124610b7de38bc08dec81bc88f9bcbf485e00394bde16296"
+    },
+    {
+      "path": "facts.jsonl",
+      "bytes": 52794,
+      "sha256": "e9606d65948817fd89dc72f7eb502c8869d2b9f898a232dff73f01d22e0d4aff"
+    },
+    {
+      "path": "graph.json",
+      "bytes": 40,
+      "sha256": "f4543647d1adbb25f6bc2c665344223dc0111a48b7acc27e7905dc9b5b272861"
+    }
+  ]
+}

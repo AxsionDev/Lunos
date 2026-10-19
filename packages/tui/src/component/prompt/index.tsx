@@ -8,6 +8,7 @@ import {
   type KeyEvent,
   type Renderable,
 } from "@opentui/core"
+import { useAnimationsEnabled } from "../../context/motion"
 import type { CommandContext } from "@opentui/keymap"
 import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match } from "solid-js"
 import { registerOpencodeSpinner } from "../register-spinner"
@@ -35,7 +36,8 @@ import { computePromptTraits } from "../../prompt/traits"
 import { expandPastedTextPlaceholders, expandTrackedPastedText } from "../../prompt/part"
 import { usePromptStash } from "../../prompt/stash"
 import { DialogStash } from "../dialog-stash"
-import { type AutocompleteRef, Autocomplete } from "./autocomplete"
+import { type AutocompleteOption, type AutocompleteRef, Autocomplete } from "./autocomplete"
+import { leftOpensMonitor } from "../../util/agent-monitor"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v2"
 import { Locale } from "../../util/locale"
@@ -47,16 +49,36 @@ import { DialogProvider as DialogProviderConnect } from "../dialog-provider"
 import { DialogAlert } from "../../ui/dialog-alert"
 import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
+import { createDoublePress } from "../../util/dismiss"
 import { createFadeIn } from "../../util/signal"
 import { DialogSkill } from "../dialog-skill"
+import { DialogMemory } from "../dialog-memory"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
+import type { Binding } from "@opentui/keymap"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
 import { useTuiConfig } from "../../config"
 import { usePromptWorkspace } from "./workspace"
 import { usePromptMove } from "./move"
 import { readLocalAttachment } from "./local-attachment"
 import { useLocation } from "../../context/location"
+import { parseRestartSlash } from "../../util/restart"
+import { parseSettingsSlash } from "../../util/settings"
+import {
+  EXTERNAL_BADGE,
+  EXTERNAL_LABEL,
+  externalAccent,
+  externalBadge,
+  bridgeLine,
+  externalOf,
+  parseExternalSlash,
+  parseToolSlash,
+} from "../../util/external"
+import { lunosCommand, MAPPED, UNAVAILABLE } from "../../util/external-commands"
+import * as Sections from "../../util/settings-sections"
+import { requestSettings } from "../../util/settings-sections"
+import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
+import { DialogExternal, useExternalCommand, useStartExternal } from "../dialog-external"
 
 registerOpencodeSpinner()
 
@@ -73,6 +95,18 @@ export type PromptProps = {
     normal?: string[]
     shell?: string[]
   }
+  /**
+   * XCOD-262: the Agent Monitor sends the prompt itself (to tagged sessions, or as a new session it
+   * stays beside). Resolves true when it took the prompt, which is then cleared and kept in history.
+   */
+  onIntercept?: (text: string) => boolean | Promise<boolean>
+  /** XCOD-262: more `@` completions, listed before agents and files (the monitor's sessions). */
+  mentions?: () => AutocompleteOption[]
+  /**
+   * XCOD-262: keys the host screen takes from the prompt while autocomplete is closed: `always`
+   * whatever is typed, `empty` only with nothing typed (the monitor's → and Esc).
+   */
+  bindings?: () => { always?: Binding<Renderable, KeyEvent>[]; empty?: Binding<Renderable, KeyEvent>[] }
 }
 
 function pastedFilepath(value: string, platform: string) {
@@ -158,20 +192,40 @@ export function Prompt(props: PromptProps) {
   const project = useProject()
   const sync = useSync()
   const tuiConfig = useTuiConfig()
+  // XCOD-260: in a Claude Code / Codex session the prompt says where it goes, in the tool's accent.
+  const external = createMemo(() => (props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined))
+  const externalModel = createMemo(() => {
+    if (!props.sessionID || !external()) return
+    // XCOD-254: a model chosen with /models shows at once; the tool uses it from the next turn.
+    if (external()!.model) return external()!.model
+    const messages = sync.data.message[props.sessionID] ?? []
+    const last = messages.findLast((item) => item.role === "assistant" && item.providerID === "external")
+    const model = last?.role === "assistant" ? last.modelID : undefined
+    return model && model !== external()!.tool ? model : undefined
+  })
   const dialog = useDialog()
   const toast = useToast()
+  const startExternal = useStartExternal()
+  const runExternalCommand = useExternalCommand()
   const status = createMemo(() => sync.data.session_status?.[props.sessionID ?? ""] ?? { type: "idle" })
   const history = usePromptHistory()
   const stash = usePromptStash()
   const keymap = useOpencodeKeymap()
-  const agentShortcut = useCommandShortcut("agent.cycle")
+  const modeShortcut = useCommandShortcut("mode.cycle")
   const paletteShortcut = useCommandShortcut("command.palette.show")
+  const undoShortcut = useCommandShortcut("input.undo")
   const renderer = useRenderer()
   const exit = useExit()
   const dimensions = useTerminalDimensions()
-  const { theme, syntax } = useTheme()
+  const themeState = useTheme()
+  const { theme, syntax } = themeState
+  const accent = createMemo(() => {
+    const marker = external()
+    return marker ? externalAccent(theme, marker.tool, tuiConfig.external_accent !== false) : undefined
+  })
+  const cursorColor = () => accent() ?? theme.text
   const kv = useKV()
-  const animationsEnabled = createMemo(() => kv.get("animations_enabled", true))
+  const animationsEnabled = useAnimationsEnabled()
   const list = createMemo(() => props.placeholders?.normal ?? [])
   const shell = createMemo(() => props.placeholders?.shell ?? [])
   const fileContextEnabled = createMemo(() => kv.get("file_context_enabled", true))
@@ -250,7 +304,7 @@ export function Prompt(props: PromptProps) {
   createEffect(() => {
     if (!input || input.isDestroyed) return
     if (props.disabled) input.cursorColor = theme.backgroundElement
-    if (!props.disabled) input.cursorColor = theme.text
+    if (!props.disabled) input.cursorColor = cursorColor()
     if (tuiConfig.cursor) input.cursorStyle = tuiConfig.cursor
   })
 
@@ -319,12 +373,13 @@ export function Prompt(props: PromptProps) {
 
       syncedSessionID = sessionID
 
-      // Only set agent if it's a primary agent (not a subagent)
-      const isPrimaryAgent = local.agent.list().some((x) => x.name === msg.agent)
+      // Only set mode if it's a primary agent (not a subagent)
+      const isPrimaryAgent = local.mode.list().some((x) => x.name === msg.agent)
       if (msg.agent && isPrimaryAgent) {
-        // Keep command line --agent if specified.
-        if (!args.agent) local.agent.set(msg.agent)
-        if (msg.model) {
+        // Keep command line --mode if specified.
+        if (!args.mode) local.mode.set(msg.agent)
+        // XCOD-218: an external session's messages name the tool, not a model to switch to.
+        if (msg.model && msg.model.providerID !== "external") {
           local.model.set(msg.model)
           local.model.variant.set(msg.model.variant)
         }
@@ -541,6 +596,28 @@ export function Prompt(props: PromptProps) {
         slashName: "warp",
         run: () => {
           workspace.open()
+        },
+      },
+      // XCOD-158: by warp, so behind the same experimental flag.
+      {
+        title: "Sandbox",
+        desc: "Move the session into a new sandbox (/sandbox end ends it)",
+        name: "sandbox.start",
+        category: "Session",
+        enabled: Flag.OPENCODE_EXPERIMENTAL_WORKSPACES && !workspace.sandboxed(),
+        slashName: "sandbox",
+        run: () => {
+          void workspace.sandbox()
+        },
+      },
+      {
+        title: "End sandbox",
+        desc: "Bring the session back, and the sandbox's results with it",
+        name: "sandbox.end",
+        category: "Session",
+        enabled: Flag.OPENCODE_EXPERIMENTAL_WORKSPACES && workspace.sandboxed(),
+        run: () => {
+          void workspace.endSandbox()
         },
       },
       {
@@ -813,6 +890,29 @@ export function Prompt(props: PromptProps) {
     }
   })
 
+  // XCOD-255: Esc twice clears the prompt while the session is idle. Busy, Esc Esc interrupts
+  // (session.interrupt) and the text stays. Autocomplete and shell mode take their Esc first, so
+  // that press never counts as the first of two.
+  useBindings(() => ({
+    target: inputTarget,
+    enabled:
+      inputTarget() !== undefined &&
+      !props.disabled &&
+      tuiConfig.double_escape_clear &&
+      status().type === "idle" &&
+      store.mode === "normal" &&
+      !auto()?.visible &&
+      hasContent(),
+    bindings: [{ key: "escape", desc: "Clear prompt (press twice)", group: "Prompt", cmd: escapeClear }],
+  }))
+
+  useBindings(() => ({
+    target: inputTarget,
+    enabled: inputTarget() !== undefined && !props.disabled && cleared() !== undefined && !hasContent(),
+    priority: 10,
+    bindings: tuiConfig.keybinds.get("input.undo").map((binding) => ({ ...binding, cmd: restoreCleared })),
+  }))
+
   useBindings(() => {
     return {
       target: inputTarget,
@@ -839,6 +939,48 @@ export function Prompt(props: PromptProps) {
       ],
     }
   })
+
+  useBindings(() => ({
+    target: inputTarget,
+    enabled: inputTarget() !== undefined && !props.disabled && store.mode === "normal" && !auto()?.visible,
+    priority: 10,
+    bindings: props.bindings?.().always ?? [],
+  }))
+
+  useBindings(() => ({
+    target: inputTarget,
+    enabled:
+      inputTarget() !== undefined && !props.disabled && store.mode === "normal" && !auto()?.visible && !hasContent(),
+    priority: 10,
+    bindings: props.bindings?.().empty ?? [],
+  }))
+
+  // XCOD-262: ← on an empty prompt opens the Agent Monitor, from home or a top-level session. With
+  // text it moves the cursor; a subagent session keeps it for "previous child".
+  useBindings(() => ({
+    target: inputTarget,
+    enabled:
+      inputTarget() !== undefined &&
+      !props.disabled &&
+      leftOpensMonitor({
+        enabled: tuiConfig.left_opens_monitor,
+        route: route.data.type === "home" || route.data.type === "session" ? route.data.type : "other",
+        child: route.data.type === "session" && !!sync.session.get(route.data.sessionID)?.parentID,
+        text: store.prompt.input,
+        parts: store.prompt.parts.length,
+        mode: store.mode,
+        autocomplete: !!auto()?.visible,
+      }),
+    priority: 10,
+    bindings: [
+      {
+        key: "left",
+        desc: "Open the Agent Monitor",
+        group: "Prompt",
+        cmd: () => keymap.dispatchCommand("agent.monitor"),
+      },
+    ],
+  }))
 
   useBindings(() => {
     return {
@@ -958,11 +1100,193 @@ export function Prompt(props: PromptProps) {
     if (workspace.creating() || move.creating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
-    const agent = local.agent.current()
+    // XCOD-94: bare /memory opens the memory browser, before any session is created.
+    // `/memory off|on` has arguments and goes to the server like any other command.
+    if (store.prompt.input.trim() === "/memory") {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      dialog.replace(() => <DialogMemory />)
+      return false
+    }
+    // XCOD-158: `/sandbox end` has an argument too, so the slash list can't run it.
+    if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES && /^\/sandbox\s+end$/.test(store.prompt.input.trim())) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      void workspace.endSandbox()
+      return false
+    }
+    // XCOD-129: `/restart --fresh` has an argument, so the slash list can't run it; neither goes
+    // to the server as a prompt.
+    const restartSlash = parseRestartSlash(store.prompt.input)
+    if (restartSlash) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      keymap.dispatchCommand(restartSlash.fresh ? "app.restart.fresh" : "app.restart")
+      return false
+    }
+    // XCOD-128: `/settings key=value` (or `/config key=value`) changes one setting in the user
+    // config, with the same validation and organisation locks as the settings screen.
+    const settingsSlash = parseSettingsSlash(store.prompt.input)
+    if (settingsSlash) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      if ("error" in settingsSlash) {
+        toast.show({ variant: "warning", message: settingsSlash.error })
+        return false
+      }
+      if ("open" in settingsSlash) {
+        requestSettings(Sections.target(settingsSlash.open) ?? { unknown: settingsSlash.open })
+        keymap.dispatchCommand("settings.open")
+        return false
+      }
+      void sdk.client.config
+        .settingsSet({ settingsSetInput: { key: settingsSlash.key, value: settingsSlash.value, scope: "user" } })
+        .then((result) => {
+          const data = result.data
+          if (!data || !data.ok) {
+            toast.show({
+              variant: "error",
+              message: data && !data.ok ? data.error : "Settings didn't save",
+              duration: 8000,
+            })
+            return
+          }
+          if (data.key === "tui.theme" && typeof data.value === "string") themeState.set(data.value)
+          toast.show({
+            variant: "success",
+            message: `${data.key} = ${JSON.stringify(data.value)} (saved to ${data.file})${data.restart ? ". /restart to apply it" : ""}`,
+            duration: 6000,
+          })
+        })
+      return false
+    }
+    // XCOD-251: `/marketplace mcp|skills|…|installed|<search words>` has arguments, so the slash list
+    // can't run it; the words are left for the Discover view, which the plugins feature owns.
+    // A user's own command of the same name wins and goes to the server as usual.
+    const marketplaceSlash = parseMarketplaceSlash(store.prompt.input)
+    const ownCommand = sync.data.command.some((x) => x.name === store.prompt.input.trim().split(/\s/)[0]!.slice(1))
+    if (marketplaceSlash && !ownCommand) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      requestDiscover(marketplaceSlash)
+      keymap.dispatchCommand("plugins.discover")
+      return false
+    }
+    // XCOD-218: `/external claude|codex` or `/external resume <tool> <id>` opens an external session.
+    const externalSlash = parseExternalSlash(store.prompt.input)
+    if (externalSlash) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      if ("error" in externalSlash) toast.show({ variant: "warning", message: externalSlash.error })
+      else if ("pick" in externalSlash) dialog.replace(() => <DialogExternal />)
+      else void startExternal(externalSlash.tool, externalSlash.session)
+      return false
+    }
+    // XCOD-250: `/claude <task>` / `/codex <task>` start a new session of that tool with the task,
+    // also from inside another external session. A user's own command of the same name wins, and
+    // with external sessions off the text isn't ours.
+    const toolSlash = parseToolSlash(store.prompt.input)
+    if (
+      toolSlash &&
+      sync.data.config.external?.enabled !== false &&
+      !sync.data.command.some((x) => x.name === toolSlash.tool)
+    ) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      void runExternalCommand(toolSlash.tool, toolSlash.text)
+      return false
+    }
+    // XCOD-262: the Agent Monitor sends the prompt itself, as text: to the sessions it tags, or as a
+    // new session it stays beside. The local commands above, and exit, still run here first.
+    if (props.onIntercept && !["exit", "quit", ":q"].includes(store.prompt.input.trim())) {
+      if (store.mode === "shell") {
+        toast.show({ variant: "info", message: "Shell commands run in a session: open one to use !" })
+        return false
+      }
+      if (store.prompt.parts.some((part) => part.type !== "text")) {
+        toast.show({
+          variant: "info",
+          message: "The Agent Monitor sends text only: open the session to attach files, images or agents",
+        })
+        return false
+      }
+      const text = expandTrackedPastedText(
+        store.prompt.input,
+        input.extmarks.getAllForTypeId(promptPartTypeId).flatMap((extmark) => {
+          const partIndex = store.extmarkToPartIndex.get(extmark.id)
+          const part = partIndex === undefined ? undefined : store.prompt.parts[partIndex]
+          if (part?.type !== "text") return []
+          return [{ start: extmark.start, end: extmark.end, text: part.text }]
+        }),
+      )
+      if (!(await props.onIntercept(text))) return false
+      history.append({ ...store.prompt, mode: store.mode })
+      input.extmarks.clear()
+      setStore("prompt", { input: "", parts: [] })
+      setStore("extmarkToPartIndex", new Map())
+      props.onSubmit?.()
+      input.clear()
+      return true
+    }
+    const agent = local.mode.current()
     if (!agent) return false
     const trimmed = store.prompt.input.trim()
     if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
       void exit()
+      return true
+    }
+    // XCOD-218: in an external session the text goes to Claude Code / Codex as typed, its own
+    // /commands included; no Lunos model is involved.
+    const external = props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined
+    if (props.sessionID && external) {
+      const text = store.prompt.input
+      // XCOD-254: a Lunos command (`/name`, or `/name:lunos` on a clash) is expanded by Lunos, and the
+      // text it makes goes to the tool; anything else goes as typed.
+      // `external.share.commands: false` (lockable): nothing is expanded by Lunos, the text goes as typed.
+      const command =
+        sync.data.config.external?.share?.commands === false
+          ? undefined
+          : lunosCommand(
+              text,
+              external.commands ?? [],
+              sync.data.command.filter((item) => item.source !== "skill").map((item) => item.name),
+            )
+      const name = command?.name
+      // XCOD-254: `/models` and `/cost` act on the tool's session here, even typed past the list.
+      const mapped = command ? undefined : /^\/(\w+)$/.exec(text.trim())?.[1]
+      if (mapped && MAPPED.has(mapped) && !(external.commands ?? []).includes(mapped)) {
+        input.clear()
+        setStore("prompt", { input: "", parts: [] })
+        keymap.dispatchCommand(mapped === "models" ? "model.list" : "session.cost")
+        return false
+      }
+      const unavailable = !command && text.startsWith("/") ? text.slice(1).split(/\s/)[0]! : undefined
+      if (unavailable && UNAVAILABLE.has(unavailable) && !(external.commands ?? []).includes(unavailable)) {
+        toast.show({
+          variant: "info",
+          message: `/${unavailable} isn't available in a ${EXTERNAL_LABEL[external.tool]} session`,
+        })
+        return false
+      }
+      ;(name
+        ? sdk.client.session.command(
+            { sessionID: props.sessionID, command: name, arguments: command!.args },
+            { throwOnError: true },
+          )
+        : sdk.client.session.prompt(
+            // No agent: the current mode (plan, say) mustn't refuse every approval the tool asks for.
+            { sessionID: props.sessionID, parts: [{ type: "text", text }] },
+            { throwOnError: true },
+          )
+      ).catch((error: unknown) =>
+        toast.show({ title: "Failed to send prompt", message: errorMessage(error), variant: "error" }),
+      )
+      history.append({ ...store.prompt, mode: store.mode })
+      input.extmarks.clear()
+      setStore("prompt", { input: "", parts: [] })
+      setStore("extmarkToPartIndex", new Map())
+      props.onSubmit?.()
+      input.clear()
       return true
     }
     const selectedModel = local.model.current()
@@ -1269,8 +1593,61 @@ export function Prompt(props: PromptProps) {
     return
   }
 
-  function clearPrompt() {
-    if (store.prompt.input.trim().length >= DRAFT_RETENTION_MIN_CHARS || store.prompt.parts.length > 0) {
+  const hasContent = () => store.prompt.input !== "" || store.prompt.parts.length > 0
+  const escapeGuard = createDoublePress(() => tuiConfig.double_escape_ms)
+  const [escapeArmed, setEscapeArmed] = createSignal(false)
+  const [cleared, setCleared] = createSignal<{ prompt: PromptInfo; mode: "normal" | "shell"; cursor: number }>()
+  let escapeTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(escapeTimer))
+
+  function disarmEscape() {
+    clearTimeout(escapeTimer)
+    escapeGuard.reset()
+    setEscapeArmed(false)
+  }
+
+  function escapeClear() {
+    // A selection is the innermost thing Esc can undo: drop it, and don't count the press.
+    if (input.hasSelection()) {
+      input.clearSelection()
+      disarmEscape()
+      return
+    }
+    clearTimeout(escapeTimer)
+    if (escapeGuard.press() === "armed") {
+      setEscapeArmed(true)
+      escapeTimer = setTimeout(() => {
+        escapeGuard.reset()
+        setEscapeArmed(false)
+      }, tuiConfig.double_escape_ms)
+      return
+    }
+    setEscapeArmed(false)
+    const snapshot = { prompt: structuredClone(unwrap(store.prompt)), mode: store.mode, cursor: input.cursorOffset }
+    clearPrompt(true)
+    setCleared(snapshot)
+    toast.show({ variant: "info", message: `Prompt cleared · ${undoShortcut()} to restore`, duration: 4000 })
+  }
+
+  function restoreCleared() {
+    const saved = cleared()
+    if (!saved) return
+    setCleared(undefined)
+    input.setText(saved.prompt.input)
+    setStore("mode", saved.mode)
+    setStore("prompt", saved.prompt)
+    restoreExtmarksFromParts(saved.prompt.parts)
+    input.cursorOffset = saved.cursor
+    toast.show({ variant: "success", message: "Prompt restored", duration: 1500 })
+  }
+
+  /** `keep`: always save the prompt to history, not only a long draft (Esc Esc promises ↑ brings it back). */
+  function clearPrompt(keep = false) {
+    if (
+      (keep && store.prompt.input.trim() !== "") ||
+      store.prompt.input.trim().length >= DRAFT_RETENTION_MIN_CHARS ||
+      store.prompt.parts.length > 0
+    ) {
       history.append({
         ...store.prompt,
         mode: store.mode,
@@ -1287,10 +1664,11 @@ export function Prompt(props: PromptProps) {
 
   const highlight = createMemo(() => {
     if (leader()) return theme.border
+    if (accent()) return accent()!
     if (store.mode === "shell") return theme.primary
-    const agent = local.agent.current()
+    const agent = local.mode.current()
     if (!agent) return theme.border
-    return local.agent.color(agent.name)
+    return local.mode.color(agent.name)
   })
 
   const showVariant = createMemo(() => {
@@ -1300,10 +1678,10 @@ export function Prompt(props: PromptProps) {
     return !!current
   })
 
-  const agentMetaAlpha = createFadeIn(() => !!local.agent.current(), animationsEnabled)
-  const modelMetaAlpha = createFadeIn(() => !!local.agent.current() && store.mode === "normal", animationsEnabled)
+  const agentMetaAlpha = createFadeIn(() => !!local.mode.current(), animationsEnabled)
+  const modelMetaAlpha = createFadeIn(() => !!local.mode.current() && store.mode === "normal", animationsEnabled)
   const variantMetaAlpha = createFadeIn(
-    () => !!local.agent.current() && store.mode === "normal" && showVariant(),
+    () => !!local.mode.current() && store.mode === "normal" && showVariant(),
     animationsEnabled,
   )
   const borderHighlight = createMemo(() => tint(theme.border, highlight(), agentMetaAlpha()))
@@ -1322,9 +1700,9 @@ export function Prompt(props: PromptProps) {
   const spinnerDef = createMemo(() => {
     const agent =
       status().type !== "idle"
-        ? (local.agent.list().find((a) => a.name === lastUserMessage()?.agent) ?? local.agent.current())
-        : local.agent.current()
-    const color = agent ? local.agent.color(agent.name) : theme.border
+        ? (local.mode.list().find((a) => a.name === lastUserMessage()?.agent) ?? local.mode.current())
+        : local.mode.current()
+    const color = accent() ?? (agent ? local.mode.color(agent.name) : theme.border)
     return {
       frames: createFrames({
         color,
@@ -1377,6 +1755,9 @@ export function Prompt(props: PromptProps) {
               onContentChange={() => {
                 const value = input.plainText
                 setStore("prompt", "input", value)
+                // Typing after the first Esc starts over; typing after a clear makes it final.
+                if (escapeArmed()) disarmEscape()
+                if (value !== "") setCleared(undefined)
                 auto()?.onInput(value)
                 syncExtmarksWithPromptParts()
                 setCursorVersion((value) => value + 1)
@@ -1431,19 +1812,36 @@ export function Prompt(props: PromptProps) {
                 setTimeout(() => {
                   // setTimeout is a workaround and needs to be addressed properly
                   if (!input || input.isDestroyed) return
-                  input.cursorColor = theme.text
+                  input.cursorColor = cursorColor()
                   if (tuiConfig.cursor) input.cursorStyle = tuiConfig.cursor
                 }, 0)
               }}
               onMouseDown={(r: MouseEvent) => r.target?.focus()}
               focusedBackgroundColor={theme.backgroundElement}
-              cursorColor={props.disabled ? theme.backgroundElement : theme.text}
+              cursorColor={props.disabled ? theme.backgroundElement : cursorColor()}
               cursorStyle={tuiConfig.cursor}
               syntaxStyle={syntax()}
             />
             <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
               <box flexDirection="row" gap={1}>
-                <Show when={local.agent.current()} fallback={<box height={1} />}>
+                <Show when={external()}>
+                  {(marker) => (
+                    <text>
+                      <span style={{ fg: accent() ?? theme.text, bold: true }}>▸ {EXTERNAL_BADGE[marker().tool]}</span>
+                      <Show when={externalModel()}>
+                        <span style={{ fg: theme.textMuted }}> · {externalModel()}</span>
+                      </Show>
+                    </text>
+                  )}
+                </Show>
+                <Show
+                  when={!external() && local.mode.current()}
+                  fallback={
+                    <Show when={!external()}>
+                      <box height={1} />
+                    </Show>
+                  }
+                >
                   {(agent) => (
                     <>
                       <text fg={fadeColor(highlight(), agentMetaAlpha())}>
@@ -1521,7 +1919,7 @@ export function Prompt(props: PromptProps) {
               >
                 <box flexShrink={0} flexDirection="row" gap={1}>
                   <box marginLeft={1}>
-                    <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
+                    <Show when={animationsEnabled()} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
                       <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
                     </Show>
                   </box>
@@ -1592,6 +1990,13 @@ export function Prompt(props: PromptProps) {
                 </text>
               </box>
             </Match>
+            <Match when={escapeArmed()}>
+              <box paddingLeft={3}>
+                <text fg={theme.primary}>
+                  esc <span style={{ fg: theme.textMuted }}>again to clear</span>
+                </text>
+              </box>
+            </Match>
             <Match when={workspace.notice()}>
               {(notice) => (
                 <box paddingLeft={3}>
@@ -1646,7 +2051,17 @@ export function Prompt(props: PromptProps) {
               {props.hint ?? (
                 <Show when={props.sessionID} fallback={<text />}>
                   <box marginLeft={1}>
-                    <text fg={theme.textMuted}>{location()?.directory ?? paths.cwd}</text>
+                    {/* XCOD-254: an external session shows what the Lunos bridge offers instead of the directory. */}
+                    <Show
+                      when={bridgeLine(external()?.bridge)}
+                      fallback={<text fg={theme.textMuted}>{location()?.directory ?? paths.cwd}</text>}
+                    >
+                      {(line) => (
+                        <text fg={line().warning ? theme.warning : theme.textMuted} wrapMode="none">
+                          {line().text}
+                        </text>
+                      )}
+                    </Show>
                   </box>
                 </Show>
               )}
@@ -1654,6 +2069,13 @@ export function Prompt(props: PromptProps) {
           </Switch>
           <Show when={status().type !== "retry"}>
             <box gap={2} flexDirection="row">
+              <Show when={external()}>
+                {(marker) => (
+                  <text fg={accent() ?? theme.text} wrapMode="none" flexShrink={0}>
+                    {externalBadge(marker().tool, externalModel())}
+                  </text>
+                )}
+              </Show>
               <Show when={editorContextLabelState() !== "none" ? editorFileLabelDisplay() : undefined}>
                 {(file) => (
                   <text fg={editorContextLabelState() === "pending" ? theme.secondary : theme.textMuted}>{file()}</text>
@@ -1669,9 +2091,10 @@ export function Prompt(props: PromptProps) {
                         </text>
                       )}
                     </Match>
-                    <Match when={true}>
+                    {/* XCOD-260: Lunos's agent modes don't apply to a Claude Code / Codex session. */}
+                    <Match when={!external()}>
                       <text fg={theme.text}>
-                        {agentShortcut()} <span style={{ fg: theme.textMuted }}>agents</span>
+                        {modeShortcut()} <span style={{ fg: theme.textMuted }}>modes</span>
                       </text>
                     </Match>
                   </Switch>
@@ -1691,6 +2114,7 @@ export function Prompt(props: PromptProps) {
       </box>
       <Autocomplete
         sessionID={props.sessionID}
+        mentions={props.mentions}
         ref={(r) => {
           setAuto(() => r)
         }}

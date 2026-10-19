@@ -4,7 +4,13 @@ import {
   type TuiDispose,
   type TuiPlugin,
   type TuiPluginApi,
+  type TuiPluginDiscoverResult,
   type TuiPluginInstallResult,
+  type TuiMarketplaceDetails,
+  type TuiMarketplaceDiscoverResult,
+  type TuiMarketplaceInstallResult,
+  type TuiMarketplaceKind,
+  type TuiMarketplacePlan,
   type TuiPluginModule,
   type TuiPluginMeta,
   type TuiPluginStatus,
@@ -29,6 +35,13 @@ import {
 import { PluginLoader } from "@/plugin/loader"
 import { PluginMeta } from "@/plugin/meta"
 import { installPlugin as installModulePlugin, patchPluginConfig, readPluginManifest } from "@/plugin/install"
+import { listPlugins } from "@/plugin/discover"
+import { listContent, type ContentItem } from "@/marketplace/content"
+import { ConfigManaged } from "@/config/managed"
+import { Residency } from "@opencode-ai/core/residency"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
+import { installedState, planInstall, readConfigs, resolveConfigPath, type ConfigItem } from "@/marketplace/install"
+import { Offline } from "@opencode-ai/core/offline"
 import { hasTheme, upsertTheme } from "@opencode-ai/tui/context/theme"
 import { Global } from "@opencode-ai/core/global"
 import { Filesystem } from "@/util/filesystem"
@@ -643,7 +656,21 @@ function pluginApi(runtime: RuntimeState, plugin: PluginEntry, scope: PluginScop
         return addPluginBySpec(runtime, spec)
       },
       install(spec, options) {
-        return installPluginBySpec(runtime, spec, options?.global)
+        return installPluginBySpec(runtime, spec, options?.global, options?.replace)
+      },
+      discover() {
+        return discoverPluginsForRuntime(runtime)
+      },
+    },
+    marketplace: {
+      discover(kind) {
+        return discoverMarketplaceForRuntime(runtime, kind)
+      },
+      plan(kind, marketplace, name) {
+        return planMarketplaceForRuntime(runtime, kind, marketplace, name)
+      },
+      install(kind, marketplace, name) {
+        return installMarketplaceForRuntime(runtime, kind, marketplace, name)
       },
     },
     lifecycle: scope.lifecycle,
@@ -888,10 +915,157 @@ async function addPluginBySpec(state: RuntimeState | undefined, raw: string) {
   return ok
 }
 
+async function discoverPluginsForRuntime(state: RuntimeState | undefined): Promise<TuiPluginDiscoverResult> {
+  if (!state) return { marketplaceCount: 0, marketplaces: [], plugins: [] }
+
+  const dir = state.api.state.path
+  if (!dir.directory) return { marketplaceCount: 0, marketplaces: [], plugins: [] }
+
+  const { marketplaceCount, marketplaces, plugins } = await listPlugins({
+    vcs: dir.worktree && dir.worktree !== "/" ? "git" : undefined,
+    worktree: dir.worktree,
+    directory: dir.directory,
+  })
+
+  return {
+    marketplaceCount,
+    marketplaces,
+    plugins: plugins.map((item) => ({
+      name: item.name,
+      marketplace: item.marketplace,
+      description: item.description,
+      spec: item.spec,
+    })),
+  }
+}
+
+function marketplaceCtx(state: RuntimeState | undefined) {
+  const dir = state?.api.state.path
+  if (!dir?.directory) return undefined
+  return {
+    vcs: dir.worktree && dir.worktree !== "/" ? "git" : undefined,
+    worktree: dir.worktree,
+    directory: dir.directory,
+  }
+}
+
+async function discoverMarketplaceForRuntime(
+  state: RuntimeState | undefined,
+  kind?: TuiMarketplaceKind,
+): Promise<TuiMarketplaceDiscoverResult> {
+  const ctx = marketplaceCtx(state)
+  if (!ctx) return { marketplaceCount: 0, marketplaces: [], items: [] }
+  const { marketplaceCount, marketplaces, items } = await listContent(ctx, kind)
+  // XCOD-251: the global config is where Discover installs skill sources, hooks and MCP servers;
+  // plugins can also be in the project's config, or loaded from tui.json.
+  const configs = await readConfigs([
+    await resolveConfigPath(Global.Path.config, true),
+    await resolveConfigPath(ctx.directory),
+  ]).catch(() => [])
+  const loaded = state?.plugins.map((plugin) => plugin.load.spec) ?? []
+  // XCOD-258: the residency policy in force (managed config first), for a remote MCP server's row.
+  const managed = await ConfigManaged.readManagedDocs().catch(() => [] as unknown[])
+  const block = [...managed, ...configs.toReversed()]
+    .map((doc) => (doc && typeof doc === "object" ? (doc as { residency?: unknown }).residency : undefined))
+    .find(Boolean) as Parameters<typeof Residency.resolve>[0]
+  const residency = Residency.resolve(block)
+  return {
+    marketplaceCount,
+    marketplaces,
+    items: items.map((item) => {
+      const installed = installedState(item, configs, loaded)
+      const review = item.entry.review?.status
+      const details = marketplaceDetails(item, residency)
+      return {
+        kind: item.kind,
+        name: item.name,
+        marketplace: item.marketplace,
+        description: item.description,
+        ...(item.kind === "plugin" ? { spec: item.spec } : {}),
+        ...(review ? { review } : {}),
+        ...(installed ? { installed } : {}),
+        ...(details ? { details } : {}),
+      }
+    }),
+    ...(Offline.enabled() ? { offline: true } : {}),
+  }
+}
+
+/** XCOD-258: what each kind's tab shows beside the name. */
+export function marketplaceDetails(
+  item: ContentItem,
+  residency: Residency.Resolved | undefined,
+): TuiMarketplaceDetails | undefined {
+  if (item.kind === "plugin") return item.entry.version ? { version: item.entry.version } : undefined
+  if (item.kind === "hook") {
+    const matcher = [item.entry.matcher?.tool, item.entry.matcher?.file].filter(Boolean).join(" ")
+    return { event: item.entry.event, ...(matcher ? { matcher } : {}), command: item.entry.command.join(" ") }
+  }
+  if (item.kind !== "mcp") return undefined
+  if (item.entry.type === "local") return { transport: "stdio", command: item.entry.command.join(" ") }
+  const host = Jurisdiction.hostOf(item.entry.url)
+  const { claim, tagged } = Jurisdiction.resolve(item.name, item.entry.url, residency?.policy.endpoints)
+  const denied = Residency.blocked(item.name, item.entry.url, residency)
+  return {
+    transport: "http",
+    ...(host ? { host } : {}),
+    region: tagged ? claim.region : "region unknown",
+    ...(residency && residency.enforce !== false
+      ? { policy: denied ? ("blocked" as const) : ("allowed" as const) }
+      : {}),
+  }
+}
+
+// Re-resolved from the manifests on every call rather than trusting an entry the TUI holds, so
+// plan and install always see what the marketplace serves now, through the same planner as the CLI.
+async function findConfigItem(
+  state: RuntimeState | undefined,
+  kind: Exclude<TuiMarketplaceKind, "plugin">,
+  marketplace: string,
+  name: string,
+) {
+  const ctx = marketplaceCtx(state)
+  if (!ctx) throw new Error("No project directory to resolve marketplaces from")
+  const { items } = await listContent(ctx, kind)
+  const item = items.find((entry) => entry.marketplace === marketplace && entry.name === name)
+  if (!item || item.kind === "plugin") throw new Error(`"${marketplace}/${name}" is no longer in that marketplace`)
+  return planInstall(item as ConfigItem, await resolveConfigPath(Global.Path.config, true))
+}
+
+async function planMarketplaceForRuntime(
+  state: RuntimeState | undefined,
+  kind: Exclude<TuiMarketplaceKind, "plugin">,
+  marketplace: string,
+  name: string,
+): Promise<TuiMarketplacePlan> {
+  try {
+    const plan = await findConfigItem(state, kind, marketplace, name)
+    return { ok: true, details: plan.details, warnings: plan.warnings, configPath: plan.configPath }
+  } catch (error) {
+    return { ok: false, message: errorMessage(error) }
+  }
+}
+
+async function installMarketplaceForRuntime(
+  state: RuntimeState | undefined,
+  kind: Exclude<TuiMarketplaceKind, "plugin">,
+  marketplace: string,
+  name: string,
+): Promise<TuiMarketplaceInstallResult> {
+  try {
+    const plan = await findConfigItem(state, kind, marketplace, name)
+    await plan.apply()
+    return { ok: true, configPath: plan.configPath }
+  } catch (error) {
+    return { ok: false, message: errorMessage(error) }
+  }
+}
+
 async function installPluginBySpec(
   state: RuntimeState | undefined,
   raw: string,
   global = false,
+  replace = false,
 ): Promise<TuiPluginInstallResult> {
   if (!state) {
     return {
@@ -945,6 +1119,7 @@ async function installPluginBySpec(
     spec,
     targets: manifest.targets,
     global,
+    force: replace,
     vcs: dir.worktree && dir.worktree !== "/" ? "git" : undefined,
     worktree: dir.worktree,
     directory: dir.directory,
@@ -1024,6 +1199,26 @@ export async function addPlugin(spec: string) {
 
 export async function installPlugin(spec: string, options?: { global?: boolean }) {
   return installPluginBySpec(runtime, spec, options?.global)
+}
+
+export async function discoverPlugins() {
+  return discoverPluginsForRuntime(runtime)
+}
+
+export async function discoverMarketplace(kind?: TuiMarketplaceKind) {
+  return discoverMarketplaceForRuntime(runtime, kind)
+}
+
+export async function planMarketplace(kind: Exclude<TuiMarketplaceKind, "plugin">, marketplace: string, name: string) {
+  return planMarketplaceForRuntime(runtime, kind, marketplace, name)
+}
+
+export async function installMarketplace(
+  kind: Exclude<TuiMarketplaceKind, "plugin">,
+  marketplace: string,
+  name: string,
+) {
+  return installMarketplaceForRuntime(runtime, kind, marketplace, name)
 }
 
 export async function dispose() {

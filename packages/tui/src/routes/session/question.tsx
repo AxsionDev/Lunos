@@ -8,10 +8,28 @@ import { useSDK } from "../../context/sdk"
 import { SplitBorder } from "../../ui/border"
 import { useTuiConfig } from "../../config"
 import { useBindings, useOpencodeModeStack } from "../../keymap"
+import { createDoublePress } from "../../util/dismiss"
 
 const QUESTION_MODE = "question"
 
-export function QuestionPrompt(props: { request: QuestionRequest; directory?: string }) {
+/** Everything needed to put the panel back exactly as the user left it (XCOD-98). */
+export type QuestionDraft = {
+  tab: number
+  answers: QuestionAnswer[]
+  custom: string[]
+  selected: number
+}
+
+export function QuestionPrompt(props: {
+  request: QuestionRequest
+  directory?: string
+  /** Restores an undone or later-answered question as it was left. */
+  initial?: QuestionDraft
+  /** Called on a confirmed dismissal. Without it the question is rejected at once. */
+  onDismiss?: (draft: QuestionDraft) => void
+  /** Replaces replying to the live request, for a question answered after its turn ended. */
+  onAnswer?: (answers: QuestionAnswer[]) => void
+}) {
   const sdk = useSDK()
   const { theme } = useTheme()
   const renderer = useRenderer()
@@ -22,11 +40,12 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
   const single = createMemo(() => questions().length === 1 && questions()[0]?.multiple !== true)
   const tabs = createMemo(() => (single() ? 1 : questions().length + 1)) // questions + confirm tab (no confirm for single select)
   const [tabHover, setTabHover] = createSignal<number | "confirm" | null>(null)
+  const initial = props.initial
   const [store, setStore] = createStore({
-    tab: 0,
-    answers: [] as QuestionAnswer[],
-    custom: [] as string[],
-    selected: 0,
+    tab: initial?.tab ?? 0,
+    answers: [...(initial?.answers ?? [])] as QuestionAnswer[],
+    custom: [...(initial?.custom ?? [])] as string[],
+    selected: initial?.selected ?? 0,
     editing: false,
   })
 
@@ -47,6 +66,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
 
   function submit() {
     const answers = questions().map((_, i) => store.answers[i] ?? [])
+    if (props.onAnswer) return props.onAnswer(answers)
     void sdk.client.question.reply({
       requestID: props.request.id,
       directory: props.directory,
@@ -61,6 +81,26 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
     })
   }
 
+  // One stray Esc must not throw the question away: the first only warns, a second within the
+  // window dismisses. `question.dismiss_window: 0` restores the single-Esc dismissal.
+  const guard = createDoublePress(() => tuiConfig.question.dismiss_window)
+  const [warning, setWarning] = createSignal(false)
+  let warningTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(warningTimer))
+
+  function dismiss() {
+    clearTimeout(warningTimer)
+    if (guard.press() === "armed") {
+      setWarning(true)
+      warningTimer = setTimeout(() => setWarning(false), tuiConfig.question.dismiss_window)
+      return
+    }
+    setWarning(false)
+    const draft = { tab: store.tab, answers: [...store.answers], custom: [...store.custom], selected: store.selected }
+    if (props.onDismiss) return props.onDismiss(draft)
+    reject()
+  }
+
   function pick(answer: string, custom: boolean = false) {
     const answers = [...store.answers]
     answers[store.tab] = [answer]
@@ -71,6 +111,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
       setStore("custom", inputs)
     }
     if (single()) {
+      if (props.onAnswer) return props.onAnswer([[answer]])
       void sdk.client.question.reply({
         requestID: props.request.id,
         directory: props.directory,
@@ -155,6 +196,8 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
         group: "Question",
         cmd: () => {
           setStore("editing", false)
+          // This Esc was spent closing the edit; it is not the first half of a dismissal.
+          guard.reset()
         },
       },
       ...tuiConfig.keybinds.get("prompt.clear"),
@@ -217,10 +260,10 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
       commands: [
         {
           name: "app.exit",
-          title: "Reject question",
+          title: "Dismiss question",
           category: "Question",
           run() {
-            reject()
+            dismiss()
           },
         },
       ],
@@ -250,7 +293,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
         ...(confirm()
           ? [
               { key: "return", desc: "Submit answer", group: "Question", cmd: () => submit() },
-              { key: "escape", desc: "Reject question", group: "Question", cmd: () => reject() },
+              { key: "escape", desc: "Dismiss question", group: "Question", cmd: () => dismiss() },
               ...tuiConfig.keybinds.get("app.exit"),
             ]
           : [
@@ -278,7 +321,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
               { key: "down", desc: "Next answer", group: "Question", cmd: () => moveTo((store.selected + 1) % total) },
               { key: "j", desc: "Next answer", group: "Question", cmd: () => moveTo((store.selected + 1) % total) },
               { key: "return", desc: "Select answer", group: "Question", cmd: () => selectOption() },
-              { key: "escape", desc: "Reject question", group: "Question", cmd: () => reject() },
+              { key: "escape", desc: "Dismiss question", group: "Question", cmd: () => dismiss() },
               ...tuiConfig.keybinds.get("app.exit"),
             ]),
       ],
@@ -505,9 +548,16 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
             </span>
           </text>
 
-          <text fg={theme.text}>
-            esc <span style={{ fg: theme.textMuted }}>dismiss</span>
-          </text>
+          <Show
+            when={warning()}
+            fallback={
+              <text fg={theme.text}>
+                esc <span style={{ fg: theme.textMuted }}>dismiss</span>
+              </text>
+            }
+          >
+            <text fg={theme.warning}>Press Esc again to dismiss the question</text>
+          </Show>
         </box>
       </box>
     </box>

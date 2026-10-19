@@ -1,7 +1,7 @@
 import { useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { batch, createContext, createEffect, onCleanup, Show, useContext, type JSX, type ParentProps } from "solid-js"
 import { useTheme } from "../context/theme"
-import { MouseButton, Renderable, RGBA } from "@opentui/core"
+import { EditBufferRenderable, MouseButton, Renderable, RGBA } from "@opentui/core"
 import { createStore } from "solid-js/store"
 import { useToast } from "./toast"
 import { Flag } from "@opencode-ai/core/flag/flag"
@@ -66,13 +66,41 @@ export function Dialog(
   )
 }
 
+/**
+ * XCOD-233: screens reachable from /settings form one window. Esc closes all of it from any depth;
+ * ← goes back one level (`back`). A screen opened with `back` (or `nav`) is part of that window,
+ * and so is anything a window screen opens with a plain `replace` (it inherits the way back).
+ * Screens opened elsewhere keep the old behaviour: Esc pops them.
+ */
+export type DialogNav = {
+  /** Where ← goes. Unset on the window's top level, where ← does nothing. */
+  back?: () => void
+  /** Part of the /settings window even without a way back (its top level). */
+  nav?: boolean
+  /**
+   * `generation` when the opener was set up. A replace from a flow that was still running when the
+   * window was closed (a save that finished after Esc) is dropped instead of reopening it.
+   */
+  generation?: number
+}
+
+type Entry = {
+  element: JSX.Element
+  onClose?: () => void
+  nav?: boolean
+  back?: () => void
+}
+
+/** A focused text field whose cursor isn't at its start: ← belongs to it, not to navigation. */
+function editingText(focused: unknown) {
+  return focused instanceof EditBufferRenderable && !focused.isDestroyed && focused.cursorOffset > 0
+}
+
 function init() {
   const [store, setStore] = createStore({
-    stack: [] as {
-      element: JSX.Element
-      onClose?: () => void
-    }[],
+    stack: [] as Entry[],
     size: "medium" as "medium" | "large" | "xlarge",
+    generation: 0,
   })
 
   const renderer = useRenderer()
@@ -102,8 +130,24 @@ function init() {
     }, 1)
   }
 
+  /** Closes the whole /settings window: nothing a pending prompt or save would do happens. */
+  function closeAll() {
+    setStore("generation", (value) => value + 1)
+    api.clear()
+  }
+
+  /** ← on a window screen: back one level. False when there's nowhere to go back to. */
+  function back() {
+    const current = store.stack.at(-1)
+    if (!current?.back) return false
+    current.back()
+    return true
+  }
+
   useBindings(() => ({
     enabled: store.stack.length > 0 && !renderer.getSelection()?.getSelectedText(),
+    // Above the text fields' own layers, so ← at the start of a field goes back (XCOD-233).
+    priority: 2,
     bindings: [
       {
         key: "escape",
@@ -114,9 +158,21 @@ function init() {
             renderer.clearSelection()
           }
           const current = store.stack.at(-1)
+          if (current?.nav) return closeAll()
           current?.onClose?.()
           setStore("stack", store.stack.slice(0, -1))
           refocus()
+        },
+      },
+      {
+        key: "left",
+        desc: "Back",
+        group: "Dialog",
+        cmd: (ctx: { focused: unknown }) => {
+          const current = store.stack.at(-1)
+          // Not ours: the key goes on to the focused field (moves its cursor) or the screen.
+          if (!current?.back || editingText(ctx.focused ?? renderer.currentFocusedRenderable)) return false
+          back()
         },
       },
       {
@@ -136,7 +192,7 @@ function init() {
     ],
   }))
 
-  return {
+  const api = {
     clear() {
       for (const item of store.stack) {
         if (item.onClose) item.onClose()
@@ -147,7 +203,17 @@ function init() {
       })
       refocus()
     },
-    replace(input: any, onClose?: () => void) {
+    replace(input: any, onClose?: () => void, nav?: DialogNav) {
+      if (nav?.generation !== undefined && nav.generation !== store.generation) return
+      const top = store.stack.at(-1)
+      const entry: Entry = { element: input, onClose }
+      if (nav && (nav.back || nav.nav)) {
+        entry.nav = true
+        entry.back = nav.back
+      } else if (top?.nav) {
+        entry.nav = true
+        entry.back = top.back
+      }
       if (store.stack.length === 0) {
         focus = renderer.currentFocusedRenderable
         focus?.blur()
@@ -156,12 +222,27 @@ function init() {
         if (item.onClose) item.onClose()
       }
       setStore("size", "medium")
-      setStore("stack", [
-        {
-          element: input,
-          onClose,
-        },
-      ])
+      setStore("stack", [entry])
+    },
+    /** Esc's meaning for the current screen, also used by the "esc" labels and the backdrop. */
+    dismiss() {
+      if (store.stack.at(-1)?.nav) return closeAll()
+      api.clear()
+    },
+    back,
+    /** Makes the screen shown the top level of the /settings window (opened by a plain replace). */
+    markNav() {
+      const index = store.stack.length - 1
+      if (index >= 0 && !store.stack[index].nav) setStore("stack", index, "nav", true)
+    },
+    /** Bumped each time the /settings window is closed with Esc (see DialogNav.generation). */
+    get generation() {
+      return store.generation
+    },
+    /** Whether the screen shown is part of the /settings window, and whether it can go back. */
+    get nav() {
+      const top = store.stack.at(-1)
+      return top?.nav ? { back: top.back !== undefined } : undefined
     },
     get stack() {
       return store.stack
@@ -173,6 +254,7 @@ function init() {
       setStore("size", size)
     },
   }
+  return api
 }
 
 export type DialogContext = ReturnType<typeof init>
@@ -213,12 +295,23 @@ export function DialogProvider(props: ParentProps) {
         onMouseUp={!Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT ? copySelection : undefined}
       >
         <Show when={value.stack.length}>
-          <Dialog onClose={() => value.clear()} size={value.size}>
+          <Dialog onClose={() => value.dismiss()} size={value.size}>
             {value.stack.at(-1)!.element}
+            <Show when={value.nav}>{(nav) => <NavHint back={nav().back} />}</Show>
           </Dialog>
         </Show>
       </box>
     </ctx.Provider>
+  )
+}
+
+/** XCOD-233: the same two keys on every screen of the /settings window. */
+function NavHint(props: { back: boolean }) {
+  const { theme } = useTheme()
+  return (
+    <box paddingLeft={4} paddingRight={4} paddingBottom={1} flexShrink={0}>
+      <text fg={theme.textMuted}>{props.back ? "← back · esc close" : "esc close"}</text>
+    </box>
   )
 }
 

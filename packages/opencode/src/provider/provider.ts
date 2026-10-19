@@ -3,6 +3,7 @@ import os from "os"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import fuzzysort from "fuzzysort"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { mapValues, mergeDeep, omit, pickBy, sortBy } from "remeda"
 import { NoSuchModelError, type Provider as SDK } from "ai"
 import { Npm } from "@opencode-ai/core/npm"
@@ -16,6 +17,9 @@ import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
+import { Residency } from "@opencode-ai/core/residency"
+import { ModelCuration } from "./curation"
+import { AuditLog } from "@/audit/log"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -228,17 +232,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         Boolean(yield* dep.auth(input.id)) ||
         Boolean((yield* dep.config()).provider?.["opencode"]?.options?.apiKey)
 
-      if (!ok) {
-        for (const [key, value] of Object.entries(input.models)) {
-          if (value.cost.input === 0) continue
-          delete input.models[key]
-        }
-      }
-
-      return {
-        autoload: Object.keys(input.models).length > 0,
-        options: ok ? {} : { apiKey: "public" },
-      }
+      // XCOD-221: upstream loads the free models here with apiKey "public", which sends a keyless
+      // user's first prompt to upstream opencode's hosted gateway (a non-EU third party that then
+      // refuses it). Lunos loads this provider only for someone who gave it a key.
+      return { autoload: ok }
     }),
     openai: () =>
       Effect.succeed({
@@ -504,8 +501,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
             "X-Source": "opencode",
           },
         },
@@ -515,8 +512,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
           },
         },
       }),
@@ -525,8 +522,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: provider.source === "config",
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
             "X-BILLING-INVOKE-ORIGIN": "OpenCode",
           },
         },
@@ -536,8 +533,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://opencode.ai/",
-            "x-title": "opencode",
+            "http-referer": "https://lunos.tech/",
+            "x-title": "Lunos",
           },
         },
       }),
@@ -641,8 +638,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
           },
         },
       }),
@@ -841,7 +838,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       if (!apiToken) {
         throw new Error(
           "CLOUDFLARE_API_TOKEN (or CF_AIG_TOKEN) is required for Cloudflare AI Gateway. " +
-            "Set it via environment variable or run `opencode auth cloudflare-ai-gateway`.",
+            "Set it via environment variable or run `lunos auth cloudflare-ai-gateway`.",
         )
       }
 
@@ -947,8 +944,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lunos.tech/",
+            "X-Title": "Lunos",
           },
         },
       }),
@@ -975,7 +972,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           autoload: false,
           async getModel() {
             throw new Error(
-              `Snowflake Cortex: missing credentials (${missing}). Provide a bearer token (OAuth, JWT, or PAT) via env var, opencode auth, or provider options.`,
+              `Snowflake Cortex: missing credentials (${missing}). Provide a bearer token (OAuth, JWT, or PAT) via env var, lunos auth, or provider options.`,
             )
           },
         }
@@ -1140,6 +1137,29 @@ export const Model = Schema.Struct({
   headers: Schema.Record(Schema.String, Schema.String),
   release_date: Schema.String,
   variants: optional(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Any))),
+  /**
+   * Set when a policy rules this model out: the residency policy would refuse its requests (XCOD-212),
+   * or the organisation locks `model` to another one (XCOD-219, `key` is the locked key). Session
+   * pickers tag it and don't select it.
+   */
+  blocked: optional(
+    Schema.Union([
+      Schema.Struct({
+        policy: Schema.Literal("residency"),
+        region: Schema.String,
+        reason: Schema.String,
+      }),
+      Schema.Struct({
+        policy: Schema.Literal("locked"),
+        key: Schema.String,
+        reason: Schema.String,
+      }),
+    ]),
+  ),
+  /** XCOD-213: from the documented size rules; absent when the size isn't known. */
+  size: optional(Schema.Literals(["large", "medium", "small"])),
+  /** XCOD-213: why this model is on the curated Recommended list, when it is. */
+  recommended: optional(Schema.String),
 }).annotate({ identifier: "Model" })
 export type Model = Types.DeepMutable<Schema.Schema.Type<typeof Model>>
 
@@ -1189,6 +1209,31 @@ export function defaultModelIDs<T extends { models: Record<string, { id: string 
   return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
 }
 
+/**
+ * Models the residency policy blocks, as "provider/model" → the policy's reason (XCOD-212). Only
+ * residency: a locked `model` (XCOD-219) doesn't stop `small_model` or a subagent using another one.
+ */
+export function blockedModels(
+  providers: Record<string, { models: Record<string, { blocked?: { policy: string; reason: string } }> }>,
+) {
+  return new Map(
+    Object.entries(providers).flatMap(([providerID, provider]) =>
+      Object.entries(provider.models).flatMap(([modelID, model]) =>
+        model.blocked?.policy === "residency" ? [[`${providerID}/${modelID}`, model.blocked.reason] as const] : [],
+      ),
+    ),
+  )
+}
+
+/** Every model available here, as "provider/model" (XCOD-214: what model-valued settings accept). */
+export function modelIDs(providers: Record<string, { models: Record<string, unknown> }>) {
+  return new Set(
+    Object.entries(providers).flatMap(([providerID, provider]) =>
+      Object.keys(provider.models).map((modelID) => `${providerID}/${modelID}`),
+    ),
+  )
+}
+
 export class ModelNotFoundError extends Schema.TaggedErrorClass<ModelNotFoundError>()("ProviderModelNotFoundError", {
   providerID: ProviderV2.ID,
   modelID: ModelV2.ID,
@@ -1210,6 +1255,8 @@ export class InitError extends Schema.TaggedErrorClass<InitError>()("ProviderIni
   cause: Schema.optional(Schema.Defect()),
 }) {
   override get message() {
+    // A residency denial is a policy decision, not a broken provider: say so, and why.
+    if (this.cause instanceof Residency.DeniedError) return this.cause.message
     return `Failed to initialize provider: ${this.providerID}`
   }
 
@@ -1220,7 +1267,7 @@ export class InitError extends Schema.TaggedErrorClass<InitError>()("ProviderIni
 
 export class NoProvidersError extends Schema.TaggedErrorClass<NoProvidersError>()("ProviderNoProvidersError", {}) {
   override get message() {
-    return "No providers are available"
+    return "No model provider is set up. Run `lunos auth login`, or set a provider's API key (for example MISTRAL_API_KEY)."
   }
 
   static isInstance(input: unknown): input is NoProvidersError {
@@ -1254,6 +1301,15 @@ export interface Interface {
   ) => Effect.Effect<{ providerID: ProviderV2.ID; modelID: string } | undefined>
   readonly getSmallModel: (providerID: ProviderV2.ID) => Effect.Effect<Model | undefined>
   readonly defaultModel: () => Effect.Effect<{ providerID: ProviderV2.ID; modelID: ModelV2.ID }, DefaultModelError>
+  /**
+   * XCOD-214 (PO, 2026-10-07): a model named in config or on the command line that isn't available
+   * here is a warning, not an error. Returns it if it's available; otherwise the next best one (the
+   * closest model of the same provider, else the default) and a warning saying what was replaced.
+   */
+  readonly resolve: (
+    providerID: ProviderV2.ID,
+    modelID: ModelV2.ID,
+  ) => Effect.Effect<{ providerID: ProviderV2.ID; modelID: ModelV2.ID; warning?: string }, DefaultModelError>
 }
 
 interface State {
@@ -1263,6 +1319,7 @@ interface State {
   sdk: Map<string, BundledSDK>
   modelLoaders: Record<string, CustomModelLoader>
   varsLoaders: Record<string, CustomVarsLoader>
+  residency: Residency.Resolved | undefined
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Provider") {}
@@ -1722,6 +1779,9 @@ const layer = Layer.effect(
           })
         }
 
+        const residency = AuditLog.residency(cfg)
+        const locked = ConfigPolicy.sessionModels(cfg)
+        const recommended = ModelCuration.recommended(cfg.recommended)
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
           if (!isProviderAllowed(providerID)) {
@@ -1730,6 +1790,10 @@ const layer = Layer.effect(
           }
 
           const configProvider = cfg.provider?.[providerID]
+          const configuredURL =
+            typeof provider.options?.["baseURL"] === "string" && provider.options["baseURL"] !== ""
+              ? provider.options["baseURL"]
+              : undefined
 
           for (const [modelID, model] of Object.entries(provider.models)) {
             model.api.id = model.api.id ?? model.id ?? modelID
@@ -1764,6 +1828,26 @@ const layer = Layer.effect(
                 (v) => omit(v, ["disabled"]),
               )
             }
+
+            // The endpoint `resolveSDK` would use, so the tag matches what `Residency.enforce` decides.
+            const denied = Residency.blocked(providerID, configuredURL ?? model.api.url, residency)
+            if (denied) model.blocked = { policy: "residency", region: denied.region, reason: denied.reason }
+            // XCOD-219: a locked `model` rules out every other model for the session.
+            else if (locked && !locked.allowed.has(`${providerID}/${modelID}`))
+              model.blocked = {
+                policy: "locked",
+                key: locked.lock.key,
+                reason: ConfigPolicy.modelLockReason(locked.lock),
+              }
+            else delete model.blocked
+
+            const size = ModelCuration.size(providerID, modelID, model.name)
+            if (size) model.size = size
+            else delete model.size
+            const why = recommended[`${providerID}/${modelID}`]
+            // XCOD-229: a reason is optional; a model listed without one is still recommended.
+            if (why !== undefined) model.recommended = why
+            else delete model.recommended
           }
 
           if (Object.keys(provider.models).length === 0) {
@@ -1779,6 +1863,7 @@ const layer = Layer.effect(
           sdk,
           modelLoaders,
           varsLoaders,
+          residency,
         }
       }),
     )
@@ -1846,6 +1931,16 @@ const layer = Layer.effect(
             options,
           }),
         )
+        // Before the SDK cache: a cached SDK only ever exists for a provider that was allowed.
+        // This is the enforcement point for live sessions; the v2 `aisdk.sdk` hook is not on this path.
+        if (s.residency)
+          options["fetch"] = Residency.enforce({
+            providerID: model.providerID,
+            baseURL: typeof options["baseURL"] === "string" ? options["baseURL"] : "",
+            resolved: s.residency,
+            defaultAuditPath: path.join(Global.Path.log, "residency-egress.log"),
+            fetch: options["fetch"],
+          })
         const existing = s.sdk.get(key)
         if (existing) return existing
 
@@ -1967,7 +2062,11 @@ const layer = Layer.effect(
       if (cfg.small_model) {
         const parsed = parseModel(cfg.small_model)
         return yield* getModel(parsed.providerID, parsed.modelID).pipe(
-          Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
+          Effect.catchTag("ProviderModelNotFoundError", () =>
+            Effect.logWarning(`small_model "${cfg.small_model}" from config isn't available here; not using it`).pipe(
+              Effect.as(undefined),
+            ),
+          ),
         )
       }
 
@@ -2030,11 +2129,44 @@ const layer = Layer.effect(
       return undefined
     })
 
+    /** The closest available model of the same provider, if it has any. */
+    const nearest = (s: State, providerID: ProviderV2.ID, modelID: ModelV2.ID) => {
+      const provider = s.providers[providerID]
+      if (!provider) return undefined
+      const [match] = modelSuggestions(provider, modelID, runtimeFlags.enableExperimentalModels).filter(
+        (id) => provider.models[id],
+      )
+      return match ? { providerID, modelID: ModelV2.ID.make(match) } : undefined
+    }
+
     const defaultModel = Effect.fn("Provider.defaultModel")(function* () {
       const cfg = yield* config.get()
-      if (cfg.model) return parseModel(cfg.model)
-
       const s = yield* InstanceState.get(state)
+      // Returned even if it isn't available here: the session replaces it then, with a warning.
+      if (cfg.model) return parseModel(cfg.model)
+      return yield* fallbackModel(s, cfg)
+    })
+
+    const resolve = Effect.fn("Provider.resolve")(function* (providerID: ProviderV2.ID, modelID: ModelV2.ID) {
+      const s = yield* InstanceState.get(state)
+      if (s.providers[providerID]?.models[modelID]) return { providerID, modelID }
+      const cfg = yield* config.get()
+      const configured = cfg.model ? parseModel(cfg.model) : undefined
+      const fallback =
+        nearest(s, providerID, modelID) ??
+        (configured && s.providers[configured.providerID]?.models[configured.modelID]
+          ? configured
+          : yield* fallbackModel(s, cfg))
+      return {
+        ...fallback,
+        warning: `Model "${providerID}/${modelID}" isn't available here, so ${fallback.providerID}/${fallback.modelID} is used instead. See \`lunos models\`.`,
+      }
+    })
+
+    const fallbackModel = Effect.fn("Provider.fallbackModel")(function* (
+      s: State,
+      cfg: { provider?: Record<string, unknown> },
+    ) {
       const recent = yield* fs.readJson(path.join(Global.Path.state, "model.json")).pipe(
         Effect.map((x): { providerID: ProviderV2.ID; modelID: ModelV2.ID }[] => {
           if (!isRecord(x) || !Array.isArray(x.recent)) return []
@@ -2065,7 +2197,7 @@ const layer = Layer.effect(
       }
     })
 
-    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
+    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel, resolve })
   }),
 )
 

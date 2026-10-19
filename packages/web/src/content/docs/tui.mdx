@@ -1,13 +1,13 @@
 ---
 title: TUI
-description: Using the OpenCode terminal user interface.
+description: Using the Lunos terminal user interface.
 ---
 
 import { Tabs, TabItem } from "@astrojs/starlight/components"
 
-OpenCode provides an interactive terminal interface or TUI for working on your projects with an LLM.
+Lunos provides an interactive terminal interface or TUI for working on your projects with an LLM.
 
-Running OpenCode starts the TUI for the current directory.
+Running Lunos starts the TUI for the current directory.
 
 ```bash
 opencode
@@ -61,9 +61,21 @@ The output of the command is added to the conversation as a tool result.
 
 ---
 
+## Clearing the prompt
+
+Press `Esc` twice to clear what you've typed and start again. The first `Esc` shows "esc again to clear" under the prompt; a second within a second clears the text, pasted blocks and `@` references.
+
+- Nothing is lost: the toast names the undo key (`input_undo`, `ctrl+-` by default, plus `ctrl+z` where the terminal doesn't use it to suspend), which brings the prompt back as it was, and `↑` finds it in prompt history.
+- While the agent is working, `Esc` `Esc` stops it as before, and what you've typed stays.
+- An `Esc` that closes autocomplete, leaves shell mode or clears a selection doesn't count as the first press.
+- It works the same in `/claude` and `/codex` sessions; the prompt is cleared in Lunos and nothing is sent to the tool.
+- Turn it off with `"double_escape_clear": false`, or change the window with `double_escape_ms`. `ctrl+c` (`input_clear`) still clears the prompt at once.
+
+---
+
 ## Commands
 
-When using the OpenCode TUI, you can type `/` followed by a command name to quickly execute actions. For example:
+When using the Lunos TUI, you can type `/` followed by a command name to quickly execute actions. For example:
 
 ```bash frame="none"
 /help
@@ -75,12 +87,14 @@ Here are all available slash commands:
 
 ---
 
-### connect
+### providers
 
-Add a provider to OpenCode. Allows you to select from available providers and add their API keys.
+Manage providers. Lists your configured providers with their status, auth method and jurisdiction.
+From there you can **Add provider** (log in with an API key or OAuth), **Log out**, or **Set as default
+for model picker**. The old name still works for now and shows a rename hint.
 
 ```bash frame="none"
-/connect
+/providers
 ```
 
 ---
@@ -121,7 +135,7 @@ Open external editor for composing messages. Uses the editor set in your `EDITOR
 
 ### exit
 
-Exit OpenCode. _Aliases_: `/quit`, `/q`
+Exit Lunos. _Aliases_: `/quit`, `/q`
 
 ```bash frame="none"
 /exit
@@ -163,6 +177,33 @@ Guided setup for creating or updating `AGENTS.md`. [Learn more](/docs/rules).
 
 ---
 
+### claude
+
+Give Claude Code a task from the prompt: `/claude <task>` starts a new Claude Code session with it,
+in its own view. `/claude` on its own lets you pick a new session or continue a recent one in this
+project. `/codex` does the same for Codex CLI (`/codex /review` runs its review). Listed while
+external sessions are on; greyed out with the reason when the tool isn't installed, isn't signed in,
+or is blocked by policy. See [Claude Code and Codex CLI from Lunos](https://github.com/AxsionDev/Lunos/blob/dev/docs/external-agents.md).
+
+```bash frame="none"
+/claude Fix the failing test
+/codex /review
+```
+
+---
+
+### marketplace
+
+Browse and install plugins, skills, hooks and MCP servers from your marketplaces, one tab per kind (`tab` / `shift+tab` or a click switches; counts follow the search). Add a tab name (`plugins`, `skills`, `hooks`, `mcp`) to open that tab, `installed` to see what is installed with available updates first, or any other words to search every tab. Without words it opens on the tab you used last. _Alias_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 List available models.
@@ -187,6 +228,16 @@ Start a new session. _Alias_: `/clear`
 
 ---
 
+### plugins
+
+List installed plugins and turn them on or off.
+
+```bash frame="none"
+/plugins
+```
+
+---
+
 ### redo
 
 Redo a previously undone message. Only available after using `/undo`.
@@ -206,12 +257,99 @@ be a Git repository**.
 
 ---
 
+### restart
+
+Restart Lunos and come back to the same session, with whatever you had typed but not sent still in
+the prompt. Use it after `/update` to run the new version, to pick up config changes, or to recover
+from a stuck MCP server or LSP. Also in the command palette as **Restart Lunos**.
+
+```bash frame="none"
+/restart
+```
+
+`/restart --fresh` starts a new session instead (palette: **Restart Lunos in a new session**).
+
+Lunos stops its MCP servers, LSP servers, memory sidecar and local server, restores the terminal,
+and starts again with the same executable, arguments, working directory and environment, plus
+`--session <id>`. The new process shows `Restarted — Lunos X.Y.Z` (`X.Y.Z → A.B.C` after an
+update).
+
+- **While the agent is working** (mid-turn, or background jobs running) Lunos asks first: **wait
+  for the current turn**, then restart; **stop and restart**, cancelling the running work (listed in
+  the banner afterwards; `/undo` reverts file changes it made); or **cancel**. It never restarts
+  silently while a tool may be writing files. While it waits, `/restart` again cancels the restart.
+- **With `lunos attach`** only the TUI client restarts. The server keeps running, along with any
+  turn it was working on.
+- **On Windows** the new Lunos starts in the same console window, and the old process stays behind,
+  idle, until it exits (Windows can't replace a running process the way Linux and macOS do).
+- **If the new process fails to start** (for example because of a broken config file), Lunos prints
+  the error and the exact command to start it by hand. It never retries.
+
+**Keybind:** none by default; set `app_restart` in [`tui.json`](/docs/keybinds).
+
+---
+
+### settings
+
+Open the settings screen: every configuration option in one place. _Alias_: `/config`
+
+```bash frame="none"
+/settings
+```
+
+`/settings key=value` changes one setting without opening the screen, for example
+`/settings share=disabled`. See [Settings](#settings-1) below.
+
+---
+
+### status
+
+Open the settings screen on its **Status** tab: version, the config files loaded, model, residency,
+memory, keys locked by your organisation, and MCP servers, LSP servers, formatters and plugins.
+
+```bash frame="none"
+/status
+```
+
+---
+
 ### sessions
 
-List and switch between sessions. _Aliases_: `/resume`, `/continue`
+Every session on this machine, across all your projects: its state (running, waiting for approval,
+idle, finished, failed), project, agent, model, last activity and cost, in your own groups. The
+groups are the same ones the desktop app's Sessions window and the web UI's `/sessions` page show.
 
 ```bash frame="none"
 /sessions
+```
+
+Type to search by name, project, state or group. **Enter** opens the selected session (a session
+waiting for approval opens at its prompt) or collapses and expands a group. `ctrl+o` moves a session
+to a group, `ctrl+g` creates a group, `ctrl+r` renames a session or group, `ctrl+d` (twice) deletes
+a group without touching its sessions, `ctrl+s` stops a running session and `ctrl+f` cycles the
+state filter.
+
+---
+
+### monitor
+
+The [Agent Monitor](/docs/agent-monitor): every session on this computer beside a prompt that starts
+new sessions or sends to the ones you tag with `@` and their number. Also opened by ← on an empty
+prompt and by `<leader>o`.
+
+```bash frame="none"
+/monitor
+```
+
+---
+
+### resume
+
+List and switch between this project's sessions, pin them and use the quick-switch slots.
+_Aliases_: `/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **Keybind:** `ctrl+x l`
@@ -283,13 +421,133 @@ Unshare current session. [Learn more](/docs/share#un-sharing).
 
 ---
 
+### whatsnew
+
+Show what changed since your previous version: behaviour changes and security entries first, then
+what's new and a count of fixes, taken from the release notes built into Lunos (no network). The
+same panel opens by itself once, on the first start after an update. Turn that off with
+`"whats_new": false` in `tui.json`; `/whatsnew` keeps working.
+
+```bash frame="none"
+/whatsnew
+```
+
+---
+
 ### update
 
-Check for a new version of OpenCode and install it. If a newer OpenCode 1 release is available, the dialog installs it. If OpenCode 1 is up to date, it offers to upgrade you to OpenCode 2.0 instead. OpenCode never installs updates on its own, so a notice on the home screen tells you when one is available. Choosing **Skip** on an OpenCode 1 update hides the notice until a newer version is released, and choosing **Dismiss** on the OpenCode 2.0 offer hides it for a week.
+Update Lunos to the latest version. Also available as `/upgrade`, its old name.
 
 ```bash frame="none"
 /update
 ```
+
+When a new version is published, the bottom-right corner of every screen shows
+`There is a new version: X.Y.Z — please run lunos update` (`New version: X.Y.Z · lunos update` in
+terminals narrower than 100 columns) until you update. While `/update` runs, that corner shows the step
+and the elapsed time instead, and you can keep using the prompt. After updating, run [`/restart`](#restart) to
+use the new version: it starts the newly installed Lunos, not the old binary, back in the same
+session. See [`lunos update`](/docs/cli#update) for when the check runs and how to turn it off.
+
+---
+
+## Settings
+
+`/settings` (or `/config`, or `lunos settings` from the shell) opens one dialog with three tabs,
+**Status | Settings | Usage**. Tab and Shift+Tab switch tabs, Esc closes. `/status` opens the same
+dialog on the Status tab.
+
+The **Settings** tab opens on a list of sections, each with a short summary of what's set and
+badges for settings changed from the default, locked by your organisation (🔒) and saved changes
+waiting for a restart (↻). Enter opens a section in its own window; where it has distinct parts,
+they're sub-tabs (Tab / Shift+Tab or a click switches):
+
+| Section               | Sub-tabs                                                                |
+| --------------------- | ----------------------------------------------------------------------- |
+| Models & agents       | Models · Agents · Providers · External sessions                         |
+| Permissions           | Rules · Tools · Sandbox                                                 |
+| Residency & privacy   | Residency · Audit · Sharing                                             |
+| Memory                | Overview (status, guided setup, analytics) · Settings · Advanced        |
+| Marketplace & plugins | Marketplaces · Plugins · Policy                                         |
+| Appearance            | Theme · Layout                                                          |
+| Tools                 | LSP · Formatters · MCP · Commands · Skills · Hooks · Shell · References |
+| Updates, Advanced     | one window each                                                         |
+
+The title shows where you are (`Settings › Memory › Advanced`); ← goes back a level. Typing on the
+home searches every setting, each result with where it lives, and Enter opens it there. Inside a
+section, typing searches that section. `/settings memory`, `/settings tools lsp` or
+`/settings models external` open a section or sub-tab directly.
+
+Every option in `opencode.json` and `tui.json` is in exactly one section, generated from the config
+schema, so new options appear without a TUI update. Each row shows the current value and where it
+comes from:
+
+| Badge        | Meaning                                                                             |
+| ------------ | ----------------------------------------------------------------------------------- |
+| `default`    | Not set anywhere; the built-in default applies                                      |
+| `user`       | Your user config (`~/.config/opencode/opencode.json[c]`, or `tui.json` for the TUI) |
+| `project`    | The project's config (`opencode.json` or `.opencode/opencode.json[c]`)              |
+| `env`        | An environment variable or `OPENCODE_CONFIG*` wins over the files                   |
+| `managed 🔒` | Set by your organisation's managed config; it can't be changed here                 |
+| `remote`     | Loaded from a well-known or console organisation config                             |
+
+Start typing to filter by name, key or description (`resid` shows the residency settings). The
+highlighted row's description, the file it comes from, and any lock, environment override or
+restart note show below the list.
+
+| Key    | Action                                                                               |
+| ------ | ------------------------------------------------------------------------------------ |
+| Enter  | Change the setting (see below)                                                       |
+| Space  | Toggle an on/off setting, or move an option setting to its next value                |
+| Ctrl+S | Switch where changes are saved: your **user** config (default) or this **project**'s |
+| Tab    | Next tab (inside a section: next sub-tab)                                            |
+| ←      | Back one level, to the row you came from (in a text field: from the start of it)     |
+| Esc    | Close the whole settings window from any screen in it; what you were typing is lost  |
+
+How Enter changes a setting depends on its type:
+
+- **On/off:** toggles.
+- **A fixed set of values** (`share`, `autoupdate`, `logLevel`…): pick from a list.
+- **Model and theme:** open the usual model and theme pickers; the choice is saved to the config.
+- **Default agent:** pick one of the main agents (shown with what they do), make a new one (it
+  becomes the default once both its name and description are entered), or Clear to use Lunos's
+  default. New sessions start with it. A default that names a subagent, a hidden agent or one that's
+  turned off is marked ⚠.
+- **Recommended:** the models the pickers list under Recommended (ctrl+l), each with why. Unset,
+  it's Lunos's curated list, marked "Lunos default". Add model… opens the model picker and asks for
+  an optional reason (up to 50 characters); Enter on a model edits its reason or removes it; Reset
+  to Lunos defaults removes the key from the scope you're saving to. The first change writes the
+  whole list to that scope. The pickers show the new list at once, without a restart.
+- **Reasoning variant** (`subagent.variant`, an agent's Variant): pick from the variants of the
+  model it applies to (the subagent's or agent's model, or the main model it inherits), or Inherit;
+  Clear removes the key. A saved variant that model doesn't have is marked
+  `not available for <model>`, and requests use the model's default effort.
+- **Text, numbers and lists:** an inline prompt. Lists are comma-separated (`eu, us`).
+- **MCP servers and providers:** open the `/mcps` and `/providers` dialogs.
+- **Structured settings made of simple fields** (`subagent`, `compaction`, `sandbox`, `memory`…):
+  open a screen of their own fields, with the same controls. The Subagent screen has Run in
+  background, Model, Variant, "Let the main agent choose a model per task" and Allowed models.
+- **Other structured settings** (`permission`, `lsp`, `hooks`…): open the config file in `$EDITOR`,
+  or show its path when no editor is set.
+
+Every change is checked against the config schema before it's written, and an invalid value is
+refused with the allowed values listed; nothing is written. Changes are saved to the user config
+(`.opencode/opencode.json` for the project scope, or `tui.json` for TUI settings such as the
+theme), and comments and formatting in the file are kept. Most changes apply at once; settings that
+need a restart (plugins, MCP servers, memory, LSP, formatters, server, TUI options other than the
+theme) are marked ↻ and offer to run [`/restart`](#restart) after saving.
+
+- **Locked settings.** Keys your organisation locks in managed config (`$locked`) show 🔒 and can't
+  be changed, from this screen, `/settings key=value` or `lunos settings set`.
+- **Environment overrides.** When an environment variable decides a value (for example
+  `LUNOS_DISABLE_MEMORY` or `OPENCODE_DISABLE_AUTOUPDATE`), the row says so: editing the file
+  won't take effect until the variable is removed.
+- **Secrets** such as API keys are never shown: they're masked, and managed in
+  [`/providers`](#providers). Values written as `{env:NAME}` or `{file:path}` show the reference,
+  not what it resolves to.
+
+The **Usage** tab shows tokens and cost for the current session and for the last 30 days, from the
+same data as [`lunos stats`](/docs/cli#stats).
 
 ---
 
@@ -405,10 +663,19 @@ This is separate from `opencode.json`, which configures server/runtime behavior.
 
 - `theme` - Sets your UI theme. [Learn more](/docs/themes).
 - `keybinds` - Customizes keyboard shortcuts. [Learn more](/docs/keybinds).
-- `leader_timeout` - Controls how long OpenCode waits after the leader key. Defaults to `2000`.
+- `leader_timeout` - Controls how long Lunos waits after the leader key. Defaults to `2000`.
 - `scroll_acceleration.enabled` - Enable macOS-style scroll acceleration for smooth, natural scrolling. When enabled, scroll speed increases with rapid scrolling gestures and stays precise for slower movements. **This setting takes precedence over `scroll_speed` and overrides it when enabled.**
 - `scroll_speed` - Controls how fast the TUI scrolls when using scroll commands (minimum: `0.001`, supports decimal values). Defaults to `3`. **Note: This is ignored if `scroll_acceleration.enabled` is set to `true`.**
 - `diff_style` - Controls diff rendering. `"auto"` adapts to terminal width, `"stacked"` always shows a single-column layout.
+- `external_accent` - `false` keeps your theme's colours in Claude Code and Codex sessions; the `▸ Claude Code` label and `Lunos · Claude Code` badge stay (default: `true`).
+- `double_escape_clear` - `false` turns off [clearing the prompt with `Esc` `Esc`](#clearing-the-prompt) (default: `true`).
+- `double_escape_ms` - Milliseconds in which the second `Esc` clears the prompt (default: `1000`).
+- `left_opens_monitor` - `false` stops ← on an empty prompt from opening the [Agent Monitor](/docs/agent-monitor) (default: `true`). `/monitor` and `<leader>o` still open it.
+- `whats_new` - `false` stops the "What's new" panel on the first start after an update (default: `true`). [`/whatsnew`](#whatsnew) and [`lunos changelog`](/docs/cli#changelog) still work.
+- `reduced_motion` - `true` turns off every animation (the home screen's moon reflection, spinners, placeholder cycling), and the in-app "Disable animations" toggle can't turn them back on. When unset, animations are off by default if `NO_COLOR` is set or `TERM=dumb`, and the toggle decides.
+
+For a high-contrast display, set `"theme": "high-contrast"` (see [Themes](/docs/themes)).
+
 - `cursor` - Controls the terminal cursor in TUI input fields. `style` defaults to `"block"`, can be `"underline"`, `"line"`, or `"default"`; `blinking` defaults to `true`. When `style` is `"default"`, the terminal default cursor is restored, so `blinking` has no effect.
 - `mouse` - Enable or disable mouse capture in the TUI (default: `true`). When disabled, the terminal's native mouse selection/scrolling behavior is preserved.
 - `attention` - Configures TUI desktop notifications and sounds. Disabled by default.

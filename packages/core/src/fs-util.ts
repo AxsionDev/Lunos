@@ -1,6 +1,7 @@
 import { NodeFileSystem } from "@effect/platform-node"
-import { dirname, isAbsolute, join, relative, resolve as pathResolve, sep } from "path"
-import { realpathSync } from "fs"
+import { dirname, isAbsolute, join, parse, relative, resolve as pathResolve, sep } from "path"
+import { win32 as pathWin32 } from "path"
+import { existsSync, readdirSync, realpathSync } from "fs"
 import * as NFS from "fs/promises"
 import { lookup } from "mime-types"
 import { Context, Effect, FileSystem, Layer, Schema } from "effect"
@@ -233,6 +234,94 @@ export namespace FSUtil {
     } catch {
       return resolved
     }
+  }
+
+  /**
+   * An absolute path with each existing component spelled the way it is on disk.
+   * macOS's default filesystem ignores case, so `…/Axcode/src` and `…/AxCode/src` are the
+   * same directory, but containment checks and permission patterns compare strings. Models
+   * regularly reproduce paths in the wrong case. Symlinks are kept as given, not resolved,
+   * and components that don't exist yet are kept as given.
+   */
+  export function onDiskCase(p: string): string {
+    if (process.platform === "win32") return normalizePath(p)
+    const resolved = pathResolve(p)
+    try {
+      if (realpathSync.native(resolved) === resolved) return resolved
+    } catch {}
+    const root = parse(resolved).root
+    const parts = resolved.slice(root.length).split(sep).filter(Boolean)
+    let current = root
+    for (const [i, part] of parts.entries()) {
+      const given = join(current, part)
+      // Missing, or unreadable: nothing on disk to take the spelling from.
+      if (!existsSync(given)) return join(given, ...parts.slice(i + 1))
+      const entries = (() => {
+        try {
+          return readdirSync(current)
+        } catch {
+          return undefined
+        }
+      })()
+      if (!entries || entries.includes(part)) {
+        current = given
+        continue
+      }
+      // The given spelling exists but isn't an entry, so the filesystem matched it
+      // case-insensitively. Take the entry's spelling if exactly one fits.
+      const matches = entries.filter((entry) => entry.toLowerCase() === part.toLowerCase())
+      current = matches.length === 1 ? join(current, matches[0]) : given
+    }
+    return current
+  }
+
+  /**
+   * A model-supplied path made absolute against `base` (the instance directory) and spelled
+   * as on disk. On Windows a rooted path without a drive (`/Users/me/x`, `\Users\me\x`) takes
+   * its drive from `base`, not from the process's cwd, which can be on another drive (XCOD-137).
+   * Git-bash/WSL spellings (`/c/…`, `/mnt/c/…`) are converted first.
+   */
+  export function resolveOnDisk(base: string, p: string): string {
+    return onDiskCase(pathResolve(base, windowsPath(p)))
+  }
+
+  /**
+   * XCOD-149: a path rule's pattern spelled as request paths are (long names). On Windows, TEMP and
+   * the XDG dirs can come as 8.3 short names (`C:\\Users\\RUNNER~1\\…`); request paths are expanded
+   * to `C:\\Users\\runneradmin\\…`, so a short-form rule never matched them. The longest existing
+   * prefix before any glob is expanded; the rest, glob included, is kept as written. Elsewhere, for
+   * patterns that aren't absolute paths, and when expanding changes nothing, the pattern is returned
+   * byte-for-byte unchanged (separators included).
+   */
+  export function canonicalPattern(
+    p: string,
+    os: { platform: string; exists: (p: string) => boolean; realpath: (p: string) => string } = {
+      platform: process.platform,
+      exists: existsSync,
+      realpath: (item) => realpathSync.native(item),
+    },
+  ): string {
+    if (os.platform !== "win32") return p
+    const win = pathWin32
+    const glob = p.search(/[*?[{]/)
+    const literal = glob === -1 ? p : p.slice(0, glob)
+    // Cut points: every separator in the literal part, plus its end when there's no glob. Longest first.
+    const cuts = [...literal.matchAll(/[\\/]/g)].map((m) => m.index!)
+    if (glob === -1) cuts.push(p.length)
+    const same = (a: string, b: string) => win.normalize(a).toLowerCase() === win.normalize(b).toLowerCase()
+    for (const cut of cuts.reverse()) {
+      const prefix = p.slice(0, cut)
+      if (!win.isAbsolute(prefix) || !os.exists(prefix)) continue
+      const expanded = (() => {
+        try {
+          return os.realpath(prefix)
+        } catch {
+          return prefix
+        }
+      })()
+      return same(expanded, prefix) ? p : expanded + p.slice(cut)
+    }
+    return p
   }
 
   export function normalizePathPattern(p: string): string {

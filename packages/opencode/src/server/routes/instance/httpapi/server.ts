@@ -28,6 +28,7 @@ import { Vcs } from "@/project/vcs"
 import { ProviderAuth } from "@/provider/auth"
 import { Provider } from "@/provider/provider"
 import { Question } from "@/question"
+import { Memory } from "@/memory"
 import { SessionCompaction } from "@/session/compaction"
 import { Instruction } from "@/session/instruction"
 import { LLM } from "@/session/llm"
@@ -40,6 +41,7 @@ import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { SessionShare } from "@/share/session"
+import { ShareNext } from "@/share/share-next"
 import { Skill } from "@/skill"
 import { Discovery } from "@/skill/discovery"
 import { Snapshot } from "@/snapshot"
@@ -95,6 +97,7 @@ import { projectCopyHandlers } from "./handlers/project-copy"
 import { providerHandlers } from "./handlers/provider"
 import { ptyConnectHandlers, ptyHandlers } from "./handlers/pty"
 import { questionHandlers } from "./handlers/question"
+import { memoryHandlers } from "./handlers/memory"
 import { sessionHandlers } from "./handlers/session"
 import { syncHandlers } from "./handlers/sync"
 import { tuiHandlers } from "./handlers/tui"
@@ -161,6 +164,7 @@ const instanceApiRoutes = HttpApiBuilder.layer(InstanceHttpApi).pipe(
     projectCopyHandlers,
     ptyHandlers,
     questionHandlers,
+    memoryHandlers,
     permissionHandlers,
     providerHandlers,
     sessionHandlers,
@@ -228,6 +232,7 @@ const app = LayerNode.group([
   Skill.node,
   Discovery.node,
   Question.node,
+  Memory.node,
   Permission.node,
   PermissionSaved.node,
   Todo.node,
@@ -257,6 +262,7 @@ const app = LayerNode.group([
   Workspace.node,
   Worktree.node,
   Installation.node,
+  ShareNext.node,
   SessionShare.node,
   InstanceStore.node,
   httpClient,

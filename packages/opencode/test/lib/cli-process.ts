@@ -22,9 +22,10 @@ import { FSUtil } from "@opencode-ai/core/fs-util"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { AppProcess } from "@opencode-ai/core/process"
-import { Deferred, Duration, Effect, Layer, Queue, Schedule, Scope, Stream } from "effect"
+import { Deferred, Duration, Effect, Layer, Queue, Schedule, Scope, Semaphore, Stream } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
+import os from "node:os"
 import path from "node:path"
 import { TestLLMServer } from "./llm-server"
 import { testProviderConfig } from "./test-provider"
@@ -34,6 +35,28 @@ const opencodeRoot = path.resolve(import.meta.dir, "../../")
 const cliEntry = path.join(opencodeRoot, "src/index.ts")
 
 export const testModelID = "test/test-model"
+
+// Every short-lived CLI child is a full `bun run src/index.ts` boot: ~2-3s of
+// CPU and ~250MB RSS once it has run a prompt. `test.concurrent` otherwise
+// starts all of a file's children at once (13 in run-process.test.ts), which on
+// a 4-vCPU CI runner already busy with other turbo packages oversubscribes the
+// CPU ~7x. Children then blow through their 30s kill timeout and the test sees
+// exitCode -1 (XCOD-139). Cap how many children one test process runs at once.
+// Default: half the cores, at least 2. Override with OPENCODE_TEST_CLI_CONCURRENCY.
+const childPermits = (() => {
+  const configured = Number(process.env.OPENCODE_TEST_CLI_CONCURRENCY)
+  if (Number.isInteger(configured) && configured > 0) return configured
+  return Math.max(2, Math.floor(os.availableParallelism() / 2))
+})()
+const childSlots = Semaphore.makeUnsafe(childPermits)
+
+// Each fixture gets a fresh XDG_CACHE_HOME, and bun keeps its runtime
+// transpiler cache under it — so without this every child re-transpiles the
+// source tree cold and writes ~23MB of cache that is deleted with the fixture.
+// The cache is content-addressed, so sharing it across children and runs
+// doesn't leak state between tests.
+const transpilerCache =
+  process.env.BUN_RUNTIME_TRANSPILER_CACHE_PATH ?? path.join(os.tmpdir(), "opencode-test-bun-transpiler-cache")
 
 // Wrap a Bun subprocess pipe (or any ReadableStream<Uint8Array>) as a Stream.
 // Centralizes the `evaluate` + `onError` boilerplate and tags errors with the
@@ -63,6 +86,10 @@ function isolatedEnv(home: string, configJson: string): Record<string, string> {
   return {
     OPENCODE_TEST_HOME: home,
     HOME: home,
+    // XCOD-150: `lunos run` takes its project from $PWD, which the child otherwise inherited from the
+    // test process: every harness run used the repo checkout as its project. The fixture is the
+    // project, as the child's cwd already is.
+    PWD: home,
     XDG_CONFIG_HOME: path.join(home, ".config"),
     XDG_DATA_HOME: path.join(home, ".local/share"),
     XDG_STATE_HOME: path.join(home, ".local/state"),
@@ -74,6 +101,7 @@ function isolatedEnv(home: string, configJson: string): Record<string, string> {
     OPENCODE_DISABLE_AUTOCOMPACT: "1",
     OPENCODE_DISABLE_MODELS_FETCH: "1",
     OPENCODE_AUTH_CONTENT: "{}",
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: transpilerCache,
   }
 }
 
@@ -93,13 +121,15 @@ export type SpawnOpts = { readonly timeoutMs?: number; readonly env?: Record<str
 
 // Typed equivalent of constructing argv for `opencode run`. New flags should
 // land here so tests stay grep-able and refactor-safe.
+type PermissionAction = "ask" | "allow" | "deny"
+
 export type RunOpts = SpawnOpts & {
   readonly model?: string
   readonly agent?: string
   readonly format?: "default" | "json"
   readonly command?: string
   readonly printLogs?: boolean
-  readonly permission?: Record<string, "ask" | "allow" | "deny">
+  readonly permission?: Record<string, PermissionAction | Record<string, PermissionAction>>
   readonly extraArgs?: string[]
 }
 
@@ -204,7 +234,9 @@ export function withCliFixture<A, E>(
     const configJson = JSON.stringify(testProviderConfig(llm.url))
     const env = isolatedEnv(home, configJson)
 
-    const spawn = Effect.fn("opencode.spawn")(function* (args: string[], opts?: SpawnOpts) {
+    const spawnChild = Effect.fn("opencode.spawn")(function* (args: string[], opts?: SpawnOpts) {
+      // Started after a slot is acquired, so durationMs and the kill timeout
+      // measure the child itself, not time spent queued behind other tests.
       const start = Date.now()
       const timeoutMs = opts?.timeoutMs ?? 30_000
       // stdin: "ignore" so the child doesn't see a piped stdin and block
@@ -247,6 +279,10 @@ export function withCliFixture<A, E>(
         durationMs: Date.now() - start,
       }
     })
+    // Only short-lived children take a slot. serve/acp/startRun are long-lived
+    // and may run alongside a spawn in the same test, so capping them could
+    // deadlock a test against itself.
+    const spawn = (args: string[], opts?: SpawnOpts) => childSlots.withPermits(1)(spawnChild(args, opts))
 
     const runArgs = (message: string, opts?: RunOpts) => {
       const argv: string[] = ["run"]
@@ -397,7 +433,7 @@ export function withCliFixture<A, E>(
         Effect.sync(() =>
           Bun.spawn(["bun", "run", cliEntry, ...argv], {
             cwd: opts?.cwd ?? home,
-            env: { ...process.env, ...env, ...opts?.env },
+            env: { ...process.env, ...env, PWD: opts?.cwd ?? home, ...opts?.env },
             stdin: "pipe",
             stdout: "pipe",
             stderr: "pipe",

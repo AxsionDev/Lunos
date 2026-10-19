@@ -37,6 +37,9 @@ import { disposeApps } from "./backend"
 import { runtime } from "./runtime"
 import { type Scenario } from "./types"
 
+// Loaded lazily so the store resolves its data directory after the exercise environment is set up.
+const groups = () => import("../../../src/session/groups").then((module) => module.SessionGroups)
+
 function cursor(input: Record<string, unknown>) {
   return Buffer.from(JSON.stringify(input)).toString("base64url")
 }
@@ -162,6 +165,81 @@ const scenarios: Scenario[] = [
     .at((ctx) => ({ path: "/config", headers: ctx.headers(), body: { username: 1 } }))
     .status(400),
   http.protected.get("/config/providers", "config.providers").json(),
+  http.protected.get("/config/settings", "config.settings").json(200, (body) => {
+    object(body)
+    array(body.rows)
+    check(
+      (body.rows as { key: string }[]).some((row) => row.key === "share"),
+      "settings should list the share key",
+    )
+  }),
+  http.protected
+    .patch("/config/settings", "config.settingsSet.invalid")
+    .at((ctx) => ({
+      path: "/config/settings",
+      headers: ctx.headers(),
+      body: { key: "autoupdate", value: "sometimes", scope: "project" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === false, "an invalid value should be refused")
+      check(String(body.error).includes("Allowed values"), "the refusal should list the allowed values")
+    }),
+  http.protected
+    .patch("/config/settings", "config.settingsSet")
+    .mutating()
+    .at((ctx) => ({
+      path: "/config/settings",
+      headers: ctx.headers(),
+      body: { key: "snapshot", value: "false", scope: "project" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === true, "a valid project setting should be written")
+    }),
+  // XCOD-210: the /agents screen lists agents and saves an edited agent file, validated first.
+  http.protected.get("/config/agents", "config.agents").json(200, (body) => {
+    array(body)
+    const build = (body as { name: string; native: boolean; file?: string }[]).find((agent) => agent.name === "build")
+    check(build?.native === true, "the built-in build agent should be listed")
+    check(build?.file === undefined, "a built-in agent has no file to edit")
+  }),
+  http.protected
+    .put("/config/agents", "config.agentSave.unknown")
+    .at((ctx) => ({ path: "/config/agents", headers: ctx.headers(), body: { name: "no-such-agent", text: "x" } }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === false, "an agent without a file should be refused")
+    }),
+  http.protected
+    .put("/config/agents", "config.agentSave.invalid")
+    .seeded((ctx) => ctx.file(".opencode/agents/exercise.md", "---\ndescription: Exercise\nmode: all\n---\nPrompt.\n"))
+    .at((ctx) => ({
+      path: "/config/agents",
+      headers: ctx.headers(),
+      body: {
+        name: "exercise",
+        text: "---\ndescription: Exercise\npermission:\n  no_such_tool: allow\n---\nPrompt.\n",
+      },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === false, "a save naming an unknown tool should be refused")
+      check(String(body.problems).includes("no_such_tool"), "the refusal should name the unknown tool")
+    }),
+  http.protected
+    .put("/config/agents", "config.agentSave")
+    .mutating()
+    .seeded((ctx) => ctx.file(".opencode/agents/exercise.md", "---\ndescription: Exercise\nmode: all\n---\nPrompt.\n"))
+    .at((ctx) => ({
+      path: "/config/agents",
+      headers: ctx.headers(),
+      body: { name: "exercise", text: "---\ndescription: Edited\nmode: all\n---\nNew prompt.\n" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.ok === true, "a valid agent file should be saved")
+    }),
   http.protected.get("/project", "project.list").json(200, array, "status"),
   http.protected.get("/project/current", "project.current").json(
     200,
@@ -263,6 +341,20 @@ const scenarios: Scenario[] = [
     .status(204, undefined, "status"),
   http.protected.get("/provider", "provider.list").json(),
   http.protected.get("/provider/auth", "provider.auth").json(),
+  http.protected
+    .get("/provider/configured", "provider.configured")
+    .seeded(() =>
+      Effect.promise(() =>
+        Bun.write(
+          path.join(exerciseDataDirectory, "auth.json"),
+          JSON.stringify({ "httpapi-configured": { type: "api", key: "must-not-leak" } }),
+        ),
+      ),
+    )
+    .json(200, (body) => {
+      array(body)
+      check(!JSON.stringify(body).includes("must-not-leak"), "configured providers must not expose credential secrets")
+    }),
   http.protected
     .post("/provider/{providerID}/oauth/authorize", "provider.oauth.authorize")
     .at((ctx) => ({
@@ -593,6 +685,146 @@ const scenarios: Scenario[] = [
     .json(200, (body) => {
       check(body === false, "background route should be a no-op without running subagents")
     }),
+  http.protected.get("/experimental/background", "experimental.background.list").json(200, (body) => {
+    array(body)
+    check(body.length === 0, "no background jobs should exist in a fresh instance")
+  }),
+  http.protected
+    .post("/experimental/background/{jobID}/cancel", "experimental.background.cancel")
+    .mutating()
+    .at((ctx) => ({
+      path: route("/experimental/background/{jobID}/cancel", { jobID: "ses_missing" }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      check(body === false, "cancelling an unknown job should be a no-op")
+    }),
+  http.protected.get("/experimental/artifact", "experimental.artifact.list").json(200, (body) => {
+    array(body)
+  }),
+  // XCOD-205: the Sessions window's overview and session groups.
+  http.protected
+    .get("/experimental/session-overview", "experimental.session.overview")
+    .seeded((ctx) => ctx.session({ title: "Overview session" }))
+    .json(200, (body, ctx) => {
+      object(body)
+      array(body.groups)
+      array(body.sessions)
+      const item = body.sessions.find((entry) => isRecord(entry) && entry.id === ctx.state.id)
+      check(isRecord(item), "overview should list the seeded session")
+      check(item.kind === "session" && item.state === "idle", "a fresh session should be an idle plain session")
+    }),
+  http.protected.get("/experimental/session-group", "experimental.sessionGroup.list").json(200, array),
+  http.protected
+    .post("/experimental/session-group", "experimental.sessionGroup.create")
+    .mutating()
+    .at((ctx) => ({ path: "/experimental/session-group", headers: ctx.headers(), body: { name: "Client A" } }))
+    .json(200, (body) => {
+      object(body)
+      check(body.name === "Client A" && typeof body.id === "string", "create should return the new group")
+    }),
+  http.protected
+    .patch("/experimental/session-group/{groupID}", "experimental.sessionGroup.update")
+    .mutating()
+    .seeded(() => Effect.promise(() => groups().then((store) => store.create({ name: "Before" }))))
+    .at((ctx) => ({
+      path: route("/experimental/session-group/{groupID}", { groupID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { name: "After", color: "#3B82F6" },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.name === "After" && body.color === "#3b82f6", "update should rename and recolour")
+    }),
+  http.protected
+    .delete("/experimental/session-group/{groupID}", "experimental.sessionGroup.delete")
+    .mutating()
+    .seeded(() => Effect.promise(() => groups().then((store) => store.create({ name: "Doomed" }))))
+    .at((ctx) => ({
+      path: route("/experimental/session-group/{groupID}", { groupID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      check(body === true, "delete should return true")
+    }),
+  http.protected
+    .post("/experimental/session-group/move", "experimental.sessionGroup.move")
+    .mutating()
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        const session = yield* ctx.session({ title: "Movable" })
+        const group = yield* Effect.promise(() => groups().then((store) => store.create({ name: "Target" })))
+        return { session, group }
+      }),
+    )
+    .at((ctx) => ({
+      path: "/experimental/session-group/move",
+      headers: ctx.headers(),
+      body: { sessionIDs: [ctx.state.session.id], groupID: ctx.state.group.id },
+    }))
+    .json(200, (body) => {
+      check(body === true, "move should return true")
+    }),
+  // XCOD-234: stopping a Claude Code / Codex session Lunos started; an unknown one is a 404.
+  http.protected
+    .post("/experimental/external/{sessionID}/stop", "experimental.external.stop")
+    .at((ctx) => ({
+      path: route("/experimental/external/{sessionID}/stop", { sessionID: "missing-session" }),
+      headers: ctx.headers(),
+    }))
+    .json(404, object, "status"),
+  // XCOD-262: the Agent Monitor's prompt to an existing session.
+  http.protected
+    .post("/experimental/session/{sessionID}/enqueue", "experimental.session.enqueue")
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/enqueue", { sessionID: "ses_missing" }),
+      headers: ctx.headers(),
+      body: { text: "hello" },
+    }))
+    .json(404, object, "status"),
+  http.protected
+    .post("/experimental/session/{sessionID}/enqueue", "experimental.session.enqueue.empty")
+    .seeded((ctx) => ctx.session({ title: "Monitor target" }))
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/enqueue", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { text: "  " },
+    }))
+    .json(400, object, "status"),
+  // XCOD-234: a session no other Lunos process runs is a 404 for every peer action.
+  ...(
+    [
+      ["post", "/experimental/peer/{sessionID}/stop", "experimental.peer.stop", undefined],
+      ["get", "/experimental/peer/{sessionID}/asks", "experimental.peer.asks", undefined],
+      [
+        "post",
+        "/experimental/peer/{sessionID}/permission/{requestID}/reply",
+        "experimental.peer.permissionReply",
+        { reply: "once" },
+      ],
+      [
+        "post",
+        "/experimental/peer/{sessionID}/question/{requestID}/reply",
+        "experimental.peer.questionReply",
+        { answers: [] },
+      ],
+      [
+        "post",
+        "/experimental/peer/{sessionID}/question/{requestID}/reject",
+        "experimental.peer.questionReject",
+        undefined,
+      ],
+      ["post", "/experimental/peer/{sessionID}/prompt", "experimental.peer.prompt", { text: "hello" }],
+    ] as const
+  ).map(([method, template, id, body]) =>
+    http.protected[method](template, id)
+      .at((ctx) => ({
+        path: route(template, { sessionID: "ses_nobody", requestID: "per_nobody" }),
+        headers: ctx.headers(),
+        ...(body ? { body } : {}),
+      }))
+      .json(404, object, "status"),
+  ),
   http.protected.get("/experimental/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")
@@ -1656,7 +1888,38 @@ const scenarios: Scenario[] = [
     .mutating()
     .seeded((ctx) => ctx.session({ title: "Share session" }))
     .at((ctx) => ({ path: route("/session/{sessionID}/share", { sessionID: ctx.state.id }), headers: ctx.headers() }))
-    .json(500, object, "status"),
+    .json(
+      403,
+      (body) => {
+        // Lunos defaults `share` to "disabled": the route refuses plainly instead of uploading.
+        object(body)
+        check(body._tag === "ShareDisabledError", "share should be refused while sharing is disabled")
+        check(
+          typeof body.message === "string" && body.message.includes('"share": "manual"'),
+          "refusal should say how to enable sharing",
+        )
+      },
+      "status",
+    ),
+  http.protected
+    .post("/session/{sessionID}/share/console", "session.shareConsole")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Share session with the organisation" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/share/console", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { sanitize: true, link: true },
+    }))
+    .json(
+      403,
+      (body) => {
+        // XCOD-191: no console named in managed config here, so it is refused with a message, never a 500.
+        object(body)
+        check(body._tag === "ShareDisabledError", "share to the console should be refused here")
+        check(typeof body.message === "string" && body.message.length > 0, "refusal should say why")
+      },
+      "status",
+    ),
   http.protected
     .delete("/session/{sessionID}/share", "session.unshare")
     .mutating()

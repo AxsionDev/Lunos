@@ -1,0 +1,21 @@
+schema_version = "1.1"
+
+[task]
+name = "lunos/xcod-111-npm12-upgrade-hint"
+description = "On npm 12, the \"upgrade manually\" hint Lunos prints gives a command that installs the `lunos-ai` package, but `lunos` th"
+keywords = ["lunos"]
+
+[metadata]
+category = "bugfix"
+source = "Lunos XCOD-111"
+
+[verifier]
+timeout_sec = 120.0
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+build_timeout_sec = 600.0
+cpus = 1
+memory_mb = 2048

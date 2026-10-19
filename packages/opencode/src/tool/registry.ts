@@ -9,7 +9,10 @@ import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
-import { TaskTool } from "./task"
+import { TaskTool, withModelParameter } from "./task"
+import { ToolJsonSchema } from "./json-schema"
+import { Residency } from "@opencode-ai/core/residency"
+import { SubagentModel } from "../agent/subagent-model"
 import { Database } from "@opencode-ai/core/database/database"
 import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
@@ -26,6 +29,7 @@ import { Plugin } from "../plugin"
 import { Provider } from "@/provider/provider"
 
 import { WebSearchTool } from "./websearch"
+import { ExternalAgentTool } from "./external"
 import { LspTool } from "./lsp"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
@@ -54,6 +58,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
+import { Offline } from "@opencode-ai/core/offline"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -107,6 +112,7 @@ const layer = Layer.effect(
     const plan = yield* PlanExitTool
     const webfetch = yield* WebFetchTool
     const websearch = yield* WebSearchTool
+    const externalAgent = yield* ExternalAgentTool
     const shell = yield* ShellTool
     const globtool = yield* GlobTool
     const writetool = yield* WriteTool
@@ -203,7 +209,7 @@ const layer = Layer.effect(
           }
         }
 
-        yield* config.get()
+        const cfg = yield* config.get()
         const questionEnabled = ["app", "cli", "desktop"].includes(flags.client) || flags.enableQuestionTool
 
         const tool = yield* Effect.all({
@@ -223,6 +229,7 @@ const layer = Layer.effect(
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          external: Tool.init(externalAgent),
           ...(codeModeTool ? { execute: Tool.init(codeModeTool) } : {}),
         })
 
@@ -238,12 +245,17 @@ const layer = Layer.effect(
             tool.edit,
             tool.write,
             tool.task,
-            tool.fetch,
+            // Offline mode (XCOD-121) doesn't offer the tools that reach the internet.
+            ...(Offline.enabled() ? [] : [tool.fetch]),
             tool.todo,
-            tool.search,
+            ...(Offline.enabled() ? [] : [tool.search]),
             tool.skill,
             tool.patch,
             ...(tool.execute ? [tool.execute] : []),
+            // XCOD-204: opt-in, and never offline (it sends the task to the tool's vendor).
+            ...(cfg.external?.delegate === true && cfg.external.enabled !== false && !Offline.enabled()
+              ? [tool.external]
+              : []),
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
           ],
@@ -302,6 +314,10 @@ const layer = Layer.effect(
         return true
       })
 
+      // XCOD-82: allowed per-task models, minus any the residency policy would deny.
+      const cfg = yield* config.get()
+      const subagentModels = SubagentModel.allowed(cfg, Residency.resolve(cfg.residency))
+
       const codeModeDescription = filtered.some((tool) => tool.id === "execute")
         ? yield* describeCodeMode(input)
         : undefined
@@ -316,10 +332,14 @@ const layer = Layer.effect(
             jsonSchema: tool.jsonSchema,
           }
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
-          const jsonSchema =
+          const pluginSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
               ? output.jsonSchema
               : undefined
+          const jsonSchema =
+            tool.id === TaskTool.id && subagentModels.length
+              ? withModelParameter(pluginSchema ?? ToolJsonSchema.fromTool(tool), subagentModels)
+              : pluginSchema
           return {
             id: tool.id,
             description: [

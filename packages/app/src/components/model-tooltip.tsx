@@ -21,6 +21,7 @@ type ModelInfo = {
   limit: {
     context: number
   }
+  recommended?: string
 }
 
 function ModelTooltipRow(props: { name: JSX.Element; value: JSX.Element }) {
@@ -103,6 +104,9 @@ export const ModelTooltip: Component<{ model: ModelInfo; latest?: boolean; free?
         </Show>
         <ModelTooltipRow name={language.t("model.tooltip.reasoning")} value={reasoning()} />
         <ModelTooltipRow name={language.t("model.tooltip.context.label")} value={contextLimit()} />
+        <Show when={props.model.recommended}>
+          {(why) => <div class="text-v2-text-text-muted">{`${language.t("model.filter.recommended")}: ${why()}`}</div>}
+        </Show>
       </div>
     )
   }
@@ -119,6 +123,11 @@ export const ModelTooltip: Component<{ model: ModelInfo; latest?: boolean; free?
       </Show>
       <div class="text-12-regular text-text-invert-base">{reasoning()}</div>
       <div class="text-12-regular text-text-invert-base">{context()}</div>
+      <Show when={props.model.recommended}>
+        {(why) => (
+          <div class="text-12-regular text-text-invert-base">{`${language.t("model.filter.recommended")}: ${why()}`}</div>
+        )}
+      </Show>
     </div>
   )
 }

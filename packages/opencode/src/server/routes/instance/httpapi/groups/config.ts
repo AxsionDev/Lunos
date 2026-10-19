@@ -1,6 +1,8 @@
 import { Config } from "@/config/config"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { Provider } from "@/provider/provider"
+import { ConfigSettings } from "@/config/settings"
+import { AgentEditHere } from "@/agent/edit-here"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
@@ -33,6 +35,64 @@ export const ConfigApi = HttpApi.make("config")
             identifier: "config.update",
             summary: "Update configuration",
             description: "Update OpenCode configuration settings and preferences.",
+          }),
+        ),
+        HttpApiEndpoint.get("settings", `${root}/settings`, {
+          query: WorkspaceRoutingQuery,
+          success: described(ConfigSettings.SnapshotSchema, "Every setting, with value, source and lock"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.settings",
+            summary: "List settings",
+            description:
+              "Every configuration option generated from the config schema, with its current value (secrets masked), the layer it came from, whether organisation policy locks it, the loaded config files and 30-day usage.",
+          }),
+        ),
+        HttpApiEndpoint.patch("settingsSet", `${root}/settings`, {
+          query: WorkspaceRoutingQuery,
+          payload: ConfigSettings.SetInput,
+          success: described(ConfigSettings.SetOutput, "Result of the change"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.settingsSet",
+            summary: "Change one setting",
+            description:
+              "Validate one setting against the config schema and write it to the user or project config, keeping comments. Refuses keys locked by organisation policy.",
+          }),
+        ),
+        HttpApiEndpoint.get("agents", `${root}/agents`, {
+          query: WorkspaceRoutingQuery,
+          success: described(AgentEditHere.AgentList, "Every agent, with its file when it can be edited"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.agents",
+            summary: "List agents for editing",
+            description:
+              "Every agent, built-ins included, with the markdown file that defines it and that file's text when Lunos can edit it (XCOD-210).",
+          }),
+        ),
+        HttpApiEndpoint.put("agentSave", `${root}/agents`, {
+          query: WorkspaceRoutingQuery,
+          payload: AgentEditHere.SaveInput,
+          success: described(AgentEditHere.SaveOutput, "Saved, or every problem that stopped the save"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.agentSave",
+            summary: "Save an agent's file",
+            description:
+              "Validate an edited agent file against the models, tools, skills and MCP servers available here and write it. Nothing is written if anything is wrong.",
+          }),
+        ),
+        HttpApiEndpoint.post("agentsMigrate", `${root}/agents/migrate`, {
+          query: WorkspaceRoutingQuery,
+          payload: ConfigSettings.MigrateInput,
+          success: described(ConfigSettings.MigrateOutput, "The deprecated keys that were migrated"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.agentsMigrate",
+            summary: "Migrate deprecated agent keys",
+            description:
+              "Rewrite one scope's deprecated agent config without losing values: top-level `mode` moves under `agent`, `tools` becomes `permission` and `maxSteps` becomes `steps` (XCOD-215).",
           }),
         ),
         HttpApiEndpoint.get("providers", `${root}/providers`, {

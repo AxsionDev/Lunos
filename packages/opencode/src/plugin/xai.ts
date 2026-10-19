@@ -224,7 +224,7 @@ export async function XaiAuthPlugin(input: PluginInput, options: XaiAuthPluginOp
           async fetch(requestInput: RequestInfo | URL, init?: RequestInit) {
             let currentAuth = await getAuth()
             // Auth can flip from oauth to api mid-session (user re-runs
-            // /connect with a pasted key). When that happens, pass the
+            // /providers with a pasted key). When that happens, pass the
             // request through untouched so the AI SDK's own apiKey-based
             // Authorization header reaches xAI unmodified.
             if (currentAuth.type !== "oauth") return fetch(requestInput, init)

@@ -27,6 +27,7 @@ import * as Stream from "effect/Stream"
 import { Command } from "../command"
 import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { ConfigMarkdown } from "@/config/markdown"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/core/util/error"
@@ -48,13 +49,21 @@ import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { TuiEvent } from "@/server/tui-event"
 import { Database } from "@opencode-ai/core/database/database"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { eq } from "drizzle-orm"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
+import { Memory } from "@/memory"
+import { MemorySources } from "@/memory/sources"
+import { Skill } from "@/skill"
+import { Question } from "@/question"
 import { SessionTools } from "./tools"
+import { SandboxGuard } from "@/sandbox/guard"
+import { RunBudget } from "@/agent/run-budget"
+import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
 // @ts-ignore
@@ -138,6 +147,10 @@ const layer = Layer.effect(
     const sys = yield* SystemPrompt.Service
     const llm = yield* LLM.Service
     const events = yield* EventV2Bridge.Service
+    const memory = yield* Memory.Service
+    const memorySources = yield* MemorySources.Service
+    const skill = yield* Skill.Service
+    const question = yield* Question.Service
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
     const { db } = database
@@ -306,7 +319,7 @@ const layer = Layer.effect(
       }
       yield* plugin.trigger(
         "tool.execute.before",
-        { tool: TaskTool.id, sessionID, callID: part.id },
+        { tool: TaskTool.id, sessionID, agent: lastUser.agent, callID: part.id },
         { args: taskArgs },
       )
 
@@ -388,7 +401,7 @@ const layer = Layer.effect(
 
       yield* plugin.trigger(
         "tool.execute.after",
-        { tool: TaskTool.id, sessionID, callID: part.id, args: taskArgs },
+        { tool: TaskTool.id, sessionID, agent: lastUser.agent, callID: part.id, args: taskArgs },
         result,
       )
 
@@ -599,6 +612,26 @@ const layer = Layer.effect(
       const exit = yield* provider.getModel(providerID, modelID).pipe(Effect.exit)
       if (Exit.isSuccess(exit)) return exit.value
       const err = Cause.squash(exit.cause)
+      // XCOD-214 (PO, 2026-10-07): a model from config or --model that isn't available here is a
+      // warning: the next best one is used instead of failing the prompt.
+      if (Provider.ModelNotFoundError.isInstance(err)) {
+        const resolved = yield* provider.resolve(providerID, modelID).pipe(Effect.option)
+        if (Option.isSome(resolved) && resolved.value.warning) {
+          const next = yield* provider.getModel(resolved.value.providerID, resolved.value.modelID).pipe(Effect.option)
+          if (Option.isSome(next)) {
+            yield* Effect.logWarning(resolved.value.warning)
+            yield* events
+              .publish(TuiEvent.ToastShow, {
+                title: "Model not available",
+                message: resolved.value.warning,
+                variant: "warning",
+                duration: 8000,
+              })
+              .pipe(Effect.ignore)
+            return next.value
+          }
+        }
+      }
       if (Provider.ModelNotFoundError.isInstance(err)) {
         const hint = err.suggestions?.length ? ` Did you mean: ${err.suggestions.join(", ")}?` : ""
         yield* events.publish(Session.Event.Error, {
@@ -643,7 +676,27 @@ const layer = Layer.effect(
         throw error
       }
 
-      const model = input.model ?? ag.model ?? (yield* currentModel(input.sessionID))
+      // XCOD-219: under a locked `model` (or `agent.<name>.model`) a main session runs on the locked
+      // model. Asking for another one is refused with the policy message and audited; a model that
+      // only came from an agent's own config or the session's history is replaced. Subagent sessions
+      // follow the subagent locks, checked by the task tool.
+      // XCOD-218: no Lunos model answers in an external session, whatever the client sent, so the
+      // model lock doesn't apply there; the external tool's own policy gate does.
+      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const external = ExternalSession.of(current)
+      const lock = external || current.parentID ? undefined : ConfigPolicy.lockedModel(yield* config.get(), ag.name)
+      if (lock && input.model && `${input.model.providerID}/${input.model.modelID}` !== lock.model) {
+        yield* ConfigPolicy.refused(lock.key, `session model ${input.model.providerID}/${input.model.modelID}`)
+        const reason = ConfigPolicy.modelLockReason(lock)
+        const error = new NamedError.Unknown({ message: reason })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw new ConfigPolicy.LockedError(lock.key, "session model", reason)
+      }
+      const model = external
+        ? ExternalSession.model(external.tool)
+        : lock
+          ? Provider.parseModel(lock.model)
+          : (input.model ?? ag.model ?? (yield* currentModel(input.sessionID)))
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
@@ -669,7 +722,6 @@ const layer = Layer.effect(
         format: input.format,
       }
 
-      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
       if (
         current.agent !== info.agent ||
         current.model?.providerID !== info.model.providerID ||
@@ -1175,6 +1227,12 @@ const layer = Layer.effect(
             yield* events.publish(Session.Event.Error, { sessionID, error: error.toObject() })
             throw error
           }
+          // XCOD-211: an unattended run's step and spend limits, subagents included, checked before the
+          // model call.
+          if (!RunBudget.take()) {
+            yield* Effect.logInfo("unattended run limit reached", { "session.id": sessionID })
+            break
+          }
           const maxSteps = agent.steps ?? Infinity
           const isLastStep = step >= maxSteps
           msgs = yield* SessionReminders.apply({ messages: msgs, agent, session }).pipe(
@@ -1182,6 +1240,32 @@ const layer = Layer.effect(
             Effect.provideService(FSUtil.Service, fsys),
             Effect.provideService(Session.Service, sessions),
           )
+          // XCOD-94: recalled memory, computed once per user message and never saved, like the
+          // reminders above. Skipped for an agent whose permission denies memory.
+          const memoryUser = msgs.findLast((m) => m.info.role === "user")
+          if (memoryUser && !Permission.disabled(["memory_search"], agent.permission).size) {
+            const query = memoryUser.parts
+              .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+              .join("\n")
+              .trim()
+            const recalled = query
+              ? yield* memory.recallFor({
+                  sessionID,
+                  userMessageID: memoryUser.info.id,
+                  query,
+                  parent: { providerID: model.providerID, modelID: model.id },
+                })
+              : undefined
+            if (recalled)
+              memoryUser.parts.push({
+                id: PartID.ascending(),
+                messageID: memoryUser.info.id,
+                sessionID,
+                type: "text",
+                text: recalled,
+                synthetic: true,
+              })
+          }
 
           const msg: SessionV1.Assistant = {
             id: MessageID.ascending(),
@@ -1238,7 +1322,10 @@ const layer = Layer.effect(
               Effect.provideService(MCP.Service, mcp),
               Effect.provideService(Truncate.Service, truncate),
               Effect.provideService(RuntimeFlags.Service, flags),
+              Effect.provideService(Memory.Service, memory),
             )
+            // XCOD-157: with sandbox.required, no tool runs outside a sandbox, whatever started this session.
+            SandboxGuard.guard(tools, (yield* config.get()).sandbox, sessionID)
 
             if (lastUser.format?.type === "json_schema") {
               tools["StructuredOutput"] = createStructuredOutputTool({
@@ -1343,6 +1430,17 @@ const layer = Layer.effect(
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
       input: LoopInput,
     ) {
+      // XCOD-218: an external session's reply comes from Claude Code / Codex, not a Lunos model.
+      const info = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      if (ExternalSession.of(info))
+        return yield* state.ensureRunning(
+          input.sessionID,
+          lastAssistant(input.sessionID),
+          ExternalSession.turn(
+            { sessions, permission, agents, config, events, status, mcp, plugin, memory, skill, question },
+            input.sessionID,
+          ),
+        )
       return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
     })
 
@@ -1368,6 +1466,35 @@ const layer = Layer.effect(
         throw error
       }
       const agentName = cmd.agent ?? input.agent
+
+      // XCOD-94: /memory off | on switches memory for this session and records that in the
+      // transcript without calling a model.
+      if (input.command === Command.Default.MEMORY) {
+        const arg = input.arguments.trim().toLowerCase()
+        if (arg === "off" || arg === "on") yield* memory.setSessionOff(input.sessionID, arg === "off")
+        const verdict = yield* memory.decision(input.sessionID)
+        let status = verdict.on ? "Memory is on for this session." : `Memory is off: ${verdict.reason}.`
+        // XCOD-135: /memory sources [on|off <name>] lists external sources, or toggles one for this session.
+        const [sub, toggle, ...rest] = input.arguments.trim().split(/\s+/)
+        if (sub?.toLowerCase() === "sources") {
+          const name = rest.join(" ")
+          const known =
+            (toggle === "on" || toggle === "off") && name
+              ? yield* memorySources.setSessionOff(input.sessionID, name, toggle === "off")
+              : undefined
+          status =
+            (known === false ? `No memory source is named "${name}".\n\n` : "") +
+            MemorySources.describe(yield* memorySources.list(input.sessionID), verdict.on)
+        }
+        return yield* prompt({
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          model: input.model ? Provider.parseModel(input.model) : yield* currentModel(input.sessionID),
+          agent: input.agent,
+          parts: [{ type: "text", text: `/memory${arg ? " " + input.arguments.trim() : ""}\n\n${status}` }],
+          noReply: true,
+        })
+      }
 
       const raw = input.arguments.match(argsRegex) ?? []
       const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
@@ -1408,7 +1535,15 @@ const layer = Layer.effect(
       }
       template = template.trim()
 
+      // XCOD-219: under a locked model a command's own `model` (or its agent's) is ignored, like an
+      // agent's own model is. A model the caller asked for still goes through, to be refused.
+      const commandLock = ConfigPolicy.lockedModel(yield* config.get(), agentName)
+      // XCOD-254: in a Claude Code / Codex session Lunos expands the command and the tool answers;
+      // no Lunos model is involved (as in the prompt loop), so none is looked up or required.
+      const external = ExternalSession.of(yield* sessions.get(input.sessionID).pipe(Effect.orDie))
       const taskModel = yield* Effect.gen(function* () {
+        if (external) return ExternalSession.model(external.tool)
+        if (commandLock) return Provider.parseModel(input.model ?? commandLock.model)
         if (cmd.model) return Provider.parseModel(cmd.model)
         if (cmd.agent) {
           const cmdAgent = yield* agents.get(cmd.agent)
@@ -1418,13 +1553,26 @@ const layer = Layer.effect(
         return yield* currentModel(input.sessionID)
       })
 
-      yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
+      if (!external) yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
 
       const agent = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
       if (!agent) {
         const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
         const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
         const error = new NamedError.Unknown({ message: `Agent not found: "${agentName}".${hint}` })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw error
+      }
+
+      // Every skill is promoted to a slash command (Command.state), but that table is
+      // built once per instance with no agent in scope, while skill permissions are
+      // per-agent. The model-facing list already filters via Skill.available(agent);
+      // without this check the same denied skill stays typeable as a command. Listing
+      // is not enforcement, so enforce here, at invocation.
+      if (cmd.source === "skill" && Permission.evaluate("skill", cmd.name, agent.permission).action === "deny") {
+        const error = new NamedError.Unknown({
+          message: `Skill "${cmd.name}" is not permitted for agent "${agent.name}".`,
+        })
         yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
         throw error
       }
@@ -1436,7 +1584,8 @@ const layer = Layer.effect(
       const uniqueTemplateParts = templateParts.filter(
         (part) => part.type !== "file" || !inputFiles.has(fileURLToPath(part.url)),
       )
-      const isSubtask = (agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true
+      // A subtask would run a Lunos subagent; in an external session the text goes to the tool instead.
+      const isSubtask = !external && ((agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true)
       const parts = isSubtask
         ? [
             {
@@ -1625,6 +1774,10 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     RuntimeFlags.node,
     Database.node,
+    Memory.node,
+    MemorySources.node,
+    Skill.node,
+    Question.node,
   ],
 })
 

@@ -54,6 +54,19 @@ it.instance("subagent permissions take precedence over parent agent restrictions
   }),
 )
 
+it.instance("research mode does not deny delegating to the general or explore subagents (unlike plan)", () =>
+  Effect.gen(function* () {
+    const researchAgent = yield* Agent.use.get("research")
+    expect(researchAgent).toBeDefined()
+    // Sanity: research mode still blocks edits outside its output path.
+    expect(Permission.evaluate("edit", "/some/file.ts", researchAgent!.permission).action).toBe("deny")
+    // Unlike plan (which sets task: { general: "deny" }), research mode must
+    // not deny task delegation to either built-in subagent.
+    expect(Permission.evaluate("task", "general", researchAgent!.permission).action).not.toBe("deny")
+    expect(Permission.evaluate("task", "explore", researchAgent!.permission).action).not.toBe("deny")
+  }),
+)
+
 it.instance("subagent's own read-only restriction remains effective", () =>
   Effect.gen(function* () {
     const explore = yield* Agent.use.get("explore")

@@ -119,7 +119,7 @@ test("app.exit prints the session epilogue after scoped cleanup", async () => {
     await task
 
     expect(stdout).toContain("Demo session")
-    expect(stdout).toContain("opencode -s dummy")
+    expect(stdout).toContain("lunos -s dummy")
   } finally {
     process.stdout.write = originalWrite
     if (!setup.renderer.isDestroyed) setup.renderer.destroy()
@@ -176,7 +176,7 @@ test("fatal startup errors set a nonzero exit after scoped cleanup", async () =>
     )
 
     await task
-    expect(stderr).toContain("Run `opencode auth login https://example.com` to re-authenticate.")
+    expect(stderr).toContain("Run `lunos auth login https://example.com` to re-authenticate.")
     expect(stderr).not.toContain("Unexpected server error")
     expect(process.exitCode).toBe(1)
     expect(setup.renderer.isDestroyed).toBe(true)

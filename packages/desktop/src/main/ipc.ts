@@ -7,7 +7,7 @@ import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 
 import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
-import { runDesktopMenuAction } from "./desktop-menu-actions"
+import { openLicenses, runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
@@ -15,6 +15,8 @@ import {
   getPinchZoomEnabled,
   getWindowID,
   openExternalURL,
+  openSessionInMainWindow,
+  takePendingOpen,
   openLocalFileURL,
   setPinchZoomEnabled,
   setTitlebar,
@@ -251,6 +253,19 @@ export function registerIpcHandlers(deps: Deps) {
     return id
   })
 
+  // XCOD-235: a session chosen in the Sessions window opens in the main window.
+  ipcMain.handle("open-session-in-main", (event: IpcMainInvokeEvent, directory: unknown, sessionID: unknown) => {
+    if (!BrowserWindow.fromWebContents(event.sender)) throw new Error("Window not found")
+    if (typeof directory !== "string" || !directory || directory.length > 4096) throw new Error("Bad directory")
+    if (typeof sessionID !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(sessionID)) throw new Error("Bad session id")
+    openSessionInMainWindow({ directory, sessionID })
+  })
+  ipcMain.handle("take-pending-open-session", (event: IpcMainInvokeEvent) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const id = win ? getWindowID(win) : undefined
+    return id ? takePendingOpen(id) : []
+  })
+
   ipcMain.handle("get-window-focused", (event: IpcMainInvokeEvent) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     return win?.isFocused() ?? false
@@ -295,6 +310,7 @@ export function registerIpcHandlers(deps: Deps) {
     runDesktopMenuAction(BrowserWindow.fromWebContents(event.sender), action, {
       checkForUpdates: () => void deps.showUpdater(),
       relaunch: deps.relaunch,
+      licenses: () => void openLicenses(),
     })
   })
 }

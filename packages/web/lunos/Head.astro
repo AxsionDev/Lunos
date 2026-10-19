@@ -1,0 +1,12 @@
+---
+// XCOD-124: upstream's Head.astro points og:image at social-cards.sst.dev/opencode-docs, an
+// upstream-branded image service. Lunos uses one static card of its own instead.
+import Default from "@astrojs/starlight/components/Head.astro"
+import config from "./config.mjs"
+
+const image = `${config.url}/docs/lunos/social-card.png`
+---
+
+<Default {...Astro.props}><slot /></Default>
+<meta property="og:image" content={image} />
+<meta property="twitter:image" content={image} />

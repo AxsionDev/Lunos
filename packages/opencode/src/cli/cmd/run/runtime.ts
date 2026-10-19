@@ -739,12 +739,14 @@ export async function runInteractiveLocalMode(input: RunLocalInput): Promise<voi
     directory: input.directory,
   })
   let session: Promise<ResolvedSession> | undefined
+  // The server answers from `subagent.background` config or the old env flag (XCOD-82).
+  const capabilities = await sdk.experimental.capabilities.get().catch(() => undefined)
 
   return runInteractiveRuntime({
     files: input.files,
     initialInput: input.initialInput,
     thinking: input.thinking,
-    backgroundSubagents: input.backgroundSubagents,
+    backgroundSubagents: capabilities?.data?.backgroundSubagents ?? input.backgroundSubagents,
     replay: input.replay,
     replayLimit: input.replayLimit,
     demo: input.demo,

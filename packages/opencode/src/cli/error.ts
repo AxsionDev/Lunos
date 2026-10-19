@@ -64,9 +64,21 @@ export function FormatError(input: unknown): string | undefined {
     return [
       `Model not found: ${stringField(providerModelNotFound, "providerID")}/${stringField(providerModelNotFound, "modelID")}`,
       ...(suggestions.length ? ["Did you mean: " + suggestions.join(", ")] : []),
-      `Try: \`opencode models\` to list available models`,
-      `Or check your config (opencode.json) provider/model names`,
+      `Try: \`lunos models\` to list available models`,
+      `Or declare it in your config (opencode.json): provider.${stringField(providerModelNotFound, "providerID")}.models`,
     ].join("\n")
+  }
+
+  // ProviderNoProvidersError: { message: string }
+  const noProviders = configData(input, "ProviderNoProvidersError")
+  if (noProviders) {
+    return stringField(noProviders, "message") ?? ""
+  }
+
+  // PolicyLockedError (XCOD-219): { key: string, message: string }
+  const locked = configData(input, "PolicyLockedError")
+  if (locked) {
+    return stringField(locked, "message") ?? ""
   }
 
   // ProviderInitError: { providerID: string }
@@ -102,7 +114,7 @@ export function FormatError(input: unknown): string | undefined {
     return [
       `Failed to load remote config${remote ? ` from ${remote}` : ""}: the server returned a login page instead of JSON.`,
       `Authentication is missing or has expired (the endpoint is likely behind an SSO or identity-aware proxy).`,
-      ...(url ? [`Run \`opencode auth login ${url}\` to re-authenticate.`] : []),
+      ...(url ? [`Run \`lunos auth login ${url}\` to re-authenticate.`] : []),
     ].join("\n")
   }
 

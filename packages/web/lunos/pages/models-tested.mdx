@@ -1,0 +1,16 @@
+---
+title: Models we tested
+description: How Lunos performed on coding tasks with the models we have evaluated, and how the tests were run.
+---
+
+We run Lunos on a fixed set of coding tasks to see how well it works with a given model. The latest result, from **4 October 2026**:
+
+| Model                  | Provider | Where it runs | Tasks passed     | Cost per task solved |
+| ---------------------- | -------- | ------------- | ---------------- | -------------------- |
+| `openai/gpt-5.3-codex` | OpenAI   | United States | 21 of 33 (63.6%) | €0.09                |
+
+**What was tested.** 33 tasks: 3 taken from real Lunos fixes and 30 exercises from the Aider Polyglot benchmark, 5 each in C++, Go, Java, JavaScript, Python and Rust. Lunos 1.18.42 had one attempt per task, with no internet access and without seeing the tests that grade it. These numbers measure Lunos's own agent; they aren't comparable with Aider's leaderboard, which uses a different harness.
+
+**OpenAI is a US provider.** Under an EU-only [data residency](/docs/data-residency/) policy, Lunos refuses it. We haven't yet published a result for an EU-hosted model; this page will list one when we have.
+
+The full report, with the method, raw results, the spend ledger and the command that reproduces it, is in the repository: [`specs/eval/2026-10-04.md`](https://github.com/AxsionDev/Lunos/blob/dev/specs/eval/2026-10-04.md).

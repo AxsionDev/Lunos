@@ -122,6 +122,41 @@ export class SessionBusyError extends Schema.TaggedErrorClass<SessionBusyError>(
   { httpApiStatus: 409 },
 ) {}
 
+export class MemoryNotFoundError extends Schema.TaggedErrorClass<MemoryNotFoundError>()(
+  "MemoryNotFoundError",
+  {
+    id: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class MemoryUnavailableError extends Schema.TaggedErrorClass<MemoryUnavailableError>()(
+  "MemoryUnavailableError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 409 },
+) {}
+
+// XCOD-133: an import refused before anything was written (verification, residency, the limit).
+export class MemoryImportRefusedError extends Schema.TaggedErrorClass<MemoryImportRefusedError>()(
+  "MemoryImportRefusedError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 422 },
+) {}
+
+// XCOD-133: the input is an encrypted bundle; ask for the passphrase and try again.
+export class MemoryPassphraseRequiredError extends Schema.TaggedErrorClass<MemoryPassphraseRequiredError>()(
+  "MemoryPassphraseRequiredError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 422 },
+) {}
+
 export class QuestionNotFoundError extends Schema.TaggedErrorClass<QuestionNotFoundError>()(
   "QuestionNotFoundError",
   {
@@ -173,6 +208,14 @@ export class ProjectNotFoundError extends Schema.TaggedErrorClass<ProjectNotFoun
     message: Schema.String,
   },
   { httpApiStatus: 404 },
+) {}
+
+export class ShareDisabledApiError extends Schema.TaggedErrorClass<ShareDisabledApiError>()(
+  "ShareDisabledError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 403 },
 ) {}
 
 export class ApiNotFoundError extends Schema.ErrorClass<ApiNotFoundError>("NotFoundError")(

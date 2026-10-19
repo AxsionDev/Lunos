@@ -24,6 +24,8 @@ export interface DialogSelectProps<T> {
   title: string
   titleView?: JSX.Element
   placeholder?: string
+  /** Text the search box opens with, already applied to the list (XCOD-251's `/marketplace <words>`). */
+  initialFilter?: string
   footer?: JSX.Element
   emptyView?: JSX.Element
   options: DialogSelectOption<T>[]
@@ -36,12 +38,19 @@ export interface DialogSelectProps<T> {
   renderFilter?: boolean
   locked?: boolean
   preserveSelection?: boolean
+  /** Whether the mouse wheel scrolls the list (default true). The keyboard always does. */
+  wheel?: boolean
   actions?: {
     command: string
     title: string
     side?: "left" | "right"
     hidden?: boolean
+    /** Shown in the footer and the Tab menu even with no key bound (XCOD-265's "stop all", "clear list"). */
+    menu?: boolean
     disabled?: boolean | ((option: DialogSelectOption<T> | undefined) => boolean)
+    // Fire even when no row is selected (e.g. switching tabs away from an empty list). Such an
+    // action receives no option.
+    withoutSelection?: boolean
     onTrigger: (option: DialogSelectOption<T>) => void
   }[]
   footerHints?: {
@@ -50,7 +59,11 @@ export interface DialogSelectProps<T> {
     side?: "left" | "right"
   }[]
   bindings?: readonly Binding<Renderable, KeyEvent>[]
+  /** false leaves Tab / Shift+Tab to `bindings` (XCOD-258's marketplace tabs) instead of cycling actions. */
+  tabCyclesActions?: boolean
   current?: T
+  /** Let the list use the rest of the terminal's height instead of half of it (XCOD-205's /sessions). */
+  fill?: boolean
 }
 
 export interface DialogSelectOption<T = any> {
@@ -85,18 +98,32 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const dialog = useDialog()
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
-  const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
+  // The scrollbox multiplies each wheel step by tick(); 0 turns the wheel off without touching the
+  // scrolling the list does itself (keyboard, keeping the selection in view).
+  const scrollAcceleration = createMemo(() =>
+    props.wheel === false ? { tick: () => 0, reset() {} } : getScrollAcceleration(tuiConfig),
+  )
 
   const [store, setStore] = createStore({
     selected: 0,
-    filter: "",
+    filter: props.initialFilter ?? "",
     input: "keyboard" as "keyboard" | "mouse",
   })
-  const [focusedAction, setFocusedAction] = createSignal<number>()
-  const actionFocused = createMemo(() => focusedAction() !== undefined)
+  // The focused footer action, by command: the list of enabled actions can change under it (a row
+  // finishes and "stop" is disabled), and the highlight must stay on the same action.
+  const [focusedCommand, setFocusedCommand] = createSignal<string>()
+  const focusedAction = () => {
+    const command = focusedCommand()
+    if (command === undefined) return undefined
+    const index = actionItems().findIndex((item) => item.command === command)
+    return index < 0 ? undefined : index
+  }
+  const actionFocused = () => focusedAction() !== undefined
   let selection: { value: T; category?: string } | undefined
   let resetSelection = false
   let visibilityGeneration = 0
+  // The last option reported through onMove, so a parent echoing it back as `current` is ignored.
+  let reported: { value: T } | undefined
 
   createEffect(
     on(
@@ -137,19 +164,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const visibleActions = createMemo(() => [
     ...shownActions()
       .map((item) => ({ ...item, label: actionLabels().get(item.command) ?? "" }))
-      .filter((item) => item.label),
+      .filter((item) => item.label || item.menu),
     ...(props.footerHints ?? []),
   ])
-  const actionItems = createMemo(() =>
-    visibleActions()
-      .filter(isActionItem)
-      .filter((item) => !isActionDisabled(item)),
-  )
-
-  createEffect(() => {
-    const index = focusedAction()
-    if (index !== undefined && index >= actionItems().length) setFocusedAction(undefined)
-  })
 
   const filtered = createMemo(() => {
     if (props.skipFilter || props.renderFilter === false) return props.options.filter((x) => x.disabled !== true)
@@ -178,8 +195,16 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   createEffect(() => {
     filtered()
     setStore("input", "keyboard")
-    setFocusedAction(undefined)
   })
+  // Typing leaves the action menu. A list that refreshes underneath (XCOD-265: /sessions re-reads on
+  // every live update) doesn't, or Tab could never reach "stop all" while sessions are running.
+  createEffect(
+    on(
+      () => store.filter,
+      () => setFocusedCommand(undefined),
+      { defer: true },
+    ),
+  )
 
   const flatten = createMemo(() => props.flat && store.filter.length > 0)
 
@@ -210,9 +235,27 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   })
 
   const dimensions = useTerminalDimensions()
-  const height = createMemo(() => Math.min(rows(), Math.floor(dimensions().height / 2) - 6))
+  const height = createMemo(() =>
+    Math.min(
+      rows(),
+      props.fill
+        ? // Below the dialog's top margin (a quarter of the height), its title, filter and footer.
+          dimensions().height - Math.floor(dimensions().height / 4) - 10
+        : Math.floor(dimensions().height / 2) - 6,
+    ),
+  )
 
   const selected = createMemo(() => flat()[store.selected])
+  // After `selected`: an action's `disabled` reads it, and a `menu` action is listed (so checked) at once.
+  const actionItems = createMemo(() =>
+    visibleActions()
+      .filter(isActionItem)
+      .filter((item) => !isActionDisabled(item)),
+  )
+
+  createEffect(() => {
+    if (focusedCommand() !== undefined && focusedAction() === undefined) setFocusedCommand(undefined)
+  })
 
   createEffect(
     on(
@@ -272,8 +315,13 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   })
 
   createEffect(
-    on([() => store.filter, () => props.current], ([filter, current]) => {
+    on([() => store.filter, () => props.current], ([filter, current], previous) => {
       if (filter.length > 0) resetSelection = true
+      // XCOD-206: a parent that feeds onMove back into `current` (/settings, plugins) must not
+      // re-centre the list. With the wheel, re-centring puts another row under the pointer, hover
+      // selects it, its echo re-centres again, and the list jumps instead of scrolling.
+      const echo = previous?.[0] === filter && reported !== undefined && isDeepEqual(current, reported.value)
+      if (echo) return
       setTimeout(() => {
         if (filter.length > 0) {
           moveTo(0, true, false)
@@ -297,14 +345,17 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   }
 
   function moveTo(next: number, center = false, preserve = true) {
-    setFocusedAction(undefined)
+    setFocusedCommand(undefined)
     setStore("selected", next)
     const option = selected()
     if (option) {
       selection = option
       resetSelection = !preserve
     }
-    if (option) props.onMove?.(option)
+    if (option) {
+      reported = { value: option.value }
+      props.onMove?.(option)
+    }
     scrollToSelection(center)
   }
 
@@ -359,11 +410,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     if (props.locked) return
     const total = actionItems().length
     if (total === 0) return
-    setFocusedAction((index) => {
-      if (index === undefined) return direction === 1 ? 0 : total - 1
-      const next = index + direction
-      return next < 0 || next >= total ? undefined : next
-    })
+    const index = focusedAction()
+    const next = index === undefined ? (direction === 1 ? 0 : total - 1) : index + direction
+    setFocusedCommand(next < 0 || next >= total ? undefined : actionItems()[next]!.command)
   }
 
   useBindings(() => {
@@ -442,8 +491,8 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
             if (isActionDisabled(item)) return
             setStore("input", "keyboard")
             const option = selected()
-            if (!option) return
-            item.onTrigger(option)
+            if (!option && !item.withoutSelection) return
+            item.onTrigger(option!)
           },
         })),
       ],
@@ -458,7 +507,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
           "dialog.select.submit",
         ]),
         ...visible.flatMap((item) => tuiConfig.keybinds.get(item.command)),
-        ...(visible.length
+        ...(visible.length && props.tabCyclesActions !== false
           ? [
               {
                 key: "tab",
@@ -505,8 +554,8 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     if (!item || !isActionItem(item) || isActionDisabled(item)) return
     setStore("input", "keyboard")
     const option = selected()
-    if (!option) return
-    item.onTrigger(option)
+    if (!option && !item.withoutSelection) return
+    item.onTrigger(option!)
   }
 
   function isActionItem(item: VisibleAction): item is Action & { label: string } {
@@ -549,7 +598,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
         >
           {item.title}
         </text>
-        <text fg={disabled() ? theme.textMuted : active() ? fg : theme.textMuted}> {item.label}</text>
+        <Show when={item.label}>
+          <text fg={disabled() ? theme.textMuted : active() ? fg : theme.textMuted}> {item.label}</text>
+        </Show>
       </box>
     )
   }
@@ -563,7 +614,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
               {props.title}
             </text>
           )}
-          <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
+          <text fg={theme.textMuted} onMouseUp={() => dialog.dismiss()}>
             esc
           </text>
         </box>
@@ -590,6 +641,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                   input.focus()
                 }, 1)
               }}
+              value={props.initialFilter}
               placeholder={props.placeholder ?? "Search"}
               placeholderColor={theme.textMuted}
             />
@@ -643,7 +695,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                           onMouseMove={() => {
                             if (props.locked) return
                             setStore("input", "mouse")
-                            setFocusedAction(undefined)
+                            setFocusedCommand(undefined)
                           }}
                           onMouseUp={() => {
                             if (props.locked) return
@@ -716,7 +768,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       </box>
       <Show when={props.footer || visibleActions().length} fallback={<box flexShrink={0} />}>
         <box paddingRight={2} paddingLeft={4} flexDirection="row" justifyContent="space-between" flexShrink={0}>
-          <box flexDirection="row" gap={2}>
+          <box flexDirection="row" flexWrap="wrap" columnGap={2} flexShrink={1}>
             {props.footer}
             <For each={left()}>{(item) => <FooterAction item={item} />}</For>
           </box>

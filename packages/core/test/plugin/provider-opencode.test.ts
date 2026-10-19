@@ -71,74 +71,12 @@ function withEnv<A, E, R>(vars: Record<string, string | undefined>, effect: () =
 const cost = (input: number, output = 0) => [{ input, output, cache: { read: 0, write: 0 } }]
 
 describe("OpencodePlugin", () => {
-  it.effect("registers account and service account methods", () =>
+  it.effect("offers only the API key method, not OpenCode Console sign-in", () =>
     Effect.gen(function* () {
       yield* addPlugin()
       expect((yield* (yield* Integration.Service).get(Integration.ID.make("opencode")))?.methods).toEqual([
-        {
-          id: Integration.MethodID.make("device"),
-          type: "oauth",
-          label: "OpenCode Console account",
-        },
         { type: "key", label: "API key (service account)" },
       ])
-    }),
-  )
-
-  it.effect("resolves origin-rooted device verification URLs", () =>
-    Effect.gen(function* () {
-      const http = HttpClient.make((request) =>
-        Effect.succeed(
-          HttpClientResponse.fromWeb(
-            request,
-            Response.json({
-              device_code: "device",
-              user_code: "user",
-              verification_uri_complete: "/console/device?user_code=user&client_id=opencode-cli",
-              expires_in: 60,
-              interval: 60,
-            }),
-          ),
-        ),
-      )
-      yield* addPlugin(http)
-      const integration = yield* Integration.Service
-      const attempt = yield* integration.connection.oauth({
-        integrationID: Integration.ID.make("opencode"),
-        methodID: Integration.MethodID.make("device"),
-        inputs: {},
-      })
-      expect(attempt.url).toBe("https://opencode.ai/console/device?user_code=user&client_id=opencode-cli")
-    }),
-  )
-
-  it.effect("rejects malformed device verification URLs", () =>
-    Effect.gen(function* () {
-      const http = HttpClient.make((request) =>
-        Effect.succeed(
-          HttpClientResponse.fromWeb(
-            request,
-            Response.json({
-              device_code: "device",
-              user_code: "user",
-              verification_uri_complete: "http://[::1",
-              expires_in: 60,
-              interval: 60,
-            }),
-          ),
-        ),
-      )
-      yield* addPlugin(http)
-      const integration = yield* Integration.Service
-      const error = yield* integration.connection
-        .oauth({
-          integrationID: Integration.ID.make("opencode"),
-          methodID: Integration.MethodID.make("device"),
-          inputs: {},
-        })
-        .pipe(Effect.flip)
-      expect(error).toBeInstanceOf(Integration.AuthorizationError)
-      expect(String(error.cause)).toContain("Invalid device verification URL")
     }),
   )
 
@@ -257,7 +195,7 @@ describe("OpencodePlugin", () => {
     ),
   )
 
-  it.effect("uses a public key and disables paid models without credentials", () =>
+  it.effect("is not listed without the user's own key, so nothing reaches opencode.ai", () =>
     withEnv({ OPENCODE_API_KEY: undefined }, () =>
       Effect.gen(function* () {
         const catalog = yield* Catalog.Service
@@ -277,62 +215,7 @@ describe("OpencodePlugin", () => {
           })
         })
         yield* addPlugin()
-        expect(required(yield* catalog.provider.get(ProviderV2.ID.opencode)).request.body.apiKey).toBe("public")
-        expect(required(yield* catalog.model.get(ProviderV2.ID.opencode, ModelV2.ID.make("paid"))).enabled).toBe(false)
-      }),
-    ),
-  )
-
-  it.effect("keeps free models without credentials", () =>
-    withEnv({ OPENCODE_API_KEY: undefined }, () =>
-      Effect.gen(function* () {
-        const catalog = yield* Catalog.Service
-        yield* catalog.transform((catalog) => {
-          const provider = ProviderV2.Info.make({
-            ...ProviderV2.Info.empty(ProviderV2.ID.opencode),
-            api: { type: "aisdk", package: "test-provider" },
-          })
-          const model = ModelV2.Info.make({
-            ...ModelV2.Info.empty(provider.id, ModelV2.ID.make("free")),
-            api: { id: ModelV2.ID.make("free"), type: "aisdk", package: "test-provider" },
-            cost: cost(0),
-          })
-          catalog.provider.update(provider.id, () => {})
-          catalog.model.update(provider.id, model.id, (draft) => {
-            draft.cost = [...model.cost]
-          })
-        })
-        yield* addPlugin()
-        expect(required(yield* catalog.provider.get(ProviderV2.ID.opencode)).request.body.apiKey).toBe("public")
-        expect(required(yield* catalog.model.get(ProviderV2.ID.opencode, ModelV2.ID.make("free"))).enabled).toBe(true)
-      }),
-    ),
-  )
-
-  it.effect("treats output-only cost as free without credentials", () =>
-    withEnv({ OPENCODE_API_KEY: undefined }, () =>
-      Effect.gen(function* () {
-        const catalog = yield* Catalog.Service
-        yield* catalog.transform((catalog) => {
-          const provider = ProviderV2.Info.make({
-            ...ProviderV2.Info.empty(ProviderV2.ID.opencode),
-            api: { type: "aisdk", package: "test-provider" },
-          })
-          const model = ModelV2.Info.make({
-            ...ModelV2.Info.empty(provider.id, ModelV2.ID.make("output-only")),
-            api: { id: ModelV2.ID.make("output-only"), type: "aisdk", package: "test-provider" },
-            cost: cost(0, 1),
-          })
-          catalog.provider.update(provider.id, () => {})
-          catalog.model.update(provider.id, model.id, (draft) => {
-            draft.cost = [...model.cost]
-          })
-        })
-        yield* addPlugin()
-        expect(required(yield* catalog.provider.get(ProviderV2.ID.opencode)).request.body.apiKey).toBe("public")
-        expect(required(yield* catalog.model.get(ProviderV2.ID.opencode, ModelV2.ID.make("output-only"))).enabled).toBe(
-          true,
-        )
+        expect(yield* catalog.provider.get(ProviderV2.ID.opencode)).toBeUndefined()
       }),
     ),
   )

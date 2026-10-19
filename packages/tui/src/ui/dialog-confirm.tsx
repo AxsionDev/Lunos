@@ -1,10 +1,11 @@
 import { TextAttributes } from "@opentui/core"
 import { useTheme } from "../context/theme"
-import { useDialog, type DialogContext } from "./dialog"
+import { useDialog, type DialogContext, type DialogNav } from "./dialog"
 import { createStore } from "solid-js/store"
 import { For } from "solid-js"
 import { Locale } from "../util/locale"
 import { useBindings } from "../keymap"
+import { selectionMarker } from "../util/status-glyph"
 
 export type DialogConfirmProps = {
   title: string
@@ -40,6 +41,8 @@ export function DialogConfirm(props: DialogConfirmProps) {
         desc: "Previous dialog option",
         group: "Dialog",
         cmd: () => {
+          // XCOD-233: in the /settings window ← is "back", as on every other screen there.
+          if (dialog.back()) return
           setStore("active", store.active === "confirm" ? "cancel" : "confirm")
         },
       },
@@ -59,7 +62,7 @@ export function DialogConfirm(props: DialogConfirmProps) {
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {props.title}
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
+        <text fg={theme.textMuted} onMouseUp={() => dialog.dismiss()}>
           esc
         </text>
       </box>
@@ -80,6 +83,8 @@ export function DialogConfirm(props: DialogConfirmProps) {
               }}
             >
               <text fg={key === store.active ? theme.selectedListItemText : theme.textMuted}>
+                {/* XCOD-141: a marker as well as the highlight, so the choice doesn't rely on colour alone. */}
+                {selectionMarker(key === store.active)}
                 {Locale.titlecase(key === "cancel" ? (props.label ?? key) : key)}
               </text>
             </box>
@@ -90,7 +95,9 @@ export function DialogConfirm(props: DialogConfirmProps) {
   )
 }
 
-DialogConfirm.show = (dialog: DialogContext, title: string, message: string, label?: string) => {
+/** `nav` (XCOD-233): as for DialogPrompt.show; ← goes back instead of switching buttons. */
+DialogConfirm.show = (dialog: DialogContext, title: string, message: string, label?: string, nav?: DialogNav) => {
+  const generation = dialog.generation
   return new Promise<DialogConfirmResult>((resolve) => {
     dialog.replace(
       () => (
@@ -102,7 +109,10 @@ DialogConfirm.show = (dialog: DialogContext, title: string, message: string, lab
           label={label}
         />
       ),
-      () => resolve(undefined),
+      () => {
+        if (dialog.generation === generation) resolve(undefined)
+      },
+      nav,
     )
   })
 }

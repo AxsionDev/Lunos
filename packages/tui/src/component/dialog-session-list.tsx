@@ -18,6 +18,7 @@ import { errorMessage } from "../util/error"
 import { DialogSessionDeleteFailed } from "./dialog-session-delete-failed"
 import { useCommandShortcut } from "../keymap"
 import { useEvent } from "../context/event"
+import { listed } from "../util/sessions-overview"
 
 type SessionListFilter = { scope?: "project"; path?: string }
 
@@ -87,9 +88,13 @@ export function DialogSessionList() {
       return session ? [session] : []
     })
     const query = search().trim().toLowerCase()
-    return [...result.map((session) => synced.get(session.id) ?? session), ...extra]
-      .filter((session) => !deleted().has(session.id))
-      .filter((session) => !query || session.title.toLowerCase().includes(query))
+    return (
+      [...result.map((session) => synced.get(session.id) ?? session), ...extra]
+        .filter((session) => !deleted().has(session.id))
+        // XCOD-265: cleared from /sessions; the session open right now stays reachable.
+        .filter((session) => listed(session) || session.id === currentSessionID())
+        .filter((session) => !query || session.title.toLowerCase().includes(query))
+    )
   })
 
   onCleanup(

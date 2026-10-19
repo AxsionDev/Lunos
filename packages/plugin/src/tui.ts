@@ -442,7 +442,7 @@ export type TuiSidebarMcpItem = {
   error?: string
 }
 
-export type TuiSidebarLspItem = Pick<LspStatus, "id" | "root" | "status">
+export type TuiSidebarLspItem = Pick<LspStatus, "id" | "root" | "status" | "reason">
 
 export type TuiSidebarTodoItem = Pick<Todo, "content" | "status">
 
@@ -559,6 +559,8 @@ export type TuiPluginStatus = {
 
 export type TuiPluginInstallOptions = {
   global?: boolean
+  /** Replace a configured version of the same package instead of leaving it (a marketplace update). */
+  replace?: boolean
 }
 
 export type TuiPluginInstallResult =
@@ -572,6 +574,75 @@ export type TuiPluginInstallResult =
       message: string
       missing?: boolean
     }
+
+export type TuiPluginDiscoverEntry = {
+  name: string
+  marketplace: string
+  description?: string
+  spec: string
+}
+
+export type TuiPluginMarketplaceStatus = {
+  name: string
+  source: string
+  fetchedAt: number
+  stale?: string
+}
+
+export type TuiPluginDiscoverResult = {
+  marketplaceCount: number
+  marketplaces: ReadonlyArray<TuiPluginMarketplaceStatus>
+  plugins: ReadonlyArray<TuiPluginDiscoverEntry>
+}
+
+export type TuiMarketplaceKind = "plugin" | "skill" | "hook" | "mcp"
+
+export type TuiMarketplaceEntry = {
+  kind: TuiMarketplaceKind
+  name: string
+  marketplace: string
+  description?: string
+  /** Install spec for `plugins.install`; present only for `kind: "plugin"`. */
+  spec?: string
+  /** The marketplace's review status (XCOD-105); absent means not reviewed. */
+  review?: "verified" | "community"
+  /**
+   * Whether it's already in your config: `installed` as the marketplace serves it now, `update`
+   * when the marketplace now serves a different version or definition than the one installed.
+   */
+  installed?: "installed" | "update"
+  /** XCOD-258: what each kind's tab shows beside the name. */
+  details?: TuiMarketplaceDetails
+}
+
+export type TuiMarketplaceDetails = {
+  /** Plugins: the version the marketplace serves. */
+  version?: string
+  /** Hooks: the event, the matcher (`Bash`, `src/**`), and the command it runs, as one line. */
+  event?: string
+  matcher?: string
+  command?: string
+  /** MCP servers: how they're reached, and for a remote one its host, region and the policy's answer. */
+  transport?: "stdio" | "http"
+  host?: string
+  region?: string
+  policy?: "allowed" | "blocked"
+}
+
+export type TuiMarketplaceDiscoverResult = {
+  marketplaceCount: number
+  marketplaces: ReadonlyArray<TuiPluginMarketplaceStatus>
+  items: ReadonlyArray<TuiMarketplaceEntry>
+  /** Network use is off (`LUNOS_OFFLINE=1`): only cached catalogues are listed. */
+  offline?: boolean
+}
+
+/** What installing a skill source, hook or MCP server would run, connect to or fetch. */
+export type TuiMarketplacePlan =
+  | { ok: true; details: ReadonlyArray<string>; warnings: ReadonlyArray<string>; configPath: string }
+  | { ok: false; message: string }
+
+export type TuiMarketplaceInstallResult = { ok: true; configPath: string } | { ok: false; message: string }
 
 export type TuiWorkspace = {
   current: () => string | undefined
@@ -621,6 +692,25 @@ export type TuiPluginApi = {
     deactivate: (id: string) => Promise<boolean>
     add: (spec: string) => Promise<boolean>
     install: (spec: string, options?: TuiPluginInstallOptions) => Promise<TuiPluginInstallResult>
+    discover: () => Promise<TuiPluginDiscoverResult>
+  }
+  /**
+   * Every content kind across added marketplaces. Plugins install through `plugins.install(spec)`;
+   * skill sources, hooks and MCP servers are written to global config through `install`, after
+   * `plan` has shown the user what they will run, connect to or fetch.
+   */
+  marketplace: {
+    discover: (kind?: TuiMarketplaceKind) => Promise<TuiMarketplaceDiscoverResult>
+    plan: (
+      kind: Exclude<TuiMarketplaceKind, "plugin">,
+      marketplace: string,
+      name: string,
+    ) => Promise<TuiMarketplacePlan>
+    install: (
+      kind: Exclude<TuiMarketplaceKind, "plugin">,
+      marketplace: string,
+      name: string,
+    ) => Promise<TuiMarketplaceInstallResult>
   }
   lifecycle: TuiLifecycle
 }
