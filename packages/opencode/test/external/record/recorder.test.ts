@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "fs"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
+import { loginProblem } from "../../../script/record-external-fixtures"
 import { lines, manifest, replay, ROOT } from "./harness"
 import { SCENARIOS, VERSIONS } from "./scenarios"
 
@@ -88,6 +89,34 @@ describe("external-fixture recorder guards (XCOD-270)", () => {
     } finally {
       await fs.rm(wire.dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe("external-fixture recorder login guard (XCOD-270)", () => {
+  const tool = (message: object) => ({ from: "tool", message })
+  const initialize = (account: object) =>
+    tool({
+      type: "control_response",
+      response: { subtype: "success", request_id: "lunos-models", response: { account } },
+    })
+
+  test("stops on a personal Claude Code login, before any prompt", () => {
+    expect(loginProblem("claude", [initialize({ subscriptionType: "max", email: "<redacted:email>" })])).toMatch(
+      /personal login/,
+    )
+    expect(loginProblem("claude", [initialize({ tokenSource: "claude.ai" })])).toMatch(/personal login/)
+    expect(loginProblem("claude", [initialize({ apiKeySource: "oauth" })])).toMatch(/personal login/)
+    expect(loginProblem("claude", [initialize({ apiKeySource: "ANTHROPIC_API_KEY" })])).toBeUndefined()
+    expect(loginProblem("claude", [initialize({})])).toBeUndefined()
+  })
+
+  test("stops when a turn's init doesn't say the given key was used", () => {
+    const init = (fields: object) => tool({ type: "system", subtype: "init", session_id: "s", ...fields })
+    expect(loginProblem("claude", [init({})])).toMatch(/apiKeySource: undefined/)
+    expect(loginProblem("claude", [init({ apiKeySource: "none" })])).toMatch(/apiKeySource: "none"/)
+    expect(loginProblem("claude", [init({ apiKeySource: "ANTHROPIC_API_KEY" })])).toBeUndefined()
+    // A host line shaped like an init is not the tool's report.
+    expect(loginProblem("claude", [{ from: "host", message: { type: "system", subtype: "init" } }])).toBeUndefined()
   })
 })
 

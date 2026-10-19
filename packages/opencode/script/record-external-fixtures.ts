@@ -179,7 +179,7 @@ function version(binary: string) {
 }
 
 /** The login a step's tool used, from its own report, or what makes it not the test key. Undefined is fine. */
-function loginProblem(tool: ExternalDetect.Tool, entries: any[]) {
+export function loginProblem(tool: ExternalDetect.Tool, entries: any[]) {
   const messages = entries.filter((entry) => entry.from === "tool").map((entry) => entry.message ?? {})
   if (tool === "claude") {
     const account = messages.find((m) => m.type === "control_response")?.response?.response?.account
