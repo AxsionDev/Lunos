@@ -5,6 +5,7 @@ import path from "node:path"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { resolveCommand, spawnArgv } from "@/cli/restart"
 import { MemoryFailure } from "./failure"
+import { withoutCwd } from "./move"
 
 // XCOD-249: memory settings apply when Lunos starts, so the setup wizard checks the settings it is
 // about to save by running `lunos memory check --json` in a new process with them layered on top
@@ -39,24 +40,31 @@ export function entry(argv: readonly string[]) {
   return [argv[0]!, path.resolve(path.dirname(script), "..", "..", "index" + path.extname(script)), ...argv.slice(2)]
 }
 
-export async function run(input: {
-  directory: string
-  memory: Record<string, unknown>
-  /** XCOD-264: variables a template's `.env` holds, for the block's `{env:}` references. */
-  env?: Record<string, string>
-}): Promise<Result> {
+/**
+ * The command the check runs. A dev run's `--cwd` is dropped (see `withoutCwd`), so the check runs in
+ * the project it is given rather than in the Lunos checkout, and remembers its test fact there.
+ */
+export function argv(input: { execPath: string; argv: readonly string[]; execArgv: readonly string[] }) {
   const command = resolveCommand({
-    execPath: process.execPath,
-    argv: entry(process.argv),
-    execArgv: process.execArgv,
+    execPath: input.execPath,
+    argv: entry(input.argv),
+    execArgv: withoutCwd(input.execArgv),
     args: ["memory", "check", "--json"],
     upgraded: false,
     platform: process.platform,
     which: (name) => Bun.which(name),
     exists: (file) => fs.existsSync(file),
   })
-  const { argv } = spawnArgv(command, process.platform)
-  const proc = Bun.spawn(argv, {
+  return spawnArgv(command, process.platform).argv
+}
+
+export async function run(input: {
+  directory: string
+  memory: Record<string, unknown>
+  /** XCOD-264: variables a template's `.env` holds, for the block's `{env:}` references. */
+  env?: Record<string, string>
+}): Promise<Result> {
+  const proc = Bun.spawn(argv({ execPath: process.execPath, argv: process.argv, execArgv: process.execArgv }), {
     cwd: input.directory,
     stdout: "pipe",
     stderr: "pipe",

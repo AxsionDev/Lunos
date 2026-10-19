@@ -14,3 +14,12 @@ test("XCOD-249: a failing check says what to do for the errors a first start hit
   expect(checkFix("Blocked by data-residency policy. memory.backend declares jurisdiction")).toContain("region")
   expect(checkFix("something else")).toBeUndefined()
 })
+
+test("XCOD-263: a dev run's --cwd is not passed on, so the check runs in the project", () => {
+  const dev = (execArgv: string[]) =>
+    MemorySetupCheck.argv({ execPath: "/bun", argv: ["/bun", "/r/src/cli/tui/worker.ts"], execArgv })
+  const expected = ["/bun", "/r/src/index.ts", "memory", "check", "--json"]
+  expect(dev(["--cwd", "/r"])).toEqual(expected)
+  expect(dev(["--cwd=/r"])).toEqual(expected)
+  expect(dev(["--smol", "--cwd", "packages/opencode"])).toEqual(["/bun", "--smol", ...expected.slice(1)])
+})

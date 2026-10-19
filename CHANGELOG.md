@@ -67,6 +67,8 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   without your facts, keys or tokens. `lunos memory check --json` returns the same fields, the
   engine's output is kept in the memory folder's `logs/`, and `lunos memory status` shows where.
   <!-- XCOD-263 -->
+- In a run from source, the memory setup check runs in the opened project, not in the Lunos
+  checkout, so its test fact no longer lands in the checkout's memory. <!-- internal --> <!-- XCOD-263 -->
 - **Settings and memory setup can save `{env:…}` references** such as `{env:NEO4J_PASSWORD}`.
   Before, saving one failed, so a team database couldn't be set up from the wizard.
   <!-- XCOD-264 -->
