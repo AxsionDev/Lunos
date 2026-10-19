@@ -249,7 +249,97 @@ export const MemorySetupInput = Schema.Struct({
   memory: Schema.Record(Schema.String, Schema.Unknown).annotate({
     description: "The memory block the wizard would save (memory.enabled, model, backend, retention, encryption)",
   }),
+  template: Schema.optional(
+    Schema.Struct({ name: Schema.String, scope: Schema.Literals(["user", "project"]) }).annotate({
+      description: "XCOD-264: a Docker template whose .env holds the variables the block's {env:} references need",
+    }),
+  ),
 }).annotate({ identifier: "MemorySetupInput" })
+
+// XCOD-264: the storage step's facts about this machine, and the templates to offer.
+export const MemorySetupTemplate = Schema.Struct({
+  name: Schema.String,
+  title: Schema.String,
+  description: Schema.optional(Schema.String),
+  leaves: Schema.String,
+  requires: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  ask: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  memory: Schema.Record(Schema.String, Schema.Unknown),
+  port: Schema.optional(Schema.Number),
+  licence: Schema.optional(Schema.String),
+  organisation: Schema.optional(Schema.Boolean),
+  unavailable: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemorySetupTemplate" })
+
+export const MemorySetupEnvironment = Schema.Struct({
+  environment: Schema.Struct({
+    paths: Schema.Struct({ project: Schema.optional(Schema.String), user: Schema.optional(Schema.String) }),
+    model: Schema.optional(Schema.Struct({ id: Schema.String, region: Schema.optional(Schema.String) })),
+    docker: Schema.optional(Schema.Struct({ tool: Schema.Literals(["docker", "podman"]), compose: Schema.Boolean })),
+    localModels: Schema.mutable(Schema.Array(Schema.String)),
+  }),
+  templates: Schema.mutable(Schema.Array(MemorySetupTemplate)),
+}).annotate({ identifier: "MemorySetupEnvironment" })
+
+/** The shape of XCOD-263's structured memory-check errors: what failed, at which stage, what to do. */
+export const MemorySetupError = Schema.Struct({
+  type: Schema.String,
+  message: Schema.String,
+  stage: Schema.String,
+  fix: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemorySetupError" })
+
+export const MemorySetupTestResult = Schema.Struct({
+  ok: Schema.Boolean,
+  ms: Schema.optional(Schema.Number),
+  server: Schema.optional(Schema.String),
+  warnings: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  error: Schema.optional(MemorySetupError),
+}).annotate({ identifier: "MemorySetupTestResult" })
+
+export const MemorySetupTemplateInput = Schema.Struct({
+  name: Schema.String,
+  scope: Schema.Literals(["user", "project"]),
+  values: Schema.optional(
+    Schema.Struct({
+      vendor: Schema.optional(Schema.Literals(["neo4j", "postgres"])),
+      url: Schema.optional(Schema.String),
+      jurisdiction: Schema.optional(Schema.String),
+      localModel: Schema.optional(Schema.String),
+      port: Schema.optional(Schema.Number),
+    }),
+  ),
+  overwrite: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+    description: "Existing files (by name) the user agreed to replace",
+  }),
+}).annotate({ identifier: "MemorySetupTemplateInput" })
+
+export const MemorySetupTemplatePlan = Schema.Struct({
+  ok: Schema.Boolean,
+  error: Schema.optional(Schema.String),
+  dir: Schema.String,
+  files: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({ name: Schema.String, path: Schema.String, content: Schema.String, exists: Schema.Boolean }),
+    ),
+  ),
+  memory: Schema.Record(Schema.String, Schema.Unknown),
+  command: Schema.String,
+  licence: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemorySetupTemplatePlan" })
+
+export const MemorySetupMoveResult = Schema.Struct({
+  ok: Schema.Boolean,
+  facts: Schema.optional(Schema.Number),
+  output: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemorySetupMoveResult" })
+
+export const MemorySetupStartResult = Schema.Struct({
+  ok: Schema.Boolean,
+  ms: Schema.optional(Schema.Number),
+  error: Schema.optional(MemorySetupError),
+}).annotate({ identifier: "MemorySetupStartResult" })
 
 export const MemorySetupBackendResult = Schema.Struct({
   ok: Schema.Boolean,
@@ -377,6 +467,77 @@ export const MemoryApi = HttpApi.make("memory")
             summary: "Check a memory database",
             description:
               "Run the checks Lunos makes before connecting to an external memory database (URL, TLS, credentials by reference, jurisdiction against the residency policy) on a proposed memory block. Connects to nothing.",
+          }),
+        ),
+        HttpApiEndpoint.get("setupEnvironment", `${root}/setup/environment`, {
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupEnvironment, "This machine's memory paths, model, Docker, and the templates"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.environment",
+            summary: "Memory storage facts",
+            description:
+              "What the storage step shows about this machine: the memory paths, the model that extracts facts and its region, whether Docker or Podman is installed, local model providers, and the memory templates to offer (built-in and from managed config).",
+          }),
+        ),
+        HttpApiEndpoint.post("setupTest", `${root}/setup/test`, {
+          payload: MemorySetupInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupTestResult, "Whether the database could be used"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.test",
+            summary: "Test a memory database connection",
+            description:
+              "Run the checks Lunos makes before connecting, then connect, write, read and delete a probe in a namespace of its own. Never touches stored facts.",
+          }),
+        ),
+        HttpApiEndpoint.post("setupTemplatePreview", `${root}/setup/template/preview`, {
+          payload: MemorySetupTemplateInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupTemplatePlan, "The files and config the template would write"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.templatePreview",
+            summary: "Preview a memory template",
+            description:
+              "Everything a memory template would write, in full, without writing it. A generated password is shown masked.",
+          }),
+        ),
+        HttpApiEndpoint.post("setupTemplateApply", `${root}/setup/template/apply`, {
+          payload: MemorySetupTemplateInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupTemplatePlan, "The files written"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.templateApply",
+            summary: "Write a memory template's files",
+            description:
+              "Write a Docker template's compose file, .env (0600, holding the generated password) and .env.example. An existing file is replaced only when named in overwrite. Starts nothing.",
+          }),
+        ),
+        HttpApiEndpoint.post("setupTemplateStart", `${root}/setup/template/start`, {
+          payload: MemorySetupTemplateInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupStartResult, "Whether the database started and became healthy"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.templateStart",
+            summary: "Start a memory template's database",
+            description:
+              "Run docker compose up -d for a written Docker template, then wait up to two minutes for its healthcheck. Call only after the user confirmed the command.",
+          }),
+        ),
+        HttpApiEndpoint.post("setupMove", `${root}/setup/move`, {
+          payload: MemorySetupInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupMoveResult, "How many facts were moved"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.move",
+            summary: "Move facts to new memory storage",
+            description:
+              'Switching storage, "Move my facts": export every fact from the storage in use now and import it into the proposed one, keeping each fact\'s provenance. The old copy is left as it is.',
           }),
         ),
         HttpApiEndpoint.post("setupCheck", `${root}/setup/check`, {

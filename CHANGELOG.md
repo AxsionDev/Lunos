@@ -21,6 +21,35 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Memory setup explains where your memory is stored, and lets you keep it in PostgreSQL.** The
+  "Where should memory be stored?" step shows each option as a card, with a "What this means" panel
+  that uses your real memory folder, model and region. The panel says what is stored where, what
+  leaves your computer, who it's shared with and what it needs. Press `c` to compare the options
+  side by side, or `?` for two questions that recommend one. Your team can now share memory in a
+  PostgreSQL database it already runs, as well as Neo4j. "Test connection" writes, reads and
+  deletes a probe and tells you which step failed and what to do. A region your residency policy
+  doesn't allow is refused right there. Memgraph is shown as coming soon.
+  <!-- XCOD-264 -->
+- **Memory templates set memory up in one step.** Choose "Just me, on this computer", "Just me,
+  fully local" (when you run a local model), "Neo4j in Docker" or "PostgreSQL in Docker" on this
+  computer, a team database you host, or a managed cloud database. The Docker templates show every
+  file before writing it, never replace an existing file without asking, and keep the generated
+  password only in a private `.env` file, never in your config. They bind the database to this
+  computer only, and start it only after you confirm the command. Organisations can add their own
+  templates and hide built-in ones in managed config. In the CLI: `lunos memory templates`, and
+  `lunos memory setup --template <name>`, with `--yes` and `--start`. <!-- XCOD-264 -->
+- **Changing where memory is stored asks what happens to your facts.** "Move my facts" copies every
+  fact, with where it came from, to the new storage. "Start empty" leaves the old facts where they
+  are. <!-- XCOD-264 -->
+
+### Changed
+
+- **Memory names where it's stored in plain words.** Setup, settings, `lunos memory status`,
+  `/memory` and the status line say "On this computer" or "Team database: PostgreSQL". Each of them
+  also repeats what leaves your computer. Your config file is unchanged. <!-- XCOD-264 -->
+
 ### Fixed
 
 - **The memory setup check says what went wrong.** A failed check no longer stops at "Memory
@@ -33,6 +62,11 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   without your facts, keys or tokens. `lunos memory check --json` returns the same fields, the
   engine's output is kept in the memory folder's `logs/`, and `lunos memory status` shows where.
   <!-- XCOD-263 -->
+- **Settings and memory setup can save `{env:…}` references** such as `{env:NEO4J_PASSWORD}`.
+  Before, saving one failed, so a team database couldn't be set up from the wizard.
+  <!-- XCOD-264 -->
+- Every published release notifies lunos.tech with the tagged CHANGELOG.md, and a daily check fails
+  when lunos.tech/changelog falls behind the latest release. <!-- XCOD-261 --> <!-- internal -->
 
 ## [1.18.50] - 2026-10-19
 
@@ -594,6 +628,22 @@ false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `auto
   permission rules written with 8.3 short names (`C:\PROGRA~1\…`) match long-form paths. <!-- XCOD-137 XCOD-149 -->
 - A legacy keybind name in `tui.json` (such as `agent_list`, renamed in an earlier release) was silently
   dropped when the config loaded, instead of resolving to its new name. <!-- XCOD-40 XCOD-130 -->
+
+## [1.18.42] - 2026-09-29
+
+### Added
+
+- **Offline install bundles,** one `lunos-offline-<os>-<arch>.tar.gz` per platform, for installing
+  Lunos on a machine with no internet access. Each contains the CLI, the model catalogue, the SBOM,
+  the signed `SHA256SUMS`, Sigstore's trust root, and pinned ripgrep and cosign builds. Verify a
+  bundle with `SHA256SUMS-offline` and its signature before you transfer it. `INSTALL-OFFLINE.md`
+  inside the bundle has the steps, and [Air-gapped deployment](docs/deployment/self-hosted.md#air-gapped-deployment)
+  covers running against your own model. <!-- XCOD-121 --> <!-- highlight -->
+
+### Fixed
+
+- The offline install bundles missing from v1.18.41 ship with this release: the release job no
+  longer hangs while building them. <!-- XCOD-121 -->
 
 ## [1.18.41] - 2026-09-29
 

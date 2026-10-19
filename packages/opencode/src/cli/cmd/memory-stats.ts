@@ -1,3 +1,4 @@
+import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import { EOL } from "os"
 import { Effect } from "effect"
 import { effectCmd } from "../effect-cmd"
@@ -26,10 +27,7 @@ export function statsLines(
   },
 ) {
   const status = stats.status
-  const backend =
-    status.backend.type === "embedded"
-      ? "this machine"
-      : `${status.backend.type}${status.backend.host ? ` at ${status.backend.host}` : ""}${status.backend.jurisdiction ? ` (${status.backend.jurisdiction})` : ""}`
+  const backend = MemoryStorage.short(status.backend)
   const lines = [
     `Memory: ${status.on ? "on" : `off (${status.reason})`} · ${backend} · ${status.encryption === "os-keychain" ? "encrypted" : "not encrypted"} · ${status.retentionDays ? `kept ${status.retentionDays} days` : "kept until removed"}`,
     `Range: ${stats.rangeDays ? `last ${stats.rangeDays} days` : "all"}`,
