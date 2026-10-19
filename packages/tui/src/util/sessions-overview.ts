@@ -149,7 +149,7 @@ export function build(input: {
   ungroupedCollapsed?: boolean
 }): Line[] {
   const search = input.search.trim().toLowerCase()
-  const filtering = !!search || (input.state !== "all" && input.state !== "archived")
+  const filtering = !!search || input.state !== "all"
   const known = new Map(input.groups.map((group) => [group.id, group]))
   const ids = new Set(input.sessions.map((item) => item.id))
 
@@ -287,10 +287,19 @@ export function stopQuestion(plan: ReturnType<typeof stopPlan>) {
   return `Stop ${plural(total, "session")}? ${stopBreakdown(plan)}.${elsewhere}`
 }
 
+/**
+ * A subagent whose parent is in the list goes with its parent (archived, restored and deleted
+ * together), so it isn't counted or sent on its own.
+ */
+export function topLevel<T extends Pick<SessionOverviewItem, "id" | "parentID">>(items: T[]) {
+  const ids = new Set(items.map((item) => item.id))
+  return items.filter((item) => !item.parentID || !ids.has(item.parentID))
+}
+
 /** XCOD-265: what Clear list would archive, and what stays because it's running or waiting. */
 export function clearPlan(items: SessionOverviewItem[]) {
   return {
-    targets: items.filter((item) => clearable(item)),
+    targets: topLevel(items.filter((item) => clearable(item))),
     staying: items.filter((item) => !clearable(item)),
   }
 }

@@ -197,6 +197,19 @@ describe("SessionPeerControl.stopHere (XCOD-265)", () => {
         { method: "POST", path: "/session/ses_here/abort", directory: "/work/here", body: "" },
       ])
       await expect(SessionPeerControl.stopHere("ses_unknown")).rejects.toThrow("isn't running that session")
+
+      // A rejection the owner refuses: the turn is not aborted (that would leave the ask hanging) and the stop fails.
+      calls.length = 0
+      SessionPeerControl.useHandler(async (request) => {
+        const url = new URL(request.url)
+        calls.push({ method: request.method, path: url.pathname, directory: null, body: "" })
+        if (url.pathname === "/permission") return Response.json([{ id: "per_9", sessionID: "ses_here" }])
+        if (url.pathname === "/question") return Response.json([])
+        if (url.pathname.endsWith("/reply")) return new Response("bad request", { status: 400 })
+        return Response.json(true)
+      })
+      await expect(SessionPeerControl.stopHere("ses_here")).rejects.toThrow("Couldn't reject its pending approval")
+      expect(calls.map((call) => call.path)).not.toContain("/session/ses_here/abort")
     } finally {
       SessionPeerControl.useHandler(undefined)
       SessionLive.reset()

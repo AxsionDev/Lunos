@@ -38,6 +38,7 @@ import {
   stopSummary,
   stoppable,
   toolOnly,
+  topLevel,
   waiting,
   type Line,
   type StateFilter,
@@ -573,7 +574,7 @@ export function DialogSessions(props: { select?: string }) {
 
   /** XCOD-265: permanent, so the count is typed back, as Forget all in the memory browser. */
   async function deleteArchived() {
-    const items = viewItems().filter((item) => !!item.archived)
+    const items = topLevel(viewItems().filter((item) => !!item.archived))
     if (items.length === 0) return toast.show({ variant: "info", message: "No archived sessions in this view." })
     const projects = [...new Set(items.map((item) => projectName(item)))].join(", ")
     const count = items.length

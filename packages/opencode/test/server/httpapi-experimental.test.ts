@@ -268,6 +268,31 @@ describe("experimental HttpApi", () => {
   )
 
   it.instance(
+    "XCOD-265: the routes a stop calls accept what it sends (a settled request is a 404, not a 400)",
+    () =>
+      Effect.gen(function* () {
+        const tmp = yield* TestInstance
+        const permissions = yield* request("/permission", tmp.directory)
+        expect(permissions.status).toBe(200)
+        expect(Array.isArray(yield* json<unknown>(permissions))).toBe(true)
+        expect((yield* request("/question", tmp.directory)).status).toBe(200)
+        const reply = yield* request("/permission/per_settled/reply", tmp.directory, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ reply: "reject", message: "Stopped from /sessions" }),
+        })
+        expect(reply.status).toBe(404)
+        const reject = yield* request("/question/que_settled/reject", tmp.directory, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "null",
+        })
+        expect(reject.status).toBe(404)
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
     "XCOD-265: clear (archive), show archived, unarchive and delete archived over HTTP",
     () =>
       Effect.gen(function* () {

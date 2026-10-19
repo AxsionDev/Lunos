@@ -160,3 +160,54 @@ test("an unbound menu action is in the footer and runs from the Tab menu", async
     await select.cleanup()
   }
 })
+
+// XCOD-265: /sessions refreshes under the footer. When an action before the focused one is disabled
+// (or appears), the highlight stays on the same action instead of sliding to its neighbour.
+test("the focused footer action stays put when the actions before it change", async () => {
+  const { createSignal } = await import("solid-js")
+  await using tmp = await tmpdir()
+  const fired: string[] = []
+  const [stopEnabled, setStopEnabled] = createSignal(true)
+  const select = await mountSelect({
+    root: tmp.path,
+    keybinds: {},
+    actions: [
+      {
+        title: "stop",
+        command: "dialog.sessions.stop",
+        menu: true,
+        withoutSelection: true,
+        disabled: () => !stopEnabled(),
+        onTrigger: () => fired.push("stop"),
+      },
+      {
+        title: "stop all",
+        command: "dialog.sessions.stop_all",
+        menu: true,
+        withoutSelection: true,
+        onTrigger: () => fired.push("stop all"),
+      },
+      {
+        title: "clear list",
+        command: "dialog.sessions.clear",
+        menu: true,
+        withoutSelection: true,
+        onTrigger: () => fired.push("clear"),
+      },
+    ],
+  })
+
+  try {
+    await Bun.sleep(100)
+    select.app.mockInput.pressTab()
+    select.app.mockInput.pressTab()
+    await Bun.sleep(50)
+    setStopEnabled(false)
+    await Bun.sleep(50)
+    select.app.mockInput.pressEnter()
+    await wait(() => fired.length > 0)
+    expect(fired).toEqual(["stop all"])
+  } finally {
+    await select.cleanup()
+  }
+})

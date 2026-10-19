@@ -101,12 +101,13 @@ export const stop = Effect.fn("SessionBulk.stop")(function* (input: {
     stopped: outcomes.filter((item) => !item.reason).map((item) => item.id),
     failed: outcomes.flatMap((item) => (item.reason ? [{ id: item.id, reason: item.reason }] : [])),
   }
-  AuditLog.emit("session.stop", {
-    origin: "bulk",
-    count: result.stopped.length,
-    ids: result.stopped,
-    failed: result.failed.length || undefined,
-  })
+  if (outcomes.length)
+    AuditLog.emit("session.stop", {
+      origin: "bulk",
+      count: result.stopped.length,
+      ids: result.stopped,
+      failed: result.failed.length || undefined,
+    })
   return result
 })
 
@@ -167,12 +168,14 @@ export const archive = Effect.fn("SessionBulk.archive")(function* (input: {
     if (reason) result.skipped.push({ id, reason })
     else result.archived.push(id)
   }
-  AuditLog.emit("session.archive", {
-    origin: "bulk",
-    action: "archive",
-    count: result.archived.length,
-    ids: result.archived,
-  })
+  // Nothing changed, nothing to record.
+  if (result.archived.length)
+    AuditLog.emit("session.archive", {
+      origin: "bulk",
+      action: "archive",
+      count: result.archived.length,
+      ids: result.archived,
+    })
   return result
 })
 
@@ -216,12 +219,13 @@ export const unarchive = Effect.fn("SessionBulk.unarchive")(function* (input: { 
     if (reason) result.skipped.push({ id, reason })
     else result.archived.push(id)
   }
-  AuditLog.emit("session.archive", {
-    origin: "bulk",
-    action: "unarchive",
-    count: result.archived.length,
-    ids: result.archived,
-  })
+  if (result.archived.length)
+    AuditLog.emit("session.archive", {
+      origin: "bulk",
+      action: "unarchive",
+      count: result.archived.length,
+      ids: result.archived,
+    })
   return result
 })
 
@@ -259,11 +263,12 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
     if (removed) result.deleted.push(id)
     else result.skipped.push({ id, reason: "no such session" })
   }
-  AuditLog.emit("session.delete", {
-    origin: "bulk",
-    count: result.deleted.length,
-    ids: result.deleted,
-  })
+  if (result.deleted.length)
+    AuditLog.emit("session.delete", {
+      origin: "bulk",
+      count: result.deleted.length,
+      ids: result.deleted,
+    })
   return result
 })
 

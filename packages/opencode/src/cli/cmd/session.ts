@@ -95,7 +95,10 @@ export const SessionListCommand = effectCmd({
         default: "table",
       }),
   handler: Effect.fn("Cli.session.list")(function* (args) {
-    const sessions = yield* Session.Service.use((svc) => svc.list({ roots: true, limit: args.maxCount }))
+    // XCOD-265: sessions cleared from /sessions (archived) aren't listed; `lunos session unarchive` brings them back.
+    const sessions = (yield* Session.Service.use((svc) => svc.list({ roots: true, limit: args.maxCount }))).filter(
+      (session) => !session.time.archived,
+    )
 
     if (sessions.length === 0) return
 

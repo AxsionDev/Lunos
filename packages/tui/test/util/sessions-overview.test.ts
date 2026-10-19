@@ -252,6 +252,13 @@ describe("Stop all and Clear list (XCOD-265)", () => {
     )
   })
 
+  test("a subagent listed with its parent is cleared with it, not counted again", () => {
+    const plan = clearPlan([item("p", { state: "finished" }), item("kid", { state: "finished", parentID: "p" })])
+    expect(plan.targets.map((row) => row.id)).toEqual(["p"])
+    // Its parent isn't in view: the subagent is a row of its own.
+    expect(clearPlan([item("kid", { state: "finished", parentID: "gone" })]).targets).toHaveLength(1)
+  })
+
   test("Stop all & clear lists both steps in one confirmation", () => {
     expect(stopAndClearQuestion(all())).toBe(
       "Stop 7 sessions and clear 11 from the list? 1. Stop 4 running, 2 waiting for an answer, 1 Claude Code (1 in another Lunos window). 2. Archive all 11: they're hidden, not deleted, and Show archived brings them back.",
@@ -268,7 +275,7 @@ describe("Stop all and Clear list (XCOD-265)", () => {
     ).toBe("Stopped 7 · 1 couldn't be stopped (another Lunos didn't respond)")
   })
 
-  test("the archived view lists archived rows whatever their state, without group headings for filtering", () => {
+  test("the archived view lists archived rows whatever their state, with group names as headings", () => {
     const sessions = [item("old", { state: "finished", archived: 5 }), item("older", { state: "failed", archived: 4 })]
     expect(inView({ groups: [], sessions, search: "", state: "archived" })).toHaveLength(2)
     expect(view(build({ groups: [], sessions, search: "", state: "archived" }))).toEqual([
@@ -276,5 +283,15 @@ describe("Stop all and Clear list (XCOD-265)", () => {
       "old",
       "older",
     ])
+    // A collapsed group (or Ungrouped) still lists its archived rows: the view has no group rows to expand.
+    const grouped = [item("old", { archived: 5, groupID: "g1" }), item("older", { archived: 4 })]
+    const lines = build({
+      groups: [group("g1", "Client A", true)],
+      sessions: grouped,
+      search: "",
+      state: "archived",
+      ungroupedCollapsed: true,
+    })
+    expect(view(lines)).toEqual(["[Client A 1 collapsed]", "old", "[Ungrouped 1 collapsed]", "older"])
   })
 })

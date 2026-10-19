@@ -78,28 +78,42 @@ async function forward(response: Response) {
 /** XCOD-265: what a stopped session's pending approvals are rejected with, unless the caller says otherwise. */
 export const STOP_REASON = "Stopped from /sessions"
 
+/** An answer to a request this process may have already settled: a 404 means it's gone, which is fine. */
+async function settled(response: Response, what: string) {
+  if (response.ok || response.status === 404) return
+  throw new PeerError(response.status, `Couldn't reject ${what}: ${(await response.text()) || response.status}`)
+}
+
 async function pending(path: "/permission" | "/question", sessionID: string, directory: string) {
   const response = await inner(path, directory)
-  const list = response.ok ? ((await response.json()) as Array<{ id?: string; sessionID?: string }>) : []
+  if (!response.ok) throw new PeerError(response.status, `Couldn't list the session's pending ${path.slice(1)}s`)
+  const list = (await response.json()) as Array<{ id?: string; sessionID?: string }>
   return list.filter((item) => item.sessionID === sessionID && typeof item.id === "string") as { id: string }[]
 }
 
 /**
  * XCOD-265: rejects the session's pending approvals and questions first, so no tool is left waiting
  * on an answer that can't come, then aborts the turn (background subagents stop with it). Aborting
- * alone would drop the asks without a reply event.
+ * alone would drop the asks without a reply event, so if a rejection fails the turn is not aborted
+ * and the stop is reported as failed.
  */
 async function stopIn(sessionID: string, directory: string, reason: string) {
   // One rejection with a message rejects the session's other pending approvals too.
   const [permission] = await pending("/permission", sessionID, directory)
   if (permission)
-    await inner(`/permission/${permission.id}/reply`, directory, {
-      method: "POST",
-      body: JSON.stringify({ reply: "reject", message: reason }),
-    })
+    await settled(
+      await inner(`/permission/${permission.id}/reply`, directory, {
+        method: "POST",
+        body: JSON.stringify({ reply: "reject", message: reason }),
+      }),
+      "its pending approval",
+    )
   // A question can't carry a reason: it is rejected as "dismissed".
   for (const question of await pending("/question", sessionID, directory))
-    await inner(`/question/${question.id}/reject`, directory, { method: "POST", body: "null" })
+    await settled(
+      await inner(`/question/${question.id}/reject`, directory, { method: "POST", body: "null" }),
+      "its pending question",
+    )
   return inner(`/session/${sessionID}/abort`, directory, { method: "POST" })
 }
 
@@ -129,7 +143,11 @@ export async function serve(request: Request): Promise<Response> {
   if (rest === "/stop" && request.method === "POST") {
     const body = (await request.json().catch(() => undefined)) as { reason?: unknown } | undefined
     const reason = typeof body?.reason === "string" && body.reason.trim() ? body.reason.slice(0, 200) : STOP_REASON
-    return forward(await stopIn(sessionID, directory, reason))
+    return stopIn(sessionID, directory, reason).then(forward, (error) =>
+      json(error instanceof PeerError ? error.status : 500, {
+        error: error instanceof Error ? error.message : "Failed.",
+      }),
+    )
   }
   if (rest === "/asks" && request.method === "GET") {
     const [permissions, questions] = await Promise.all(

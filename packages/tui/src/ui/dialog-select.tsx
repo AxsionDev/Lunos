@@ -109,8 +109,16 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     filter: props.initialFilter ?? "",
     input: "keyboard" as "keyboard" | "mouse",
   })
-  const [focusedAction, setFocusedAction] = createSignal<number>()
-  const actionFocused = createMemo(() => focusedAction() !== undefined)
+  // The focused footer action, by command: the list of enabled actions can change under it (a row
+  // finishes and "stop" is disabled), and the highlight must stay on the same action.
+  const [focusedCommand, setFocusedCommand] = createSignal<string>()
+  const focusedAction = () => {
+    const command = focusedCommand()
+    if (command === undefined) return undefined
+    const index = actionItems().findIndex((item) => item.command === command)
+    return index < 0 ? undefined : index
+  }
+  const actionFocused = () => focusedAction() !== undefined
   let selection: { value: T; category?: string } | undefined
   let resetSelection = false
   let visibilityGeneration = 0
@@ -193,7 +201,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   createEffect(
     on(
       () => store.filter,
-      () => setFocusedAction(undefined),
+      () => setFocusedCommand(undefined),
       { defer: true },
     ),
   )
@@ -246,8 +254,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   )
 
   createEffect(() => {
-    const index = focusedAction()
-    if (index !== undefined && index >= actionItems().length) setFocusedAction(undefined)
+    if (focusedCommand() !== undefined && focusedAction() === undefined) setFocusedCommand(undefined)
   })
 
   createEffect(
@@ -338,7 +345,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   }
 
   function moveTo(next: number, center = false, preserve = true) {
-    setFocusedAction(undefined)
+    setFocusedCommand(undefined)
     setStore("selected", next)
     const option = selected()
     if (option) {
@@ -403,11 +410,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     if (props.locked) return
     const total = actionItems().length
     if (total === 0) return
-    setFocusedAction((index) => {
-      if (index === undefined) return direction === 1 ? 0 : total - 1
-      const next = index + direction
-      return next < 0 || next >= total ? undefined : next
-    })
+    const index = focusedAction()
+    const next = index === undefined ? (direction === 1 ? 0 : total - 1) : index + direction
+    setFocusedCommand(next < 0 || next >= total ? undefined : actionItems()[next]!.command)
   }
 
   useBindings(() => {
@@ -690,7 +695,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                           onMouseMove={() => {
                             if (props.locked) return
                             setStore("input", "mouse")
-                            setFocusedAction(undefined)
+                            setFocusedCommand(undefined)
                           }}
                           onMouseUp={() => {
                             if (props.locked) return
