@@ -1,4 +1,5 @@
 import { EOL } from "os"
+import { ConfigExternal } from "@opencode-ai/core/config/external"
 import { createInterface } from "readline/promises"
 import { Effect } from "effect"
 import type { Argv } from "yargs"
@@ -97,7 +98,10 @@ function runHandler(resume: boolean) {
           prompt: args.prompt,
           resume: resume ? args.session : undefined,
           model: args.model,
-          permissionMode: args.permissionMode ?? (config.external as any)?.[tool]?.permission_mode,
+          // A --permission-mode for this run replaces what config says.
+          ...(args.permissionMode
+            ? { permissionMode: args.permissionMode }
+            : ConfigExternal.launch(tool, config.external)),
           allowUnsafe: args.unsafe,
           maxBudgetUSD: args.maxBudgetUsd,
           executable: status.path,
