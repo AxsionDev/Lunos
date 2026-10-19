@@ -42,7 +42,7 @@ Press **Tab** to move between the prompt and the list. In the list:
 
 An approval given here goes to the Lunos that runs the session, which checks it and writes it to its [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md), as if you'd answered it there.
 
-**stop all** and **clear list** in the list's header work as in [`/sessions`](/docs/tui#sessions), on the sessions the list shows (with its filter): Stop all stops every running or waiting one, and Clear list archives the finished, idle and failed ones after a confirmation that counts them. Archived sessions aren't listed; `/sessions` → "show archived" brings them back. Both have no key by default: click them, use the command palette, or bind `monitor.stop_all` and `monitor.clear`.
+**stop all** and **clear list** in the list's header work as in [`/sessions`](/docs/tui#sessions), on the sessions the list shows (with its filter): Stop all stops every running or waiting one, and Clear list archives the finished, idle and failed ones after a confirmation that counts them. Archived sessions aren't listed; `/sessions` → "show archived" brings them back. Both have no key by default: click them, press Tab and then Ctrl+P (with the list focused, Ctrl+P opens the command palette), or bind `monitor.stop_all` and `monitor.clear`.
 
 In a terminal narrower than 100 columns, the list takes the whole screen. Tab switches between it and the prompt, and what you've typed stays.
 

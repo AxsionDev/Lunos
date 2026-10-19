@@ -265,10 +265,11 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     ),
   )
 
-  // Prompt focus follows Tab: with the rail focused nothing is typed into the prompt.
+  // Prompt focus follows Tab: with the rail focused nothing is typed into the prompt. A dialog
+  // closing hands focus back to the prompt, so this runs again then.
   createEffect(() => {
     const ref = promptRef()
-    if (!ref) return
+    if (!ref || dialog.stack.length > 0) return
     if (focus() === "rail") ref.blur()
     else ref.focus()
   })
@@ -613,6 +614,16 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
   // is active while a dialog or the autocomplete is open (base mode).
   const keys = (name: string, cmd: () => void): Binding<Renderable, KeyEvent>[] =>
     tuiConfig.keybinds.get(name).map((binding) => ({ ...binding, cmd }))
+  /** A binding without its ctrl+p / ctrl+n alternatives (keys are comma lists, e.g. "up,ctrl+p"). */
+  const arrowsOnly = (binding: Binding<Renderable, KeyEvent>) => {
+    if (typeof binding.key !== "string") return binding
+    const key = binding.key
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part !== "ctrl+p" && part !== "ctrl+n")
+      .join(",")
+    return key ? { ...binding, key } : undefined
+  }
   const toggleFocus = () => setFocus((value) => (value === "prompt" ? "rail" : "prompt"))
   const promptBindings = createMemo(() => ({
     always: [
@@ -631,10 +642,11 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     priority: 10,
     bindings: [
       ...keys("monitor.focus", toggleFocus),
+      // No monitor.project here: with the rail focused, ctrl+p opens the command palette (Stop all, Clear).
       ...keys("monitor.back", back),
-      ...keys("monitor.project", () => void pickProject()),
-      ...keys("dialog.select.prev", () => move(-1)),
-      ...keys("dialog.select.next", () => move(1)),
+      // ↑/↓ only: dialog.select.prev's ctrl+p is the palette here.
+      ...keys("dialog.select.prev", () => move(-1)).flatMap((binding) => arrowsOnly(binding) ?? []),
+      ...keys("dialog.select.next", () => move(1)).flatMap((binding) => arrowsOnly(binding) ?? []),
       ...keys("dialog.select.submit", () => current() && open(current()!)),
       ...keys("monitor.approve", () => current() && void answer(current()!, true)),
       ...keys("monitor.deny", () => current() && void answer(current()!, false)),
@@ -755,16 +767,18 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       borderColor={focus() === "rail" ? theme.borderActive : theme.border}
       backgroundColor={theme.background}
     >
-      <box flexDirection="row" paddingLeft={1} paddingRight={1} flexShrink={0}>
-        <text fg={theme.text} attributes={TextAttributes.BOLD} flexGrow={1}>
+      <box flexDirection="row" gap={1} paddingLeft={1} paddingRight={1} flexShrink={0}>
+        <text fg={theme.text} attributes={TextAttributes.BOLD} flexGrow={1} flexShrink={1} wrapMode="none">
           Sessions on this computer
         </text>
         {/* XCOD-265: unbound by default (monitor.stop_all, monitor.clear); click them, or use the command palette. */}
-        <text fg={theme.textMuted} onMouseUp={() => void stopAll()}>
+        <text fg={theme.textMuted} flexShrink={0} wrapMode="none" onMouseUp={() => void stopAll()}>
           stop all
         </text>
-        <text fg={theme.textMuted}> · </text>
-        <text fg={theme.textMuted} onMouseUp={() => void clearList()}>
+        <text fg={theme.textMuted} flexShrink={0}>
+          {" · "}
+        </text>
+        <text fg={theme.textMuted} flexShrink={0} wrapMode="none" onMouseUp={() => void clearList()}>
           clear list
         </text>
         <Show when={search()}>
@@ -815,7 +829,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       <box paddingLeft={1} flexShrink={0}>
         <text fg={theme.textMuted} wrapMode="none">
           {focus() === "rail"
-            ? "↑↓ move · enter open · a approve · d deny · s stop · / filter · tab prompt"
+            ? "↑↓ move · enter open · a approve · d deny · s stop · / filter · ctrl+p stop all, clear · tab prompt"
             : "tab rail"}
         </text>
       </box>

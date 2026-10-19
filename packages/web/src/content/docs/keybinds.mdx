@@ -249,7 +249,7 @@ You can disable a keybind by adding the key to `tui.json` with a value of `"none
 
 ## Agent Monitor
 
-`agent_monitor` (`<leader>o`) opens the [Agent Monitor](/docs/agent-monitor). Its own keys are `monitor.back` (`escape,right`, from an empty prompt), `monitor.focus` (`tab`), `monitor.project` (`ctrl+p`), `monitor.send_now` (`ctrl+return`), `monitor.approve` (`a`), `monitor.deny` (`d`), `monitor.stop` (`s`), `monitor.filter` (`/`) and `monitor.older` (`o`). They apply only inside the monitor, so `tab`, `ctrl+p` and `ctrl+return` keep their usual meaning everywhere else. ← on an empty prompt opening it isn't a keybind: turn it off with `"left_opens_monitor": false` in `tui.json`.
+`agent_monitor` (`<leader>o`) opens the [Agent Monitor](/docs/agent-monitor). Its own keys are `monitor.back` (`escape,right`, from an empty prompt), `monitor.focus` (`tab`), `monitor.project` (`ctrl+p`, from the prompt; with the list focused `ctrl+p` opens the command palette), `monitor.stop_all` and `monitor.clear` (unbound), `monitor.send_now` (`ctrl+return`), `monitor.approve` (`a`), `monitor.deny` (`d`), `monitor.stop` (`s`), `monitor.filter` (`/`) and `monitor.older` (`o`). They apply only inside the monitor, so `tab`, `ctrl+p` and `ctrl+return` keep their usual meaning everywhere else. ← on an empty prompt opening it isn't a keybind: turn it off with `"left_opens_monitor": false` in `tui.json`.
 
 ---
 
