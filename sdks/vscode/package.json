@@ -2,7 +2,7 @@
   "name": "lunos",
   "displayName": "Lunos",
   "description": "Lunos, the EU-sovereign, self-hostable AI coding agent, in VS Code",
-  "version": "1.18.49",
+  "version": "1.18.50",
   "publisher": "axsion",
   "repository": {
     "type": "git",
