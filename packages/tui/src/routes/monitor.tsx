@@ -235,13 +235,15 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
         if (!sessionID || toolOnly({ id: sessionID })) return setPreview(undefined)
         const item = byID().get(sessionID)
         void sdk.client.session
-          .messages({ sessionID, directory: item?.directory, limit: 1 })
+          .messages({ sessionID, directory: item?.directory, limit: 4 })
           .then((result) => {
-            const last = result.data?.at(-1)
-            const text = last?.parts
-              .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
-              .join("\n")
-              .trim()
+            const texts = (result.data ?? []).map((message) =>
+              message.parts
+                .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+                .join("\n")
+                .trim(),
+            )
+            const text = texts.findLast((value) => !!value)
             if (previewTarget()?.id === sessionID) setPreview({ sessionID, text: text || "(no text yet)" })
           })
           .catch(() => setPreview(undefined))
@@ -422,6 +424,12 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     route.navigate({ type: "session", sessionID: item.id })
   }
 
+  /** After answering one, the next session waiting for you is highlighted. */
+  function nextWaiting(after: string) {
+    const next = rail().rows.find((row) => row.section === "waiting" && row.depth === 0 && row.item.id !== after)
+    if (next) setSelected(next.item.id)
+  }
+
   /** a / d: the shown ask, through the same replies as the session view (or the Lunos that runs it). */
   async function answer(item: SessionOverviewItem, allow: boolean) {
     const pending = asks[item.id]
@@ -459,6 +467,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
           message: `${allow ? "Approved" : "Denied"}: ${Locale.truncate(askText(pending!) ?? permission.permission, 60)}`,
         }),
       )
+      .then(() => nextWaiting(item.id))
       .catch(fail)
     refresh()
   }
@@ -581,30 +590,20 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
               ●
             </text>
           </Show>
-          <text
-            fg={active() ? theme.text : theme.text}
-            attributes={active() ? TextAttributes.BOLD : undefined}
-            wrapMode="none"
-            flexGrow={1}
-          >
+          <text fg={theme.text} attributes={active() ? TextAttributes.BOLD : undefined} wrapMode="none" flexShrink={1}>
             {item().title}
-          </text>
-          <text fg={theme.textMuted} flexShrink={0} wrapMode="none">
-            {[
-              item().queued ? `${item().queued} queued` : undefined,
-              elapsed(
-                item().state === "running" || item().state === "waiting" ? item().updated : item().updated,
-                now(),
-              ),
-              money(item().cost),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
           </text>
         </box>
         <box flexDirection="row" paddingLeft={rowProps.row.depth ? 8 : 5}>
           <text fg={theme.textMuted} wrapMode="none">
-            {[projectName(item()), who(), item().elsewhere || item().stale ? stateLabel(item()) : undefined]
+            {[
+              item().queued ? `${item().queued} queued` : undefined,
+              projectName(item()),
+              who(),
+              item().elsewhere || item().stale ? stateLabel(item()) : undefined,
+              elapsed(item().updated, now()),
+              money(item().cost),
+            ]
               .filter(Boolean)
               .join(" · ")}
           </text>
@@ -691,65 +690,71 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
 
   return (
     <box flexDirection="row" flexGrow={1} minHeight={0}>
-      <Show when={!narrow() || focus() === "prompt"}>
-        <box flexDirection="column" flexGrow={1} paddingLeft={2} paddingRight={2} paddingTop={1}>
-          <box flexDirection="row" flexShrink={0}>
-            <text fg={theme.text} attributes={TextAttributes.BOLD}>
-              Agent Monitor
-            </text>
-            <text fg={theme.textMuted}>
-              {"  "}
-              {rail().counts.waiting > 0 ? `${STATE_GLYPH.waiting} ${rail().counts.waiting} waiting · ` : ""}
-              {rail().counts.running} running · esc back
-            </text>
-          </box>
-          <box flexGrow={1} minHeight={0} paddingTop={1}>
-            <Show
-              when={previewTarget()}
-              fallback={
-                <text fg={theme.textMuted}>
-                  Type to start a session in {project().split(/[\\/]/).filter(Boolean).pop() ?? project()} (ctrl+p to
-                  change). Tag sessions with @ and their number, as in "@2 run the tests", to send to them.
-                </text>
-              }
-            >
-              {(target) => (
-                <box flexDirection="column">
-                  <text fg={theme.text} attributes={TextAttributes.BOLD} wrapMode="none">
-                    {tagged().length > 1
-                      ? `To ${tagged().length} sessions: ${tagged()
-                          .map((item) => `@${numbers().get(item.id)} ${item.title}`)
-                          .join(", ")}`
-                      : `${tagged().length ? "To" : "Highlighted"}: @${numbers().get(target().id) ?? "?"} ${target().title}`}
-                  </text>
-                  <text fg={theme.textMuted}>
-                    {stateLabel(target())}
-                    {target().queued ? ` · ${target().queued} queued` : ""}
-                    {target().state === "running"
-                      ? " · enter queues it for when the turn ends, ctrl+enter interrupts"
-                      : ""}
-                  </text>
-                  <Show when={preview()?.sessionID === target().id}>
-                    <box paddingTop={1}>
-                      <text fg={theme.textMuted}>{Locale.truncate(preview()!.text, 600)}</text>
-                    </box>
-                  </Show>
-                </box>
-              )}
-            </Show>
-          </box>
-          <box flexShrink={0} paddingBottom={1}>
-            <Prompt
-              ref={setPromptRef}
-              placeholders={{ normal: ["Start a new session, or @2 to send to session 2"] }}
-              onIntercept={submit}
-              mentions={mentions}
-              bindings={promptBindings}
-            />
-          </box>
-          <Toast />
+      {/* Hidden, not unmounted, while the narrow rail overlay is shown: what was typed stays. */}
+      <box
+        visible={!narrow() || focus() === "prompt"}
+        flexDirection="column"
+        flexGrow={1}
+        paddingLeft={2}
+        paddingRight={2}
+        paddingTop={1}
+      >
+        <box flexDirection="row" flexShrink={0}>
+          <text fg={theme.text} attributes={TextAttributes.BOLD}>
+            Agent Monitor
+          </text>
+          <text fg={theme.textMuted}>
+            {"  "}
+            {rail().counts.waiting > 0 ? `${STATE_GLYPH.waiting} ${rail().counts.waiting} waiting · ` : ""}
+            {rail().counts.running} running · esc back
+          </text>
         </box>
-      </Show>
+        <box flexGrow={1} minHeight={0} paddingTop={1}>
+          <Show
+            when={previewTarget()}
+            fallback={
+              <text fg={theme.textMuted}>
+                Type to start a session in {project().split(/[\\/]/).filter(Boolean).pop() ?? project()} (ctrl+p to
+                change). Tag sessions with @ and their number, as in "@2 run the tests", to send to them.
+              </text>
+            }
+          >
+            {(target) => (
+              <box flexDirection="column">
+                <text fg={theme.text} attributes={TextAttributes.BOLD} wrapMode="none">
+                  {tagged().length > 1
+                    ? `To ${tagged().length} sessions: ${tagged()
+                        .map((item) => `@${numbers().get(item.id)} ${item.title}`)
+                        .join(", ")}`
+                    : `${tagged().length ? "To" : "Highlighted"}: @${numbers().get(target().id) ?? "?"} ${target().title}`}
+                </text>
+                <text fg={theme.textMuted}>
+                  {stateLabel(target())}
+                  {target().queued ? ` · ${target().queued} queued` : ""}
+                  {target().state === "running"
+                    ? " · enter queues it for when the turn ends, ctrl+enter interrupts"
+                    : ""}
+                </text>
+                <Show when={preview()?.sessionID === target().id}>
+                  <box paddingTop={1}>
+                    <text fg={theme.textMuted}>{Locale.truncate(preview()!.text, 600)}</text>
+                  </box>
+                </Show>
+              </box>
+            )}
+          </Show>
+        </box>
+        <box flexShrink={0} paddingBottom={1}>
+          <Prompt
+            ref={setPromptRef}
+            placeholders={{ normal: ["Start a new session, or @2 to send to session 2"] }}
+            onIntercept={submit}
+            mentions={mentions}
+            bindings={promptBindings}
+          />
+        </box>
+        <Toast />
+      </box>
       <Show when={!narrow() || focus() === "rail"}>
         <Rail />
       </Show>

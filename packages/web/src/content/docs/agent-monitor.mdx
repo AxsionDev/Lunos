@@ -1,0 +1,79 @@
+---
+title: Agent Monitor
+description: Every session on this computer beside one prompt that starts new sessions or sends to the ones you tag.
+---
+
+The Agent Monitor is for running several agents at once. It lists every session on this computer on the right: the ones waiting for you, running, completed and failed. The prompt in the centre starts a new session, or sends to the sessions you tag with `@`.
+
+---
+
+## Opening it
+
+- Press **←** on an empty prompt (no text and no attachments), on the home screen or in a session. With text in the prompt, ← moves the cursor as usual. In a subagent session ← still goes to the previous subagent, and in the diff viewer it still collapses.
+- Type `/monitor`, or press `<leader>o` (`agent_monitor` in [keybinds](/docs/keybinds)).
+- **Esc** or **→**, with the prompt empty, takes you back to where you were. With the list focused, Esc always does.
+
+To stop ← opening it, set `"left_opens_monitor": false` in `tui.json`. `/monitor` and the keybind still work.
+
+---
+
+## The list of sessions
+
+The list shows the same sessions as [`/sessions`](/docs/tui#sessions): every project, every Lunos running on this computer, Claude Code and Codex sessions, and background subagents under the session that started them. It's in four sections, each with its count:
+
+1. **Waiting for you**: a session asking for approval or with a question. The row shows what it asks, for example `approve: bash git push origin main`.
+2. **Running**.
+3. **Completed**: finished or idle in the last 24 hours. Older ones are behind **Show older**.
+4. **Failed**.
+
+Each row has a number, the title, the project, the agent (or Claude Code / Codex), a state symbol, the time since its last activity and its cost. The symbols are `!` waiting, `»` running, `○` idle, `✓` finished and `✕` failed, so the state is readable without colour (`NO_COLOR`). A row that starts waiting moves to the top and is highlighted for a moment. With reduced motion it isn't highlighted.
+
+Press **Tab** to move between the prompt and the list. In the list:
+
+| Key   | Does                                                |
+| ----- | --------------------------------------------------- |
+| ↑ ↓   | Move                                                |
+| Enter | Open the session                                    |
+| `a`   | Approve what the session asks (once)                |
+| `d`   | Deny it, or dismiss its question                    |
+| `s`   | Stop the session, after you confirm                 |
+| `/`   | Filter by title, project, state, agent or tool      |
+| `o`   | Show or hide completed sessions older than 24 hours |
+
+An approval given here goes to the Lunos that runs the session, which checks it and writes it to its [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md), as if you'd answered it there.
+
+In a terminal narrower than 100 columns, the list takes the whole screen. Tab switches between it and the prompt, and what you've typed stays.
+
+---
+
+## Starting a session
+
+Type a prompt with no tag and press Enter. A new session starts in this project with the current agent and model, and appears under Running. You stay in the monitor, ready for the next one. **Ctrl+P** picks another project from the ones in the list.
+
+---
+
+## Sending to a session
+
+Tag a session with `@` and its number: `@2 run the tests` sends "run the tests" to session 2. Type `@` and part of a session's title to pick it from the **sessions** at the top of the suggestions; files and agents are suggested below them as usual. Above the prompt, you see the session you tagged and its last message.
+
+Numbers stay with their session while the monitor is open, even when the rows move, so `@2` keeps meaning the same session.
+
+What happens to the prompt depends on the session:
+
+- **Idle or finished**: it runs as the session's next turn.
+- **Running**: it's queued, and sent when the current turn ends. The row shows how many prompts are queued. **Ctrl+Enter** stops the turn and sends it now, ahead of the queue. Ctrl+Enter needs a terminal that reports it separately from Enter (kitty, WezTerm, Ghostty, iTerm2 with CSI u). In others it is just Enter, and the prompt is queued.
+- **Waiting for an answer to a question**: the prompt is the answer, when the question takes a typed answer.
+- **Waiting for an approval**: the prompt is queued. A prompt never approves or denies a tool call: press `a` or `d`.
+- **Run by another Lunos on this computer**: that Lunos receives it and runs it, with its own agent, permissions and organisation policy. A session is never run by two Lunos processes at once.
+- **Its Lunos closed in the middle of a turn**: you're asked "Take over this session here?" before it runs in this Lunos.
+- **A Claude Code or Codex session with no Lunos session**: open it to send to it.
+
+Tag several sessions to send the same prompt to each. You confirm first ("Send to 3 sessions?").
+
+---
+
+## Safety
+
+- Each prompt sent to an existing session is written to the audit log of the Lunos that runs it, as `session.prompt` with `origin: "monitor"`, the session and how it was delivered. The text of the prompt is never logged.
+- Lunos processes on this computer reach each other only on `127.0.0.1`, with a random token in a file only your OS user can read. Requests from a browser are refused.
+- The receiving session's organisation policy and data-residency rules apply, exactly as if the prompt had been typed in it.
