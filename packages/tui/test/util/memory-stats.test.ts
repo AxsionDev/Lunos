@@ -75,7 +75,9 @@ const stats = {
 describe("/memory analytics rows (XCOD-252)", () => {
   test("Overview: status, per-scope counts with their drill-down keys, an unreadable scope, health", () => {
     const rows = overviewRows(stats)
-    expect(rows[0]!.title).toBe("Memory: on · this machine · encrypted · kept until removed")
+    expect(rows[0]!.title).toBe("Memory: on · on this computer · encrypted · kept until removed")
+    // XCOD-264: the same "what leaves the computer" sentence as setup and lunos memory status.
+    expect(rows[1]!.title).toStartWith("Leaves the computer: the fact text, sent to your model")
     expect(rows.find((row) => row.title === "Active")).toMatchObject({ footer: "2", group: "state:project:active" })
     expect(rows.some((row) => row.title === "can't be read: can't reach neo4j")).toBe(true)
     expect(rows.some((row) => row.title.includes("1 unencrypted line(s) in project memory"))).toBe(true)

@@ -19,6 +19,7 @@ import { openFileInEditor } from "../editor"
 import { DialogModel } from "./dialog-model"
 import { useMemorySetup } from "./dialog-memory-setup"
 import { MemorySetup } from "@opencode-ai/core/memory-setup"
+import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import { DialogRecommended } from "./dialog-recommended"
 import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
@@ -563,7 +564,11 @@ export function DialogSettings(props: {
             placeholder={row.key}
             skipFilter
             current={String(row.value)}
-            options={(row.values ?? []).map((value) => ({ title: String(value), value: String(value) }))}
+            options={(row.values ?? []).map((value) => ({
+              // XCOD-264: where memory is stored, in plain words; the value saved stays "embedded" etc.
+              title: row.key === "memory.backend.type" ? MemoryStorage.label(String(value)) : String(value),
+              value: String(value),
+            }))}
             onSelect={(option) => void save(row, option.value, { reopen: true })}
           />
         ),
