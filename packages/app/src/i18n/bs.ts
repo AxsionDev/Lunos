@@ -1165,6 +1165,7 @@ export const dict = {
   "session.delete.title": "Izbriši sesiju",
   "session.delete.confirm": 'Izbriši sesiju "{{name}}"?',
   "session.delete.button": "Izbriši sesiju",
+  "session.delete.queued": "Briše i promptove na čekanju koji nikad nisu poslani ({{count}}).",
 
   "workspace.new": "Novi radni prostor",
   "workspace.type.local": "lokalno",
@@ -1430,6 +1431,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Promptovi na čekanju",
   "sessions.monitor.takeover.queuedSend": "Prvo ih pošalji, redom ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Odbaci ih ({{count}})",
+  "sessions.monitor.takeover.action": "Preuzmi",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos koji je izvodio „{{title}}“ zatvoren je s promptovima koji su još na čekanju. Na čekanju: {{count}}. Ako ih pošaljete, izvršavaju se u ovom Lunosu, redom.",
+  "sessions.monitor.takeover.sendQueued": "Pošalji promptove na čekanju ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ preuzeta: šalju se promptovi na čekanju ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ preuzeta: promptovi na čekanju odbačeni ({{count}})",
   "sessions.monitor.send.question.one": "Poslati {{count}} sesiji?",
   "sessions.monitor.send.question.few": "Poslati na {{count}} sesije?",
   "sessions.monitor.send.question.other": "Poslati na {{count}} sesija?",

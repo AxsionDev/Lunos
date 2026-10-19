@@ -314,6 +314,42 @@ test("prompts a closed Lunos queued show on the row; the take-over says how many
   })
 })
 
+// XCOD-268: Take over on the row sends just the queued prompts, with no new prompt, or discards them.
+test("Take over on a row with a closed Lunos's queued prompts sends or discards just those", async ({ page }) => {
+  const state = await open(page, (row, now) => [
+    row("ses_q1", "Queued work", "idle", { queued: 2, ownerClosed: true, updated: now - 6500 }),
+  ])
+  const queuedRow = page.locator('[data-session-id="ses_q1"]')
+  await expect(queuedRow.getByText("2 queued (owner closed)")).toBeVisible()
+  // Not offered where nothing a closed Lunos queued is waiting: a stale turn, a running session.
+  for (const id of ["ses_s1", "ses_r1", "ses_f1"])
+    await expect(page.locator(`[data-session-id="${id}"] [data-action="takeover"]`)).toHaveCount(0)
+
+  const dialog = page.locator('[data-component="sessions-bulk-confirm"]')
+  await queuedRow.locator('[data-action="takeover"]').click()
+  await expect(page.getByRole("heading", { name: "Take over this session here?" })).toBeVisible()
+  await expect(dialog).toContainText("Queued: 2. Sent, they run in this Lunos, in order.")
+  // Cancel takes nothing over.
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+  expect(state.calls).toHaveLength(0)
+
+  // Sending them is the default; no text goes with it.
+  await queuedRow.locator('[data-action="takeover"]').click()
+  await expect(dialog.getByRole("combobox", { name: "Queued prompts" })).toHaveValue("send")
+  await expect(dialog.getByRole("option", { name: "Send the queued prompts (2)" })).toHaveCount(1)
+  await dialog.getByRole("button", { name: "Take over" }).click()
+  await expect.poll(() => state.calls.length).toBe(1)
+  expect(state.calls[0]).toEqual({ path: "/experimental/session/ses_q1/takeover", body: { queued: "send" } })
+  await expect(page.getByText('Took over "Queued work": sending its queued prompts (2)')).toBeVisible()
+
+  await queuedRow.locator('[data-action="takeover"]').click()
+  await dialog.getByRole("combobox", { name: "Queued prompts" }).selectOption({ label: "Discard them (2)" })
+  await dialog.getByRole("button", { name: "Take over" }).click()
+  await expect.poll(() => state.calls.length).toBe(2)
+  expect(state.calls[1]).toEqual({ path: "/experimental/session/ses_q1/takeover", body: { queued: "discard" } })
+})
+
 test("a prompt never approves a tool call; Approve on the row does, once", async ({ page }) => {
   const state = await open(page)
   await send(page, "@1 yes, go ahead")

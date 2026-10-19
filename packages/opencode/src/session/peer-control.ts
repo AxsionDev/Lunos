@@ -132,6 +132,12 @@ export async function stopHere(sessionID: string, reason = STOP_REASON) {
   return true
 }
 
+/**
+ * XCOD-269: drops what this process holds queued for a session that was deleted (set by
+ * SessionPromptQueue, which this module can't import). Returns how many went.
+ */
+export const hooks: { forget?: (sessionID: string) => number } = {}
+
 /** The routes another process may call. Anything else is a 404. */
 export async function serve(request: Request): Promise<Response> {
   const url = new URL(request.url)
@@ -179,6 +185,8 @@ export async function serve(request: Request): Promise<Response> {
       }),
     )
   }
+  // XCOD-269: the session was deleted in another process: its prompts queued here go too.
+  if (rest === "/forget" && request.method === "POST") return json(200, { discarded: hooks.forget?.(sessionID) ?? 0 })
   const answer = /^\/(permission|question)\/([A-Za-z0-9_-]{1,100})\/(reply|reject)$/.exec(rest)
   if (answer && request.method === "POST" && !(answer[1] === "permission" && answer[3] === "reject")) {
     // Only an ask this session made: the owning process checks the id belongs to it.

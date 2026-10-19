@@ -2852,6 +2852,11 @@ export type SessionTakeoverResult = {
   position?: number
 }
 
+export type SessionQueued = {
+  orphaned: number
+  held: number
+}
+
 export type McpResource = {
   name: string
   uri: string
@@ -9970,6 +9975,13 @@ export type ExperimentalSessionTakeoverData = {
   body?: {
     queued: "send" | "discard"
     text?: string
+    origin?: "monitor" | "session"
+    request?: {
+      kind: "prompt" | "command" | "shell"
+      body: {
+        [key: string]: unknown
+      }
+    }
   }
   path: {
     sessionID: string
@@ -10004,6 +10016,41 @@ export type ExperimentalSessionTakeoverResponses = {
 
 export type ExperimentalSessionTakeoverResponse =
   ExperimentalSessionTakeoverResponses[keyof ExperimentalSessionTakeoverResponses]
+
+export type ExperimentalSessionQueuedData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session/{sessionID}/queued"
+}
+
+export type ExperimentalSessionQueuedErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionQueuedError = ExperimentalSessionQueuedErrors[keyof ExperimentalSessionQueuedErrors]
+
+export type ExperimentalSessionQueuedResponses = {
+  /**
+   * Unsent prompts held for the session
+   */
+  200: SessionQueued
+}
+
+export type ExperimentalSessionQueuedResponse =
+  ExperimentalSessionQueuedResponses[keyof ExperimentalSessionQueuedResponses]
 
 export type ExperimentalPeerPromptData = {
   body?: {

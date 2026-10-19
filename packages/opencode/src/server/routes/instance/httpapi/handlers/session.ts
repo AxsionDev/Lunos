@@ -10,6 +10,8 @@ import { CloudAuth } from "@/cloud/auth"
 import { CloudOrg } from "@/cloud/org"
 import { CloudShare } from "@/cloud/share"
 import { Session } from "@/session/session"
+import { SessionPromptQueue } from "@/session/prompt-queue"
+import { AuditLog } from "@/audit/log"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
@@ -199,7 +201,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const remove = Effect.fn("SessionHttpApi.remove")(function* (ctx: { params: { sessionID: SessionID } }) {
+      // XCOD-269: prompts queued for it and never sent go too (Session.remove); audited as a count.
+      const queued = SessionPromptQueue.held(ctx.params.sessionID)
       yield* SessionError.mapStorageNotFound(session.remove(ctx.params.sessionID))
+      AuditLog.emit("session.delete", {
+        origin: "api",
+        count: 1,
+        ids: [ctx.params.sessionID],
+        queued_discarded: queued,
+      })
       return true
     })
 

@@ -39,6 +39,7 @@ import {
   MONITOR_SECTIONS,
   number,
   orphanedQueue,
+  canTakeOver,
   rail as monitorRail,
   route as deliveryRoute,
   tags,
@@ -479,11 +480,14 @@ export function SessionsPage() {
       const items = topLevel(viewItems().filter((item) => !!item.archived))
       if (items.length === 0) return info(t("sessions.bulk.noArchived"))
       const count = items.length
+      // XCOD-269: prompts queued for them and never sent go with them.
+      const queued = items.reduce((sum, item) => sum + (item.queued ?? 0), 0)
       const choice = await confirm({
         title: language.plural("sessions.bulk.delete.question", count),
         lines: [
           t("sessions.bulk.delete.warning"),
           t("sessions.bulk.delete.projects", { projects: list([...new Set(items.map((item) => projectName(item)))]) }),
+          ...(queued ? [t("session.delete.queued", { count: queued })] : []),
         ],
         confirm: t("sessions.bulk.delete.confirm", { count }),
         typed: { value: String(count), placeholder: t("sessions.bulk.delete.placeholder", { count }) },
@@ -675,6 +679,40 @@ export function SessionsPage() {
       return sdk.experimental.session
         .enqueue({ sessionID: item.id, directory: item.directory, text, interrupt }, { throwOnError: true })
         .then((response) => response.data)
+    },
+    /**
+     * XCOD-268: Take over on a row whose Lunos closed with prompts queued: send just those, in order,
+     * through the same at-most-once take-over, or discard them; no new prompt is needed.
+     */
+    takeOver: async (item: SessionOverviewItem) => {
+      const sdk = client()
+      const held = orphanedQueue(item)
+      if (!sdk || !canTakeOver(item)) return
+      const answer = await confirm({
+        title: t("sessions.monitor.takeover.title"),
+        lines: [t("sessions.monitor.takeover.onlyBody", { title: item.title, count: held })],
+        confirm: t("sessions.monitor.takeover.confirm"),
+        scopeLabel: t("sessions.monitor.takeover.queuedLabel"),
+        scopes: [
+          { value: "send", label: t("sessions.monitor.takeover.sendQueued", { count: held }) },
+          { value: "discard", label: t("sessions.monitor.takeover.queuedDiscard", { count: held }) },
+        ],
+      })
+      if (!answer) return
+      const queued = answer.scope === "discard" ? "discard" : "send"
+      const result = await sdk.experimental.session
+        .takeover({ sessionID: item.id, directory: item.directory, queued }, { throwOnError: true })
+        .then((response) => response.data)
+        .catch((cause: unknown) => void fail(cause))
+      if (result)
+        showToast({
+          variant: "success",
+          title:
+            queued === "send"
+              ? t("sessions.monitor.takeover.sent", { title: item.title, count: result.sent })
+              : t("sessions.monitor.takeover.discarded", { title: item.title, count: result.discarded }),
+        })
+      refresh()
     },
     /** The prompt with no tag starts a session; tagged, it goes to each tagged session. */
     submit: async (raw: string, interrupt: boolean) => {
@@ -919,6 +957,16 @@ export function SessionsPage() {
                 onClick={() => (item().elsewhere ? void peerActions.load(item()) : sessionActions.open(item()))}
               >
                 {language.t("sessions.action.answer")}
+              </button>
+            </Show>
+            <Show when={canTakeOver(item())}>
+              <button
+                type="button"
+                class="rounded border border-v2-border-border-base px-2 py-1 text-12-medium"
+                data-action="takeover"
+                onClick={() => void monitorActions.takeOver(item())}
+              >
+                {t("sessions.monitor.takeover.action")}
               </button>
             </Show>
             <Show when={!external()}>

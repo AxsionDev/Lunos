@@ -1037,6 +1037,7 @@ export const dict = {
   "session.delete.title": "Slet session",
   "session.delete.confirm": 'Slet session "{{name}}"?',
   "session.delete.button": "Slet session",
+  "session.delete.queued": "Sletter også prompts i kø, som aldrig blev sendt ({{count}}).",
 
   "workspace.new": "Nyt arbejdsområde",
   "workspace.type.local": "lokal",
@@ -1413,6 +1414,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompts i kø",
   "sessions.monitor.takeover.queuedSend": "Send dem først, i rækkefølge ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Kassér dem ({{count}})",
+  "sessions.monitor.takeover.action": "Overtag",
+  "sessions.monitor.takeover.onlyBody":
+    'Den Lunos, der kørte "{{title}}", lukkede med prompts stadig i kø. I kø: {{count}}. Sender du dem, kører de i denne Lunos, i rækkefølge.',
+  "sessions.monitor.takeover.sendQueued": "Send prompts i kø ({{count}})",
+  "sessions.monitor.takeover.sent": 'Overtog "{{title}}": sender dens prompts i kø ({{count}})',
+  "sessions.monitor.takeover.discarded": 'Overtog "{{title}}": kasserede dens prompts i kø ({{count}})',
   "sessions.monitor.send.question.one": "Send til {{count}} session?",
   "sessions.monitor.send.question.other": "Send til {{count}} sessioner?",
   "sessions.monitor.sent": 'Sendt til "{{title}}"',

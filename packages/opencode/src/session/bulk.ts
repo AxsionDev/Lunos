@@ -8,6 +8,7 @@ import { SessionLive } from "./live"
 import { SessionOverview } from "./overview"
 import { SessionPeerControl } from "./peer-control"
 import { SessionPeers } from "./peers"
+import { SessionPromptQueue } from "./prompt-queue"
 import { SessionID } from "./schema"
 
 /**
@@ -239,6 +240,8 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
 }) {
   const sessions = yield* Session.Service
   const result: DeleteResult = { deleted: [], skipped: [] }
+  // XCOD-269: prompts queued for them and never sent go with them (Session.remove); counted here.
+  let queued = 0
   for (const id of new Set(input.sessionIDs)) {
     if (toolOnly(id)) {
       const entry = yield* Effect.promise(() => ExternalRegistry.get(externalID(id)))
@@ -256,10 +259,12 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
       result.skipped.push({ id, reason: info ? "it isn't archived" : "no such session" })
       continue
     }
+    const held = SessionPromptQueue.held(id)
     const removed = yield* sessions.remove(sessionID).pipe(
       Effect.as(true),
       Effect.catch(() => Effect.succeed(false)),
     )
+    if (removed) queued += held
     if (removed) result.deleted.push(id)
     else result.skipped.push({ id, reason: "no such session" })
   }
@@ -268,6 +273,7 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
       origin: "bulk",
       count: result.deleted.length,
       ids: result.deleted,
+      queued_discarded: queued,
     })
   return result
 })

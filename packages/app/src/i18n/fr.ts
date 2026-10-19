@@ -1099,6 +1099,7 @@ export const dict = {
   "session.delete.title": "Supprimer la session",
   "session.delete.confirm": 'Supprimer la session "{{name}}" ?',
   "session.delete.button": "Supprimer la session",
+  "session.delete.queued": "Supprime aussi les prompts en file d'attente qui n'ont jamais été envoyés ({{count}}).",
   "workspace.new": "Nouvel espace de travail",
   "workspace.type.local": "local",
   "workspace.type.sandbox": "bac à sable",
@@ -1373,6 +1374,13 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompts en file d'attente",
   "sessions.monitor.takeover.queuedSend": "Les envoyer d'abord, dans l'ordre ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Les abandonner ({{count}})",
+  "sessions.monitor.takeover.action": "Reprendre",
+  "sessions.monitor.takeover.onlyBody":
+    "Le Lunos qui exécutait « {{title}} » s'est fermé avec des prompts encore en file d'attente. En file d'attente : {{count}}. Si vous les envoyez, ils s'exécutent dans ce Lunos, dans l'ordre.",
+  "sessions.monitor.takeover.sendQueued": "Envoyer les prompts en file d'attente ({{count}})",
+  "sessions.monitor.takeover.sent": "« {{title}} » reprise : envoi de ses prompts en file d'attente ({{count}})",
+  "sessions.monitor.takeover.discarded":
+    "« {{title}} » reprise : ses prompts en file d'attente ont été abandonnés ({{count}})",
   "sessions.monitor.send.question.one": "Envoyer à {{count}} session ?",
   "sessions.monitor.send.question.many": "Envoyer à {{count}} de sessions ?",
   "sessions.monitor.send.question.other": "Envoyer à {{count}} sessions ?",

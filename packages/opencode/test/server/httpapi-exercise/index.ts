@@ -809,6 +809,15 @@ const scenarios: Scenario[] = [
       body: { queued: "send", text: "  " },
     }))
     .json(400, object, "status"),
+  // XCOD-267: no Lunos that stopped holds prompts for a fresh session.
+  http.protected
+    .get("/experimental/session/{sessionID}/queued", "experimental.session.queued")
+    .seeded((ctx) => ctx.session({ title: "Monitor queued" }))
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/queued", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, object, "status"),
   // XCOD-234: a session no other Lunos process runs is a 404 for every peer action.
   ...(
     [

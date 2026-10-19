@@ -1,0 +1,4 @@
+{"from":"argv","argv":["-p","--input-format","stream-json","--output-format","stream-json","--verbose","--permission-mode","default","--permission-prompt-tool","stdio"]}
+{"from":"host","message":{"type":"control_request","request_id":"lunos-models","request":{"subtype":"initialize"}}}
+{"from":"tool","message":{"type":"control_response","response":{"subtype":"success","request_id":"lunos-models","response":{"commands":[],"models":[{"value":"default","displayName":"Default (recommended)","description":"Opus 5.5 with 1M context"},{"value":"sonnet","displayName":"Sonnet","description":"Sonnet 5.5 for everyday tasks"},{"value":"haiku","displayName":"Haiku","description":"Haiku 5.5 for quick answers"}]}}}}
+{"from":"exit","code":null,"signal":"SIGTERM"}

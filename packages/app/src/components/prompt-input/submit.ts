@@ -23,6 +23,7 @@ import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
 import { Event } from "@opencode-ai/schema/event"
 import { blobDataUrl } from "@/utils/draft-store"
+import type { SessionTakeover } from "./takeover"
 
 type PendingPrompt = {
   abort: AbortController
@@ -229,6 +230,8 @@ type PromptSubmitInput = {
   onAbort?: () => void
   onSubmit?: () => void
   model?: ModelSelection
+  /** XCOD-267: asks first when a Lunos that closed left prompts queued for the session. */
+  takeover?: SessionTakeover
 }
 
 export function createPromptSubmit(input: PromptSubmitInput) {
@@ -346,6 +349,11 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       })
       return
     }
+
+    // XCOD-267: a Lunos that closed left prompts queued for this session: they go first or are
+    // discarded, as the user chooses, before this one runs. Cancel keeps the text.
+    const takeover = params.id && input.takeover ? await input.takeover.ask(params.id) : undefined
+    if (takeover === "cancel") return
 
     input.addToHistory(currentPrompt, mode)
     input.resetHistoryNavigation()
@@ -477,6 +485,63 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         input.queueScroll()
       })
       return true
+    }
+
+    if (takeover === "send") {
+      // The request the paths below would make, run once the queued prompts have; no optimistic
+      // message, which would show it above them.
+      const files = await Promise.all(
+        images.map(async (attachment) => ({
+          type: "file" as const,
+          mime: attachment.mime,
+          url: await blobDataUrl(attachment.blob, attachment.mime),
+          filename: attachment.filename,
+        })),
+      )
+      const [cmdName, ...args] = text.split(" ")
+      const command = text.startsWith("/") && sync().data.command.find((c) => c.name === cmdName!.slice(1))
+      const request =
+        mode === "shell"
+          ? { kind: "shell" as const, body: { command: text, agent, model } }
+          : command
+            ? {
+                kind: "command" as const,
+                body: {
+                  command: command.name,
+                  arguments: args.join(" "),
+                  agent,
+                  model: `${model.providerID}/${model.modelID}`,
+                  ...(variant ? { variant } : {}),
+                  parts: files,
+                },
+              }
+            : {
+                kind: "prompt" as const,
+                body: {
+                  agent,
+                  model,
+                  ...(variant ? { variant } : {}),
+                  parts: buildRequestParts({
+                    prompt: currentPrompt,
+                    context,
+                    images: await Promise.all(
+                      images.map(async (attachment) => ({
+                        ...attachment,
+                        dataUrl: await blobDataUrl(attachment.blob, attachment.mime),
+                      })),
+                    ),
+                    text,
+                    sessionID: session.id,
+                    messageID: Identifier.ascending("message"),
+                    sessionDirectory,
+                  }).requestParts.map(({ id: _, ...part }) => part),
+                },
+              }
+      input.onSubmit?.()
+      clearContext(submission.target())
+      clearInput()
+      if (!(await input.takeover!.send(session.id, text, request))) restoreInput()
+      return
     }
 
     if (!isNewSession && mode === "normal" && input.shouldQueue?.()) {

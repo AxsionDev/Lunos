@@ -276,4 +276,100 @@ describe("SessionBulk (XCOD-265)", () => {
       expect(lines.find((line) => line.event === "session.stop")).toMatchObject({ origin: "bulk", count: 0 })
     }),
   )
+
+  // XCOD-269: what a Lunos that stopped left queued for a session, as its file.
+  const leftBehind = (sessionID: string, texts: string[], others: Record<string, string[]> = {}) =>
+    Effect.promise(async () => {
+      const child = Bun.spawn([process.execPath, "-e", "0"])
+      await child.exited
+      const file = path.join(SessionPeers.dir(), `${child.pid}-dead.json`)
+      await fs.mkdir(SessionPeers.dir(), { recursive: true, mode: 0o700 })
+      const queue = Object.fromEntries(
+        Object.entries({ [sessionID]: texts, ...others }).map(([id, list]) => [
+          id,
+          list.map((text, index) => ({ id: `qp_${id}_${index}`, text })),
+        ]),
+      )
+      await fs.writeFile(
+        file,
+        JSON.stringify({
+          version: 1,
+          pid: child.pid,
+          heartbeat: Date.now() - 60_000,
+          sessions: {},
+          queue,
+          closed: true,
+        }),
+        { mode: 0o600 },
+      )
+      return file
+    })
+  /** Every file under the peer directory, read as text: the test greps it. */
+  const peerDir = () =>
+    Effect.promise(async () => {
+      const names = await fs.readdir(SessionPeers.dir()).catch(() => [] as string[])
+      return (await Promise.all(names.map((name) => fs.readFile(path.join(SessionPeers.dir(), name), "utf8")))).join(
+        "\n",
+      )
+    })
+
+  it.instance("XCOD-269: deleting a session removes its queued prompts from every peer file, and an emptied file", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const gone = yield* sessions.create({ title: "deleted" })
+      const kept = yield* sessions.create({ title: "kept" })
+      const file = yield* leftBehind(gone.id, ["SECRET-ONE", "SECRET-TWO"])
+      const shared = yield* leftBehind(gone.id, ["SECRET-THREE"], { [kept.id]: ["still wanted"] })
+      expect(yield* peerDir()).toContain("SECRET-ONE")
+      yield* sessions.remove(gone.id)
+      const left = yield* peerDir()
+      for (const text of ["SECRET-ONE", "SECRET-TWO", "SECRET-THREE"]) expect(left).not.toContain(text)
+      expect(
+        yield* Effect.promise(() =>
+          fs.stat(file).then(
+            () => true,
+            () => false,
+          ),
+        ),
+      ).toBe(false)
+      // The other session's prompt stays, in a file that is still this user's only.
+      expect(left).toContain("still wanted")
+      if (process.platform !== "win32") expect((yield* Effect.promise(() => fs.stat(shared))).mode & 0o777).toBe(0o600)
+    }),
+  )
+
+  it.instance("XCOD-269: archiving keeps them; Delete archived removes them and audits only the count", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const one = yield* sessions.create({ title: "one" })
+      yield* leftBehind(one.id, ["SECRET-A", "SECRET-B"])
+      yield* SessionBulk.archive({ sessionIDs: [one.id] })
+      expect(yield* peerDir()).toContain("SECRET-A")
+      expect(SessionPeers.orphans().get(one.id)).toBe(2)
+      // Archived, it is still listed with its queue, so unarchive and take-over can send them.
+      expect(
+        (yield* SessionOverview.build({ archived: true })).sessions.find((item) => item.id === one.id),
+      ).toMatchObject({ queued: 2, ownerClosed: true })
+
+      const file = path.join(path.dirname(SessionPeers.dir()), `audit-269-${Date.now()}.log`)
+      AuditLog.activate({ enabled: true, file, redact: [] })
+      const result = yield* SessionBulk.removeArchived({ sessionIDs: [one.id] })
+      yield* Effect.promise(() => Audit.flush())
+      const log = yield* Effect.promise(() => fs.readFile(file, "utf8"))
+      AuditLog.activate({ enabled: false, file, redact: [] })
+      expect(result.deleted).toEqual([one.id])
+      expect(yield* peerDir()).not.toContain("SECRET")
+      expect(log).not.toContain("SECRET")
+      const lines = log
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+      expect(lines.find((line) => line.event === "session.delete")).toMatchObject({
+        origin: "bulk",
+        count: 1,
+        ids: [one.id],
+        queued_discarded: 2,
+      })
+    }),
+  )
 })

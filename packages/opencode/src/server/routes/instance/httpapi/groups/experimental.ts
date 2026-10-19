@@ -294,6 +294,7 @@ export const ExperimentalPaths = {
   peerQuestionReject: "/experimental/peer/:sessionID/question/:requestID/reject",
   sessionEnqueue: "/experimental/session/:sessionID/enqueue",
   sessionTakeover: "/experimental/session/:sessionID/takeover",
+  sessionQueued: "/experimental/session/:sessionID/queued",
   peerPrompt: "/experimental/peer/:sessionID/prompt",
 } as const
 
@@ -323,7 +324,27 @@ export const SessionTakeoverPayload = Schema.Struct({
   queued: Schema.Literals(["send", "discard"]),
   /** The prompt being sent, run after the queued ones. */
   text: Schema.optional(Schema.String),
+  /** XCOD-267: "session" when the full session view asked; audited as such. */
+  origin: Schema.optional(Schema.Literals(["monitor", "session"])),
+  /**
+   * XCOD-267: the request the session view would have sent for `text` (a prompt with its files and
+   * agent, a command, a shell command), sent once the queued ones have run. `text` is its readable text.
+   */
+  request: Schema.optional(
+    Schema.Struct({
+      kind: Schema.Literals(["prompt", "command", "shell"]),
+      body: Schema.Record(Schema.String, Schema.Unknown),
+    }),
+  ),
 })
+
+/** XCOD-267 / XCOD-269: prompts held for a session that haven't been sent. Counts only. */
+export const SessionQueued = Schema.Struct({
+  /** Held by a Lunos that stopped: sent or discarded only by a take-over. */
+  orphaned: NonNegativeInt,
+  /** XCOD-269: held by any Lunos, this one included: what deleting the session also deletes. */
+  held: NonNegativeInt,
+}).annotate({ identifier: "SessionQueued" })
 
 export const SessionTakeoverResult = Schema.Struct({
   sent: NonNegativeInt,
@@ -783,6 +804,19 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Take over a session whose Lunos stopped",
             description:
               "Run a session here whose Lunos process stopped, after the user confirmed it. The prompts that process had queued for it are sent first, in order (queued: send), or dropped (queued: discard); then text, if given. Refused while another Lunos runs the session, or while the process that queued them still exists. Audited as session.takeover, without the text.",
+          }),
+        ),
+        HttpApiEndpoint.get("sessionQueued", ExperimentalPaths.sessionQueued, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(SessionQueued, "Unsent prompts held for the session"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.queued",
+            summary: "Prompts held for a session",
+            description:
+              "How many prompts a Lunos process that stopped still holds for the session (orphaned), and how many any Lunos holds (held, which deleting the session also deletes); never their text. While any are orphaned, a prompt typed in the session asks to take it over first (experimental.session.takeover).",
           }),
         ),
         HttpApiEndpoint.post("peerPrompt", ExperimentalPaths.peerPrompt, {

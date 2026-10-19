@@ -1131,6 +1131,7 @@ export const dict = {
   "session.delete.title": "刪除工作階段",
   "session.delete.confirm": "要刪除工作階段「{{name}}」嗎？",
   "session.delete.button": "刪除工作階段",
+  "session.delete.queued": "同時刪除佇列中但從未傳送的提示詞（{{count}}）。",
 
   "workspace.new": "新增工作區",
   "workspace.type.local": "本機",
@@ -1383,6 +1384,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "佇列中的提示詞",
   "sessions.monitor.takeover.queuedSend": "先依序傳送（{{count}}）",
   "sessions.monitor.takeover.queuedDiscard": "捨棄（{{count}}）",
+  "sessions.monitor.takeover.action": "接管",
+  "sessions.monitor.takeover.onlyBody":
+    "執行「{{title}}」的 Lunos 已關閉，仍有提示詞在佇列中。佇列中：{{count}}。若傳送，它們將在此 Lunos 中依序執行。",
+  "sessions.monitor.takeover.sendQueued": "傳送佇列中的提示詞（{{count}}）",
+  "sessions.monitor.takeover.sent": "已接管「{{title}}」：正在傳送其佇列中的提示詞（{{count}}）",
+  "sessions.monitor.takeover.discarded": "已接管「{{title}}」：已捨棄其佇列中的提示詞（{{count}}）",
   "sessions.monitor.send.question.one": "要傳送到 {{count}} 個工作階段嗎？",
   "sessions.monitor.send.question.other": "要傳送到 {{count}} 個工作階段嗎？",
   "sessions.monitor.sent": "已傳送到「{{title}}」",

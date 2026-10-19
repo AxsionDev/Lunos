@@ -1173,6 +1173,7 @@ export const dict = {
   "session.delete.title": "Eliminar sesión",
   "session.delete.confirm": '¿Eliminar sesión "{{name}}"?',
   "session.delete.button": "Eliminar sesión",
+  "session.delete.queued": "También elimina los prompts en cola que nunca se enviaron ({{count}}).",
 
   "workspace.new": "Nuevo espacio de trabajo",
   "workspace.type.local": "local",
@@ -1441,6 +1442,13 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompts en cola",
   "sessions.monitor.takeover.queuedSend": "Enviarlos primero, en orden ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Descartarlos ({{count}})",
+  "sessions.monitor.takeover.action": "Tomar el control",
+  "sessions.monitor.takeover.onlyBody":
+    "El Lunos que ejecutaba «{{title}}» se cerró con prompts aún en cola. En cola: {{count}}. Si los envías, se ejecutan en este Lunos, en orden.",
+  "sessions.monitor.takeover.sendQueued": "Enviar los prompts en cola ({{count}})",
+  "sessions.monitor.takeover.sent": "Has tomado el control de «{{title}}»: enviando sus prompts en cola ({{count}})",
+  "sessions.monitor.takeover.discarded":
+    "Has tomado el control de «{{title}}»: se descartaron sus prompts en cola ({{count}})",
   "sessions.monitor.send.question.one": "¿Enviar a {{count}} sesión?",
   "sessions.monitor.send.question.many": "¿Enviar a {{count}} de sesiones?",
   "sessions.monitor.send.question.other": "¿Enviar a {{count}} sesiones?",

@@ -645,6 +645,9 @@ const layer: Layer.Layer<
 
         yield* events.publish(SessionV1.Event.Deleted, { sessionID, info: session })
         yield* events.remove(sessionID)
+        // XCOD-269: prompts queued for it and never sent go too, from every Lunos's file. Imported
+        // here, not at the top: the queue module reaches this one through the overview.
+        yield* Effect.promise(() => import("./prompt-queue").then((queue) => queue.discard(sessionID)).catch(() => 0))
       } catch (error) {
         yield* Effect.logError("failed to remove session", { sessionID, error })
       }

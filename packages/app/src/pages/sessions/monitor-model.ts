@@ -211,6 +211,11 @@ export function orphanedQueue(item: Pick<SessionOverviewItem, "queued" | "ownerC
   return item.ownerClosed ? (item.queued ?? 0) : 0
 }
 
+/** XCOD-268: a row whose closed Lunos left prompts queued, which Take over sends or discards with no new prompt. */
+export function canTakeOver(item: Pick<SessionOverviewItem, "id" | "queued" | "ownerClosed" | "elsewhere">) {
+  return orphanedQueue(item) > 0 && !item.elsewhere && !toolOnly(item)
+}
+
 export type Asks = {
   permissions: ReadonlyArray<{ id: string; permission: string; patterns: ReadonlyArray<string> }>
   questions: ReadonlyArray<{ id: string; questions: ReadonlyArray<{ question: string }> }>

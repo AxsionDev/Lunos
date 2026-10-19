@@ -1156,6 +1156,7 @@ export const dict = {
   "session.delete.title": "Delete session",
   "session.delete.confirm": 'Delete session "{{name}}"?',
   "session.delete.button": "Delete session",
+  "session.delete.queued": "Also deletes queued prompts that were never sent ({{count}}).",
 
   "workspace.new": "New workspace",
   "workspace.type.local": "local",
@@ -1312,6 +1313,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Queued prompts",
   "sessions.monitor.takeover.queuedSend": "Send them first, in order ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Discard them ({{count}})",
+  "sessions.monitor.takeover.action": "Take over",
+  "sessions.monitor.takeover.onlyBody":
+    'The Lunos that ran "{{title}}" closed with prompts still queued for it. Queued: {{count}}. Sent, they run in this Lunos, in order.',
+  "sessions.monitor.takeover.sendQueued": "Send the queued prompts ({{count}})",
+  "sessions.monitor.takeover.sent": 'Took over "{{title}}": sending its queued prompts ({{count}})',
+  "sessions.monitor.takeover.discarded": 'Took over "{{title}}": discarded its queued prompts ({{count}})',
   "sessions.monitor.send.question.one": "Send to {{count}} session?",
   "sessions.monitor.send.question.other": "Send to {{count}} sessions?",
   "sessions.monitor.sent": 'Sent to "{{title}}"',
