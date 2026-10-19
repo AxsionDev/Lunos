@@ -196,8 +196,12 @@ export async function waitForTokens(
     options.sleep ??
     ((ms: number) =>
       new Promise((resolve) => {
-        const timer = setTimeout(resolve, ms)
-        options.signal?.addEventListener("abort", () => (clearTimeout(timer), resolve(undefined)), { once: true })
+        const stop = () => (clearTimeout(timer), resolve(undefined))
+        const timer = setTimeout(() => {
+          options.signal?.removeEventListener("abort", stop)
+          resolve(undefined)
+        }, ms)
+        options.signal?.addEventListener("abort", stop, { once: true })
       }))
   let interval = Math.max(1, device.interval ?? 5)
   const deadline = Date.now() + device.expires_in * 1000

@@ -154,6 +154,11 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
       const session = await CloudStore.load()
       await recordConsent(session?.issuer ?? input.issuer, session?.tokens.access_token, version)
     },
+    async probe() {
+      return CloudOidc.discover(input.issuer)
+        .then(() => "ok" as const)
+        .catch((error: unknown) => CloudSignin.classify(error))
+    },
     async start(): Promise<DeviceFlow> {
       const started = await CloudSignin.begin({ issuer: input.issuer, clientID: input.clientID }).catch(fail)
       return {

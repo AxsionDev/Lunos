@@ -107,6 +107,8 @@ export type Host = {
   /** The Terms version this account last accepted on this machine. */
   accepted(): Promise<string | undefined>
   accept(version: string): Promise<void>
+  /** Whether the sign-in service can be reached; "offline" at start means the one-time offline exemption. */
+  probe(): Promise<"ok" | FailureKind>
   start(input: { signup: boolean }): Promise<DeviceFlow>
   /** Opens the browser; false when it couldn't. */
   open(url: string): Promise<boolean>
@@ -128,7 +130,7 @@ export function maskEmail(email: string | undefined) {
 
 /** "4:59" for a countdown. */
 export function countdown(ms: number) {
-  const total = Math.max(0, Math.ceil(ms / 1000))
+  const total = Math.max(0, Math.floor(ms / 1000))
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`
 }
 
