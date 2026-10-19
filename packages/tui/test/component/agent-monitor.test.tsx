@@ -645,4 +645,15 @@ test('opening: ← does nothing new with "left_opens_monitor": false, or in a su
   } finally {
     await ui.cleanup()
   }
+  // The control: the same session as a top-level one opens it from the session route.
+  const { parentID: _, ...top } = child
+  const parent = await promptOn({ route: { type: "session", sessionID: "ses_child" }, sessions: [top] })
+  try {
+    await Bun.sleep(150)
+    await parent.arrow("left")
+    await wait(() => parent.opened.length === 1)
+    expect(parent.opened).toEqual(["session"])
+  } finally {
+    await parent.cleanup()
+  }
 })

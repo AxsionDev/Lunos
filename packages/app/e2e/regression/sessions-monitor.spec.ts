@@ -260,3 +260,12 @@ test("a prompt never approves a tool call; Approve on the row does, once", async
   ).toBeVisible()
   expect(state.calls).toHaveLength(2)
 })
+
+test("at a narrow desktop window's width the list still sits to the right of the prompt", async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 820 })
+  await open(page)
+  const list = (await rail(page).boundingBox())!
+  const input = (await prompt(page).boundingBox())!
+  expect(list.x).toBeGreaterThanOrEqual(input.x + input.width)
+  await expect(rail(page).getByRole("heading", { name: "Running (3)" })).toBeVisible()
+})

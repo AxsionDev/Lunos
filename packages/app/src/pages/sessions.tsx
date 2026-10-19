@@ -1176,7 +1176,10 @@ export function SessionsPage() {
   const byGroups = () => archivedView() || ui.view === "groups"
 
   return (
-    <div class="flex min-h-0 w-full flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden" data-page="sessions">
+    <div
+      class="flex min-h-0 w-full flex-1 flex-col overflow-auto min-[720px]:flex-row min-[720px]:overflow-hidden"
+      data-page="sessions"
+    >
       {/* XCOD-262: the centre, a composer that starts sessions or sends to the ones tagged with @. */}
       <div class="flex min-h-[320px] min-w-0 flex-1 flex-col gap-3 p-4">
         <header class="flex flex-wrap items-center gap-3">
@@ -1211,7 +1214,7 @@ export function SessionsPage() {
       </div>
       {/* The rail: every session on this computer, by status (as the TUI's monitor) or by group. */}
       <aside
-        class="flex w-full flex-col gap-3 border-v2-border-border-base p-4 lg:w-[40%] lg:min-w-[420px] lg:overflow-auto lg:border-l"
+        class="flex w-full flex-col gap-3 border-v2-border-border-base p-4 min-[720px]:w-[40%] min-[720px]:min-w-[340px] min-[720px]:overflow-auto min-[720px]:border-l"
         aria-label={t("sessions.monitor.rail")}
       >
         <div class="flex flex-wrap items-center gap-2">
