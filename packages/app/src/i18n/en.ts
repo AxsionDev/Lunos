@@ -1154,6 +1154,7 @@ export const dict = {
   "session.delete.title": "Delete session",
   "session.delete.confirm": 'Delete session "{{name}}"?',
   "session.delete.button": "Delete session",
+  "session.delete.queued": "Also deletes queued prompts that were never sent ({{count}}).",
 
   "workspace.new": "New workspace",
   "workspace.type.local": "local",

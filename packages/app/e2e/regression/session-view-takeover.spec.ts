@@ -11,7 +11,7 @@ import { expectAppVisible } from "../utils/waits"
 const cors = { "access-control-allow-origin": "*" }
 const session = fixture.sessions[0]!
 
-async function open(page: Page, input: { orphaned: number; v2?: boolean }) {
+async function open(page: Page, input: { orphaned: number; held?: number; v2?: boolean }) {
   const state = { orphaned: input.orphaned, calls: [] as { path: string; body: any }[] }
   await mockOpenCodeServer(page, {
     protocol: "v1",
@@ -22,7 +22,7 @@ async function open(page: Page, input: { orphaned: number; v2?: boolean }) {
     pageMessages,
   })
   await page.route(/\/experimental\/session\/[^/]+\/queued(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { orphaned: state.orphaned }, headers: cors }),
+    route.fulfill({ json: { orphaned: state.orphaned, held: input.held ?? state.orphaned }, headers: cors }),
   )
   await page.route(/\/(experimental\/session\/[^/]+\/takeover|session\/[^/]+\/prompt_async)(?:\?.*)?$/, (route) => {
     const request = route.request()
@@ -121,3 +121,20 @@ test("a session with nothing a closed Lunos queued is sent to with no question",
   expect(state.calls[0]!.path).toBe(`/session/${session.id}/prompt_async`)
   await expect(page.getByRole("heading", { name: "Take over this session here?" })).toHaveCount(0)
 })
+
+// XCOD-269: the single delete says so too, when prompts queued for the session were never sent.
+for (const held of [2, 0])
+  test(`Delete session ${held ? "says it also deletes 2 queued prompts" : "says nothing more with none queued"}`, async ({
+    page,
+  }) => {
+    await open(page, { orphaned: 0, held })
+    await page.getByRole("button", { name: "More options" }).first().click()
+    await page.getByRole("menuitem", { name: "Delete" }).click()
+    await expect(page.getByText(`Delete session "${session.title}"?`)).toBeVisible()
+    const note = page.getByText("Also deletes queued prompts that were never sent (2).")
+    if (held) await expect(note).toBeVisible()
+    else {
+      await page.waitForTimeout(300)
+      await expect(note).toHaveCount(0)
+    }
+  })

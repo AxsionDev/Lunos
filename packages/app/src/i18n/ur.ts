@@ -1170,6 +1170,7 @@ export const dict = {
   "session.delete.title": "سیشن کو حذف کریں۔",
   "session.delete.confirm": 'سیشن "{{name}}" کو حذف کریں؟',
   "session.delete.button": "سیشن کو حذف کریں۔",
+  "session.delete.queued": "قطار میں موجود وہ پرامپٹس بھی حذف کرتا ہے جو کبھی نہیں بھیجے گئے ({{count}})۔",
   "workspace.new": "نئی ورک اسپیس",
   "workspace.type.local": "مقامی",
   "workspace.type.sandbox": "سینڈ باکس",

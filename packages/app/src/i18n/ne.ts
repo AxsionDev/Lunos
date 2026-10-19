@@ -1163,6 +1163,7 @@ export const dict: Record<string, string> = {
   "session.delete.title": "सत्र मेटाउनुहोस्",
   "session.delete.confirm": 'सत्र "{{name}}" मेटाउने हो?',
   "session.delete.button": "सत्र मेटाउनुहोस्",
+  "session.delete.queued": "लाइनमा रहेका कहिल्यै नपठाइएका प्रम्प्टहरू पनि मेटिन्छन् ({{count}})।",
   "workspace.new": "नयाँ कार्यस्थान",
   "workspace.type.local": "स्थानीय",
   "workspace.type.sandbox": "स्यान्डबक्स",

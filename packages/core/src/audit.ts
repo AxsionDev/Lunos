@@ -96,6 +96,8 @@ export const EVENTS = [
   "cloud.denied",
   // XCOD-265: sessions stopped, archived (cleared from the lists) or restored, or archived sessions
   // deleted for good, many at once (origin "bulk"): count and session ids. Never titles or content.
+  // XCOD-269: a single delete too (origin "api" or "cli"), and every delete counts the prompts queued
+  // for the sessions and never sent that went with them (`queued_discarded`), never their text.
   "session.stop",
   "session.archive",
   "session.delete",

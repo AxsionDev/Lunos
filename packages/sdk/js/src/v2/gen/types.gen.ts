@@ -2854,6 +2854,7 @@ export type SessionTakeoverResult = {
 
 export type SessionQueued = {
   orphaned: number
+  held: number
 }
 
 export type McpResource = {

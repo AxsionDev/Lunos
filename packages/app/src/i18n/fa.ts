@@ -1161,6 +1161,7 @@ export const dict = {
   "session.delete.title": "حذف جلسه",
   "session.delete.confirm": "جلسه «{{name}}» حذف شود؟",
   "session.delete.button": "حذف جلسه",
+  "session.delete.queued": "پرامپت‌های در صف که هرگز ارسال نشدند نیز حذف می‌شوند ({{count}}).",
   "workspace.new": "فضای کاری جدید",
   "workspace.type.local": "محلی",
   "workspace.type.sandbox": "جعبه شنی",

@@ -1154,6 +1154,7 @@ export const dict = {
   "session.delete.title": "ລຶບເຊດຊັນ",
   "session.delete.confirm": 'ລຶບເຊດຊັນ "{{name}}" ບໍ?',
   "session.delete.button": "ລຶບເຊດຊັນ",
+  "session.delete.queued": "ຍັງລຶບຄຳສັ່ງໃນຄິວທີ່ບໍ່ເຄີຍຖືກສົ່ງນຳ ({{count}}).",
   "workspace.new": "ພື້ນທີ່ເຮັດວຽກໃໝ່",
   "workspace.type.local": "ທ້ອງຖິ່ນ",
   "workspace.type.sandbox": "ກ່ອງຊາຍ",

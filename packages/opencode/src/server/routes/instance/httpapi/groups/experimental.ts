@@ -342,6 +342,8 @@ export const SessionTakeoverPayload = Schema.Struct({
 export const SessionQueued = Schema.Struct({
   /** Held by a Lunos that stopped: sent or discarded only by a take-over. */
   orphaned: NonNegativeInt,
+  /** XCOD-269: held by any Lunos, this one included: what deleting the session also deletes. */
+  held: NonNegativeInt,
 }).annotate({ identifier: "SessionQueued" })
 
 export const SessionTakeoverResult = Schema.Struct({
@@ -814,7 +816,7 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.session.queued",
             summary: "Prompts held for a session",
             description:
-              "How many prompts a Lunos process that stopped still holds for the session, never their text. While there are any, a prompt typed in the session asks to take it over first (experimental.session.takeover).",
+              "How many prompts a Lunos process that stopped still holds for the session (orphaned), and how many any Lunos holds (held, which deleting the session also deletes); never their text. While any are orphaned, a prompt typed in the session asks to take it over first (experimental.session.takeover).",
           }),
         ),
         HttpApiEndpoint.post("peerPrompt", ExperimentalPaths.peerPrompt, {

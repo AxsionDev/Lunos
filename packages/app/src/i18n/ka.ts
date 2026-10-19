@@ -1162,6 +1162,7 @@ export const dict = {
   "session.delete.title": "სესიის წაშლა",
   "session.delete.confirm": "წაშალე სესია „{{name}}“?",
   "session.delete.button": "სესიის წაშლა",
+  "session.delete.queued": "ასევე წაშლის რიგში მყოფ, არასდროს გაგზავნილ მოთხოვნებს ({{count}}).",
   "workspace.new": "ახალი სამუშაო სივრცე",
   "workspace.type.local": "ადგილობრივი",
   "workspace.type.sandbox": "Sandbox",

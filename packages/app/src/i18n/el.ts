@@ -1179,6 +1179,7 @@ export const dict = {
   "session.delete.title": "Διαγραφή συνεδρίας",
   "session.delete.confirm": 'Διαγραφή συνεδρίας "{{name}}";',
   "session.delete.button": "Διαγραφή συνεδρίας",
+  "session.delete.queued": "Διαγράφει επίσης τις προτροπές σε αναμονή που δεν στάλθηκαν ποτέ ({{count}}).",
   "workspace.new": "Νέος χώρος εργασίας",
   "workspace.type.local": "τοπικό",
   "workspace.type.sandbox": "απομονωμένο περιβάλλον",

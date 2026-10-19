@@ -1168,6 +1168,7 @@ export const dict = {
   "session.delete.title": "Șterge sesiunea",
   "session.delete.confirm": "Ștergi sesiunea „{{name}}”?",
   "session.delete.button": "Șterge sesiunea",
+  "session.delete.queued": "Șterge și prompturile din coadă care nu au fost trimise niciodată ({{count}}).",
   "workspace.new": "Spațiu de lucru nou",
   "workspace.type.local": "local",
   "workspace.type.sandbox": "sandbox",

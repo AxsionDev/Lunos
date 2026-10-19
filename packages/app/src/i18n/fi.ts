@@ -1064,6 +1064,7 @@ export const dict = {
   "session.delete.title": "Poista istunto",
   "session.delete.confirm": 'Poistetaanko istunto "{{name}}"?',
   "session.delete.button": "Poista istunto",
+  "session.delete.queued": "Poistaa myös jonossa olleet kehotteet, joita ei koskaan lähetetty ({{count}}).",
   "workspace.new": "Uusi työtila",
   "workspace.type.local": "paikallinen",
   "workspace.type.sandbox": "hiekkalaatikko",

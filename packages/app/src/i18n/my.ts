@@ -1182,6 +1182,7 @@ export const dict = {
   "session.delete.title": "စက်ရှင်ကို ဖျက်ပါ။",
   "session.delete.confirm": 'စက်ရှင် "{{name}}" ကို ဖျက်မလား။',
   "session.delete.button": "စက်ရှင်ကို ဖျက်ပါ။",
+  "session.delete.queued": "တန်းစီထားပြီး တစ်ခါမျှ မပို့ရသေးသော prompt များကိုလည်း ဖျက်မည် ({{count}})။",
   "workspace.new": "အလုပ်နေရာအသစ်",
   "workspace.type.local": "ပြည်တွင်း",
   "workspace.type.sandbox": "သဲပုံး",

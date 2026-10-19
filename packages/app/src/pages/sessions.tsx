@@ -480,11 +480,14 @@ export function SessionsPage() {
       const items = topLevel(viewItems().filter((item) => !!item.archived))
       if (items.length === 0) return info(t("sessions.bulk.noArchived"))
       const count = items.length
+      // XCOD-269: prompts queued for them and never sent go with them.
+      const queued = items.reduce((sum, item) => sum + (item.queued ?? 0), 0)
       const choice = await confirm({
         title: language.plural("sessions.bulk.delete.question", count),
         lines: [
           t("sessions.bulk.delete.warning"),
           t("sessions.bulk.delete.projects", { projects: list([...new Set(items.map((item) => projectName(item)))]) }),
+          ...(queued ? [t("session.delete.queued", { count: queued })] : []),
         ],
         confirm: t("sessions.bulk.delete.confirm", { count }),
         typed: { value: String(count), placeholder: t("sessions.bulk.delete.placeholder", { count }) },

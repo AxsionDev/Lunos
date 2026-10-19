@@ -1177,6 +1177,7 @@ export const dict = {
   "session.delete.title": "Seansni o'chirish",
   "session.delete.confirm": '"{{name}}" seansi o‘chirilsinmi?',
   "session.delete.button": "Seansni o'chirish",
+  "session.delete.queued": "Navbatda turgan, hech qachon yuborilmagan so‘rovlarni ham o‘chiradi ({{count}}).",
   "workspace.new": "Yangi ish maydoni",
   "workspace.type.local": "mahalliy",
   "workspace.type.sandbox": "qum qutisi",

@@ -1,6 +1,7 @@
 import {
   createEffect,
   createMemo,
+  createResource,
   createSignal,
   For,
   Index,
@@ -894,6 +895,15 @@ export function MessageTimeline(props: {
       await deleteSession(props.sessionID)
       dialog.close()
     }
+    // XCOD-269: prompts queued for it and never sent are deleted with it: say so.
+    const [queued] = createResource(
+      () => props.sessionID,
+      (sessionID) =>
+        sdk()
+          .client.experimental.session.queued({ sessionID }, { throwOnError: true })
+          .then((response) => response.data.held)
+          .catch(() => 0),
+    )
 
     if (settings.general.newLayoutDesigns())
       return (
@@ -901,7 +911,10 @@ export function MessageTimeline(props: {
           <DialogHeader hideClose>
             <DialogTitleGroup
               title={language.t("session.delete.title")}
-              description={language.t("session.delete.confirm", { name: name() })}
+              description={[
+                language.t("session.delete.confirm", { name: name() }),
+                ...(queued() ? [language.t("session.delete.queued", { count: queued()! })] : []),
+              ].join(" ")}
             />
           </DialogHeader>
           <DialogFooter>
@@ -922,6 +935,13 @@ export function MessageTimeline(props: {
             <span class="text-14-regular text-text-strong">
               {language.t("session.delete.confirm", { name: name() })}
             </span>
+            <Show when={queued()}>
+              {(count) => (
+                <span class="text-14-regular text-text-strong" data-slot="delete-queued">
+                  {language.t("session.delete.queued", { count: count() })}
+                </span>
+              )}
+            </Show>
           </div>
           <div class="flex justify-end gap-2">
             <Button variant="ghost" size="large" onClick={() => dialog.close()}>

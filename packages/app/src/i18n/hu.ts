@@ -1176,6 +1176,7 @@ export const dict = {
   "session.delete.title": "Delete munkamenet",
   "session.delete.confirm": "Delete „{{name}}” munkamenet?",
   "session.delete.button": "Delete munkamenet",
+  "session.delete.queued": "A sorban álló, soha el nem küldött promptokat is törli ({{count}}).",
   "workspace.new": "Új munkaterület",
   "workspace.type.local": "helyi",
   "workspace.type.sandbox": "homokozó",

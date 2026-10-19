@@ -1144,6 +1144,7 @@ export const dict = {
   "session.delete.title": "ลบเซสชัน",
   "session.delete.confirm": 'ลบเซสชัน "{{name}}" หรือไม่?',
   "session.delete.button": "ลบเซสชัน",
+  "session.delete.queued": "ลบพรอมต์ในคิวที่ยังไม่เคยส่งด้วย ({{count}})",
 
   "workspace.new": "พื้นที่ทำงานใหม่",
   "workspace.type.local": "ในเครื่อง",

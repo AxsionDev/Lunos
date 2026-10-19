@@ -4125,7 +4125,7 @@
             }
           }
         },
-        "description": "How many prompts a Lunos process that stopped still holds for the session, never their text. While there are any, a prompt typed in the session asks to take it over first (experimental.session.takeover).",
+        "description": "How many prompts a Lunos process that stopped still holds for the session (orphaned), and how many any Lunos holds (held, which deleting the session also deletes); never their text. While any are orphaned, a prompt typed in the session asks to take it over first (experimental.session.takeover).",
         "summary": "Prompts held for a session",
         "x-codeSamples": [
           {
@@ -28270,9 +28270,13 @@
           "orphaned": {
             "type": "integer",
             "minimum": 0
+          },
+          "held": {
+            "type": "integer",
+            "minimum": 0
           }
         },
-        "required": ["orphaned"],
+        "required": ["orphaned", "held"],
         "additionalProperties": false
       },
       "McpResource": {

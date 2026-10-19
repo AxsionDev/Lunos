@@ -1163,6 +1163,7 @@ export const dict = {
   "session.delete.title": "Izbriši sesiju",
   "session.delete.confirm": 'Izbriši sesiju "{{name}}"?',
   "session.delete.button": "Izbriši sesiju",
+  "session.delete.queued": "Briše i promptove na čekanju koji nikad nisu poslani ({{count}}).",
 
   "workspace.new": "Novi radni prostor",
   "workspace.type.local": "lokalno",

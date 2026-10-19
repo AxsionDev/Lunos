@@ -1170,6 +1170,7 @@ export const dict = {
   "session.delete.title": "Oturumu sil",
   "session.delete.confirm": '"{{name}}" oturumu silinsin mi?',
   "session.delete.button": "Oturumu sil",
+  "session.delete.queued": "Sırada bekleyen ve hiç gönderilmemiş istemleri de siler ({{count}}).",
 
   "workspace.new": "Yeni çalışma alanı",
   "workspace.type.local": "yerel",

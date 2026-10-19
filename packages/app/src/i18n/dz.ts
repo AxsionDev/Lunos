@@ -1186,6 +1186,7 @@ export const dict: Record<string, string> = {
   "session.delete.title": "ལཱ་ཡུན་བཏོན་གཏང་།",
   "session.delete.confirm": 'ལཱ་ཡུན་ "{{name}}" བཏོན་གཏང་ནི་ཨིན་ན?',
   "session.delete.button": "ལཱ་ཡུན་བཏོན་གཏང་།",
+  "session.delete.queued": "གྲལ་རིམ་ནང་ཡོད་པའི་ ནམ་ཡང་མ་བཏང་བའི་ བཀོད་རྒྱ་ཚུ་ཡང་ བཏོན་གཏང་འོང་ ({{count}})།",
   "workspace.new": "ལཱ་གི་ས་སྒོ་གསརཔ།",
   "workspace.type.local": "ས་གནས་ཀྱི",
   "workspace.type.sandbox": "བྱེ་སྒམ།",

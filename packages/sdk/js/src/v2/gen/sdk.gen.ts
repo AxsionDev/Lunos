@@ -1148,7 +1148,7 @@ export class Session extends HeyApiClient {
   /**
    * Prompts held for a session
    *
-   * How many prompts a Lunos process that stopped still holds for the session, never their text. While there are any, a prompt typed in the session asks to take it over first (experimental.session.takeover).
+   * How many prompts a Lunos process that stopped still holds for the session (orphaned), and how many any Lunos holds (held, which deleting the session also deletes); never their text. While any are orphaned, a prompt typed in the session asks to take it over first (experimental.session.takeover).
    */
   public queued<ThrowOnError extends boolean = false>(
     parameters: {

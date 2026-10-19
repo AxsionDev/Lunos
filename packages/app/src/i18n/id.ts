@@ -1256,6 +1256,7 @@ export const dict = {
   "session.delete.title": "Hapus sesi",
   "session.delete.confirm": 'Hapus sesi "{{name}}"?',
   "session.delete.button": "Hapus sesi",
+  "session.delete.queued": "Juga menghapus prompt dalam antrean yang tidak pernah dikirim ({{count}}).",
 
   "workspace.new": "Ruang kerja baru",
   "workspace.type.local": "lokal",

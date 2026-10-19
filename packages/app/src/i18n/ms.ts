@@ -1163,6 +1163,7 @@ export const dict = {
   "session.delete.title": "Padam sesi",
   "session.delete.confirm": 'Padam sesi "{{name}}"?',
   "session.delete.button": "Padam sesi",
+  "session.delete.queued": "Juga memadam gesaan dalam baris gilir yang tidak pernah dihantar ({{count}}).",
   "workspace.new": "Ruang kerja baharu",
   "workspace.type.local": "setempat",
   "workspace.type.sandbox": "kotak pasir",

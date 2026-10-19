@@ -1173,6 +1173,7 @@ export const dict = {
   "session.delete.title": "Sessiyanı sil",
   "session.delete.confirm": '"{{name}}" sessiyasını silmək istəyirsiniz?',
   "session.delete.button": "Sessiyanı sil",
+  "session.delete.queued": "Növbədə olan və heç vaxt göndərilməyən sorğuları da silir ({{count}}).",
   "workspace.new": "Yeni iş sahəsi",
   "workspace.type.local": "yerli",
   "workspace.type.sandbox": "sandbox",

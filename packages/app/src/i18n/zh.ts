@@ -1158,6 +1158,7 @@ export const dict = {
   "session.delete.title": "删除会话",
   "session.delete.confirm": '删除会话 "{{name}}"？',
   "session.delete.button": "删除会话",
+  "session.delete.queued": "同时删除排队中但从未发送的提示词（{{count}}）。",
 
   "workspace.new": "新建工作区",
   "workspace.type.local": "本地",

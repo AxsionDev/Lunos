@@ -1157,6 +1157,7 @@ export const dict = {
   "session.delete.title": "លុបសម័យ",
   "session.delete.confirm": 'លុបសម័យ "{{name}}"?',
   "session.delete.button": "លុបសម័យ",
+  "session.delete.queued": "ក៏លុបសំណើក្នុងជួរ ដែលមិនដែលបានផ្ញើផងដែរ ({{count}})។",
   "workspace.new": "កន្លែងធ្វើការថ្មី។",
   "workspace.type.local": "ក្នុងស្រុក",
   "workspace.type.sandbox": "ប្រអប់ខ្សាច់",

@@ -554,7 +554,10 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const sessionQueued = Effect.fn("ExperimentalHttpApi.sessionQueued")(function* (ctx: {
       params: { sessionID: string }
     }) {
-      return { orphaned: SessionPromptQueue.orphaned(ctx.params.sessionID) }
+      return {
+        orphaned: SessionPromptQueue.orphaned(ctx.params.sessionID),
+        held: SessionPromptQueue.held(ctx.params.sessionID),
+      }
     })
     const peerPrompt = Effect.fn("ExperimentalHttpApi.peerPrompt")(function* (ctx: {
       params: { sessionID: string }

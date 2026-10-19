@@ -18,7 +18,7 @@ import { errorMessage } from "../util/error"
 import { DialogSessionDeleteFailed } from "./dialog-session-delete-failed"
 import { useCommandShortcut } from "../keymap"
 import { useEvent } from "../context/event"
-import { listed } from "../util/sessions-overview"
+import { listed, queuedDeleteNote } from "../util/sessions-overview"
 
 type SessionListFilter = { scope?: "project"; path?: string }
 
@@ -54,6 +54,8 @@ export function DialogSessionList() {
   const local = useLocal()
   const toast = useToast()
   const [toDelete, setToDelete] = createSignal<string>()
+  // XCOD-269: prompts queued for the session about to be deleted, which go with it.
+  const [toDeleteQueued, setToDeleteQueued] = createSignal(0)
   const [deleted, setDeleted] = createSignal(new Set<string>())
   const [search, setSearch] = createDebouncedSignal("", 150)
   const deleteHint = useCommandShortcut("session.delete")
@@ -248,7 +250,9 @@ export function DialogSessionList() {
           ? () => <text fg={theme.accent}>{slot}</text>
           : undefined
       return {
-        title: isDeleting ? `Press ${deleteHint()} again to confirm` : x.title,
+        title: isDeleting
+          ? [`Press ${deleteHint()} again to confirm`, queuedDeleteNote(toDeleteQueued())].filter(Boolean).join(" · ")
+          : x.title,
         bg: isDeleting ? theme.error : undefined,
         value: x.id,
         category,
@@ -346,7 +350,13 @@ export function DialogSessionList() {
               setToDelete(undefined)
               return
             }
+            setToDeleteQueued(0)
             setToDelete(option.value)
+            const asked = option.value
+            void sdk.client.experimental.session
+              .queued({ sessionID: asked }, { throwOnError: true })
+              .then((response) => toDelete() === asked && setToDeleteQueued(response.data.held))
+              .catch(() => {})
           },
         },
         {

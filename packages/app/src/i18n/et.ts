@@ -1157,6 +1157,7 @@ export const dict = {
   "session.delete.title": "Kustuta seanss",
   "session.delete.confirm": 'Kas kustutada seanss "{{name}}"?',
   "session.delete.button": "Kustuta seanss",
+  "session.delete.queued": "Kustutab ka järjekorras olnud viibad, mida ei saadetud kunagi ({{count}}).",
   "workspace.new": "Uus tööruum",
   "workspace.type.local": "kohalik",
   "workspace.type.sandbox": "liivakast",

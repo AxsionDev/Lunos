@@ -1183,6 +1183,7 @@ export const dict = {
   "session.delete.title": "ސެޝަން ފުހެލުން",
   "session.delete.confirm": 'ސެޝަން "{{name}}" ފުހެލަންތަ؟',
   "session.delete.button": "ސެޝަން ފުހެލުން",
+  "session.delete.queued": "ކިއުގައި ހުރި، ފޮނުވިފައި ނުވާ ޕްރޮމްޕްޓްތައްވެސް ފޮހެލާނެއެވެ ({{count}}).",
   "workspace.new": "އާ ވޯކްސްޕޭސް",
   "workspace.type.local": "ލޯކަލް",
   "workspace.type.sandbox": "ސޭންޑްބޮކްސް އެވެ",

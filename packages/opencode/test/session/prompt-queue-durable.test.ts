@@ -79,7 +79,7 @@ async function leftBehind(input: { sessionID: string; texts: string[]; pid?: num
 }
 
 /** Another Lunos: a child that queues `texts` for a busy session, then exits or waits to be killed. */
-async function owner(texts: string[], then: "exit" | "wait") {
+async function owner(texts: string[], then: "exit" | "wait", control = false) {
   const script = `
     const { Global } = await import(${JSON.stringify(path.resolve(import.meta.dir, "../../../core/src/global.ts"))})
     Global.Path.data = ${JSON.stringify(Global.Path.data)}
@@ -89,6 +89,7 @@ async function owner(texts: string[], then: "exit" | "wait") {
     const { SessionPromptQueue } = await import(${JSON.stringify(path.resolve(import.meta.dir, "../../src/session/prompt-queue.ts"))})
     SessionLive.start()
     SessionPeerControl.useHandler(async () => Response.json(true))
+    ${control ? "SessionPeerControl.start(); await new Promise((resolve) => setTimeout(resolve, 100))" : ""}
     GlobalBus.emit("event", { directory: "/work/a", payload: { type: "session.status", properties: { sessionID: "ses_owned", status: { type: "busy" } } } })
     for (const text of ${JSON.stringify(texts)}) await SessionPromptQueue.submit({ sessionID: "ses_owned", directory: "/work/a", text })
     console.log("queued")
@@ -521,3 +522,56 @@ describe("the session view asks first (XCOD-267)", () => {
     })
   })
 })
+
+describe("deleting a session discards what is queued for it (XCOD-269)", () => {
+  const peerText = async () => {
+    const names = await fs.readdir(SessionPeers.dir()).catch(() => [] as string[])
+    return (await Promise.all(names.map((name) => fs.readFile(path.join(SessionPeers.dir(), name), "utf8")))).join("\n")
+  }
+
+  test("held here: they leave memory and this process's file, and nothing sends them later", async () => {
+    status("ses_a", "busy")
+    await SessionPromptQueue.submit({ sessionID: "ses_a", directory: "/work/a", text: "SECRET-HERE-1" })
+    await SessionPromptQueue.submit({ sessionID: "ses_a", directory: "/work/a", text: "SECRET-HERE-2" })
+    expect(SessionPromptQueue.held("ses_a")).toBe(2)
+    expect(await SessionPromptQueue.discard("ses_a")).toBe(2)
+    expect(await peerText()).not.toContain("SECRET")
+    status("ses_a", "idle")
+    await settle()
+    expect(sent()).toEqual([])
+  })
+
+  test("held by a Lunos that is still running: it drops them itself, through its control endpoint", async () => {
+    const child = await owner(["SECRET-LIVE-1", "SECRET-LIVE-2"], "wait", true)
+    try {
+      await waitFor(() => SessionPeers.read().get("ses_owned")?.control !== undefined)
+      expect(SessionPromptQueue.held("ses_owned")).toBe(2)
+      expect(await peerText()).toContain("SECRET-LIVE-1")
+      expect(await SessionPromptQueue.discard("ses_owned")).toBe(2)
+      // Its next heartbeat writes from memory: they must not come back.
+      await new Promise((resolve) => setTimeout(resolve, SessionPeers.HEARTBEAT_MS + 500))
+      expect(await peerText()).not.toContain("SECRET")
+      expect(SessionPromptQueue.held("ses_owned")).toBe(0)
+    } finally {
+      child.kill()
+      await child.exited
+    }
+  }, 15_000)
+
+  test("held by a Lunos that stopped: every file is cleaned, an emptied one deleted", async () => {
+    const one = await leftBehind({ sessionID: "ses_a", texts: ["SECRET-OLD-1", "SECRET-OLD-2"] })
+    expect(SessionPromptQueue.held("ses_a")).toBe(2)
+    expect(await SessionPromptQueue.discard("ses_a")).toBe(2)
+    expect(existsSync(one)).toBe(false)
+    expect(await peerText()).not.toContain("SECRET")
+    expect(SessionPeers.orphans().size).toBe(0)
+  })
+})
+
+async function waitFor(fn: () => boolean, timeout = 5000) {
+  const start = Date.now()
+  while (!fn()) {
+    if (Date.now() - start > timeout) throw new Error("timed out")
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}

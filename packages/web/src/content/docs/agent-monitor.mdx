@@ -88,6 +88,8 @@ To send just the queued prompts, without a prompt of your own, select the sessio
 
 Each prompt is sent at most once. It leaves the closed Lunos's file before it's sent, so if a Lunos crashes in the middle of a take-over, a prompt is never sent twice, but the one prompt being moved at that moment can be lost. The ones not yet moved stay queued for the next take-over.
 
+Deleting a session (on its own, with Delete archived, with `lunos session delete` or through the API) also deletes the prompts queued for it, from every Lunos's file; the confirmation says how many. Archiving a session keeps them: unarchive it and take it over to send them.
+
 A Lunos that is still running but not responding (for example, a suspended one) keeps its prompts: the take-over is refused until it has closed.
 
 ---

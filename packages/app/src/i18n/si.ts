@@ -1158,6 +1158,7 @@ export const dict: Record<string, string> = {
   "session.delete.title": "සැසිය මකන්න",
   "session.delete.confirm": '"{{name}}" සැසිය මකන්නද?',
   "session.delete.button": "සැසිය මකන්න",
+  "session.delete.queued": "පෝලිමේ තිබූ, කිසි දිනෙක නොයැවූ prompt ද මකයි ({{count}}).",
   "workspace.new": "නව වැඩබිම",
   "workspace.type.local": "දේශීය",
   "workspace.type.sandbox": "වැලිපිල්ල",

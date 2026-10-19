@@ -1167,6 +1167,7 @@ export const dict = {
   "session.delete.title": "Ta bort session",
   "session.delete.confirm": 'Ta bort session "{{name}}"?',
   "session.delete.button": "Ta bort session",
+  "session.delete.queued": "Raderar också prompter i kö som aldrig skickades ({{count}}).",
   "workspace.new": "Ny arbetsyta",
   "workspace.type.local": "lokal",
   "workspace.type.sandbox": "sandlåda",

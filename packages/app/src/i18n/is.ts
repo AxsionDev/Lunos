@@ -1163,6 +1163,7 @@ export const dict = {
   "session.delete.title": "Eyða setu",
   "session.delete.confirm": 'Eyða setunni "{{name}}"?',
   "session.delete.button": "Eyða setu",
+  "session.delete.queued": "Eyðir líka kvaðningum í biðröð sem voru aldrei sendar ({{count}}).",
   "workspace.new": "Nýtt vinnurými",
   "workspace.type.local": "staðbundið",
   "workspace.type.sandbox": "sandkassi",

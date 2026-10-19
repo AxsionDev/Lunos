@@ -1168,6 +1168,7 @@ export const dict = {
   "session.delete.title": "Fshi sesionin",
   "session.delete.confirm": 'Të fshihet sesioni "{{name}}"?',
   "session.delete.button": "Fshi sesionin",
+  "session.delete.queued": "Fshin edhe kërkesat në radhë që nuk u dërguan kurrë ({{count}}).",
   "workspace.new": "Hapësirë e re pune",
   "workspace.type.local": "lokale",
   "workspace.type.sandbox": "mjedis i izoluar",

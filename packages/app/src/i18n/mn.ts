@@ -1174,6 +1174,7 @@ export const dict = {
   "session.delete.title": "Сеанс устгах",
   "session.delete.confirm": '"{{name}}" сессийг устгах уу?',
   "session.delete.button": "Сеанс устгах",
+  "session.delete.queued": "Хэзээ ч илгээгдээгүй, дараалалд буй хүсэлтүүдийг мөн устгана ({{count}}).",
   "workspace.new": "Шинэ ажлын талбар",
   "workspace.type.local": "орон нутгийн",
   "workspace.type.sandbox": "хамгаалагдсан хязгаарлагдмал орчин",

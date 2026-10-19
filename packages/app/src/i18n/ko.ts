@@ -793,6 +793,7 @@ export const dict = {
   "session.delete.title": "세션 삭제",
   "session.delete.confirm": '"{{name}}" 세션을 삭제하시겠습니까?',
   "session.delete.button": "세션 삭제",
+  "session.delete.queued": "보내지 않은 채 대기 중인 프롬프트도 함께 삭제됩니다 ({{count}}).",
   "workspace.new": "새 작업 공간",
   "workspace.type.local": "로컬",
   "workspace.type.sandbox": "샌드박스",

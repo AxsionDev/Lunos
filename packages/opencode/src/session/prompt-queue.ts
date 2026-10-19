@@ -358,6 +358,51 @@ export async function takeover(input: {
   }
 }
 
+/** XCOD-269: drops what this process holds for a deleted session (and from its file). */
+function forget(sessionID: string) {
+  const queue = queues.get(sessionID)
+  if (!queue) return 0
+  queues.delete(sessionID)
+  changed(sessionID, queue[0]?.directory ?? "")
+  return queue.length
+}
+SessionPeerControl.hooks.forget = forget
+
+/** XCOD-269: every prompt held for the session, by this process or any other, never sent. */
+export function held(sessionID: string) {
+  return (queues.get(sessionID)?.length ?? 0) + SessionPeers.heldFor(sessionID)
+}
+
+/**
+ * XCOD-269: the session was deleted, however (one, Delete archived, the CLI, the API): what is
+ * queued for it goes from this process, from a live Lunos that holds some (through its control
+ * endpoint) and from every file a stopped one left, so the text isn't kept on disk. Archiving keeps
+ * them. Returns how many went, for the `session.delete` audit (a count, never the text).
+ */
+export async function discard(sessionID: string) {
+  let count = forget(sessionID)
+  const peer = SessionPeers.read().get(sessionID)
+  if (peer?.fresh && peer.queued)
+    count += await SessionPeerControl.call(sessionID, "/forget", { method: "POST" }).then(
+      (body: { discarded?: number } | undefined) => body?.discarded ?? 0,
+      () => 0,
+    )
+  // Not while a take-over is moving them (it takes moments): wait for it, up to a second.
+  let release: (() => void) | undefined
+  for (let attempt = 0; !release && attempt < 20; attempt++)
+    try {
+      release = SessionPeers.lockTakeover(sessionID)
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  try {
+    count += SessionPeers.discardHeld(sessionID)
+  } finally {
+    release?.()
+  }
+  return count
+}
+
 /** For tests. */
 export function reset() {
   const held = [...queues.keys()]

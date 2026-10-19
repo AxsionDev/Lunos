@@ -1178,6 +1178,7 @@ export const dict = {
   "session.delete.title": "Suprimeix la sessió",
   "session.delete.confirm": 'Voleu suprimir la sessió "{{name}}"?',
   "session.delete.button": "Suprimeix la sessió",
+  "session.delete.queued": "També esborra els prompts de la cua que no s'han enviat mai ({{count}}).",
   "workspace.new": "Nou espai de treball",
   "workspace.type.local": "locals",
   "workspace.type.sandbox": "caixa de sorra",

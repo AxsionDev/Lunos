@@ -1172,6 +1172,7 @@ export const dict = {
   "session.delete.title": "Ջնջել նիստը",
   "session.delete.confirm": "Ջնջե՞լ «{{name}}» նիստը",
   "session.delete.button": "Ջնջել նիստը",
+  "session.delete.queued": "Ջնջում է նաև հերթում եղած, երբեք չուղարկված հուշումները ({{count}})։",
   "workspace.new": "Նոր աշխատանքային տարածք",
   "workspace.type.local": "տեղական",
   "workspace.type.sandbox": "Sandbox",

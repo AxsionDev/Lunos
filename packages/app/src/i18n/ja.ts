@@ -1070,6 +1070,7 @@ export const dict = {
   "session.delete.title": "セッションの削除",
   "session.delete.confirm": 'セッション "{{name}}" を削除しますか？',
   "session.delete.button": "セッションを削除",
+  "session.delete.queued": "送信されずにキューに残っているプロンプトも削除されます ({{count}})。",
   "workspace.new": "新しいワークスペース",
   "workspace.type.local": "ローカル",
   "workspace.type.sandbox": "サンドボックス",

@@ -1166,6 +1166,7 @@ export const dict = {
   "session.delete.title": "Dzēst sesiju",
   "session.delete.confirm": 'Dzēst sesiju "{{name}}"?',
   "session.delete.button": "Dzēst sesiju",
+  "session.delete.queued": "Dzēš arī rindā esošās uzvednes, kas nekad netika nosūtītas ({{count}}).",
   "workspace.new": "Jauna darba vide",
   "workspace.type.local": "lokāla",
   "workspace.type.sandbox": "smilškaste",

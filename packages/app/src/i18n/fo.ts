@@ -1160,6 +1160,7 @@ export const dict = {
   "session.delete.title": "Strika setu",
   "session.delete.confirm": 'Strika setuna "{{name}}"?',
   "session.delete.button": "Strika setu",
+  "session.delete.queued": "Strikar eisini boðini í bíðirøð, sum ongantíð vórðu send ({{count}}).",
   "workspace.new": "Nýtt workspace",
   "workspace.type.local": "lokalt",
   "workspace.type.sandbox": "sandkassi",

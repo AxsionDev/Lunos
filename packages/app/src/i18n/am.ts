@@ -1132,6 +1132,7 @@ export const dict = {
   "session.delete.title": "ክፍለ ጊዜን ሰርዝ",
   "session.delete.confirm": 'ክፍለ-ጊዜውን ይሰርዙ"{{name}}?',
   "session.delete.button": "ክፍለ ጊዜን ሰርዝ",
+  "session.delete.queued": "በወረፋ ላይ ያሉና ያልተላኩ ጥያቄዎችንም ይሰርዛል ({{count}})።",
   "workspace.new": "አዲስ workspace",
   "workspace.type.local": "አካባቢ",
   "workspace.type.sandbox": "ማጠሪያ",

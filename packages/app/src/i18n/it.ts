@@ -1087,6 +1087,7 @@ export const dict = {
   "session.delete.title": "Elimina sessione",
   "session.delete.confirm": 'Eliminare la sessione "{{name}}"?',
   "session.delete.button": "Elimina sessione",
+  "session.delete.queued": "Elimina anche i prompt in coda mai inviati ({{count}}).",
   "workspace.new": "Nuova area di lavoro",
   "workspace.type.local": "locale",
   "workspace.type.sandbox": "sandbox",

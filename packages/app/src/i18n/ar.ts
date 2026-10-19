@@ -1079,6 +1079,7 @@ export const dict = {
   "session.delete.title": "حذف الجلسة",
   "session.delete.confirm": 'حذف الجلسة "{{name}}"؟',
   "session.delete.button": "حذف الجلسة",
+  "session.delete.queued": "يحذف أيضًا المطالبات المنتظرة التي لم تُرسل قط ({{count}}).",
   "workspace.new": "مساحة عمل جديدة",
   "workspace.type.local": "محلي",
   "workspace.type.sandbox": "بيئة معزولة",

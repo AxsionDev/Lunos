@@ -1156,6 +1156,7 @@ export const dict: Record<string, string> = {
   "session.delete.title": "সেশন মুছুন",
   "session.delete.confirm": 'সেশন "{{name}}" মুছবেন?',
   "session.delete.button": "সেশন মুছুন",
+  "session.delete.queued": "সারিতে থাকা যে প্রম্পটগুলো কখনো পাঠানো হয়নি, সেগুলোও মুছে ফেলে ({{count}})।",
   "workspace.new": "নতুন ওয়ার্কস্পেস",
   "workspace.type.local": "স্থানীয়",
   "workspace.type.sandbox": "স্যান্ডবক্স",

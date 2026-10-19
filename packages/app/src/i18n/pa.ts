@@ -1168,6 +1168,7 @@ export const dict = {
   "session.delete.title": "سیشن مٹاؤ",
   "session.delete.confirm": 'سیشن "{{name}}" نوں مٹا دیو؟',
   "session.delete.button": "سیشن مٹاؤ",
+  "session.delete.queued": "قطار وچ پئے اوہ پرامپٹ وی مٹا دیندا اے جیہڑے کدی نہیں گھلے گئے ({{count}})۔",
   "workspace.new": "نویں ورک سپیس",
   "workspace.type.local": "مقامی",
   "workspace.type.sandbox": "سینڈ باکس",

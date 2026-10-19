@@ -42,6 +42,7 @@ import {
   waiting,
   type Line,
   type StateFilter,
+  queuedDeleteNote,
 } from "../util/sessions-overview"
 
 // Events after which the overview is re-read. The same list the desktop/web window uses.
@@ -578,11 +579,14 @@ export function DialogSessions(props: { select?: string }) {
     if (items.length === 0) return toast.show({ variant: "info", message: "No archived sessions in this view." })
     const projects = [...new Set(items.map((item) => projectName(item)))].join(", ")
     const count = items.length
+    // XCOD-269: prompts queued for them and never sent go with them.
+    const queued = queuedDeleteNote(items.reduce((sum, item) => sum + (item.queued ?? 0), 0))
     const typed = await DialogPrompt.show(dialog, `Delete ${count} archived ${count === 1 ? "session" : "sessions"}?`, {
       placeholder: `type ${count} to confirm`,
       description: () => (
         <text fg={theme.textMuted} wrapMode="word">
           Their history is deleted for good; this can't be undone. Projects: {projects}
+          {queued ? ` ${queued}` : ""}
         </text>
       ),
     })

@@ -990,6 +990,7 @@ export const dict = {
   "session.delete.title": "Slett sesjon",
   "session.delete.confirm": 'Slette sesjonen "{{name}}"?',
   "session.delete.button": "Slett sesjon",
+  "session.delete.queued": "Sletter også prompter i kø som aldri ble sendt ({{count}}).",
 
   "workspace.new": "Nytt arbeidsområde",
   "workspace.type.local": "lokal",

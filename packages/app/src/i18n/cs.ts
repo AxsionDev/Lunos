@@ -1168,6 +1168,7 @@ export const dict = {
   "session.delete.title": "Odstranit relaci",
   "session.delete.confirm": 'Odstranit relaci "{{name}}"?',
   "session.delete.button": "Odstranit relaci",
+  "session.delete.queued": "Smaže také prompty ve frontě, které nebyly nikdy odeslány ({{count}}).",
   "workspace.new": "Nový pracovní prostor",
   "workspace.type.local": "místní",
   "workspace.type.sandbox": "pískoviště",

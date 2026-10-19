@@ -1130,6 +1130,7 @@ export const dict = {
   "session.delete.title": "刪除工作階段",
   "session.delete.confirm": "要刪除工作階段「{{name}}」嗎？",
   "session.delete.button": "刪除工作階段",
+  "session.delete.queued": "同時刪除佇列中但從未傳送的提示詞（{{count}}）。",
 
   "workspace.new": "新增工作區",
   "workspace.type.local": "本機",

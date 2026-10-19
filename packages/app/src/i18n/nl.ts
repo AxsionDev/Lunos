@@ -1177,6 +1177,7 @@ export const dict = {
   "session.delete.title": "Sessie verwijderen",
   "session.delete.confirm": 'Sessie "{{name}}" verwijderen?',
   "session.delete.button": "Sessie verwijderen",
+  "session.delete.queued": "Verwijdert ook prompts in de wachtrij die nooit zijn verstuurd ({{count}}).",
   "workspace.new": "Nieuwe werkruimte",
   "workspace.type.local": "lokaal",
   "workspace.type.sandbox": "sandbox",

@@ -1090,6 +1090,7 @@ export const dict = {
   "session.delete.title": "Usuń sesję",
   "session.delete.confirm": 'Usunąć sesję "{{name}}"?',
   "session.delete.button": "Usuń sesję",
+  "session.delete.queued": "Usuwa też prompty z kolejki, które nigdy nie zostały wysłane ({{count}}).",
   "workspace.new": "Nowa przestrzeń robocza",
   "workspace.type.local": "lokalna",
   "workspace.type.sandbox": "piaskownica",

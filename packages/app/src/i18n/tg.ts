@@ -1170,6 +1170,7 @@ export const dict = {
   "session.delete.title": "Сеансро нест кунед",
   "session.delete.confirm": 'Сеанси "{{name}}" нест карда шавад?',
   "session.delete.button": "Сеансро нест кунед",
+  "session.delete.queued": "Дархостҳои дар навбат, ки ҳеҷ гоҳ фиристода нашуданд, низ нест карда мешаванд ({{count}}).",
   "workspace.new": "Майдони нави корӣ",
   "workspace.type.local": "маҳаллӣ",
   "workspace.type.sandbox": "қуттии қум",

@@ -1176,6 +1176,7 @@ export const dict = {
   "session.delete.title": "Xóa phiên",
   "session.delete.confirm": 'Xóa phiên "{{name}}"?',
   "session.delete.button": "Xóa phiên",
+  "session.delete.queued": "Cũng xóa các lời nhắc trong hàng đợi chưa từng được gửi ({{count}}).",
   "workspace.new": "Không gian làm việc mới",
   "workspace.type.local": "cục bộ",
   "workspace.type.sandbox": "sandbox",

@@ -1164,6 +1164,7 @@ export const dict = {
   "session.delete.title": "Odstrániť reláciu",
   "session.delete.confirm": "Odstrániť reláciu „{{name}}“?",
   "session.delete.button": "Odstrániť reláciu",
+  "session.delete.queued": "Odstráni aj prompty čakajúce v poradí, ktoré neboli nikdy odoslané ({{count}}).",
   "workspace.new": "Nový pracovný priestor",
   "workspace.type.local": "lokálny",
   "workspace.type.sandbox": "sandbox",

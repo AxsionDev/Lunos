@@ -1164,6 +1164,7 @@ export const dict = {
   "session.delete.title": "Sessiýany poz",
   "session.delete.confirm": '"{{name}}" sessiýasyny pozmalymy?',
   "session.delete.button": "Sessiýany poz",
+  "session.delete.queued": "Nobatda duran, hiç haçan iberilmedik haýyşlary hem pozýar ({{count}}).",
   "workspace.new": "Täze workspace",
   "workspace.type.local": "ýerli",
   "workspace.type.sandbox": "sandyk",
