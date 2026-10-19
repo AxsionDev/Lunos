@@ -355,7 +355,12 @@ export function DialogSessionList() {
             const asked = option.value
             void sdk.client.experimental.session
               .queued({ sessionID: asked }, { throwOnError: true })
-              .then((response) => toDelete() === asked && setToDeleteQueued(response.data.held))
+              .then((response) => {
+                if (toDelete() !== asked || !response.data.held) return
+                setToDeleteQueued(response.data.held)
+                // The row is cut to the dialog's width: the whole sentence is here.
+                toast.show({ variant: "warning", message: queuedDeleteNote(response.data.held)! })
+              })
               .catch(() => {})
           },
         },

@@ -380,6 +380,8 @@ export function held(sessionID: string) {
  * them. Returns how many went, for the `session.delete` audit (a count, never the text).
  */
 export async function discard(sessionID: string) {
+  // Nothing held anywhere (the usual delete): no lock, no file touched.
+  if (held(sessionID) === 0) return 0
   let count = forget(sessionID)
   const peer = SessionPeers.read().get(sessionID)
   if (peer?.fresh && peer.queued)
