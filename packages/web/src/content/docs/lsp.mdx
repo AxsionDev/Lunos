@@ -65,6 +65,29 @@ When LSP is enabled and opencode opens a file, it:
 
 ---
 
+## Seeing what's running
+
+`/lsp` (also `/settings` → Tools → lsp) shows whether LSP is on, whether downloads are allowed, and every server with its state. `lunos lsp status [--json]` prints the same list; add `--file <path>` to open a file first, so its servers start and you see how that went.
+
+| State           | Meaning                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| **Running**     | Started for a file the agent read; shows where the binary came from, the project root and PID. |
+| **Starting…**   | Starting now.                                                                                  |
+| **Failed**      | Didn't start, with the reason (see below). It's retried after **Restart** or in a new session. |
+| **Not started** | No matching file has been read yet.                                                            |
+| **Off**         | LSP is off (`"lsp": false`), or this server is turned off (`lsp.<id>.disabled`).               |
+
+Enter on a server: **Restart**, **Stop**, **Turn off / on** (writes `lsp.<id>.disabled` to your user config), and **View log** (its stderr this session). The sidebar shows a failed server with its reason.
+
+### Troubleshooting
+
+- **command not found: …** — the binary isn't on `PATH` or in the project's `node_modules/.bin`. Install it, or set `command` for that server.
+- **not installed, and downloads are off** — `OPENCODE_DISABLE_LSP_DOWNLOAD` (or offline mode) is set, so Lunos won't fetch it. Install it yourself, or allow downloads.
+- **not found here, and not downloaded** — some servers need the project to have a dependency first (`typescript` for the TypeScript server).
+- **exited with code N before it finished starting** — the server started and quit; the last lines of its stderr follow. Often a missing project config (a `biome.json`, for example). **View log** shows everything it wrote.
+
+---
+
 ## Best Practices
 
 LSP can help the agent find and fix issues by providing diagnostics from language servers. This is useful in some projects, but it is not always a net positive.

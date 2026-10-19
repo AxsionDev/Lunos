@@ -2873,7 +2873,28 @@ export type LspStatus = {
   id: string
   name: string
   root: string
-  status: "connected" | "error"
+  status: "connected" | "starting" | "error"
+  reason?: string
+}
+
+export type LspServerInfo = {
+  id: string
+  extensions: Array<string>
+  state: "running" | "starting" | "failed" | "not_started" | "disabled"
+  custom: boolean
+  reason?: string
+  root?: string
+  source?: string
+  command?: string
+  pid?: number
+  started?: number
+  diagnostics?: number
+}
+
+export type LspOverview = {
+  enabled: boolean
+  downloads: boolean
+  servers: Array<LspServerInfo>
 }
 
 export type FormatterStatus = {
@@ -9992,6 +10013,96 @@ export type LspStatusResponses = {
 }
 
 export type LspStatusResponse = LspStatusResponses[keyof LspStatusResponses]
+
+export type LspServersData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/lsp/servers"
+}
+
+export type LspServersErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type LspServersError = LspServersErrors[keyof LspServersErrors]
+
+export type LspServersResponses = {
+  /**
+   * Every LSP server Lunos knows and its state
+   */
+  200: LspOverview
+}
+
+export type LspServersResponse = LspServersResponses[keyof LspServersResponses]
+
+export type LspStopData = {
+  body?: {
+    restart?: boolean
+  }
+  path: {
+    serverID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/lsp/{serverID}/stop"
+}
+
+export type LspStopErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type LspStopError = LspStopErrors[keyof LspStopErrors]
+
+export type LspStopResponses = {
+  /**
+   * Stopped
+   */
+  200: boolean
+}
+
+export type LspStopResponse = LspStopResponses[keyof LspStopResponses]
+
+export type LspLogData = {
+  body?: never
+  path: {
+    serverID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/lsp/{serverID}/log"
+}
+
+export type LspLogErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type LspLogError = LspLogErrors[keyof LspLogErrors]
+
+export type LspLogResponses = {
+  /**
+   * The last lines of the server's stderr
+   */
+  200: Array<string>
+}
+
+export type LspLogResponse = LspLogResponses[keyof LspLogResponses]
 
 export type FormatterStatusData = {
   body?: never

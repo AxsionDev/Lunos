@@ -24,6 +24,7 @@ import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-
 import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
 import { DialogThemeList } from "./dialog-theme-list"
 import { choices as externalChoices, KEYS as EXTERNAL_KEYS, perRun } from "../util/external-permission"
+import { DialogLsp } from "./dialog-lsp"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogProviders } from "./dialog-provider"
 import { StatusServers } from "./dialog-status"
@@ -433,6 +434,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
     }
     if (row.key === "default_agent") return pickDefaultAgent(row)
     if (EXTERNAL_KEYS.includes(row.key)) return pickExternal(row)
+    // XCOD-257: LSP gets its own panel (state, failures, actions) instead of raw JSON.
+    if (row.key === "lsp") return dialog.replace(() => <DialogLsp />, undefined, backTo(row.key))
     if (row.key === "subagent.variant")
       return dialog.replace(
         () => (

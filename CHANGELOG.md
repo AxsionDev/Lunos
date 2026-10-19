@@ -29,6 +29,14 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   the sidebar mark these sessions with the tool's name. `"external_accent": false` in `tui.json`
   keeps your theme's colours.
 
+- **See whether LSP works, and why a language server didn't start.** `/lsp` (and `/settings` →
+  Tools → lsp) lists every language server as running, starting, failed with its reason (for example
+  "command not found: gopls" or "exited with code 3 before it finished starting"), not started, or
+  off, with where it came from and its PID. Enter on one restarts, stops, turns it off or shows its
+  log. The sidebar shows a failed server's reason, and `lunos lsp status [--file <path>] [--json]`
+  prints the same list. A server that quits while starting now fails at once instead of after the
+  start-up timeout.
+
 - **Press Esc twice to clear the prompt** and start again, in the terminal, desktop and web apps.
   The first Esc shows "esc again to clear"; a second within a second clears it. The undo key brings
   it back right after, and ↑ finds it in history. While the agent is working, Esc still stops it and
