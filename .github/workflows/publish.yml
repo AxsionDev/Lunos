@@ -756,3 +756,35 @@ jobs:
           LATEST_YML_DIR: /tmp/latest-yml
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      # XCOD-261: tell lunos.tech a release is out, so its changelog page is rebuilt from the tagged
+      # CHANGELOG.md instead of being edited by hand. Sends a `lunos-changelog` repository_dispatch to
+      # the repo in the CHANGELOG_DISPATCH_REPO variable (owner/name). GITHUB_TOKEN can't dispatch to
+      # another repository: CHANGELOG_DISPATCH_TOKEN is a fine-grained PAT with Contents read/write on
+      # that repo. Skipped, with a notice, while either is unset. The release is already public here,
+      # so a failed dispatch must not fail the run; changelog-drift.yml catches a site left behind.
+      - name: Notify the website of the release
+        if: needs.version.outputs.release && !startsWith(needs.version.outputs.version, '0.0.0-')
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          DISPATCH_REPO: ${{ vars.CHANGELOG_DISPATCH_REPO }}
+          DISPATCH_TOKEN: ${{ secrets.CHANGELOG_DISPATCH_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+          REPO: ${{ needs.version.outputs.repo }}
+        run: |
+          if [ -z "$DISPATCH_REPO" ] || [ -z "$DISPATCH_TOKEN" ]; then
+            echo "::notice title=Website not notified::Set the CHANGELOG_DISPATCH_REPO variable and the CHANGELOG_DISPATCH_TOKEN secret to update lunos.tech/changelog on release."
+            exit 0
+          fi
+          tag="v$VERSION"
+          body=$(jq -n --arg version "$VERSION" --arg tag "$tag" \
+            --arg url "https://raw.githubusercontent.com/$REPO/$tag/CHANGELOG.md" \
+            '{event_type: "lunos-changelog", client_payload: {version: $version, tag: $tag, changelog_url: $url}}')
+          curl --fail-with-body --silent --show-error --max-time 30 --retry 2 \
+            -X POST "https://api.github.com/repos/$DISPATCH_REPO/dispatches" \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d "$body"
+          echo "Sent lunos-changelog for $tag to $DISPATCH_REPO"
