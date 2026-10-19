@@ -24,7 +24,14 @@ const dim = (text: string) => UI.Style.TEXT_DIM + text + UI.Style.TEXT_NORMAL
  * `lunos login`'s sign-in, in line mode: also the official build's sign-in for `lunos --mini` and
  * `lunos --sandbox`, which have no Welcome screen. Throws with a message on failure.
  */
-export async function lineSignIn(input: { issuer: string; clientID: string; browser: boolean; syncLocked: boolean }) {
+export async function lineSignIn(input: {
+  issuer: string
+  clientID: string
+  browser: boolean
+  syncLocked: boolean
+  /** False for the sign-in asked for at start: it doesn't turn session sync on. */
+  sync?: boolean
+}) {
   const started = await CloudSignin.begin({ issuer: input.issuer, clientID: input.clientID })
   const link = started.device.verification_uri_complete ?? started.device.verification_uri
   out(`Open ${link}`)
@@ -38,7 +45,11 @@ export async function lineSignIn(input: { issuer: string; clientID: string; brow
     )
   // Session sync and team features report after the sign-in line, as before.
   const notes: string[] = []
-  const kept = await CloudSignin.keep(confirmed, { syncLocked: input.syncLocked, print: (line) => notes.push(line) })
+  const kept = await CloudSignin.keep(confirmed, {
+    syncLocked: input.syncLocked,
+    sync: input.sync,
+    print: (line) => notes.push(line),
+  })
   out(
     `Signed in as ${confirmed.user.email ?? confirmed.user.preferred_username ?? confirmed.user.sub} ${dim(`(${input.issuer})`)}`,
   )
@@ -74,7 +85,7 @@ export async function requireLineSignIn() {
     )
     return false
   }
-  return lineSignIn({ issuer, clientID, browser: true, syncLocked: false }).then(
+  return lineSignIn({ issuer, clientID, browser: true, syncLocked: false, sync: false }).then(
     async () => {
       await CloudTuiHost.create({ gate, issuer, clientID }).accept(legal.version)
       return true

@@ -216,7 +216,7 @@ describe("Welcome screen (XCOD-273)", () => {
       expect(account).toContain("Pat Lunos · pat@lunos.test")
       expect(account).toContain("Plan: Free")
       expect(account).toContain("Lunos role: support")
-      expect(account).toMatch(/Devices: laptop \(linux\), this \(\w+\) · this one/)
+      expect(account).toContain("Devices: laptop (linux)")
       expect(account).toContain("Sign out everywhere")
       expect(account).toContain("Delete my account")
       tui!.press(KEY.escape)
@@ -297,6 +297,34 @@ describe("Welcome screen (XCOD-273)", () => {
       expect(screen).toContain("[ ] I accept the Terms")
       await acceptAnd("Continue")
       await tui.waitFor("Ask anything")
+    },
+    TIMEOUT,
+  )
+})
+
+describe("the Welcome screen can't be bypassed (XCOD-273)", () => {
+  test(
+    "ctrl+p opens no command palette over it",
+    async () => {
+      await start({ env: OFFICIAL })
+      await tui!.waitFor("Welcome to Lunos")
+      tui!.press("\x10")
+      await Bun.sleep(1_000)
+      const screen = tui!.screen.text()
+      expect(screen).toContain("Create a free Lunos account to start")
+      expect(screen).not.toContain("Commands")
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "lunos settings starts on the Welcome screen, not the settings window",
+    async () => {
+      const home = await start({ env: OFFICIAL, args: ["settings"] })
+      await home.waitFor("Welcome to Lunos")
+      await Bun.sleep(1_500)
+      expect(home.screen.text()).toContain("Create a free Lunos account to start")
+      expect(home.screen.text()).not.toContain("Models & agents")
     },
     TIMEOUT,
   )

@@ -94,7 +94,7 @@ function pending(confirmed: CloudSignin.Confirmed, legal: Legal, strict: boolean
       if (CloudSignin.unverified(state, strict))
         throw new AccountError("unverified", "The e-mail address isn't confirmed yet.")
       const notes: string[] = []
-      const kept = await CloudSignin.keep(state, { syncLocked: false, print: (line) => notes.push(line) })
+      const kept = await CloudSignin.keep(state, { syncLocked: false, sync: false, print: (line) => notes.push(line) })
       await recordConsent(state.issuer, state.tokens.access_token, legal.version)
       return {
         sub: state.user.sub,

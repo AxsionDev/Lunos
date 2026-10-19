@@ -668,6 +668,12 @@ function App(props: {
     ),
   )
 
+  // XCOD-273: nothing opens over the Welcome screen: the command palette, a keybind's dialog, or
+  // `lunos settings`'s settings window are closed while it stands.
+  createEffect(() => {
+    if (account.blocks() && dialog.stack.length > 0) dialog.clear()
+  })
+
   // XCOD-248: after the effect above, so a "connect a provider" dialog opens first and the panel waits.
   createEffect(() => {
     const since = pendingWhatsNew()

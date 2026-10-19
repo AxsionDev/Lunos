@@ -196,10 +196,9 @@ describe("CloudTuiHost (XCOD-273)", () => {
     expect(details.user.plan).toBe("Free")
     expect(details.platformRole).toBe("support")
     expect(details.organisations).toEqual([{ org: "acme", role: "admin" }])
-    expect(details.devices?.map((d) => [d.name, d.current])).toEqual([
-      ["laptop", false],
-      ["this", true],
-    ])
+    expect(details.devices?.map((d) => [d.name, d.current])).toEqual([["laptop", false]])
+    // The sign-in asked for at start doesn't turn session sync on: no device is registered.
+    expect(idp.requests.some((request) => request.method === "POST" && request.path === "/v1/devices")).toBe(false)
     expect(details.missing).toEqual([])
     idp.stop()
 

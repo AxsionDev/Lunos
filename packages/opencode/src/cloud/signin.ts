@@ -81,7 +81,18 @@ export async function loginSync(input: {
  * Keeps the session and does what follows a sign-in. Registering the device and looking up the hosted
  * organisation never fail the sign-in: their problems are printed.
  */
-export async function keep(confirmed: Confirmed, input: { syncLocked: boolean; print: (line: string) => void }) {
+export async function keep(
+  confirmed: Confirmed,
+  input: {
+    syncLocked: boolean
+    print: (line: string) => void
+    /**
+     * XCOD-273: false for the sign-in Lunos asks for at start (Welcome screen, line mode): that one
+     * mustn't turn session sync on by itself. `lunos sync on` (or `lunos login`) does.
+     */
+    sync?: boolean
+  },
+) {
   const backend = await CloudStore.save({
     issuer: confirmed.issuer,
     clientID: confirmed.clientID,
@@ -90,9 +101,10 @@ export async function keep(confirmed: Confirmed, input: { syncLocked: boolean; p
     sub: confirmed.user.sub,
     savedAt: new Date().toISOString(),
   })
-  await loginSync({ issuer: confirmed.issuer, locked: input.syncLocked, print: input.print }).catch((error) =>
-    input.print(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`),
-  )
+  if (input.sync !== false)
+    await loginSync({ issuer: confirmed.issuer, locked: input.syncLocked, print: input.print }).catch((error) =>
+      input.print(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`),
+    )
   // XCOD-242: team features for the account's hosted organisation, unless managed config decides
   // (it sets cloud.policy, or cloud.auto_team: false): then nothing is looked up.
   const hosted = await (async () => {

@@ -126,7 +126,7 @@ export function DialogAccount() {
           const sure = await DialogConfirm.show(
             dialog,
             "Delete your Lunos account?",
-            "Your account, synced sessions and devices are deleted within 30 days, and you're signed out. Your code and local sessions on this computer stay. This can't be undone.",
+            "Lunos Cloud deletes your synced sessions and your devices, and you're signed out; where it can, it also removes the account within 30 days, and the next screen says which. Your code and local sessions on this computer stay. This can't be undone.",
             "Cancel",
           )
           if (sure !== true) return
