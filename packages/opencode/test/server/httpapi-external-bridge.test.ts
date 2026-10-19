@@ -570,6 +570,21 @@ describe("Lunos bridge (XCOD-254)", () => {
           const events = yield* audit(auditPath)
           expect(events.find((line) => line.event === "tool.run" && line.tool === "echo_say")).toBeTruthy()
 
+          // A Codex that asks to approve the call to the bridge: approved at once, since the bridge asks
+          // in Lunos itself (before, the unknown request was refused, declining every bridge call).
+          process.env.FAKE_CODEX_BRIDGE_APPROVAL = "1"
+          const approved = yield* call(directory, pathFor(SessionPaths.prompt, { sessionID }), {
+            agent: "build",
+            parts: [{ type: "text", text: "say it again" }],
+          }).pipe(Effect.forkChild)
+          const again = yield* pending(directory, sessionID, "/permission")
+          expect(again).toMatchObject({ permission: "echo_say", metadata: { via: "lunos-bridge" } })
+          yield* call(directory, `/permission/${again.id}/reply`, { reply: "once" })
+          expect((yield* Fiber.join(approved)).status).toBe(200)
+          const approvals = (yield* Effect.promise(() => readLog(log))).filter((line) => line.approval)
+          expect(approvals.map((line) => line.approval)).toEqual([{ action: "accept", content: {} }])
+          delete process.env.FAKE_CODEX_BRIDGE_APPROVAL
+
           // A Codex that refuses config overrides: the turn still runs, without the bridge.
           delete process.env.FAKE_CODEX_BRIDGE_CALL
           process.env.FAKE_CODEX_REFUSE_CONFIG = "1"
@@ -583,9 +598,9 @@ describe("Lunos bridge (XCOD-254)", () => {
           }
           expect((yield* Fiber.join(next)).status).toBe(200)
           const resumed = (yield* Effect.promise(() => readLog(log))).filter((line) => line.method === "thread/resume")
-          expect(resumed.length).toBe(2)
-          expect(resumed[0].params.config).toBeDefined()
-          expect(resumed[1].params.config).toBeUndefined()
+          expect(resumed.length).toBe(3)
+          expect(resumed[1].params.config).toBeDefined()
+          expect(resumed[2].params.config).toBeUndefined()
           expect((yield* marker(directory, sessionID)).bridge.off).toMatch(/Codex CLI refused the bridge/)
 
           expect(yield* Effect.promise(digest)).toEqual(before)

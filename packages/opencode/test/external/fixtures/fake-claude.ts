@@ -67,6 +67,48 @@ console.log(
 )
 // then the user prompt
 await nextLine()
+// XCOD-254: FAKE_CLAUDE_BASH=<command> runs that command through Bash the way Claude Code would:
+// announce the tool_use, ask the host with can_use_tool, report the tool_result (the host's refusal
+// when denied; the command isn't run either way), then end the turn with the recorded result.
+const bash = process.env.FAKE_CLAUDE_BASH
+if (bash) {
+  const args = { command: bash, description: "Run a command" }
+  console.log(lines[0])
+  console.log(
+    JSON.stringify({
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", id: "toolu_bash", name: "Bash", input: args }] },
+    }),
+  )
+  console.log(
+    JSON.stringify({
+      type: "control_request",
+      request_id: "req_bash",
+      request: { subtype: "can_use_tool", tool_name: "Bash", input: args, tool_use_id: "toolu_bash" },
+    }),
+  )
+  const answer = JSON.parse(await nextLine()).response?.response ?? {}
+  const allowed = answer.behavior === "allow"
+  console.log(
+    JSON.stringify({
+      type: "user",
+      message: {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: "toolu_bash",
+            content: allowed ? "(ran)" : String(answer.message ?? "denied"),
+            is_error: !allowed,
+          },
+        ],
+      },
+    }),
+  )
+  console.log(lines.at(-1))
+  await new Promise((resolve) => input.on("close", resolve))
+  process.exit(0)
+}
 // XCOD-254: given a --mcp-config, start the Lunos bridge from it and list its tools (logged). With
 // FAKE_CLAUDE_BRIDGE_CALL=<tool>, call that tool the way Claude Code would: announce the tool_use,
 // ask the host with can_use_tool, call it when allowed, report the tool_result, then end the turn

@@ -25,6 +25,7 @@ import { ExternalCodex } from "./codex"
 import { ExternalBridge } from "./bridge"
 import { ExternalBridgeTools } from "./bridge-tools"
 import { ExternalConsent } from "./consent"
+import { ExternalHooks } from "./hooks"
 import type { MCP } from "@/mcp"
 import { McpEvent } from "@opencode-ai/schema/mcp-event"
 import type { Plugin } from "@/plugin"
@@ -179,7 +180,7 @@ interface Bridge {
   launch: { mcpConfig?: string; config?: Record<string, unknown> }
   /** Codex refused the config: the turn runs without the bridge. */
   refused?: (message: string) => void
-  /** The tool asks to run one of the bridge's tools (Claude Code: `mcp__lunos__<name>`). */
+  /** The tool asks to run one of the bridge's tools (`mcp__lunos__<name>`). */
   owns: (tool: string) => Promise<boolean>
   close: Effect.Effect<void>
 }
@@ -324,14 +325,15 @@ const open = Effect.fnUntraced(function* (input: OpenInput) {
     skills: counts.skills,
     memory: counts.memory,
   })
-  const prefix = tool === "claude" ? `mcp__${ExternalBridge.SERVER}__` : undefined
+  // Claude Code names an MCP tool this way, and so does the Codex adapter for an `mcpToolCall`.
+  const prefix = `mcp__${ExternalBridge.SERVER}__`
   return {
     launch,
     refused: (message: string) => {
       refusedBy = message
     },
     owns: async (name: string) => {
-      if (!prefix || !name.startsWith(prefix)) return false
+      if (!name.startsWith(prefix)) return false
       const listed = await tools.engine.list().catch(() => [])
       return listed.some((item) => item.name === name.slice(prefix.length))
     },
@@ -406,6 +408,12 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
     chain = chain.then(() => bridge.promise(effect)).catch(() => undefined)
   }
   const tools = new Map<string, SessionV1.ToolPart>()
+  // XCOD-254: Lunos plugin hooks on the tool's own calls (`external.share.hooks`). They run here, on
+  // this machine, so they don't wait for consent: a deny hook works whether or not anything is shared.
+  const hooks = ConfigExternal.share(cfg.external).hooks
+  /** The tool's calls by id, as hooks see them; and those refused, which never ran (no after hook). */
+  const calls = new Map<string, ReturnType<typeof ExternalHooks.call> & { name: string }>()
+  const refusedCalls = new Set<string>()
   const pending = new Set<PermissionV1.ID>()
   const started = new Date().toISOString()
   let current = marker.session
@@ -511,6 +519,7 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
               },
             }
             tools.set(event.id, part)
+            calls.set(event.id, { ...ExternalHooks.call(tool, event.name, event.input), name: event.name })
             enqueue(sessions.updatePart(part))
           }
           if (event.type === "tool_result") {
@@ -528,6 +537,24 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                   time: { start, end: Date.now() },
                 }
             enqueue(sessions.updatePart({ ...part }))
+            // XCOD-254: Lunos's post-tool hooks, on a call that ran. A bridge call ran them already, in
+            // the bridge. Observational, as in a Lunos session: a failing hook never fails the turn.
+            const call = calls.get(event.id)
+            if (hooks && call && !refusedCalls.has(event.id))
+              enqueue(
+                Effect.gen(function* () {
+                  if (yield* Effect.promise(() => lunos.owns(call.name))) return
+                  yield* deps.plugin.trigger(
+                    "tool.execute.after",
+                    { tool: call.tool, sessionID, agent: lastUser.info.agent, callID: event.id, args: call.args },
+                    { title: call.name, output: event.output, metadata: { external: tool } },
+                  )
+                }).pipe(
+                  Effect.catchCause((cause) =>
+                    Effect.logWarning("external tool.execute.after hook failed", { cause: Cause.pretty(cause) }),
+                  ),
+                ),
+              )
           }
         },
         ask: async (request) => {
@@ -535,6 +562,26 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
           // tool it really runs), so the tool's own approval of it isn't asked twice. Only the names
           // the bridge lists right now: a server of the user's own called "lunos" still asks.
           if (await lunos.owns(request.tool)) return { allow: true }
+          const callID = request.toolUseID ?? request.requestID
+          // XCOD-254: Lunos's pre-tool hooks run before Lunos asks, as in a Lunos session, where a hook
+          // that throws refuses the call and the model carries on with the error.
+          if (hooks) {
+            const call = { ...ExternalHooks.call(tool, request.tool, request.input), name: request.tool }
+            calls.set(callID, call)
+            const hooked = await bridge.promise(
+              Effect.exit(
+                deps.plugin.trigger(
+                  "tool.execute.before",
+                  { tool: call.tool, sessionID, agent: lastUser.info.agent, callID, external: tool },
+                  { args: call.args },
+                ),
+              ),
+            )
+            if (Exit.isFailure(hooked)) {
+              refusedCalls.add(callID)
+              return { allow: false, message: ExternalHooks.refusal(Cause.squash(hooked.cause)) }
+            }
+          }
           const id = PermissionV1.ID.ascending()
           pending.add(id)
           const exit = await bridge.promise(
@@ -558,6 +605,7 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
           )
           pending.delete(id)
           if (Exit.isSuccess(exit)) return { allow: true }
+          refusedCalls.add(callID)
           // As in a Lunos session: a refusal with feedback is passed on and the tool carries on; a
           // plain refusal also ends the tool's turn (Claude Code's `interrupt`); a deny rule just refuses.
           const error = Cause.squash(exit.cause)

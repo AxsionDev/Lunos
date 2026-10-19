@@ -95,6 +95,97 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   }
   if (m.method !== "turn/start") return
   send({ id: m.id, result: { turn: { id: "turn-1", status: "inProgress" } } })
+  const ask = (request: { id: number; method: string; params: unknown }) =>
+    new Promise<any>((resolve) => {
+      answers.set(request.id, resolve)
+      send(request)
+    })
+  const end = () => {
+    send({ method: "item/completed", params: { item: { id: "msg-1", type: "agentMessage", text: "Done." } } })
+    send({ method: "turn/completed", params: { turn: { id: "turn-1", status: "completed" } } })
+  }
+  // XCOD-254: FAKE_CODEX_BASH=<command> asks to run that command, as the recorded commandExecution
+  // approval of 0.160.1's v2 protocol is shaped (not recorded here); the command isn't run either way.
+  const bash = process.env.FAKE_CODEX_BASH
+  if (bash) {
+    const item = { id: "cmd-1", type: "commandExecution", command: bash, cwd: process.cwd(), status: "inProgress" }
+    send({ method: "item/started", params: { item } })
+    const answer = await ask({
+      id: 900,
+      method: "item/commandExecution/requestApproval",
+      params: { threadId: thread, turnId: "turn-1", itemId: "cmd-1", command: bash, reason: null },
+    })
+    const accepted = answer.result?.decision === "accept"
+    send({
+      method: "item/completed",
+      params: {
+        item: { ...item, status: accepted ? "completed" : "declined", aggregatedOutput: accepted ? "(ran)" : "" },
+      },
+    })
+    return end()
+  }
+  // XCOD-254: FAKE_CODEX_MCP_APPROVAL=elicitation|question asks to approve an MCP tool call (server
+  // FAKE_CODEX_MCP_SERVER, default "github") in one of the two shapes Lunos reads. Neither is
+  // recorded from 0.160.1: they stand in for what it may send. The answer is logged by the host log.
+  const mcp = process.env.FAKE_CODEX_MCP_APPROVAL
+  if (mcp) {
+    const server = process.env.FAKE_CODEX_MCP_SERVER ?? "github"
+    const item = {
+      id: "mcp-9",
+      type: "mcpToolCall",
+      server,
+      tool: "create_issue",
+      arguments: { title: "Bug" },
+      status: "inProgress",
+    }
+    send({ method: "item/started", params: { item } })
+    const answer =
+      mcp === "elicitation"
+        ? await ask({
+            id: 901,
+            method: "mcpServer/elicitation/request",
+            params: {
+              threadId: thread,
+              turnId: "turn-1",
+              serverName: server,
+              request: {
+                mode: "form",
+                message: `Allow ${server} to run create_issue?`,
+                requestedSchema: { type: "object", properties: {} },
+                _meta: { codex_approval_kind: "mcp_tool_call" },
+              },
+            },
+          })
+        : await ask({
+            id: 902,
+            method: "item/tool/requestUserInput",
+            params: {
+              threadId: thread,
+              turnId: "turn-1",
+              itemId: "mcp-9",
+              questions: [
+                {
+                  id: "mcp_tool_call_approval_mcp-9",
+                  header: "Approve app tool call?",
+                  question: `Allow ${server} to run create_issue?`,
+                  options: [
+                    { label: "Allow", description: "Run the tool" },
+                    { label: "Allow for this session", description: "Don't ask again" },
+                    { label: "Cancel", description: "Don't run it" },
+                  ],
+                },
+              ],
+            },
+          })
+    const accepted =
+      answer.result?.action === "accept" ||
+      Object.values(answer.result?.answers ?? {}).some((value: any) => value.answers?.[0] === "Allow")
+    send({
+      method: "item/completed",
+      params: { item: { ...item, status: accepted ? "completed" : "failed", result: { content: [] } } },
+    })
+    return end()
+  }
   // XCOD-254: with the Lunos bridge, list its tools (logged); with FAKE_CODEX_BRIDGE_CALL=<tool>,
   // call it as an MCP tool call item and end the turn there instead of replaying the recording.
   if (bridge) {
@@ -111,6 +202,29 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
         status: "inProgress",
       }
       send({ method: "item/started", params: { item } })
+      // XCOD-254: FAKE_CODEX_BRIDGE_APPROVAL=1 first asks to approve the call, as a Codex that
+      // approves MCP tool calls might (not recorded); a declined call isn't made.
+      if (process.env.FAKE_CODEX_BRIDGE_APPROVAL === "1") {
+        const answer = await ask({
+          id: 903,
+          method: "mcpServer/elicitation/request",
+          params: {
+            threadId: thread,
+            turnId: "turn-1",
+            serverName: "lunos",
+            request: {
+              mode: "form",
+              message: `Allow lunos to run ${name}?`,
+              _meta: { codex_approval_kind: "mcp_tool_call" },
+            },
+          },
+        })
+        record(JSON.stringify({ approval: answer.result }))
+        if (answer.result?.action !== "accept") {
+          send({ method: "item/completed", params: { item: { ...item, status: "failed" } } })
+          return end()
+        }
+      }
       const used = await useBridge(bridge, { name, arguments: args })
       record(JSON.stringify({ bridge: used }))
       send({ method: "item/completed", params: { item: { ...item, status: "completed", result: used.result } } })
