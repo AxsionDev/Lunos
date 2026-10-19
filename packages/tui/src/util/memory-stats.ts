@@ -1,3 +1,4 @@
+import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import type { MemoryStats } from "@opencode-ai/sdk/v2"
 
 // XCOD-252: /memory's Overview and Activity tabs as list rows. Each count carries the drill-down
@@ -26,10 +27,7 @@ const pct = (value: number | null | undefined) =>
 
 export function statusLine(stats: MemoryStats) {
   const s = stats.status
-  const backend =
-    s.backend.type === "embedded"
-      ? "this machine"
-      : `${s.backend.type}${s.backend.host ? ` at ${s.backend.host}` : ""}${s.backend.jurisdiction ? ` (${s.backend.jurisdiction})` : ""}`
+  const backend = MemoryStorage.short(s.backend)
   return [
     s.on ? "Memory: on" : `Memory: off (${s.reason})`,
     backend,
@@ -39,7 +37,14 @@ export function statusLine(stats: MemoryStats) {
 }
 
 export function overviewRows(stats: MemoryStats): Row[] {
-  const rows: Row[] = [{ title: statusLine(stats), value: "status", category: "Status" }]
+  const rows: Row[] = [
+    { title: statusLine(stats), value: "status", category: "Status" },
+    {
+      title: `Leaves the computer: ${MemoryStorage.leaves(stats.status.backend.type, undefined, stats.status.backend.host ?? undefined)}`,
+      value: "leaves",
+      category: "Status",
+    },
+  ]
   for (const scope of stats.scopes) {
     const category = scope.scope === "project" ? "Project memory" : "User memory"
     if (scope.error) {

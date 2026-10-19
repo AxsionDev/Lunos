@@ -1126,7 +1126,12 @@ export async function set(input: {
   }
   // A struct decode drops keys it doesn't know; make sure what we meant to write survives it.
   const landed = ConfigPolicy.get(decoded, jsonPath.join("."))
-  if (stable(jsonSafe(landed)) !== stable(value))
+  // XCOD-264: an {env:}/{file:} reference loads as what it refers to, so compare with that.
+  const expected =
+    typeof value === "string" && /\{(env|file):[^}]+\}/.test(value)
+      ? await ConfigVariable.substitute({ text: value, type: "path", path: file, missing: "empty", into: "plain" })
+      : value
+  if (stable(jsonSafe(landed)) !== stable(expected))
     throw new SettingError(
       `${item.key} didn't survive the config schema (it would load as ${JSON.stringify(jsonSafe(landed))}), so nothing was written`,
       "invalid",

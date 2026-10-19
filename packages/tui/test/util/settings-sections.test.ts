@@ -41,6 +41,13 @@ describe("settings sections", () => {
         { key: "memory.enabled", display: "true", source: "user" },
         { key: "memory.backend.type", display: "neo4j", source: "user" },
       ]),
-    ).toBe("on · neo4j")
+    ).toBe("on · Neo4j")
+    // XCOD-264: the config value "embedded" is never shown.
+    expect(
+      Sections.summary("Memory", [
+        { key: "memory.enabled", display: "true", source: "user" },
+        { key: "memory.backend.type", display: "embedded", source: "user" },
+      ]),
+    ).toBe("on · on this computer")
   })
 })

@@ -1,12 +1,21 @@
 export * as MemorySetup from "./memory-setup"
 
+import { MemoryStorage } from "./memory-storage"
+
 // XCOD-249: the memory setup wizard's answers and what saving them writes, shared by the TUI
 // (/settings → Memory → Set up memory…) and `lunos memory setup`. It writes the same keys as editing
 // them one by one, through the same settings API, so validation, scope and locks are the same.
 
+/** XCOD-264: a team database, Neo4j or PostgreSQL. */
+export type Database = "neo4j" | "postgres"
+
 export type Backend =
   | { type: "embedded" }
-  | { type: "neo4j"; url: string; username: string; password: string; jurisdiction: string }
+  | { type: Database; url: string; username: string; password: string; jurisdiction: string }
+
+export function database(type: string | undefined): type is Database {
+  return type === "neo4j" || type === "postgres"
+}
 
 export type Draft = {
   enabled: boolean
@@ -33,7 +42,15 @@ export type Row = { key: string; value?: unknown; locked?: boolean; source?: str
 type MemoryConfig = {
   enabled?: boolean
   model?: string
-  backend?: { type?: string; url?: string; username?: string; password?: string; jurisdiction?: string }
+  backend?: {
+    type?: string
+    url?: string
+    username?: string
+    password?: string
+    jurisdiction?: string
+    database?: string
+    allow_insecure?: boolean
+  }
   retention?: { days?: number }
   encryption?: "os-keychain" | "off"
 }
@@ -54,12 +71,12 @@ export function blocked(rows: readonly Row[], memory: MemoryConfig | undefined) 
 /** The recommended answers, or the current setup when memory is already configured. */
 export function initial(memory: MemoryConfig | undefined): Draft {
   const backend = memory?.backend
-  const external = backend?.type === "neo4j"
+  const external = database(backend?.type)
   return {
     enabled: true,
     backend: external
       ? {
-          type: "neo4j",
+          type: backend.type as Database,
           url: backend.url ?? "",
           username: backend.username ?? "",
           password: backend.password ?? "",
@@ -78,7 +95,9 @@ export function block(draft: Draft): Record<string, unknown> {
   return {
     enabled: draft.enabled,
     ...(draft.model ? { model: draft.model } : {}),
-    ...(draft.backend.type === "neo4j" ? { backend: draft.backend } : {}),
+    // Explicit for this computer too: the block is layered over the config files (the check, Move),
+    // where a team database may still be set.
+    backend: draft.backend,
     ...(draft.retentionDays ? { retention: { days: draft.retentionDays } } : {}),
     encryption: draft.encryption,
   }
@@ -102,12 +121,18 @@ export function writes(draft: Draft, memory: MemoryConfig | undefined, rows: rea
     if (String(current) !== value) out.push({ key, value })
   }
   set("memory.enabled", String(draft.enabled), memory?.enabled)
-  if (draft.backend.type === "neo4j") {
-    set("memory.backend.type", "neo4j", memory?.backend?.type)
+  if (draft.backend.type !== "embedded") {
+    set("memory.backend.type", draft.backend.type, memory?.backend?.type)
     set("memory.backend.url", draft.backend.url, memory?.backend?.url)
     set("memory.backend.username", draft.backend.username, memory?.backend?.username)
     set("memory.backend.password", draft.backend.password, memory?.backend?.password)
     set("memory.backend.jurisdiction", draft.backend.jurisdiction, memory?.backend?.jurisdiction)
+    // XCOD-264: another database doesn't inherit the old one's exceptions: an unencrypted connection
+    // allowed to one host isn't allowed to the next, and a Neo4j database name means nothing to PostgreSQL.
+    if (memory?.backend?.url !== draft.backend.url)
+      set("memory.backend.allow_insecure", undefined, memory?.backend?.allow_insecure)
+    if (memory?.backend?.type !== draft.backend.type)
+      set("memory.backend.database", undefined, memory?.backend?.database)
   } else if (memory?.backend?.type && memory.backend.type !== "embedded") {
     set("memory.backend.type", "embedded", memory.backend.type)
   }
@@ -134,14 +159,11 @@ export function conflicts(rows: readonly Row[], scope: "user" | "project") {
   return out
 }
 
-/** "Memory: on · this machine · model mistral/ministral-8b · encrypted" */
+/** "Memory: on · on this computer · model mistral/ministral-8b · encrypted" */
 export function status(memory: MemoryConfig | undefined, off?: string) {
   if (off) return `Memory: off (${off})`
   if (memory?.enabled !== true) return "Memory: off"
-  const where =
-    memory.backend?.type === "neo4j"
-      ? `team Neo4j${memory.backend.jurisdiction ? ` (${memory.backend.jurisdiction})` : ""}`
-      : "this machine"
+  const where = MemoryStorage.short({ type: memory.backend?.type, jurisdiction: memory.backend?.jurisdiction })
   return [
     "Memory: on",
     where,
@@ -159,3 +181,42 @@ export const DOWNLOAD =
 
 export const OFFLINE_DOWNLOAD =
   "Offline (LUNOS_OFFLINE): nothing is downloaded, so uv's package cache and Lunos's memory/models directory must already be filled (run the check once on a machine with network access, or pre-seed them as the memory docs describe)."
+
+/** XCOD-264: the answers a template's memory block sets, on top of the current ones. */
+export function apply(draft: Draft, memory: Record<string, unknown>): Draft {
+  const backend = memory.backend as Record<string, string> | undefined
+  return {
+    ...draft,
+    ...(backend
+      ? {
+          backend: database(backend.type)
+            ? {
+                type: backend.type,
+                url: backend.url ?? "",
+                username: backend.username ?? "",
+                password: backend.password ?? "",
+                jurisdiction: backend.jurisdiction ?? "",
+              }
+            : { type: "embedded" as const },
+        }
+      : {}),
+    ...(typeof memory.model === "string" && memory.model ? { model: memory.model } : {}),
+    ...(memory.encryption === "off" || memory.encryption === "os-keychain" ? { encryption: memory.encryption } : {}),
+  }
+}
+
+/**
+ * XCOD-264: whether saving moves memory somewhere else, so existing facts need a decision (Move my
+ * facts, or Start empty). Only when memory is already on: a first setup has nothing to move.
+ */
+export function switching(memory: MemoryConfig | undefined, draft: Draft) {
+  if (memory?.enabled !== true || !draft.enabled) return false
+  const before = database(memory.backend?.type) ? memory.backend : undefined
+  const after = draft.backend.type === "embedded" ? undefined : draft.backend
+  if (!before || !after) return !!before !== !!after
+  return before.type !== after.type || (before.url ?? "") !== after.url
+}
+
+export const MOVE =
+  "Move my facts: copies every fact, with where it came from, from the current storage to the new one (the old copy stays until you delete it)."
+export const START_EMPTY = "Start empty: the new storage starts with no facts; the old ones stay where they are."
