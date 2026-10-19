@@ -16,7 +16,8 @@ import { useCommandShortcut } from "../keymap"
 import { errorMessage } from "../util/error"
 import { Locale } from "../util/locale"
 import { useStartExternal } from "./dialog-external"
-import type { ExternalTool } from "../util/external"
+import { useTuiConfig } from "../config"
+import { externalAccent, type ExternalTool } from "../util/external"
 import {
   STATE_GLYPH,
   ago,
@@ -64,6 +65,15 @@ export function DialogSessions(props: { select?: string }) {
   const event = useEvent()
   const toast = useToast()
   const { theme } = useTheme()
+  const tuiConfig = useTuiConfig()
+  const externalTool = (item: { kind: string; tool?: string }): ExternalTool | undefined =>
+    item.kind !== "external"
+      ? undefined
+      : item.tool === "codex"
+        ? "codex"
+        : item.tool?.startsWith("claude")
+          ? "claude"
+          : undefined
   const startExternal = useStartExternal()
   const deleteHint = useCommandShortcut("dialog.sessions.group.delete")
 
@@ -187,6 +197,19 @@ export function DialogSessions(props: { select?: string }) {
         {
           value: entry.key,
           title,
+          // XCOD-260: an accent dot before an external session; its tool is named in the description.
+          titleView: externalTool(item) ? (
+            <>
+              <span
+                style={{
+                  fg: externalAccent(theme, externalTool(item)!, tuiConfig.external_accent !== false) ?? theme.text,
+                }}
+              >
+                ●{" "}
+              </span>
+              {title}
+            </>
+          ) : undefined,
           category: filtering() ? heading : undefined,
           titleWidth: 40,
           description: [projectName(item), kind].filter(Boolean).join(" · "),

@@ -393,6 +393,10 @@
       "required": ["path"],
       "additionalProperties": false
     },
+    "BlankString": {
+      "pattern": "^\\s*$",
+      "type": "string"
+    },
     "ExternalConfig": {
       "type": "object",
       "properties": {
@@ -412,8 +416,16 @@
               "description": "The tool's executable, when it isn't on PATH"
             },
             "permission_mode": {
-              "type": "string",
-              "description": "Permission mode passed to the tool on every run. Unset means its safe default (every edit and command is approved in Lunos). Unsafe modes (bypassPermissions, danger-full-access) are refused here; pass them per run only"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["default", "manual", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"]
+                },
+                {
+                  "$ref": "#/$defs/BlankString"
+                }
+              ],
+              "description": "Claude Code's permission mode on every run. Unset or empty: manual approval (every edit and command asks in Lunos). bypassPermissions is refused here; pass it for one run only"
             }
           },
           "additionalProperties": false,
@@ -426,9 +438,33 @@
               "type": "string",
               "description": "The tool's executable, when it isn't on PATH"
             },
+            "sandbox": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["read-only", "workspace-write", "danger-full-access"]
+                },
+                {
+                  "$ref": "#/$defs/BlankString"
+                }
+              ],
+              "description": "Codex's sandbox on every run. Unset or empty: read-only. danger-full-access is refused here; pass it for one run only"
+            },
+            "approval_policy": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["untrusted", "on-request", "never"]
+                },
+                {
+                  "$ref": "#/$defs/BlankString"
+                }
+              ],
+              "description": "Codex's approval policy on every run. Unset or empty: untrusted (anything beyond reading asks in Lunos). never is refused here; pass it for one run only"
+            },
             "permission_mode": {
               "type": "string",
-              "description": "Permission mode passed to the tool on every run. Unset means its safe default (every edit and command is approved in Lunos). Unsafe modes (bypassPermissions, danger-full-access) are refused here; pass them per run only"
+              "description": "@deprecated Moved to sandbox / approval_policy: still read while those are unset, and saving either moves it"
             }
           },
           "additionalProperties": false,

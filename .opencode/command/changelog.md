@@ -29,6 +29,7 @@ Rules:
 - Start each bullet with a capital letter
 - Prefer what changed for users over what code changed internally
 - Do not copy raw commit prefixes like `fix:` or `feat:` or trailing PR numbers like `(#123)`
+- Never include ticket ids such as `XCOD-123` (prefixes like `XCOD-123:` or references like `(XCOD-123)`): the tracker is private and they mean nothing to readers
 - Community attribution is deterministic: only preserve an existing `(@username)` suffix from the changelog input
 - If an input bullet has no `(@username)` suffix, do not add one
 - Never add a new `(@username)` suffix from `git show`, commit authors, names, or email addresses

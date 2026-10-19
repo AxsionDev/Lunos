@@ -194,7 +194,7 @@ or is blocked by policy. See [Claude Code and Codex CLI from Lunos](https://gith
 
 ### marketplace
 
-Browse and install plugins, skills, hooks and MCP servers from your marketplaces. Add a tab name (`plugins`, `skills`, `hooks`, `mcp`) to open that tab, `installed` to see what is installed with available updates marked, or any other words to search. _Alias_: `/discover`
+Browse and install plugins, skills, hooks and MCP servers from your marketplaces, one tab per kind (`tab` / `shift+tab` or a click switches; counts follow the search). Add a tab name (`plugins`, `skills`, `hooks`, `mcp`) to open that tab, `installed` to see what is installed with available updates first, or any other words to search every tab. Without words it opens on the tab you used last. _Alias_: `/discover`
 
 ```bash frame="none"
 /marketplace
@@ -655,6 +655,7 @@ This is separate from `opencode.json`, which configures server/runtime behavior.
 - `scroll_acceleration.enabled` - Enable macOS-style scroll acceleration for smooth, natural scrolling. When enabled, scroll speed increases with rapid scrolling gestures and stays precise for slower movements. **This setting takes precedence over `scroll_speed` and overrides it when enabled.**
 - `scroll_speed` - Controls how fast the TUI scrolls when using scroll commands (minimum: `0.001`, supports decimal values). Defaults to `3`. **Note: This is ignored if `scroll_acceleration.enabled` is set to `true`.**
 - `diff_style` - Controls diff rendering. `"auto"` adapts to terminal width, `"stacked"` always shows a single-column layout.
+- `external_accent` - `false` keeps your theme's colours in Claude Code and Codex sessions; the `▸ Claude Code` label and `Lunos · Claude Code` badge stay (default: `true`).
 - `double_escape_clear` - `false` turns off [clearing the prompt with `Esc` `Esc`](#clearing-the-prompt) (default: `true`).
 - `double_escape_ms` - Milliseconds in which the second `Esc` clears the prompt (default: `1000`).
 - `whats_new` - `false` stops the "What's new" panel on the first start after an update (default: `true`). [`/whatsnew`](#whatsnew) and [`lunos changelog`](/docs/cli#changelog) still work.

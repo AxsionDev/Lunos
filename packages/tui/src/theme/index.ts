@@ -87,6 +87,9 @@ export type Theme = {
   readonly syntaxType: RGBA
   readonly syntaxOperator: RGBA
   readonly syntaxPunctuation: RGBA
+  /** XCOD-260: the accents of a Claude Code / Codex session (prompt border, cursor, spinner, badge). */
+  readonly externalClaude: RGBA
+  readonly externalCodex: RGBA
   readonly thinkingOpacity: number
   _hasSelectedListItemText: boolean
 }
@@ -121,9 +124,14 @@ type ColorValue = HexColor | RefName | Variant | RGBA
 export type ThemeJson = {
   $schema?: string
   defs?: Record<string, HexColor | RefName>
-  theme: Omit<Record<ThemeColor, ColorValue>, "selectedListItemText" | "backgroundMenu"> & {
+  theme: Omit<
+    Record<ThemeColor, ColorValue>,
+    "selectedListItemText" | "backgroundMenu" | "externalClaude" | "externalCodex"
+  > & {
     selectedListItemText?: ColorValue
     backgroundMenu?: ColorValue
+    externalClaude?: ColorValue
+    externalCodex?: ColorValue
     thinkingOpacity?: number
   }
 }
@@ -241,6 +249,17 @@ export function upsertTheme(name: string, theme: unknown) {
   return true
 }
 
+/** WCAG relative luminance. */
+function luminance(color: RGBA) {
+  const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b)
+}
+
+export const EXTERNAL_ACCENTS = {
+  externalClaude: { dark: "#f0a07c", light: "#a2461f" },
+  externalCodex: { dark: "#a3bdad", light: "#3d5a4b" },
+} as const
+
 export function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
   const defs = theme.defs ?? {}
   function resolveColor(c: ColorValue, chain: string[] = []): RGBA {
@@ -290,6 +309,15 @@ export function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
   } else {
     resolved.backgroundMenu = resolved.backgroundElement
   }
+
+  // XCOD-260: a warm terracotta for Claude Code and a green-tinted graphite for Codex, both at least
+  // 4.5:1 on every built-in theme's background; a theme can set its own. Some themes keep a dark
+  // background in light mode, so the variant follows the background, not the mode.
+  const dark =
+    !resolved.background || resolved.background.a === 0 ? mode === "dark" : luminance(resolved.background) < 0.4
+  for (const [key, fallback] of Object.entries(EXTERNAL_ACCENTS) as [keyof typeof EXTERNAL_ACCENTS, Variant][])
+    resolved[key] =
+      theme.theme[key] !== undefined ? resolveColor(theme.theme[key]!) : RGBA.fromHex(fallback[dark ? "dark" : "light"])
 
   // Handle thinkingOpacity - optional with default of 0.6
   const thinkingOpacity = theme.theme.thinkingOpacity ?? 0.6

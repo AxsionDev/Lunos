@@ -235,6 +235,60 @@ describe("settings set", () => {
   })
 })
 
+describe("external permission settings (XCOD-256)", () => {
+  test("listed as selects, with manual approval shown for unset, empty and refused values", async () => {
+    expect(ConfigSettings.find("external.claude.permission_mode")).toMatchObject({ kind: "enum" })
+    expect(ConfigSettings.find("external.codex.sandbox")?.values).toEqual([
+      "read-only",
+      "workspace-write",
+      "danger-full-access",
+    ])
+    const rows = await ConfigSettings.list({
+      config: { external: { claude: { permission_mode: "  " }, codex: { approval_policy: "never" } } },
+      origins: { external: { layer: "global", source: Global.Path.config } },
+      locked: [],
+      ctx: ctx(),
+      env: {},
+    })
+    const row = (key: string) => rows.find((item) => item.key === key)!
+    expect(row("external.claude.permission_mode")).toMatchObject({
+      value: "default",
+      display: "Manual approval (default)",
+    })
+    expect(row("external.codex.sandbox")).toMatchObject({ value: "read-only", display: "Manual approval (default)" })
+    expect(row("external.codex.approval_policy")).toMatchObject({ value: "untrusted" })
+    expect(row("external.codex.approval_policy").override).toContain("refused in config")
+  })
+
+  test("an unsafe value is refused on save and nothing is written", async () => {
+    await fs.writeFile(userFile(), "{}\n")
+    for (const [key, value] of [
+      ["external.claude.permission_mode", "bypassPermissions"],
+      ["external.codex.sandbox", "danger-full-access"],
+      ["external.codex.approval_policy", "never"],
+    ])
+      await expect(ConfigSettings.set({ key, value, scope: "user", ctx: ctx(), locked: [] })).rejects.toThrow(
+        /refused in config/,
+      )
+    expect(await read(userFile())).toBe("{}\n")
+  })
+
+  test("saving sandbox moves a legacy permission_mode holding an approval policy", async () => {
+    await fs.writeFile(userFile(), JSON.stringify({ external: { codex: { permission_mode: "on-request" } } }))
+    await ConfigSettings.set({
+      key: "external.codex.sandbox",
+      value: "workspace-write",
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+    })
+    expect(JSON.parse(await read(userFile())).external.codex).toEqual({
+      sandbox: "workspace-write",
+      approval_policy: "on-request",
+    })
+  })
+})
+
 describe("settings list", () => {
   test("source badges follow the config layers, and locks win", async () => {
     const rows = await ConfigSettings.list({

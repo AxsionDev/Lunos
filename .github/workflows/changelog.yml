@@ -6,8 +6,9 @@ name: changelog
 # src/ directory (packages/<pkg>/src/…, packages/<group>/<pkg>/src/…), not tests, fixtures or
 # snapshots. Docs, scripts, workflows and config don't trigger it.
 #
-# It only warns (a ::warning:: annotation; the job stays green), and the `no-changelog` label skips
-# it. Upstream-sync PRs will usually warn: upstream changes are noted as one entry per merge, so
+# The line check only warns (a ::warning:: annotation), and the `no-changelog` label skips it.
+# XCOD-253: the lint step fails the job when CHANGELOG.md has a ticket id outside an HTML comment or
+# a user-facing entry without a bold lead. Upstream-sync PRs will usually warn: upstream changes are noted as one entry per merge, so
 # label them `no-changelog` or add that entry.
 #
 # Runs on ubuntu-latest: the inherited workflows use upstream's Blacksmith runners, which never
@@ -38,3 +39,6 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: git diff --name-only "$BASE...$HEAD" | bun script/check-changelog.ts --pr
+
+      - name: CHANGELOG.md has no ticket ids in its text
+        run: bun script/check-changelog.ts --lint
