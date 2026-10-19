@@ -86,6 +86,8 @@ type ThemeJson = {
 }
 
 type SharedSyntaxTheme = TuiThemeCurrent & {
+  externalClaude: RGBA
+  externalCodex: RGBA
   _hasSelectedListItemText: boolean
 }
 
@@ -674,6 +676,8 @@ export async function resolveRunTheme(renderer: CliRenderer): Promise<RunTheme> 
     const shared = await import("@opencode-ai/tui/context/theme")
     const syntaxTheme: SharedSyntaxTheme = {
       ...scrollbackTheme,
+      externalClaude: RGBA.fromHex(shared.EXTERNAL_ACCENTS.externalClaude[pick]),
+      externalCodex: RGBA.fromHex(shared.EXTERNAL_ACCENTS.externalCodex[pick]),
       _hasSelectedListItemText: true,
     }
     const syntax = shared.generateSyntax(syntaxTheme)
