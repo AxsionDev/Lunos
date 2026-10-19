@@ -168,6 +168,7 @@ With offline mode on:
 - **Syntax highlighting** is off in the TUI.
 - **ripgrep** must be installed as `rg`.
 - **Memory**, if you turn it on, uses only what uv and Hugging Face have already cached. See [Avoiding the downloads](#leaves-your-infrastructure).
+- **The Lunos account** isn't asked for. The official build's sign-in at start is also skipped with managed `"auth": { "required": false }` or your organisation's `cloud.issuer`; see [Using Lunos without an account](../without-account.md).
 
 Every refused call names `LUNOS_OFFLINE` in its message. It doesn't hang or retry. This table is generated from the code that does the gating, so it lists every outbound call Lunos can make:
 

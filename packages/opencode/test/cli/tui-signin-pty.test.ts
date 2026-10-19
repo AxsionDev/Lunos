@@ -473,3 +473,38 @@ describe("exemptions: no Welcome screen, and no call to a Lunos service (XCOD-27
     TIMEOUT,
   )
 })
+
+// The compiled official build (`LUNOS_OFFICIAL_BUILD=1 ./script/build.ts --single`), when
+// LUNOS_TEST_BINARY points at it: the build flag is compiled in, and the exemptions are read at
+// run time, not snapshotted with Flag when the binary loads. No LUNOS_AUTH_REQUIRED here.
+const binary = process.env.LUNOS_TEST_BINARY
+describe.skipIf(!binary)("the compiled official build (XCOD-273)", () => {
+  test(
+    "requires a sign-in with no exemption",
+    async () => {
+      await start({ binary })
+      await tui!.waitFor("Welcome to Lunos", 60_000)
+      await acceptAnd("Sign in")
+      await tui!.waitFor("Signed in as pat@lunos.test", 30_000)
+    },
+    TIMEOUT,
+  )
+
+  const cases: [string, Pty.Options][] = [
+    ["CI=true", { config: {}, env: { CI: "true" } }],
+    ["LUNOS_OFFLINE=1", { config: {}, env: { LUNOS_OFFLINE: "1" } }],
+    ["managed auth.required: false", { config: {}, managed: { auth: { required: false } } }],
+  ]
+  for (const [name, options] of cases)
+    test(
+      `${name}: no Welcome, no Lunos host`,
+      async () => {
+        await start({ ...options, binary })
+        await tui!.waitFor("Ask anything", 60_000)
+        await Bun.sleep(3_000)
+        expect(tui!.screen.text()).not.toContain("Welcome to Lunos")
+        expect(proxy.lunos()).toEqual([])
+      },
+      TIMEOUT,
+    )
+})

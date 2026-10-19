@@ -159,6 +159,8 @@ export type Options = {
   args?: string[]
   /** After the project directory: `--mini`, say. */
   extraArgs?: string[]
+  /** A compiled binary to run instead of the source (to check what the build does). */
+  binary?: string
   /** Reuse a HOME from an earlier run (a second start after /logout, say). */
   home?: string
 }
@@ -226,9 +228,10 @@ export async function launch(options: Options = {}) {
   const screen = new Screen()
   let raw = ""
   let exited: number | undefined
+  const args = [...(options.args ?? [dirs.project]), ...(options.extraArgs ?? [])]
   const pty = spawn(
-    process.execPath,
-    ["run", "--cwd", opencode, "src/index.ts", ...(options.args ?? [dirs.project]), ...(options.extraArgs ?? [])],
+    options.binary ?? process.execPath,
+    options.binary ? args : ["run", "--cwd", opencode, "src/index.ts", ...args],
     {
       name: "xterm-256color",
       cols: COLS,
