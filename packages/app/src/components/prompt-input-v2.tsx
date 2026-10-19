@@ -6,7 +6,9 @@ import { Icon } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
-import { createEffect, createMemo, on, Show } from "solid-js"
+import { createEffect, createMemo, createResource, on, Show } from "solid-js"
+import { useTheme } from "@opencode-ai/ui/theme/context"
+import { useParams } from "@solidjs/router"
 import { ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
 import type { PromptInputProps } from "@/components/prompt-input/contracts"
@@ -44,13 +46,42 @@ export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly model: PromptInputProps["controls"]["model"]
 }
 
+// XCOD-260: the TUI's accents (packages/tui/src/theme, EXTERNAL_ACCENTS), 4.5:1 on light and dark.
+const EXTERNAL = {
+  claude: { name: "Claude Code", dark: "#f0a07c", light: "#a2461f" },
+  codex: { name: "Codex", dark: "#a3bdad", light: "#3d5a4b" },
+} as const
+
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
   const dialog = useDialog()
   const command = useCommand()
   const language = useLanguage()
+  const theme = useTheme()
+  const sdk = useSDK()
+  const params = useParams<{ id?: string }>()
+  // XCOD-260: the Claude Code / Codex session this prompt goes to, if it's one. The synced session
+  // list leaves `metadata` out, so the session is asked for once.
+  const [session] = createResource(
+    () => params.id,
+    (sessionID) =>
+      sdk()
+        .client.session.get({ sessionID })
+        .then((result) => result.data)
+        .catch(() => undefined),
+  )
+  const tool = () => {
+    const name = (session()?.metadata as { external?: { tool?: string } } | undefined)?.external?.tool
+    return name === "claude" || name === "codex" ? name : undefined
+  }
+  const external = () => (tool() ? EXTERNAL[tool()!] : undefined)
+  const accent = () => external()?.[theme.mode() === "light" ? "light" : "dark"]
 
   return (
-    <div class="flex flex-col gap-3">
+    <div
+      class="flex flex-col gap-3 rounded-xl"
+      style={accent() ? { "box-shadow": `0 0 0 1.5px ${accent()}` } : undefined}
+      data-external={tool()}
+    >
       <PromptInputV2
         controller={props.controller}
         borderUnderlay={props.borderUnderlay}
@@ -74,6 +105,13 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
           />
         }
       />
+      <Show when={external()}>
+        {(item) => (
+          <span class="px-3 pb-2 -mt-2 self-end text-12-medium" style={{ color: accent() }}>
+            Lunos · {item().name}
+          </span>
+        )}
+      </Show>
       <Show when={props.controller.escapeArmed()}>
         <span class="px-3 -mt-2 text-12-regular text-text-weak" role="status">
           {language.t("prompt.escape.again")}

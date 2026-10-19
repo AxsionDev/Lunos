@@ -20,6 +20,12 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Added
 
+- **You always see when a prompt goes to Claude Code or Codex.** Their sessions show `▸ Claude Code`
+  (or `▸ Codex`) by the prompt and `Lunos · Claude Code` bottom right, and the prompt border, cursor
+  and spinner take the tool's accent colour, in the terminal, desktop and web apps. `/sessions` and
+  the sidebar mark these sessions with the tool's name. `"external_accent": false` in `tui.json`
+  keeps your theme's colours.
+
 - **Press Esc twice to clear the prompt** and start again, in the terminal, desktop and web apps.
   The first Esc shows "esc again to clear"; a second within a second clears it. The undo key brings
   it back right after, and ↑ finds it in history. While the agent is working, Esc still stops it and

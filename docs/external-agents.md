@@ -74,6 +74,17 @@ They're listed only while external sessions are on (`external.enabled` isn't `fa
 
 If you have your own command, skill or agent command named `claude` or `codex`, yours runs, and Lunos says once that its own is `/external claude` / `/external codex`.
 
+### Knowing where your prompt goes
+
+A Claude Code or Codex session looks different from a Lunos one, so you don't send a prompt to Anthropic or OpenAI by mistake:
+
+- **Label and badge:** `▸ Claude Code` (or `▸ Codex`) sits where the agent and model are in a Lunos session, and `Lunos · Claude Code` (or `Lunos · Codex`) is at the bottom right, with the tool's model once it reports one. These are text, so they show with `NO_COLOR` and on a monochrome terminal.
+- **Accent:** the prompt border, cursor, spinner and the tool's reply markers use the tool's colour, a warm terracotta for Claude Code and a green-tinted graphite for Codex. Text, code and diffs keep your theme. A theme can set its own as `externalClaude` / `externalCodex`; the built-in ones reach 4.5:1 on every built-in theme's background. `"external_accent": false` in `tui.json` keeps your theme's colours (the label and badge stay).
+- **Session list and sidebar:** these sessions have an accent dot and the tool's name.
+- **Desktop and web:** the prompt has the accent border and the same badge.
+
+Claude Code is a product of Anthropic; Codex is a product of OpenAI. Lunos is not affiliated with either, and uses the products' plain names next to its own.
+
 ## Handing a task from a Lunos agent
 
 To let Lunos agents hand a task to Claude Code or Codex CLI, turn on the `external_agent` tool:
