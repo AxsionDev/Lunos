@@ -19,6 +19,7 @@ import { eq } from "drizzle-orm"
 import { and } from "drizzle-orm"
 import { gte } from "drizzle-orm"
 import { isNull } from "drizzle-orm"
+import { isNotNull } from "drizzle-orm"
 import { desc } from "drizzle-orm"
 import { like } from "drizzle-orm"
 import { sql } from "drizzle-orm"
@@ -317,7 +318,8 @@ export type GlobalListInput = {
   cursor?: number
   search?: string
   limit?: number
-  archived?: boolean
+  /** true includes archived sessions; "only" lists nothing else (XCOD-265's "Show archived"). */
+  archived?: boolean | "only"
 }
 
 export const Event = {
@@ -581,6 +583,7 @@ const layer: Layer.Layer<
       if (input?.cursor) conditions.push(lt(SessionTable.time_updated, input.cursor))
       if (input?.search) conditions.push(like(SessionTable.title, `%${input.search}%`))
       if (!input?.archived) conditions.push(isNull(SessionTable.time_archived))
+      if (input?.archived === "only") conditions.push(isNotNull(SessionTable.time_archived))
 
       const query =
         conditions.length > 0

@@ -31692,6 +31692,1238 @@
           ],
           "description": "Cycle the Sessions view's state filter"
         },
+        "dialog.sessions.stop_all": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Stop every running or waiting session in the Sessions view"
+        },
+        "dialog.sessions.clear": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Clear (archive) the finished sessions in the Sessions view"
+        },
+        "dialog.sessions.stop_all_clear": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Stop all, then clear the Sessions view"
+        },
+        "dialog.sessions.undo": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Undo the last Clear in the Sessions view"
+        },
+        "dialog.sessions.archived": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Show the archived sessions in the Sessions view, or go back"
+        },
+        "dialog.sessions.unarchive": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Put the selected archived session back in the Sessions view"
+        },
+        "dialog.sessions.delete_archived": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Delete the archived sessions for good, after typing their count"
+        },
         "prompt.autocomplete.prev": {
           "anyOf": [
             {

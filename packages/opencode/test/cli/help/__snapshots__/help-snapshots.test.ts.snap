@@ -395,8 +395,13 @@ exports[`opencode CLI help-text snapshots every documented command emits stable 
 manage sessions
 
 Commands:
-  lunos session list                list sessions
-  lunos session delete <sessionID>  delete a session
+  lunos session list                   list sessions
+  lunos session delete <sessionID>     delete a session
+  lunos session stop                   stop every running or waiting session on this computer (as
+                                       Stop all in /sessions)
+  lunos session archive                clear finished sessions from the lists (archived: hidden, not
+                                       deleted)
+  lunos session unarchive [sessionID]  put archived sessions back in the lists
 
 Options:
   -h, --help        show help                                                              [boolean]

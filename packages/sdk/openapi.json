@@ -2202,6 +2202,22 @@
               "type": "string"
             },
             "required": false
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "enum": ["true", "false"]
+                }
+              ]
+            },
+            "required": false
           }
         ],
         "responses": {
@@ -2226,12 +2242,313 @@
             }
           }
         },
-        "description": "Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups.",
+        "description": "Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups. Archived sessions are left out; with archived=true only they are listed, however old.",
         "summary": "Sessions overview",
         "x-codeSamples": [
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.session.overview({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/session-bulk/stop": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.sessionBulk.stop",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Which sessions stopped, and why the others didn't",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBulkStopResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Stop several sessions at once: Lunos sessions here or in another Lunos on this machine, and Claude Code / Codex sessions. Pending approvals are rejected with the reason first. Audited as session.stop.",
+        "summary": "Stop sessions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionIDs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["sessionIDs"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.sessionBulk.stop({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/session-bulk/archive": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.sessionBulk.archive",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Which sessions were archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBulkArchiveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Hide sessions from every list without deleting anything. Running and waiting sessions are skipped unless stop is set, which stops them first. Audited as session.archive.",
+        "summary": "Archive sessions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionIDs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "stop": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["sessionIDs"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.sessionBulk.archive({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/session-bulk/unarchive": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.sessionBulk.unarchive",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Which sessions were restored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBulkArchiveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Put archived sessions back in the lists. Audited as session.archive (unarchive).",
+        "summary": "Unarchive sessions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionIDs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": ["sessionIDs"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.sessionBulk.unarchive({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/session-bulk/delete": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.sessionBulk.delete",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Which archived sessions were deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBulkDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Delete archived sessions and their history for good. Sessions that aren't archived are skipped. Audited as session.delete.",
+        "summary": "Delete archived sessions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionIDs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": ["sessionIDs"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.sessionBulk.delete({\n  ...\n})"
           }
         ]
       }
@@ -26842,6 +27159,9 @@
           },
           "groupID": {
             "type": "string"
+          },
+          "archived": {
+            "type": "number"
           }
         },
         "required": [
@@ -26875,6 +27195,88 @@
           }
         },
         "required": ["groups", "sessions"],
+        "additionalProperties": false
+      },
+      "SessionBulkFailure": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "reason"],
+        "additionalProperties": false
+      },
+      "SessionBulkStopResult": {
+        "type": "object",
+        "properties": {
+          "stopped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionBulkFailure"
+            }
+          }
+        },
+        "required": ["stopped", "failed"],
+        "additionalProperties": false
+      },
+      "SessionBulkArchiveResult": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionBulkFailure"
+            }
+          },
+          "stopped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionBulkFailure"
+            }
+          }
+        },
+        "required": ["archived", "skipped"],
+        "additionalProperties": false
+      },
+      "SessionBulkDeleteResult": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionBulkFailure"
+            }
+          }
+        },
+        "required": ["deleted", "skipped"],
         "additionalProperties": false
       },
       "NotFoundError": {

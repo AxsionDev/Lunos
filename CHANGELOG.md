@@ -57,6 +57,18 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   <!-- XCOD-264 -->
 - Every published release notifies lunos.tech with the tagged CHANGELOG.md, and a daily check fails
   when lunos.tech/changelog falls behind the latest release. <!-- XCOD-261 --> <!-- internal -->
+- **Stop every session at once, and clear finished ones out of `/sessions`.** "stop all" stops every
+  running or waiting session in the current view (state filter and search), including Claude Code
+  and Codex sessions and those running in another Lunos window, after one confirmation that counts
+  them; pending approvals are rejected with "Stopped from /sessions" so no tool is left waiting.
+  "clear list" archives the finished, idle and failed ones: they're hidden from `/sessions`, the
+  session list and quick switch, but nothing is deleted, and "undo" or "show archived" → "unarchive"
+  brings them back. "stop all & clear" does both, and "delete archived" removes archived sessions
+  for good after you type their count. Both ship without a key (bind `dialog.sessions.stop_all` and
+  `dialog.sessions.clear` in `tui.json`); they're always in the view's footer, reachable with Tab.
+  From scripts: `lunos session stop --all [--project]`, `lunos session archive --finished
+[--older-than 7d]` and `lunos session unarchive <id|--all>`, each with `--yes`. Bulk actions are
+  written to the audit log as `session.stop`, `session.archive` and `session.delete`. <!-- XCOD-265 -->
 
 ## [1.18.50] - 2026-10-19
 
