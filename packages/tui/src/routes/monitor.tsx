@@ -762,6 +762,8 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     <box
       flexDirection="column"
       width={narrow() ? "100%" : "40%"}
+      // The centre grows into the rest; without this the rail is squeezed below its 40%.
+      flexShrink={0}
       height="100%"
       border={["left"]}
       borderColor={focus() === "rail" ? theme.borderActive : theme.border}

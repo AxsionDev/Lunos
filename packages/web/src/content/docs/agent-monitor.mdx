@@ -74,6 +74,21 @@ Tag several sessions to send the same prompt to each. You confirm first ("Send t
 
 ---
 
+## In the desktop app and the web UI
+
+The Sessions window of the desktop app, and `/sessions` in the web UI, have the same layout. The list on the right is sorted **By status** into the same four sections, each with its count, and every row has its number. A waiting row shows what it asks, with **Approve** and **Deny** (or **Dismiss** for a question). **By group** shows your session groups as before; the search, the filters, Stop all and Clear list work in both.
+
+The prompt in the centre works as in the terminal:
+
+- With no tag, Enter starts a session in the project picked under the prompt and keeps you in the window.
+- `@2` sends to session 2. Typing `@` and part of a title or project lists matching sessions; ↑/↓ and Enter pick one. Clicking a row's number adds its tag. Each tagged session shows as a chip above the prompt, and the chip's × removes the tag.
+- Ctrl+Enter (⌘+Enter on macOS) interrupts a running session and sends now. Shift+Enter starts a new line.
+- Sending to several sessions asks first, and a session whose Lunos closed asks "Take over this session here?".
+
+The prompt sends text only. To attach files or pick an agent or model, open the session.
+
+---
+
 ## Safety
 
 - Each prompt sent to an existing session is written to the audit log of the Lunos that runs it, as `session.prompt` with `origin: "monitor"`, the session and how it was delivered. The text of the prompt is never logged.

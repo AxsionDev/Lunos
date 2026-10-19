@@ -180,7 +180,8 @@ export function openSessionsWindow() {
     existing.focus()
     return existing
   }
-  return createMainWindow(SESSIONS_WINDOW_ID, { width: 760, height: 820 })
+  // XCOD-262: wide enough for the composer beside the list of sessions (the Agent Monitor layout).
+  return createMainWindow(SESSIONS_WINDOW_ID, { width: 1120, height: 820 })
 }
 
 /** XCOD-235: sessions waiting for a main window that has just been created, by window id. */

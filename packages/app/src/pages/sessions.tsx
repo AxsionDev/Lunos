@@ -5,7 +5,7 @@ import type {
   SessionPeerAsks as PeerAsks,
 } from "@opencode-ai/sdk/v2/client"
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from "solid-js"
-import { createStore } from "solid-js/store"
+import { createStore, reconcile } from "solid-js/store"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
@@ -22,6 +22,8 @@ import {
   projectName,
   STATE_ORDER,
   stopPlan,
+  toolName,
+  toolOnly,
   topLevel,
   UNGROUPED,
   waiting,
@@ -30,6 +32,18 @@ import {
   type Section,
 } from "./sessions/sessions-model"
 import { useBulkConfirm } from "./sessions/bulk-confirm"
+import { MonitorComposer } from "./sessions/monitor-composer"
+import {
+  ask as askOf,
+  MONITOR_SECTIONS,
+  number,
+  rail as monitorRail,
+  route as deliveryRoute,
+  tags,
+  type Asks,
+  type MonitorSection,
+  type RailRow,
+} from "./sessions/monitor-model"
 import { useOpenSession } from "./sessions/open-session"
 
 // Events after which the overview is re-read. Everything else is noise for this page.
@@ -86,8 +100,14 @@ export function SessionsPage() {
     // XCOD-234: what a session another Lunos runs is waiting for, shown under its row.
     peerAsks: undefined as { sessionID: string; asks: PeerAsks } | undefined,
     responding: false,
+    // XCOD-262: the rail by status (the Agent Monitor's sections) or by the user's groups.
+    view: "status" as "status" | "groups",
+    showOlder: false,
   })
   const [error, setError] = createSignal<string>()
+  const [now, setNow] = createSignal(Date.now())
+  // XCOD-262: what each Waiting row asks, shown on the row and answered there.
+  const [asks, setAsks] = createStore<Record<string, Asks>>({})
   // XCOD-265: the last Clear, for Undo, and the rows Stop all couldn't stop (with why).
   const [lastClear, setLastClear] = createSignal<string[]>()
   const [failedStops, setFailedStops] = createSignal<Record<string, string>>({})
@@ -116,7 +136,9 @@ export function SessionsPage() {
       const result = await sdk.experimental.session.overview(archived ? { archived: true } : undefined)
       if (result.data && archived === archivedView()) {
         setData({ groups: result.data.groups, sessions: result.data.sessions, loaded: true })
+        setNow(Date.now())
         setError(undefined)
+        if (!archived) void loadAsks(result.data.sessions.filter((item) => item.state === "waiting"))
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -474,6 +496,251 @@ export function SessionsPage() {
     },
   }
 
+  // XCOD-262: the Agent Monitor layout. The rail lists the sessions in view by status, numbered for
+  // `@n` tags; the composer starts a session or sends to the tagged ones, through the same routes as
+  // the TUI's monitor (experimental.session.enqueue, experimental.peer.prompt). A prompt never
+  // answers a permission: only Approve / Deny on the row do.
+  const statusRail = createMemo(() =>
+    monitorRail({ sessions: viewItems(), now: now(), search: filter.search, showOlder: ui.showOlder }),
+  )
+  const [numbers, setNumbers] = createSignal<ReadonlyMap<string, number>>(new Map())
+  createEffect(
+    on(statusRail, (value) =>
+      setNumbers((previous) =>
+        number(
+          previous,
+          value.rows.map((row) => row.item.id),
+        ),
+      ),
+    ),
+  )
+  const byNumber = createMemo(() => new Map([...numbers()].map(([id, value]) => [value, id])))
+  const byID = createMemo(() => new Map(data.sessions.map((item) => [item.id, item])))
+  const tagLabel = (item: SessionOverviewItem) => `@${numbers().get(item.id) ?? "?"} ${item.title}`
+  const [draft, setDraft] = createSignal("")
+  let composer: HTMLDivElement | undefined
+
+  /** Where an untagged prompt starts a session: the projects in the list, most recent first. */
+  const projects = createMemo(() => {
+    const seen = new Map<string, string>()
+    for (const item of data.sessions.toSorted((a, b) => b.updated - a.updated))
+      if (!seen.has(projectKey(item))) seen.set(projectKey(item), projectName(item))
+    return [...seen].map(([value, label]) => ({ value, label }))
+  })
+  const [chosen, setChosen] = createSignal<string>()
+  const project = () => {
+    const value = chosen()
+    return value && projects().some((item) => item.value === value) ? value : projects()[0]?.value
+  }
+
+  /** What each Waiting row asks: from this Lunos's own lists, or the Lunos that runs it. */
+  const loadAsks = async (waitingItems: SessionOverviewItem[]) => {
+    const sdk = client()
+    if (!sdk) return
+    const own = waitingItems.filter((item) => !item.elsewhere && !toolOnly(item))
+    const lists = await Promise.all(
+      [...new Set(own.map((item) => item.directory))].map((directory) =>
+        Promise.all([
+          sdk.permission.list({ directory }).then((result) => result.data ?? []),
+          sdk.question.list({ directory }).then((result) => result.data ?? []),
+        ]).catch(() => [[], []] as const),
+      ),
+    )
+    const permissions = lists.flatMap(([list]) => (Array.isArray(list) ? list : []))
+    const questions = lists.flatMap(([, list]) => (Array.isArray(list) ? list : []))
+    const next: Record<string, Asks> = {}
+    for (const item of own)
+      next[item.id] = {
+        permissions: permissions.filter((request) => request.sessionID === item.id),
+        questions: questions.filter((request) => request.sessionID === item.id),
+      }
+    await Promise.all(
+      waitingItems
+        .filter((item) => item.elsewhere)
+        .map(async (item) => {
+          const result = await sdk.experimental.peer.asks({ sessionID: item.id }).catch(() => undefined)
+          const value = result?.data
+          if (value && Array.isArray(value.permissions) && Array.isArray(value.questions)) next[item.id] = value
+        }),
+    )
+    setAsks(reconcile(next))
+  }
+
+  const monitorActions = {
+    /** A row's number puts its tag in the prompt. */
+    tag: (item: SessionOverviewItem) => {
+      const value = numbers().get(item.id)
+      if (value === undefined) return
+      setDraft((text) => `${text}${text && !/\s$/.test(text) ? " " : ""}@${value} `)
+      composer?.querySelector("textarea")?.focus()
+    },
+    /** Approve / Deny on a Waiting row, through the same replies as the session view (or its Lunos). */
+    answer: async (item: SessionOverviewItem, allow: boolean) => {
+      const current = askOf(asks[item.id])
+      const sdk = client()
+      if (!current || !sdk) return
+      const request =
+        current.type === "question"
+          ? item.elsewhere
+            ? sdk.experimental.peer.questionReject(
+                { sessionID: item.id, requestID: current.id },
+                { throwOnError: true },
+              )
+            : sdk.question.reject({ requestID: current.id, directory: item.directory }, { throwOnError: true })
+          : item.elsewhere
+            ? sdk.experimental.peer.permissionReply(
+                { sessionID: item.id, requestID: current.id, reply: allow ? "once" : "reject" },
+                { throwOnError: true },
+              )
+            : sdk.permission.reply(
+                { requestID: current.id, directory: item.directory, reply: allow ? "once" : "reject" },
+                { throwOnError: true },
+              )
+      const ok = await request.then(
+        () => true,
+        (cause: unknown) => (fail(cause), false),
+      )
+      if (ok && current.type === "permission")
+        showToast({
+          variant: allow ? "success" : undefined,
+          title: t(allow ? "sessions.monitor.approved" : "sessions.monitor.denied", { request: current.text }),
+        })
+      refresh()
+    },
+    deliver: async (item: SessionOverviewItem, text: string, interrupt: boolean) => {
+      const sdk = client()
+      const where = deliveryRoute(item)
+      if (!sdk) return undefined
+      if (where.type === "tool-only") {
+        showToast({
+          title: t("sessions.monitor.toolOnly", {
+            title: item.title,
+            tool: toolName(item) ?? t("sessions.kind.external"),
+          }),
+        })
+        return undefined
+      }
+      if (
+        where.type === "takeover" &&
+        !(await confirm({
+          title: t("sessions.monitor.takeover.title"),
+          lines: [t("sessions.monitor.takeover.body", { title: item.title })],
+          confirm: t("sessions.monitor.takeover.confirm"),
+        }))
+      )
+        return undefined
+      if (where.type === "peer") {
+        const result = await sdk.experimental.peer
+          .prompt({ sessionID: item.id, text, interrupt }, { throwOnError: true })
+          .then((response) => response.data)
+          .catch((cause: unknown) => {
+            // The other Lunos finished the turn and let the session go: it's idle, and runs here.
+            if ((cause as { name?: string })?.name === "NotFoundError") return undefined
+            throw cause
+          })
+        if (result) return result
+      }
+      return sdk.experimental.session
+        .enqueue({ sessionID: item.id, directory: item.directory, text, interrupt }, { throwOnError: true })
+        .then((response) => response.data)
+    },
+    /** The prompt with no tag starts a session; tagged, it goes to each tagged session. */
+    submit: async (raw: string, interrupt: boolean) => {
+      const parsed = tags(raw, byNumber())
+      if (parsed.unknown.length) {
+        showToast({
+          title: t("sessions.monitor.unknown", { tags: parsed.unknown.map((value) => `@${value}`).join(", ") }),
+        })
+        return false
+      }
+      if (!parsed.text) return false
+      if (parsed.targets.length === 0) return monitorActions.start(parsed.text)
+      const targets = parsed.targets.map((id) => byID().get(id)).filter((item): item is SessionOverviewItem => !!item)
+      if (
+        targets.length > 1 &&
+        !(await confirm({
+          title: language.plural("sessions.monitor.send.question", targets.length),
+          lines: [targets.map(tagLabel).join(", ")],
+          confirm: t("sessions.monitor.send"),
+        }))
+      )
+        return false
+      const results = await Promise.all(
+        targets.map((item) =>
+          monitorActions
+            .deliver(item, parsed.text, interrupt)
+            .then((result) => ({ item, result }))
+            .catch((cause: unknown) => {
+              fail(cause)
+              return { item, result: undefined }
+            }),
+        ),
+      )
+      const done = results.filter((entry) => entry.result)
+      if (done.length === 0) return false
+      const queued = done.filter((entry) => entry.result!.delivery === "queued").length
+      const one = done[0]!
+      showToast({
+        variant: "success",
+        title:
+          done.length > 1
+            ? t("sessions.monitor.sentMany", { sent: done.length - queued, queued })
+            : t(
+                one.result!.delivery === "queued"
+                  ? "sessions.monitor.queued"
+                  : one.result!.delivery === "answered"
+                    ? "sessions.monitor.answered"
+                    : "sessions.monitor.sent",
+                { title: one.item.title },
+              ),
+      })
+      refresh()
+      return true
+    },
+    /** A new session in the chosen project, with the server's default agent and model. */
+    start: async (text: string) => {
+      const sdk = client()
+      const directory = project()
+      if (!sdk || !directory) {
+        showToast({ title: t("sessions.monitor.noProject") })
+        return false
+      }
+      const created = await sdk.session
+        .create({ directory }, { throwOnError: true })
+        .then((response) => response.data)
+        .catch((cause: unknown) => void fail(cause))
+      if (!created) return false
+      // Through the monitor's own route, so the first prompt is audited with origin "monitor" too.
+      const sent = await sdk.experimental.session
+        .enqueue({ sessionID: created.id, directory, text }, { throwOnError: true })
+        .then(
+          () => true,
+          (cause: unknown) => (fail(cause), false),
+        )
+      if (sent)
+        showToast({
+          variant: "success",
+          title: t("sessions.monitor.started", {
+            project: projects().find((item) => item.value === directory)?.label ?? directory,
+          }),
+        })
+      refresh()
+      return sent
+    },
+    /** The last message of a session, for the composer's preview. */
+    preview: async (item: SessionOverviewItem) => {
+      if (toolOnly(item)) return undefined
+      const result = await client()?.session.messages({ sessionID: item.id, directory: item.directory, limit: 4 })
+      const texts = (result?.data ?? []).map((message) =>
+        message.parts
+          .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+          .join("\n")
+          .trim(),
+      )
+      return texts.findLast((value) => !!value)
+    },
+  }
+
   const stateLabel = (item: SessionOverviewItem) =>
     item.stale
       ? language.t("sessions.state.stale")
@@ -507,6 +774,20 @@ export function SessionsPage() {
           event.dataTransfer?.setData("text/plain", item().title)
         }}
       >
+        {/* XCOD-262: the row's number, for `@n` tags; clicking it puts the tag in the prompt. */}
+        <Show when={!archivedView() ? numbers().get(item().id) : undefined}>
+          {(value) => (
+            <button
+              type="button"
+              class="w-6 shrink-0 rounded text-left text-12-medium tabular-nums text-v2-text-text-weak"
+              aria-label={t("sessions.monitor.tag", { session: tagLabel(item()) })}
+              title={t("sessions.monitor.tag", { session: tagLabel(item()) })}
+              onClick={() => monitorActions.tag(item())}
+            >
+              {value()}
+            </button>
+          )}
+        </Show>
         <span
           class="inline-block size-2 shrink-0 rounded-full"
           classList={{
@@ -517,7 +798,7 @@ export function SessionsPage() {
           }}
           aria-hidden="true"
         />
-        <div class="flex min-w-0 flex-1 flex-col">
+        <div class="flex min-w-0 flex-1 basis-40 flex-col">
           <Show
             when={ui.renamingSession === item().id}
             fallback={
@@ -540,7 +821,15 @@ export function SessionsPage() {
             />
           </Show>
           <span class="truncate text-12-regular text-v2-text-text-weak">
-            {[projectName(item()), item().agent, item().model, item().tool].filter(Boolean).join(" · ")}
+            {[
+              item().queued ? t("sessions.monitor.queuedCount", { count: item().queued! }) : undefined,
+              projectName(item()),
+              item().agent,
+              item().model,
+              item().tool,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
         <Show when={item().kind !== "session"}>
@@ -648,6 +937,44 @@ export function SessionsPage() {
               </select>
             </Show>
           </div>
+        </Show>
+        <Show when={!archivedView() && item().state === "waiting" ? askOf(asks[item().id]) : undefined}>
+          {(current) => (
+            <div class="flex w-full flex-wrap items-center gap-2 pl-9">
+              <span class="min-w-0 flex-1 truncate text-12-regular text-v2-state-fg-warning">
+                {current().type === "permission"
+                  ? t("sessions.monitor.ask.permission", { request: current().text })
+                  : t("sessions.monitor.ask.question", { question: current().text })}
+              </span>
+              <Show
+                when={current().type === "permission"}
+                fallback={
+                  <button
+                    type="button"
+                    class="rounded px-2 py-1 text-12-medium"
+                    onClick={() => void monitorActions.answer(item(), false)}
+                  >
+                    {language.t("common.dismiss")}
+                  </button>
+                }
+              >
+                <button
+                  type="button"
+                  class="rounded border border-v2-border-border-base px-2 py-1 text-12-medium"
+                  onClick={() => void monitorActions.answer(item(), true)}
+                >
+                  {t("sessions.monitor.approve")}
+                </button>
+                <button
+                  type="button"
+                  class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
+                  onClick={() => void monitorActions.answer(item(), false)}
+                >
+                  {t("sessions.monitor.deny")}
+                </button>
+              </Show>
+            </div>
+          )}
         </Show>
         <Show when={failedStops()[item().id]}>
           {(reason) => (
@@ -816,9 +1143,45 @@ export function SessionsPage() {
     )
   }
 
+  /** XCOD-262: a section of the rail by status, with its count. */
+  const StatusSection = (props: { section: MonitorSection }) => {
+    const rows = createMemo(() => statusRail().rows.filter((row) => row.section === props.section))
+    const heading = () => t(`sessions.monitor.section.${props.section}`, { count: statusRail().counts[props.section] })
+    return (
+      <Show when={rows().length > 0}>
+        <section
+          class="rounded-lg border border-v2-border-border-base"
+          data-monitor-section={props.section}
+          aria-label={heading()}
+        >
+          <header class="border-b border-v2-border-border-base px-3 py-2">
+            <h2
+              class="text-14-medium"
+              classList={{
+                "text-v2-state-fg-warning": props.section === "waiting",
+                "text-v2-text-text-strong": props.section !== "waiting",
+              }}
+            >
+              {heading()}
+            </h2>
+          </header>
+          <ul class="flex flex-col">
+            <For each={rows()}>{(row: RailRow) => <SessionRow item={row.item} child={row.depth === 1} />}</For>
+          </ul>
+        </section>
+      </Show>
+    )
+  }
+
+  const byGroups = () => archivedView() || ui.view === "groups"
+
   return (
-    <div class="flex min-h-0 w-full flex-1 flex-col overflow-auto" data-page="sessions">
-      <div class="mx-auto flex w-full max-w-[1080px] flex-col gap-3 p-4">
+    <div
+      class="flex min-h-0 w-full flex-1 flex-col overflow-auto min-[720px]:flex-row min-[720px]:overflow-hidden"
+      data-page="sessions"
+    >
+      {/* XCOD-262: the centre, a composer that starts sessions or sends to the ones tagged with @. */}
+      <div class="flex min-h-[320px] min-w-0 flex-1 flex-col gap-3 p-4">
         <header class="flex flex-wrap items-center gap-3">
           <h1 class="text-18-medium text-v2-text-text-strong">
             {archivedView() ? t("sessions.archived.title") : language.t("sessions.title")}
@@ -832,10 +1195,32 @@ export function SessionsPage() {
             </span>
           </Show>
         </header>
+        <div class="flex min-h-0 flex-1 flex-col" ref={composer}>
+          <MonitorComposer
+            text={draft()}
+            setText={setDraft}
+            rows={statusRail().rows}
+            numbers={numbers()}
+            byNumber={byNumber()}
+            byID={byID()}
+            projects={projects()}
+            project={project()}
+            onProject={setChosen}
+            stateLabel={stateLabel}
+            preview={monitorActions.preview}
+            submit={monitorActions.submit}
+          />
+        </div>
+      </div>
+      {/* The rail: every session on this computer, by status (as the TUI's monitor) or by group. */}
+      <aside
+        class="flex w-full flex-col gap-3 border-v2-border-border-base p-4 min-[720px]:w-[40%] min-[720px]:min-w-[340px] min-[720px]:overflow-auto min-[720px]:border-l"
+        aria-label={t("sessions.monitor.rail")}
+      >
         <div class="flex flex-wrap items-center gap-2">
           <input
             type="search"
-            class="min-w-[240px] flex-1 rounded border border-v2-border-border-base bg-transparent px-2 py-1 text-14-regular"
+            class="min-w-[200px] flex-1 rounded border border-v2-border-border-base bg-transparent px-2 py-1 text-14-regular"
             aria-label={language.t("sessions.search.label")}
             placeholder={language.t("sessions.search.placeholder")}
             value={filter.search}
@@ -863,24 +1248,6 @@ export function SessionsPage() {
             <option value={UNGROUPED}>{language.t("sessions.group.ungrouped")}</option>
             <For each={data.groups}>{(group) => <option value={group.id}>{group.name}</option>}</For>
           </select>
-          <form
-            class="flex items-center gap-1"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void groupActions.create()
-            }}
-          >
-            <input
-              class="rounded border border-v2-border-border-base bg-transparent px-2 py-1 text-14-regular"
-              aria-label={language.t("sessions.group.name")}
-              placeholder={language.t("sessions.group.new")}
-              value={ui.newGroup}
-              onInput={(event) => setUi("newGroup", event.currentTarget.value)}
-            />
-            <button type="submit" class="rounded px-2 py-1 text-14-medium">
-              {language.t("sessions.group.create")}
-            </button>
-          </form>
         </div>
         <div class="flex flex-wrap items-center gap-2" role="toolbar" aria-label={t("sessions.title")}>
           <Show
@@ -934,18 +1301,78 @@ export function SessionsPage() {
             {archivedView() ? t("sessions.bulk.backToList") : t("sessions.bulk.showArchived")}
           </button>
         </div>
+        <Show when={!archivedView()}>
+          <div class="flex items-center gap-1" role="group" aria-label={t("sessions.monitor.view.label")}>
+            <For each={["status", "groups"] as const}>
+              {(view) => (
+                <button
+                  type="button"
+                  class="rounded px-2 py-1 text-12-medium"
+                  classList={{ "bg-v2-background-bg-raised text-v2-text-text-strong": ui.view === view }}
+                  aria-pressed={ui.view === view}
+                  onClick={() => setUi("view", view)}
+                >
+                  {t(`sessions.monitor.view.${view}`)}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={byGroups()}>
+          <form
+            class="flex items-center gap-1"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void groupActions.create()
+            }}
+          >
+            <input
+              class="min-w-0 flex-1 rounded border border-v2-border-border-base bg-transparent px-2 py-1 text-14-regular"
+              aria-label={language.t("sessions.group.name")}
+              placeholder={language.t("sessions.group.new")}
+              value={ui.newGroup}
+              onInput={(event) => setUi("newGroup", event.currentTarget.value)}
+            />
+            <button type="submit" class="rounded px-2 py-1 text-14-medium">
+              {language.t("sessions.group.create")}
+            </button>
+          </form>
+        </Show>
         <Show when={error()}>
           <p class="text-12-regular text-v2-state-fg-danger" role="alert">
             {error()}
           </p>
         </Show>
-        <For each={sections()}>{(section) => <SectionView section={section} />}</For>
-        <Show when={data.loaded && sections().every((section) => section.rows.length === 0)}>
-          <p class="text-14-regular text-v2-text-text-weak">
-            {archivedView() ? t("sessions.archived.empty") : language.t("sessions.empty")}
-          </p>
+        <Show
+          when={byGroups()}
+          fallback={
+            <>
+              <For each={MONITOR_SECTIONS}>{(section) => <StatusSection section={section} />}</For>
+              <Show when={data.loaded && statusRail().rows.length === 0}>
+                <p class="text-14-regular text-v2-text-text-weak">{language.t("sessions.empty")}</p>
+              </Show>
+              <Show when={statusRail().older > 0 || ui.showOlder}>
+                <button
+                  type="button"
+                  class="self-start rounded px-2 py-1 text-12-medium text-v2-text-text-weak"
+                  onClick={() => setUi("showOlder", (value) => !value)}
+                >
+                  {ui.showOlder
+                    ? t("sessions.monitor.hideOlder")
+                    : t("sessions.monitor.showOlder", { count: statusRail().older })}
+                </button>
+              </Show>
+            </>
+          }
+        >
+          <For each={sections()}>{(section) => <SectionView section={section} />}</For>
+          <Show when={data.loaded && sections().every((section) => section.rows.length === 0)}>
+            <p class="text-14-regular text-v2-text-text-weak">
+              {archivedView() ? t("sessions.archived.empty") : language.t("sessions.empty")}
+            </p>
+          </Show>
         </Show>
-      </div>
+      </aside>
     </div>
   )
 }
