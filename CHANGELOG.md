@@ -33,6 +33,11 @@ reasoning behind a change are published separately as **Lunos Notes**.
 
 ### Changed
 
+- **`/marketplace` has a real tab bar** (All · Plugins · Skills · Hooks · MCP · Installed) with a
+  count on each tab that follows your search. `tab` / `shift+tab` or a click switches tabs, and it
+  reopens on the one you used last. Each kind shows what matters for it: a hook's event and the
+  command it runs, an MCP server's transport, host, region and whether your residency policy allows
+  it. After installing you're back on the same tab and row, and `ctrl+g` picks where plugins go.
 - **Claude Code's permission mode and Codex's sandbox and approval policy are chosen from a list**
   in `/settings` → Models & agents, each with what it does. Manual approval is selected when
   nothing is set, and an empty value now means the default instead of an error. Claude Code's list
