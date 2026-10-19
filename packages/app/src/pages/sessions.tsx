@@ -4,7 +4,7 @@ import type {
   SessionOverviewItem,
   SessionPeerAsks as PeerAsks,
 } from "@opencode-ai/sdk/v2/client"
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
@@ -14,16 +14,22 @@ import { showToast } from "@/utils/toast"
 import { SessionPermissionDock } from "./session/composer/session-permission-dock"
 import {
   build,
+  clearPlan,
   GROUP_COLORS,
+  inView,
   money as formatMoney,
+  projectKey,
   projectName,
   STATE_ORDER,
+  stopPlan,
+  topLevel,
   UNGROUPED,
   waiting,
   type Filter,
   type Row,
   type Section,
 } from "./sessions/sessions-model"
+import { useBulkConfirm } from "./sessions/bulk-confirm"
 import { useOpenSession } from "./sessions/open-session"
 
 // Events after which the overview is re-read. Everything else is noise for this page.
@@ -47,6 +53,9 @@ const REFRESH_ON = new Set([
 ])
 
 const DRAG_TYPE = "application/x-lunos-session"
+
+/** How long Undo stays offered after a Clear (XCOD-265), as in /sessions. */
+const UNDO_MS = 2 * 60 * 1000
 
 /**
  * XCOD-205: every session on this machine, across projects, in the user's groups. The same page
@@ -79,6 +88,11 @@ export function SessionsPage() {
     responding: false,
   })
   const [error, setError] = createSignal<string>()
+  // XCOD-265: the last Clear, for Undo, and the rows Stop all couldn't stop (with why).
+  const [lastClear, setLastClear] = createSignal<string[]>()
+  const [failedStops, setFailedStops] = createSignal<Record<string, string>>({})
+  const archivedView = () => filter.state === "archived"
+  const confirm = useBulkConfirm()
 
   const fail = (cause: unknown) =>
     showToast({
@@ -96,9 +110,11 @@ export function SessionsPage() {
       return
     }
     inflight = true
+    // XCOD-265: Show archived reads a different list; a load started for the other one is dropped.
+    const archived = archivedView()
     try {
-      const result = await sdk.experimental.session.overview()
-      if (result.data) {
+      const result = await sdk.experimental.session.overview(archived ? { archived: true } : undefined)
+      if (result.data && archived === archivedView()) {
         setData({ groups: result.data.groups, sessions: result.data.sessions, loaded: true })
         setError(undefined)
       }
@@ -106,12 +122,23 @@ export function SessionsPage() {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       inflight = false
-      if (again) {
+      if (again || archived !== archivedView()) {
         again = false
         void load()
       }
     }
   }
+
+  createEffect(
+    on(
+      archivedView,
+      () => {
+        setData({ sessions: [], loaded: false })
+        void load()
+      },
+      { defer: true },
+    ),
+  )
 
   let timer: ReturnType<typeof setTimeout> | undefined
   const refresh = () => {
@@ -251,6 +278,202 @@ export function SessionsPage() {
     },
   }
 
+  // XCOD-265: Stop all, Clear list, Stop all & clear, Undo, Unarchive and Delete archived, over the
+  // rows in the current view, with the same counts and wording as /sessions in the TUI.
+  const viewItems = createMemo(() => inView({ groups: data.groups, sessions: data.sessions, filter }))
+  const t = language.t
+  const list = (parts: string[]) => new Intl.ListFormat(language.intl(), { type: "unit", style: "long" }).format(parts)
+  /** "4 running, 2 waiting for an answer, 1 Claude Code" */
+  const breakdown = (plan: ReturnType<typeof stopPlan>) =>
+    list([
+      ...(plan.running ? [t("sessions.bulk.stop.running", { count: plan.running })] : []),
+      ...(plan.waiting ? [t("sessions.bulk.stop.waiting", { count: plan.waiting })] : []),
+      ...plan.tools.map((tool) =>
+        t("sessions.bulk.stop.tool", { count: tool.count, tool: tool.name ?? t("sessions.kind.external") }),
+      ),
+    ])
+  /** "Stopped 7 · 1 couldn't be stopped (another Lunos didn't respond)" */
+  const stopSummary = (result: { stopped: string[]; failed: { id: string; reason: string }[] }) =>
+    [
+      t("sessions.bulk.stopped", { count: result.stopped.length }),
+      ...(result.failed.length
+        ? [
+            t("sessions.bulk.stopFailed", {
+              count: result.failed.length,
+              reasons: [...new Set(result.failed.map((item) => item.reason))].join("; "),
+            }),
+          ]
+        : []),
+    ].join(" · ")
+  const info = (title: string) => showToast({ title })
+
+  let undoTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(undoTimer))
+  const cleared = (ids: string[], stopped?: { summary: string; failed: boolean }) => {
+    setLastClear(ids)
+    clearTimeout(undoTimer)
+    undoTimer = setTimeout(() => setLastClear(undefined), UNDO_MS)
+    showToast({
+      variant: stopped?.failed ? "error" : "success",
+      title: stopped?.summary ?? t("sessions.bulk.cleared", { count: ids.length }),
+      description: stopped ? t("sessions.bulk.cleared", { count: ids.length }) : undefined,
+      duration: 8000,
+      actions: [{ label: t("sessions.bulk.undo"), onClick: () => void bulkActions.undo() }],
+    })
+  }
+
+  const bulkActions = {
+    stopAll: async () => {
+      const plan = stopPlan(viewItems())
+      const total = plan.targets.length
+      if (total === 0) return info(t("sessions.bulk.nothingToStop"))
+      // The window spans every project; when the view does too, Stop all can be kept to one of them.
+      const scopes =
+        plan.projects.length > 1
+          ? [
+              { value: "", label: t("sessions.bulk.stop.allProjects", { count: total }) },
+              ...plan.projects.map((project) => ({
+                value: project.key,
+                label: t("sessions.bulk.stop.inProject", { project: project.name, count: project.count }),
+              })),
+            ]
+          : undefined
+      const pick = (scope: string | undefined) =>
+        scope ? plan.targets.filter((item) => projectKey(item) === scope) : plan.targets
+      const choice = await confirm({
+        title: language.plural("sessions.bulk.stop.question", total),
+        lines: [
+          t("sessions.bulk.stop.breakdown", { list: breakdown(plan) }),
+          ...(plan.elsewhere ? [language.plural("sessions.bulk.stop.elsewhere", plan.elsewhere)] : []),
+        ],
+        confirm: (scope) => t("sessions.bulk.stop.confirm", { count: pick(scope).length }),
+        scopes,
+        scopeLabel: t("sessions.bulk.stop.scope"),
+      })
+      if (!choice) return
+      setFailedStops({})
+      const result = await client()
+        ?.experimental.sessionBulk.stop(
+          { sessionIDs: pick(choice.scope).map((item) => item.id) },
+          { throwOnError: true },
+        )
+        .then((response) => response.data)
+        .catch((cause) => void fail(cause))
+      if (result) {
+        setFailedStops(Object.fromEntries(result.failed.map((item) => [item.id, item.reason])))
+        showToast({ variant: result.failed.length ? "error" : "success", title: stopSummary(result) })
+      }
+      refresh()
+    },
+    clear: async () => {
+      const plan = clearPlan(viewItems())
+      const running = stopPlan(plan.staying).targets.length
+      if (plan.targets.length === 0 && running === 0) return info(t("sessions.bulk.nothingToClear"))
+      // Nothing finished, only running ones: the one thing to offer is Stop all & clear.
+      if (plan.targets.length === 0) return bulkActions.stopAndClear()
+      const choice = await confirm({
+        title: language.plural("sessions.bulk.clear.question", plan.targets.length),
+        lines: [
+          t("sessions.bulk.clear.note"),
+          ...(plan.staying.length ? [language.plural("sessions.bulk.clear.staying", plan.staying.length)] : []),
+        ],
+        confirm: t("sessions.bulk.clear.confirm", { count: plan.targets.length }),
+      })
+      if (!choice) return
+      const result = await client()
+        ?.experimental.sessionBulk.archive({ sessionIDs: plan.targets.map((item) => item.id) }, { throwOnError: true })
+        .then((response) => response.data)
+        .catch((cause) => void fail(cause))
+      if (result) cleared(result.archived)
+      refresh()
+    },
+    stopAndClear: async () => {
+      const items = viewItems()
+      const stop = stopPlan(items)
+      const clear = clearPlan(items).targets
+      const total = stop.targets.length + clear.length
+      if (total === 0) return info(t("sessions.bulk.nothingToStopOrClear"))
+      const step1 = !stop.targets.length
+        ? t("sessions.bulk.stopAndClear.step1None")
+        : stop.elsewhere
+          ? t("sessions.bulk.stopAndClear.step1Elsewhere", { list: breakdown(stop), count: stop.elsewhere })
+          : t("sessions.bulk.stopAndClear.step1", { list: breakdown(stop) })
+      const choice = await confirm({
+        title: language.plural("sessions.bulk.stopAndClear.question", stop.targets.length, { total }),
+        lines: [step1, t("sessions.bulk.stopAndClear.step2", { count: total })],
+        confirm: t("sessions.bulk.stopAndClear.confirm", { stop: stop.targets.length, total }),
+      })
+      if (!choice) return
+      setFailedStops({})
+      const result = await client()
+        ?.experimental.sessionBulk.archive(
+          { sessionIDs: [...stop.targets, ...clear].map((item) => item.id), stop: true },
+          { throwOnError: true },
+        )
+        .then((response) => response.data)
+        .catch((cause) => void fail(cause))
+      if (result) {
+        const failed = result.failed ?? []
+        setFailedStops(Object.fromEntries(failed.map((item) => [item.id, item.reason])))
+        cleared(result.archived, {
+          summary: stopSummary({ stopped: result.stopped ?? [], failed }),
+          failed: failed.length > 0,
+        })
+      }
+      refresh()
+    },
+    undo: async () => {
+      const ids = lastClear()
+      if (!ids) return
+      setLastClear(undefined)
+      const result = await client()
+        ?.experimental.sessionBulk.unarchive({ sessionIDs: ids }, { throwOnError: true })
+        .then((response) => response.data)
+        .catch((cause) => void fail(cause))
+      if (result)
+        showToast({ variant: "success", title: t("sessions.bulk.restored", { count: result.archived.length }) })
+      refresh()
+    },
+    unarchive: async (item: SessionOverviewItem) => {
+      const result = await client()
+        ?.experimental.sessionBulk.unarchive({ sessionIDs: [item.id] }, { throwOnError: true })
+        .then((response) => response.data)
+        .catch((cause) => void fail(cause))
+      if (result?.archived.length)
+        showToast({ variant: "success", title: t("sessions.bulk.unarchived", { title: item.title }) })
+      refresh()
+    },
+    /** Permanent, so the count is typed back. Only rows that are archived can be reached. */
+    deleteArchived: async () => {
+      const items = topLevel(viewItems().filter((item) => !!item.archived))
+      if (items.length === 0) return info(t("sessions.bulk.noArchived"))
+      const count = items.length
+      const choice = await confirm({
+        title: language.plural("sessions.bulk.delete.question", count),
+        lines: [
+          t("sessions.bulk.delete.warning"),
+          t("sessions.bulk.delete.projects", { projects: list([...new Set(items.map((item) => projectName(item)))]) }),
+        ],
+        confirm: t("sessions.bulk.delete.confirm", { count }),
+        typed: { value: String(count), placeholder: t("sessions.bulk.delete.placeholder", { count }) },
+      })
+      if (!choice) return
+      const result = await client()
+        ?.experimental.sessionBulk.delete({ sessionIDs: items.map((item) => item.id) }, { throwOnError: true })
+        .then((response) => response.data)
+        .catch((cause) => void fail(cause))
+      if (result)
+        showToast({
+          variant: "success",
+          title: [
+            t("sessions.bulk.deleted", { count: result.deleted.length }),
+            ...(result.skipped.length ? [t("sessions.bulk.skipped", { count: result.skipped.length })] : []),
+          ].join(" · "),
+        })
+      refresh()
+    },
+  }
+
   const stateLabel = (item: SessionOverviewItem) =>
     item.stale
       ? language.t("sessions.state.stale")
@@ -334,34 +557,73 @@ export function SessionsPage() {
             "text-v2-text-text-weak": item().state === "idle" || item().state === "finished",
           }}
         >
-          {stateLabel(item())}
+          {item().archived ? t("sessions.archived.at", { time: ago(item().archived!) }) : stateLabel(item())}
         </span>
         <span class="text-12-regular text-v2-text-text-weak tabular-nums">{ago(item().updated)}</span>
         <span class="text-12-regular text-v2-text-text-weak tabular-nums">{money(item().cost)}</span>
-        <div class="flex items-center gap-1">
-          <Show when={item().state === "waiting"}>
-            <button
-              type="button"
-              class="rounded border border-v2-state-border-warning bg-v2-state-bg-warning px-2 py-1 text-12-medium text-v2-state-fg-warning"
-              onClick={() => (item().elsewhere ? void peerActions.load(item()) : sessionActions.open(item()))}
-            >
-              {language.t("sessions.action.answer")}
-            </button>
-          </Show>
-          <Show when={!external()}>
-            <button type="button" class="rounded px-2 py-1 text-12-medium" onClick={() => sessionActions.open(item())}>
-              {language.t("common.open")}
-            </button>
-            <button
-              type="button"
-              class="rounded px-2 py-1 text-12-medium"
-              onClick={() => {
-                setUi({ renamingSession: item().id, draft: item().title })
-              }}
-            >
-              {language.t("common.rename")}
-            </button>
-            <Show when={item().state === "running" || item().state === "waiting"}>
+        <Show
+          when={!archivedView()}
+          fallback={
+            <div class="flex items-center gap-1">
+              <Show when={!external()}>
+                <button
+                  type="button"
+                  class="rounded px-2 py-1 text-12-medium"
+                  onClick={() => sessionActions.open(item())}
+                >
+                  {language.t("common.open")}
+                </button>
+              </Show>
+              <Show when={item().archived && !props.child}>
+                <button
+                  type="button"
+                  class="rounded px-2 py-1 text-12-medium"
+                  onClick={() => void bulkActions.unarchive(item())}
+                >
+                  {t("sessions.bulk.unarchive")}
+                </button>
+              </Show>
+            </div>
+          }
+        >
+          <div class="flex items-center gap-1">
+            <Show when={item().state === "waiting"}>
+              <button
+                type="button"
+                class="rounded border border-v2-state-border-warning bg-v2-state-bg-warning px-2 py-1 text-12-medium text-v2-state-fg-warning"
+                onClick={() => (item().elsewhere ? void peerActions.load(item()) : sessionActions.open(item()))}
+              >
+                {language.t("sessions.action.answer")}
+              </button>
+            </Show>
+            <Show when={!external()}>
+              <button
+                type="button"
+                class="rounded px-2 py-1 text-12-medium"
+                onClick={() => sessionActions.open(item())}
+              >
+                {language.t("common.open")}
+              </button>
+              <button
+                type="button"
+                class="rounded px-2 py-1 text-12-medium"
+                onClick={() => {
+                  setUi({ renamingSession: item().id, draft: item().title })
+                }}
+              >
+                {language.t("common.rename")}
+              </button>
+              <Show when={item().state === "running" || item().state === "waiting"}>
+                <button
+                  type="button"
+                  class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
+                  onClick={() => void sessionActions.stop(item())}
+                >
+                  {language.t("sessions.action.stop")}
+                </button>
+              </Show>
+            </Show>
+            <Show when={external() && item().state === "running"}>
               <button
                 type="button"
                 class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
@@ -370,32 +632,30 @@ export function SessionsPage() {
                 {language.t("sessions.action.stop")}
               </button>
             </Show>
-          </Show>
-          <Show when={external() && item().state === "running"}>
-            <button
-              type="button"
-              class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
-              onClick={() => void sessionActions.stop(item())}
-            >
-              {language.t("sessions.action.stop")}
-            </button>
-          </Show>
-          <Show when={!props.child}>
-            <select
-              class="rounded border border-v2-border-border-base bg-transparent px-1 py-1 text-12-regular"
-              aria-label={language.t("sessions.action.moveTo")}
-              title={language.t("sessions.action.moveTo")}
-              value={item().groupID ?? UNGROUPED}
-              onChange={(event) => {
-                const value = event.currentTarget.value
-                void groupActions.move(item().id, value === UNGROUPED ? undefined : value)
-              }}
-            >
-              <option value={UNGROUPED}>{language.t("sessions.group.ungrouped")}</option>
-              <For each={data.groups}>{(group) => <option value={group.id}>{group.name}</option>}</For>
-            </select>
-          </Show>
-        </div>
+            <Show when={!props.child}>
+              <select
+                class="rounded border border-v2-border-border-base bg-transparent px-1 py-1 text-12-regular"
+                aria-label={language.t("sessions.action.moveTo")}
+                title={language.t("sessions.action.moveTo")}
+                value={item().groupID ?? UNGROUPED}
+                onChange={(event) => {
+                  const value = event.currentTarget.value
+                  void groupActions.move(item().id, value === UNGROUPED ? undefined : value)
+                }}
+              >
+                <option value={UNGROUPED}>{language.t("sessions.group.ungrouped")}</option>
+                <For each={data.groups}>{(group) => <option value={group.id}>{group.name}</option>}</For>
+              </select>
+            </Show>
+          </div>
+        </Show>
+        <Show when={failedStops()[item().id]}>
+          {(reason) => (
+            <p class="w-full text-12-regular text-v2-state-fg-danger" role="status">
+              {t("sessions.bulk.failed", { reason: reason() })}
+            </p>
+          )}
+        </Show>
         <Show when={ui.peerAsks?.sessionID === item().id ? ui.peerAsks : undefined}>
           {(peer) => (
             <div class="w-full">
@@ -560,7 +820,9 @@ export function SessionsPage() {
     <div class="flex min-h-0 w-full flex-1 flex-col overflow-auto" data-page="sessions">
       <div class="mx-auto flex w-full max-w-[1080px] flex-col gap-3 p-4">
         <header class="flex flex-wrap items-center gap-3">
-          <h1 class="text-18-medium text-v2-text-text-strong">{language.t("sessions.title")}</h1>
+          <h1 class="text-18-medium text-v2-text-text-strong">
+            {archivedView() ? t("sessions.archived.title") : language.t("sessions.title")}
+          </h1>
           <Show when={waitingCount() > 0}>
             <span
               class="rounded border border-v2-state-border-warning bg-v2-state-bg-warning px-2 py-0.5 text-12-medium text-v2-state-fg-warning"
@@ -589,6 +851,7 @@ export function SessionsPage() {
             <For each={STATE_ORDER}>
               {(state) => <option value={state}>{language.t(`sessions.state.${state}`)}</option>}
             </For>
+            <option value="archived">{t("sessions.filter.archived")}</option>
           </select>
           <select
             class="rounded border border-v2-border-border-base bg-transparent px-2 py-1 text-14-regular"
@@ -619,6 +882,58 @@ export function SessionsPage() {
             </button>
           </form>
         </div>
+        <div class="flex flex-wrap items-center gap-2" role="toolbar" aria-label={t("sessions.title")}>
+          <Show
+            when={!archivedView()}
+            fallback={
+              <button
+                type="button"
+                class="rounded border border-v2-border-border-base px-2 py-1 text-14-medium text-v2-state-fg-danger"
+                onClick={() => void bulkActions.deleteArchived()}
+              >
+                {t("sessions.bulk.deleteArchived")}
+              </button>
+            }
+          >
+            <button
+              type="button"
+              class="rounded border border-v2-border-border-base px-2 py-1 text-14-medium"
+              onClick={() => void bulkActions.stopAll()}
+            >
+              {t("sessions.bulk.stopAll")}
+            </button>
+            <button
+              type="button"
+              class="rounded border border-v2-border-border-base px-2 py-1 text-14-medium"
+              onClick={() => void bulkActions.clear()}
+            >
+              {t("sessions.bulk.clear")}
+            </button>
+            <button
+              type="button"
+              class="rounded border border-v2-border-border-base px-2 py-1 text-14-medium"
+              onClick={() => void bulkActions.stopAndClear()}
+            >
+              {t("sessions.bulk.stopAndClear")}
+            </button>
+            <Show when={lastClear()}>
+              <button
+                type="button"
+                class="rounded border border-v2-border-border-base px-2 py-1 text-14-medium"
+                onClick={() => void bulkActions.undo()}
+              >
+                {t("sessions.bulk.undo")}
+              </button>
+            </Show>
+          </Show>
+          <button
+            type="button"
+            class="ml-auto rounded px-2 py-1 text-14-medium"
+            onClick={() => setFilter("state", archivedView() ? "all" : "archived")}
+          >
+            {archivedView() ? t("sessions.bulk.backToList") : t("sessions.bulk.showArchived")}
+          </button>
+        </div>
         <Show when={error()}>
           <p class="text-12-regular text-v2-state-fg-danger" role="alert">
             {error()}
@@ -626,7 +941,9 @@ export function SessionsPage() {
         </Show>
         <For each={sections()}>{(section) => <SectionView section={section} />}</For>
         <Show when={data.loaded && sections().every((section) => section.rows.length === 0)}>
-          <p class="text-14-regular text-v2-text-text-weak">{language.t("sessions.empty")}</p>
+          <p class="text-14-regular text-v2-text-text-weak">
+            {archivedView() ? t("sessions.archived.empty") : language.t("sessions.empty")}
+          </p>
         </Show>
       </div>
     </div>

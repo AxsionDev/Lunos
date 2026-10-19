@@ -6,7 +6,8 @@ import type { SessionGroup, SessionOverviewItem } from "@opencode-ai/sdk/v2/clie
  */
 
 export type SessionState = SessionOverviewItem["state"]
-export type StateFilter = SessionState | "all"
+/** XCOD-265: "archived" is the "Show archived" view: the sessions Clear list hid, and nothing else. */
+export type StateFilter = SessionState | "all" | "archived"
 
 export type Row = { item: SessionOverviewItem; children: SessionOverviewItem[] }
 
@@ -33,7 +34,8 @@ export function projectName(item: SessionOverviewItem) {
 }
 
 function matches(item: SessionOverviewItem, filter: Filter, groupName: string | undefined) {
-  if (filter.state !== "all" && item.state !== filter.state) return false
+  // The archived view lists archived sessions whatever their state.
+  if (filter.state !== "all" && filter.state !== "archived" && item.state !== filter.state) return false
   const query = filter.search.trim().toLowerCase()
   if (!query) return true
   return [item.title, projectName(item), item.directory, item.state, item.agent, item.model, groupName]
@@ -104,4 +106,102 @@ export function money(value: number, locale?: string) {
   const format = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 4 })
   if (value > 0 && value < SMALLEST) return `<${format.format(SMALLEST)}`
   return format.format(value)
+}
+
+/**
+ * XCOD-265: the sessions in the current view, for Stop all and Clear list: those matching the state
+ * filter, the search and the group filter, whether or not their group is collapsed. A subagent counts
+ * on its own (with the filter on "waiting", only waiting sessions are in view), in its parent's group.
+ * Same rule as /sessions in the TUI; the plans below are counted the way its confirmations say them.
+ */
+export function inView(input: { groups: SessionGroup[]; sessions: SessionOverviewItem[]; filter: Filter }) {
+  const names = new Map(input.groups.map((group) => [group.id, group.name]))
+  const byID = new Map(input.sessions.map((item) => [item.id, item]))
+  return input.sessions.filter((item) => {
+    const top = item.parentID ? (byID.get(item.parentID) ?? item) : item
+    const group = top.groupID && names.has(top.groupID) ? top.groupID : undefined
+    if (input.filter.group !== "all") {
+      if (input.filter.group === UNGROUPED ? group !== undefined : group !== input.filter.group) return false
+    }
+    return matches(item, input.filter, group ? names.get(group) : undefined)
+  })
+}
+
+/** An "external:" row: a Claude Code / Codex session with no Lunos session of its own. */
+export const toolOnly = (item: Pick<SessionOverviewItem, "id">) => item.id.startsWith("external:")
+
+/** Same rule as the per-row Stop and the server: a running external tool, or a Lunos session running or waiting. */
+export function stoppable(item: Pick<SessionOverviewItem, "id" | "state">) {
+  if (toolOnly(item)) return item.state === "running"
+  return item.state === "running" || item.state === "waiting"
+}
+
+/** What Clear list archives: anything not running or waiting for an answer. */
+export function clearable(item: Pick<SessionOverviewItem, "state">) {
+  return item.state === "finished" || item.state === "idle" || item.state === "failed"
+}
+
+/**
+ * A subagent whose parent is in the list goes with its parent (archived, restored and deleted
+ * together), so it isn't counted or sent on its own.
+ */
+export function topLevel<T extends Pick<SessionOverviewItem, "id" | "parentID">>(items: T[]) {
+  const ids = new Set(items.map((item) => item.id))
+  return items.filter((item) => !item.parentID || !ids.has(item.parentID))
+}
+
+const TOOL_NAMES: Record<string, string> = { claude: "Claude Code", "claude-code": "Claude Code", codex: "Codex" }
+
+/** "Claude Code", "Codex", or the tool's own id; undefined when the row doesn't say which tool. */
+export function toolName(item: Pick<SessionOverviewItem, "tool">) {
+  return item.tool ? (TOOL_NAMES[item.tool] ?? item.tool) : undefined
+}
+
+/**
+ * The project a row belongs to, for "Stop all" in one project only: its worktree, so a Claude Code /
+ * Codex row (which only has its folder) lands with the Lunos sessions of the same project. Folders
+ * that aren't a git repo share the "global" project; there the folder is the project.
+ */
+export const projectKey = (item: SessionOverviewItem) =>
+  item.project && item.project.id !== "global" ? item.project.worktree : item.directory
+
+/** XCOD-265: what Stop all would stop, by kind, for its confirmation. */
+export function stopPlan(items: SessionOverviewItem[]) {
+  const targets = items.filter((item) => stoppable(item))
+  const tools = new Map<string | undefined, number>()
+  let running = 0
+  let waitingCount = 0
+  for (const item of targets) {
+    if (item.kind === "external") {
+      const name = toolName(item)
+      tools.set(name, (tools.get(name) ?? 0) + 1)
+      continue
+    }
+    if (item.state === "waiting") waitingCount++
+    else running++
+  }
+  const projects = new Map<string, { key: string; name: string; count: number }>()
+  for (const item of targets) {
+    const key = projectKey(item)
+    const name = item.project?.name ?? key.split(/[\\/]/).filter(Boolean).pop() ?? key
+    const entry = projects.get(key) ?? { key, name, count: 0 }
+    entry.count++
+    projects.set(key, entry)
+  }
+  return {
+    targets,
+    running,
+    waiting: waitingCount,
+    tools: [...tools].map(([name, count]) => ({ name, count })),
+    elsewhere: targets.filter((item) => item.elsewhere).length,
+    projects: [...projects.values()],
+  }
+}
+
+/** XCOD-265: what Clear list would archive, and what stays because it's running or waiting. */
+export function clearPlan(items: SessionOverviewItem[]) {
+  return {
+    targets: topLevel(items.filter((item) => clearable(item))),
+    staying: items.filter((item) => !clearable(item)),
+  }
 }
