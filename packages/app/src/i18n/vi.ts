@@ -1304,6 +1304,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Theo nhóm",
   "sessions.monitor.tag": "Gắn thẻ {{session}} trong lời nhắc",
   "sessions.monitor.queuedCount": "Trong hàng đợi: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Trong hàng đợi: {{count}} (chủ sở hữu đã đóng)",
   "sessions.monitor.ask.permission": "Phê duyệt: {{request}}",
   "sessions.monitor.ask.question": "Hỏi: {{question}}",
   "sessions.monitor.approve": "Phê duyệt",
@@ -1327,6 +1328,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'Lunos đang chạy "{{title}}" đã dừng trước khi hết lượt. Chạy lời nhắc của bạn trong Lunos này thay thế?',
   "sessions.monitor.takeover.confirm": "Tiếp quản",
+  "sessions.monitor.takeover.queuedBody":
+    'Lunos chạy "{{title}}" đã đóng khi vẫn còn lời nhắc trong hàng đợi. Trong hàng đợi: {{count}}. Lời nhắc của bạn chạy trong Lunos này, sau chúng nếu bạn gửi chúng.',
+  "sessions.monitor.takeover.queuedLabel": "Lời nhắc trong hàng đợi",
+  "sessions.monitor.takeover.queuedSend": "Gửi trước, theo thứ tự ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Bỏ chúng ({{count}})",
   "sessions.monitor.send.question.one": "Gửi tới {{count}} phiên?",
   "sessions.monitor.send.question.other": "Gửi tới {{count}} phiên?",
   "sessions.monitor.sent": 'Đã gửi tới "{{title}}"',

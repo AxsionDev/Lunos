@@ -791,6 +791,24 @@ const scenarios: Scenario[] = [
       body: { text: "  " },
     }))
     .json(400, object, "status"),
+  // XCOD-262: taking over a session that doesn't exist, and with no queued prompts to move.
+  http.protected
+    .post("/experimental/session/{sessionID}/takeover", "experimental.session.takeover")
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/takeover", { sessionID: "ses_missing" }),
+      headers: ctx.headers(),
+      body: { queued: "discard" },
+    }))
+    .json(404, object, "status"),
+  http.protected
+    .post("/experimental/session/{sessionID}/takeover", "experimental.session.takeover.empty")
+    .seeded((ctx) => ctx.session({ title: "Monitor takeover" }))
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/takeover", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { queued: "send", text: "  " },
+    }))
+    .json(400, object, "status"),
   // XCOD-234: a session no other Lunos process runs is a 404 for every peer action.
   ...(
     [

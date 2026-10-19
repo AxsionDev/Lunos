@@ -1411,6 +1411,7 @@ export const dict = {
   "sessions.monitor.view.groups": "По группе",
   "sessions.monitor.tag": "Отметить {{session}} в запросе",
   "sessions.monitor.queuedCount": "В очереди: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "В очереди: {{count}} (владелец закрыт)",
   "sessions.monitor.ask.permission": "Разрешить: {{request}}",
   "sessions.monitor.ask.question": "Спрашивает: {{question}}",
   "sessions.monitor.approve": "Разрешить",
@@ -1435,6 +1436,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, в котором выполнялась «{{title}}», остановился до конца хода. Выполнить ваш запрос в этом Lunos?",
   "sessions.monitor.takeover.confirm": "Перехватить",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, в котором выполнялась «{{title}}», закрылся, когда в очереди ещё были запросы. В очереди: {{count}}. Ваш запрос выполнится в этом Lunos, после них, если вы их отправите.",
+  "sessions.monitor.takeover.queuedLabel": "Запросы в очереди",
+  "sessions.monitor.takeover.queuedSend": "Сначала отправить по порядку ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Отбросить их ({{count}})",
   "sessions.monitor.send.question.one": "Отправить в {{count}} сессию?",
   "sessions.monitor.send.question.few": "Отправить в {{count}} сессии?",
   "sessions.monitor.send.question.many": "Отправить в {{count}} сессий?",

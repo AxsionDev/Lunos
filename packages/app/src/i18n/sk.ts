@@ -1307,6 +1307,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Podľa skupiny",
   "sessions.monitor.tag": "Označiť {{session}} v prompte",
   "sessions.monitor.queuedCount": "V poradí: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "V poradí: {{count}} (vlastník zatvorený)",
   "sessions.monitor.ask.permission": "Schváliť: {{request}}",
   "sessions.monitor.ask.question": "Pýta sa: {{question}}",
   "sessions.monitor.approve": "Schváliť",
@@ -1331,6 +1332,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, v ktorom bežala „{{title}}“, skončil pred koncom ťahu. Spustiť váš prompt namiesto toho v tomto Lunos?",
   "sessions.monitor.takeover.confirm": "Prevziať",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, v ktorom bežala „{{title}}“, sa zatvoril s promptmi, ktoré ešte čakajú v poradí. V poradí: {{count}}. Váš prompt sa spustí v tomto Lunos, po nich, ak ich odošlete.",
+  "sessions.monitor.takeover.queuedLabel": "Prompty v poradí",
+  "sessions.monitor.takeover.queuedSend": "Najprv ich odoslať, po poradí ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Zahodiť ich ({{count}})",
   "sessions.monitor.send.question.one": "Odoslať do {{count}} relácie?",
   "sessions.monitor.send.question.few": "Odoslať do {{count}} relácií?",
   "sessions.monitor.send.question.many": "Odoslať do {{count}} relácie?",

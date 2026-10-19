@@ -12,6 +12,7 @@ import { Heap } from "@/cli/heap"
 import { AppRuntime } from "@/effect/app-runtime"
 import { Effect } from "effect"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
+import { SessionPeers } from "@/session/peers"
 
 Heap.start()
 
@@ -84,6 +85,8 @@ export const rpc = {
   },
   async shutdown() {
     await InstanceRuntime.disposeAllInstances()
+    // XCOD-262: a worker gets no "exit" event; tell the other Lunos processes this one is gone now.
+    SessionPeers.close()
     if (server) await server.stop(true)
     process.off("unhandledRejection", onUnhandledRejection)
     process.off("uncaughtException", onUncaughtException)

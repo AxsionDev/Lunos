@@ -1315,6 +1315,7 @@ export const dict = {
   "sessions.monitor.view.groups": "ގްރޫޕުގެ މަތިން",
   "sessions.monitor.tag": "ޕްރޮމްޕްޓުގައި {{session}} ޓެގްކުރޭ",
   "sessions.monitor.queuedCount": "ކިއުގައި: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "ކިއުގައި: {{count}} (ވެރި Lunos ބަންދުވެއްޖެ)",
   "sessions.monitor.ask.permission": "ހުއްދަ ދޭ: {{request}}",
   "sessions.monitor.ask.question": "ސުވާލު: {{question}}",
   "sessions.monitor.approve": "ހުއްދަ ދޭ",
@@ -1340,6 +1341,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     '"{{title}}" ދުއްވި Lunos ދައުރު ނިމުމުގެ ކުރިން ހުއްޓިއްޖެ. އޭގެ ބަދަލުގައި ތިބާގެ ޕްރޮމްޕްޓް މި Lunos ގައި ދުއްވަންވީތަ؟',
   "sessions.monitor.takeover.confirm": "ބަލަހައްޓަން ފަށާ",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” ހިންގި Lunos ބަންދުވީ ކިއުގައި ހުރި ޕްރޮމްޕްޓްތަކާއެކުއެވެ. ކިއުގައި: {{count}}. ތިބާގެ ޕްރޮމްޕްޓް ހިންގާނީ މި Lunos ގައެވެ، ފޮނުވައިފިނަމަ އެތަކެތީގެ ފަހުންނެވެ.",
+  "sessions.monitor.takeover.queuedLabel": "ކިއުގައި ހުރި ޕްރޮމްޕްޓްތައް",
+  "sessions.monitor.takeover.queuedSend": "ފުރަތަމަ ތަރުތީބުން ފޮނުވާ ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "ދޫކޮށްލާ ({{count}})",
   "sessions.monitor.send.question.one": "ސެޝަންތަކަށް ފޮނުވަންވީތަ؟ ({{count}})",
   "sessions.monitor.send.question.other": "ސެޝަންތަކަށް ފޮނުވަންވީތަ؟ ({{count}})",
   "sessions.monitor.sent": '"{{title}}" އަށް ފޮނުވިއްޖެ',

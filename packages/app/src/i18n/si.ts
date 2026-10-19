@@ -1287,6 +1287,7 @@ export const dict: Record<string, string> = {
   "sessions.monitor.view.groups": "සමූහය අනුව",
   "sessions.monitor.tag": "විමසුමේ {{session}} ටැග් කරන්න",
   "sessions.monitor.queuedCount": "පෝලිමේ: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "පෝලිමේ: {{count}} (හිමිකරු වසා ඇත)",
   "sessions.monitor.ask.permission": "අනුමත කරන්න: {{request}}",
   "sessions.monitor.ask.question": "අසයි: {{question}}",
   "sessions.monitor.approve": "අනුමත කරන්න",
@@ -1310,6 +1311,11 @@ export const dict: Record<string, string> = {
   "sessions.monitor.takeover.body":
     '"{{title}}" ධාවනය කළ Lunos වාරය අවසන් වීමට පෙර නතර විය. ඒ වෙනුවට ඔබගේ විමසුම මෙම Lunos හි ධාවනය කරන්නද?',
   "sessions.monitor.takeover.confirm": "භාර ගන්න",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” ධාවනය කළ Lunos පෝලිමේ prompt තිබියදී වැසුණි. පෝලිමේ: {{count}}. ඔබේ prompt මෙම Lunos හි ධාවනය වේ, ඔබ ඒවා යවන්නේ නම් ඒවාට පසුව.",
+  "sessions.monitor.takeover.queuedLabel": "පෝලිමේ ඇති prompt",
+  "sessions.monitor.takeover.queuedSend": "පළමුව අනුපිළිවෙලින් යවන්න ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "ඉවත දමන්න ({{count}})",
   "sessions.monitor.send.question.one": "සැසි වෙත යවන්නද? ගණන: {{count}}",
   "sessions.monitor.send.question.other": "සැසි වෙත යවන්නද? ගණන: {{count}}",
   "sessions.monitor.sent": '"{{title}}" වෙත යැවුවා',

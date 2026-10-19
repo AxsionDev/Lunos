@@ -1303,6 +1303,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Бүлгээр",
   "sessions.monitor.tag": "{{session}}-г хүсэлтэд тэмдэглэх",
   "sessions.monitor.queuedCount": "Дараалалд: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Дараалалд: {{count}} (эзэмшигч хаагдсан)",
   "sessions.monitor.ask.permission": "Зөвшөөрөх: {{request}}",
   "sessions.monitor.ask.question": "Асууж байна: {{question}}",
   "sessions.monitor.approve": "Зөвшөөрөх",
@@ -1326,6 +1327,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "«{{title}}»-г ажиллуулж байсан Lunos ээлж дуусахаас өмнө зогссон. Оронд нь таны хүсэлтийг энэ Lunos-д ажиллуулах уу?",
   "sessions.monitor.takeover.confirm": "Хүлээж авах",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}”-г ажиллуулж байсан Lunos дараалалд хүсэлтүүд үлдсэн байхад хаагдсан. Дараалалд: {{count}}. Таны хүсэлт энэ Lunos-д ажиллана, илгээвэл тэдгээрийн дараа.",
+  "sessions.monitor.takeover.queuedLabel": "Дараалсан хүсэлтүүд",
+  "sessions.monitor.takeover.queuedSend": "Эхлээд дарааллаар илгээх ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Устгах ({{count}})",
   "sessions.monitor.send.question.one": "Сессүүд рүү илгээх үү? Тоо: {{count}}",
   "sessions.monitor.send.question.other": "Сессүүд рүү илгээх үү? Тоо: {{count}}",
   "sessions.monitor.sent": "«{{title}}» руу илгээсэн",

@@ -1289,6 +1289,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Eftir bólki",
   "sessions.monitor.tag": "Merk {{session}} í ábendingini",
   "sessions.monitor.queuedCount": "Í bíðirøð: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Í bíðirøð: {{count}} (eigarin er latin aftur)",
   "sessions.monitor.ask.permission": "Góðkenn: {{request}}",
   "sessions.monitor.ask.question": "Spyr: {{question}}",
   "sessions.monitor.approve": "Góðkenn",
@@ -1313,6 +1314,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, ið koyrdi „{{title}}“, steðgaði áðrenn umferðin var liðug. Koyra tína ábending í hesum Lunos í staðin?",
   "sessions.monitor.takeover.confirm": "Yvirtak",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, sum koyrdi „{{title}}“, varð latið aftur við boðum, sum enn eru í bíðirøð. Í bíðirøð: {{count}}. Títt boð verður koyrt í hesum Lunos, aftaná tey, um tú sendir tey.",
+  "sessions.monitor.takeover.queuedLabel": "Boð í bíðirøð",
+  "sessions.monitor.takeover.queuedSend": "Send tey fyrst, í røð ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Burturkasta tey ({{count}})",
   "sessions.monitor.send.question.one": "Senda til {{count}} setu?",
   "sessions.monitor.send.question.other": "Senda til {{count}} setur?",
   "sessions.monitor.sent": "Sent til „{{title}}“",

@@ -1297,6 +1297,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Sipas grupit",
   "sessions.monitor.tag": "Etiketo {{session}} në kërkesë",
   "sessions.monitor.queuedCount": "Në radhë: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Në radhë: {{count}} (pronari u mbyll)",
   "sessions.monitor.ask.permission": "Mirato: {{request}}",
   "sessions.monitor.ask.question": "Pyet: {{question}}",
   "sessions.monitor.approve": "Mirato",
@@ -1321,6 +1322,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'Lunos-i që ekzekutonte "{{title}}" ndaloi para fundit të radhës. Ta ekzekutosh kërkesën tënde në këtë Lunos?',
   "sessions.monitor.takeover.confirm": "Merre",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos që ekzekutonte „{{title}}“ u mbyll me kërkesa ende në radhë. Në radhë: {{count}}. Kërkesa jote ekzekutohet në këtë Lunos, pas tyre nëse i dërgon.",
+  "sessions.monitor.takeover.queuedLabel": "Kërkesat në radhë",
+  "sessions.monitor.takeover.queuedSend": "Dërgoji fillimisht, me radhë ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Hidhi poshtë ({{count}})",
   "sessions.monitor.send.question.one": "Të dërgohet te {{count}} sesion?",
   "sessions.monitor.send.question.other": "Të dërgohet te {{count}} sesione?",
   "sessions.monitor.sent": 'U dërgua te "{{title}}"',

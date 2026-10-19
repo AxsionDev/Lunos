@@ -1291,6 +1291,7 @@ export const dict = {
   "sessions.monitor.view.groups": "ჯგუფის მიხედვით",
   "sessions.monitor.tag": "{{session}}-ის მონიშვნა მოთხოვნაში",
   "sessions.monitor.queuedCount": "რიგში: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "რიგში: {{count}} (მფლობელი დაიხურა)",
   "sessions.monitor.ask.permission": "დამტკიცება: {{request}}",
   "sessions.monitor.ask.question": "კითხულობს: {{question}}",
   "sessions.monitor.approve": "დამტკიცება",
@@ -1315,6 +1316,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, რომელიც „{{title}}“-ს უშვებდა, სვლის დასრულებამდე გაჩერდა. გავუშვათ თქვენი მოთხოვნა ამ Lunos-ში?",
   "sessions.monitor.takeover.confirm": "გადაბარება",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, რომელშიც „{{title}}“ მუშაობდა, დაიხურა, როცა რიგში ჯერ კიდევ იყო მოთხოვნები. რიგში: {{count}}. თქვენი მოთხოვნა შესრულდება ამ Lunos-ში, მათ შემდეგ, თუ გაგზავნით.",
+  "sessions.monitor.takeover.queuedLabel": "რიგში მყოფი მოთხოვნები",
+  "sessions.monitor.takeover.queuedSend": "ჯერ გაგზავნა, თანმიმდევრობით ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "უარყოფა ({{count}})",
   "sessions.monitor.send.question.one": "გაიგზავნოს {{count}} სესიაში?",
   "sessions.monitor.send.question.other": "გაიგზავნოს {{count}} სესიაში?",
   "sessions.monitor.sent": "გაიგზავნა „{{title}}“-ში",

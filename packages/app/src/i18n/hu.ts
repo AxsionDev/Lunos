@@ -1307,6 +1307,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Csoport szerint",
   "sessions.monitor.tag": "{{session}} megjelölése a promptban",
   "sessions.monitor.queuedCount": "Sorban áll: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Sorban áll: {{count}} (a tulajdonos bezárult)",
   "sessions.monitor.ask.permission": "Jóváhagyás: {{request}}",
   "sessions.monitor.ask.question": "Kérdés: {{question}}",
   "sessions.monitor.approve": "Jóváhagyás",
@@ -1332,6 +1333,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "A Lunos, amely a(z) „{{title}}” munkamenetet futtatta, a kör vége előtt leállt. Futtassuk a promptodat inkább ebben a Lunosban?",
   "sessions.monitor.takeover.confirm": "Átvétel",
+  "sessions.monitor.takeover.queuedBody":
+    "A „{{title}}” munkamenetet futtató Lunos úgy zárult be, hogy még promptok álltak sorban. Sorban áll: {{count}}. A promptod ebben a Lunosban fut, utánuk, ha elküldöd őket.",
+  "sessions.monitor.takeover.queuedLabel": "Sorban álló promptok",
+  "sessions.monitor.takeover.queuedSend": "Először küldd el őket, sorrendben ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Elvetés ({{count}})",
   "sessions.monitor.send.question.one": "Küldés {{count}} munkamenetnek?",
   "sessions.monitor.send.question.other": "Küldés {{count}} munkamenetnek?",
   "sessions.monitor.sent": "Elküldve ide: „{{title}}”",

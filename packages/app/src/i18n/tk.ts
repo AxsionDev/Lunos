@@ -1293,6 +1293,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Topara görä",
   "sessions.monitor.tag": "Talapda {{session}} sessiýasyny belle",
   "sessions.monitor.queuedCount": "Nobatda: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Nobatda: {{count}} (eýesi ýapyldy)",
   "sessions.monitor.ask.permission": "Tassykla: {{request}}",
   "sessions.monitor.ask.question": "Soraýar: {{question}}",
   "sessions.monitor.approve": "Tassykla",
@@ -1316,6 +1317,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "«{{title}}» sessiýasyny işledýän Lunos aýlaw gutarmanka durdy. Talabyňyz onuň ýerine şu Lunos-da işledilsinmi?",
   "sessions.monitor.takeover.confirm": "Öz üstüňe al",
+  "sessions.monitor.takeover.queuedBody":
+    "„{{title}}“ işledýän Lunos nobatda henizem haýyşlar bar wagty ýapyldy. Nobatda: {{count}}. Siziň haýyşyňyz şu Lunos-da işlär, olary iberseňiz, olardan soň.",
+  "sessions.monitor.takeover.queuedLabel": "Nobatdaky haýyşlar",
+  "sessions.monitor.takeover.queuedSend": "Ilki tertip bilen iber ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Olary taşla ({{count}})",
   "sessions.monitor.send.question.one": "Sessiýalara iberilsinmi? Sany: {{count}}",
   "sessions.monitor.send.question.other": "Sessiýalara iberilsinmi? Sany: {{count}}",
   "sessions.monitor.sent": "«{{title}}» sessiýasyna iberildi",

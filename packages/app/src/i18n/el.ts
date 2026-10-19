@@ -1308,6 +1308,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Κατά ομάδα",
   "sessions.monitor.tag": "Επισήμανση {{session}} στην προτροπή",
   "sessions.monitor.queuedCount": "Σε αναμονή: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Σε αναμονή: {{count}} (ο κάτοχος έκλεισε)",
   "sessions.monitor.ask.permission": "Έγκριση: {{request}}",
   "sessions.monitor.ask.question": "Ρωτά: {{question}}",
   "sessions.monitor.approve": "Έγκριση",
@@ -1333,6 +1334,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Το Lunos που εκτελούσε τη «{{title}}» σταμάτησε πριν τελειώσει ο γύρος. Να εκτελεστεί η προτροπή σας σε αυτό το Lunos;",
   "sessions.monitor.takeover.confirm": "Ανάληψη",
+  "sessions.monitor.takeover.queuedBody":
+    "Το Lunos που εκτελούσε το «{{title}}» έκλεισε με προτροπές ακόμη σε αναμονή. Σε αναμονή: {{count}}. Η προτροπή σας εκτελείται σε αυτό το Lunos, μετά από αυτές αν τις στείλετε.",
+  "sessions.monitor.takeover.queuedLabel": "Προτροπές σε αναμονή",
+  "sessions.monitor.takeover.queuedSend": "Αποστολή πρώτα, με τη σειρά ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Απόρριψη ({{count}})",
   "sessions.monitor.send.question.one": "Αποστολή σε {{count}} συνεδρία;",
   "sessions.monitor.send.question.other": "Αποστολή σε {{count}} συνεδρίες;",
   "sessions.monitor.sent": "Στάλθηκε στη «{{title}}»",

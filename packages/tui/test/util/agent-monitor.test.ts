@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionOverviewItem } from "@opencode-ai/sdk/v2"
-import { askText, build, leftOpensMonitor, number, RECENT_MS, route, tags } from "../../src/util/agent-monitor"
+import {
+  askText,
+  build,
+  leftOpensMonitor,
+  number,
+  queuedLabel,
+  RECENT_MS,
+  route,
+  tags,
+  takeoverChoices,
+} from "../../src/util/agent-monitor"
 
 const NOW = 1_800_000_000_000
 
@@ -136,11 +146,32 @@ describe("rail numbers and @ tags (XCOD-262)", () => {
   })
 })
 
+describe("durable queue labels (XCOD-262)", () => {
+  test("a stopped Lunos's queued prompts read as owner closed", () => {
+    expect(queuedLabel(item("ses_a"))).toBeUndefined()
+    expect(queuedLabel(item("ses_a", { queued: 1 }))).toBe("1 queued")
+    expect(queuedLabel(item("ses_a", { queued: 3, ownerClosed: true }))).toBe("3 queued (owner closed)")
+  })
+
+  test("the take-over offers to send them first or discard them, with the count", () => {
+    expect(takeoverChoices(1)).toEqual([
+      { value: "send", title: "Take over, send the queued prompt first" },
+      { value: "discard", title: "Take over, discard it" },
+    ])
+    expect(takeoverChoices(3).map((choice) => choice.title)).toEqual([
+      "Take over, send the 3 queued prompts first",
+      "Take over, discard all 3",
+    ])
+  })
+})
+
 describe("delivery and opening rules (XCOD-262)", () => {
   test("one session is never driven by two processes", () => {
     expect(route(item("ses_a"))).toEqual({ type: "local" })
     expect(route(item("ses_a", { elsewhere: true, state: "running" }))).toEqual({ type: "peer" })
     expect(route(item("ses_a", { stale: true }))).toEqual({ type: "takeover" })
+    // XCOD-262: prompts a closed Lunos queued are only sent through a take-over, stale turn or not.
+    expect(route(item("ses_a", { queued: 2, ownerClosed: true }))).toEqual({ type: "takeover" })
     expect(route(item("external:abc", { kind: "external", tool: "claude" }))).toEqual({ type: "tool-only" })
   })
 

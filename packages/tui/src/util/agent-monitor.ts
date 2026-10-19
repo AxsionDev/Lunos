@@ -163,7 +163,10 @@ export function tags(text: string, numbers: ReadonlyMap<number, string>) {
 export type Route =
   /** A Claude Code / Codex session with no Lunos session: only its tool takes prompts. */
   | { type: "tool-only" }
-  /** Its Lunos stopped mid-turn: ask "Take over this session here?" before running it here. */
+  /**
+   * Its Lunos stopped mid-turn, or with prompts queued for it: ask "Take over this session here?"
+   * before running it here (and say what happens to the queued ones).
+   */
   | { type: "takeover" }
   /** Another live Lunos process runs it: `peer.prompt`, run by that process. */
   | { type: "peer" }
@@ -171,11 +174,29 @@ export type Route =
   | { type: "local" }
 
 /** Where a tagged prompt goes. One session is never driven by two processes. */
-export function route(item: Pick<SessionOverviewItem, "id" | "elsewhere" | "stale">): Route {
+export function route(item: Pick<SessionOverviewItem, "id" | "elsewhere" | "stale" | "ownerClosed">): Route {
   if (toolOnly(item)) return { type: "tool-only" }
   if (item.elsewhere) return { type: "peer" }
-  if (item.stale) return { type: "takeover" }
+  if (item.stale || item.ownerClosed) return { type: "takeover" }
   return { type: "local" }
+}
+
+/** "2 queued", or "2 queued (owner closed)" when the Lunos that holds them stopped. */
+export function queuedLabel(item: Pick<SessionOverviewItem, "queued" | "ownerClosed">) {
+  if (!item.queued) return undefined
+  return item.ownerClosed ? `${item.queued} queued (owner closed)` : `${item.queued} queued`
+}
+
+/** What the take-over confirmation offers for a stopped Lunos's queued prompts: send them first, or discard them. */
+export function takeoverChoices(count: number) {
+  return [
+    {
+      value: "send" as const,
+      title:
+        count === 1 ? "Take over, send the queued prompt first" : `Take over, send the ${count} queued prompts first`,
+    },
+    { value: "discard" as const, title: count === 1 ? "Take over, discard it" : `Take over, discard all ${count}` },
+  ]
 }
 
 /**

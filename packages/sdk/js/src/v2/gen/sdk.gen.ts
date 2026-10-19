@@ -108,6 +108,8 @@ import type {
   ExperimentalSessionListResponses,
   ExperimentalSessionOverviewErrors,
   ExperimentalSessionOverviewResponses,
+  ExperimentalSessionTakeoverErrors,
+  ExperimentalSessionTakeoverResponses,
   ExperimentalWorkspaceAdapterListErrors,
   ExperimentalWorkspaceAdapterListResponses,
   ExperimentalWorkspaceCreateErrors,
@@ -1077,6 +1079,51 @@ export class Session extends HeyApiClient {
       ThrowOnError
     >({
       url: "/experimental/session/{sessionID}/enqueue",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Take over a session whose Lunos stopped
+   *
+   * Run a session here whose Lunos process stopped, after the user confirmed it. The prompts that process had queued for it are sent first, in order (queued: send), or dropped (queued: discard); then text, if given. Refused while another Lunos runs the session, or while the process that queued them still exists. Audited as session.takeover, without the text.
+   */
+  public takeover<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      queued?: "send" | "discard"
+      text?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "queued" },
+            { in: "body", key: "text" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionTakeoverResponses,
+      ExperimentalSessionTakeoverErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/takeover",
       ...options,
       ...params,
       headers: {

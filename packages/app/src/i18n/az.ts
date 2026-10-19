@@ -1303,6 +1303,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Qrupa görə",
   "sessions.monitor.tag": "{{session}} sessiyasını sorğuda etiketlə",
   "sessions.monitor.queuedCount": "Növbədə: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Növbədə: {{count}} (sahibi bağlanıb)",
   "sessions.monitor.ask.permission": "Təsdiqlə: {{request}}",
   "sessions.monitor.ask.question": "Soruşur: {{question}}",
   "sessions.monitor.approve": "Təsdiqlə",
@@ -1327,6 +1328,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     '"{{title}}" sessiyasını işlədən Lunos növbə bitmədən dayandı. Sorğunuz bunun əvəzinə bu Lunos-da işə salınsın?',
   "sessions.monitor.takeover.confirm": "Ələ al",
+  "sessions.monitor.takeover.queuedBody":
+    "«{{title}}» sessiyasını işlədən Lunos növbədə gözləyən sorğularla bağlandı. Növbədə: {{count}}. Sorğunuz bu Lunos-da işləyəcək, onları göndərsəniz, onlardan sonra.",
+  "sessions.monitor.takeover.queuedLabel": "Növbədəki sorğular",
+  "sessions.monitor.takeover.queuedSend": "Əvvəlcə ardıcıllıqla göndər ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Onları at ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} sessiyaya göndərilsin?",
   "sessions.monitor.send.question.other": "{{count}} sessiyaya göndərilsin?",
   "sessions.monitor.sent": '"{{title}}" sessiyasına göndərildi',

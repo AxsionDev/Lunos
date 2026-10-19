@@ -9,7 +9,10 @@ import { expectAppVisible } from "../utils/waits"
 
 const cors = { "access-control-allow-origin": "*" }
 
-function setup(page: Page) {
+function setup(
+  page: Page,
+  extra: (row: (id: string, title: string, state: string, extra?: object) => object, now: number) => object[],
+) {
   const now = Date.now()
   const row = (id: string, title: string, state: string, extra: object = {}) => ({
     id,
@@ -35,6 +38,7 @@ function setup(page: Page) {
     row("ses_f1", "Fix typo", "finished", { updated: now - 6000 }),
     row("ses_x1", "Flaky test", "failed", { updated: now - 7000 }),
     row("ses_old", "Last week's spike", "finished", { updated: now - 7 * 24 * 60 * 60 * 1000 }),
+    ...extra(row, now),
   ]
   const state = { listed, calls: [] as { path: string; body: any }[], created: 0 }
   const permission = {
@@ -51,7 +55,7 @@ function setup(page: Page) {
       route.fulfill({ json: { groups: [], sessions: state.listed }, headers: cors }),
     )
     await page.route(
-      /\/(experimental\/(session|peer)\/[^/]+\/(enqueue|prompt)|permission\/[^/]+\/reply|session)(?:\?.*)?$/,
+      /\/(experimental\/(session|peer)\/[^/]+\/(enqueue|prompt|takeover)|permission\/[^/]+\/reply|session)(?:\?.*)?$/,
       (route) => {
         const request = route.request()
         if (request.method() === "OPTIONS")
@@ -77,6 +81,15 @@ function setup(page: Page) {
           })
         }
         if (path.startsWith("/permission/")) return route.fulfill({ json: true, headers: cors })
+        if (path.endsWith("/takeover"))
+          return route.fulfill({
+            json: {
+              sent: body.queued === "send" ? 2 : 0,
+              discarded: body.queued === "discard" ? 2 : 0,
+              delivery: "now",
+            },
+            headers: cors,
+          })
         const id = path.split("/")[3]
         const running = state.listed.find((item) => item.id === id)?.state === "running"
         return route.fulfill({
@@ -89,8 +102,8 @@ function setup(page: Page) {
   return { state, routes, permission }
 }
 
-async function open(page: Page) {
-  const fake = setup(page)
+async function open(page: Page, extra: Parameters<typeof setup>[1] = () => []) {
+  const fake = setup(page, extra)
   await mockOpenCodeServer(page, {
     protocol: "v1",
     sessions: fixture.sessions.map((session) => ({ ...session })),
@@ -236,8 +249,68 @@ test("another Lunos's session gets it through peer.prompt; a stopped one asks to
   await page.getByRole("button", { name: "Take over" }).click()
   await expect.poll(() => state.calls.length).toBe(2)
   expect(state.calls[1]).toEqual({
-    path: "/experimental/session/ses_s1/enqueue",
-    body: { text: "carry on", interrupt: false },
+    path: "/experimental/session/ses_s1/takeover",
+    body: { queued: "send", text: "carry on" },
+  })
+})
+
+test("the rail remembers By status / By group across a reload", async ({ page }) => {
+  await open(page)
+  const view = (name: string) => rail(page).getByRole("button", { name, exact: true })
+  await expect(view("By status")).toHaveAttribute("aria-pressed", "true")
+  await view("By group").click()
+  await expect(view("By group")).toHaveAttribute("aria-pressed", "true")
+  await page.reload()
+  await expectAppVisible(page.getByText("Refactor parser", { exact: true }))
+  await expect(view("By group")).toHaveAttribute("aria-pressed", "true")
+  await expect(rail(page).getByRole("heading", { name: "Ungrouped" })).toBeVisible()
+  await view("By status").click()
+  await page.reload()
+  await expectAppVisible(page.getByText("Refactor parser", { exact: true }))
+  await expect(view("By status")).toHaveAttribute("aria-pressed", "true")
+  await expect(rail(page).getByRole("heading", { level: 2 })).toHaveText([
+    "Waiting for you (1)",
+    "Running (3)",
+    "Completed (2)",
+    "Failed (1)",
+  ])
+})
+
+test("prompts a closed Lunos queued show on the row; the take-over says how many and can discard them", async ({
+  page,
+}) => {
+  // Completed: 5 Crashed run, 6 Fix typo, 7 this one; Failed: 8.
+  const state = await open(page, (row, now) => [
+    row("ses_q1", "Queued work", "idle", { queued: 2, ownerClosed: true, updated: now - 6500 }),
+  ])
+  await expect(page.locator('[data-session-id="ses_q1"]').getByText("2 queued (owner closed)")).toBeVisible()
+
+  // Cancelling sends nothing and takes nothing over.
+  await send(page, "@7 carry on")
+  const dialog = page.locator('[data-component="sessions-bulk-confirm"]')
+  await expect(page.getByRole("heading", { name: "Take over this session here?" })).toBeVisible()
+  await expect(dialog).toContainText("Queued: 2.")
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+  expect(state.calls).toHaveLength(0)
+
+  // Sending them first is the default.
+  await prompt(page).press("Enter")
+  await expect(dialog.getByRole("combobox", { name: "Queued prompts" })).toHaveValue("send")
+  await dialog.getByRole("button", { name: "Take over" }).click()
+  await expect.poll(() => state.calls.length).toBe(1)
+  expect(state.calls[0]).toEqual({
+    path: "/experimental/session/ses_q1/takeover",
+    body: { queued: "send", text: "carry on" },
+  })
+
+  await send(page, "@7 start over")
+  await dialog.getByRole("combobox", { name: "Queued prompts" }).selectOption({ label: "Discard them (2)" })
+  await dialog.getByRole("button", { name: "Take over" }).click()
+  await expect.poll(() => state.calls.length).toBe(2)
+  expect(state.calls[1]).toEqual({
+    path: "/experimental/session/ses_q1/takeover",
+    body: { queued: "discard", text: "start over" },
   })
 })
 

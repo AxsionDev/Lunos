@@ -1293,6 +1293,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Mengikut kumpulan",
   "sessions.monitor.tag": "Tag {{session}} dalam gesaan",
   "sessions.monitor.queuedCount": "Dalam baris gilir: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Dalam baris gilir: {{count}} (pemilik ditutup)",
   "sessions.monitor.ask.permission": "Luluskan: {{request}}",
   "sessions.monitor.ask.question": "Bertanya: {{question}}",
   "sessions.monitor.approve": "Luluskan",
@@ -1318,6 +1319,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'Lunos yang menjalankan "{{title}}" berhenti sebelum gilirannya tamat. Jalankan gesaan anda dalam Lunos ini sebaliknya?',
   "sessions.monitor.takeover.confirm": "Ambil alih",
+  "sessions.monitor.takeover.queuedBody":
+    'Lunos yang menjalankan "{{title}}" ditutup dengan gesaan masih dalam baris gilir. Dalam baris gilir: {{count}}. Gesaan anda dijalankan dalam Lunos ini, selepasnya jika anda menghantarnya.',
+  "sessions.monitor.takeover.queuedLabel": "Gesaan dalam baris gilir",
+  "sessions.monitor.takeover.queuedSend": "Hantar dahulu, mengikut urutan ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Buang ({{count}})",
   "sessions.monitor.send.question.one": "Hantar ke {{count}} sesi?",
   "sessions.monitor.send.question.other": "Hantar ke {{count}} sesi?",
   "sessions.monitor.sent": 'Dihantar ke "{{title}}"',

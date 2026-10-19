@@ -1285,6 +1285,7 @@ export const dict: Record<string, string> = {
   "sessions.monitor.view.groups": "গ্রুপ অনুযায়ী",
   "sessions.monitor.tag": "প্রম্পটে {{session}} ট্যাগ করুন",
   "sessions.monitor.queuedCount": "সারিতে: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "সারিতে: {{count}} (মালিক বন্ধ)",
   "sessions.monitor.ask.permission": "অনুমোদন: {{request}}",
   "sessions.monitor.ask.question": "জিজ্ঞাসা করছে: {{question}}",
   "sessions.monitor.approve": "অনুমোদন করুন",
@@ -1308,6 +1309,11 @@ export const dict: Record<string, string> = {
   "sessions.monitor.takeover.body":
     'যে Lunos "{{title}}" চালাচ্ছিল সেটি পালা শেষের আগেই থেমে গেছে। এর বদলে আপনার প্রম্পট এই Lunos-এ চালাবেন?',
   "sessions.monitor.takeover.confirm": "নিয়ে নিন",
+  "sessions.monitor.takeover.queuedBody":
+    "“{{title}}” চালানো Lunos সারিতে থাকা প্রম্পট সহ বন্ধ হয়ে গেছে। সারিতে: {{count}}। আপনার প্রম্পট এই Lunos-এ চলবে, পাঠালে সেগুলোর পরে।",
+  "sessions.monitor.takeover.queuedLabel": "সারিতে থাকা প্রম্পট",
+  "sessions.monitor.takeover.queuedSend": "আগে ক্রমানুসারে পাঠান ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "বাতিল করুন ({{count}})",
   "sessions.monitor.send.question.one": "{{count}}টি সেশনে পাঠাবেন?",
   "sessions.monitor.send.question.other": "{{count}}টি সেশনে পাঠাবেন?",
   "sessions.monitor.sent": '"{{title}}"-এ পাঠানো হয়েছে',

@@ -1385,6 +1385,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Menurut grup",
   "sessions.monitor.tag": "Tandai {{session}} di prompt",
   "sessions.monitor.queuedCount": "Dalam antrean: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Dalam antrean: {{count}} (pemilik ditutup)",
   "sessions.monitor.ask.permission": "Setujui: {{request}}",
   "sessions.monitor.ask.question": "Bertanya: {{question}}",
   "sessions.monitor.approve": "Setujui",
@@ -1410,6 +1411,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'Lunos yang menjalankan "{{title}}" berhenti sebelum gilirannya selesai. Jalankan prompt Anda di Lunos ini sebagai gantinya?',
   "sessions.monitor.takeover.confirm": "Ambil alih",
+  "sessions.monitor.takeover.queuedBody":
+    'Lunos yang menjalankan "{{title}}" ditutup dengan prompt yang masih dalam antrean. Dalam antrean: {{count}}. Prompt Anda berjalan di Lunos ini, setelahnya jika Anda mengirimnya.',
+  "sessions.monitor.takeover.queuedLabel": "Prompt dalam antrean",
+  "sessions.monitor.takeover.queuedSend": "Kirim dulu, berurutan ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Buang ({{count}})",
   "sessions.monitor.send.question.one": "Kirim ke {{count}} sesi?",
   "sessions.monitor.send.question.other": "Kirim ke {{count}} sesi?",
   "sessions.monitor.sent": 'Terkirim ke "{{title}}"',

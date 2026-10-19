@@ -1281,6 +1281,7 @@ export const dict = {
   "sessions.monitor.view.groups": "By group",
   "sessions.monitor.tag": "Tag {{session}} in the prompt",
   "sessions.monitor.queuedCount": "Queued: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "{{count}} queued (owner closed)",
   "sessions.monitor.ask.permission": "Approve: {{request}}",
   "sessions.monitor.ask.question": "Asks: {{question}}",
   "sessions.monitor.approve": "Approve",
@@ -1304,6 +1305,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     'The Lunos that ran "{{title}}" stopped before its turn finished. Run your prompt in this Lunos instead?',
   "sessions.monitor.takeover.confirm": "Take over",
+  "sessions.monitor.takeover.queuedBody":
+    'The Lunos that ran "{{title}}" closed with prompts still queued for it. Queued: {{count}}. Your prompt runs in this Lunos, after them if you send them.',
+  "sessions.monitor.takeover.queuedLabel": "Queued prompts",
+  "sessions.monitor.takeover.queuedSend": "Send them first, in order ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Discard them ({{count}})",
   "sessions.monitor.send.question.one": "Send to {{count}} session?",
   "sessions.monitor.send.question.other": "Send to {{count}} sessions?",
   "sessions.monitor.sent": 'Sent to "{{title}}"',

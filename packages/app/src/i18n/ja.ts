@@ -1305,6 +1305,7 @@ export const dict = {
   "sessions.monitor.view.groups": "グループ別",
   "sessions.monitor.tag": "{{session}} をプロンプトでタグ付け",
   "sessions.monitor.queuedCount": "キュー: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "キュー: {{count}}（所有元は終了）",
   "sessions.monitor.ask.permission": "承認: {{request}}",
   "sessions.monitor.ask.question": "質問: {{question}}",
   "sessions.monitor.approve": "承認",
@@ -1329,6 +1330,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "「{{title}}」を実行していた Lunos はターンの途中で停止しました。代わりにこの Lunos でプロンプトを実行しますか?",
   "sessions.monitor.takeover.confirm": "引き継ぐ",
+  "sessions.monitor.takeover.queuedBody":
+    "「{{title}}」を実行していた Lunos は、未送信のプロンプトをキューに残したまま終了しました。キュー: {{count}}。プロンプトはこの Lunos で実行されます（送信する場合はその後）。",
+  "sessions.monitor.takeover.queuedLabel": "キュー内のプロンプト",
+  "sessions.monitor.takeover.queuedSend": "先に順番どおり送信 ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "破棄 ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} 件のセッションに送信しますか?",
   "sessions.monitor.send.question.other": "{{count}} 件のセッションに送信しますか?",
   "sessions.monitor.sent": "「{{title}}」に送信しました",

@@ -2724,6 +2724,7 @@ export type SessionOverviewItem = {
   permissions: number
   questions: number
   queued?: number
+  ownerClosed?: boolean
   groupID?: string
   archived?: number
 }
@@ -2824,6 +2825,13 @@ export type SessionPeerAsks = {
 
 export type SessionEnqueueResult = {
   delivery: "now" | "queued" | "interrupted" | "answered"
+  position?: number
+}
+
+export type SessionTakeoverResult = {
+  sent: number
+  discarded: number
+  delivery?: "now" | "queued" | "interrupted" | "answered"
   position?: number
 }
 
@@ -9939,6 +9947,45 @@ export type ExperimentalSessionEnqueueResponses = {
 
 export type ExperimentalSessionEnqueueResponse =
   ExperimentalSessionEnqueueResponses[keyof ExperimentalSessionEnqueueResponses]
+
+export type ExperimentalSessionTakeoverData = {
+  body?: {
+    queued: "send" | "discard"
+    text?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session/{sessionID}/takeover"
+}
+
+export type ExperimentalSessionTakeoverErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionTakeoverError =
+  ExperimentalSessionTakeoverErrors[keyof ExperimentalSessionTakeoverErrors]
+
+export type ExperimentalSessionTakeoverResponses = {
+  /**
+   * What was sent and discarded
+   */
+  200: SessionTakeoverResult
+}
+
+export type ExperimentalSessionTakeoverResponse =
+  ExperimentalSessionTakeoverResponses[keyof ExperimentalSessionTakeoverResponses]
 
 export type ExperimentalPeerPromptData = {
   body?: {

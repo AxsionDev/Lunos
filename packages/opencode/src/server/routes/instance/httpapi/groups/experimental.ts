@@ -192,6 +192,7 @@ export const SessionOverviewItem = Schema.Struct({
   permissions: NonNegativeInt,
   questions: NonNegativeInt,
   queued: Schema.optional(NonNegativeInt),
+  ownerClosed: Schema.optional(Schema.Boolean),
   groupID: Schema.optional(Schema.String),
   archived: Schema.optional(Schema.Finite),
 }).annotate({ identifier: "SessionOverviewItem" })
@@ -292,6 +293,7 @@ export const ExperimentalPaths = {
   peerQuestionReply: "/experimental/peer/:sessionID/question/:requestID/reply",
   peerQuestionReject: "/experimental/peer/:sessionID/question/:requestID/reject",
   sessionEnqueue: "/experimental/session/:sessionID/enqueue",
+  sessionTakeover: "/experimental/session/:sessionID/takeover",
   peerPrompt: "/experimental/peer/:sessionID/prompt",
 } as const
 
@@ -315,6 +317,20 @@ export const SessionEnqueueResult = Schema.Struct({
   delivery: Schema.Literals(["now", "queued", "interrupted", "answered"]),
   position: Schema.optional(NonNegativeInt),
 }).annotate({ identifier: "SessionEnqueueResult" })
+
+// XCOD-262: taking over a session whose Lunos stopped, with what to do with the prompts it queued.
+export const SessionTakeoverPayload = Schema.Struct({
+  queued: Schema.Literals(["send", "discard"]),
+  /** The prompt being sent, run after the queued ones. */
+  text: Schema.optional(Schema.String),
+})
+
+export const SessionTakeoverResult = Schema.Struct({
+  sent: NonNegativeInt,
+  discarded: NonNegativeInt,
+  delivery: Schema.optional(Schema.Literals(["now", "queued", "interrupted", "answered"])),
+  position: Schema.optional(NonNegativeInt),
+}).annotate({ identifier: "SessionTakeoverResult" })
 
 export const ExperimentalApi = HttpApi.make("experimental")
   .add(
@@ -753,6 +769,20 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Send a prompt to a session from the Agent Monitor",
             description:
               "Run a prompt as the session's next turn: now when it is idle, after the current turn when it is busy (or now, stopping the turn, with interrupt), or as the answer to its one open question. A prompt never answers a permission request. Refused when another Lunos process runs the session; use experimental.peer.prompt.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionTakeover", ExperimentalPaths.sessionTakeover, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionTakeoverPayload,
+          success: described(SessionTakeoverResult, "What was sent and discarded"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.takeover",
+            summary: "Take over a session whose Lunos stopped",
+            description:
+              "Run a session here whose Lunos process stopped, after the user confirmed it. The prompts that process had queued for it are sent first, in order (queued: send), or dropped (queued: discard); then text, if given. Refused while another Lunos runs the session, or while the process that queued them still exists. Audited as session.takeover, without the text.",
           }),
         ),
         HttpApiEndpoint.post("peerPrompt", ExperimentalPaths.peerPrompt, {

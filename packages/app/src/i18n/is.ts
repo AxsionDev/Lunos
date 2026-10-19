@@ -1292,6 +1292,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Eftir hópi",
   "sessions.monitor.tag": "Merkja {{session}} í kvaðningunni",
   "sessions.monitor.queuedCount": "Í biðröð: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Í biðröð: {{count}} (eigandi lokaður)",
   "sessions.monitor.ask.permission": "Samþykkja: {{request}}",
   "sessions.monitor.ask.question": "Spyr: {{question}}",
   "sessions.monitor.approve": "Samþykkja",
@@ -1315,6 +1316,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos sem keyrði „{{title}}“ stöðvaðist áður en umferðinni lauk. Keyra kvaðninguna þína í þessu Lunos í staðinn?",
   "sessions.monitor.takeover.confirm": "Taka yfir",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos sem keyrði „{{title}}“ lokaðist með kvaðningar enn í biðröð. Í biðröð: {{count}}. Kvaðningin þín keyrir í þessu Lunos, á eftir þeim ef þú sendir þær.",
+  "sessions.monitor.takeover.queuedLabel": "Kvaðningar í biðröð",
+  "sessions.monitor.takeover.queuedSend": "Senda þær fyrst, í röð ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Henda þeim ({{count}})",
   "sessions.monitor.send.question.one": "Senda á {{count}} setu?",
   "sessions.monitor.send.question.other": "Senda á {{count}} setur?",
   "sessions.monitor.sent": "Sent á „{{title}}“",

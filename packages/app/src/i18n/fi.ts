@@ -1304,6 +1304,7 @@ export const dict = {
   "sessions.monitor.view.groups": "Ryhmän mukaan",
   "sessions.monitor.tag": "Merkitse {{session}} kehotteeseen",
   "sessions.monitor.queuedCount": "Jonossa: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "Jonossa: {{count}} (omistaja suljettu)",
   "sessions.monitor.ask.permission": "Hyväksy: {{request}}",
   "sessions.monitor.ask.question": "Kysyy: {{question}}",
   "sessions.monitor.approve": "Hyväksy",
@@ -1328,6 +1329,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "Lunos, jossa ”{{title}}” oli käynnissä, pysähtyi ennen vuoron loppua. Ajetaanko kehotteesi sen sijaan tässä Lunosissa?",
   "sessions.monitor.takeover.confirm": "Ota haltuun",
+  "sessions.monitor.takeover.queuedBody":
+    "Lunos, jossa ”{{title}}” oli käynnissä, suljettiin, kun jonossa oli vielä kehotteita. Jonossa: {{count}}. Kehotteesi suoritetaan tässä Lunosissa, niiden jälkeen, jos lähetät ne.",
+  "sessions.monitor.takeover.queuedLabel": "Jonossa olevat kehotteet",
+  "sessions.monitor.takeover.queuedSend": "Lähetä ne ensin järjestyksessä ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "Hylkää ne ({{count}})",
   "sessions.monitor.send.question.one": "Lähetetäänkö {{count}} istuntoon?",
   "sessions.monitor.send.question.other": "Lähetetäänkö {{count}} istuntoon?",
   "sessions.monitor.sent": "Lähetetty istuntoon ”{{title}}”",

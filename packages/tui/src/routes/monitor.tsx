@@ -31,8 +31,10 @@ import {
   build,
   elapsed,
   number,
+  queuedLabel,
   route as deliveryRoute,
   tags,
+  takeoverChoices,
   type Row,
 } from "../util/agent-monitor"
 import { errorMessage } from "../util/error"
@@ -304,11 +306,24 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       return undefined
     }
     if (where.type === "takeover") {
-      const yes = await confirm(
-        "Take over this session here?",
-        `The Lunos that ran "${Locale.truncate(item.title, 40)}" stopped before its turn finished. Run your prompt in this Lunos instead?`,
-      )
-      if (!yes) return undefined
+      const title = Locale.truncate(item.title, 40)
+      // XCOD-262: prompts its Lunos queued are sent or discarded only here, as the user chooses.
+      const held = item.ownerClosed ? (item.queued ?? 0) : 0
+      const queued = held
+        ? await choose(
+            `Take over this session here? The Lunos that ran "${title}" closed with ${held === 1 ? "1 prompt" : `${held} prompts`} queued for it, never sent. Sent first, they run in order before yours.`,
+            takeoverChoices(held),
+          )
+        : (await confirm(
+              "Take over this session here?",
+              `The Lunos that ran "${title}" stopped before its turn finished. Run your prompt in this Lunos instead?`,
+            ))
+          ? ("send" as const)
+          : undefined
+      if (!queued) return undefined
+      return sdk.client.experimental.session
+        .takeover({ sessionID: item.id, directory: item.directory, queued, text }, { throwOnError: true })
+        .then((response) => ({ delivery: response.data.delivery ?? "now", position: response.data.position }))
     }
     if (where.type === "peer") {
       const result = await sdk.client.experimental.peer
@@ -736,7 +751,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
         <box flexDirection="row" paddingLeft={rowProps.row.depth ? 8 : 5}>
           <text fg={theme.textMuted} wrapMode="none">
             {[
-              item().queued ? `${item().queued} queued` : undefined,
+              queuedLabel(item()),
               projectName(item()),
               who(),
               item().elsewhere || item().stale ? stateLabel(item()) : undefined,
@@ -880,7 +895,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
                 </text>
                 <text fg={theme.textMuted}>
                   {stateLabel(target())}
-                  {target().queued ? ` · ${target().queued} queued` : ""}
+                  {queuedLabel(target()) ? ` · ${queuedLabel(target())}` : ""}
                   {target().state === "running"
                     ? " · enter queues it for when the turn ends, ctrl+enter interrupts"
                     : ""}

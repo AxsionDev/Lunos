@@ -10,6 +10,7 @@ import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
+import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { SessionPermissionDock } from "./session/composer/session-permission-dock"
 import {
@@ -37,6 +38,7 @@ import {
   ask as askOf,
   MONITOR_SECTIONS,
   number,
+  orphanedQueue,
   rail as monitorRail,
   route as deliveryRoute,
   tags,
@@ -67,6 +69,9 @@ const REFRESH_ON = new Set([
 ])
 
 const DRAG_TYPE = "application/x-lunos-session"
+
+const RAIL_VIEWS = ["status", "groups"] as const
+type RailView = (typeof RAIL_VIEWS)[number]
 
 /** How long Undo stays offered after a Clear (XCOD-265), as in /sessions. */
 const UNDO_MS = 2 * 60 * 1000
@@ -100,10 +105,14 @@ export function SessionsPage() {
     // XCOD-234: what a session another Lunos runs is waiting for, shown under its row.
     peerAsks: undefined as { sessionID: string; asks: PeerAsks } | undefined,
     responding: false,
-    // XCOD-262: the rail by status (the Agent Monitor's sections) or by the user's groups.
-    view: "status" as "status" | "groups",
     showOlder: false,
   })
+  // XCOD-262: the rail by status (the Agent Monitor's sections) or by the user's groups, remembered.
+  const [railPrefs, setRailPrefs] = persisted(
+    Persist.global("sessions.rail"),
+    createStore({ view: "status" as RailView }),
+  )
+  const railView = (): RailView => (RAIL_VIEWS.includes(railPrefs.view) ? railPrefs.view : "status")
   const [error, setError] = createSignal<string>()
   const [now, setNow] = createSignal(Date.now())
   // XCOD-262: what each Waiting row asks, shown on the row and answered there.
@@ -620,15 +629,38 @@ export function SessionsPage() {
         })
         return undefined
       }
-      if (
-        where.type === "takeover" &&
-        !(await confirm({
+      if (where.type === "takeover") {
+        // XCOD-262: prompts its Lunos queued are sent or discarded only here, as the user chooses.
+        const held = orphanedQueue(item)
+        const answer = await confirm({
           title: t("sessions.monitor.takeover.title"),
-          lines: [t("sessions.monitor.takeover.body", { title: item.title })],
+          lines: held
+            ? [t("sessions.monitor.takeover.queuedBody", { title: item.title, count: held })]
+            : [t("sessions.monitor.takeover.body", { title: item.title })],
           confirm: t("sessions.monitor.takeover.confirm"),
-        }))
-      )
-        return undefined
+          ...(held
+            ? {
+                scopeLabel: t("sessions.monitor.takeover.queuedLabel"),
+                scopes: [
+                  { value: "send", label: t("sessions.monitor.takeover.queuedSend", { count: held }) },
+                  { value: "discard", label: t("sessions.monitor.takeover.queuedDiscard", { count: held }) },
+                ],
+              }
+            : {}),
+        })
+        if (!answer) return undefined
+        return sdk.experimental.session
+          .takeover(
+            {
+              sessionID: item.id,
+              directory: item.directory,
+              queued: answer.scope === "discard" ? "discard" : "send",
+              text,
+            },
+            { throwOnError: true },
+          )
+          .then((response) => ({ delivery: response.data.delivery ?? "now", position: response.data.position }))
+      }
       if (where.type === "peer") {
         const result = await sdk.experimental.peer
           .prompt({ sessionID: item.id, text, interrupt }, { throwOnError: true })
@@ -822,7 +854,11 @@ export function SessionsPage() {
           </Show>
           <span class="truncate text-12-regular text-v2-text-text-weak">
             {[
-              item().queued ? t("sessions.monitor.queuedCount", { count: item().queued! }) : undefined,
+              item().queued
+                ? t(item().ownerClosed ? "sessions.monitor.queuedOwnerClosed" : "sessions.monitor.queuedCount", {
+                    count: item().queued!,
+                  })
+                : undefined,
               projectName(item()),
               item().agent,
               item().model,
@@ -1173,7 +1209,7 @@ export function SessionsPage() {
     )
   }
 
-  const byGroups = () => archivedView() || ui.view === "groups"
+  const byGroups = () => archivedView() || railView() === "groups"
 
   return (
     <div
@@ -1303,14 +1339,14 @@ export function SessionsPage() {
         </div>
         <Show when={!archivedView()}>
           <div class="flex items-center gap-1" role="group" aria-label={t("sessions.monitor.view.label")}>
-            <For each={["status", "groups"] as const}>
+            <For each={RAIL_VIEWS}>
               {(view) => (
                 <button
                   type="button"
                   class="rounded px-2 py-1 text-12-medium"
-                  classList={{ "bg-v2-background-bg-raised text-v2-text-text-strong": ui.view === view }}
-                  aria-pressed={ui.view === view}
-                  onClick={() => setUi("view", view)}
+                  classList={{ "bg-v2-background-bg-raised text-v2-text-text-strong": railView() === view }}
+                  aria-pressed={railView() === view}
+                  onClick={() => setRailPrefs("view", view)}
                 >
                   {t(`sessions.monitor.view.${view}`)}
                 </button>

@@ -1332,6 +1332,7 @@ export const dict = {
   "sessions.monitor.view.groups": "حسب المجموعة",
   "sessions.monitor.tag": "وسم {{session}} في الطلب",
   "sessions.monitor.queuedCount": "في قائمة الانتظار: {{count}}",
+  "sessions.monitor.queuedOwnerClosed": "في قائمة الانتظار: {{count}} (أُغلق المالك)",
   "sessions.monitor.ask.permission": "موافقة: {{request}}",
   "sessions.monitor.ask.question": "يسأل: {{question}}",
   "sessions.monitor.approve": "موافقة",
@@ -1355,6 +1356,11 @@ export const dict = {
   "sessions.monitor.takeover.body":
     "توقف Lunos الذي كان يشغّل «{{title}}» قبل انتهاء دوره. تشغيل طلبك في Lunos هذا بدلًا من ذلك؟",
   "sessions.monitor.takeover.confirm": "تولي الجلسة",
+  "sessions.monitor.takeover.queuedBody":
+    "أُغلق Lunos الذي كان يشغّل «{{title}}» وما زالت لديه مطالبات في قائمة الانتظار. في قائمة الانتظار: {{count}}. تعمل مطالبتك في Lunos هذا، بعدها إن أرسلتها.",
+  "sessions.monitor.takeover.queuedLabel": "المطالبات في قائمة الانتظار",
+  "sessions.monitor.takeover.queuedSend": "أرسلها أولًا بالترتيب ({{count}})",
+  "sessions.monitor.takeover.queuedDiscard": "تجاهلها ({{count}})",
   "sessions.monitor.send.question.one": "إرسال إلى جلسة واحدة؟ العدد: {{count}}",
   "sessions.monitor.send.question.zero": "إرسال إلى الجلسات؟ العدد: {{count}}",
   "sessions.monitor.send.question.two": "إرسال إلى جلستين؟ العدد: {{count}}",
