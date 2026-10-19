@@ -212,6 +212,65 @@ const APPROVAL_METHODS: Record<string, string> = {
   "item/permissions/requestApproval": "Permissions",
 }
 
+const ALLOW = /^(allow|accept|approve|yes|run)\b/i
+const DECLINE = /^(decline|deny|reject|cancel|no)\b/i
+/** Options that would also approve later calls, which only the user can choose in Lunos. */
+const STANDING = /session|always|remember|don't ask/i
+
+/**
+ * XCOD-254: Codex asking to approve an MCP server's tool call, the Lunos bridge's included. Not in
+ * the recorded fixtures and not verified against 0.160.1: shaped on the app server's v2 protocol as
+ * far as it's known, which has it in one of two forms:
+ *
+ *   mcpServer/elicitation/request { serverName, request: { message, _meta: { codex_approval_kind: "mcp_tool_call" } } }
+ *     → { action: "accept" | "decline", content }
+ *   item/tool/requestUserInput { itemId, questions: [{ id: "mcp_tool_call_approval…", options: [{ label }] }] }
+ *     → { answers: { <id>: { answers: [<label>] } } }
+ *
+ * Before, both were refused as unknown requests, which would decline every call to the bridge. Any
+ * other elicitation or question is still refused, as is a question whose options can't be read.
+ */
+export function mcpApproval(method: string, params: any, items: Map<string, any>) {
+  const running = (server?: string) =>
+    [...items.values()].findLast(
+      (item) => item?.type === "mcpToolCall" && item.status !== "completed" && (!server || item.server === server),
+    )
+  if (method === "mcpServer/elicitation/request") {
+    const request = params.request ?? {}
+    const meta = request._meta ?? params._meta
+    if (meta?.codex_approval_kind !== "mcp_tool_call") return undefined
+    const item = items.get(params.itemId) ?? running(params.serverName) ?? {}
+    return {
+      tool: `mcp__${params.serverName ?? item.server ?? "unknown"}__${meta.tool_name ?? item.tool ?? "unknown"}`,
+      input: (meta.tool_params ?? item.arguments ?? {}) as Record<string, unknown>,
+      description: typeof request.message === "string" ? request.message : undefined,
+      itemID: item.id ?? params.itemId,
+      reply: (allow: boolean) => (allow ? { action: "accept", content: {} } : { action: "decline", content: null }),
+    }
+  }
+  if (method === "item/tool/requestUserInput") {
+    const questions: any[] = Array.isArray(params.questions) ? params.questions : []
+    if (!questions.length || !questions.every((q) => String(q?.id ?? "").startsWith("mcp_tool_call_approval")))
+      return undefined
+    const pick = (question: any, pattern: RegExp) =>
+      (Array.isArray(question.options) ? question.options : [])
+        .map((option: any) => String(option?.label ?? ""))
+        .find((label: string) => pattern.test(label) && !STANDING.test(label))
+    if (!questions.every((q) => pick(q, ALLOW) && pick(q, DECLINE))) return undefined
+    const item = items.get(params.itemId) ?? running() ?? {}
+    return {
+      tool: `mcp__${item.server ?? "unknown"}__${item.tool ?? "unknown"}`,
+      input: (item.arguments ?? {}) as Record<string, unknown>,
+      description: questions.map((q) => q.question).find((text) => typeof text === "string"),
+      itemID: item.id ?? params.itemId,
+      reply: (allow: boolean) => ({
+        answers: Object.fromEntries(questions.map((q) => [q.id, { answers: [pick(q, allow ? ALLOW : DECLINE)] }])),
+      }),
+    }
+  }
+  return undefined
+}
+
 export interface Running {
   child: ChildProcess
   done: Promise<Extract<Event, { type: "result" }> | Extract<Event, { type: "error" }>>
@@ -302,6 +361,25 @@ export function start(options: Options): Running {
           .then((decision) => {
             if (!decision.allow) denied.push({ tool, id: params.itemId })
             write({ id: message.id, result: { decision: decision.allow ? "accept" : "decline" } })
+          })
+        return
+      }
+      // XCOD-254: an MCP tool call's approval, asked in Lunos like the others.
+      const mcp = message.id !== undefined ? mcpApproval(message.method, params, items) : undefined
+      if (mcp) {
+        const permission: PermissionRequest = {
+          requestID: String(message.id),
+          tool: mcp.tool,
+          input: mcp.input,
+          description: mcp.description,
+          toolUseID: mcp.itemID,
+        }
+        void options
+          .ask(permission)
+          .catch((error: unknown) => ({ allow: false as const, message: String(error) }))
+          .then((decision) => {
+            if (!decision.allow) denied.push({ tool: mcp.tool, id: mcp.itemID })
+            write({ id: message.id, result: mcp.reply(decision.allow) })
           })
         return
       }

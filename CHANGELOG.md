@@ -66,6 +66,13 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   message on, after a resume too; the prompt shows it. `/compact` has the tool compact its own
   session, and `/cost` shows the cost Claude Code reported (Codex reports tokens, so its cost shows
   as "not reported", and its turns no longer show $0.0000). <!-- XCOD-254 -->
+- **Your Lunos hooks also guard Claude Code and Codex.** Your plugins' before- and after-tool hooks,
+  and the `hooks` in your config, run on the calls Claude Code and Codex make with their own tools.
+  They see the calls as they would in Lunos: `bash`, `edit`, with Lunos's argument names. A hook
+  that refuses `rm -rf` refuses it in both tools, before you're asked. Hooks run on your computer
+  and send nothing to Anthropic or OpenAI, so they work even if you don't share anything. Turn
+  them off with `external.share.hooks: false`. Before hooks see the calls the tool asks you about,
+  not the ones it allows by itself. <!-- XCOD-254 -->
 
 ### Changed
 

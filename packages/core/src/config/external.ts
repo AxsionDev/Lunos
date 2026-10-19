@@ -102,6 +102,7 @@ const Codex = Schema.Struct({
  * XCOD-254: what an external session may use from Lunos, once the user has agreed to share it with
  * that tool (the consent is asked once per tool and project, and kept outside config so a repository
  * can't agree on its users' behalf). Each is on unless set to false; an organisation can lock any.
+ * `hooks` is the exception to the consent: hooks run in Lunos and send nothing to the tool's vendor.
  */
 export const SHARE = ["mcp", "skills", "memory", "commands", "hooks"] as const
 export type Share = Record<(typeof SHARE)[number], boolean>
@@ -121,7 +122,8 @@ const ShareInfo = Schema.Struct({
     description: "List Lunos's custom commands, skills and MCP prompts in a Claude Code / Codex session (default true)",
   }),
   hooks: Schema.Boolean.pipe(Schema.optional).annotate({
-    description: "Run Lunos plugin hooks on Claude Code / Codex sessions' events (default true; not used yet)",
+    description:
+      "Run Lunos plugins' tool.execute.before / tool.execute.after hooks on Claude Code / Codex's own tool calls (default true). They run on this machine, so they don't need the sharing consent",
   }),
 })
 

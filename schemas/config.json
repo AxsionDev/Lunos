@@ -541,7 +541,7 @@
             },
             "hooks": {
               "type": "boolean",
-              "description": "Run Lunos plugin hooks on Claude Code / Codex sessions' events (default true; not used yet)"
+              "description": "Run Lunos plugins' tool.execute.before / tool.execute.after hooks on Claude Code / Codex's own tool calls (default true). They run on this machine, so they don't need the sharing consent"
             }
           },
           "additionalProperties": false,
