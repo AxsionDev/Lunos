@@ -52,6 +52,16 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Fixed
 
+- **The memory setup check says what went wrong.** A failed check no longer stops at "Memory
+  remember failed:" with nothing after it. It names the step that failed (for example extraction or
+  the embedding model), why, and what to do: choose another `memory.model` when the model returns
+  invalid output, is rate limited or isn't allowed by your residency policy; check the network
+  when the embedding model can't be downloaded; free or fix the memory folder on a disk or
+  permission error; close the other Lunos when the database is locked. The wizard adds **Details**
+  (stage, error type, cause, model and log file) and **Copy diagnostics**, a block for a bug report
+  without your facts, keys or tokens. `lunos memory check --json` returns the same fields, the
+  engine's output is kept in the memory folder's `logs/`, and `lunos memory status` shows where.
+  <!-- XCOD-263 -->
 - **Settings and memory setup can save `{env:…}` references** such as `{env:NEO4J_PASSWORD}`.
   Before, saving one failed, so a team database couldn't be set up from the wizard.
   <!-- XCOD-264 -->

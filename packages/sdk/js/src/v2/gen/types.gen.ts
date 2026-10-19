@@ -3401,6 +3401,12 @@ export type MemorySetupCheckResult = {
   ms?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
   error?: string
   fix?: string
+  stage?: string
+  type?: string
+  cause?: string
+  model?: string
+  log?: string
+  diagnostics?: string
 }
 
 export type PermissionNotFoundError = {

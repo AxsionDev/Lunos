@@ -29596,6 +29596,24 @@
           },
           "fix": {
             "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "cause": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "log": {
+            "type": "string"
+          },
+          "diagnostics": {
+            "type": "string"
           }
         },
         "required": ["ok"],

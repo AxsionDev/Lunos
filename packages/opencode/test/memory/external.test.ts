@@ -207,6 +207,8 @@ describe("gate: PostgreSQL and databases on this computer (XCOD-264)", () => {
       residency: eu,
     })
     expect(nothing).toMatchObject({ ok: false, error: { stage: "connect" } })
+    // XCOD-263: through MemoryFailure, the reason is never empty.
+    if (!nothing.ok) expect(nothing.error.message.trim()).not.toBe("")
   })
 })
 

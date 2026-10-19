@@ -459,7 +459,7 @@ const layer = Layer.effect(
         // problems. Quarantined facts stay in the ledger but are never recalled.
         await MemoryStore.prepare(root, encryption)
         report(s, scope, (await MemoryStore.load(root)).problems, "start")
-        const handle = await MemorySidecar.start({ root, sample })
+        const handle = await MemorySidecar.start({ root, sample, model: chosen.model })
         const backend = MemoryBackend.cognee({ root, handle, limits, mode: encryption, retention })
         try {
           const swept = await backend.sweep(MemoryLifecycle.now())

@@ -13,6 +13,7 @@ import { AuditLog } from "@/audit/log"
 import { ConfigMemoryBackend } from "@/config/memory-backend"
 import type { MemoryBackend } from "./backend"
 import { MemoryLifecycle } from "./lifecycle"
+import { MemoryFailure } from "./failure"
 import { MemoryStore } from "./store"
 
 /**
@@ -785,8 +786,9 @@ async function postgresDriver(checked: Checked): Promise<Driver> {
 
 // ---------------------------------------------------------------------------------------------
 // The setup wizard's "Test connection" (XCOD-264): connect, write, read and delete a probe, in a
-// namespace of its own so it never touches a real fact. The error shape matches XCOD-263's
-// structured memory-check errors: what failed, at which stage, and what to do.
+// namespace of its own so it never touches a real fact. A failure is described through XCOD-263's
+// MemoryFailure: a reason that is never empty, with keys masked, and its fix when the probe's own
+// stage-specific ones don't apply.
 
 export type ProbeStage = "settings" | "residency" | "connect" | "write" | "read" | "delete"
 export type ProbeError = { type: string; message: string; stage: ProbeStage; fix?: string }
@@ -815,9 +817,18 @@ export async function probe(input: {
   residency: Residency.Resolved | undefined
 }): Promise<ProbeResult> {
   const fail = (stage: ProbeStage, error: unknown): ProbeResult => {
-    const message = error instanceof Error ? error.message : String(error)
     const type = error instanceof DeniedError ? "residency" : error instanceof ConfigError ? "config" : stage
-    return { ok: false, error: { type, message, stage, fix: probeFix(stage, message) } }
+    const info: MemoryFailure.Info = {
+      type: error instanceof Error ? error.name : type,
+      message: MemoryFailure.summary(error),
+      cause: [],
+      stage,
+      sampling: [],
+    }
+    const message = MemoryFailure.reason(info)
+    const general = MemoryFailure.fix(info)
+    const fix = probeFix(stage, message) ?? (general && general.kind !== "unknown" ? general.text : undefined)
+    return { ok: false, error: { type, message, stage, fix } }
   }
   let checked: Checked
   try {

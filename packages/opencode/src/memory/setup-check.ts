@@ -2,7 +2,9 @@ export * as MemorySetupCheck from "./setup-check"
 
 import fs from "node:fs"
 import path from "node:path"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { resolveCommand, spawnArgv } from "@/cli/restart"
+import { MemoryFailure } from "./failure"
 
 // XCOD-249: memory settings apply when Lunos starts, so the setup wizard checks the settings it is
 // about to save by running `lunos memory check --json` in a new process with them layered on top
@@ -11,7 +13,21 @@ import { resolveCommand, spawnArgv } from "@/cli/restart"
 
 const TIMEOUT = 11 * 60_000
 
-export type Result = { ok: boolean; scope?: string; ms?: number; error?: string; fix?: string }
+export type Result = {
+  ok: boolean
+  scope?: string
+  ms?: number
+  error?: string
+  fix?: string
+  // XCOD-263: why it failed (see `CheckFailure` in cli/cmd/memory-setup.ts).
+  stage?: string | null
+  type?: string | null
+  cause?: string | null
+  model?: string | null
+  log?: string | null
+  sampling?: { provider: string; model: string; message: string }[]
+  diagnostics?: string
+}
 
 /**
  * The CLI's own entry script. Inside the TUI the server runs in a worker, whose script is
@@ -56,12 +72,37 @@ export async function run(input: {
   try {
     return JSON.parse(line) as Result
   } catch {
-    return {
-      ok: false,
-      error:
-        code === null || proc.signalCode
-          ? "The check took longer than 11 minutes and was stopped"
-          : (err.trim().split("\n").at(-1) ?? `The check exited with ${code}`),
-    }
+    return unparsed({ code, signal: proc.signalCode, stderr: err })
+  }
+}
+
+/**
+ * The check printed no result: it crashed, or was stopped. The last stderr line is the error and the
+ * lines before it the cause, so nothing it said is dropped; with no stderr, the exit code says it.
+ */
+export function unparsed(input: { code: number | null; signal?: string | null; stderr: string }): Result {
+  const lines = input.stderr
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim())
+  const timedOut = input.code === null || !!input.signal
+  const error = timedOut
+    ? "The check took longer than 11 minutes and was stopped"
+    : (lines.at(-1)?.trim() ?? "") || `The check exited with code ${input.code} and printed nothing`
+  const type = timedOut ? "TimeoutError" : "CheckCrashed"
+  const cause = lines.slice(-20, -1)
+  return {
+    ok: false,
+    error,
+    stage: "check",
+    type,
+    cause: cause.length ? cause.join("\n") : null,
+    model: null,
+    log: null,
+    diagnostics: MemoryFailure.diagnostics({
+      error,
+      info: { type, message: error, cause: cause.slice(-5), stage: "check", sampling: [] },
+      version: InstallationVersion,
+    }),
   }
 }

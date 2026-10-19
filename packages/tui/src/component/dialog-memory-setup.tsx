@@ -11,6 +11,7 @@ import { DialogSelect } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogConfirm } from "../ui/dialog-confirm"
 import { useOpencodeKeymap } from "../keymap"
+import { useClipboard } from "../context/clipboard"
 import { DialogModel } from "./dialog-model"
 
 // XCOD-249: /settings → Memory → "Set up memory…". Six short steps, each with a recommended answer,
@@ -20,7 +21,45 @@ import { DialogModel } from "./dialog-model"
 // stays under Advanced in the settings list.
 
 type Scope = "user" | "project"
-type Check = { ok: boolean; scope?: string; ms?: number; error?: string; fix?: string }
+type Check = {
+  ok: boolean
+  scope?: string
+  ms?: number
+  error?: string
+  fix?: string
+  // XCOD-263: why it failed, for Details, and the redacted block Copy diagnostics copies.
+  stage?: string | null
+  type?: string | null
+  cause?: string | null
+  model?: string | null
+  log?: string | null
+  diagnostics?: string
+}
+
+/** The Details rows of a failed check: the ones that are known. */
+export function checkDetails(check: Check) {
+  return (
+    [
+      ["Stage", check.stage],
+      ["Type", check.type],
+      ["Cause", check.cause],
+      ["Model", check.model],
+      ["Log", check.log],
+    ] as const
+  ).flatMap(([title, value]) => (value ? [{ title, value }] : []))
+}
+
+/**
+ * What a failed check says, as lines for the dialog's footer, where they wrap instead of being cut
+ * off: never an empty reason, and the fix when there is one.
+ */
+export function checkLines(check: Check) {
+  return [
+    `✗ ${check.error?.trim() || "The check failed and gave no reason"}`,
+    ...(check.fix ? [`Fix: ${check.fix}`] : []),
+  ]
+}
+
 type Template = { name: string; scope: Scope }
 
 /** "What this means" (or any short text) under a list, wrapped. */
@@ -61,6 +100,8 @@ export function useMemorySetup() {
   const dialog = useDialog()
   const toast = useToast()
   const keymap = useOpencodeKeymap()
+  const clipboard = useClipboard()
+  const { theme } = useTheme()
 
   return (input: { scope: Scope; rows: readonly SettingRow[]; onExit: () => void }) => {
     const memory = sync.data.config.memory as Parameters<typeof MemorySetup.initial>[0]
@@ -742,6 +783,17 @@ export function useMemorySetup() {
       )
     }
 
+    // A failed check's reason and fix (or its details), wrapped under the options.
+    const failure = (lines: string[]) => (
+      <box flexDirection="column" flexShrink={1}>
+        {lines.map((line, index) => (
+          <text fg={index === 0 ? theme.error : theme.textMuted} wrapMode="word">
+            {line}
+          </text>
+        ))}
+      </box>
+    )
+
     // 6. Check it works.
     const step6 = () => {
       if (!download) return void summary(encryption)
@@ -754,9 +806,10 @@ export function useMemorySetup() {
               result
                 ? result.ok
                   ? `✓ Remembered, recalled and removed a test fact in ${result.scope} memory (${((result.ms ?? 0) / 1000).toFixed(1)} s)`
-                  : `✗ ${result.error}${result.fix ? ` — ${result.fix}` : ""}`
+                  : "✗ The check failed. Why, and what to do:"
                 : "Remembers a test fact, recalls it, then removes it. The first run downloads the engine and can take a few minutes."
             }
+            footer={result && !result.ok ? failure(checkLines(result)) : undefined}
             skipFilter
             options={[
               ...(result?.ok ? [{ title: "Continue", value: "next", description: "to the summary" }] : []),
@@ -765,17 +818,63 @@ export function useMemorySetup() {
                 value: "run",
                 description: result ? "" : "recommended",
               },
-              ...(result && !result.ok ? [{ title: "Continue without a passing check", value: "next" }] : []),
+              ...(result && !result.ok
+                ? [
+                    { title: "Details", value: "details", description: "stage, type, cause, model and log" },
+                    ...(result.diagnostics
+                      ? [{ title: "Copy diagnostics", value: "copy", description: "redacted, for a bug report" }]
+                      : []),
+                    { title: "Continue without a passing check", value: "next" },
+                  ]
+                : []),
               ...(!result ? [{ title: "Skip", value: "next" }] : []),
             ]}
             onSelect={(option) => {
               if (option.value === "next") return void summary(step6)
+              if (option.value === "details") return details()
+              if (option.value === "copy") return copy()
               void running()
             }}
           />
         ),
         encryption,
       )
+    }
+
+    // The failed check's details, one row each; Esc or Back returns to the check.
+    const details = () => {
+      const result = check
+      if (!result) return step6()
+      const rows = checkDetails(result)
+      show(
+        () => (
+          <DialogSelect
+            title="Set up memory · 6 of 6 · Details"
+            placeholder="✗ The check failed. Its details:"
+            footer={failure([
+              ...checkLines(result),
+              ...(rows.length ? rows.map((row) => `${row.title}: ${row.value}`) : ["No details were reported."]),
+            ])}
+            skipFilter
+            options={[
+              ...(result.diagnostics
+                ? [{ title: "Copy diagnostics", value: "copy", description: "redacted, for a bug report" }]
+                : []),
+              { title: "Back", value: "back" },
+            ]}
+            onSelect={(option) => (option.value === "copy" ? copy() : step6())}
+          />
+        ),
+        step6,
+      )
+    }
+
+    const copy = () => {
+      const text = check?.diagnostics
+      if (!text) return
+      void (clipboard.write?.(text) ?? Promise.reject(new Error("No clipboard is available")))
+        .then(() => toast.show({ variant: "info", message: "Diagnostics copied (no fact text, keys or tokens)" }))
+        .catch(toast.error)
     }
 
     const running = async () => {

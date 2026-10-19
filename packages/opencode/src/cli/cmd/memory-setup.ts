@@ -2,70 +2,190 @@ import { EOL } from "os"
 import { Effect } from "effect"
 import { effectCmd, fail } from "../effect-cmd"
 import { writeStdoutEffect } from "../stdout"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Memory } from "@/memory"
+import { MemoryFailure } from "@/memory/failure"
+import { MemorySidecar } from "@/memory/sidecar"
 
 // XCOD-249: `lunos memory check` proves memory works end to end: it remembers a test fact,
 // recalls it and forgets it again. The setup wizard (TUI and `lunos memory setup`) runs it in a
 // fresh process with the settings it is about to save, since memory settings apply on restart.
+// XCOD-263: a failure says which step failed, why and what to do, never an empty reason, and
+// carries a redacted `diagnostics` block for a bug report.
 
-export type CheckResult =
-  | { ok: true; scope: string; ms: number }
-  | { ok: false; error: string; fix?: string; scope?: string }
+export type CheckFailure = {
+  ok: false
+  error: string
+  fix?: string
+  scope?: string
+  /** The pipeline stage that failed, e.g. "extraction", "embedding", "start". */
+  stage?: string | null
+  /** The exception class. */
+  type?: string | null
+  /** The cause chain, outermost first. */
+  cause?: string | null
+  /** The memory model, "provider/model". */
+  model?: string | null
+  /** The log with the full traceback. */
+  log?: string | null
+  /** Sampling requests (the engine asking the memory model) that failed. */
+  sampling?: MemoryFailure.Sampling[]
+  /** Redacted JSON for a bug report: no fact text, keys or tokens. */
+  diagnostics?: string
+}
 
-/** What to do about a failure, for the errors a first start actually hits. */
-export function checkFix(error: string) {
-  if (/uv \(https|needs uv/i.test(error)) return "Install uv (https://docs.astral.sh/uv/), then run the check again."
-  if (/python/i.test(error) && /3\.1[0-3]|not found|no interpreter/i.test(error))
-    return "Install Python 3.10–3.13 (uv finds it on PATH), then run the check again."
-  if (/offline|LUNOS_OFFLINE/i.test(error))
-    return "Offline, the first start needs uv's and Hugging Face's caches already filled. Run the check once with network access, or see the memory docs on pre-seeding."
-  if (/no model is configured/i.test(error)) return "Connect a provider with /providers, or set memory.model."
-  if (/residency|jurisdiction/i.test(error)) return "Pick a database in a region your residency policy allows."
-  return undefined
+export type CheckResult = { ok: true; scope: string; ms: number } | CheckFailure
+
+/** What to do about a failure, for the errors a user can act on. */
+export function checkFix(error: string | MemoryFailure.Info) {
+  return MemoryFailure.fix(error)?.text
+}
+
+/**
+ * A failed check, from whatever the step threw. An engine error keeps the sidecar's stage, type
+ * and cause; anything else becomes the same shape with the step as its stage.
+ */
+export function checkFailure(input: {
+  error: unknown
+  step?: "remember" | "recall"
+  scope?: string
+  model?: string
+  /** The check's fact text and marker: cut out of the diagnostics. */
+  secrets?: readonly string[]
+}): CheckFailure {
+  const { error, step } = input
+  const info: MemoryFailure.Info | undefined =
+    error instanceof MemoryFailure.EngineError
+      ? error.info
+      : error instanceof MemorySidecar.UnavailableError
+        ? { type: error.name, message: error.message, cause: [], stage: "start", log: error.log, sampling: [] }
+        : step && error instanceof Error
+          ? {
+              type: error.name,
+              message: error.message,
+              cause: error.cause instanceof Error ? [`${error.cause.name}: ${error.cause.message}`] : [],
+              stage: step,
+              dir: pathOf(error),
+              sampling: [],
+            }
+          : undefined
+  const full = info && { ...info, model: info.model ?? input.model }
+  const message =
+    error instanceof MemoryFailure.EngineError && step
+      ? `Couldn't ${step} the test fact: ${MemoryFailure.stageLabel(error.info.stage)}, ${MemoryFailure.reason(error.info)}`
+      : full
+        ? MemoryFailure.reason(full)
+        : MemoryFailure.summary(error)
+  const fixed = MemoryFailure.fix(full ?? message)
+  return {
+    ok: false,
+    scope: input.scope,
+    error: message,
+    fix: fixed?.text,
+    stage: full?.stage ?? null,
+    type: full?.type ?? null,
+    cause: full?.cause.length ? full.cause.join(" ← ") : null,
+    model: full?.model ?? input.model ?? null,
+    log: full?.log ?? null,
+    sampling: full?.sampling ?? [],
+    diagnostics: MemoryFailure.diagnostics({
+      error: message,
+      info: full,
+      fix: fixed?.kind,
+      version: InstallationVersion,
+      secrets: input.secrets,
+    }),
+  }
 }
 
 const runCheck = Effect.fn("Cli.memory.check.run")(function* () {
   const memory = yield* Memory.Service
   const verdict = yield* memory.decision()
-  if (!verdict.on) return { ok: false as const, error: `Memory is off: ${verdict.reason}` }
+  const refuse = (error: string) => checkFailure({ error: new Error(error) })
+  if (!verdict.on) return refuse(`Memory is off: ${verdict.reason}`)
   const { Provider } = yield* Effect.promise(() => import("@/provider/provider"))
+  const { Config } = yield* Effect.promise(() => import("@/config/config"))
+  const { MemoryModel } = yield* Effect.promise(() => import("@/memory/model"))
   const model = yield* Provider.Service.use((provider) => provider.defaultModel()).pipe(Effect.option)
   // XCOD-264: a team database makes no model calls, so it needs no model to be checked.
   const external = (yield* memory.target()).type !== "embedded"
-  if (model._tag === "None" && !external)
-    return { ok: false as const, error: "No model is configured, and memory needs one to run" }
+  if (model._tag === "None" && !external) return refuse("No model is configured, and memory needs one to run")
   const parent =
     model._tag === "Some"
       ? { providerID: model.value.providerID, modelID: model.value.modelID }
       : { providerID: "none", modelID: "" }
+  const cfg = yield* Config.Service.use((config) => config.get())
+  const label = external
+    ? undefined
+    : (() => {
+        try {
+          const chosen = MemoryModel.resolve({ memory: cfg.memory, small_model: cfg.small_model, parent }).model
+          return `${chosen.providerID}/${chosen.modelID}`
+        } catch {
+          return undefined
+        }
+      })()
   const [scope] = yield* memory.scopes()
-  if (!scope) return { ok: false as const, error: "memory.scope lists no scope" }
+  if (!scope) return refuse("memory.scope lists no scope")
   const started = Date.now()
   const marker = Math.random().toString(36).slice(2, 10)
   const text = `The Lunos memory check ran on ${new Date().toISOString().slice(0, 10)} (check ${marker}).`
-  const fact = yield* memory.remember({
-    fact: text,
-    source: "memory-check",
-    scope,
-    sessionID: "memory-check",
-    agent: "memory-check",
-    parent,
-    messages: [],
-    kind: "observed",
-  })
+  const failed = (step: "remember" | "recall") => (error: unknown) =>
+    Effect.fail(checkFailure({ error, step, scope, model: label, secrets: [text, marker] }))
+  const fact = yield* memory
+    .remember({
+      fact: text,
+      source: "memory-check",
+      scope,
+      sessionID: "memory-check",
+      agent: "memory-check",
+      parent,
+      messages: [],
+      kind: "observed",
+    })
+    .pipe(Effect.catch(failed("remember")))
   // Removed whatever happens next, so a failed recall leaves nothing behind.
   const recalled = yield* memory
     .search({ query: text, parent, limit: 5, origin: "cli" })
-    .pipe(Effect.ensuring(memory.forget({ id: fact.id, parent, origin: "cli" }).pipe(Effect.ignore)))
+    .pipe(
+      Effect.catch(failed("recall")),
+      Effect.ensuring(memory.forget({ id: fact.id, parent, origin: "cli" }).pipe(Effect.ignore)),
+    )
   const found = recalled.some((item) => item.facts.some((hit) => hit.fact.id === fact.id))
-  if (!found) return { ok: false as const, scope, error: "The test fact was stored but not recalled" }
+  if (!found) return { ...refuse("The test fact was stored but not recalled"), scope }
   return { ok: true as const, scope, ms: Date.now() - started }
 })
 
+/** The check's result for a terminal: the reason, the fix, then the details a bug report needs. */
 export function checkLine(result: CheckResult) {
   if (result.ok)
     return `✓ Memory works: remembered, recalled and removed a test fact in ${result.scope} memory (${(result.ms / 1000).toFixed(1)} s).`
-  return [`✗ ${result.error}`, ...(result.fix ? [`  ${result.fix}`] : [])].join(EOL)
+  return [
+    `✗ ${result.error}`,
+    ...(result.fix ? [`  Fix: ${result.fix}`] : []),
+    ...checkDetails(result).map((line) => `  ${line}`),
+  ].join(EOL)
+}
+
+/** The "Details" lines: stage, type, cause, model and log, the ones that are known. */
+export function checkDetails(result: CheckFailure) {
+  return [
+    result.stage ? `Stage: ${result.stage}` : undefined,
+    result.type ? `Type: ${result.type}` : undefined,
+    result.cause ? `Cause: ${result.cause}` : undefined,
+    result.model ? `Model: ${result.model}` : undefined,
+    result.log ? `Log: ${result.log}` : undefined,
+  ].filter((line): line is string => line !== undefined)
+}
+
+/** The file a Node filesystem error is about (EACCES, EROFS, ENOSPC carry it). */
+function pathOf(error: Error) {
+  const file = (error as Error & { path?: unknown }).path
+  return typeof file === "string" ? file : undefined
+}
+
+function isCheckFailure(value: unknown): value is CheckFailure {
+  return typeof value === "object" && value !== null && (value as CheckFailure).ok === false && "diagnostics" in value
 }
 
 export const MemoryCheckCommand = effectCmd({
@@ -74,14 +194,10 @@ export const MemoryCheckCommand = effectCmd({
   builder: (yargs) => yargs.option("json", { type: "boolean", describe: "print the result as JSON" }),
   handler: Effect.fn("Cli.memory.check")(function* (args: { json?: boolean }) {
     const result: CheckResult = yield* runCheck().pipe(
-      Effect.catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error)
-        return Effect.succeed({ ok: false as const, error: message })
-      }),
+      Effect.catch((error: unknown) => Effect.succeed(isCheckFailure(error) ? error : checkFailure({ error }))),
     )
-    const out = result.ok ? result : { ...result, fix: result.fix ?? checkFix(result.error) }
-    yield* writeStdoutEffect((args.json ? JSON.stringify(out) : checkLine(out)) + EOL)
-    if (!out.ok) process.exitCode = 1
+    yield* writeStdoutEffect((args.json ? JSON.stringify(result) : checkLine(result)) + EOL)
+    if (!result.ok) process.exitCode = 1
   }),
 })
 
@@ -257,6 +373,9 @@ export const MemorySetupCommand = effectCmd({
         MemorySetupCheck.run({ directory: ctx.directory, memory: MemorySetup.block(draft), env: template?.env }),
       ) as Effect.Effect<CheckResult>
       yield* say(checkLine(check.ok ? check : { ...check, fix: check.fix ?? checkFix(check.error) }))
+      // The draft isn't saved yet, so a later `lunos memory check` would test other settings.
+      if (!check.ok && check.diagnostics)
+        yield* say(`  Diagnostics for a bug report (no fact text, keys or tokens):${EOL}${check.diagnostics}`)
     }
 
     const writes = MemorySetup.writes(draft, memory, rows)
