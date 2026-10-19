@@ -3264,12 +3264,105 @@ export type MemorySetupInput = {
   memory: {
     [key: string]: unknown
   }
+  /**
+   * XCOD-264: a Docker template whose .env holds the variables the block's {env:} references need
+   */
+  template?: {
+    name: string
+    scope: "user" | "project"
+  }
 }
 
 export type MemorySetupBackendResult = {
   ok: boolean
   warnings: Array<string>
   error?: string
+}
+
+export type MemorySetupTemplate = {
+  name: string
+  title: string
+  description?: string
+  leaves: string
+  requires?: Array<string>
+  ask?: Array<string>
+  memory: {
+    [key: string]: unknown
+  }
+  port?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  licence?: string
+  organisation?: boolean
+  unavailable?: string
+}
+
+export type MemorySetupEnvironment = {
+  environment: {
+    paths: {
+      project?: string
+      user?: string
+    }
+    model?: {
+      id: string
+      region?: string
+    }
+    docker?: {
+      tool: "docker" | "podman"
+      compose: boolean
+    }
+    localModels: Array<string>
+  }
+  templates: Array<MemorySetupTemplate>
+}
+
+export type MemorySetupError = {
+  type: string
+  message: string
+  stage: string
+  fix?: string
+}
+
+export type MemorySetupTestResult = {
+  ok: boolean
+  ms?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  server?: string
+  warnings?: Array<string>
+  error?: MemorySetupError
+}
+
+export type MemorySetupTemplateInput = {
+  name: string
+  scope: "user" | "project"
+  values?: {
+    vendor?: "neo4j" | "postgres"
+    url?: string
+    jurisdiction?: string
+    localModel?: string
+    port?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  }
+  overwrite?: Array<string>
+}
+
+export type MemorySetupTemplatePlan = {
+  ok: boolean
+  error?: string
+  dir: string
+  files: Array<{
+    name: string
+    path: string
+    content: string
+    exists: boolean
+  }>
+  memory: {
+    [key: string]: unknown
+  }
+  command: string
+  licence?: string
+}
+
+export type MemorySetupStartResult = {
+  ok: boolean
+  ms?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  error?: MemorySetupError
 }
 
 export type MemorySetupCheckResult = {
@@ -11242,6 +11335,149 @@ export type MemorySetupBackendResponses = {
 }
 
 export type MemorySetupBackendResponse = MemorySetupBackendResponses[keyof MemorySetupBackendResponses]
+
+export type MemorySetupEnvironmentData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/environment"
+}
+
+export type MemorySetupEnvironmentErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupEnvironmentError = MemorySetupEnvironmentErrors[keyof MemorySetupEnvironmentErrors]
+
+export type MemorySetupEnvironmentResponses = {
+  /**
+   * This machine's memory paths, model, Docker, and the templates
+   */
+  200: MemorySetupEnvironment
+}
+
+export type MemorySetupEnvironmentResponse = MemorySetupEnvironmentResponses[keyof MemorySetupEnvironmentResponses]
+
+export type MemorySetupTestData = {
+  body?: MemorySetupInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/test"
+}
+
+export type MemorySetupTestErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupTestError = MemorySetupTestErrors[keyof MemorySetupTestErrors]
+
+export type MemorySetupTestResponses = {
+  /**
+   * Whether the database could be used
+   */
+  200: MemorySetupTestResult
+}
+
+export type MemorySetupTestResponse = MemorySetupTestResponses[keyof MemorySetupTestResponses]
+
+export type MemorySetupTemplatePreviewData = {
+  body?: MemorySetupTemplateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/template/preview"
+}
+
+export type MemorySetupTemplatePreviewErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupTemplatePreviewError = MemorySetupTemplatePreviewErrors[keyof MemorySetupTemplatePreviewErrors]
+
+export type MemorySetupTemplatePreviewResponses = {
+  /**
+   * The files and config the template would write
+   */
+  200: MemorySetupTemplatePlan
+}
+
+export type MemorySetupTemplatePreviewResponse =
+  MemorySetupTemplatePreviewResponses[keyof MemorySetupTemplatePreviewResponses]
+
+export type MemorySetupTemplateApplyData = {
+  body?: MemorySetupTemplateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/template/apply"
+}
+
+export type MemorySetupTemplateApplyErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupTemplateApplyError = MemorySetupTemplateApplyErrors[keyof MemorySetupTemplateApplyErrors]
+
+export type MemorySetupTemplateApplyResponses = {
+  /**
+   * The files written
+   */
+  200: MemorySetupTemplatePlan
+}
+
+export type MemorySetupTemplateApplyResponse =
+  MemorySetupTemplateApplyResponses[keyof MemorySetupTemplateApplyResponses]
+
+export type MemorySetupTemplateStartData = {
+  body?: MemorySetupTemplateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/template/start"
+}
+
+export type MemorySetupTemplateStartErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupTemplateStartError = MemorySetupTemplateStartErrors[keyof MemorySetupTemplateStartErrors]
+
+export type MemorySetupTemplateStartResponses = {
+  /**
+   * Whether the database started and became healthy
+   */
+  200: MemorySetupStartResult
+}
+
+export type MemorySetupTemplateStartResponse =
+  MemorySetupTemplateStartResponses[keyof MemorySetupTemplateStartResponses]
 
 export type MemorySetupCheckData = {
   body?: MemorySetupInput

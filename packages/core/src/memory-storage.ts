@@ -259,6 +259,8 @@ export type Listed = Template & { unavailable?: string }
 
 export const DOCKER_MISSING = "Docker or Podman not found"
 export const DOCKER_INSTALL = "https://docs.docker.com/get-docker/"
+export const COMPOSE_MISSING = "Docker Compose not found"
+export const COMPOSE_INSTALL = "https://docs.docker.com/compose/install/"
 
 /** The templates to offer: the organisation's first, then the built-ins not hidden, each with why it can't be used. */
 export function templates(
@@ -273,8 +275,10 @@ export function templates(
       const requires = item.requires ?? []
       // "Fully local" is offered only when a local model is configured: without one it has nothing to set.
       if (requires.includes("local-model") && !env.localModels.length) return []
-      if (requires.includes("docker") && !(env.docker && env.docker.compose))
+      if (requires.includes("docker") && !env.docker)
         return [{ ...item, unavailable: `${DOCKER_MISSING} (install: ${DOCKER_INSTALL})` }]
+      if (requires.includes("docker") && !env.docker?.compose)
+        return [{ ...item, unavailable: `${COMPOSE_MISSING} (install: ${COMPOSE_INSTALL})` }]
       return [item]
     },
   )

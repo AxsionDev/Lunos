@@ -17,11 +17,20 @@ import {
   MemoryPassphraseRequiredError,
   MemoryUnavailableError,
 } from "../errors"
-import type { MemoryExportInput, MemoryImportApplyInput, MemoryImportInput, MemorySetupInput } from "../groups/memory"
+import type {
+  MemoryExportInput,
+  MemoryImportApplyInput,
+  MemoryImportInput,
+  MemorySetupInput,
+  MemorySetupTemplateInput,
+} from "../groups/memory"
 import { Config } from "@/config/config"
 import { AuditLog } from "@/audit/log"
 import { MemoryExternal } from "@/memory/external"
 import { MemorySetupCheck } from "@/memory/setup-check"
+import { MemorySetupEnv } from "@/memory/setup-env"
+import { MemoryTemplate } from "@/memory/template"
+import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import type { ConfigMemory } from "@opencode-ai/core/config/memory"
 
 const SCOPES = ["project", "user"] as const
@@ -284,15 +293,131 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
     }) {
       const instance = yield* InstanceState.context
       for (const scope of SCOPES) yield* memory.release(scope)
+      const env = yield* templateEnv(ctx.payload.template)
       return yield* Effect.promise(() =>
-        MemorySetupCheck.run({ directory: instance.directory, memory: ctx.payload.memory }),
+        MemorySetupCheck.run({ directory: instance.directory, memory: ctx.payload.memory, env }),
       )
+    })
+
+    // XCOD-264: a template's `.env`, for the `{env:}` references in the block it wrote.
+    const templateEnv = Effect.fn("MemoryHttpApi.templateEnv")(function* (
+      template: (typeof MemorySetupInput.Type)["template"],
+    ) {
+      if (!template) return {}
+      const instance = yield* InstanceState.context
+      return yield* Effect.promise(() =>
+        MemoryTemplate.env(MemoryTemplate.dir(template.scope, template.name, instance.worktree)),
+      )
+    })
+
+    const setupEnvironment = Effect.fn("MemoryHttpApi.setupEnvironment")(function* () {
+      return yield* MemorySetupEnv.environment()
+    })
+
+    // XCOD-264: the wizard's "Test connection": the gate, then a probe written, read and deleted.
+    const setupTest = Effect.fn("MemoryHttpApi.setupTest")(function* (ctx: { payload: typeof MemorySetupInput.Type }) {
+      const cfg = yield* config.get()
+      const env = yield* templateEnv(ctx.payload.template)
+      const proposed = yield* Effect.promise(() => MemoryTemplate.resolve(ctx.payload.memory, env))
+      return yield* Effect.promise(() =>
+        MemoryExternal.probe({ memory: proposed as ConfigMemory.Info, residency: AuditLog.residency(cfg) }),
+      )
+    })
+
+    const templatePlan = Effect.fn("MemoryHttpApi.templatePlan")(function* (
+      payload: typeof MemorySetupTemplateInput.Type,
+      reveal: boolean,
+    ) {
+      const instance = yield* InstanceState.context
+      const { environment, templates } = yield* MemorySetupEnv.environment()
+      const template = MemoryStorage.find(templates, payload.name)
+      if (!template) return { error: `No memory template named "${payload.name}"` }
+      if (template.unavailable) return { error: `${template.title}: ${template.unavailable}` }
+      const plan = yield* Effect.promise(() =>
+        MemoryTemplate.plan({
+          template,
+          scope: payload.scope,
+          worktree: instance.worktree,
+          values: payload.values,
+          docker: environment.docker,
+          reveal,
+        }),
+      )
+      return { plan }
+    })
+
+    const planResult = (plan: MemoryTemplate.Plan, error?: string) => ({
+      ok: !error,
+      ...(error ? { error } : {}),
+      dir: plan.dir,
+      files: plan.files.map((file) => ({
+        name: file.name,
+        path: file.path,
+        content: file.content,
+        exists: file.exists,
+      })),
+      memory: plan.memory,
+      command: plan.command,
+      ...(plan.template.licence ? { licence: plan.template.licence } : {}),
+    })
+    const planError = (error: string) => ({ ok: false, error, dir: "", files: [], memory: {}, command: "" })
+
+    const setupTemplatePreview = Effect.fn("MemoryHttpApi.setupTemplatePreview")(function* (ctx: {
+      payload: typeof MemorySetupTemplateInput.Type
+    }) {
+      const got = yield* templatePlan(ctx.payload, false)
+      return got.plan ? planResult(got.plan) : planError(got.error!)
+    })
+
+    const setupTemplateApply = Effect.fn("MemoryHttpApi.setupTemplateApply")(function* (ctx: {
+      payload: typeof MemorySetupTemplateInput.Type
+    }) {
+      const got = yield* templatePlan(ctx.payload, true)
+      if (!got.plan) return planError(got.error!)
+      const plan = got.plan
+      const written = yield* Effect.tryPromise(() => MemoryTemplate.write(plan, ctx.payload.overwrite ?? [])).pipe(
+        Effect.result,
+      )
+      // Never echo the password back: the result shows the .env masked, like the preview.
+      const shown = {
+        ...plan,
+        files: plan.files.map((file) => (file.name === ".env" ? { ...file, content: "(written, 0600)" } : file)),
+      }
+      if (written._tag === "Failure") {
+        const cause = written.failure.cause
+        return planResult(shown, cause instanceof Error ? cause.message : String(cause))
+      }
+      return planResult(shown)
+    })
+
+    const setupTemplateStart = Effect.fn("MemoryHttpApi.setupTemplateStart")(function* (ctx: {
+      payload: typeof MemorySetupTemplateInput.Type
+    }) {
+      const got = yield* templatePlan(ctx.payload, false)
+      if (!got.plan) return { ok: false, error: { type: "template", stage: "start", message: got.error! } }
+      const plan = got.plan
+      const result = yield* Effect.promise(() => MemoryTemplate.start(plan))
+      if (result.ok) return { ok: true, ms: result.ms }
+      return {
+        ok: false,
+        error: {
+          type: "docker",
+          stage: result.stage,
+          message: result.message,
+          ...(result.fix ? { fix: result.fix } : {}),
+        },
+      }
     })
 
     return handlers
       .handle("stats", stats)
       .handle("setupBackend", setupBackend)
       .handle("setupCheck", setupCheck)
+      .handle("setupEnvironment", setupEnvironment)
+      .handle("setupTest", setupTest)
+      .handle("setupTemplatePreview", setupTemplatePreview)
+      .handle("setupTemplateApply", setupTemplateApply)
+      .handle("setupTemplateStart", setupTemplateStart)
       .handle("list", list)
       .handle("importPreview", importPreview)
       .handle("importApply", importApply)

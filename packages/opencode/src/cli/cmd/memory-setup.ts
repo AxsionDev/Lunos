@@ -30,8 +30,14 @@ const runCheck = Effect.fn("Cli.memory.check.run")(function* () {
   if (!verdict.on) return { ok: false as const, error: `Memory is off: ${verdict.reason}` }
   const { Provider } = yield* Effect.promise(() => import("@/provider/provider"))
   const model = yield* Provider.Service.use((provider) => provider.defaultModel()).pipe(Effect.option)
-  if (model._tag === "None") return { ok: false as const, error: "No model is configured, and memory needs one to run" }
-  const parent = { providerID: model.value.providerID, modelID: model.value.modelID }
+  // XCOD-264: a team database makes no model calls, so it needs no model to be checked.
+  const external = (yield* memory.target()).type !== "embedded"
+  if (model._tag === "None" && !external)
+    return { ok: false as const, error: "No model is configured, and memory needs one to run" }
+  const parent =
+    model._tag === "Some"
+      ? { providerID: model.value.providerID, modelID: model.value.modelID }
+      : { providerID: "none", modelID: "" }
   const [scope] = yield* memory.scopes()
   if (!scope) return { ok: false as const, error: "memory.scope lists no scope" }
   const started = Date.now()
@@ -91,14 +97,33 @@ export const MemorySetupCommand = effectCmd({
     yargs
       .option("yes", { type: "boolean", describe: "accept every recommended answer" })
       .option("project", { type: "boolean", describe: "save to this project's config instead of your user config" })
-      .option("check", { type: "boolean", default: true, describe: "run the check (--no-check skips it)" }),
-  handler: Effect.fn("Cli.memory.setup")(function* (args: { yes?: boolean; project?: boolean; check?: boolean }) {
+      .option("check", { type: "boolean", default: true, describe: "run the check (--no-check skips it)" })
+      .option("template", { type: "string", describe: "start from a template (see lunos memory templates)" })
+      .option("start", {
+        type: "boolean",
+        describe: "with a Docker template and --yes: start the database (never started without it)",
+      })
+      .option("vendor", { type: "string", choices: ["neo4j", "postgres"], describe: "team templates: the database" })
+      .option("url", { type: "string", describe: "team templates: the database's URL" })
+      .option("jurisdiction", { type: "string", describe: 'team templates: where the database runs, e.g. "EU-DE"' }),
+  handler: Effect.fn("Cli.memory.setup")(function* (args: {
+    yes?: boolean
+    project?: boolean
+    check?: boolean
+    template?: string
+    start?: boolean
+    vendor?: string
+    url?: string
+    jurisdiction?: string
+  }) {
     const { MemorySetup } = yield* Effect.promise(() => import("@opencode-ai/core/memory-setup"))
     const { ConfigSettings } = yield* Effect.promise(() => import("@/config/settings"))
     const { Config } = yield* Effect.promise(() => import("@/config/config"))
     const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))
     const { MemorySetupCheck } = yield* Effect.promise(() => import("@/memory/setup-check"))
-    const { MemoryExternal } = yield* Effect.promise(() => import("@/memory/external"))
+    const { MemorySetupEnv } = yield* Effect.promise(() => import("@/memory/setup-env"))
+    const { MemoryStorage } = yield* Effect.promise(() => import("@opencode-ai/core/memory-storage"))
+    const Storage = yield* Effect.promise(() => import("./memory-storage"))
     const { AuditLog } = yield* Effect.promise(() => import("@/audit/log"))
     const prompts = yield* Effect.promise(() => import("@clack/prompts"))
     const say = (text: string) => writeStdoutEffect(text + EOL)
@@ -129,6 +154,39 @@ export const MemorySetupCommand = effectCmd({
     const ask = <T>(run: () => Promise<T | symbol>) => Effect.promise(run)
     const quit = () => say("Cancelled. Nothing was saved.")
 
+    // XCOD-264: step 2, where memory is stored. With --template it runs with --yes too.
+    const storageEnv = yield* MemorySetupEnv.environment()
+    let template: { name: string; scope: "user" | "project"; env: Record<string, string> } | undefined
+    let notStarted = false
+    const storageStep = Effect.fn("Cli.memory.setup.storage")(function* () {
+      const outcome = yield* Effect.promise(() =>
+        Storage.storage({
+          prompts,
+          env: storageEnv,
+          draft,
+          residency: AuditLog.residency(config),
+          worktree: ctx.worktree ?? ctx.directory,
+          args,
+        }),
+      )
+      if (outcome.kind === "cancel") {
+        yield* quit()
+        return true
+      }
+      if (outcome.kind === "fail") {
+        yield* say(outcome.message)
+        process.exitCode = 1
+        return true
+      }
+      Object.assign(draft, outcome.draft)
+      template = outcome.template
+      notStarted = !!args.template && !outcome.template && draft.backend.type !== "embedded"
+      return false
+    })
+    if (args.yes && args.template && !MemorySetup.locked(rows, "memory.backend")) {
+      if (yield* storageStep()) return
+    }
+
     if (!args.yes) {
       prompts.intro("Set up memory")
       if (!MemorySetup.locked(rows, "memory.enabled")) {
@@ -142,58 +200,8 @@ export const MemorySetupCommand = effectCmd({
         draft.enabled = on as boolean
       }
       if (draft.enabled && !MemorySetup.locked(rows, "memory.backend")) {
-        const where = yield* ask(() =>
-          prompts.select({
-            message: "2/6 Where is memory kept?",
-            options: [
-              { value: "embedded", label: "On this machine", hint: "recommended" },
-              { value: "neo4j", label: "A team Neo4j database" },
-            ],
-            initialValue: draft.backend.type,
-          }),
-        )
-        if (cancelled(where)) return yield* quit()
-        if (where === "neo4j") {
-          const field = (message: string, placeholder: string, initialValue?: string) =>
-            ask(() => prompts.text({ message, placeholder, initialValue }))
-          const url = yield* field("Neo4j URL", "bolt+s://graph.internal:7687")
-          if (cancelled(url)) return yield* quit()
-          const jurisdiction = yield* field("Where it runs (region)", "EU-DE")
-          if (cancelled(jurisdiction)) return yield* quit()
-          const username = yield* field("Username", "{env:NEO4J_USER}", "{env:NEO4J_USER}")
-          if (cancelled(username)) return yield* quit()
-          const password = yield* field(
-            "Password (a reference, never the password)",
-            "{env:NEO4J_PASSWORD}",
-            "{env:NEO4J_PASSWORD}",
-          )
-          if (cancelled(password)) return yield* quit()
-          const backend = {
-            type: "neo4j" as const,
-            url: String(url),
-            jurisdiction: String(jurisdiction),
-            username: String(username),
-            password: String(password),
-          }
-          const refused = (() => {
-            try {
-              MemoryExternal.gate({
-                memory: MemorySetup.block({ ...draft, backend, encryption: "off" }) as never,
-                residency: AuditLog.residency(config),
-              })
-              return undefined
-            } catch (error) {
-              return error instanceof Error ? error.message : String(error)
-            }
-          })()
-          if (refused) {
-            yield* say(`That database can't be used: ${refused}`)
-            process.exitCode = 1
-            return
-          }
-          draft.backend = backend
-          draft.encryption = "off"
-        }
+        const failed = yield* storageStep()
+        if (failed) return
       }
       if (draft.enabled && !MemorySetup.locked(rows, "memory.model")) {
         const model = yield* ask(() =>
@@ -206,7 +214,7 @@ export const MemorySetupCommand = effectCmd({
         if (cancelled(model)) return yield* quit()
         draft.model = String(model).trim() || undefined
       }
-      if (draft.enabled && args.check) {
+      if (draft.enabled && args.check && draft.backend.type === "embedded") {
         const now = yield* ask(() =>
           prompts.confirm({
             message: `4/6 ${process.env.LUNOS_OFFLINE ? MemorySetup.OFFLINE_DOWNLOAD : MemorySetup.DOWNLOAD} Download now?`,
@@ -240,15 +248,30 @@ export const MemorySetupCommand = effectCmd({
     }
 
     let check: CheckResult | undefined
-    if (draft.enabled && args.check) {
+    // A Docker template written but not started has nothing to check yet.
+    if (notStarted && args.check)
+      yield* say("The check is skipped: start the database first, then run lunos memory check.")
+    if (draft.enabled && args.check && !notStarted) {
       yield* say("6/6 Checking memory works (the first run downloads the engine and can take a few minutes)…")
       check = yield* Effect.promise(() =>
-        MemorySetupCheck.run({ directory: ctx.directory, memory: MemorySetup.block(draft) }),
+        MemorySetupCheck.run({ directory: ctx.directory, memory: MemorySetup.block(draft), env: template?.env }),
       ) as Effect.Effect<CheckResult>
       yield* say(checkLine(check.ok ? check : { ...check, fix: check.fix ?? checkFix(check.error) }))
     }
 
     const writes = MemorySetup.writes(draft, memory, rows)
+    // XCOD-264: the summary repeats what the chosen storage means before saving.
+    if (draft.enabled) {
+      const card = MemoryStorage.cards(storageEnv.environment, {
+        host: draft.backend.type === "embedded" ? undefined : hostOf(draft.backend.url),
+      }).find((item) => item.kind === draft.backend.type)
+      if (card)
+        yield* say(
+          ["", `Memory will be stored: ${card.title}`, ...MemoryStorage.meaning(card).map((line) => `  ${line}`)].join(
+            EOL,
+          ),
+        )
+    }
     for (const line of MemorySetup.conflicts(rows, scope)) yield* say(`Warning: ${line}`)
     if (!args.yes && writes.length) {
       const save = yield* ask(() =>
@@ -287,3 +310,11 @@ export const MemorySetupCommand = effectCmd({
     if (check && !check.ok) process.exitCode = 1
   }),
 })
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return undefined
+  }
+}
