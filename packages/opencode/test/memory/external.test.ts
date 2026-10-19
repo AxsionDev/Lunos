@@ -43,7 +43,7 @@ describe("config", () => {
       allow_insecure: true,
       user: "x",
     })
-    expect(() => Schema.decodeUnknownSync(ConfigV1.Info)({ memory: { backend: { type: "postgres" } } })).toThrow()
+    expect(() => Schema.decodeUnknownSync(ConfigV1.Info)({ memory: { backend: { type: "mongodb" } } })).toThrow()
   })
 
   test("credentials must be {env:} or {file:} references; the message never holds the value", () => {
@@ -126,7 +126,7 @@ describe("gate: checked before any connection", () => {
   test("+ssc is encrypted but unverified, and says so", () => {
     const checked = gate({ url: "bolt+ssc://graph.example.eu:7687" })
     expect(checked.tls).toBe("unverified")
-    expect(checked.warnings[0]).toContain("not verified")
+    expect(checked.warnings[0]).toContain("not fully verified")
   })
 
   test("other schemes, credentials in the URL, memgraph and keychain encryption are refused", () => {
@@ -147,6 +147,66 @@ describe("gate: checked before any connection", () => {
     expect(MemoryExternal.region("LI")).toBe("eu")
     expect(MemoryExternal.region("CH")).toBe("other")
     expect(MemoryExternal.region("GB")).toBe("other")
+  })
+})
+
+describe("gate: PostgreSQL and databases on this computer (XCOD-264)", () => {
+  const pg = { type: "postgres" as const, url: "postgres://db.example.eu:5432/lunos", jurisdiction: "EU-DE" }
+  const gate = (backend: object, residency: Residency.Resolved | undefined = eu) =>
+    MemoryExternal.gate({ memory: { backend: { ...pg, ...backend } } as never, residency })
+
+  test("postgres:// to another host uses verified TLS unless sslmode says otherwise", () => {
+    expect(gate({}).tls).toBe("verified")
+    const require = gate({ url: "postgres://db.example.eu:5432/lunos?sslmode=require" })
+    expect(require.tls).toBe("unverified")
+    expect(require.warnings[0]).toContain("not fully verified")
+    expect(gate({ url: "postgresql://db.example.eu/lunos?sslmode=verify-full" }).tls).toBe("verified")
+  })
+
+  test("TLS is required except to localhost", () => {
+    expect(() => gate({ url: "postgres://db.example.eu:5432/lunos?sslmode=disable" })).toThrow(/unencrypted/)
+    expect(
+      gate({ url: "postgres://db.example.eu:5432/lunos?sslmode=disable", allow_insecure: true }).warnings[0],
+    ).toContain("allow_insecure")
+    expect(gate({ url: "postgres://localhost:5432/lunos" }).tls).toBe("none")
+  })
+
+  test("bolt:// is not a PostgreSQL URL, and credentials in the URL are refused", () => {
+    expect(() => gate({ url: "bolt+s://db.example.eu:7687" })).toThrow(/postgres:\/\//)
+    expect(() => gate({ url: "postgres://u:p@db.example.eu:5432/lunos" })).toThrow(/must not contain credentials/)
+  })
+
+  test("residency refuses a disallowed region before connecting", () => {
+    expect(() => gate({ jurisdiction: "US" })).toThrow(/Blocked by data-residency policy/)
+  })
+
+  test('"local" is only for a database on this computer, and passes an EU-only policy there', () => {
+    expect(gate({ url: "postgres://localhost:5432/lunos", jurisdiction: "local" }).host).toBe("localhost")
+    expect(
+      MemoryExternal.gate({
+        memory: { backend: { ...base, url: "bolt://127.0.0.1:7687", jurisdiction: "local" } } as never,
+        residency: eu,
+      }).tls,
+    ).toBe("none")
+    expect(() => gate({ jurisdiction: "local" })).toThrow(/only for a database on this computer/)
+  })
+
+  test("Memgraph stays refused", () => {
+    expect(() => gate({ type: "memgraph", url: "bolt://localhost:7687" })).toThrow(/not supported yet/)
+  })
+
+  test("a probe refused by the gate never connects, and says which stage and what to do", async () => {
+    const refused = await MemoryExternal.probe({
+      memory: { backend: { ...pg, jurisdiction: "US" } } as never,
+      residency: eu,
+    })
+    expect(refused).toMatchObject({ ok: false, error: { type: "residency", stage: "residency" } })
+    if (!refused.ok) expect(refused.error.fix).toContain("residency policy allows")
+    const nothing = await MemoryExternal.probe({
+      memory: { backend: { ...pg, url: "postgres://127.0.0.1:1/lunos", jurisdiction: "local" } } as never,
+      residency: eu,
+    })
+    expect(nothing).toMatchObject({ ok: false, error: { stage: "connect" } })
   })
 })
 
@@ -179,108 +239,4 @@ describe("identities", () => {
   })
 })
 
-// Against a real database. Run with, for example:
-//   docker run -d -p 127.0.0.1:47687:7687 -e NEO4J_AUTH=neo4j/<password> neo4j:5
-//   LUNOS_TEST_NEO4J_URL=bolt://127.0.0.1:47687 LUNOS_TEST_NEO4J_PASSWORD=<password> bun test test/memory/external.test.ts
-const url = process.env.LUNOS_TEST_NEO4J_URL
-describe.skipIf(!url)("neo4j (live)", () => {
-  const run = crypto.randomUUID().slice(0, 8)
-  const opened: MemoryExternal.External[] = []
-  const open = async (namespace: string, extra: object = {}) => {
-    const checked = MemoryExternal.gate({
-      memory: {
-        backend: {
-          type: "neo4j",
-          url,
-          jurisdiction: "EU-DE",
-          username: "neo4j",
-          password: process.env.LUNOS_TEST_NEO4J_PASSWORD,
-          ...extra,
-        },
-      } as never,
-      residency: eu,
-    })
-    const store = await MemoryExternal.neo4j({
-      checked,
-      scope: "project",
-      worktree: "/nonexistent",
-      limits: MemoryBackend.DEFAULT_LIMITS,
-      namespace: `test:${run}:${namespace}`,
-    })
-    opened.push(store)
-    return store
-  }
-  const provenance: MemoryStore.Provenance = {
-    sessionID: "ses_1",
-    agent: "build",
-    source: "user message",
-    date: "2026-09-01T10:00:00.000Z",
-  }
-  afterAll(async () => {
-    for (const store of opened) {
-      if (!store.readOnly) await store.purge().catch(() => {})
-      await store.close()
-    }
-  })
-
-  test("remember, recall with provenance, outdate, forget", async () => {
-    const store = await open("a")
-    const billing = await store.remember("The billing service owns the invoices table.", provenance, {
-      kind: "observed",
-    })
-    await store.remember("The search team owns the index repo.", provenance)
-    expect((await store.remember("The billing service owns the invoices table.", provenance)).id).toBe(billing.id)
-    const found = await store.recall("who owns the invoices table?", 5)
-    expect(found.facts[0].fact).toMatchObject({ id: billing.id, provenance, kind: "observed" })
-    const outdated = await store.outdate(billing.id, { at: new Date() })
-    expect(outdated?.status).toBe("outdated")
-    expect((await store.recall("invoices table", 5)).facts.map((item) => item.fact.id)).not.toContain(billing.id)
-    expect((await store.recall("invoices table", 5, { history: true })).facts.map((item) => item.fact.id)).toContain(
-      billing.id,
-    )
-    // Remembering an outdated fact's text again stores a new, active fact that is recalled.
-    const again = await store.remember("The billing service owns the invoices table.", provenance)
-    expect(again.id).not.toBe(billing.id)
-    expect(again.status ?? "active").toBe("active")
-    expect((await store.recall("invoices table", 5)).facts.map((item) => item.fact.id)).toContain(again.id)
-    expect(await store.forget(again.id)).toBe(true)
-    expect(await store.forget(billing.id)).toBe(true)
-    expect((await store.list()).map((fact) => fact.text)).toEqual(["The search team owns the index repo."])
-  })
-
-  test("a migrated fact keeps its id; namespaces in one database never mix", async () => {
-    const a = await open("proj-a")
-    const b = await open("proj-b")
-    const id = crypto.randomUUID()
-    await a.remember("The platform team owns the deploy repo.", provenance, { id })
-    expect((await a.list())[0].id).toBe(id)
-    expect((await b.recall("platform team deploy repo", 5)).facts).toEqual([])
-    expect(await b.list()).toEqual([])
-    expect(await b.forget(id)).toBe(false)
-    expect((await a.list()).length).toBe(1)
-  })
-
-  test("an edited node is quarantined and never recalled", async () => {
-    const store = await open("tamper")
-    const fact = await store.remember("The data team owns the events queue.", provenance)
-    const lib = (await import("neo4j-driver")).default
-    const driver = lib.driver(url!, lib.auth.basic("neo4j", process.env.LUNOS_TEST_NEO4J_PASSWORD ?? ""))
-    await driver.executeQuery(
-      "MATCH (f:LunosMemoryFact {id: $id}) SET f.record = replace(f.record, 'data team', 'evil team')",
-      { id: fact.id },
-    )
-    await driver.close()
-    expect((await store.list())[0].quarantined).toContain("integrity hash")
-    expect((await store.recall("events queue", 5)).facts).toEqual([])
-    expect((await store.health()).problems).toHaveLength(1)
-  })
-
-  test("read_only: recall works, writes are refused", async () => {
-    const writer = await open("ro")
-    await writer.remember("The mobile team owns the app repo.", provenance)
-    const reader = await open("ro", { read_only: true })
-    expect((await reader.recall("mobile app repo", 5)).facts).toHaveLength(1)
-    await expect(reader.remember("The x team owns the y repo.", provenance)).rejects.toThrow(/read_only/)
-    await expect(reader.purge()).rejects.toThrow(/read_only/)
-  })
-})
+// The live tests against real databases are in external-contract.test.ts (one suite per vendor).

@@ -24,6 +24,8 @@ import { CloudOrg } from "@/cloud/org"
 import { CloudShare } from "@/cloud/share"
 import { MemoryStatsCommand } from "./memory-stats"
 import { MemoryCheckCommand, MemorySetupCommand } from "./memory-setup"
+import { MemoryTemplatesCommand } from "./memory-storage"
+import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 
 // XCOD-94: the review surface for long-term memory. `list`, `show`, `status`, `verify` and `export`
 // read the provenance ledger only, so reviewing memory never starts the engine or needs a model.
@@ -260,7 +262,8 @@ export const MemoryStatusCommand = effectCmd({
 function backendLines(where: Memory.Where) {
   if (where.type === "embedded")
     return [
-      `Backend: embedded (on this machine).`,
+      `Stored: ${MemoryStorage.label("embedded")}.`,
+      `  Leaves the computer: ${MemoryStorage.leaves("embedded")}`,
       ...where.scopes.map(
         (item) =>
           `  ${item.scope}: ${item.error ? `can't be read: ${item.error}` : `${item.facts} fact(s), last write ${item.lastWrite ?? "never"}`}`,
@@ -276,7 +279,8 @@ function backendLines(where: Memory.Where) {
           : undefined
   const details = [`jurisdiction ${where.jurisdiction ?? "not set"}`, tls, where.readOnly ? "read-only" : undefined]
   return [
-    `Backend: ${where.type}${where.host ? ` at ${where.host}` : ""} (${details.filter(Boolean).join(", ")}).`,
+    `Stored: ${MemoryStorage.label(where.type)}${where.host ? ` at ${where.host}` : ""} (${details.filter(Boolean).join(", ")}).`,
+    `  Leaves the computer: ${MemoryStorage.leaves(where.type, undefined, where.host)}`,
     ...where.warnings.map((warning) => `  WARNING: ${warning}.`),
     `  connection: ${where.connection ?? "not opened"}`,
     ...where.scopes.map(
@@ -540,20 +544,25 @@ export const MemoryImportCommand = effectCmd({
 })
 
 /**
- * XCOD-134: move embedded memory into the external database set in memory.backend. Exports a bundle
+ * XCOD-134: move memory on this computer into the team database set in memory.backend. Exports a bundle
  * from embedded memory (facts and notes, no graph: the external database keeps facts only), then
  * imports it into the database through the same preview and write guard as `lunos memory import`.
  * Facts keep their ids and provenance. The embedded memory is left as it is.
  */
 export const MemoryMigrateCommand = effectCmd({
   command: "migrate",
-  describe: "move embedded memory into the external database set in memory.backend; previews first",
+  describe: "move memory on this computer into the team database set in memory.backend; previews first",
   builder: (yargs) =>
     yargs
       .option("to", {
-        choices: ["neo4j", "memgraph"] as const,
+        choices: ["neo4j", "postgres", "embedded"] as const,
         demandOption: true,
         describe: "the backend to move to; must match memory.backend.type",
+      })
+      .option("from-bundle", {
+        type: "string",
+        describe:
+          "move the facts of this export bundle instead of memory on this computer (the setup wizard's Move my facts)",
       })
       .option("scope", scopeOption)
       .option("yes", { type: "boolean", default: false, describe: "write the new rows (without it, only preview)" })
@@ -574,24 +583,41 @@ export const MemoryMigrateCommand = effectCmd({
     if (!verdict.on) return yield* fail(`Memory is off: ${verdict.reason}. Nothing was migrated`)
     const scopes = scopesOf(args.scope)
     const dir = yield* Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), "lunos-migrate-")))
-    const bundle = path.join(dir, "bundle")
+    const from = args["from-bundle"] as string | undefined
+    if (args.to === "embedded" && !from) return yield* fail("--to embedded needs --from-bundle: the facts to move here")
+    const bundle = from ? path.resolve(from) : path.join(dir, "bundle")
+    // Into memory on this computer, facts are extracted again, so that needs the model.
+    // Imported here, like the other heavy modules the memory commands use, so loading the CLI stays light.
+    const { Provider } = yield* Effect.promise(() => import("@/provider/provider"))
+    const model =
+      args.to === "embedded"
+        ? yield* Provider.Service.use((provider) => provider.defaultModel()).pipe(
+            Effect.catch(() => fail("Moving facts to this computer needs a model: connect a provider first")),
+          )
+        : { providerID: "none", modelID: "" }
     const result = yield* Effect.gen(function* () {
-      yield* memory.pin("embedded")
-      const exported = yield* MemoryExport.run({
-        scopes,
-        graph: false,
-        includeIndex: false,
-        zip: false,
-        out: bundle,
-        directory: dir,
-      }).pipe(
-        Effect.ensuring(memory.pin(undefined)),
-        Effect.catch((error) => fail(`Could not read embedded memory: ${error.message}`)),
-      )
-      yield* writeStdoutEffect(
-        `Read ${exported.manifest.counts.facts.total} fact(s) and ${exported.manifest.counts.notes} note file(s) from embedded memory.${EOL}`,
-      )
-      const options = { path: bundle, migrate: true, parent: { providerID: "none", modelID: "" } }
+      if (!from) {
+        yield* memory.pin("embedded")
+        const exported = yield* MemoryExport.run({
+          scopes,
+          graph: false,
+          includeIndex: false,
+          zip: false,
+          out: bundle,
+          directory: dir,
+        }).pipe(
+          Effect.ensuring(memory.pin(undefined)),
+          Effect.catch((error) => fail(`Could not read memory on this computer: ${error.message}`)),
+        )
+        yield* writeStdoutEffect(
+          `Read ${exported.manifest.counts.facts.total} fact(s) and ${exported.manifest.counts.notes} note file(s) from memory on this computer.${EOL}`,
+        )
+      }
+      const options = {
+        path: bundle,
+        migrate: true,
+        parent: { providerID: String(model.providerID), modelID: String(model.modelID) },
+      }
       const preview = yield* MemoryImport.preview(options).pipe(Effect.catch((error) => fail(error.message)))
       yield* writeStdoutEffect(previewText(preview) + EOL)
       if (preview.limit) return yield* fail(preview.limit)
@@ -611,7 +637,9 @@ export const MemoryMigrateCommand = effectCmd({
     }).pipe(Effect.ensuring(Effect.promise(() => fs.rm(dir, { recursive: true, force: true }))))
     if (!result) return
     const lines = [
-      `Migrated ${result.facts} fact(s) to ${args.to}. Embedded memory is unchanged; delete it with lunos memory purge once you have checked the database.`,
+      from
+        ? `Moved ${result.facts} fact(s) to ${MemoryStorage.label(args.to)}, each with where it came from. The old storage is unchanged.`
+        : `Migrated ${result.facts} fact(s) to ${MemoryStorage.label(args.to)}. Memory on this computer is unchanged; delete it with lunos memory purge once you have checked the database.`,
     ]
     for (const item of result.failed) lines.push(`Not migrated: ${oneLine(item.text, 60)}: ${item.reason}`)
     yield* writeStdoutEffect(lines.join(EOL) + EOL)
@@ -714,6 +742,7 @@ export const MemoryCommand = cmd({
       .command(MemoryStatsCommand)
       .command(MemoryCheckCommand)
       .command(MemorySetupCommand)
+      .command(MemoryTemplatesCommand)
       .demandCommand(),
   handler: () => {},
 })

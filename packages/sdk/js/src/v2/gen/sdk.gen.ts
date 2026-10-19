@@ -190,7 +190,20 @@ import type {
   MemorySetupBackendResponses,
   MemorySetupCheckErrors,
   MemorySetupCheckResponses,
+  MemorySetupEnvironmentErrors,
+  MemorySetupEnvironmentResponses,
   MemorySetupInput,
+  MemorySetupMoveErrors,
+  MemorySetupMoveResponses,
+  MemorySetupTemplateApplyErrors,
+  MemorySetupTemplateApplyResponses,
+  MemorySetupTemplateInput,
+  MemorySetupTemplatePreviewErrors,
+  MemorySetupTemplatePreviewResponses,
+  MemorySetupTemplateStartErrors,
+  MemorySetupTemplateStartResponses,
+  MemorySetupTestErrors,
+  MemorySetupTestResponses,
   MemoryStatsErrors,
   MemoryStatsResponses,
   ModelRef,
@@ -4311,6 +4324,237 @@ export class Setup extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<MemorySetupBackendResponses, MemorySetupBackendErrors, ThrowOnError>({
       url: "/memory/setup/backend",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Memory storage facts
+   *
+   * What the storage step shows about this machine: the memory paths, the model that extracts facts and its region, whether Docker or Podman is installed, local model providers, and the memory templates to offer (built-in and from managed config).
+   */
+  public environment<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      MemorySetupEnvironmentResponses,
+      MemorySetupEnvironmentErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/environment",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Test a memory database connection
+   *
+   * Run the checks Lunos makes before connecting, then connect, write, read and delete a probe in a namespace of its own. Never touches stored facts.
+   */
+  public test<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupTestResponses, MemorySetupTestErrors, ThrowOnError>({
+      url: "/memory/setup/test",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview a memory template
+   *
+   * Everything a memory template would write, in full, without writing it. A generated password is shown masked.
+   */
+  public templatePreview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplatePreviewResponses,
+      MemorySetupTemplatePreviewErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/preview",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Write a memory template's files
+   *
+   * Write a Docker template's compose file, .env (0600, holding the generated password) and .env.example. An existing file is replaced only when named in overwrite. Starts nothing.
+   */
+  public templateApply<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplateApplyResponses,
+      MemorySetupTemplateApplyErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/apply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Start a memory template's database
+   *
+   * Run docker compose up -d for a written Docker template, then wait up to two minutes for its healthcheck. Call only after the user confirmed the command.
+   */
+  public templateStart<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplateStartResponses,
+      MemorySetupTemplateStartErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/start",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Move facts to new memory storage
+   *
+   * Switching storage, "Move my facts": export every fact from the storage in use now and import it into the proposed one, keeping each fact's provenance. The old copy is left as it is.
+   */
+  public move<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupMoveResponses, MemorySetupMoveErrors, ThrowOnError>({
+      url: "/memory/setup/move",
       ...options,
       ...params,
       headers: {

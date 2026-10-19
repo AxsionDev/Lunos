@@ -457,7 +457,7 @@ Commands:
                                provenance), or as one Markdown file per fact with --format markdown
   lunos memory import <path>   import memory from a Lunos bundle, Markdown, or AGENTS.md / CLAUDE.md
                                / Claude Code memory notes; previews first
-  lunos memory migrate         move embedded memory into the external database set in
+  lunos memory migrate         move memory on this computer into the team database set in
                                memory.backend; previews first
   lunos memory share <ids..>   share facts with your organisation's team memory (an admin approves
                                each one)
@@ -465,6 +465,8 @@ Commands:
                                are recalled
   lunos memory check           check that memory works: remember, recall and remove a test fact
   lunos memory setup           set up memory in a few steps, each with a recommended answer
+  lunos memory templates       list the memory setup templates (lunos memory setup --template
+                               <name>)
 
 Options:
   -h, --help        show help                                                              [boolean]
