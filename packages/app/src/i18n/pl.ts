@@ -1364,6 +1364,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompty w kolejce",
   "sessions.monitor.takeover.queuedSend": "Najpierw wyślij, po kolei ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Odrzuć je ({{count}})",
+  "sessions.monitor.takeover.action": "Przejmij",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, w którym działała „{{title}}”, zamknął się z promptami wciąż w kolejce. W kolejce: {{count}}. Jeśli je wyślesz, zostaną uruchomione w tym Lunos, po kolei.",
+  "sessions.monitor.takeover.sendQueued": "Wyślij prompty z kolejki ({{count}})",
+  "sessions.monitor.takeover.sent": "Przejęto „{{title}}”: wysyłanie promptów z kolejki ({{count}})",
+  "sessions.monitor.takeover.discarded": "Przejęto „{{title}}”: odrzucono prompty z kolejki ({{count}})",
   "sessions.monitor.send.question.one": "Wysłać do {{count}} sesji?",
   "sessions.monitor.send.question.few": "Wysłać do {{count}} sesji?",
   "sessions.monitor.send.question.many": "Wysłać do {{count}} sesji?",

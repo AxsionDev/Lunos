@@ -1352,6 +1352,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Raginimai eilėje",
   "sessions.monitor.takeover.queuedSend": "Pirmiausia išsiųsti, iš eilės ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Atmesti juos ({{count}})",
+  "sessions.monitor.takeover.action": "Perimti",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, kuriame veikė „{{title}}“, užsidarė su raginimais, vis dar laukiančiais eilėje. Eilėje: {{count}}. Jei juos išsiųsite, jie bus vykdomi šiame Lunos, iš eilės.",
+  "sessions.monitor.takeover.sendQueued": "Siųsti eilėje laukiančius raginimus ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ perimta: siunčiami eilėje laukiantys raginimai ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ perimta: eilėje laukę raginimai atmesti ({{count}})",
   "sessions.monitor.send.question.one": "Siųsti {{count}} seansui?",
   "sessions.monitor.send.question.few": "Siųsti {{count}} seansams?",
   "sessions.monitor.send.question.many": "Siųsti {{count}} seanso?",

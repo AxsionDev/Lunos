@@ -1340,6 +1340,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Promptovi u redu čekanja",
   "sessions.monitor.takeover.queuedSend": "Prvo ih pošalji, redom ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Odbaci ih ({{count}})",
+  "sessions.monitor.takeover.action": "Preuzmi",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos koji je izvodio „{{title}}” zatvoren je s promptovima koji su još u redu čekanja. U redu čekanja: {{count}}. Ako ih pošaljete, izvršavaju se u ovom Lunosu, redom.",
+  "sessions.monitor.takeover.sendQueued": "Pošalji promptove iz reda čekanja ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}” preuzeta: šalju se promptovi iz reda čekanja ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}” preuzeta: promptovi iz reda čekanja odbačeni ({{count}})",
   "sessions.monitor.send.question.one": "Poslati {{count}} sesiji?",
   "sessions.monitor.send.question.few": "Poslati na {{count}} sesije?",
   "sessions.monitor.send.question.other": "Poslati na {{count}} sesija?",

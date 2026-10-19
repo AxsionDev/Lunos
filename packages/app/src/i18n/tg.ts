@@ -1332,6 +1332,13 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Дархостҳои дар навбат",
   "sessions.monitor.takeover.queuedSend": "Аввал бо тартиб фиристодан ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Рад кардан ({{count}})",
+  "sessions.monitor.takeover.action": "Ба ӯҳда гирифтан",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, ки «{{title}}»-ро иҷро мекард, бо дархостҳои ҳанӯз дар навбат баста шуд. Дар навбат: {{count}}. Агар онҳоро фиристед, онҳо дар ҳамин Lunos бо тартиб иҷро мешаванд.",
+  "sessions.monitor.takeover.sendQueued": "Фиристодани дархостҳои навбат ({{count}})",
+  "sessions.monitor.takeover.sent": "«{{title}}» ба ӯҳда гирифта шуд: дархостҳои навбат фиристода мешаванд ({{count}})",
+  "sessions.monitor.takeover.discarded":
+    "«{{title}}» ба ӯҳда гирифта шуд: дархостҳои навбат партофта шуданд ({{count}})",
   "sessions.monitor.send.question.one": "Ба {{count}} сеанс фиристем?",
   "sessions.monitor.send.question.other": "Ба {{count}} сеанс фиристем?",
   "sessions.monitor.sent": "Ба «{{title}}» фиристода шуд",

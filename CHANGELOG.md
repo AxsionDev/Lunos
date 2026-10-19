@@ -42,6 +42,9 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   session over: the confirmation says how many there are, and offers to send them first, in order,
   or discard them. A prompt is never sent twice. The Sessions window also remembers whether you
   last arranged the list by status or by group. <!-- XCOD-262 -->
+- **Send a closed Lunos's queued prompts without writing a new one.** A session showing "2 queued
+  (owner closed)" now has **Take over** on its row in the Sessions window, and `t` in the Agent
+  Monitor's list. It sends just those prompts, in order, or discards them. <!-- XCOD-268 -->
 - **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory, if you
   agree.** The first time per tool and project, Lunos asks: Share, Not now, or Never for this tool.
   Their results are sent to Anthropic or OpenAI with your prompts, so nothing is offered until you

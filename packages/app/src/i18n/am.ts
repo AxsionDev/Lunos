@@ -1287,6 +1287,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "በወረፋ ላይ ያሉ ጥያቄዎች",
   "sessions.monitor.takeover.queuedSend": "መጀመሪያ በቅደም ተከተል ላክ ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "አስወግዳቸው ({{count}})",
+  "sessions.monitor.takeover.action": "ተረከብ",
+  "sessions.monitor.takeover.onlyBody":
+    "«{{title}}»ን ያስኬደው Lunos በወረፋ ላይ ያሉ ጥያቄዎች እያሉ ተዘግቷል። በወረፋ ላይ: {{count}}። ከላኳቸው በዚህ Lunos ውስጥ በቅደም ተከተል ይሄዳሉ።",
+  "sessions.monitor.takeover.sendQueued": "በወረፋ ያሉትን ጥያቄዎች ላክ ({{count}})",
+  "sessions.monitor.takeover.sent": "«{{title}}» ተረክቧል፦ በወረፋ ያሉት ጥያቄዎች እየተላኩ ነው ({{count}})",
+  "sessions.monitor.takeover.discarded": "«{{title}}» ተረክቧል፦ በወረፋ ያሉት ጥያቄዎች ተጥለዋል ({{count}})",
   "sessions.monitor.send.question.one": "ወደ {{count}} ክፍለ ጊዜ ይላክ?",
   "sessions.monitor.send.question.other": "ወደ {{count}} ክፍለ ጊዜዎች ይላክ?",
   "sessions.monitor.sent": 'ወደ "{{title}}" ተልኳል',

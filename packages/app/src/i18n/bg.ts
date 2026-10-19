@@ -1336,6 +1336,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Подкани на опашка",
   "sessions.monitor.takeover.queuedSend": "Първо ги изпрати, по ред ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Отхвърли ги ({{count}})",
+  "sessions.monitor.takeover.action": "Поеми",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, в който вървеше „{{title}}“, се затвори с подкани, още чакащи на опашка. На опашка: {{count}}. Ако ги изпратите, те се изпълняват в този Lunos, по ред.",
+  "sessions.monitor.takeover.sendQueued": "Изпрати чакащите подкани ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ е поета: чакащите подкани се изпращат ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ е поета: чакащите подкани са отхвърлени ({{count}})",
   "sessions.monitor.send.question.one": "Да се изпрати ли до {{count}} сесия?",
   "sessions.monitor.send.question.other": "Да се изпрати ли до {{count}} сесии?",
   "sessions.monitor.sent": "Изпратено до „{{title}}“",

@@ -1334,6 +1334,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Jonossa olevat kehotteet",
   "sessions.monitor.takeover.queuedSend": "Lähetä ne ensin järjestyksessä ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Hylkää ne ({{count}})",
+  "sessions.monitor.takeover.action": "Ota haltuun",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, jossa ”{{title}}” oli käynnissä, suljettiin, kun jonossa oli vielä kehotteita. Jonossa: {{count}}. Jos lähetät ne, ne suoritetaan tässä Lunosissa järjestyksessä.",
+  "sessions.monitor.takeover.sendQueued": "Lähetä jonossa olevat kehotteet ({{count}})",
+  "sessions.monitor.takeover.sent": "”{{title}}” otettu haltuun: jonossa olevia kehotteita lähetetään ({{count}})",
+  "sessions.monitor.takeover.discarded": "”{{title}}” otettu haltuun: jonossa olevat kehotteet hylättiin ({{count}})",
   "sessions.monitor.send.question.one": "Lähetetäänkö {{count}} istuntoon?",
   "sessions.monitor.send.question.other": "Lähetetäänkö {{count}} istuntoon?",
   "sessions.monitor.sent": "Lähetetty istuntoon ”{{title}}”",

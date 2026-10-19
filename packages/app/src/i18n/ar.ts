@@ -1361,6 +1361,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "المطالبات في قائمة الانتظار",
   "sessions.monitor.takeover.queuedSend": "أرسلها أولًا بالترتيب ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "تجاهلها ({{count}})",
+  "sessions.monitor.takeover.action": "تولي الجلسة",
+  "sessions.monitor.takeover.onlyBody":
+    "أُغلق Lunos الذي كان يشغّل «{{title}}» وما زالت لديه مطالبات في قائمة الانتظار. في قائمة الانتظار: {{count}}. إن أرسلتها، تعمل في Lunos هذا بالترتيب.",
+  "sessions.monitor.takeover.sendQueued": "أرسل المطالبات المنتظرة ({{count}})",
+  "sessions.monitor.takeover.sent": "تم تولي «{{title}}»: جارٍ إرسال مطالباتها المنتظرة ({{count}})",
+  "sessions.monitor.takeover.discarded": "تم تولي «{{title}}»: تم تجاهل مطالباتها المنتظرة ({{count}})",
   "sessions.monitor.send.question.one": "إرسال إلى جلسة واحدة؟ العدد: {{count}}",
   "sessions.monitor.send.question.zero": "إرسال إلى الجلسات؟ العدد: {{count}}",
   "sessions.monitor.send.question.two": "إرسال إلى جلستين؟ العدد: {{count}}",

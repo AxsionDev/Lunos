@@ -1338,6 +1338,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Sorban álló promptok",
   "sessions.monitor.takeover.queuedSend": "Először küldd el őket, sorrendben ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Elvetés ({{count}})",
+  "sessions.monitor.takeover.action": "Átvétel",
+  "sessions.monitor.takeover.onlyBody":
+    "A „{{title}}” munkamenetet futtató Lunos úgy zárult be, hogy még promptok álltak sorban. Sorban áll: {{count}}. Ha elküldöd őket, ebben a Lunosban futnak, sorrendben.",
+  "sessions.monitor.takeover.sendQueued": "Sorban álló promptok küldése ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}” átvéve: a sorban álló promptok küldése folyamatban ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}” átvéve: a sorban álló promptok elvetve ({{count}})",
   "sessions.monitor.send.question.one": "Küldés {{count}} munkamenetnek?",
   "sessions.monitor.send.question.other": "Küldés {{count}} munkamenetnek?",
   "sessions.monitor.sent": "Elküldve ide: „{{title}}”",

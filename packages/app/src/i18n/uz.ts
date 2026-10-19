@@ -1338,6 +1338,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Navbatdagi so‘rovlar",
   "sessions.monitor.takeover.queuedSend": "Avval tartib bilan yuborish ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Ularni bekor qilish ({{count}})",
+  "sessions.monitor.takeover.action": "Zimmaga olish",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}”ni ishlatgan Lunos navbatda hali so‘rovlar turganida yopildi. Navbatda: {{count}}. Yuborsangiz, ular shu Lunosda tartib bilan ishlaydi.",
+  "sessions.monitor.takeover.sendQueued": "Navbatdagi so‘rovlarni yuborish ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” zimmaga olindi: navbatdagi so‘rovlar yuborilmoqda ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}” zimmaga olindi: navbatdagi so‘rovlar bekor qilindi ({{count}})",
   "sessions.monitor.send.question.one": "Sessiyalarga yuborilsinmi? Soni: {{count}}",
   "sessions.monitor.send.question.other": "Sessiyalarga yuborilsinmi? Soni: {{count}}",
   "sessions.monitor.sent": "«{{title}}» ga yuborildi",

@@ -1351,6 +1351,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Wartende Prompts",
   "sessions.monitor.takeover.queuedSend": "Zuerst senden, der Reihe nach ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Verwerfen ({{count}})",
+  "sessions.monitor.takeover.action": "Übernehmen",
+  "sessions.monitor.takeover.onlyBody":
+    "Das Lunos, in dem „{{title}}“ lief, wurde mit noch wartenden Prompts beendet. In der Warteschlange: {{count}}. Wenn du sie sendest, laufen sie in diesem Lunos, der Reihe nach.",
+  "sessions.monitor.takeover.sendQueued": "Wartende Prompts senden ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ übernommen: wartende Prompts werden gesendet ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ übernommen: wartende Prompts verworfen ({{count}})",
   "sessions.monitor.send.question.one": "An {{count}} Sitzung senden?",
   "sessions.monitor.send.question.other": "An {{count}} Sitzungen senden?",
   "sessions.monitor.sent": "An „{{title}}“ gesendet",

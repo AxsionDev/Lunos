@@ -1321,6 +1321,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "რიგში მყოფი მოთხოვნები",
   "sessions.monitor.takeover.queuedSend": "ჯერ გაგზავნა, თანმიმდევრობით ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "უარყოფა ({{count}})",
+  "sessions.monitor.takeover.action": "გადაბარება",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, რომელშიც „{{title}}“ მუშაობდა, დაიხურა, როცა რიგში ჯერ კიდევ იყო მოთხოვნები. რიგში: {{count}}. თუ გაგზავნით, ისინი ამ Lunos-ში შესრულდება, თანმიმდევრობით.",
+  "sessions.monitor.takeover.sendQueued": "რიგში მყოფი მოთხოვნების გაგზავნა ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ გადაბარებულია: რიგში მყოფი მოთხოვნები იგზავნება ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ გადაბარებულია: რიგში მყოფი მოთხოვნები გაუქმდა ({{count}})",
   "sessions.monitor.send.question.one": "გაიგზავნოს {{count}} სესიაში?",
   "sessions.monitor.send.question.other": "გაიგზავნოს {{count}} სესიაში?",
   "sessions.monitor.sent": "გაიგზავნა „{{title}}“-ში",

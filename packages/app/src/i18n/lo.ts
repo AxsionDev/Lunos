@@ -1311,6 +1311,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "ຄຳສັ່ງໃນຄິວ",
   "sessions.monitor.takeover.queuedSend": "ສົ່ງກ່ອນ ຕາມລຳດັບ ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "ຍົກເລີກ ({{count}})",
+  "sessions.monitor.takeover.action": "ຮັບຊ່ວງ",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos ທີ່ແລ່ນ “{{title}}” ໄດ້ປິດລົງ ໃນຂະນະທີ່ຍັງມີຄຳສັ່ງຢູ່ໃນຄິວ. ໃນຄິວ: {{count}}. ຖ້າທ່ານສົ່ງ, ພວກມັນຈະແລ່ນໃນ Lunos ນີ້ ຕາມລຳດັບ.",
+  "sessions.monitor.takeover.sendQueued": "ສົ່ງຄຳສັ່ງໃນຄິວ ({{count}})",
+  "sessions.monitor.takeover.sent": "ຮັບຊ່ວງ “{{title}}” ແລ້ວ: ກຳລັງສົ່ງຄຳສັ່ງໃນຄິວ ({{count}})",
+  "sessions.monitor.takeover.discarded": "ຮັບຊ່ວງ “{{title}}” ແລ້ວ: ຖິ້ມຄຳສັ່ງໃນຄິວແລ້ວ ({{count}})",
   "sessions.monitor.send.question.one": "ສົ່ງໄປ {{count}} ເຊດຊັນບໍ?",
   "sessions.monitor.send.question.other": "ສົ່ງໄປ {{count}} ເຊດຊັນບໍ?",
   "sessions.monitor.sent": 'ສົ່ງໄປ "{{title}}" ແລ້ວ',

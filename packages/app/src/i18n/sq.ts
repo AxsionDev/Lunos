@@ -1327,6 +1327,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Kërkesat në radhë",
   "sessions.monitor.takeover.queuedSend": "Dërgoji fillimisht, me radhë ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Hidhi poshtë ({{count}})",
+  "sessions.monitor.takeover.action": "Merre",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos që ekzekutonte „{{title}}“ u mbyll me kërkesa ende në radhë. Në radhë: {{count}}. Nëse i dërgon, ato ekzekutohen në këtë Lunos, me radhë.",
+  "sessions.monitor.takeover.sendQueued": "Dërgo kërkesat në radhë ({{count}})",
+  "sessions.monitor.takeover.sent": "U mor „{{title}}“: po dërgohen kërkesat në radhë ({{count}})",
+  "sessions.monitor.takeover.discarded": "U mor „{{title}}“: kërkesat në radhë u hodhën poshtë ({{count}})",
   "sessions.monitor.send.question.one": "Të dërgohet te {{count}} sesion?",
   "sessions.monitor.send.question.other": "Të dërgohet te {{count}} sesione?",
   "sessions.monitor.sent": 'U dërgua te "{{title}}"',

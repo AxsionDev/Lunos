@@ -30,15 +30,16 @@ Each row has a number, the title, the project, the agent (or Claude Code / Codex
 
 Press **Tab** to move between the prompt and the list. In the list:
 
-| Key   | Does                                                |
-| ----- | --------------------------------------------------- |
-| ↑ ↓   | Move                                                |
-| Enter | Open the session                                    |
-| `a`   | Approve what the session asks (once)                |
-| `d`   | Deny it, or dismiss its question                    |
-| `s`   | Stop the session, after you confirm                 |
-| `/`   | Filter by title, project, state, agent or tool      |
-| `o`   | Show or hide completed sessions older than 24 hours |
+| Key   | Does                                                                         |
+| ----- | ---------------------------------------------------------------------------- |
+| ↑ ↓   | Move                                                                         |
+| Enter | Open the session                                                             |
+| `a`   | Approve what the session asks (once)                                         |
+| `d`   | Deny it, or dismiss its question                                             |
+| `s`   | Stop the session, after you confirm                                          |
+| `/`   | Filter by title, project, state, agent or tool                               |
+| `o`   | Show or hide completed sessions older than 24 hours                          |
+| `t`   | Take over a session whose Lunos closed with prompts queued (shown only then) |
 
 An approval given here goes to the Lunos that runs the session, which checks it and writes it to its [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md), as if you'd answered it there.
 
@@ -82,6 +83,8 @@ When that Lunos has closed, its session shows **2 queued (owner closed)**. Nothi
 - **Send them first**: they run in this Lunos, one turn each, in the order they were queued, and then your prompt.
 - **Discard them**: they're deleted, and only your prompt runs.
 - **Cancel**: nothing is sent, and the prompts stay queued.
+
+To send just the queued prompts, without a prompt of your own, select the session in the list and press `t` (**Take over** on the row in the desktop app and the web UI). You choose **Send 2 queued prompts** (the default) or **Discard them**, or cancel. Sent, they run in this Lunos in the order they were queued, and the session is run by this Lunos from then on. The key is `monitor.takeover` in your keybinds.
 
 Each prompt is sent at most once. It leaves the closed Lunos's file before it's sent, so if a Lunos crashes in the middle of a take-over, a prompt is never sent twice, but the one prompt being moved at that moment can be lost. The ones not yet moved stay queued for the next take-over.
 

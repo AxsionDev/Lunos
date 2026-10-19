@@ -1332,6 +1332,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Uzvednes rindā",
   "sessions.monitor.takeover.queuedSend": "Vispirms nosūtīt, pēc kārtas ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Atmest tās ({{count}})",
+  "sessions.monitor.takeover.action": "Pārņemt",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, kurā darbojās “{{title}}”, aizvērās ar uzvednēm, kas vēl gaidīja rindā. Rindā: {{count}}. Ja tās nosūtīsiet, tās darbosies šajā Lunos pēc kārtas.",
+  "sessions.monitor.takeover.sendQueued": "Nosūtīt rindā esošās uzvednes ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” pārņemta: rindā esošās uzvednes tiek sūtītas ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}” pārņemta: rindā esošās uzvednes atmestas ({{count}})",
   "sessions.monitor.send.question.one": "Sūtīt {{count}} sesijai?",
   "sessions.monitor.send.question.zero": "Sūtīt {{count}} sesijām?",
   "sessions.monitor.send.question.other": "Sūtīt {{count}} sesijām?",

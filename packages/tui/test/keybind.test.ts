@@ -102,4 +102,6 @@ test("the Agent Monitor's keys collide with neither each other, the leader nor X
     "dialog.sessions.clear",
   ] as const)
     expect(TuiKeybind.defaultValue(name)).toBe("none")
+  // XCOD-268: Take over is a free single key, so the loop above checks it against every other one.
+  expect(TuiKeybind.defaultValue("monitor.takeover")).toBe("t")
 })

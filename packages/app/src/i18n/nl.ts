@@ -1337,6 +1337,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompts in de wachtrij",
   "sessions.monitor.takeover.queuedSend": "Eerst versturen, op volgorde ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Weggooien ({{count}})",
+  "sessions.monitor.takeover.action": "Overnemen",
+  "sessions.monitor.takeover.onlyBody":
+    'De Lunos waarin "{{title}}" draaide, is gesloten met prompts die nog in de wachtrij stonden. In de wachtrij: {{count}}. Als je ze verstuurt, draaien ze in deze Lunos, op volgorde.',
+  "sessions.monitor.takeover.sendQueued": "Prompts in de wachtrij versturen ({{count}})",
+  "sessions.monitor.takeover.sent": '"{{title}}" overgenomen: prompts in de wachtrij worden verstuurd ({{count}})',
+  "sessions.monitor.takeover.discarded": '"{{title}}" overgenomen: prompts in de wachtrij verwijderd ({{count}})',
   "sessions.monitor.send.question.one": "Naar {{count}} sessie sturen?",
   "sessions.monitor.send.question.other": "Naar {{count}} sessies sturen?",
   "sessions.monitor.sent": 'Verstuurd naar "{{title}}"',

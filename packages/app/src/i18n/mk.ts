@@ -1330,6 +1330,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Барања во редица",
   "sessions.monitor.takeover.queuedSend": "Прво испрати ги, по ред ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Отфрли ги ({{count}})",
+  "sessions.monitor.takeover.action": "Преземи",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos во кој работеше „{{title}}“ се затвори со барања што сè уште чекаат во редица. Во редица: {{count}}. Ако ги испратите, тие се извршуваат во овој Lunos, по ред.",
+  "sessions.monitor.takeover.sendQueued": "Испрати ги барањата во редица ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ е преземена: се испраќаат барањата во редица ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ е преземена: барањата во редица се отфрлени ({{count}})",
   "sessions.monitor.send.question.one": "Да се испрати ли до {{count}} сесија?",
   "sessions.monitor.send.question.other": "Да се испрати ли до {{count}} сесии?",
   "sessions.monitor.sent": "Испратено до „{{title}}“",

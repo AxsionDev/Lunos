@@ -1332,6 +1332,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Упити на чекању",
   "sessions.monitor.takeover.queuedSend": "Прво их пошаљи, редом ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Одбаци их ({{count}})",
+  "sessions.monitor.takeover.action": "Преузми",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos који је извршавао „{{title}}“ затворен је са упитима који још чекају. На чекању: {{count}}. Ако их пошаљете, извршавају се у овом Lunos-у, редом.",
+  "sessions.monitor.takeover.sendQueued": "Пошаљи упите на чекању ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ преузета: шаљу се упити на чекању ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ преузета: упити на чекању одбачени ({{count}})",
   "sessions.monitor.send.question.one": "Послати {{count}} сесији?",
   "sessions.monitor.send.question.few": "Послати на {{count}} сесије?",
   "sessions.monitor.send.question.other": "Послати на {{count}} сесија?",

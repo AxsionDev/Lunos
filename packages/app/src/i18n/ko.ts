@@ -1331,6 +1331,13 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "대기 중인 프롬프트",
   "sessions.monitor.takeover.queuedSend": "먼저 순서대로 보내기 ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "버리기 ({{count}})",
+  "sessions.monitor.takeover.action": "넘겨받기",
+  "sessions.monitor.takeover.onlyBody":
+    '"{{title}}"을(를) 실행하던 Lunos가 대기 중인 프롬프트를 남긴 채 종료되었습니다. 대기열: {{count}}. 보내면 이 Lunos에서 순서대로 실행됩니다.',
+  "sessions.monitor.takeover.sendQueued": "대기 중인 프롬프트 보내기 ({{count}})",
+  "sessions.monitor.takeover.sent": '"{{title}}"을(를) 넘겨받았습니다: 대기 중인 프롬프트를 보내는 중 ({{count}})',
+  "sessions.monitor.takeover.discarded":
+    '"{{title}}"을(를) 넘겨받았습니다: 대기 중인 프롬프트를 버렸습니다 ({{count}})',
   "sessions.monitor.send.question.one": "세션 {{count}}개에 보낼까요?",
   "sessions.monitor.send.question.other": "세션 {{count}}개에 보낼까요?",
   "sessions.monitor.sent": '"{{title}}"에 보냄',

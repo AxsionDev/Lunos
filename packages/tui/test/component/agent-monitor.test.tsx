@@ -158,7 +158,11 @@ function fakeServer(input: { sessions: SessionOverviewItem[]; extra?: (url: URL)
     }
     if (/^\/experimental\/session\/[^/]+\/takeover$/.test(url.pathname)) {
       calls.push(call)
-      return json({ sent: call.body?.queued === "send" ? 2 : 0, discarded: 0, delivery: "now" })
+      return json({
+        sent: call.body?.queued === "send" ? 2 : 0,
+        discarded: call.body?.queued === "discard" ? 2 : 0,
+        ...(call.body?.text ? { delivery: "now" } : {}),
+      })
     }
     if (
       url.pathname.startsWith("/experimental/peer/") ||
@@ -597,6 +601,59 @@ test("XCOD-262: prompts a closed Lunos queued show on the row, and go only with 
     await ui.cleanup()
   }
 })
+
+test("XCOD-268: t takes over a closed Lunos's queued prompts with no new prompt; only offered on such rows", async () => {
+  const sessions = () => [
+    row("w1", { state: "waiting", permissions: 1, updated: NOW - 1000 }),
+    row("q1", { state: "idle", queued: 2, ownerClosed: true, updated: NOW - 2000 }),
+  ]
+  for (const [choice, keys, toast] of [
+    ["send", [], 'Took over "title q1": sending its 2 queued prompts'],
+    ["discard", ["down"], 'Took over "title q1": discarded its 2 queued prompts'],
+  ] as const) {
+    const ui = await monitor(sessions())
+    try {
+      await wait(() => ui.frame().includes("2 queued (owner closed)"))
+      await ui.tab()
+      await wait(() => ui.frame().includes("a approve · d deny"))
+      // The waiting row has nothing queued: no hint, and t does nothing.
+      expect(ui.frame()).not.toContain("t take over")
+      await ui.key("t")
+      await Bun.sleep(100)
+      expect(ui.frame()).not.toContain("Take over this session here?")
+      await ui.arrow("down")
+      await wait(() => ui.frame().includes("t take over"))
+      await ui.key("t")
+      await wait(() => ui.frame().includes("closed with 2 prompts queued"))
+      expect(ui.frame()).toContain("Send 2 queued prompts")
+      expect(ui.frame()).toContain("Discard them")
+      expect(ui.frame()).toContain("Cancel")
+      for (const key of keys) await ui.arrow(key)
+      await ui.enter()
+      await wait(() => ui.calls.length === 1)
+      // No text: only the queued prompts move, through the same take-over.
+      expect(ui.calls[0]).toEqual({ path: "/experimental/session/q1/takeover", body: { queued: choice } })
+      await wait(() => ui.toast() === toast)
+    } finally {
+      await ui.cleanup()
+    }
+  }
+  // Cancel takes nothing over.
+  const ui = await monitor(sessions())
+  try {
+    await wait(() => ui.frame().includes("2 queued (owner closed)"))
+    await ui.tab()
+    await ui.arrow("down")
+    await wait(() => ui.frame().includes("t take over"))
+    await ui.key("t")
+    await wait(() => ui.frame().includes("closed with 2 prompts queued"))
+    await ui.escape()
+    await Bun.sleep(100)
+    expect(ui.calls).toHaveLength(0)
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
 
 test("a prompt never approves a tool call: tagged to a session waiting on one, only the prompt is sent", async () => {
   const ui = await monitor()

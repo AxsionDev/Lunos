@@ -1441,6 +1441,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Запросы в очереди",
   "sessions.monitor.takeover.queuedSend": "Сначала отправить по порядку ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Отбросить их ({{count}})",
+  "sessions.monitor.takeover.action": "Перехватить",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, в котором выполнялась «{{title}}», закрылся, когда в очереди ещё были запросы. В очереди: {{count}}. Если вы их отправите, они выполнятся в этом Lunos по порядку.",
+  "sessions.monitor.takeover.sendQueued": "Отправить запросы из очереди ({{count}})",
+  "sessions.monitor.takeover.sent": "«{{title}}» перехвачена: запросы из очереди отправляются ({{count}})",
+  "sessions.monitor.takeover.discarded": "«{{title}}» перехвачена: запросы из очереди отброшены ({{count}})",
   "sessions.monitor.send.question.one": "Отправить в {{count}} сессию?",
   "sessions.monitor.send.question.few": "Отправить в {{count}} сессии?",
   "sessions.monitor.send.question.many": "Отправить в {{count}} сессий?",

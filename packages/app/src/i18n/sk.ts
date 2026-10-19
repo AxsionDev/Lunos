@@ -1337,6 +1337,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompty v poradí",
   "sessions.monitor.takeover.queuedSend": "Najprv ich odoslať, po poradí ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Zahodiť ich ({{count}})",
+  "sessions.monitor.takeover.action": "Prevziať",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, v ktorom bežala „{{title}}“, sa zatvoril s promptmi, ktoré ešte čakajú v poradí. V poradí: {{count}}. Ak ich odošlete, spustia sa v tomto Lunos, po poradí.",
+  "sessions.monitor.takeover.sendQueued": "Odoslať prompty v poradí ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ prevzatá: odosielajú sa prompty v poradí ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ prevzatá: prompty v poradí zahodené ({{count}})",
   "sessions.monitor.send.question.one": "Odoslať do {{count}} relácie?",
   "sessions.monitor.send.question.few": "Odoslať do {{count}} relácií?",
   "sessions.monitor.send.question.many": "Odoslať do {{count}} relácie?",

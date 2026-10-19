@@ -199,6 +199,19 @@ export function takeoverChoices(count: number) {
   ]
 }
 
+/** XCOD-268: a row whose Lunos closed with prompts queued for it, which Take over can send or discard. */
+export function canTakeOver(item: Pick<SessionOverviewItem, "id" | "queued" | "ownerClosed" | "elsewhere">) {
+  return !!item.ownerClosed && (item.queued ?? 0) > 0 && !item.elsewhere && !toolOnly(item)
+}
+
+/** XCOD-268: Take over without a new prompt: the queued ones are all that is sent, or nothing is. */
+export function takeoverOnlyChoices(count: number) {
+  return [
+    { value: "send" as const, title: count === 1 ? "Send 1 queued prompt" : `Send ${count} queued prompts` },
+    { value: "discard" as const, title: count === 1 ? "Discard it" : "Discard them" },
+  ]
+}
+
 /**
  * What ← does on a prompt. It opens the monitor only from an empty prompt (no text, no attachments)
  * in normal mode with no autocomplete open, on home or a top-level session; anything else keeps the

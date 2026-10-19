@@ -1319,6 +1319,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Boð í bíðirøð",
   "sessions.monitor.takeover.queuedSend": "Send tey fyrst, í røð ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Burturkasta tey ({{count}})",
+  "sessions.monitor.takeover.action": "Yvirtak",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, sum koyrdi „{{title}}“, varð latið aftur við boðum, sum enn eru í bíðirøð. Í bíðirøð: {{count}}. Sendir tú tey, verða tey koyrd í hesum Lunos, í røð.",
+  "sessions.monitor.takeover.sendQueued": "Send boðini í bíðirøð ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ yvirtikin: boðini í bíðirøð verða send ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ yvirtikin: boðini í bíðirøð eru strikað ({{count}})",
   "sessions.monitor.send.question.one": "Senda til {{count}} setu?",
   "sessions.monitor.send.question.other": "Senda til {{count}} setur?",
   "sessions.monitor.sent": "Sent til „{{title}}“",

@@ -1346,6 +1346,13 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "ކިއުގައި ހުރި ޕްރޮމްޕްޓްތައް",
   "sessions.monitor.takeover.queuedSend": "ފުރަތަމަ ތަރުތީބުން ފޮނުވާ ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "ދޫކޮށްލާ ({{count}})",
+  "sessions.monitor.takeover.action": "ބަލަހައްޓަން ފަށާ",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” ހިންގި Lunos ބަންދުވީ ކިއުގައި ހުރި ޕްރޮމްޕްޓްތަކާއެކުއެވެ. ކިއުގައި: {{count}}. ފޮނުވައިފިނަމަ، އެތަކެތި ހިންގާނީ މި Lunos ގައި ތަރުތީބުންނެވެ.",
+  "sessions.monitor.takeover.sendQueued": "ކިއުގައި ހުރި ޕްރޮމްޕްޓްތައް ފޮނުވާ ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” ބަލަހައްޓަން ފެށީ: ކިއުގައި ހުރި ޕްރޮމްޕްޓްތައް ފޮނުވަނީ ({{count}})",
+  "sessions.monitor.takeover.discarded":
+    "“{{title}}” ބަލަހައްޓަން ފެށީ: ކިއުގައި ހުރި ޕްރޮމްޕްޓްތައް ދޫކޮށްލީ ({{count}})",
   "sessions.monitor.send.question.one": "ސެޝަންތަކަށް ފޮނުވަންވީތަ؟ ({{count}})",
   "sessions.monitor.send.question.other": "ސެޝަންތަކަށް ފޮނުވަންވީތަ؟ ({{count}})",
   "sessions.monitor.sent": '"{{title}}" އަށް ފޮނުވިއްޖެ',

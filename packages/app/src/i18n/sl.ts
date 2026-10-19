@@ -1342,6 +1342,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Pozivi v čakalni vrsti",
   "sessions.monitor.takeover.queuedSend": "Najprej jih pošlji, po vrsti ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Zavrzi jih ({{count}})",
+  "sessions.monitor.takeover.action": "Prevzemi",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, ki je izvajal »{{title}}«, se je zaprl s pozivi, ki še čakajo v vrsti. V čakalni vrsti: {{count}}. Če jih pošljete, se izvedejo v tem Lunos, po vrsti.",
+  "sessions.monitor.takeover.sendQueued": "Pošlji pozive iz čakalne vrste ({{count}})",
+  "sessions.monitor.takeover.sent": "»{{title}}« prevzeta: pošiljanje pozivov iz čakalne vrste ({{count}})",
+  "sessions.monitor.takeover.discarded": "»{{title}}« prevzeta: pozivi iz čakalne vrste zavrženi ({{count}})",
   "sessions.monitor.send.question.one": "Pošljem {{count}} seji?",
   "sessions.monitor.send.question.two": "Pošljem {{count}} sejama?",
   "sessions.monitor.send.question.few": "Pošljem {{count}} sejam?",

@@ -1341,6 +1341,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompty ve frontě",
   "sessions.monitor.takeover.queuedSend": "Nejdřív je odeslat, popořadě ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Zahodit je ({{count}})",
+  "sessions.monitor.takeover.action": "Převzít",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, ve kterém běžela „{{title}}“, se zavřel s prompty, které ještě čekají ve frontě. Ve frontě: {{count}}. Pokud je odešlete, poběží v tomto Lunos, popořadě.",
+  "sessions.monitor.takeover.sendQueued": "Odeslat prompty ve frontě ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ převzata: odesílají se prompty ve frontě ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ převzata: prompty ve frontě zahozeny ({{count}})",
   "sessions.monitor.send.question.one": "Odeslat do {{count}} relace?",
   "sessions.monitor.send.question.few": "Odeslat do {{count}} relací?",
   "sessions.monitor.send.question.many": "Odeslat do {{count}} relace?",

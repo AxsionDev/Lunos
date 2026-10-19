@@ -1327,6 +1327,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "कतार में प्रॉम्प्ट",
   "sessions.monitor.takeover.queuedSend": "पहले क्रम से भेजें ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "हटा दें ({{count}})",
+  "sessions.monitor.takeover.action": "संभालें",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” चलाने वाला Lunos कतार में बचे प्रॉम्प्ट के साथ बंद हो गया। कतार में: {{count}}। भेजने पर वे इस Lunos में क्रम से चलेंगे।",
+  "sessions.monitor.takeover.sendQueued": "कतार के प्रॉम्प्ट भेजें ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” संभाला गया: कतार के प्रॉम्प्ट भेजे जा रहे हैं ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}” संभाला गया: कतार के प्रॉम्प्ट हटा दिए गए ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} सेशन को भेजें?",
   "sessions.monitor.send.question.other": "{{count}} सेशनों को भेजें?",
   "sessions.monitor.sent": '"{{title}}" को भेजा गया',

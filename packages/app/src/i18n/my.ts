@@ -1342,6 +1342,13 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "တန်းစီထားသော prompt များ",
   "sessions.monitor.takeover.queuedSend": "ဦးစွာ အစဉ်လိုက် ပို့ပါ ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "ပယ်ဖျက်ပါ ({{count}})",
+  "sessions.monitor.takeover.action": "လွှဲယူပါ",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” ကို လုပ်ဆောင်ခဲ့သော Lunos သည် တန်းစီထားသော prompt များ ကျန်နေစဉ် ပိတ်သွားခဲ့သည်။ တန်းစီထားသည်: {{count}}။ ပို့ပါက ၎င်းတို့ကို ဤ Lunos တွင် အစဉ်လိုက် လုပ်ဆောင်မည်။",
+  "sessions.monitor.takeover.sendQueued": "တန်းစီထားသော prompt များကို ပို့ပါ ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” ကို လွှဲယူပြီး: တန်းစီထားသော prompt များကို ပို့နေသည် ({{count}})",
+  "sessions.monitor.takeover.discarded":
+    "“{{title}}” ကို လွှဲယူပြီး: တန်းစီထားသော prompt များကို ပယ်ဖျက်ပြီး ({{count}})",
   "sessions.monitor.send.question.one": "စက်ရှင် {{count}} ခုသို့ ပို့မလား။",
   "sessions.monitor.send.question.other": "စက်ရှင် {{count}} ခုသို့ ပို့မလား။",
   "sessions.monitor.sent": '"{{title}}" သို့ ပို့ပြီး',

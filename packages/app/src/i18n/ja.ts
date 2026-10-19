@@ -1335,6 +1335,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "キュー内のプロンプト",
   "sessions.monitor.takeover.queuedSend": "先に順番どおり送信 ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "破棄 ({{count}})",
+  "sessions.monitor.takeover.action": "引き継ぐ",
+  "sessions.monitor.takeover.onlyBody":
+    "「{{title}}」を実行していた Lunos は、未送信のプロンプトをキューに残したまま終了しました。キュー: {{count}}。送信すると、この Lunos で順番どおり実行されます。",
+  "sessions.monitor.takeover.sendQueued": "キューのプロンプトを送信 ({{count}})",
+  "sessions.monitor.takeover.sent": "「{{title}}」を引き継ぎました: キューのプロンプトを送信しています ({{count}})",
+  "sessions.monitor.takeover.discarded": "「{{title}}」を引き継ぎました: キューのプロンプトを破棄しました ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} 件のセッションに送信しますか?",
   "sessions.monitor.send.question.other": "{{count}} 件のセッションに送信しますか?",
   "sessions.monitor.sent": "「{{title}}」に送信しました",

@@ -244,6 +244,10 @@ export const Definitions = {
   "monitor.stop": keybind("s", "Stop the selected session in the Agent Monitor"),
   "monitor.filter": keybind("/", "Filter the Agent Monitor's rail"),
   "monitor.older": keybind("o", "Show or hide older completed sessions in the Agent Monitor"),
+  "monitor.takeover": keybind(
+    "t",
+    "Take over the selected session, whose Lunos closed with prompts queued, and send or discard them, in the Agent Monitor",
+  ),
   // XCOD-265's Stop all / Clear list in the Agent Monitor's rail: unbound, as in /sessions.
   "monitor.stop_all": keybind("none", "Stop every running or waiting session in the Agent Monitor's rail"),
   "monitor.clear": keybind("none", "Clear (archive) the finished sessions in the Agent Monitor's rail"),

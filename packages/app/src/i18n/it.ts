@@ -1348,6 +1348,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompt in coda",
   "sessions.monitor.takeover.queuedSend": "Inviali prima, in ordine ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Scartali ({{count}})",
+  "sessions.monitor.takeover.action": "Prendi in carico",
+  "sessions.monitor.takeover.onlyBody":
+    'Il Lunos che eseguiva "{{title}}" si è chiuso con prompt ancora in coda. In coda: {{count}}. Se li invii, vengono eseguiti in questo Lunos, in ordine.',
+  "sessions.monitor.takeover.sendQueued": "Invia i prompt in coda ({{count}})",
+  "sessions.monitor.takeover.sent": 'Preso in carico "{{title}}": invio dei prompt in coda ({{count}})',
+  "sessions.monitor.takeover.discarded": 'Preso in carico "{{title}}": prompt in coda scartati ({{count}})',
   "sessions.monitor.send.question.one": "Inviare a {{count}} sessione?",
   "sessions.monitor.send.question.many": "Inviare a {{count}} di sessioni?",
   "sessions.monitor.send.question.other": "Inviare a {{count}} sessioni?",

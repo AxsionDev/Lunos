@@ -1322,6 +1322,12 @@ export const dict: Record<string, string> = {
   "sessions.monitor.takeover.queuedLabel": "लाइनमा रहेका प्रम्प्टहरू",
   "sessions.monitor.takeover.queuedSend": "पहिले क्रमैसँग पठाउनुहोस् ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "हटाउनुहोस् ({{count}})",
+  "sessions.monitor.takeover.action": "लिनुहोस्",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” चलाउने Lunos लाइनमा प्रम्प्टहरू बाँकी रहँदै बन्द भयो। लाइनमा: {{count}}। पठाउनुभयो भने ती यो Lunos मा क्रमैसँग चल्छन्।",
+  "sessions.monitor.takeover.sendQueued": "लाइनका प्रम्प्टहरू पठाउनुहोस् ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” लिइयो: लाइनका प्रम्प्टहरू पठाइँदैछन् ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}” लिइयो: लाइनका प्रम्प्टहरू हटाइए ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} सत्रमा पठाउने हो?",
   "sessions.monitor.send.question.other": "{{count}} सत्रहरूमा पठाउने हो?",
   "sessions.monitor.sent": '"{{title}}" मा पठाइयो',

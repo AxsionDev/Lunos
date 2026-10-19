@@ -1348,6 +1348,12 @@ export const dict: Record<string, string> = {
   "sessions.monitor.takeover.queuedLabel": "གྲལ་རིམ་ནང་གི་བཀོད་རྒྱ",
   "sessions.monitor.takeover.queuedSend": "དང་པ་ གོ་རིམ་བཞིན་ བཏང་ ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "བཏོན་གཏང་ ({{count}})",
+  "sessions.monitor.takeover.action": "འཛིན",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” གཡོག་བཀོལ་མི་ Lunos དེ་ གྲལ་རིམ་ནང་ལུ་ བཀོད་རྒྱ་ཚུ་ཡོད་པའི་བར་ན་ ཁ་བསྡམས་ཡི། གྲལ་རིམ་ནང་: {{count}}། ཁྱོད་ཀྱིས་བཏང་པ་ཅིན་ Lunos འདི་ནང་ གོ་རིམ་བཞིན་ གཡོག་བཀོལ་འོང་།",
+  "sessions.monitor.takeover.sendQueued": "གྲལ་རིམ་ནང་གི་ བཀོད་རྒྱ་ཚུ་ བཏང་ ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” འཛིན་ཡི། གྲལ་རིམ་ནང་གི་ བཀོད་རྒྱ་ཚུ་ གཏང་དོ ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}” འཛིན་ཡི། གྲལ་རིམ་ནང་གི་ བཀོད་རྒྱ་ཚུ་ བཏོན་བཏང་ཡི ({{count}})",
   "sessions.monitor.send.question.one": "ལཱ་ཡུན་ཚུ་ལུ་གཏང་ནི་ཨིན་ན? ({{count}})",
   "sessions.monitor.send.question.other": "ལཱ་ཡུན་ཚུ་ལུ་གཏང་ནི་ཨིན་ན? ({{count}})",
   "sessions.monitor.sent": '"{{title}}" ལུ་བཏང་ཡོད',

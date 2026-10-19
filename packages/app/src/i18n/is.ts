@@ -1321,6 +1321,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Kvaðningar í biðröð",
   "sessions.monitor.takeover.queuedSend": "Senda þær fyrst, í röð ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Henda þeim ({{count}})",
+  "sessions.monitor.takeover.action": "Taka yfir",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos sem keyrði „{{title}}“ lokaðist með kvaðningar enn í biðröð. Í biðröð: {{count}}. Ef þú sendir þær keyra þær í þessu Lunos, í röð.",
+  "sessions.monitor.takeover.sendQueued": "Senda kvaðningar í biðröð ({{count}})",
+  "sessions.monitor.takeover.sent": "Tók yfir „{{title}}“: sendir kvaðningar í biðröð ({{count}})",
+  "sessions.monitor.takeover.discarded": "Tók yfir „{{title}}“: kvaðningum í biðröð hent ({{count}})",
   "sessions.monitor.send.question.one": "Senda á {{count}} setu?",
   "sessions.monitor.send.question.other": "Senda á {{count}} setur?",
   "sessions.monitor.sent": "Sent á „{{title}}“",

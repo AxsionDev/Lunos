@@ -1324,6 +1324,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Gesaan dalam baris gilir",
   "sessions.monitor.takeover.queuedSend": "Hantar dahulu, mengikut urutan ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Buang ({{count}})",
+  "sessions.monitor.takeover.action": "Ambil alih",
+  "sessions.monitor.takeover.onlyBody":
+    'Lunos yang menjalankan "{{title}}" ditutup dengan gesaan masih dalam baris gilir. Dalam baris gilir: {{count}}. Jika dihantar, gesaan itu berjalan dalam Lunos ini, mengikut urutan.',
+  "sessions.monitor.takeover.sendQueued": "Hantar gesaan dalam baris gilir ({{count}})",
+  "sessions.monitor.takeover.sent": 'Mengambil alih "{{title}}": menghantar gesaan dalam baris gilir ({{count}})',
+  "sessions.monitor.takeover.discarded": 'Mengambil alih "{{title}}": gesaan dalam baris gilir dibuang ({{count}})',
   "sessions.monitor.send.question.one": "Hantar ke {{count}} sesi?",
   "sessions.monitor.send.question.other": "Hantar ke {{count}} sesi?",
   "sessions.monitor.sent": 'Dihantar ke "{{title}}"',

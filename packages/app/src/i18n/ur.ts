@@ -1327,6 +1327,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "قطار میں پرامپٹس",
   "sessions.monitor.takeover.queuedSend": "پہلے ترتیب سے بھیجیں ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "رد کریں ({{count}})",
+  "sessions.monitor.takeover.action": "سنبھالیں",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” چلانے والا Lunos قطار میں موجود پرامپٹس کے ساتھ بند ہو گیا۔ قطار میں: {{count}}۔ اگر آپ انہیں بھیجیں تو وہ اس Lunos میں ترتیب سے چلیں گے۔",
+  "sessions.monitor.takeover.sendQueued": "قطار کے پرامپٹس بھیجیں ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” سنبھال لیا: قطار کے پرامپٹس بھیجے جا رہے ہیں ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}” سنبھال لیا: قطار کے پرامپٹس رد کر دیے ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} سیشن کو بھیجیں؟",
   "sessions.monitor.send.question.other": "{{count}} سیشنز کو بھیجیں؟",
   "sessions.monitor.sent": '"{{title}}" کو بھیج دیا',

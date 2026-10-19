@@ -1427,6 +1427,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Sıradaki istemler",
   "sessions.monitor.takeover.queuedSend": "Önce sırayla gönder ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Onları at ({{count}})",
+  "sessions.monitor.takeover.action": "Devral",
+  "sessions.monitor.takeover.onlyBody":
+    '"{{title}}" oturumunu çalıştıran Lunos, sırada bekleyen istemlerle kapandı. Sırada: {{count}}. Gönderirseniz bu Lunos\'ta sırayla çalışırlar.',
+  "sessions.monitor.takeover.sendQueued": "Sıradaki istemleri gönder ({{count}})",
+  "sessions.monitor.takeover.sent": '"{{title}}" devralındı: sıradaki istemler gönderiliyor ({{count}})',
+  "sessions.monitor.takeover.discarded": '"{{title}}" devralındı: sıradaki istemler atıldı ({{count}})',
   "sessions.monitor.send.question.one": "{{count}} oturuma gönderilsin mi?",
   "sessions.monitor.send.question.other": "{{count}} oturuma gönderilsin mi?",
   "sessions.monitor.sent": '"{{title}}" oturumuna gönderildi',

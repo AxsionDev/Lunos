@@ -1316,6 +1316,12 @@ export const dict: Record<string, string> = {
   "sessions.monitor.takeover.queuedLabel": "පෝලිමේ ඇති prompt",
   "sessions.monitor.takeover.queuedSend": "පළමුව අනුපිළිවෙලින් යවන්න ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "ඉවත දමන්න ({{count}})",
+  "sessions.monitor.takeover.action": "භාර ගන්න",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” ධාවනය කළ Lunos පෝලිමේ prompt තිබියදී වැසුණි. පෝලිමේ: {{count}}. ඔබ ඒවා යවන්නේ නම්, ඒවා මෙම Lunos හි අනුපිළිවෙලින් ධාවනය වේ.",
+  "sessions.monitor.takeover.sendQueued": "පෝලිමේ ඇති prompt යවන්න ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” භාර ගත්තා: පෝලිමේ ඇති prompt යවමින් ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}” භාර ගත්තා: පෝලිමේ ඇති prompt ඉවත දැමුවා ({{count}})",
   "sessions.monitor.send.question.one": "සැසි වෙත යවන්නද? ගණන: {{count}}",
   "sessions.monitor.send.question.other": "සැසි වෙත යවන්නද? ගණන: {{count}}",
   "sessions.monitor.sent": '"{{title}}" වෙත යැවුවා',

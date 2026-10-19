@@ -9,6 +9,7 @@ import {
   rail,
   RECENT_MS,
   orphanedQueue,
+  canTakeOver,
   route,
   tags,
   untag,
@@ -185,6 +186,13 @@ describe("delivery (XCOD-262)", () => {
     expect(orphanedQueue(item("ses_a", { queued: 2, ownerClosed: true }))).toBe(2)
     expect(orphanedQueue(item("ses_a", { queued: 2 }))).toBe(0)
     expect(route(item("external:abc", { kind: "external", tool: "claude" }))).toEqual({ type: "tool-only" })
+  })
+
+  test("XCOD-268: Take over is offered only on a row a closed Lunos left prompts queued for", () => {
+    expect(canTakeOver(item("ses_a", { queued: 2, ownerClosed: true }))).toBe(true)
+    expect(canTakeOver(item("ses_a", { queued: 2 }))).toBe(false)
+    expect(canTakeOver(item("ses_a", { stale: true }))).toBe(false)
+    expect(canTakeOver(item("ses_a", { queued: 2, ownerClosed: true, elsewhere: true }))).toBe(false)
   })
 
   test("a Waiting row shows its first approval, else its first question", () => {

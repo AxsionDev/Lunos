@@ -1339,6 +1339,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Προτροπές σε αναμονή",
   "sessions.monitor.takeover.queuedSend": "Αποστολή πρώτα, με τη σειρά ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Απόρριψη ({{count}})",
+  "sessions.monitor.takeover.action": "Ανάληψη",
+  "sessions.monitor.takeover.onlyBody":
+    "Το Lunos που εκτελούσε το «{{title}}» έκλεισε με προτροπές ακόμη σε αναμονή. Σε αναμονή: {{count}}. Αν τις στείλετε, εκτελούνται σε αυτό το Lunos, με τη σειρά.",
+  "sessions.monitor.takeover.sendQueued": "Αποστολή των προτροπών σε αναμονή ({{count}})",
+  "sessions.monitor.takeover.sent": "Ανάληψη του «{{title}}»: αποστέλλονται οι προτροπές σε αναμονή ({{count}})",
+  "sessions.monitor.takeover.discarded": "Ανάληψη του «{{title}}»: απορρίφθηκαν οι προτροπές σε αναμονή ({{count}})",
   "sessions.monitor.send.question.one": "Αποστολή σε {{count}} συνεδρία;",
   "sessions.monitor.send.question.other": "Αποστολή σε {{count}} συνεδρίες;",
   "sessions.monitor.sent": "Στάλθηκε στη «{{title}}»",

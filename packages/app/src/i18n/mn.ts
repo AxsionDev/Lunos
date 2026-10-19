@@ -1332,6 +1332,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Дараалсан хүсэлтүүд",
   "sessions.monitor.takeover.queuedSend": "Эхлээд дарааллаар илгээх ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Устгах ({{count}})",
+  "sessions.monitor.takeover.action": "Хүлээж авах",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}”-г ажиллуулж байсан Lunos дараалалд хүсэлтүүд үлдсэн байхад хаагдсан. Дараалалд: {{count}}. Илгээвэл тэд энэ Lunos-д дарааллаар ажиллана.",
+  "sessions.monitor.takeover.sendQueued": "Дараалалд буй хүсэлтүүдийг илгээх ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}”-г хүлээж авлаа: дараалалд буй хүсэлтүүдийг илгээж байна ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}”-г хүлээж авлаа: дараалалд буй хүсэлтүүдийг хаялаа ({{count}})",
   "sessions.monitor.send.question.one": "Сессүүд рүү илгээх үү? Тоо: {{count}}",
   "sessions.monitor.send.question.other": "Сессүүд рүү илгээх үү? Тоо: {{count}}",
   "sessions.monitor.sent": "«{{title}}» руу илгээсэн",

@@ -1335,6 +1335,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompturi în coadă",
   "sessions.monitor.takeover.queuedSend": "Trimite-le întâi, în ordine ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Renunță la ele ({{count}})",
+  "sessions.monitor.takeover.action": "Preia",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos-ul care rula „{{title}}” s-a închis cu prompturi încă în coadă. În coadă: {{count}}. Dacă le trimiți, rulează în acest Lunos, în ordine.",
+  "sessions.monitor.takeover.sendQueued": "Trimite prompturile din coadă ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}” preluată: se trimit prompturile din coadă ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}” preluată: prompturile din coadă au fost renunțate ({{count}})",
   "sessions.monitor.send.question.one": "Trimiți la {{count}} sesiune?",
   "sessions.monitor.send.question.few": "Trimiți la {{count}} sesiuni?",
   "sessions.monitor.send.question.other": "Trimiți la {{count}} de sesiuni?",

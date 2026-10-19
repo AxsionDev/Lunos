@@ -1325,6 +1325,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "قطار وچ پرامپٹ",
   "sessions.monitor.takeover.queuedSend": "پہلاں ترتیب نال گھلو ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "رد کرو ({{count}})",
+  "sessions.monitor.takeover.action": "سنبھالو",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” چلان والا Lunos قطار وچ پرامپٹاں ہوندیاں بند ہو گیا۔ قطار وچ: {{count}}۔ جے تسیں اوہناں نوں گھلو تے اوہ ایس Lunos وچ ترتیب نال چلن گے۔",
+  "sessions.monitor.takeover.sendQueued": "قطار والے پرامپٹ گھلو ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” سنبھال لیا: قطار والے پرامپٹ گھلے جا رہے نیں ({{count}})",
+  "sessions.monitor.takeover.discarded": "“{{title}}” سنبھال لیا: قطار والے پرامپٹ رد کر دتے ({{count}})",
   "sessions.monitor.send.question.one": "{{count}} سیشن نوں بھیجو؟",
   "sessions.monitor.send.question.other": "{{count}} سیشناں نوں بھیجو؟",
   "sessions.monitor.sent": '"{{title}}" نوں بھیج دتا',

@@ -1315,6 +1315,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Järjekorras viibad",
   "sessions.monitor.takeover.queuedSend": "Saada need esmalt, järjekorras ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Loobu neist ({{count}})",
+  "sessions.monitor.takeover.action": "Võta üle",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, milles „{{title}}“ töötas, suleti, kui järjekorras olid veel viibad. Järjekorras: {{count}}. Kui need saadad, käivituvad need selles Lunoses järjekorras.",
+  "sessions.monitor.takeover.sendQueued": "Saada järjekorras olevad viibad ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ üle võetud: järjekorras olevad viibad saadetakse ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ üle võetud: järjekorras olevad viibad visati ära ({{count}})",
   "sessions.monitor.send.question.one": "Kas saata {{count}} seansile?",
   "sessions.monitor.send.question.other": "Kas saata {{count}} seansile?",
   "sessions.monitor.sent": "Saadetud seansile „{{title}}“",

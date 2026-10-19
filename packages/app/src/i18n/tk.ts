@@ -1322,6 +1322,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Nobatdaky haýyşlar",
   "sessions.monitor.takeover.queuedSend": "Ilki tertip bilen iber ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Olary taşla ({{count}})",
+  "sessions.monitor.takeover.action": "Öz üstüňe al",
+  "sessions.monitor.takeover.onlyBody":
+    "„{{title}}“ işledýän Lunos nobatda henizem haýyşlar bar wagty ýapyldy. Nobatda: {{count}}. Olary iberseňiz, şu Lunos-da tertip bilen işlär.",
+  "sessions.monitor.takeover.sendQueued": "Nobatdaky haýyşlary iber ({{count}})",
+  "sessions.monitor.takeover.sent": "„{{title}}“ öz üstüňe alyndy: nobatdaky haýyşlar iberilýär ({{count}})",
+  "sessions.monitor.takeover.discarded": "„{{title}}“ öz üstüňe alyndy: nobatdaky haýyşlar taşlandy ({{count}})",
   "sessions.monitor.send.question.one": "Sessiýalara iberilsinmi? Sany: {{count}}",
   "sessions.monitor.send.question.other": "Sessiýalara iberilsinmi? Sany: {{count}}",
   "sessions.monitor.sent": "«{{title}}» sessiýasyna iberildi",

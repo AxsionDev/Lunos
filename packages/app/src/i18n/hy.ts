@@ -1332,6 +1332,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Հերթում գտնվող հուշումներ",
   "sessions.monitor.takeover.queuedSend": "Նախ ուղարկել, հերթականությամբ ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Չեղարկել դրանք ({{count}})",
+  "sessions.monitor.takeover.action": "Ստանձնել",
+  "sessions.monitor.takeover.onlyBody":
+    "«{{title}}»-ը գործարկող Lunos-ը փակվեց՝ հերթում դեռ հուշումներ ունենալով։ Հերթում՝ {{count}}։ Եթե դրանք ուղարկեք, դրանք կաշխատեն այս Lunos-ում՝ հերթականությամբ։",
+  "sessions.monitor.takeover.sendQueued": "Ուղարկել հերթի հուշումները ({{count}})",
+  "sessions.monitor.takeover.sent": "«{{title}}»-ը ստանձնվեց. հերթի հուշումներն ուղարկվում են ({{count}})",
+  "sessions.monitor.takeover.discarded": "«{{title}}»-ը ստանձնվեց. հերթի հուշումները մերժվեցին ({{count}})",
   "sessions.monitor.send.question.one": "Ուղարկե՞լ {{count}} նիստի",
   "sessions.monitor.send.question.other": "Ուղարկե՞լ {{count}} նիստերի",
   "sessions.monitor.sent": "Ուղարկվեց «{{title}}»-ին",
