@@ -2688,6 +2688,7 @@ export type SessionOverviewItem = {
   stale?: boolean
   permissions: number
   questions: number
+  queued?: number
   groupID?: string
 }
 
@@ -2744,6 +2745,17 @@ export type QuestionRequest = {
 export type SessionPeerAsks = {
   permissions: Array<PermissionRequest>
   questions: Array<QuestionRequest>
+}
+
+export type SessionEnqueueInput = {
+  text: string
+  interrupt?: boolean
+  via?: "local" | "peer"
+}
+
+export type SessionEnqueueResult = {
+  delivery: "now" | "queued" | "interrupted" | "answered"
+  position?: number
 }
 
 export type McpResource = {
@@ -9471,6 +9483,78 @@ export type ExperimentalPeerQuestionRejectResponses = {
 
 export type ExperimentalPeerQuestionRejectResponse =
   ExperimentalPeerQuestionRejectResponses[keyof ExperimentalPeerQuestionRejectResponses]
+
+export type ExperimentalSessionEnqueueData = {
+  body?: SessionEnqueueInput
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session/{sessionID}/enqueue"
+}
+
+export type ExperimentalSessionEnqueueErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionEnqueueError = ExperimentalSessionEnqueueErrors[keyof ExperimentalSessionEnqueueErrors]
+
+export type ExperimentalSessionEnqueueResponses = {
+  /**
+   * How the prompt was delivered
+   */
+  200: SessionEnqueueResult
+}
+
+export type ExperimentalSessionEnqueueResponse =
+  ExperimentalSessionEnqueueResponses[keyof ExperimentalSessionEnqueueResponses]
+
+export type ExperimentalPeerPromptData = {
+  body?: {
+    text: string
+    interrupt?: boolean
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/peer/{sessionID}/prompt"
+}
+
+export type ExperimentalPeerPromptErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalPeerPromptError = ExperimentalPeerPromptErrors[keyof ExperimentalPeerPromptErrors]
+
+export type ExperimentalPeerPromptResponses = {
+  /**
+   * How the prompt was delivered
+   */
+  200: SessionEnqueueResult
+}
+
+export type ExperimentalPeerPromptResponse = ExperimentalPeerPromptResponses[keyof ExperimentalPeerPromptResponses]
 
 export type ExperimentalResourceListData = {
   body?: never

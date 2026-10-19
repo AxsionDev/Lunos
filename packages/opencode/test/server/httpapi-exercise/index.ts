@@ -773,6 +773,24 @@ const scenarios: Scenario[] = [
       headers: ctx.headers(),
     }))
     .json(404, object, "status"),
+  // XCOD-262: the Agent Monitor's prompt to an existing session.
+  http.protected
+    .post("/experimental/session/{sessionID}/enqueue", "experimental.session.enqueue")
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/enqueue", { sessionID: "ses_missing" }),
+      headers: ctx.headers(),
+      body: { text: "hello" },
+    }))
+    .json(404, object, "status"),
+  http.protected
+    .post("/experimental/session/{sessionID}/enqueue", "experimental.session.enqueue.empty")
+    .seeded((ctx) => ctx.session({ title: "Monitor target" }))
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/enqueue", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { text: "  " },
+    }))
+    .json(400, object, "status"),
   // XCOD-234: a session no other Lunos process runs is a 404 for every peer action.
   ...(
     [
@@ -796,6 +814,7 @@ const scenarios: Scenario[] = [
         "experimental.peer.questionReject",
         undefined,
       ],
+      ["post", "/experimental/peer/{sessionID}/prompt", "experimental.peer.prompt", { text: "hello" }],
     ] as const
   ).map(([method, template, id, body]) =>
     http.protected[method](template, id)

@@ -22,6 +22,7 @@ import { InstanceHttpApi } from "../api"
 import {
   PeerAsks,
   ConsoleSwitchPayload,
+  SessionEnqueuePayload,
   SessionGroupCreatePayload,
   SessionGroupMovePayload,
   SessionGroupUpdatePayload,
@@ -35,6 +36,7 @@ import { SessionLive } from "@/session/live"
 import { SessionPeers } from "@/session/peers"
 import { SessionPeerControl } from "@/session/peer-control"
 import { SessionOverview } from "@/session/overview"
+import { SessionPromptQueue } from "@/session/prompt-queue"
 import { ExternalRegistry } from "@/external/registry"
 import { ExternalDetect } from "@/external/detect"
 import { ExternalPolicy } from "@/external/policy"
@@ -373,6 +375,58 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       )
     })
 
+    // XCOD-262: the Agent Monitor's prompts. A session another live Lunos runs is that process's to
+    // drive, so it is refused here and goes through peerPrompt.
+    const promptText = (text: string) =>
+      text.trim() && text.length <= SessionPromptQueue.MAX_TEXT
+        ? Effect.succeed(text)
+        : Effect.fail(new InvalidRequestError({ message: "A prompt is non-empty text of at most 100,000 characters." }))
+    const sessionEnqueue = Effect.fn("ExperimentalHttpApi.sessionEnqueue")(function* (ctx: {
+      params: { sessionID: string }
+      payload: typeof SessionEnqueuePayload.Type
+    }) {
+      const text = yield* promptText(ctx.payload.text)
+      const sessionID = SessionID.make(ctx.params.sessionID)
+      const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.fail(notFound("No such session."))))
+      const peer = SessionPeers.read().get(sessionID)
+      if (peer?.fresh && (peer.status || peer.permissions > 0 || peer.questions > 0 || peer.queued))
+        return yield* new InvalidRequestError({
+          message: "Another Lunos on this computer runs that session; the prompt goes to it.",
+        })
+      // The session's own agent, as if the prompt were typed in it (prompt_async without one uses the default).
+      const lastUser = yield* sessions
+        .findMessage(sessionID, (message) => message.info.role === "user")
+        .pipe(Effect.orElseSucceed(() => Option.none()))
+      const agent =
+        info.agent ?? (Option.isSome(lastUser) ? (lastUser.value.info as { agent?: string }).agent : undefined)
+      return yield* Effect.tryPromise({
+        try: () =>
+          SessionPromptQueue.submit({
+            sessionID,
+            directory: info.directory,
+            text,
+            ...(agent ? { agent } : {}),
+            interrupt: ctx.payload.interrupt === true,
+            via: ctx.payload.via ?? "local",
+          }),
+        catch: (error) => new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+    })
+    const peerPrompt = Effect.fn("ExperimentalHttpApi.peerPrompt")(function* (ctx: {
+      params: { sessionID: string }
+      payload: { text: string; interrupt?: boolean }
+    }) {
+      const text = yield* promptText(ctx.payload.text)
+      return yield* peer<{ delivery: SessionPromptQueue.Delivery; position?: number }>(
+        ctx.params.sessionID,
+        "/prompt",
+        {
+          method: "POST",
+          body: { text, interrupt: ctx.payload.interrupt === true },
+        },
+      )
+    })
+
     const resource = Effect.fn("ExperimentalHttpApi.resource")(function* () {
       return yield* mcp.resources()
     })
@@ -406,6 +460,8 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("peerPermissionReply", peerPermissionReply)
       .handle("peerQuestionReply", peerQuestionReply)
       .handle("peerQuestionReject", peerQuestionReject)
+      .handle("sessionEnqueue", sessionEnqueue)
+      .handle("peerPrompt", peerPrompt)
       .handle("resource", resource)
   }),
 )

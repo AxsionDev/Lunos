@@ -72,6 +72,10 @@ export const EVENTS = [
   // XCOD-211: an unattended agent run finished. Agent, job, status, stop reason, steps, spend,
   // duration and the permissions it was refused; never the prompt, the output or file contents.
   "agent.run",
+  // XCOD-262: a prompt the Agent Monitor sent to an existing session: session, origin ("monitor"),
+  // delivery (now, queued, interrupted, answered) and whether another Lunos process forwarded it.
+  // Never the prompt.
+  "session.prompt",
   // XCOD-204: a Claude Code / Codex CLI session Lunos started (tool, provider, session id, outcome,
   // cost), or one refused before it started (residency or policy). Never the prompt or output.
   "external.session",

@@ -146,6 +146,7 @@ export function read(input: { now?: number } = {}): Map<string, Peer> {
         status: claim.status === "busy" || claim.status === "retry" ? claim.status : undefined,
         permissions: Number.isInteger(claim.permissions) && claim.permissions > 0 ? claim.permissions : 0,
         questions: Number.isInteger(claim.questions) && claim.questions > 0 ? claim.questions : 0,
+        ...(Number.isInteger(claim.queued) && claim.queued! > 0 ? { queued: claim.queued } : {}),
         ...(typeof claim.directory === "string" && claim.directory ? { directory: claim.directory } : {}),
         fresh,
         pid: body.pid,
@@ -166,7 +167,10 @@ export function read(input: { now?: number } = {}): Map<string, Peer> {
 /** What readers would show, as one comparable string. */
 function snapshot() {
   return [...read()]
-    .map(([id, peer]) => `${id}:${peer.fresh}:${peer.status ?? ""}:${peer.permissions}:${peer.questions}`)
+    .map(
+      ([id, peer]) =>
+        `${id}:${peer.fresh}:${peer.status ?? ""}:${peer.permissions}:${peer.questions}:${peer.queued ?? 0}`,
+    )
     .sort()
     .join("|")
 }

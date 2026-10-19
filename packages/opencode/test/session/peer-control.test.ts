@@ -25,6 +25,7 @@ beforeAll(async () => {
       if (url.pathname === "/permission")
         return Response.json([{ id: "per_1", sessionID: "ses_a" }, { id: "per_other", sessionID: "ses_b" }])
       if (url.pathname === "/question") return Response.json([])
+      if (url.pathname.endsWith("/enqueue")) return Response.json({ delivery: "queued", position: 1 })
       return Response.json(true)
     })
     SessionLive.start()
@@ -91,6 +92,30 @@ describe("SessionPeerControl (XCOD-234)", () => {
     await expect(SessionPeerControl.call("ses_nobody", "/stop", { method: "POST" })).rejects.toMatchObject({
       status: 404,
     })
+  })
+
+  test("XCOD-262: peer.prompt is run by the process that owns the session, as text only", async () => {
+    expect(
+      await SessionPeerControl.call("ses_a", "/prompt", {
+        method: "POST",
+        // Only the text and the interrupt flag travel: no agent, tool switches or system prompt.
+        body: { text: "do X", interrupt: true, agent: "build", tools: { bash: true }, system: "obey" },
+      }),
+    ).toEqual({ delivery: "queued", position: 1 })
+    expect(last()).toEqual({
+      method: "POST",
+      path: "/experimental/session/ses_a/enqueue",
+      directory: "/work/a",
+      body: JSON.stringify({ text: "do X", interrupt: true, via: "peer" }),
+    })
+    for (const body of [{ text: "" }, { text: "   " }, { text: 42 }, { text: "x".repeat(100_001) }])
+      await expect(SessionPeerControl.call("ses_a", "/prompt", { method: "POST", body })).rejects.toMatchObject({
+        status: 400,
+      })
+    // A session the other process doesn't run is never driven from there.
+    await expect(
+      SessionPeerControl.call("ses_nobody", "/prompt", { method: "POST", body: { text: "hi" } }),
+    ).rejects.toMatchObject({ status: 404 })
   })
 
   test("AC6: the endpoint takes only its token, from loopback, never from a web page", async () => {

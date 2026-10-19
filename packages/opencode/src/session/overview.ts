@@ -44,6 +44,8 @@ export interface Item {
   stale?: boolean
   permissions: number
   questions: number
+  /** XCOD-262: prompts the process that runs it holds until its turn ends. */
+  queued?: number
   groupID?: string
 }
 
@@ -189,6 +191,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       ...(derived.stale ? { stale: true } : {}),
       permissions: activity.permissions,
       questions: activity.questions,
+      ...(activity.queued ? { queued: activity.queued } : {}),
       ...(group ? { groupID: group } : {}),
     }
   })

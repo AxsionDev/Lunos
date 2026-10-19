@@ -11,10 +11,17 @@ import { SessionPeers } from "./peers"
  * this process's with them through SessionPeers.
  */
 
-export type Activity = { status?: "busy" | "retry"; permissions: number; questions: number }
+export type Activity = {
+  status?: "busy" | "retry"
+  permissions: number
+  questions: number
+  /** XCOD-262: prompts held until the session's turn ends (SessionPromptQueue). Absent when none. */
+  queued?: number
+}
 
 const status = new Map<string, { type: "busy" | "retry"; directory?: string }>()
 const asks = new Map<string, { sessionID: string; kind: "permission" | "question"; directory?: string }>()
+const queued = new Map<string, { count: number; directory: string }>()
 
 function drop(predicate: (directory: string | undefined, sessionID: string) => boolean) {
   for (const [id, item] of status) if (predicate(item.directory, id)) status.delete(id)
@@ -49,6 +56,16 @@ function share() {
     )
   }, 50)
   pending.unref?.()
+}
+
+/**
+ * XCOD-262: how many prompts this process holds for a session until its turn ends. No event says
+ * so, so this shares the change itself.
+ */
+export function setQueued(sessionID: string, count: number, directory: string) {
+  if (count > 0) queued.set(sessionID, { count, directory })
+  else queued.delete(sessionID)
+  share()
 }
 
 export function handle(event: GlobalEvent) {
@@ -125,7 +142,8 @@ export function get(sessionID: string): Activity {
     if (item.kind === "permission") permissions++
     else questions++
   }
-  return { status: status.get(sessionID)?.type, permissions, questions }
+  const held = queued.get(sessionID)?.count
+  return { status: status.get(sessionID)?.type, permissions, questions, ...(held ? { queued: held } : {}) }
 }
 
 /** The project directory this process serves a running or waiting session under. */
@@ -133,17 +151,19 @@ export function directoryOf(sessionID: string) {
   const own = status.get(sessionID)?.directory
   if (own) return own
   for (const item of asks.values()) if (item.sessionID === sessionID && item.directory) return item.directory
+  return queued.get(sessionID)?.directory
 }
 
 /** Session ids this process knows to be running or waiting, so they're listed however old they are. */
 export function active() {
-  return new Set([...status.keys(), ...[...asks.values()].map((item) => item.sessionID)])
+  return new Set([...status.keys(), ...[...asks.values()].map((item) => item.sessionID), ...queued.keys()])
 }
 
 /** For tests. */
 export function reset() {
   status.clear()
   asks.clear()
+  queued.clear()
   if (pending) clearTimeout(pending)
   pending = undefined
 }
