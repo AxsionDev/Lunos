@@ -135,6 +135,8 @@ export const ExternalToolStatus = Schema.Struct({
   refused: Schema.optional(
     Schema.Struct({ reason: Schema.Literals(["disabled", "policy", "residency"]), message: Schema.String }),
   ),
+  /** XCOD-256: Claude Code's `--permission-mode` choices, from this install's `--help`. */
+  permissionModes: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
 }).annotate({ identifier: "ExternalToolStatus" })
 
 // XCOD-205: one row of the Sessions window.

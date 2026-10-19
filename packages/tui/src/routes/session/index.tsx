@@ -37,7 +37,7 @@ import type {
   SessionStatus,
 } from "@opencode-ai/sdk/v2"
 import { useLocal } from "../../context/local"
-import { externalCost, externalOf } from "../../util/external"
+import { externalAccent, externalCost, externalOf } from "../../util/external"
 import { Locale } from "../../util/locale"
 import { webSearchProviderLabel } from "../../util/tool-display"
 import { Dynamic, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -1563,6 +1563,13 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
   const sync = useSync()
   const messages = createMemo(() => sync.data.message[props.message.sessionID] ?? [])
   const model = createMemo(() => Model.name(ctx.providers(), props.message.providerID, props.message.modelID))
+  const tuiConfig = useTuiConfig()
+  // XCOD-260: the tool's messages carry its accent.
+  const externalMarkerColor = () => {
+    const marker =
+      props.message.providerID === "external" ? externalOf(sync.session.get(props.message.sessionID)) : undefined
+    return marker ? externalAccent(theme, marker.tool, tuiConfig.external_accent !== false) : undefined
+  }
 
   const final = createMemo(() => {
     return props.message.finish && !["tool-calls", "unknown"].includes(props.message.finish)
@@ -1644,7 +1651,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                   fg:
                     props.message.error?.name === "MessageAbortedError"
                       ? theme.textMuted
-                      : local.mode.color(props.message.agent),
+                      : (externalMarkerColor() ?? local.mode.color(props.message.agent)),
                 }}
               >
                 ▣{" "}

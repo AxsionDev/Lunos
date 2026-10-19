@@ -37013,6 +37013,10 @@
       "additionalProperties": false,
       "description": "Guards against dismissing an agent's question by accident"
     },
+    "external_accent": {
+      "type": "boolean",
+      "description": "false keeps the theme's colours in Claude Code and Codex sessions; the \"Lunos · Claude Code\" badge and the ▸ label stay (default: true)"
+    },
     "double_escape_clear": {
       "type": "boolean",
       "description": "Esc twice in the prompt clears it while the session is idle; the cleared prompt can be undone and is kept in history (default: true)"

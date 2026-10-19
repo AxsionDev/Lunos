@@ -611,6 +611,22 @@ export type TuiMarketplaceEntry = {
    * when the marketplace now serves a different version or definition than the one installed.
    */
   installed?: "installed" | "update"
+  /** XCOD-258: what each kind's tab shows beside the name. */
+  details?: TuiMarketplaceDetails
+}
+
+export type TuiMarketplaceDetails = {
+  /** Plugins: the version the marketplace serves. */
+  version?: string
+  /** Hooks: the event, the matcher (`Bash`, `src/**`), and the command it runs, as one line. */
+  event?: string
+  matcher?: string
+  command?: string
+  /** MCP servers: how they're reached, and for a remote one its host, region and the policy's answer. */
+  transport?: "stdio" | "http"
+  host?: string
+  region?: string
+  policy?: "allowed" | "blocked"
 }
 
 export type TuiMarketplaceDiscoverResult = {

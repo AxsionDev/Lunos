@@ -1,4 +1,5 @@
 import { Effect, Exit, Schema } from "effect"
+import { ConfigExternal } from "@opencode-ai/core/config/external"
 import { spawnSync } from "node:child_process"
 import * as Tool from "./tool"
 import DESCRIPTION from "./external.txt"
@@ -73,7 +74,7 @@ export const ExternalAgentTool = Tool.define(
             tool: params.tool,
             cwd,
             prompt: params.task,
-            permissionMode: (cfg.external as any)?.[params.tool]?.permission_mode,
+            ...ConfigExternal.launch(params.tool, cfg.external),
             executable: status.path,
             // Progress in the tool part, so the TUI and apps show what Claude Code is doing.
             onEvent: (event) => {

@@ -21,6 +21,7 @@ import { normalizeLoadedConfig } from "./config"
 import fuzzysort from "fuzzysort"
 import { VariantModel } from "@opencode-ai/core/config/variant-model"
 import { ModelCuration } from "@/provider/curation"
+import { ConfigExternal } from "@opencode-ai/core/config/external"
 
 // XCOD-128: every configuration option in one place, for the TUI's /settings screen and for
 // `lunos settings list|get|set`. The list is generated from the live schemas (ConfigV1.Info for
@@ -159,6 +160,7 @@ const DEFAULTS: Record<string, unknown> = {
   "tui.mouse": true,
   // XCOD-229: the curated list the pickers use while `recommended` isn't set.
   recommended: ModelCuration.RECOMMENDED,
+  // XCOD-256: external.*'s permission defaults are filled in by `list`, which knows the legacy key.
 }
 
 /** Environment variables that win over whatever the files say. */
@@ -225,7 +227,8 @@ function members(ast: SchemaAST.AST): SchemaAST.AST[] {
 }
 
 function concrete(ast: SchemaAST.AST) {
-  return members(ast).filter((item) => item._tag !== "Undefined")
+  // XCOD-256: a blank string beside known values means "unset", so the field still lists as a select.
+  return members(ast).filter((item) => item._tag !== "Undefined" && SchemaAST.resolveIdentifier(item) !== "BlankString")
 }
 
 function struct(ast: SchemaAST.AST): SchemaAST.Objects | undefined {
@@ -511,7 +514,7 @@ export type Row = {
   /** The file (or variable) the value came from, when known. */
   from?: string
   locked: boolean
-  /** Set when an environment variable or flag overrides the files. */
+  /** Set when an environment variable or flag overrides the files, or (XCOD-256) a refused value is ignored. */
   override?: string
   secret: boolean
 }
@@ -648,18 +651,32 @@ export async function list(input: {
       let value: unknown = raw && containsReference(raw.value) ? raw.value : resolved
       value = jsonSafe(value)
       if (value === undefined && source === "default") value = DEFAULTS[item.key]
+      // XCOD-256: an empty permission mode is the default, and a refused one is replaced by it.
+      // Unset Codex rows show what a run uses, which may come from the legacy permission_mode.
+      const external = ConfigExternal.DEFAULTS[item.key]
+      const refused = external ? ConfigExternal.refused(value) : undefined
+      if (external && (ConfigExternal.value(value) === undefined || ConfigExternal.UNSAFE.has(String(value)))) {
+        const tool = item.key.split(".")[1] as "claude" | "codex"
+        const run = ConfigExternal.launch(tool, ConfigPolicy.get(input.config, "external") as never)
+        value =
+          (item.key.endsWith("sandbox")
+            ? run.sandbox
+            : item.key.endsWith("approval_policy")
+              ? run.approvalPolicy
+              : undefined) ?? external
+      }
       value = secret || item.kind === "object" ? redact(value, false) : value
       if (secret && typeof value === "string" && !isReference(value)) value = "***"
       return {
         ...item,
         value,
-        display: display(value, item.kind),
+        display: external ? ConfigExternal.label(value, external) : display(value, item.kind),
         source,
         from: locked ? origin?.source : (envName ?? raw?.file ?? leaf?.file ?? origin?.source),
         locked,
         override: envName
           ? `${envName} is set, so it wins over the config files until it's removed from the environment`
-          : undefined,
+          : refused,
         secret,
       }
     }),
@@ -1014,6 +1031,8 @@ export async function set(input: {
     throw new SettingError(`${item.key} must be between ${range[0]} and ${range[1]}. Nothing was written.`, "invalid")
   const refusal = input.scope === "project" ? projectRefusal(item.key, value) : undefined
   if (refusal) throw new SettingError(refusal, "invalid")
+  const unsafe = ConfigExternal.DEFAULTS[item.key] ? ConfigExternal.refused(value) : undefined
+  if (unsafe) throw new SettingError(`${unsafe}. Nothing was written.`, "invalid")
   const schema = item.target === "config" ? "https://lunos.tech/config.json" : "https://lunos.tech/tui.json"
   const base = before && before.trim() ? before : `{\n  "$schema": "${schema}"\n}\n`
   const jsonPath = item.key.split(".").slice(item.target === "tui" ? 1 : 0)
@@ -1046,6 +1065,12 @@ export async function set(input: {
   if (changed) {
     await fs.mkdir(path.dirname(file), { recursive: true })
     await fs.writeFile(file, updated)
+  }
+  // XCOD-256: saving Codex's sandbox or approval policy moves a legacy permission_mode in this file.
+  for (const write of ConfigExternal.migrate(item.key, ConfigPolicy.get(rawDoc(before), "external.codex") as never)) {
+    const next = { key: write.key, scope: input.scope, ctx: input.ctx, locked: input.locked, via: input.via }
+    if ("unset" in write) await unset(next)
+    else await set({ ...next, value: write.value })
   }
   return { key: item.key, value, file, scope: input.scope, restart: item.restart, changed }
 }

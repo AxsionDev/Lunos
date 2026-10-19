@@ -9,6 +9,7 @@ import { usePluginRuntime } from "../../plugin/runtime"
 
 import { getScrollAcceleration } from "../../util/scroll"
 import { WorkspaceLabel } from "../../component/workspace-label"
+import { EXTERNAL_BADGE, externalAccent, externalOf } from "../../util/external"
 
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const pluginRuntime = usePluginRuntime()
@@ -72,6 +73,20 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                 <text fg={theme.text}>
                   <b>{session()!.title}</b>
                 </text>
+                <Show when={externalOf(session())}>
+                  {(marker) => (
+                    <text>
+                      <span
+                        style={{
+                          fg: externalAccent(theme, marker().tool, tuiConfig.external_accent !== false) ?? theme.text,
+                        }}
+                      >
+                        ●{" "}
+                      </span>
+                      <span style={{ fg: theme.textMuted }}>{EXTERNAL_BADGE[marker().tool]} session</span>
+                    </text>
+                  )}
+                </Show>
                 <Show when={InstallationChannel !== "latest"}>
                   <text fg={theme.textMuted}>{props.sessionID}</text>
                 </Show>
