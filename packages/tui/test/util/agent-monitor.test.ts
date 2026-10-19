@@ -10,6 +10,8 @@ import {
   route,
   tags,
   takeoverChoices,
+  takeoverOnlyChoices,
+  canTakeOver,
 } from "../../src/util/agent-monitor"
 
 const NOW = 1_800_000_000_000
@@ -162,6 +164,25 @@ describe("durable queue labels (XCOD-262)", () => {
       "Take over, send the 3 queued prompts first",
       "Take over, discard all 3",
     ])
+  })
+})
+
+describe("Take over on a row (XCOD-268)", () => {
+  test("offered only where a closed Lunos left prompts queued, and this Lunos would run the session", () => {
+    expect(canTakeOver(item("ses_a", { queued: 2, ownerClosed: true }))).toBe(true)
+    // Its own process still has them (live queue), none queued, or a stale turn with nothing queued.
+    expect(canTakeOver(item("ses_a", { queued: 2 }))).toBe(false)
+    expect(canTakeOver(item("ses_a", { ownerClosed: true }))).toBe(false)
+    expect(canTakeOver(item("ses_a", { stale: true }))).toBe(false)
+    expect(canTakeOver(item("ses_a", { queued: 2, ownerClosed: true, elsewhere: true }))).toBe(false)
+  })
+
+  test("it sends or discards just the queued prompts, with the count", () => {
+    expect(takeoverOnlyChoices(1)).toEqual([
+      { value: "send", title: "Send 1 queued prompt" },
+      { value: "discard", title: "Discard it" },
+    ])
+    expect(takeoverOnlyChoices(2).map((choice) => choice.title)).toEqual(["Send 2 queued prompts", "Discard them"])
   })
 })
 

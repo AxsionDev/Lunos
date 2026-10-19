@@ -37,7 +37,7 @@ import { expandPastedTextPlaceholders, expandTrackedPastedText } from "../../pro
 import { usePromptStash } from "../../prompt/stash"
 import { DialogStash } from "../dialog-stash"
 import { type AutocompleteOption, type AutocompleteRef, Autocomplete } from "./autocomplete"
-import { leftOpensMonitor } from "../../util/agent-monitor"
+import { leftOpensMonitor, takeoverChoices, takeoverQuestion } from "../../util/agent-monitor"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v2"
 import { Locale } from "../../util/locale"
@@ -47,6 +47,7 @@ import { createColors, createFrames } from "../../ui/spinner"
 import { useDialog } from "../../ui/dialog"
 import { DialogProvider as DialogProviderConnect } from "../dialog-provider"
 import { DialogAlert } from "../../ui/dialog-alert"
+import { DialogSelect } from "../../ui/dialog-select"
 import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { createDoublePress } from "../../util/dismiss"
@@ -1086,6 +1087,55 @@ export function Prompt(props: PromptProps) {
     }
   }
 
+  /**
+   * XCOD-267: before a prompt runs in a session whose Lunos closed with prompts queued for it, the
+   * same "Take over this session here?" as the Agent Monitor. Discard happens here; "send" is left
+   * to the caller, which sends its prompt with the take-over so it runs after them.
+   */
+  async function askTakeover(sessionID: string): Promise<"send" | "discard" | "cancel" | undefined> {
+    const held = await sdk.client.experimental.session
+      .queued({ sessionID }, { throwOnError: true })
+      .then((response) => response.data.orphaned)
+      .catch(() => 0)
+    if (!held) return undefined
+    const title = Locale.truncate(sync.session.get(sessionID)?.title ?? "this session", 40)
+    const message = takeoverQuestion(title, held)
+    const choice = await new Promise<"send" | "discard" | undefined>((resolve) =>
+      dialog.replace(
+        () => (
+          <DialogSelect<"send" | "discard" | "cancel">
+            title={message}
+            titleView={
+              <box flexShrink={1} paddingRight={2}>
+                <text fg={theme.text} wrapMode="word">
+                  {message}
+                </text>
+              </box>
+            }
+            renderFilter={false}
+            options={[...takeoverChoices(held), { value: "cancel" as const, title: "Cancel" }]}
+            onSelect={(option) => {
+              resolve(option.value === "cancel" ? undefined : option.value)
+              dialog.clear()
+            }}
+          />
+        ),
+        () => resolve(undefined),
+      ),
+    )
+    if (!choice) return "cancel"
+    if (choice === "send") return "send"
+    return sdk.client.experimental.session
+      .takeover({ sessionID, queued: "discard", origin: "session" }, { throwOnError: true })
+      .then(
+        () => "discard" as const,
+        (error: unknown) => {
+          toast.show({ title: "Couldn't take the session over", message: errorMessage(error), variant: "error" })
+          return "cancel" as const
+        },
+      )
+  }
+
   async function submitInner() {
     workspace.clearNotice()
 
@@ -1310,6 +1360,11 @@ export function Prompt(props: PromptProps) {
       return false
     }
 
+    // XCOD-267: a Lunos that closed left prompts queued for this session: they go first or are
+    // discarded, as the user chooses, before this one runs. Cancel keeps the text.
+    const takeover = props.sessionID ? await askTakeover(props.sessionID) : undefined
+    if (takeover === "cancel") return false
+
     const variant = local.model.variant.current()
     let sessionID = props.sessionID
     let finishMoveProgress = false
@@ -1380,7 +1435,61 @@ export function Prompt(props: PromptProps) {
           ]
         : []
 
-    if (store.mode === "shell") {
+    const commandName = inputText.split("\n")[0].split(" ")[0].slice(1)
+    const isCommand = inputText.startsWith("/") && sync.data.command.some((x) => x.name === commandName)
+    if (takeover === "send") {
+      // The same request the branches below make, run here once the queued prompts have.
+      const firstLineEnd = inputText.indexOf("\n")
+      const firstLine = firstLineEnd === -1 ? inputText : inputText.slice(0, firstLineEnd)
+      const request =
+        store.mode === "shell"
+          ? {
+              kind: "shell" as const,
+              body: {
+                agent: agent.name,
+                model: { providerID: selectedModel.providerID, modelID: selectedModel.modelID },
+                command: inputText,
+              },
+            }
+          : isCommand
+            ? {
+                kind: "command" as const,
+                body: {
+                  command: commandName,
+                  arguments:
+                    firstLine.split(" ").slice(1).join(" ") +
+                    (firstLineEnd === -1 ? "" : "\n" + inputText.slice(firstLineEnd + 1)),
+                  agent: agent.name,
+                  model: `${selectedModel.providerID}/${selectedModel.modelID}`,
+                  ...(variant ? { variant } : {}),
+                  parts: nonTextParts.filter((x) => x.type === "file"),
+                },
+              }
+            : {
+                kind: "prompt" as const,
+                body: {
+                  agent: agent.name,
+                  model: { providerID: selectedModel.providerID, modelID: selectedModel.modelID },
+                  ...(variant ? { variant } : {}),
+                  parts: [...editorParts, { type: "text", text: inputText }, ...nonTextParts],
+                },
+              }
+      const sent = await sdk.client.experimental.session
+        .takeover(
+          { sessionID: sessionID!, queued: "send", origin: "session", text: inputText, request },
+          { throwOnError: true },
+        )
+        .then(
+          () => true,
+          (error: unknown) => {
+            toast.show({ title: "Couldn't take the session over", message: errorMessage(error), variant: "error" })
+            return false
+          },
+        )
+      if (!sent) return false
+      if (store.mode === "shell") setStore("mode", "normal")
+      if (request.kind === "prompt" && editorParts.length > 0) editor.markSelectionSent()
+    } else if (store.mode === "shell") {
       move.startSubmit()
       void sdk.client.session.shell({
         sessionID,
@@ -1392,10 +1501,7 @@ export function Prompt(props: PromptProps) {
         command: inputText,
       })
       setStore("mode", "normal")
-    } else if (
-      inputText.startsWith("/") &&
-      sync.data.command.some((x) => x.name === inputText.split("\n")[0].split(" ")[0].slice(1))
-    ) {
+    } else if (isCommand) {
       move.startSubmit()
       // Parse command from first line, preserve multi-line content in arguments
       const firstLineEnd = inputText.indexOf("\n")

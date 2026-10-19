@@ -545,9 +545,19 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
             queued: ctx.payload.queued,
             ...(text !== undefined ? { text } : {}),
             ...(agent ? { agent } : {}),
+            ...(text !== undefined && ctx.payload.request ? { request: ctx.payload.request } : {}),
+            ...(ctx.payload.origin ? { origin: ctx.payload.origin } : {}),
           }),
         catch: (error) => new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
       })
+    })
+    const sessionQueued = Effect.fn("ExperimentalHttpApi.sessionQueued")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      return {
+        orphaned: SessionPromptQueue.orphaned(ctx.params.sessionID),
+        held: SessionPromptQueue.held(ctx.params.sessionID),
+      }
     })
     const peerPrompt = Effect.fn("ExperimentalHttpApi.peerPrompt")(function* (ctx: {
       params: { sessionID: string }
@@ -606,6 +616,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("peerQuestionReject", peerQuestionReject)
       .handle("sessionEnqueue", sessionEnqueue)
       .handle("sessionTakeover", sessionTakeover)
+      .handle("sessionQueued", sessionQueued)
       .handle("peerPrompt", peerPrompt)
       .handle("resource", resource)
   }),

@@ -1178,6 +1178,7 @@ export const dict = {
   "session.delete.title": "Suprimeix la sessió",
   "session.delete.confirm": 'Voleu suprimir la sessió "{{name}}"?',
   "session.delete.button": "Suprimeix la sessió",
+  "session.delete.queued": "També esborra els prompts de la cua que no s'han enviat mai ({{count}}).",
   "workspace.new": "Nou espai de treball",
   "workspace.type.local": "locals",
   "workspace.type.sandbox": "caixa de sorra",
@@ -1344,6 +1345,13 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompts a la cua",
   "sessions.monitor.takeover.queuedSend": "Envia'ls primer, en ordre ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Descarta'ls ({{count}})",
+  "sessions.monitor.takeover.action": "Pren el control",
+  "sessions.monitor.takeover.onlyBody":
+    "El Lunos que executava «{{title}}» s'ha tancat amb prompts encara a la cua. A la cua: {{count}}. Si els envies, s'executen en aquest Lunos, en ordre.",
+  "sessions.monitor.takeover.sendQueued": "Envia els prompts de la cua ({{count}})",
+  "sessions.monitor.takeover.sent": "Has pres el control de «{{title}}»: s'envien els prompts de la cua ({{count}})",
+  "sessions.monitor.takeover.discarded":
+    "Has pres el control de «{{title}}»: s'han descartat els prompts de la cua ({{count}})",
   "sessions.monitor.send.question.one": "Vols enviar a {{count}} sessió?",
   "sessions.monitor.send.question.many": "Vols enviar a {{count}} sessions?",
   "sessions.monitor.send.question.other": "Vols enviar a {{count}} sessions?",

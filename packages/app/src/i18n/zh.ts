@@ -1158,6 +1158,7 @@ export const dict = {
   "session.delete.title": "删除会话",
   "session.delete.confirm": '删除会话 "{{name}}"？',
   "session.delete.button": "删除会话",
+  "session.delete.queued": "同时删除排队中但从未发送的提示词（{{count}}）。",
 
   "workspace.new": "新建工作区",
   "workspace.type.local": "本地",
@@ -1410,6 +1411,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "排队中的提示词",
   "sessions.monitor.takeover.queuedSend": "先按顺序发送（{{count}}）",
   "sessions.monitor.takeover.queuedDiscard": "丢弃（{{count}}）",
+  "sessions.monitor.takeover.action": "接管",
+  "sessions.monitor.takeover.onlyBody":
+    "运行“{{title}}”的 Lunos 已关闭，仍有提示词在排队。排队中：{{count}}。如果发送，它们将在此 Lunos 中按顺序运行。",
+  "sessions.monitor.takeover.sendQueued": "发送排队的提示词（{{count}}）",
+  "sessions.monitor.takeover.sent": "已接管“{{title}}”：正在发送其排队的提示词（{{count}}）",
+  "sessions.monitor.takeover.discarded": "已接管“{{title}}”：已丢弃其排队的提示词（{{count}}）",
   "sessions.monitor.send.question.one": "要发送到 {{count}} 个会话吗？",
   "sessions.monitor.send.question.other": "要发送到 {{count}} 个会话吗？",
   "sessions.monitor.sent": "已发送到“{{title}}”",

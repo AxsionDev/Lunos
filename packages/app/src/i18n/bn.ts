@@ -1156,6 +1156,7 @@ export const dict: Record<string, string> = {
   "session.delete.title": "সেশন মুছুন",
   "session.delete.confirm": 'সেশন "{{name}}" মুছবেন?',
   "session.delete.button": "সেশন মুছুন",
+  "session.delete.queued": "সারিতে থাকা যে প্রম্পটগুলো কখনো পাঠানো হয়নি, সেগুলোও মুছে ফেলে ({{count}})।",
   "workspace.new": "নতুন ওয়ার্কস্পেস",
   "workspace.type.local": "স্থানীয়",
   "workspace.type.sandbox": "স্যান্ডবক্স",
@@ -1314,6 +1315,13 @@ export const dict: Record<string, string> = {
   "sessions.monitor.takeover.queuedLabel": "সারিতে থাকা প্রম্পট",
   "sessions.monitor.takeover.queuedSend": "আগে ক্রমানুসারে পাঠান ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "বাতিল করুন ({{count}})",
+  "sessions.monitor.takeover.action": "নিয়ে নিন",
+  "sessions.monitor.takeover.onlyBody":
+    "“{{title}}” চালানো Lunos সারিতে থাকা প্রম্পট সহ বন্ধ হয়ে গেছে। সারিতে: {{count}}। পাঠালে সেগুলো এই Lunos-এ ক্রমানুসারে চলবে।",
+  "sessions.monitor.takeover.sendQueued": "সারিতে থাকা প্রম্পট পাঠান ({{count}})",
+  "sessions.monitor.takeover.sent": "“{{title}}” নিয়ে নেওয়া হয়েছে: সারিতে থাকা প্রম্পট পাঠানো হচ্ছে ({{count}})",
+  "sessions.monitor.takeover.discarded":
+    "“{{title}}” নিয়ে নেওয়া হয়েছে: সারিতে থাকা প্রম্পট বাদ দেওয়া হয়েছে ({{count}})",
   "sessions.monitor.send.question.one": "{{count}}টি সেশনে পাঠাবেন?",
   "sessions.monitor.send.question.other": "{{count}}টি সেশনে পাঠাবেন?",
   "sessions.monitor.sent": '"{{title}}"-এ পাঠানো হয়েছে',

@@ -42,6 +42,19 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   session over: the confirmation says how many there are, and offers to send them first, in order,
   or discard them. A prompt is never sent twice. The Sessions window also remembers whether you
   last arranged the list by status or by group. <!-- XCOD-262 -->
+- **Send a closed Lunos's queued prompts without writing a new one.** A session showing "2 queued
+  (owner closed)" now has **Take over** on its row in the Sessions window, and `t` in the Agent
+  Monitor's list. It sends just those prompts, in order, or discards them. <!-- XCOD-268 -->
+- **Typing in a session a closed Lunos left prompts queued for asks first.** In the session itself
+  (terminal, desktop app and web UI), your first prompt asks "Take over this session here?", as the
+  Agent Monitor does: send the queued prompts first and then yours, discard them, or cancel and keep
+  what you typed. Sessions with nothing queued are sent to as before. <!-- XCOD-267 -->
+- **Deleting a session also deletes the prompts queued for it.** Prompts that were queued for a
+  session and never sent no longer stay on disk after you delete it, whichever way you delete it.
+  The confirmation says how many go with it. Archiving keeps them. <!-- XCOD-269 -->
+- Single session deletes (from the app, the terminal UI, the API or `lunos session delete`) are
+  now written to the audit log as `session.delete`, with how many queued prompts went with them.
+  <!-- XCOD-269 -->
 - **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory, if you
   agree.** The first time per tool and project, Lunos asks: Share, Not now, or Never for this tool.
   Their results are sent to Anthropic or OpenAI with your prompts, so nothing is offered until you

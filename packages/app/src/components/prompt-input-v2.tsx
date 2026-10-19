@@ -16,6 +16,7 @@ import { normalizePromptHistoryEntry, promptLength, type PromptHistoryComment } 
 import { createPersistedPromptInputHistory } from "@/components/prompt-input/history-store"
 import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-input/placeholder"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
+import { useSessionTakeover } from "@/components/prompt-input/takeover"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import { useComments } from "@/context/comments"
 import { formatKeybind, useCommand } from "@/context/command"
@@ -233,6 +234,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     )
   }
 
+  const takeover = useSessionTakeover()
   const accepting = createMemo(() => {
     const id = props.controls.session.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk().directory)
@@ -262,6 +264,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     onAbort: props.onAbort,
     onSubmit: props.onSubmit,
     model: props.controls.model.selection,
+    takeover,
   })
 
   const referenceDescription = (reference: ReferenceInfo) =>

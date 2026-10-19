@@ -354,6 +354,38 @@ test("Stop all & clear: one confirmation listing both steps, then everything is 
   }
 })
 
+// XCOD-269: Delete archived says when prompts queued for those sessions, never sent, go with them
+// (with none, it says nothing: the test above).
+test("Delete archived says how many queued prompts it also deletes", async () => {
+  const server = fakeServer({
+    sessions: [
+      row("a1", { archived: Date.now() - 1000, queued: 2, ownerClosed: true }),
+      row("a2", { archived: Date.now() - 1000 }),
+      row("live", { state: "finished" }),
+    ],
+  })
+  const ui = await mountSessions(server)
+  try {
+    await ui.press("dialog.sessions.archived")
+    await wait(() => ui.frame().includes("title a1"))
+    ui.app.mockInput.pressArrow("down")
+    await Bun.sleep(50)
+    ui.app.mockInput.pressArrow("up")
+    await Bun.sleep(50)
+    await ui.press("dialog.sessions.delete_archived")
+    await wait(() => ui.frame().includes("Delete 2 archived sessions?"))
+    expect(ui.frame()).toContain("Also deletes 2 queued prompts that were never sent.")
+    // Leave nothing deleted, and the list (not the archived view) for the next test.
+    ui.app.mockInput.pressEscape()
+    await wait(() => ui.frame().includes("Archived sessions"))
+    await ui.press("dialog.sessions.archived")
+    await wait(() => ui.frame().includes("title live"))
+    expect(server.calls).toHaveLength(0)
+  } finally {
+    ui.cleanup()
+  }
+})
+
 test("Show archived lists them; Unarchive restores one; Delete archived needs the typed count", async () => {
   const server = fakeServer({
     sessions: [
@@ -388,6 +420,7 @@ test("Show archived lists them; Unarchive restores one; Delete archived needs th
     await ui.press("dialog.sessions.delete_archived")
     await wait(() => ui.frame().includes("Delete 2 archived sessions?"))
     expect(ui.frame()).toContain("Their history is deleted for good; this can't be undone. Projects: beta, alpha")
+    expect(ui.frame()).not.toContain("queued prompt")
     await ui.app.mockInput.typeText("3")
     await ui.enter()
     await wait(() => ui.toast() === "Nothing was deleted: the count didn't match.")

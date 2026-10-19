@@ -108,6 +108,8 @@ import type {
   ExperimentalSessionListResponses,
   ExperimentalSessionOverviewErrors,
   ExperimentalSessionOverviewResponses,
+  ExperimentalSessionQueuedErrors,
+  ExperimentalSessionQueuedResponses,
   ExperimentalSessionTakeoverErrors,
   ExperimentalSessionTakeoverResponses,
   ExperimentalWorkspaceAdapterListErrors,
@@ -1101,6 +1103,13 @@ export class Session extends HeyApiClient {
       workspace?: string
       queued?: "send" | "discard"
       text?: string
+      origin?: "monitor" | "session"
+      request?: {
+        kind: "prompt" | "command" | "shell"
+        body: {
+          [key: string]: unknown
+        }
+      }
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1114,6 +1123,8 @@ export class Session extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "body", key: "queued" },
             { in: "body", key: "text" },
+            { in: "body", key: "origin" },
+            { in: "body", key: "request" },
           ],
         },
       ],
@@ -1131,6 +1142,42 @@ export class Session extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
+    })
+  }
+
+  /**
+   * Prompts held for a session
+   *
+   * How many prompts a Lunos process that stopped still holds for the session (orphaned), and how many any Lunos holds (held, which deleting the session also deletes); never their text. While any are orphaned, a prompt typed in the session asks to take it over first (experimental.session.takeover).
+   */
+  public queued<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalSessionQueuedResponses,
+      ExperimentalSessionQueuedErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/queued",
+      ...options,
+      ...params,
     })
   }
 }

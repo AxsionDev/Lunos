@@ -243,3 +243,18 @@ test("Show archived lists them, Unarchive restores one, Delete archived needs th
   await expect(page.getByText("Fix typo", { exact: true })).toBeVisible()
   await expect(page.getByText("Refactor parser", { exact: true })).toBeVisible()
 })
+
+// XCOD-269: deleting sessions also deletes prompts queued for them and never sent: the confirmation says so.
+test("Delete archived says how many queued prompts it also deletes", async ({ page }) => {
+  const state = await open(page)
+  Object.assign(state.listed.find((item) => item.id === "ses_f2")!, { queued: 2, ownerClosed: true })
+  await page.getByRole("button", { name: "Clear list", exact: true }).click()
+  await dialog(page).getByRole("button", { name: "Clear 4" }).click()
+  await page.getByRole("button", { name: "Show archived" }).click()
+  await expect(page.getByRole("heading", { name: "Archived sessions" })).toBeVisible()
+  // Archived, the queue is kept (unarchive and take over still send it).
+  await expect(page.locator('[data-session-id="ses_f2"]').getByText("2 queued (owner closed)")).toBeVisible()
+  await page.getByRole("button", { name: "Delete archived" }).click()
+  await expect(page.getByRole("heading", { name: "Delete 4 archived sessions?" })).toBeVisible()
+  await expect(dialog(page)).toContainText("Also deletes queued prompts that were never sent (2).")
+})

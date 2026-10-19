@@ -1272,6 +1272,7 @@ export const dict = {
   "session.delete.title": "Видалити сесію",
   "session.delete.confirm": 'Видалити сесію "{{name}}"?',
   "session.delete.button": "Видалити сесію",
+  "session.delete.queued": "Також видаляє запити в черзі, які так і не були надіслані ({{count}}).",
 
   "workspace.new": "Нова робоча область",
   "workspace.type.local": "локальна",
@@ -1445,6 +1446,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Запити в черзі",
   "sessions.monitor.takeover.queuedSend": "Спершу надіслати за порядком ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Відкинути їх ({{count}})",
+  "sessions.monitor.takeover.action": "Перехопити",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos, у якому виконувалася «{{title}}», закрився, коли в черзі ще були запити. У черзі: {{count}}. Якщо ви їх надішлете, вони виконаються в цьому Lunos за порядком.",
+  "sessions.monitor.takeover.sendQueued": "Надіслати запити з черги ({{count}})",
+  "sessions.monitor.takeover.sent": "«{{title}}» перехоплено: запити з черги надсилаються ({{count}})",
+  "sessions.monitor.takeover.discarded": "«{{title}}» перехоплено: запити з черги відкинуто ({{count}})",
   "sessions.monitor.send.question.one": "Надіслати в {{count}} сесію?",
   "sessions.monitor.send.question.few": "Надіслати в {{count}} сесії?",
   "sessions.monitor.send.question.many": "Надіслати в {{count}} сесій?",

@@ -331,3 +331,9 @@ export function stopSummary(result: { stopped: string[]; failed: { id: string; r
   const failed = result.failed.length ? ` · ${result.failed.length} couldn't be stopped (${reasons})` : ""
   return `Stopped ${result.stopped.length}${failed}`
 }
+
+/** XCOD-269: what a delete confirmation adds when prompts queued for the session(s) were never sent. */
+export function queuedDeleteNote(count: number) {
+  if (count <= 0) return undefined
+  return `Also deletes ${count === 1 ? "1 queued prompt" : `${count} queued prompts`} that ${count === 1 ? "was" : "were"} never sent.`
+}

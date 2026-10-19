@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionGroup, SessionOverviewItem } from "@opencode-ai/sdk/v2"
 import {
+  queuedDeleteNote,
   STATE_GLYPH,
   STATE_FILTERS,
   UNGROUPED_KEY,
@@ -293,5 +294,13 @@ describe("Stop all and Clear list (XCOD-265)", () => {
       ungroupedCollapsed: true,
     })
     expect(view(lines)).toEqual(["[Client A 1 collapsed]", "old", "[Ungrouped 1 collapsed]", "older"])
+  })
+})
+
+describe("delete confirmations (XCOD-269)", () => {
+  test("say how many queued prompts, never sent, go with the session; none, nothing", () => {
+    expect(queuedDeleteNote(0)).toBeUndefined()
+    expect(queuedDeleteNote(1)).toBe("Also deletes 1 queued prompt that was never sent.")
+    expect(queuedDeleteNote(2)).toBe("Also deletes 2 queued prompts that were never sent.")
   })
 })

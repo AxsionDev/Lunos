@@ -1144,6 +1144,7 @@ export const dict = {
   "session.delete.title": "ลบเซสชัน",
   "session.delete.confirm": 'ลบเซสชัน "{{name}}" หรือไม่?',
   "session.delete.button": "ลบเซสชัน",
+  "session.delete.queued": "ลบพรอมต์ในคิวที่ยังไม่เคยส่งด้วย ({{count}})",
 
   "workspace.new": "พื้นที่ทำงานใหม่",
   "workspace.type.local": "ในเครื่อง",
@@ -1402,6 +1403,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "พรอมต์ในคิว",
   "sessions.monitor.takeover.queuedSend": "ส่งก่อนตามลำดับ ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "ทิ้ง ({{count}})",
+  "sessions.monitor.takeover.action": "รับช่วง",
+  "sessions.monitor.takeover.onlyBody":
+    "Lunos ที่รัน “{{title}}” ปิดไปทั้งที่ยังมีพรอมต์อยู่ในคิว อยู่ในคิว: {{count}} หากคุณส่ง พรอมต์เหล่านั้นจะรันใน Lunos นี้ตามลำดับ",
+  "sessions.monitor.takeover.sendQueued": "ส่งพรอมต์ที่อยู่ในคิว ({{count}})",
+  "sessions.monitor.takeover.sent": "รับช่วง “{{title}}” แล้ว: กำลังส่งพรอมต์ที่อยู่ในคิว ({{count}})",
+  "sessions.monitor.takeover.discarded": "รับช่วง “{{title}}” แล้ว: ทิ้งพรอมต์ที่อยู่ในคิวแล้ว ({{count}})",
   "sessions.monitor.send.question.one": "ส่งไปยัง {{count}} เซสชันหรือไม่",
   "sessions.monitor.send.question.other": "ส่งไปยัง {{count}} เซสชันหรือไม่",
   "sessions.monitor.sent": 'ส่งไปยัง "{{title}}" แล้ว',

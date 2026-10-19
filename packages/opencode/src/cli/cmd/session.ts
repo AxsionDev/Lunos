@@ -17,6 +17,8 @@ import * as prompts from "@clack/prompts"
 import { InstanceRef } from "@/effect/instance-ref"
 import { SessionBulk } from "@/session/bulk"
 import { SessionOverview } from "@/session/overview"
+import { SessionPromptQueue } from "@/session/prompt-queue"
+import { AuditLog } from "@/audit/log"
 
 function pagerCmd(): string[] {
   const lessOptions = ["-R", "-S"]
@@ -71,9 +73,12 @@ export const SessionDeleteCommand = effectCmd({
   handler: Effect.fn("Cli.session.delete")(function* (args) {
     const svc = yield* Session.Service
     const sessionID = SessionID.make(args.sessionID)
+    // XCOD-269: prompts queued for it and never sent go too (Session.remove); audited as a count.
+    const queued = SessionPromptQueue.held(sessionID)
     yield* svc
       .remove(sessionID)
       .pipe(Effect.catchIf(NotFoundError.isInstance, () => fail(`Session not found: ${args.sessionID}`)))
+    AuditLog.emit("session.delete", { origin: "cli", count: 1, ids: [sessionID], queued_discarded: queued })
     UI.println(UI.Style.TEXT_SUCCESS_BOLD + `Session ${args.sessionID} deleted` + UI.Style.TEXT_NORMAL)
   }),
 })

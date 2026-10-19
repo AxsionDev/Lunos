@@ -35,6 +35,9 @@ import {
   route as deliveryRoute,
   tags,
   takeoverChoices,
+  takeoverQuestion,
+  takeoverOnlyChoices,
+  canTakeOver,
   type Row,
 } from "../util/agent-monitor"
 import { errorMessage } from "../util/error"
@@ -310,10 +313,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       // XCOD-262: prompts its Lunos queued are sent or discarded only here, as the user chooses.
       const held = item.ownerClosed ? (item.queued ?? 0) : 0
       const queued = held
-        ? await choose(
-            `Take over this session here? The Lunos that ran "${title}" closed with ${held === 1 ? "1 prompt" : `${held} prompts`} queued for it, never sent. Sent first, they run in order before yours.`,
-            takeoverChoices(held),
-          )
+        ? await choose(takeoverQuestion(title, held), takeoverChoices(held))
         : (await confirm(
               "Take over this session here?",
               `The Lunos that ran "${title}" stopped before its turn finished. Run your prompt in this Lunos instead?`,
@@ -517,6 +517,34 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     refresh()
   }
 
+  /**
+   * XCOD-268: t on a row whose Lunos closed with prompts queued: send just those (in order, through the
+   * same at-most-once take-over), or discard them, with no new prompt of its own.
+   */
+  async function takeOver(item: SessionOverviewItem) {
+    if (!canTakeOver(item)) return
+    const held = item.queued!
+    const title = Locale.truncate(item.title, 40)
+    const queued = await choose(
+      `Take over this session here? The Lunos that ran "${title}" closed with ${held === 1 ? "1 prompt" : `${held} prompts`} queued for it, never sent. Sent, they run in this Lunos, in order.`,
+      takeoverOnlyChoices(held),
+    )
+    if (!queued) return
+    const result = await sdk.client.experimental.session
+      .takeover({ sessionID: item.id, directory: item.directory, queued }, { throwOnError: true })
+      .then((response) => response.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (result)
+      toast.show({
+        variant: "success",
+        message:
+          queued === "send"
+            ? `Took over "${title}": sending ${result.sent === 1 ? "its queued prompt" : `its ${result.sent} queued prompts`}`
+            : `Took over "${title}": discarded ${result.discarded === 1 ? "its queued prompt" : `its ${result.discarded} queued prompts`}`,
+      })
+    refresh()
+  }
+
   /** XCOD-265: the rows Stop all and Clear list act on: what the rail shows (filter, Show older). */
   const railView = () => rail().rows.map((row) => row.item)
 
@@ -668,6 +696,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       ...keys("monitor.stop", () => current() && void stop(current()!)),
       ...keys("monitor.filter", () => void filter()),
       ...keys("monitor.older", () => setShowOlder((value) => !value)),
+      ...keys("monitor.takeover", () => current() && void takeOver(current()!)),
       ...keys("monitor.stop_all", () => void stopAll()),
       ...keys("monitor.clear", () => void clearList()),
     ],
@@ -846,7 +875,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       <box paddingLeft={1} flexShrink={0}>
         <text fg={theme.textMuted} wrapMode="none">
           {focus() === "rail"
-            ? "↑↓ move · enter open · a approve · d deny · s stop · / filter · ctrl+p stop all, clear · tab prompt"
+            ? `↑↓ move · enter open · ${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · / filter · ctrl+p stop all, clear · tab prompt`
             : "tab rail"}
         </text>
       </box>

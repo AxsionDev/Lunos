@@ -335,6 +335,39 @@ export function removeHeld(file: string, sessionID: string, id: string) {
 }
 
 /**
+ * XCOD-269: the session was deleted: its prompts go from every file of a process that stopped (a
+ * live one drops its own, through its control endpoint). A file left holding no prompts is deleted
+ * when its process is gone, or rewritten without them (still 0600). Returns how many went.
+ */
+export function discardHeld(sessionID: string, input: { now?: number } = {}) {
+  const now = input.now ?? Date.now()
+  let count = 0
+  for (const file of others()) {
+    const body = load(file)
+    if (!body || isFresh(body, now)) continue
+    const held = heldIn(body, sessionID).length
+    if (!held && !body.queue?.[sessionID]) continue
+    count += held
+    const { [sessionID]: _, ...queue } = body.queue ?? {}
+    const { [sessionID]: __, ...sessions } = body.sessions
+    const next: File = { ...body, sessions, queue }
+    if (!heldCount(next) && (gone(body, now) || Object.keys(sessions).length === 0)) rmSync(file, { force: true })
+    else replace(file, next)
+  }
+  return count
+}
+
+/** XCOD-269: how many prompts processes that stopped, or are running, hold for the session. Counts only. */
+export function heldFor(sessionID: string) {
+  let count = 0
+  for (const file of others()) {
+    const body = load(file)
+    if (body) count += heldIn(body, sessionID).length
+  }
+  return count
+}
+
+/**
  * XCOD-262: one take-over of a session at a time on this machine. Throws when another live process
  * is taking it over; a lock left by one that crashed is taken. Returns the release.
  */

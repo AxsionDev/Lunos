@@ -1256,6 +1256,7 @@ export const dict = {
   "session.delete.title": "Hapus sesi",
   "session.delete.confirm": 'Hapus sesi "{{name}}"?',
   "session.delete.button": "Hapus sesi",
+  "session.delete.queued": "Juga menghapus prompt dalam antrean yang tidak pernah dikirim ({{count}}).",
 
   "workspace.new": "Ruang kerja baru",
   "workspace.type.local": "lokal",
@@ -1416,6 +1417,12 @@ export const dict = {
   "sessions.monitor.takeover.queuedLabel": "Prompt dalam antrean",
   "sessions.monitor.takeover.queuedSend": "Kirim dulu, berurutan ({{count}})",
   "sessions.monitor.takeover.queuedDiscard": "Buang ({{count}})",
+  "sessions.monitor.takeover.action": "Ambil alih",
+  "sessions.monitor.takeover.onlyBody":
+    'Lunos yang menjalankan "{{title}}" ditutup dengan prompt yang masih dalam antrean. Dalam antrean: {{count}}. Jika dikirim, prompt tersebut berjalan di Lunos ini, berurutan.',
+  "sessions.monitor.takeover.sendQueued": "Kirim prompt dalam antrean ({{count}})",
+  "sessions.monitor.takeover.sent": 'Mengambil alih "{{title}}": mengirim prompt dalam antrean ({{count}})',
+  "sessions.monitor.takeover.discarded": 'Mengambil alih "{{title}}": prompt dalam antrean dibuang ({{count}})',
   "sessions.monitor.send.question.one": "Kirim ke {{count}} sesi?",
   "sessions.monitor.send.question.other": "Kirim ke {{count}} sesi?",
   "sessions.monitor.sent": 'Terkirim ke "{{title}}"',
