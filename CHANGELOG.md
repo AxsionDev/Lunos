@@ -21,6 +21,9 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+- Every published release notifies lunos.tech with the tagged CHANGELOG.md, and a daily check fails
+  when lunos.tech/changelog falls behind the latest release. <!-- XCOD-261 --> <!-- internal -->
+
 ## [1.18.50] - 2026-10-19
 
 ### Added
@@ -581,6 +584,22 @@ false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `auto
   permission rules written with 8.3 short names (`C:\PROGRA~1\…`) match long-form paths. <!-- XCOD-137 XCOD-149 -->
 - A legacy keybind name in `tui.json` (such as `agent_list`, renamed in an earlier release) was silently
   dropped when the config loaded, instead of resolving to its new name. <!-- XCOD-40 XCOD-130 -->
+
+## [1.18.42] - 2026-09-29
+
+### Added
+
+- **Offline install bundles,** one `lunos-offline-<os>-<arch>.tar.gz` per platform, for installing
+  Lunos on a machine with no internet access. Each contains the CLI, the model catalogue, the SBOM,
+  the signed `SHA256SUMS`, Sigstore's trust root, and pinned ripgrep and cosign builds. Verify a
+  bundle with `SHA256SUMS-offline` and its signature before you transfer it. `INSTALL-OFFLINE.md`
+  inside the bundle has the steps, and [Air-gapped deployment](docs/deployment/self-hosted.md#air-gapped-deployment)
+  covers running against your own model. <!-- XCOD-121 --> <!-- highlight -->
+
+### Fixed
+
+- The offline install bundles missing from v1.18.41 ship with this release: the release job no
+  longer hangs while building them. <!-- XCOD-121 -->
 
 ## [1.18.41] - 2026-09-29
 
