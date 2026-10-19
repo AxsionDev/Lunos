@@ -137,7 +137,15 @@ export const ExternalToolStatus = Schema.Struct({
   ),
   /** XCOD-256: Claude Code's `--permission-mode` choices, from this install's `--help`. */
   permissionModes: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  /** XCOD-254: the answer to sharing Lunos's tools, skills and memory with it in this project, if given. */
+  consent: Schema.optional(Schema.Literals(["share", "never"])),
 }).annotate({ identifier: "ExternalToolStatus" })
+
+// XCOD-254: /settings → External sessions changes the answer; "ask" forgets it (asked next session).
+export const ExternalConsentPayload = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  answer: Schema.Literals(["share", "never", "ask"]),
+})
 
 // XCOD-254: /models in a Claude Code or Codex session lists the tool's models.
 export const ExternalModel = Schema.Struct({
@@ -277,6 +285,7 @@ export const ExperimentalPaths = {
   externalTools: "/experimental/external/tools",
   externalModels: "/experimental/external/:sessionID/models",
   externalModel: "/experimental/external/:sessionID/model",
+  externalConsent: "/experimental/external/consent",
   peerStop: "/experimental/peer/:sessionID/stop",
   peerAsks: "/experimental/peer/:sessionID/asks",
   peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
@@ -654,6 +663,18 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Choose an external session's model",
             description:
               "Save the model Claude Code or Codex uses in an external session from its next turn on (resumes included). Omit it to go back to the tool's default.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalConsent", ExperimentalPaths.externalConsent, {
+          query: WorkspaceRoutingQuery,
+          payload: ExternalConsentPayload,
+          success: described(Schema.Boolean, "Answer saved"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.consent",
+            summary: "Share Lunos with Claude Code or Codex",
+            description:
+              "Whether Lunos's MCP servers, skills and memory are offered to Claude Code or Codex sessions in this project (share), never offered without asking (never), or asked about in the next session (ask). Kept on this machine, never in config. Audited as external.consent.",
           }),
         ),
         HttpApiEndpoint.post("peerStop", ExperimentalPaths.peerStop, {

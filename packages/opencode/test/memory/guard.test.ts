@@ -27,6 +27,29 @@ function assistant(...tools: [string, Record<string, unknown>?][]): SessionV1.Wi
 }
 
 describe("MemoryGuard.taint", () => {
+  test("XCOD-254: a Claude Code / Codex turn's web and MCP tools taint it; the Lunos bridge's own skill and memory tools don't", () => {
+    for (const tool of [
+      "claude:WebFetch",
+      "claude:WebSearch",
+      "claude:mcp__github__get_issue",
+      "codex:mcp__lunos__lunos__echo__say",
+    ])
+      expect(MemoryGuard.taint([user(), assistant([tool])], worktree)).toContain(tool)
+    for (const tool of [
+      "claude:mcp__lunos__lunos_skill_load",
+      "claude:mcp__lunos__lunos_memory_search",
+      "claude:Edit",
+      "codex:Bash",
+    ])
+      expect(MemoryGuard.taint([user(), assistant([tool])], worktree)).toBeUndefined()
+    expect(MemoryGuard.taint([user(), assistant(["claude:Read", { file_path: "/etc/hosts" }])], worktree)).toContain(
+      "/etc/hosts",
+    )
+    expect(MemoryGuard.taint([user(), assistant(["claude:Read", { file_path: "/work/project/a.ts" }])], worktree)).toBe(
+      undefined,
+    )
+  })
+
   test("a clean turn is fine, including reads inside the project", () => {
     expect(MemoryGuard.taint([user(), assistant(["read", { filePath: "/work/project/src/a.ts" }])], worktree)).toBe(
       undefined,

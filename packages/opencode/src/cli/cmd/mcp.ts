@@ -1,4 +1,5 @@
 import { cmd } from "./cmd"
+import { McpBridgeCommand } from "./mcp-bridge"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { effectCmd, fail } from "../effect-cmd"
 import { Cause } from "effect"
@@ -108,6 +109,7 @@ export const McpCommand = cmd({
       .command(McpAuthCommand)
       .command(McpLogoutCommand)
       .command(McpDebugCommand)
+      .command(McpBridgeCommand)
       .demandCommand(),
   async handler() {},
 })

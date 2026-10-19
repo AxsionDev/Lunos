@@ -58,6 +58,8 @@ import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { Memory } from "@/memory"
 import { MemorySources } from "@/memory/sources"
+import { Skill } from "@/skill"
+import { Question } from "@/question"
 import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
@@ -147,6 +149,8 @@ const layer = Layer.effect(
     const events = yield* EventV2Bridge.Service
     const memory = yield* Memory.Service
     const memorySources = yield* MemorySources.Service
+    const skill = yield* Skill.Service
+    const question = yield* Question.Service
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
     const { db } = database
@@ -1432,7 +1436,10 @@ const layer = Layer.effect(
         return yield* state.ensureRunning(
           input.sessionID,
           lastAssistant(input.sessionID),
-          ExternalSession.turn({ sessions, permission, agents, config, events, status }, input.sessionID),
+          ExternalSession.turn(
+            { sessions, permission, agents, config, events, status, mcp, plugin, memory, skill, question },
+            input.sessionID,
+          ),
         )
       return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
     })
@@ -1769,6 +1776,8 @@ export const node = LayerNode.make({
     Database.node,
     Memory.node,
     MemorySources.node,
+    Skill.node,
+    Question.node,
   ],
 })
 

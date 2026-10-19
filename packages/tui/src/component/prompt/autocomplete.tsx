@@ -515,7 +515,9 @@ export function Autocomplete(props: {
         },
       })
 
-    for (const serverCommand of sync.data.command) {
+    // XCOD-254: `external.share.commands: false` (lockable) keeps Lunos's commands out of these sessions.
+    const shareCommands = !external || sync.data.config.external?.share?.commands !== false
+    for (const serverCommand of shareCommands ? sync.data.command : []) {
       if (serverCommand.source === "skill") continue
       // XCOD-254: in an external session Lunos's commands are listed too, labelled, and renamed
       // `name:lunos` where the tool has one of the same name.

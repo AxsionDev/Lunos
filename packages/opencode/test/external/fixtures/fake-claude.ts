@@ -14,7 +14,11 @@ if (process.argv.includes("--version")) {
   process.exit(0)
 }
 if (process.argv.includes("--help")) {
-  console.log("--input-format <format>\n--output-format <format>\n--permission-prompts <target>")
+  // XCOD-254: FAKE_CLAUDE_MCP=1 also lists --mcp-config, as a Claude Code that can take the Lunos bridge.
+  console.log(
+    "--input-format <format>\n--output-format <format>\n--permission-prompts <target>" +
+      (process.env.FAKE_CLAUDE_MCP === "1" ? "\n--mcp-config <configs...>" : ""),
+  )
   process.exit(0)
 }
 if (process.argv[2] === "auth" && process.argv[3] === "status") {
@@ -63,6 +67,56 @@ console.log(
 )
 // then the user prompt
 await nextLine()
+// XCOD-254: given a --mcp-config, start the Lunos bridge from it and list its tools (logged). With
+// FAKE_CLAUDE_BRIDGE_CALL=<tool>, call that tool the way Claude Code would: announce the tool_use,
+// ask the host with can_use_tool, call it when allowed, report the tool_result, then end the turn
+// with the recorded result instead of replaying the recorded Write.
+const mcpConfig = process.argv.includes("--mcp-config")
+  ? process.argv[process.argv.indexOf("--mcp-config") + 1]
+  : undefined
+if (mcpConfig) {
+  const { useBridge } = await import("./bridge-client")
+  const entry = JSON.parse(readFileSync(mcpConfig, "utf8")).mcpServers.lunos
+  const call = process.env.FAKE_CLAUDE_BRIDGE_CALL
+  if (!call) record(JSON.stringify({ bridge: await useBridge(entry) }))
+  else {
+    const name = `mcp__lunos__${call}`
+    const args = JSON.parse(process.env.FAKE_CLAUDE_BRIDGE_ARGS ?? "{}")
+    console.log(lines[0])
+    console.log(
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: [{ type: "tool_use", id: "toolu_bridge", name, input: args }] },
+      }),
+    )
+    console.log(
+      JSON.stringify({
+        type: "control_request",
+        request_id: "req_bridge",
+        request: { subtype: "can_use_tool", tool_name: name, input: args, tool_use_id: "toolu_bridge" },
+      }),
+    )
+    const answer = JSON.parse(await nextLine())
+    const allowed = answer.response?.response?.behavior === "allow"
+    const used = allowed ? await useBridge(entry, { name: call, arguments: args }) : await useBridge(entry)
+    record(JSON.stringify({ bridge: used, approval: answer.response?.response?.behavior }))
+    const output = ((used.result?.content as any[]) ?? []).map((item) => item.text ?? "").join("\n")
+    console.log(
+      JSON.stringify({
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "toolu_bridge", content: output, is_error: !!used.result?.isError },
+          ],
+        },
+      }),
+    )
+    console.log(lines.at(-1))
+    await new Promise((resolve) => input.on("close", resolve))
+    process.exit(0)
+  }
+}
 // XCOD-254: the replayed init names the model passed with --model, as Claude Code's would.
 const chosen = process.argv[process.argv.indexOf("--model") + 1]
 if (process.argv.includes("--model") && chosen) {

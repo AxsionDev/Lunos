@@ -30,6 +30,17 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   the monitor, or sends to the sessions you tag, as in `@2 run the tests`. A busy session gets the
   prompt when its turn ends, and a session another Lunos runs gets it through that Lunos. A prompt
   never approves a tool call. <!-- XCOD-262 -->
+- **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory, if you
+  agree.** The first time per tool and project, Lunos asks: Share, Not now, or Never for this tool.
+  Their results are sent to Anthropic or OpenAI with your prompts, so nothing is offered until you
+  choose Share. Each call asks in Lunos unless your permission rules allow that tool by name, and
+  follows your residency policy and plugin hooks. Every call is written to the audit log. The
+  session's header and prompt show what's offered ("Lunos bridge: 2 servers, 3 skills, memory on")
+  and warn when the tool didn't connect; `lunos external list` shows the same line. Change your
+  answer in `/settings` → External sessions or with `lunos external share`. `external.share.*`
+  chooses what's shared, and an organisation can lock it. Your `~/.claude` and `~/.codex` settings
+  are never changed.
+  <!-- XCOD-254 -->
 - **Memory setup explains where your memory is stored, and lets you keep it in PostgreSQL.** The
   "Where should memory be stored?" step shows each option as a card, with a "What this means" panel
   that uses your real memory folder, model and region. The panel says what is stored where, what
@@ -74,6 +85,8 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   without your facts, keys or tokens. `lunos memory check --json` returns the same fields, the
   engine's output is kept in the memory folder's `logs/`, and `lunos memory status` shows where.
   <!-- XCOD-263 -->
+- In a run from source, the memory setup check runs in the opened project, not in the Lunos
+  checkout, so its test fact no longer lands in the checkout's memory. <!-- internal --> <!-- XCOD-263 -->
 - **Settings and memory setup can save `{env:…}` references** such as `{env:NEO4J_PASSWORD}`.
   Before, saving one failed, so a team database couldn't be set up from the wizard.
   <!-- XCOD-264 -->
@@ -91,6 +104,12 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   From scripts: `lunos session stop --all [--project]`, `lunos session archive --finished
 [--older-than 7d]` and `lunos session unarchive <id|--all>`, each with `--yes`. Bulk actions are
   written to the audit log as `session.stop`, `session.archive` and `session.delete`. <!-- XCOD-265 -->
+- **The same Stop all and Clear list in the desktop Sessions window and on the web.** The Sessions
+  window has Stop all, Clear list and Stop all & clear buttons, with the same counts and the same
+  confirmation as `/sessions`; when the sessions in view span several projects, Stop all can be kept
+  to one of them. Rows that couldn't be stopped say why. Undo brings back what Clear hid, Show
+  archived lists archived sessions with Unarchive on each, and Delete archived asks you to type the
+  count first. <!-- XCOD-265 -->
 
 ## [1.18.50] - 2026-10-19
 

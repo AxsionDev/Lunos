@@ -47,6 +47,7 @@ import { ExternalDetect } from "@/external/detect"
 import { ExternalPolicy } from "@/external/policy"
 import { ExternalRun } from "@/external/run"
 import { ExternalSession } from "@/external/session"
+import { ExternalConsent } from "@/external/consent"
 import { GlobalBus } from "@/bus/global"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
 
@@ -346,11 +347,13 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     // so it's asked when the commands are offered, not on every keystroke.
     const externalTools = Effect.fn("ExperimentalHttpApi.externalTools")(function* () {
       const cfg = yield* config.get()
+      const instance = yield* InstanceState.context
       return yield* Effect.promise(() =>
         Promise.all(
           (["claude", "codex"] as const).map(async (tool) => {
             const status = await ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, cfg))
             const refused = ExternalPolicy.evaluate(tool, cfg)
+            const consent = await ExternalConsent.get(ExternalConsent.project(instance), tool)
             return {
               tool,
               label: status.label,
@@ -359,6 +362,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
               ...(status.hint || status.outdated ? { hint: status.hint ?? status.outdated } : {}),
               ...(refused ? { refused } : {}),
               ...(status.permissionModes ? { permissionModes: status.permissionModes } : {}),
+              ...(consent ? { consent } : {}),
             }
           }),
         ),
@@ -399,6 +403,25 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       const invalid = model ? ExternalSession.invalidModel(model) : undefined
       if (invalid) return yield* Effect.fail(new InvalidRequestError({ message: invalid }))
       yield* ExternalSession.setModel(sessions, SessionID.make(ctx.params.sessionID), model)
+      return true
+    })
+
+    // XCOD-254: the answer to sharing Lunos with a tool in this project, as `lunos external share`.
+    const externalConsent = Effect.fn("ExperimentalHttpApi.externalConsent")(function* (ctx: {
+      payload: { tool: "claude" | "codex"; answer: "share" | "never" | "ask" }
+    }) {
+      const cfg = yield* config.get()
+      const instance = yield* InstanceState.context
+      const { tool, answer } = ctx.payload
+      yield* Effect.promise(() =>
+        ExternalConsent.set(ExternalConsent.project(instance), tool, answer === "ask" ? undefined : answer),
+      )
+      ExternalPolicy.record(cfg, "external.consent", {
+        tool,
+        provider: ExternalDetect.TOOLS[tool].provider,
+        answer,
+        origin: "settings",
+      })
       return true
     })
 
@@ -536,6 +559,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("externalTools", externalTools)
       .handle("externalModels", externalModels)
       .handle("externalModel", externalModel)
+      .handle("externalConsent", externalConsent)
       .handle("peerStop", peerStop)
       .handle("peerAsks", peerAsks)
       .handle("peerPermissionReply", peerPermissionReply)

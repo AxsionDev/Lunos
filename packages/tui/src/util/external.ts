@@ -36,6 +36,28 @@ export type ExternalMarker = {
   commands?: string[]
   /** XCOD-254: the tool's model chosen with /models, used from the next turn. */
   model?: string
+  /** XCOD-254: what the Lunos bridge offered on the last turn (server side: ExternalBridge.Status). */
+  bridge?: ExternalBridgeStatus
+}
+
+export type ExternalBridgeStatus = {
+  servers: number
+  skills: number
+  memory: boolean
+  connected?: boolean
+  off?: string
+}
+
+/**
+ * XCOD-254: "Lunos bridge: 2 servers, 3 skills, memory on", the same line `lunos external list`
+ * prints. `warning` is set when the bridge was offered but the tool didn't connect to it.
+ */
+export function bridgeLine(status: ExternalBridgeStatus | undefined) {
+  if (!status) return undefined
+  if (status.off) return { text: `Lunos bridge: off (${status.off})`, warning: false }
+  const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`
+  const text = `Lunos bridge: ${plural(status.servers, "server")}, ${plural(status.skills, "skill")}, memory ${status.memory ? "on" : "off"}`
+  return status.connected === false ? { text: `${text} ⚠ not connected`, warning: true } : { text, warning: false }
 }
 
 /** The marker the server keeps on an external session (`metadata.external`), if this is one. */

@@ -11,6 +11,7 @@ import { useRoute } from "../context/route"
 import { useRenderer } from "@opentui/solid"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
+import { EXTERNAL_LABEL } from "../util/external"
 import { DialogSelect, type DialogSelectRef } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogConfirm } from "../ui/dialog-confirm"
@@ -70,6 +71,13 @@ let memoryAdvancedOpen = false
 /** XCOD-259: keys saved this session that wait for a restart, for the section badges. */
 const pendingRestart = new Set<string>()
 const MEMORY = "Memory"
+const EXTERNAL_AREA = "Models & agents"
+const EXTERNAL_SUB = "External sessions"
+
+/** XCOD-254: the footer of a tool's sharing row. */
+export function consentLabel(consent: "share" | "never" | undefined) {
+  return consent === "share" ? "shared" : consent === "never" ? "never" : "asks first"
+}
 
 /**
  * `section` (XCOD-231): one structured setting's own screen, e.g. `subagent`, listing its fields
@@ -182,6 +190,43 @@ export function DialogSettings(props: {
         : area
           ? { back: () => openHome(area), generation }
           : { nav: true, generation },
+    )
+  }
+
+  // XCOD-254: the tools' state, with this project's answer to sharing Lunos with each.
+  const [externalTools] = createResource(
+    () => props.area === EXTERNAL_AREA,
+    async () => (await sdk.client.experimental.external.tools().catch(() => undefined))?.data,
+  )
+
+  function pickConsent(tool: "claude" | "codex") {
+    const current = externalTools()?.find((item) => item.tool === tool)?.consent ?? "ask"
+    const label = EXTERNAL_LABEL[tool]
+    dialog.replace(
+      () => (
+        <DialogSelect<"share" | "never" | "ask">
+          title={`Share Lunos with ${label} in this project`}
+          skipFilter
+          current={current}
+          options={[
+            {
+              title: "Share",
+              value: "share",
+              description: `Offer Lunos's MCP servers, skills and memory to ${label}. Their results go to ${tool === "claude" ? "Anthropic" : "OpenAI"} with your prompts`,
+            },
+            { title: "Never", value: "never", description: `${label} runs without them, and you aren't asked` },
+            { title: "Ask in the next session", value: "ask", description: "Forget the answer" },
+          ]}
+          onSelect={(option) => {
+            void sdk.client.experimental.external
+              .consent({ tool, answer: option.value })
+              .catch(() => toast.show({ variant: "error", message: "Couldn't save the answer" }))
+              .then(() => reopen(`+external.consent.${tool}`))
+          }}
+        />
+      ),
+      undefined,
+      { back: () => reopen(`+external.consent.${tool}`), generation },
     )
   }
 
@@ -750,6 +795,17 @@ export function DialogSettings(props: {
         footer: right,
       }
     })
+    // XCOD-254: Models & agents › External sessions starts with the answer to sharing Lunos with each
+    // tool in this project; it's kept on this machine, not in config, so it isn't a setting row.
+    if (props.area === EXTERNAL_AREA && sub() === EXTERNAL_SUB && !query())
+      return [
+        ...(["claude", "codex"] as const).map((tool) => ({
+          title: `Share Lunos with ${EXTERNAL_LABEL[tool]} in this project`,
+          value: `+external.consent.${tool}`,
+          footer: consentLabel(externalTools()?.find((item) => item.tool === tool)?.consent),
+        })),
+        ...list,
+      ]
     if (props.area !== MEMORY || sub() !== "Overview" || query()) return list
     // Memory › Overview: the status, the guided setup and the analytics.
     const config = sync.data.config.memory
@@ -780,6 +836,13 @@ export function DialogSettings(props: {
       return (
         <text fg={theme.textMuted} wrapMode="word">
           Memory at a glance: its status, a guided setup, and what's in it. Tab for every setting.
+        </text>
+      )
+    if (synthetic?.startsWith("+external.consent."))
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          Lunos's MCP servers, skills and memory, offered to the tool through the Lunos bridge. Their results are sent
+          to Anthropic or OpenAI with your prompts. Each call asks in Lunos unless your rules allow that tool by name.
         </text>
       )
     if (synthetic === "+memory.analytics")
@@ -917,6 +980,8 @@ export function DialogSettings(props: {
               onSelect={(option) => {
                 if (option.value.startsWith("+area:")) return openArea(option.value.slice("+area:".length))
                 if (option.value === "+memory.analytics") return dialog.replace(() => <DialogMemory />)
+                if (option.value.startsWith("+external.consent."))
+                  return pickConsent(option.value.slice("+external.consent.".length) as "claude" | "codex")
                 // A search result from the home opens its section and sub-tab, on that row.
                 const found = atHome() ? rows().find((item) => item.key === option.value) : undefined
                 if (found) return openArea(found.category, found.sub ?? undefined, found.key)

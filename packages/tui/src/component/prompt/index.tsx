@@ -69,6 +69,7 @@ import {
   EXTERNAL_LABEL,
   externalAccent,
   externalBadge,
+  bridgeLine,
   externalOf,
   parseExternalSlash,
   parseToolSlash,
@@ -1241,11 +1242,15 @@ export function Prompt(props: PromptProps) {
       const text = store.prompt.input
       // XCOD-254: a Lunos command (`/name`, or `/name:lunos` on a clash) is expanded by Lunos, and the
       // text it makes goes to the tool; anything else goes as typed.
-      const command = lunosCommand(
-        text,
-        external.commands ?? [],
-        sync.data.command.filter((item) => item.source !== "skill").map((item) => item.name),
-      )
+      // `external.share.commands: false` (lockable): nothing is expanded by Lunos, the text goes as typed.
+      const command =
+        sync.data.config.external?.share?.commands === false
+          ? undefined
+          : lunosCommand(
+              text,
+              external.commands ?? [],
+              sync.data.command.filter((item) => item.source !== "skill").map((item) => item.name),
+            )
       const name = command?.name
       // XCOD-254: `/models` and `/cost` act on the tool's session here, even typed past the list.
       const mapped = command ? undefined : /^\/(\w+)$/.exec(text.trim())?.[1]
@@ -2046,7 +2051,17 @@ export function Prompt(props: PromptProps) {
               {props.hint ?? (
                 <Show when={props.sessionID} fallback={<text />}>
                   <box marginLeft={1}>
-                    <text fg={theme.textMuted}>{location()?.directory ?? paths.cwd}</text>
+                    {/* XCOD-254: an external session shows what the Lunos bridge offers instead of the directory. */}
+                    <Show
+                      when={bridgeLine(external()?.bridge)}
+                      fallback={<text fg={theme.textMuted}>{location()?.directory ?? paths.cwd}</text>}
+                    >
+                      {(line) => (
+                        <text fg={line().warning ? theme.warning : theme.textMuted} wrapMode="none">
+                          {line().text}
+                        </text>
+                      )}
+                    </Show>
                   </box>
                 </Show>
               )}
