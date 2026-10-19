@@ -117,6 +117,88 @@ export function command(prompt: string, resuming: boolean): Turn {
   )
 }
 
+/** The models in a `model/list` page (`data`: `{ id, model, displayName, description, isDefault }`). */
+export function parseModels(result: unknown): ExternalClaude.Model[] {
+  const body = result as { data?: unknown; models?: unknown } | undefined
+  const list = Array.isArray(body?.data) ? body.data : Array.isArray(body?.models) ? body.models : []
+  return list.flatMap((item: any) => {
+    const id = item?.model ?? item?.id
+    if (typeof id !== "string" || !id) return []
+    return [
+      {
+        id,
+        name: String(item.displayName ?? item.display_name ?? id),
+        ...(typeof item.description === "string" && item.description ? { description: item.description } : {}),
+        ...(item.isDefault === true || item.is_default === true ? { default: true } : {}),
+      },
+    ]
+  })
+}
+
+/**
+ * XCOD-254: the models this Codex offers, from the app server's `model/list` (a few pages at most).
+ * No thread is started, so no model is called. Empty when it doesn't list them in time.
+ */
+export function models(options: { executable: string; cwd: string; timeoutMs?: number }) {
+  const cmd = ExternalDetect.command(options.executable, ["app-server"])
+  const child = spawn(cmd.file, cmd.args, {
+    cwd: options.cwd,
+    shell: cmd.shell,
+    env: ExternalDetect.environment(),
+    stdio: ["pipe", "pipe", "ignore"],
+  })
+  child.stdin?.on("error", () => undefined)
+  const write = (message: unknown) => {
+    if (child.stdin && !child.stdin.destroyed) child.stdin.write(JSON.stringify(message) + "\n")
+  }
+  let nextID = 0
+  const waiting = new Map<number, (message: any) => void>()
+  const request = (method: string, params: unknown) =>
+    new Promise<any>((resolve, reject) => {
+      const id = ++nextID
+      waiting.set(id, (message) =>
+        message.error ? reject(new Error(message.error.message ?? method)) : resolve(message.result),
+      )
+      write({ id, method, params })
+    })
+  createInterface({ input: child.stdout! }).on("line", (line) => {
+    let message: any
+    try {
+      message = JSON.parse(line)
+    } catch {
+      return
+    }
+    if (message.id === undefined || message.method) return
+    waiting.get(message.id)?.(message)
+    waiting.delete(message.id)
+  })
+  const list = async () => {
+    await request("initialize", { clientInfo: { name: "lunos", version: "1" } })
+    write({ method: "initialized" })
+    const result: ExternalClaude.Model[] = []
+    let cursor: string | undefined
+    for (let page = 0; page < 5; page++) {
+      const response = await request("model/list", cursor ? { cursor } : {})
+      result.push(...parseModels(response))
+      cursor = response?.nextCursor ?? undefined
+      if (!cursor) break
+    }
+    return result
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<ExternalClaude.Model[]>((resolve) => {
+    timer = setTimeout(() => resolve([]), options.timeoutMs ?? 15_000)
+  })
+  const exited = new Promise<ExternalClaude.Model[]>((resolve) => {
+    child.on("error", () => resolve([]))
+    child.on("close", () => resolve([]))
+  })
+  return Promise.race([list().catch(() => []), timeout, exited]).finally(() => {
+    clearTimeout(timer)
+    child.kill()
+  })
+}
+
 const APPROVAL_METHODS: Record<string, string> = {
   "item/fileChange/requestApproval": "FileChange",
   "item/commandExecution/requestApproval": "Bash",

@@ -56,6 +56,10 @@ import type {
   ExperimentalConsoleSwitchOrgResponses,
   ExperimentalControlPlaneMoveSessionErrors,
   ExperimentalControlPlaneMoveSessionResponses,
+  ExperimentalExternalModelErrors,
+  ExperimentalExternalModelResponses,
+  ExperimentalExternalModelsErrors,
+  ExperimentalExternalModelsResponses,
   ExperimentalExternalStopErrors,
   ExperimentalExternalStopResponses,
   ExperimentalExternalToolsErrors,
@@ -1581,6 +1585,85 @@ export class External extends HeyApiClient {
       url: "/experimental/external/{sessionID}/stop",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * External session models
+   *
+   * The models Claude Code or Codex offers for an external session, asked from the tool without a prompt (no model is called), and the one chosen for the session.
+   */
+  public models<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalExternalModelsResponses,
+      ExperimentalExternalModelsErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/models",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Choose an external session's model
+   *
+   * Save the model Claude Code or Codex uses in an external session from its next turn on (resumes included). Omit it to go back to the tool's default.
+   */
+  public model<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      model?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "model" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalModelResponses,
+      ExperimentalExternalModelErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/model",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }

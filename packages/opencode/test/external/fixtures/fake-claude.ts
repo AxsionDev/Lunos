@@ -36,9 +36,39 @@ input.on("line", (line) => {
 const nextLine = () =>
   new Promise<string>((resolve) => (received.length ? resolve(received.shift()!) : waiters.push(resolve)))
 
-// initialize, then the user prompt
+// XCOD-254: initialize is answered at once, as Claude Code does, with the models it offers. Not
+// recorded: shaped as the Agent SDK's initialize response (`models: { value, displayName,
+// description }[]`). FAKE_CLAUDE_MODELS=none answers without them, like a release that doesn't list them.
+const init = JSON.parse(await nextLine())
+console.log(
+  JSON.stringify({
+    type: "control_response",
+    response: {
+      subtype: "success",
+      request_id: init.request_id,
+      response: {
+        commands: [],
+        ...(process.env.FAKE_CLAUDE_MODELS === "none"
+          ? {}
+          : {
+              models: [
+                { value: "default", displayName: "Default (recommended)", description: "Opus 5.5 with 1M context" },
+                { value: "sonnet", displayName: "Sonnet", description: "Sonnet 5.5 for everyday tasks" },
+                { value: "haiku", displayName: "Haiku", description: "Haiku 5.5 for quick answers" },
+              ],
+            }),
+      },
+    },
+  }),
+)
+// then the user prompt
 await nextLine()
-await nextLine()
+// XCOD-254: the replayed init names the model passed with --model, as Claude Code's would.
+const chosen = process.argv[process.argv.indexOf("--model") + 1]
+if (process.argv.includes("--model") && chosen) {
+  const first = JSON.parse(lines[0]!)
+  lines[0] = JSON.stringify({ ...first, model: chosen })
+}
 // XCOD-218: FAKE_CLAUDE_DELAY_MS slows the replay, so a test can stop a turn while it runs.
 const delay = Number(process.env.FAKE_CLAUDE_DELAY_MS ?? 0)
 for (const line of lines) {

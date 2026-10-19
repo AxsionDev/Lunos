@@ -1,5 +1,5 @@
 import type { BoxRenderable, TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
-import { EXTERNAL_LABEL, externalOf, wantExternalTools } from "../../util/external"
+import { EXTERNAL_BADGE, EXTERNAL_LABEL, externalOf, wantExternalTools } from "../../util/external"
 import { lunosName, UNAVAILABLE } from "../../util/external-commands"
 import { pathToFileURL } from "bun"
 import fuzzysort from "fuzzysort"
@@ -463,6 +463,8 @@ export function Autocomplete(props: {
           .map((item) => {
             // XCOD-254: app commands for a Lunos agent, mode or model mean nothing here.
             const name = item.display.slice(1).trim()
+            // XCOD-254: these act on the tool's session, so say whose.
+            if (name === "models") return { ...item, description: `Switch ${EXTERNAL_BADGE[external.tool]}'s model` }
             if (!UNAVAILABLE.has(name)) return item
             return {
               ...item,

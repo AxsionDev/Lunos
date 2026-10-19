@@ -37,7 +37,7 @@ import type {
   SessionStatus,
 } from "@opencode-ai/sdk/v2"
 import { useLocal } from "../../context/local"
-import { externalAccent, externalCost, externalOf } from "../../util/external"
+import { EXTERNAL_BADGE, externalAccent, externalCost, externalOf } from "../../util/external"
 import { Locale } from "../../util/locale"
 import { webSearchProviderLabel } from "../../util/tool-display"
 import { Dynamic, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -640,6 +640,25 @@ export function Session() {
         aliases: ["summarize"],
       },
       run: () => {
+        // XCOD-254: in a Claude Code / Codex session the tool compacts its own session (Claude Code's
+        // /compact, Codex's thread/compact/start); a Lunos model never sees the conversation.
+        const external = externalOf(session())
+        if (external) {
+          dialog.clear()
+          if (!external.session) {
+            toast.show({
+              variant: "info",
+              message: `Nothing to compact yet in this ${EXTERNAL_BADGE[external.tool]} session`,
+            })
+            return
+          }
+          void sdk.client.session
+            .prompt({ sessionID: route.sessionID, parts: [{ type: "text", text: "/compact" }] }, { throwOnError: true })
+            .catch((error: unknown) =>
+              toast.show({ variant: "error", message: error instanceof Error ? error.message : "Compacting failed" }),
+            )
+          return
+        }
         const selectedModel = local.model.current()
         if (!selectedModel) {
           toast.show({
@@ -655,6 +674,42 @@ export function Session() {
           providerID: selectedModel.providerID,
         })
         dialog.clear()
+      },
+    },
+    {
+      // XCOD-254: the cost the tool reported for this session; only in a Claude Code / Codex session.
+      title: "Show cost",
+      value: "session.cost",
+      category: "Session",
+      hidden: !externalOf(session()),
+      slash: {
+        name: "cost",
+      },
+      run: () => {
+        dialog.clear()
+        const external = externalOf(session())
+        if (!external) return
+        const tool = EXTERNAL_BADGE[external.tool]
+        const reported = messages().some((item) => item.role === "assistant" && item.time.completed)
+        if (!reported) {
+          toast.show({ variant: "info", message: `${tool} hasn't reported anything in this session yet` })
+          return
+        }
+        if (external.tool === "claude") {
+          toast.show({
+            variant: "info",
+            message: `${externalCost(session()?.cost ?? 0)} for this session, as reported by ${tool}`,
+            duration: 8000,
+          })
+          return
+        }
+        const last = messages().findLast((item) => item.role === "assistant" && item.tokens.total)
+        const tokens = last?.role === "assistant" ? last.tokens.total : undefined
+        toast.show({
+          variant: "info",
+          message: `Cost: not reported (${tool} reports tokens, not money)${tokens ? ` · ${Locale.number(tokens)} tokens so far` : ""}`,
+          duration: 8000,
+        })
       },
     },
     {
@@ -1670,13 +1725,15 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
               </Show>
               <Show when={props.message.providerID === "external" && props.message.time.completed}>
-                {/* XCOD-218: the cost Claude Code reports for this turn, and the session's total so far. */}
+                {/* XCOD-218: the cost Claude Code reports for this turn, and the session's total so far.
+                    XCOD-254: Codex reports tokens, never money, so no $0 is shown for it. */}
                 <span style={{ fg: theme.textMuted }}>
                   {" · "}
-                  {props.message.cost > 0 || !props.message.tokens.total
-                    ? `${externalCost(props.message.cost)} this turn`
-                    : `${Locale.number(props.message.tokens.total ?? 0)} tokens (cost not reported)`}
-                  {props.last ? ` · ${externalCost(sync.session.get(props.message.sessionID)?.cost ?? 0)} total` : ""}
+                  {externalOf(sync.session.get(props.message.sessionID))?.tool === "codex"
+                    ? props.message.tokens.total
+                      ? `${Locale.number(props.message.tokens.total)} tokens (cost not reported)`
+                      : "cost not reported"
+                    : `${externalCost(props.message.cost)} this turn${props.last ? ` · ${externalCost(sync.session.get(props.message.sessionID)?.cost ?? 0)} total` : ""}`}
                 </span>
               </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>

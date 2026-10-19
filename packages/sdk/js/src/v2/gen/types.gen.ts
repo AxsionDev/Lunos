@@ -2767,6 +2767,22 @@ export type ExternalToolStatus = {
   permissionModes?: Array<string>
 }
 
+export type ExternalModel = {
+  id: string
+  name: string
+  description?: string
+  default?: boolean
+}
+
+export type ExternalModels = {
+  tool: "claude" | "codex"
+  label: string
+  current?: string
+  models: Array<ExternalModel>
+  fallback: boolean
+  error?: string
+}
+
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -9576,6 +9592,78 @@ export type ExperimentalExternalStopResponses = {
 
 export type ExperimentalExternalStopResponse =
   ExperimentalExternalStopResponses[keyof ExperimentalExternalStopResponses]
+
+export type ExperimentalExternalModelsData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/{sessionID}/models"
+}
+
+export type ExperimentalExternalModelsErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalExternalModelsError = ExperimentalExternalModelsErrors[keyof ExperimentalExternalModelsErrors]
+
+export type ExperimentalExternalModelsResponses = {
+  /**
+   * The tool's models
+   */
+  200: ExternalModels
+}
+
+export type ExperimentalExternalModelsResponse =
+  ExperimentalExternalModelsResponses[keyof ExperimentalExternalModelsResponses]
+
+export type ExperimentalExternalModelData = {
+  body?: {
+    model?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/{sessionID}/model"
+}
+
+export type ExperimentalExternalModelErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalExternalModelError = ExperimentalExternalModelErrors[keyof ExperimentalExternalModelErrors]
+
+export type ExperimentalExternalModelResponses = {
+  /**
+   * Model saved
+   */
+  200: boolean
+}
+
+export type ExperimentalExternalModelResponse =
+  ExperimentalExternalModelResponses[keyof ExperimentalExternalModelResponses]
 
 export type ExperimentalPeerStopData = {
   body?: never

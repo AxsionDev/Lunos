@@ -71,7 +71,7 @@ import {
   parseExternalSlash,
   parseToolSlash,
 } from "../../util/external"
-import { lunosCommand, UNAVAILABLE } from "../../util/external-commands"
+import { lunosCommand, MAPPED, UNAVAILABLE } from "../../util/external-commands"
 import * as Sections from "../../util/settings-sections"
 import { requestSettings } from "../../util/settings-sections"
 import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
@@ -181,6 +181,8 @@ export function Prompt(props: PromptProps) {
   const external = createMemo(() => (props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined))
   const externalModel = createMemo(() => {
     if (!props.sessionID || !external()) return
+    // XCOD-254: a model chosen with /models shows at once; the tool uses it from the next turn.
+    if (external()!.model) return external()!.model
     const messages = sync.data.message[props.sessionID] ?? []
     const last = messages.findLast((item) => item.role === "assistant" && item.providerID === "external")
     const model = last?.role === "assistant" ? last.modelID : undefined
@@ -1157,6 +1159,14 @@ export function Prompt(props: PromptProps) {
         sync.data.command.filter((item) => item.source !== "skill").map((item) => item.name),
       )
       const name = command?.name
+      // XCOD-254: `/models` and `/cost` act on the tool's session here, even typed past the list.
+      const mapped = command ? undefined : /^\/(\w+)$/.exec(text.trim())?.[1]
+      if (mapped && MAPPED.has(mapped) && !(external.commands ?? []).includes(mapped)) {
+        input.clear()
+        setStore("prompt", { input: "", parts: [] })
+        keymap.dispatchCommand(mapped === "models" ? "model.list" : "session.cost")
+        return false
+      }
       const unavailable = !command && text.startsWith("/") ? text.slice(1).split(/\s/)[0]! : undefined
       if (unavailable && UNAVAILABLE.has(unavailable) && !(external.commands ?? []).includes(unavailable)) {
         toast.show({
