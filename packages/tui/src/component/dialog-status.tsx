@@ -102,6 +102,7 @@ export function StatusServers() {
                   style={{
                     fg: {
                       connected: theme.success,
+                      starting: theme.warning,
                       error: theme.error,
                     }[item.status],
                   }}
@@ -110,6 +111,9 @@ export function StatusServers() {
                 </text>
                 <text fg={theme.text} wrapMode="word">
                   <b>{item.id}</b> <span style={{ fg: theme.textMuted }}>{item.root}</span>
+                  <Show when={item.reason}>
+                    <span style={{ fg: theme.error }}> — {item.reason}</span>
+                  </Show>
                 </text>
               </box>
             )}
