@@ -95,8 +95,9 @@ export async function models(
   config: Parameters<typeof ExternalPolicy.check>[1] & { external?: Record<string, any> },
   cwd: string,
 ): Promise<{ models: ExternalClaude.Model[]; fallback: boolean; error?: string }> {
-  const refusal = refused(tool, config)
-  if (refusal) return { models: [], fallback: false, error: refusal }
+  // Asking isn't starting: a refusal is reported without an `external.denied` audit, as for /claude's state.
+  const refusal = ExternalPolicy.evaluate(tool, config)
+  if (refusal) return { models: [], fallback: false, error: refusal.message }
   const status = await ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, config))
   if (!status.installed || status.outdated || status.loggedIn === false || !status.path)
     return { models: [], fallback: false, error: status.hint ?? `${label(tool)} isn't usable here` }

@@ -23,11 +23,11 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
-- **Choose Claude Code's or Codex's model from Lunos.** In a Claude Code or Codex session, `/models`
-  lists the tool's own models, and the one you pick is used from your next message on, after a
-  resume too; the prompt shows it. `/compact` has the tool compact its own session, and `/cost`
-  shows the cost Claude Code reported (Codex reports tokens, so its cost shows as "not reported").
-  <!-- XCOD-254 -->
+- **Choose Claude Code's or Codex's model from Lunos.** In a Claude Code or Codex session in the
+  terminal app, `/models` lists the tool's own models, and the one you pick is used from your next
+  message on, after a resume too; the prompt shows it. `/compact` has the tool compact its own
+  session, and `/cost` shows the cost Claude Code reported (Codex reports tokens, so its cost shows
+  as "not reported", and its turns no longer show $0.0000). <!-- XCOD-254 -->
 
 ## [1.18.50] - 2026-10-19
 

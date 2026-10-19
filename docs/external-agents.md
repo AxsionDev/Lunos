@@ -93,7 +93,7 @@ Lunos commands that switch a Lunos agent, mode or model provider (`/agents`, `/m
 
 ### The tool's model, `/compact` and `/cost`
 
-Some Lunos commands act on the tool's session instead:
+In the terminal app, some Lunos commands act on the tool's session instead:
 
 - **`/models`** lists the tool's models under "Claude Code models" or "Codex models", never Lunos's. Lunos asks the tool itself without sending a prompt, so no model is called: Claude Code lists them when Lunos starts it, and Codex through its app server's model list. If Claude Code doesn't list them, its aliases (Opus, Sonnet, Haiku) are offered. The model you choose is saved on the session and used from your next message on, also after a Lunos restart or a resume, and the prompt shows it (`Lunos · Claude Code · sonnet`). Choose Default to go back to the tool's own default.
 - **`/compact`** has the tool compact its own session: Claude Code's `/compact`, or Codex's compaction. No Lunos model sees the conversation.

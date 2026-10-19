@@ -1725,13 +1725,15 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
               </Show>
               <Show when={props.message.providerID === "external" && props.message.time.completed}>
-                {/* XCOD-218: the cost Claude Code reports for this turn, and the session's total so far. */}
+                {/* XCOD-218: the cost Claude Code reports for this turn, and the session's total so far.
+                    XCOD-254: Codex reports tokens, never money, so no $0 is shown for it. */}
                 <span style={{ fg: theme.textMuted }}>
                   {" · "}
-                  {props.message.cost > 0 || !props.message.tokens.total
-                    ? `${externalCost(props.message.cost)} this turn`
-                    : `${Locale.number(props.message.tokens.total ?? 0)} tokens (cost not reported)`}
-                  {props.last ? ` · ${externalCost(sync.session.get(props.message.sessionID)?.cost ?? 0)} total` : ""}
+                  {externalOf(sync.session.get(props.message.sessionID))?.tool === "codex"
+                    ? props.message.tokens.total
+                      ? `${Locale.number(props.message.tokens.total)} tokens (cost not reported)`
+                      : "cost not reported"
+                    : `${externalCost(props.message.cost)} this turn${props.last ? ` · ${externalCost(sync.session.get(props.message.sessionID)?.cost ?? 0)} total` : ""}`}
                 </span>
               </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>
