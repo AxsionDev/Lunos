@@ -321,6 +321,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
               ...(status.loggedIn !== undefined ? { loggedIn: status.loggedIn } : {}),
               ...(status.hint || status.outdated ? { hint: status.hint ?? status.outdated } : {}),
               ...(refused ? { refused } : {}),
+              ...(status.permissionModes ? { permissionModes: status.permissionModes } : {}),
             }
           }),
         ),

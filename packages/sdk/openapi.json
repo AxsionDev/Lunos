@@ -23560,6 +23560,10 @@
         },
         "additionalProperties": false
       },
+      "BlankString": {
+        "type": "string",
+        "pattern": "^\\s*$"
+      },
       "ExternalConfig": {
         "type": "object",
         "properties": {
@@ -23576,7 +23580,16 @@
                 "type": "string"
               },
               "permission_mode": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": ["default", "manual", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"]
+                  },
+                  {
+                    "$ref": "#/components/schemas/BlankString"
+                  }
+                ],
+                "description": "Claude Code's permission mode on every run. Unset or empty: manual approval (every edit and command asks in Lunos). bypassPermissions is refused here; pass it for one run only"
               }
             },
             "additionalProperties": false
@@ -23586,6 +23599,30 @@
             "properties": {
               "path": {
                 "type": "string"
+              },
+              "sandbox": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": ["read-only", "workspace-write", "danger-full-access"]
+                  },
+                  {
+                    "$ref": "#/components/schemas/BlankString"
+                  }
+                ],
+                "description": "Codex's sandbox on every run. Unset or empty: read-only. danger-full-access is refused here; pass it for one run only"
+              },
+              "approval_policy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": ["untrusted", "on-request", "never"]
+                  },
+                  {
+                    "$ref": "#/components/schemas/BlankString"
+                  }
+                ],
+                "description": "Codex's approval policy on every run. Unset or empty: untrusted (anything beyond reading asks in Lunos). never is refused here; pass it for one run only"
               },
               "permission_mode": {
                 "type": "string"
@@ -26472,6 +26509,12 @@
             },
             "required": ["reason", "message"],
             "additionalProperties": false
+          },
+          "permissionModes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": ["tool", "label", "installed"],

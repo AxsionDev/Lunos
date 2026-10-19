@@ -1,4 +1,7 @@
 import type { SessionGroup, SessionOverviewItem } from "@opencode-ai/sdk/v2"
+import { EXTERNAL_BADGE } from "./external"
+
+const EXTERNAL_TOOL_NAMES: Record<string, string> = { ...EXTERNAL_BADGE, "claude-code": EXTERNAL_BADGE.claude }
 
 /**
  * XCOD-205: the model behind the TUI's /sessions view. Pure, so grouping, filtering and collapsing
@@ -66,9 +69,11 @@ export function stateLabel(item: Pick<SessionOverviewItem, "state" | "elsewhere"
   return STATE_LABEL[item.state]
 }
 
-/** "subagent", "scheduled", "external (claude)"; nothing for an ordinary session. */
+/** "subagent", "scheduled", "Claude Code", "Codex"; nothing for an ordinary session. */
 export function kindLabel(item: Pick<SessionOverviewItem, "kind" | "tool">) {
-  if (item.kind === "external") return item.tool ? `external (${item.tool})` : "external"
+  // XCOD-260: an external session is named by its tool, as the session's own badge names it.
+  if (item.kind === "external")
+    return EXTERNAL_TOOL_NAMES[item.tool ?? ""] ?? (item.tool ? `external (${item.tool})` : "external")
   if (item.kind === "session") return undefined
   return item.kind
 }

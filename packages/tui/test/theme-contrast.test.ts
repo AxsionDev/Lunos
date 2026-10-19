@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { DEFAULT_THEMES } from "../src/theme"
+import { DEFAULT_THEMES, resolveTheme } from "../src/theme"
 
 // XCOD-107: the high-contrast theme's promise, pinned. WCAG 2.1 contrast ratio from relative
 // luminance; ≥7:1 is AAA for normal text (AA needs 4.5:1).
@@ -35,4 +35,33 @@ describe("high-contrast theme (XCOD-107)", () => {
           expect({ fg, bg, ratio: ratio(color(fg, mode), color(bg, mode)) >= 7 }).toEqual({ fg, bg, ratio: true })
     })
   }
+})
+
+describe("external session accents (XCOD-260)", () => {
+  const hex = (c: { r: number; g: number; b: number }) =>
+    "#" +
+    [c.r, c.g, c.b]
+      .map((v) =>
+        Math.round(v * 255)
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+
+  for (const [name, json] of Object.entries(DEFAULT_THEMES))
+    for (const mode of ["dark", "light"] as const)
+      test(`${name} (${mode}): Claude Code's and Codex's accents reach 4.5:1 on the background`, () => {
+        const resolved = resolveTheme(json, mode)
+        if (resolved.background.a === 0) return
+        for (const key of ["externalClaude", "externalCodex"] as const)
+          expect({ key, ok: ratio(hex(resolved[key]), hex(resolved.background)) >= 4.5 }).toEqual({ key, ok: true })
+      })
+
+  test("a theme can set its own accent", () => {
+    const custom = {
+      ...DEFAULT_THEMES.opencode!,
+      theme: { ...DEFAULT_THEMES.opencode!.theme, externalClaude: "#123456" },
+    }
+    expect(hex(resolveTheme(custom, "dark").externalClaude)).toBe("#123456")
+  })
 })

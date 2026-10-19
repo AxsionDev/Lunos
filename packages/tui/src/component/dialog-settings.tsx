@@ -23,6 +23,7 @@ import { DialogRecommended } from "./dialog-recommended"
 import { DialogVariantSetting, useVariantModel, variantWarning } from "./dialog-variant-setting"
 import { AGENTS_HELP, DialogAgentList } from "./dialog-agent-settings"
 import { DialogThemeList } from "./dialog-theme-list"
+import { choices as externalChoices, KEYS as EXTERNAL_KEYS, perRun } from "../util/external-permission"
 import { DialogLsp } from "./dialog-lsp"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogProviders } from "./dialog-provider"
@@ -230,6 +231,53 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
   }
 
   /**
+   * XCOD-256: Claude Code's permission mode and Codex's sandbox and approval policy, from a list.
+   * Manual approval (the default) is selected when nothing is set and choosing it writes nothing,
+   * or removes the key when one is set. Unsafe values are listed greyed and never saved.
+   */
+  async function pickExternal(row: SettingRow) {
+    const tools = row.key.startsWith("external.claude.")
+      ? (await sdk.client.experimental.external.tools().catch(() => undefined))?.data
+      : undefined
+    const detected = tools?.find((item) => item.tool === "claude")?.permissionModes
+    const list = externalChoices(row.key, detected, row.value)
+    const set = row.source !== "default" && row.source !== "env"
+    const current = list.find((item) => item.value === row.value && !item.unsafe) ?? list[0]!
+    dialog.replace(
+      () => (
+        <DialogSelect<string>
+          title={row.label}
+          placeholder={
+            row.key.startsWith("external.claude.") && !detected
+              ? "Claude Code's --help couldn't be read: common modes"
+              : row.key
+          }
+          skipFilter
+          current={current.value}
+          options={list.map((item) => ({
+            title: item.title,
+            titleView: item.unsafe ? <span style={{ fg: theme.textMuted }}>{item.title}</span> : undefined,
+            value: item.value,
+            description: item.unsafe ? `${item.description}. ${perRun(item.value)}` : item.description,
+            footer: item.unsafe ? "per run only" : item.default && set ? "removes the key" : undefined,
+          }))}
+          onSelect={(option) => {
+            const item = list.find((entry) => entry.value === option.value)!
+            if (item.unsafe) return toast.show({ variant: "info", message: perRun(item.value), duration: 6000 })
+            if (item.default) {
+              if (!set) return reopen(row.key)
+              return void save(row, "", { reopen: true, unset: true })
+            }
+            void save(row, item.value, { reopen: true })
+          }}
+        />
+      ),
+      undefined,
+      backTo(row.key),
+    )
+  }
+
+  /**
    * XCOD-230: Agents' New agent flow (name, then what it does), and the new agent becomes the
    * default. Nothing is written until both are answered; ← or Esc at either step changes nothing.
    */
@@ -385,6 +433,7 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
       return
     }
     if (row.key === "default_agent") return pickDefaultAgent(row)
+    if (EXTERNAL_KEYS.includes(row.key)) return pickExternal(row)
     // XCOD-257: LSP gets its own panel (state, failures, actions) instead of raw JSON.
     if (row.key === "lsp") return dialog.replace(() => <DialogLsp />, undefined, backTo(row.key))
     if (row.key === "subagent.variant")
@@ -541,7 +590,8 @@ export function DialogSettings(props: { tab?: Tab; focus?: string; scope?: Scope
 
   function toggle(row: SettingRow | undefined) {
     if (!row || refuse(row)) return
-    const next = cycle(row)
+    // XCOD-256: cycling would step onto values refused in config; the list explains each one.
+    const next = EXTERNAL_KEYS.includes(row.key) ? undefined : cycle(row)
     if (next === undefined) return void edit(row)
     void save(row, next)
   }

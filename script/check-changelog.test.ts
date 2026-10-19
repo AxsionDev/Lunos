@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { checkPR, checkRelease, isPreview, sections, userFacing } from "./check-changelog"
+import { checkPR, checkRelease, isPreview, lint, notes, scrub, sections, userFacing } from "./check-changelog"
 
 const CHANGELOG = `# Changelog
 
@@ -114,5 +114,56 @@ describe("pull-request check", () => {
       warn: false,
       reason: "label no-changelog",
     })
+  })
+})
+
+describe("lint (XCOD-253)", () => {
+  const doc = (entry: string) => `# Changelog\n\n## [Unreleased]\n\n### Added\n\n${entry}\n`
+
+  test("a ticket id in the text fails; in a trailing comment it passes", () => {
+    expect(lint(doc("- **Clear the prompt.** Press Esc twice (XCOD-999)."))).toEqual([
+      "line 7: ticket id outside an HTML comment; move it to a trailing <!-- XCOD-999 -->",
+    ])
+    expect(lint(doc("- **Clear the prompt.** Press Esc twice. <!-- XCOD-999 -->"))).toEqual([])
+  })
+
+  test("a user-facing entry needs a bold lead; internal ones, fixes and old releases don't", () => {
+    expect(lint(doc("- Clear the prompt by pressing Esc twice."))[0]).toContain("without a bold lead")
+    expect(lint(doc("- Audit entries record chars. <!-- internal -->"))).toEqual([])
+    expect(lint("## [Unreleased]\n\n### Fixed\n\n- A crash on start.\n")).toEqual([])
+    expect(lint("## [1.18.39] - 2026-09-25\n\n### Added\n\n- Something old.\n")).toEqual([])
+  })
+
+  test("the repository's CHANGELOG.md passes", async () => {
+    expect(lint(await Bun.file(path.resolve(import.meta.dir, "../CHANGELOG.md")).text())).toEqual([])
+  })
+})
+
+describe("release notes without ticket ids (XCOD-253)", () => {
+  test("scrub drops id prefixes, references and merge commits", () => {
+    const body = [
+      "- `43ddaf4` XCOD-252: /memory Overview and Activity (@pminev1)",
+      "  - XCOD-244: lunos-idp tests: OldLunos strips XCOD-185's clients",
+      "  - Merge remote-tracking branch 'origin/dev' into xcod-244-login-theme",
+      "  - Merge origin/dev into xcod-252-memory-analytics",
+      "- **Sandboxed runs** (XCOD-144, XCOD-157): run in a container",
+    ].join("\n")
+    const out = scrub(body)
+    expect(out).not.toMatch(/xcod-\d+/i)
+    expect(out).toBe(
+      [
+        "- `43ddaf4` /memory Overview and Activity (@pminev1)",
+        "  - lunos-idp tests: OldLunos strips clients",
+        "- **Sandboxed runs**: run in a container",
+      ].join("\n"),
+    )
+  })
+
+  test("the curated section for a release is used as written, without comments", async () => {
+    const text = await Bun.file(path.resolve(import.meta.dir, "../CHANGELOG.md")).text()
+    const body = notes(text, "1.18.49")!
+    expect(body).toContain("Set up memory in a few steps")
+    expect(body).not.toMatch(/XCOD-\d+|<!--/)
+    expect(notes(text, "9.9.9")).toBeUndefined()
   })
 })

@@ -13,6 +13,11 @@
 //     Pull-request check (changelog.yml). Prints a `::warning::` when the PR changes user-facing
 //     code (see userFacing) without touching CHANGELOG.md, unless it has the `no-changelog` label.
 //     Always exits 0: it's a reminder, not a gate.
+//
+//   bun script/check-changelog.ts --lint [--file CHANGELOG.md]
+//     XCOD-253 (changelog.yml, and the release gate above): exits 1 when a ticket id appears outside
+//     an HTML comment, or a user-facing entry in [Unreleased] or a release from 1.18.40 on has no
+//     bold lead. Ticket ids are internal: they go in a trailing `<!-- XCOD-123 -->`.
 
 const HEADING = /^## \[([^\]]+)\][^\n]*$/gm
 
@@ -49,6 +54,68 @@ export function checkRelease(text: string, version: string): { ok: true } | { ok
   }
   if (!found.body) return { ok: false, message: `CHANGELOG.md's section for ${want} is empty. ${fix}` }
   return { ok: true }
+}
+
+const TICKET = /XCOD-\d+/
+const COMMENT = /<!--[\s\S]*?-->/g
+/** The first release written to the rules above; older entries keep their own style. */
+const LINT_FROM = "1.18.40"
+
+function newer(name: string) {
+  if (name === "Unreleased") return true
+  const [a, b] = [name, LINT_FROM].map((v) => v.split(".").map(Number))
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return (a[i] ?? 0) > (b[i] ?? 0)
+  return true
+}
+
+/** Problems that fail the check, each with its line number. */
+export function lint(text: string) {
+  const problems: string[] = []
+  const lines = text.split("\n")
+  let version = ""
+  let section = ""
+  lines.forEach((line, i) => {
+    if (TICKET.test(line.replace(COMMENT, "")))
+      problems.push(
+        `line ${i + 1}: ticket id outside an HTML comment; move it to a trailing <!-- ${line.match(TICKET)![0]} -->`,
+      )
+    const heading = line.match(/^## \[([^\]]+)\]/)
+    if (heading) [version, section] = [heading[1]!, ""]
+    const sub = line.match(/^### (.+)$/)
+    if (sub) section = sub[1]!.trim()
+    if (!line.startsWith("- ") || !version || !newer(version) || section === "Fixed") return
+    // The entry runs to the next item, heading or blank line.
+    const end = lines.findIndex((next, j) => j > i && (next.startsWith("- ") || next.startsWith("#") || next === ""))
+    const entry = lines.slice(i, end === -1 ? undefined : end).join("\n")
+    if (/<!--\s*[^>]*\binternal\b/.test(entry)) return
+    if (!/^- \*\*.+?\*\*/.test(line))
+      problems.push(
+        `line ${i + 1}: user-facing entry without a bold lead (start with **what the user gets.**, or mark it <!-- internal -->)`,
+      )
+  })
+  return problems
+}
+
+/**
+ * Release notes for a GitHub Release with no ticket ids: comments removed, `XCOD-123:` prefixes and
+ * `(XCOD-123)` references dropped, and merge commits left out.
+ */
+export function scrub(text: string) {
+  return text
+    .replace(COMMENT, "")
+    .split("\n")
+    .filter((line) => !/\bMerge (pull request|remote-tracking branch|branch|\S+ into) /.test(line))
+    .join("\n")
+    .replace(/\s*\((?:part of\s+)?XCOD-\d+(?:,\s*(?:part of\s+)?XCOD-\d+)*\)/g, "")
+    .replace(/\bXCOD-\d+(?:,\s*XCOD-\d+)*:\s*/g, "")
+    .replace(/\s*\bXCOD-\d+(?:'s)?/g, "")
+    .replace(/[ \t]+$/gm, "")
+}
+
+/** The CHANGELOG section for `version`, as a reader sees it. */
+export function notes(text: string, version: string) {
+  const found = sections(text).find((s) => s.name === normalize(version))
+  return found ? scrub(found.body).trim() : undefined
 }
 
 const TEST = /(\.test\.|\.spec\.|\/test\/|\/tests\/|\/__tests__\/|\/fixtures?\/|\.snap$)/
@@ -101,13 +168,22 @@ if (import.meta.main) {
     } else {
       const shown = result.files.slice(0, 10).join(", ") + (result.files.length > 10 ? ", …" : "")
       console.log(
-        `::warning title=No CHANGELOG.md line::This PR changes user-facing code (${shown}) but not CHANGELOG.md. Add a line under [Unreleased] (user benefit first, ticket key in brackets), or add the no-changelog label if users won't notice the change.`,
+        `::warning title=No CHANGELOG.md line::This PR changes user-facing code (${shown}) but not CHANGELOG.md. Add a line under [Unreleased] (what the user gets first, no ticket id in the text: it goes in a trailing <!-- XCOD-123 -->), or add the no-changelog label if users won't notice the change.`,
       )
     }
     process.exit(0)
   }
 
   const file = flag(args, "--file") ?? "CHANGELOG.md"
+
+  if (args.includes("--lint")) {
+    const problems = lint(await Bun.file(file).text())
+    for (const problem of problems) console.error(`::error file=${file},title=CHANGELOG.md::${problem}`)
+    if (problems.length) process.exit(1)
+    console.log(`changelog: ${file} has no ticket ids in its text, and every user-facing entry has a bold lead`)
+    process.exit(0)
+  }
+
   const version = await (async () => {
     if (args[0]) return args[0]
     // Same computation as script/version.ts. Imported lazily: its top level checks the Bun version
@@ -133,5 +209,8 @@ if (import.meta.main) {
     console.error(`::error title=Missing changelog section::${result.message}`)
     process.exit(1)
   }
+  const problems = lint(text)
+  for (const problem of problems) console.error(`::error file=${file},title=CHANGELOG.md::${problem}`)
+  if (problems.length) process.exit(1)
   console.log(`changelog: ${file} has a section for ${normalize(version)}`)
 }

@@ -62,7 +62,14 @@ import { readLocalAttachment } from "./local-attachment"
 import { useLocation } from "../../context/location"
 import { parseRestartSlash } from "../../util/restart"
 import { parseSettingsSlash } from "../../util/settings"
-import { externalOf, parseExternalSlash, parseToolSlash } from "../../util/external"
+import {
+  EXTERNAL_BADGE,
+  externalAccent,
+  externalBadge,
+  externalOf,
+  parseExternalSlash,
+  parseToolSlash,
+} from "../../util/external"
 import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
 import { DialogExternal, useExternalCommand, useStartExternal } from "../dialog-external"
 
@@ -166,6 +173,15 @@ export function Prompt(props: PromptProps) {
   const project = useProject()
   const sync = useSync()
   const tuiConfig = useTuiConfig()
+  // XCOD-260: in a Claude Code / Codex session the prompt says where it goes, in the tool's accent.
+  const external = createMemo(() => (props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined))
+  const externalModel = createMemo(() => {
+    if (!props.sessionID || !external()) return
+    const messages = sync.data.message[props.sessionID] ?? []
+    const last = messages.findLast((item) => item.role === "assistant" && item.providerID === "external")
+    const model = last?.role === "assistant" ? last.modelID : undefined
+    return model && model !== external()!.tool ? model : undefined
+  })
   const dialog = useDialog()
   const toast = useToast()
   const startExternal = useStartExternal()
@@ -182,6 +198,11 @@ export function Prompt(props: PromptProps) {
   const dimensions = useTerminalDimensions()
   const themeState = useTheme()
   const { theme, syntax } = themeState
+  const accent = createMemo(() => {
+    const marker = external()
+    return marker ? externalAccent(theme, marker.tool, tuiConfig.external_accent !== false) : undefined
+  })
+  const cursorColor = () => accent() ?? theme.text
   const kv = useKV()
   const animationsEnabled = useAnimationsEnabled()
   const list = createMemo(() => props.placeholders?.normal ?? [])
@@ -262,7 +283,7 @@ export function Prompt(props: PromptProps) {
   createEffect(() => {
     if (!input || input.isDestroyed) return
     if (props.disabled) input.cursorColor = theme.backgroundElement
-    if (!props.disabled) input.cursorColor = theme.text
+    if (!props.disabled) input.cursorColor = cursorColor()
     if (tuiConfig.cursor) input.cursorStyle = tuiConfig.cursor
   })
 
@@ -1511,6 +1532,7 @@ export function Prompt(props: PromptProps) {
 
   const highlight = createMemo(() => {
     if (leader()) return theme.border
+    if (accent()) return accent()!
     if (store.mode === "shell") return theme.primary
     const agent = local.mode.current()
     if (!agent) return theme.border
@@ -1548,7 +1570,7 @@ export function Prompt(props: PromptProps) {
       status().type !== "idle"
         ? (local.mode.list().find((a) => a.name === lastUserMessage()?.agent) ?? local.mode.current())
         : local.mode.current()
-    const color = agent ? local.mode.color(agent.name) : theme.border
+    const color = accent() ?? (agent ? local.mode.color(agent.name) : theme.border)
     return {
       frames: createFrames({
         color,
@@ -1658,19 +1680,36 @@ export function Prompt(props: PromptProps) {
                 setTimeout(() => {
                   // setTimeout is a workaround and needs to be addressed properly
                   if (!input || input.isDestroyed) return
-                  input.cursorColor = theme.text
+                  input.cursorColor = cursorColor()
                   if (tuiConfig.cursor) input.cursorStyle = tuiConfig.cursor
                 }, 0)
               }}
               onMouseDown={(r: MouseEvent) => r.target?.focus()}
               focusedBackgroundColor={theme.backgroundElement}
-              cursorColor={props.disabled ? theme.backgroundElement : theme.text}
+              cursorColor={props.disabled ? theme.backgroundElement : cursorColor()}
               cursorStyle={tuiConfig.cursor}
               syntaxStyle={syntax()}
             />
             <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
               <box flexDirection="row" gap={1}>
-                <Show when={local.mode.current()} fallback={<box height={1} />}>
+                <Show when={external()}>
+                  {(marker) => (
+                    <text>
+                      <span style={{ fg: accent() ?? theme.text, bold: true }}>▸ {EXTERNAL_BADGE[marker().tool]}</span>
+                      <Show when={externalModel()}>
+                        <span style={{ fg: theme.textMuted }}> · {externalModel()}</span>
+                      </Show>
+                    </text>
+                  )}
+                </Show>
+                <Show
+                  when={!external() && local.mode.current()}
+                  fallback={
+                    <Show when={!external()}>
+                      <box height={1} />
+                    </Show>
+                  }
+                >
                   {(agent) => (
                     <>
                       <text fg={fadeColor(highlight(), agentMetaAlpha())}>
@@ -1888,6 +1927,13 @@ export function Prompt(props: PromptProps) {
           </Switch>
           <Show when={status().type !== "retry"}>
             <box gap={2} flexDirection="row">
+              <Show when={external()}>
+                {(marker) => (
+                  <text fg={accent() ?? theme.text} wrapMode="none" flexShrink={0}>
+                    {externalBadge(marker().tool, externalModel())}
+                  </text>
+                )}
+              </Show>
               <Show when={editorContextLabelState() !== "none" ? editorFileLabelDisplay() : undefined}>
                 {(file) => (
                   <text fg={editorContextLabelState() === "pending" ? theme.secondary : theme.textMuted}>{file()}</text>
@@ -1903,7 +1949,8 @@ export function Prompt(props: PromptProps) {
                         </text>
                       )}
                     </Match>
-                    <Match when={true}>
+                    {/* XCOD-260: Lunos's agent modes don't apply to a Claude Code / Codex session. */}
+                    <Match when={!external()}>
                       <text fg={theme.text}>
                         {modeShortcut()} <span style={{ fg: theme.textMuted }}>modes</span>
                       </text>
