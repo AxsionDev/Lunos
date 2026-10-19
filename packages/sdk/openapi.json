@@ -3329,7 +3329,21 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SessionEnqueueInput"
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "interrupt": {
+                    "type": "boolean"
+                  },
+                  "via": {
+                    "type": "string",
+                    "enum": ["local", "peer"]
+                  }
+                },
+                "required": ["text"],
+                "additionalProperties": false
               }
             }
           }
@@ -26801,23 +26815,6 @@
           }
         },
         "required": ["permissions", "questions"],
-        "additionalProperties": false
-      },
-      "SessionEnqueueInput": {
-        "type": "object",
-        "properties": {
-          "text": {
-            "type": "string"
-          },
-          "interrupt": {
-            "type": "boolean"
-          },
-          "via": {
-            "type": "string",
-            "enum": ["local", "peer"]
-          }
-        },
-        "required": ["text"],
         "additionalProperties": false
       },
       "SessionEnqueueResult": {

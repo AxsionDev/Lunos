@@ -68,6 +68,7 @@ import { DialogMode } from "./component/dialog-mode"
 import { DialogAgentList } from "./component/dialog-agent-settings"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogSessions } from "./component/dialog-sessions"
+import { AgentMonitor, MONITOR_ROUTE } from "./routes/monitor"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
 import { ThemeProvider, useTheme } from "./context/theme"
@@ -846,6 +847,20 @@ function App(props: {
         },
       },
       {
+        // XCOD-262: every session on this computer beside a prompt that starts or tags them.
+        name: "agent.monitor",
+        title: "Agent Monitor",
+        category: "Session",
+        slashName: "monitor",
+        run: () => {
+          if (route.data.type === "plugin" && route.data.id === MONITOR_ROUTE) return
+          const from =
+            route.data.type === "session" ? { type: "session", sessionID: route.data.sessionID } : { type: "home" }
+          dialog.clear()
+          route.navigate({ type: "plugin", id: MONITOR_ROUTE, data: { from } })
+        },
+      },
+      {
         name: "artifact.list",
         title: "Plans and research notes",
         category: "Session",
@@ -1537,6 +1552,7 @@ function App(props: {
   const plugin = createMemo(() => {
     if (!ready()) return
     if (route.data.type !== "plugin") return
+    if (route.data.id === MONITOR_ROUTE) return <AgentMonitor params={route.data.data} />
     const render = pluginRuntime.routes.get(route.data.id)
     if (!render) return <PluginRouteMissing id={route.data.id} onHome={() => route.navigate({ type: "home" })} />
     return render({ params: route.data.data })

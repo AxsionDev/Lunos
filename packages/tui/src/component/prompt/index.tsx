@@ -36,7 +36,8 @@ import { computePromptTraits } from "../../prompt/traits"
 import { expandPastedTextPlaceholders, expandTrackedPastedText } from "../../prompt/part"
 import { usePromptStash } from "../../prompt/stash"
 import { DialogStash } from "../dialog-stash"
-import { type AutocompleteRef, Autocomplete } from "./autocomplete"
+import { type AutocompleteOption, type AutocompleteRef, Autocomplete } from "./autocomplete"
+import { leftOpensMonitor } from "../../util/agent-monitor"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v2"
 import { Locale } from "../../util/locale"
@@ -54,6 +55,7 @@ import { DialogSkill } from "../dialog-skill"
 import { DialogMemory } from "../dialog-memory"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
+import type { Binding } from "@opentui/keymap"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
 import { useTuiConfig } from "../../config"
 import { usePromptWorkspace } from "./workspace"
@@ -92,6 +94,18 @@ export type PromptProps = {
     normal?: string[]
     shell?: string[]
   }
+  /**
+   * XCOD-262: the Agent Monitor sends the prompt itself (to tagged sessions, or as a new session it
+   * stays beside). Resolves true when it took the prompt, which is then cleared and kept in history.
+   */
+  onIntercept?: (text: string) => boolean | Promise<boolean>
+  /** XCOD-262: more `@` completions, listed before agents and files (the monitor's sessions). */
+  mentions?: () => AutocompleteOption[]
+  /**
+   * XCOD-262: keys the host screen takes from the prompt while autocomplete is closed: `always`
+   * whatever is typed, `empty` only with nothing typed (the monitor's → and Esc).
+   */
+  bindings?: () => { always?: Binding<Renderable, KeyEvent>[]; empty?: Binding<Renderable, KeyEvent>[] }
 }
 
 function pastedFilepath(value: string, platform: string) {
@@ -923,6 +937,48 @@ export function Prompt(props: PromptProps) {
     }
   })
 
+  useBindings(() => ({
+    target: inputTarget,
+    enabled: inputTarget() !== undefined && !props.disabled && store.mode === "normal" && !auto()?.visible,
+    priority: 10,
+    bindings: props.bindings?.().always ?? [],
+  }))
+
+  useBindings(() => ({
+    target: inputTarget,
+    enabled:
+      inputTarget() !== undefined && !props.disabled && store.mode === "normal" && !auto()?.visible && !hasContent(),
+    priority: 10,
+    bindings: props.bindings?.().empty ?? [],
+  }))
+
+  // XCOD-262: ← on an empty prompt opens the Agent Monitor, from home or a top-level session. With
+  // text it moves the cursor; a subagent session keeps it for "previous child".
+  useBindings(() => ({
+    target: inputTarget,
+    enabled:
+      inputTarget() !== undefined &&
+      !props.disabled &&
+      leftOpensMonitor({
+        enabled: tuiConfig.left_opens_monitor,
+        route: route.data.type === "home" || route.data.type === "session" ? route.data.type : "other",
+        child: route.data.type === "session" && !!sync.session.get(route.data.sessionID)?.parentID,
+        text: store.prompt.input,
+        parts: store.prompt.parts.length,
+        mode: store.mode,
+        autocomplete: !!auto()?.visible,
+      }),
+    priority: 10,
+    bindings: [
+      {
+        key: "left",
+        desc: "Open the Agent Monitor",
+        group: "Prompt",
+        cmd: () => keymap.dispatchCommand("agent.monitor"),
+      },
+    ],
+  }))
+
   useBindings(() => {
     return {
       target: inputTarget,
@@ -1041,6 +1097,25 @@ export function Prompt(props: PromptProps) {
     if (workspace.creating() || move.creating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
+    if (props.onIntercept) {
+      const text = expandTrackedPastedText(
+        store.prompt.input,
+        input.extmarks.getAllForTypeId(promptPartTypeId).flatMap((extmark) => {
+          const partIndex = store.extmarkToPartIndex.get(extmark.id)
+          const part = partIndex === undefined ? undefined : store.prompt.parts[partIndex]
+          if (part?.type !== "text") return []
+          return [{ start: extmark.start, end: extmark.end, text: part.text }]
+        }),
+      )
+      if (!(await props.onIntercept(text))) return false
+      history.append({ ...store.prompt, mode: store.mode })
+      input.extmarks.clear()
+      setStore("prompt", { input: "", parts: [] })
+      setStore("extmarkToPartIndex", new Map())
+      props.onSubmit?.()
+      input.clear()
+      return true
+    }
     // XCOD-94: bare /memory opens the memory browser, before any session is created.
     // `/memory off|on` has arguments and goes to the server like any other command.
     if (store.prompt.input.trim() === "/memory") {
@@ -2001,6 +2076,7 @@ export function Prompt(props: PromptProps) {
       </box>
       <Autocomplete
         sessionID={props.sessionID}
+        mentions={props.mentions}
         ref={(r) => {
           setAuto(() => r)
         }}

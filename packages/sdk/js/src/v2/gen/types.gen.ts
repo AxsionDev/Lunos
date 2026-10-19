@@ -2747,12 +2747,6 @@ export type SessionPeerAsks = {
   questions: Array<QuestionRequest>
 }
 
-export type SessionEnqueueInput = {
-  text: string
-  interrupt?: boolean
-  via?: "local" | "peer"
-}
-
 export type SessionEnqueueResult = {
   delivery: "now" | "queued" | "interrupted" | "answered"
   position?: number
@@ -9485,7 +9479,11 @@ export type ExperimentalPeerQuestionRejectResponse =
   ExperimentalPeerQuestionRejectResponses[keyof ExperimentalPeerQuestionRejectResponses]
 
 export type ExperimentalSessionEnqueueData = {
-  body?: SessionEnqueueInput
+  body?: {
+    text: string
+    interrupt?: boolean
+    via?: "local" | "peer"
+  }
   path: {
     sessionID: string
   }

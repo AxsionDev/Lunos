@@ -98,6 +98,10 @@ export const Info = Schema.Struct({
     description:
       "Esc twice in the prompt clears it while the session is idle; the cleared prompt can be undone and is kept in history (default: true)",
   }),
+  left_opens_monitor: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "← on an empty prompt (home or a top-level session) opens the Agent Monitor; /monitor and the agent_monitor keybind still do with this off (default: true)",
+  }),
   double_escape_ms: Schema.optional(PromptSize).annotate({
     description: "Milliseconds in which a second Esc clears the prompt (default 1000)",
   }),

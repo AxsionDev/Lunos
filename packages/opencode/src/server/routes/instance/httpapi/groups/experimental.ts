@@ -226,7 +226,7 @@ export const SessionEnqueuePayload = Schema.Struct({
   text: Schema.String,
   interrupt: Schema.optional(Schema.Boolean),
   via: Schema.optional(Schema.Literals(["local", "peer"])),
-}).annotate({ identifier: "SessionEnqueueInput" })
+})
 
 export const SessionEnqueueResult = Schema.Struct({
   delivery: Schema.Literals(["now", "queued", "interrupted", "answered"]),

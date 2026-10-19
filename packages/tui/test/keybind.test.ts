@@ -31,3 +31,22 @@ test("parse() accepts legacy keybind names instead of hard-erroring", () => {
 test("parse() still rejects genuinely unknown keybind names", () => {
   expect(() => TuiKeybind.parse({ not_a_real_keybind: "ctrl+a" } as unknown as TuiKeybind.KeybindOverrides)).toThrow()
 })
+
+// XCOD-262: the ticket proposed <leader>m, which is model_list. The Agent Monitor's default must not
+// shadow any other default binding (dev already has unrelated duplicates, so this checks only its own).
+test("agent_monitor's default collides with no other default keybind", () => {
+  const keys = (value: unknown): string[] =>
+    typeof value === "string"
+      ? value.split(",").map((key) => key.trim())
+      : Array.isArray(value)
+        ? value.flatMap(keys)
+        : []
+  const own = keys(TuiKeybind.defaultValue("agent_monitor"))
+  expect(own).toEqual(["<leader>o"])
+  const clashes = Object.entries(TuiKeybind.Definitions)
+    .filter(([name]) => name !== "agent_monitor")
+    .filter(([, item]) => keys(item.default).some((key) => own.includes(key)))
+    .map(([name]) => name)
+  expect(clashes).toEqual([])
+  expect(TuiKeybind.CommandMap.agent_monitor).toBe("agent.monitor")
+})

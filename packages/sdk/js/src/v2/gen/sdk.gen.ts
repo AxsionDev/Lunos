@@ -270,7 +270,6 @@ import type {
   SessionDeleteResponses,
   SessionDiffErrors,
   SessionDiffResponses,
-  SessionEnqueueInput,
   SessionForkErrors,
   SessionForkResponses,
   SessionGetErrors,
@@ -1015,7 +1014,9 @@ export class Session extends HeyApiClient {
       sessionID: string
       directory?: string
       workspace?: string
-      sessionEnqueueInput?: SessionEnqueueInput
+      text?: string
+      interrupt?: boolean
+      via?: "local" | "peer"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1027,7 +1028,9 @@ export class Session extends HeyApiClient {
             { in: "path", key: "sessionID" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
-            { key: "sessionEnqueueInput", map: "body" },
+            { in: "body", key: "text" },
+            { in: "body", key: "interrupt" },
+            { in: "body", key: "via" },
           ],
         },
       ],
