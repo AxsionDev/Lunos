@@ -3365,6 +3365,13 @@ export type MemorySetupStartResult = {
   error?: MemorySetupError
 }
 
+export type MemorySetupMoveResult = {
+  ok: boolean
+  facts?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  output?: string
+  error?: string
+}
+
 export type MemorySetupCheckResult = {
   ok: boolean
   scope?: string
@@ -11478,6 +11485,34 @@ export type MemorySetupTemplateStartResponses = {
 
 export type MemorySetupTemplateStartResponse =
   MemorySetupTemplateStartResponses[keyof MemorySetupTemplateStartResponses]
+
+export type MemorySetupMoveData = {
+  body?: MemorySetupInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/setup/move"
+}
+
+export type MemorySetupMoveErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemorySetupMoveError = MemorySetupMoveErrors[keyof MemorySetupMoveErrors]
+
+export type MemorySetupMoveResponses = {
+  /**
+   * How many facts were moved
+   */
+  200: MemorySetupMoveResult
+}
+
+export type MemorySetupMoveResponse = MemorySetupMoveResponses[keyof MemorySetupMoveResponses]
 
 export type MemorySetupCheckData = {
   body?: MemorySetupInput

@@ -165,3 +165,42 @@ export const DOWNLOAD =
 
 export const OFFLINE_DOWNLOAD =
   "Offline (LUNOS_OFFLINE): nothing is downloaded, so uv's package cache and Lunos's memory/models directory must already be filled (run the check once on a machine with network access, or pre-seed them as the memory docs describe)."
+
+/** XCOD-264: the answers a template's memory block sets, on top of the current ones. */
+export function apply(draft: Draft, memory: Record<string, unknown>): Draft {
+  const backend = memory.backend as Record<string, string> | undefined
+  return {
+    ...draft,
+    ...(backend
+      ? {
+          backend: database(backend.type)
+            ? {
+                type: backend.type,
+                url: backend.url ?? "",
+                username: backend.username ?? "",
+                password: backend.password ?? "",
+                jurisdiction: backend.jurisdiction ?? "",
+              }
+            : { type: "embedded" as const },
+        }
+      : {}),
+    ...(typeof memory.model === "string" && memory.model ? { model: memory.model } : {}),
+    ...(memory.encryption === "off" || memory.encryption === "os-keychain" ? { encryption: memory.encryption } : {}),
+  }
+}
+
+/**
+ * XCOD-264: whether saving moves memory somewhere else, so existing facts need a decision (Move my
+ * facts, or Start empty). Only when memory is already on: a first setup has nothing to move.
+ */
+export function switching(memory: MemoryConfig | undefined, draft: Draft) {
+  if (memory?.enabled !== true || !draft.enabled) return false
+  const before = database(memory.backend?.type) ? memory.backend : undefined
+  const after = draft.backend.type === "embedded" ? undefined : draft.backend
+  if (!before || !after) return !!before !== !!after
+  return before.type !== after.type || (before.url ?? "") !== after.url
+}
+
+export const MOVE =
+  "Move my facts: copies every fact, with where it came from, from the current storage to the new one (the old copy stays until you delete it)."
+export const START_EMPTY = "Start empty: the new storage starts with no facts; the old ones stay where they are."

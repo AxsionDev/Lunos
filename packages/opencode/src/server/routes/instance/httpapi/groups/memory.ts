@@ -328,6 +328,13 @@ export const MemorySetupTemplatePlan = Schema.Struct({
   licence: Schema.optional(Schema.String),
 }).annotate({ identifier: "MemorySetupTemplatePlan" })
 
+export const MemorySetupMoveResult = Schema.Struct({
+  ok: Schema.Boolean,
+  facts: Schema.optional(Schema.Number),
+  output: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemorySetupMoveResult" })
+
 export const MemorySetupStartResult = Schema.Struct({
   ok: Schema.Boolean,
   ms: Schema.optional(Schema.Number),
@@ -512,6 +519,18 @@ export const MemoryApi = HttpApi.make("memory")
             summary: "Start a memory template's database",
             description:
               "Run docker compose up -d for a written Docker template, then wait up to two minutes for its healthcheck. Call only after the user confirmed the command.",
+          }),
+        ),
+        HttpApiEndpoint.post("setupMove", `${root}/setup/move`, {
+          payload: MemorySetupInput,
+          query: WorkspaceRoutingQuery,
+          success: described(MemorySetupMoveResult, "How many facts were moved"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.setup.move",
+            summary: "Move facts to new memory storage",
+            description:
+              'Switching storage, "Move my facts": export every fact from the storage in use now and import it into the proposed one, keeping each fact\'s provenance. The old copy is left as it is.',
           }),
         ),
         HttpApiEndpoint.post("setupCheck", `${root}/setup/check`, {

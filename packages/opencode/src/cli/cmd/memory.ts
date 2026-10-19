@@ -25,6 +25,7 @@ import { CloudShare } from "@/cloud/share"
 import { MemoryStatsCommand } from "./memory-stats"
 import { MemoryCheckCommand, MemorySetupCommand } from "./memory-setup"
 import { MemoryTemplatesCommand } from "./memory-storage"
+import { Provider } from "@/provider/provider"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 
 // XCOD-94: the review surface for long-term memory. `list`, `show`, `status`, `verify` and `export`
@@ -555,9 +556,14 @@ export const MemoryMigrateCommand = effectCmd({
   builder: (yargs) =>
     yargs
       .option("to", {
-        choices: ["neo4j", "postgres"] as const,
+        choices: ["neo4j", "postgres", "embedded"] as const,
         demandOption: true,
         describe: "the backend to move to; must match memory.backend.type",
+      })
+      .option("from-bundle", {
+        type: "string",
+        describe:
+          "move the facts of this export bundle instead of memory on this computer (the setup wizard's Move my facts)",
       })
       .option("scope", scopeOption)
       .option("yes", { type: "boolean", default: false, describe: "write the new rows (without it, only preview)" })
@@ -578,24 +584,39 @@ export const MemoryMigrateCommand = effectCmd({
     if (!verdict.on) return yield* fail(`Memory is off: ${verdict.reason}. Nothing was migrated`)
     const scopes = scopesOf(args.scope)
     const dir = yield* Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), "lunos-migrate-")))
-    const bundle = path.join(dir, "bundle")
+    const from = args["from-bundle"] as string | undefined
+    if (args.to === "embedded" && !from) return yield* fail("--to embedded needs --from-bundle: the facts to move here")
+    const bundle = from ? path.resolve(from) : path.join(dir, "bundle")
+    // Into memory on this computer, facts are extracted again, so that needs the model.
+    const model =
+      args.to === "embedded"
+        ? yield* Provider.Service.use((provider) => provider.defaultModel()).pipe(
+            Effect.catch(() => fail("Moving facts to this computer needs a model: connect a provider first")),
+          )
+        : { providerID: "none", modelID: "" }
     const result = yield* Effect.gen(function* () {
-      yield* memory.pin("embedded")
-      const exported = yield* MemoryExport.run({
-        scopes,
-        graph: false,
-        includeIndex: false,
-        zip: false,
-        out: bundle,
-        directory: dir,
-      }).pipe(
-        Effect.ensuring(memory.pin(undefined)),
-        Effect.catch((error) => fail(`Could not read memory on this computer: ${error.message}`)),
-      )
-      yield* writeStdoutEffect(
-        `Read ${exported.manifest.counts.facts.total} fact(s) and ${exported.manifest.counts.notes} note file(s) from memory on this computer.${EOL}`,
-      )
-      const options = { path: bundle, migrate: true, parent: { providerID: "none", modelID: "" } }
+      if (!from) {
+        yield* memory.pin("embedded")
+        const exported = yield* MemoryExport.run({
+          scopes,
+          graph: false,
+          includeIndex: false,
+          zip: false,
+          out: bundle,
+          directory: dir,
+        }).pipe(
+          Effect.ensuring(memory.pin(undefined)),
+          Effect.catch((error) => fail(`Could not read memory on this computer: ${error.message}`)),
+        )
+        yield* writeStdoutEffect(
+          `Read ${exported.manifest.counts.facts.total} fact(s) and ${exported.manifest.counts.notes} note file(s) from memory on this computer.${EOL}`,
+        )
+      }
+      const options = {
+        path: bundle,
+        migrate: true,
+        parent: { providerID: String(model.providerID), modelID: String(model.modelID) },
+      }
       const preview = yield* MemoryImport.preview(options).pipe(Effect.catch((error) => fail(error.message)))
       yield* writeStdoutEffect(previewText(preview) + EOL)
       if (preview.limit) return yield* fail(preview.limit)
@@ -615,7 +636,9 @@ export const MemoryMigrateCommand = effectCmd({
     }).pipe(Effect.ensuring(Effect.promise(() => fs.rm(dir, { recursive: true, force: true }))))
     if (!result) return
     const lines = [
-      `Migrated ${result.facts} fact(s) to ${MemoryStorage.label(args.to)}. Memory on this computer is unchanged; delete it with lunos memory purge once you have checked the database.`,
+      from
+        ? `Moved ${result.facts} fact(s) to ${MemoryStorage.label(args.to)}, each with where it came from. The old storage is unchanged.`
+        : `Migrated ${result.facts} fact(s) to ${MemoryStorage.label(args.to)}. Memory on this computer is unchanged; delete it with lunos memory purge once you have checked the database.`,
     ]
     for (const item of result.failed) lines.push(`Not migrated: ${oneLine(item.text, 60)}: ${item.reason}`)
     yield* writeStdoutEffect(lines.join(EOL) + EOL)

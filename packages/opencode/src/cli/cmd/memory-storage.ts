@@ -1,6 +1,6 @@
 import { EOL } from "os"
 import { Effect } from "effect"
-import type { MemorySetup } from "@opencode-ai/core/memory-setup"
+import { MemorySetup } from "@opencode-ai/core/memory-setup"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import type { Residency } from "@opencode-ai/core/residency"
 import type { ConfigMemory } from "@opencode-ai/core/config/memory"
@@ -277,7 +277,7 @@ async function applyTemplate(input: {
     if (!interactive && (!args.url || !args.jurisdiction))
       return { kind: "fail", message: `${template.title} needs --url and --jurisdiction with --yes` }
     const memory = MemoryStorage.memoryOf(template, { vendor: type })
-    const draft = { ...input.draft, ...pick(memory) }
+    const draft = MemorySetup.apply(input.draft, memory)
     if (!interactive) {
       const backend = {
         type,
@@ -301,7 +301,7 @@ async function applyTemplate(input: {
   }
 
   const memory = MemoryStorage.memoryOf(template, values)
-  const draft = { ...input.draft, ...pick(memory) }
+  const draft = MemorySetup.apply(input.draft, memory)
   if (!template.compose) return { kind: "ok", draft }
 
   // A Docker template: preview everything, write after confirming, start only when asked.
@@ -384,29 +384,6 @@ async function applyTemplate(input: {
     kind: "ok",
     draft,
     ...(start ? { template: { name: template.name, scope, env: await MemoryTemplate.env(plan.dir) } } : {}),
-  }
-}
-
-/** The wizard answers a template's memory block sets. */
-function pick(memory: Record<string, unknown>): Partial<MemorySetup.Draft> {
-  const backend = memory.backend as Record<string, string> | undefined
-  return {
-    ...(backend
-      ? {
-          backend:
-            backend.type === "neo4j" || backend.type === "postgres"
-              ? {
-                  type: backend.type,
-                  url: backend.url ?? "",
-                  username: backend.username ?? "",
-                  password: backend.password ?? "",
-                  jurisdiction: backend.jurisdiction ?? "",
-                }
-              : { type: "embedded" },
-        }
-      : {}),
-    ...(typeof memory.model === "string" && memory.model ? { model: memory.model } : {}),
-    ...(memory.encryption === "off" || memory.encryption === "os-keychain" ? { encryption: memory.encryption } : {}),
   }
 }
 

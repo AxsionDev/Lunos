@@ -185,6 +185,8 @@ import type {
   MemorySetupEnvironmentErrors,
   MemorySetupEnvironmentResponses,
   MemorySetupInput,
+  MemorySetupMoveErrors,
+  MemorySetupMoveResponses,
   MemorySetupTemplateApplyErrors,
   MemorySetupTemplateApplyResponses,
   MemorySetupTemplateInput,
@@ -4329,6 +4331,43 @@ export class Setup extends HeyApiClient {
       ThrowOnError
     >({
       url: "/memory/setup/template/start",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Move facts to new memory storage
+   *
+   * Switching storage, "Move my facts": export every fact from the storage in use now and import it into the proposed one, keeping each fact's provenance. The old copy is left as it is.
+   */
+  public move<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupMoveResponses, MemorySetupMoveErrors, ThrowOnError>({
+      url: "/memory/setup/move",
       ...options,
       ...params,
       headers: {

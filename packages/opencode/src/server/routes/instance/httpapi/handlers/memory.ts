@@ -1,3 +1,5 @@
+import fs from "node:fs/promises"
+import os from "node:os"
 import path from "node:path"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
@@ -30,6 +32,7 @@ import { MemoryExternal } from "@/memory/external"
 import { MemorySetupCheck } from "@/memory/setup-check"
 import { MemorySetupEnv } from "@/memory/setup-env"
 import { MemoryTemplate } from "@/memory/template"
+import { MemoryMove } from "@/memory/move"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import type { ConfigMemory } from "@opencode-ai/core/config/memory"
 
@@ -310,6 +313,32 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       )
     })
 
+    // XCOD-264: "Move my facts": export from the storage in use, import into the proposed one.
+    const setupMove = Effect.fn("MemoryHttpApi.setupMove")(function* (ctx: { payload: typeof MemorySetupInput.Type }) {
+      const instance = yield* InstanceState.context
+      const env = yield* templateEnv(ctx.payload.template)
+      const to = MemoryExternal.type(ctx.payload.memory as ConfigMemory.Info)
+      const dir = yield* Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), "lunos-move-")))
+      const bundle = path.join(dir, "bundle")
+      return yield* Effect.gen(function* () {
+        const exported = yield* MemoryExport.run({
+          scopes: yield* memory.scopes(),
+          graph: false,
+          includeIndex: false,
+          zip: false,
+          out: bundle,
+          directory: dir,
+        }).pipe(Effect.result)
+        if (exported._tag === "Failure")
+          return { ok: false, error: `Could not read the facts to move: ${exported.failure.message}` }
+        if (!exported.success.manifest.counts.facts.total) return { ok: true, facts: 0, output: "No facts to move." }
+        for (const scope of SCOPES) yield* memory.release(scope)
+        return yield* Effect.promise(() =>
+          MemoryMove.run({ directory: instance.directory, memory: ctx.payload.memory, to, bundle, env }),
+        )
+      }).pipe(Effect.ensuring(Effect.promise(() => fs.rm(dir, { recursive: true, force: true }))))
+    })
+
     const setupEnvironment = Effect.fn("MemoryHttpApi.setupEnvironment")(function* () {
       return yield* MemorySetupEnv.environment()
     })
@@ -415,6 +444,7 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       .handle("setupCheck", setupCheck)
       .handle("setupEnvironment", setupEnvironment)
       .handle("setupTest", setupTest)
+      .handle("setupMove", setupMove)
       .handle("setupTemplatePreview", setupTemplatePreview)
       .handle("setupTemplateApply", setupTemplateApply)
       .handle("setupTemplateStart", setupTemplateStart)

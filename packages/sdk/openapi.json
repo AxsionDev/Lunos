@@ -7546,6 +7546,69 @@
         ]
       }
     },
+    "/memory/setup/move": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.setup.move",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How many facts were moved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySetupMoveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Switching storage, \"Move my facts\": export every fact from the storage in use now and import it into the proposed one, keeping each fact's provenance. The old copy is left as it is.",
+        "summary": "Move facts to new memory storage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySetupInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.setup.move({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/memory/setup/check": {
       "post": {
         "tags": ["memory"],
@@ -29050,6 +29113,45 @@
           },
           "error": {
             "$ref": "#/components/schemas/MemorySetupError"
+          }
+        },
+        "required": ["ok"],
+        "additionalProperties": false
+      },
+      "MemorySetupMoveResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "facts": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "output": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
           }
         },
         "required": ["ok"],
