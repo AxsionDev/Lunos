@@ -150,6 +150,66 @@ describe("gate: checked before any connection", () => {
   })
 })
 
+describe("gate: PostgreSQL and databases on this computer (XCOD-264)", () => {
+  const pg = { type: "postgres" as const, url: "postgres://db.example.eu:5432/lunos", jurisdiction: "EU-DE" }
+  const gate = (backend: object, residency: Residency.Resolved | undefined = eu) =>
+    MemoryExternal.gate({ memory: { backend: { ...pg, ...backend } } as never, residency })
+
+  test("postgres:// to another host uses verified TLS unless sslmode says otherwise", () => {
+    expect(gate({}).tls).toBe("verified")
+    const require = gate({ url: "postgres://db.example.eu:5432/lunos?sslmode=require" })
+    expect(require.tls).toBe("unverified")
+    expect(require.warnings[0]).toContain("not fully verified")
+    expect(gate({ url: "postgresql://db.example.eu/lunos?sslmode=verify-full" }).tls).toBe("verified")
+  })
+
+  test("TLS is required except to localhost", () => {
+    expect(() => gate({ url: "postgres://db.example.eu:5432/lunos?sslmode=disable" })).toThrow(/unencrypted/)
+    expect(
+      gate({ url: "postgres://db.example.eu:5432/lunos?sslmode=disable", allow_insecure: true }).warnings[0],
+    ).toContain("allow_insecure")
+    expect(gate({ url: "postgres://localhost:5432/lunos" }).tls).toBe("none")
+  })
+
+  test("bolt:// is not a PostgreSQL URL, and credentials in the URL are refused", () => {
+    expect(() => gate({ url: "bolt+s://db.example.eu:7687" })).toThrow(/postgres:\/\//)
+    expect(() => gate({ url: "postgres://u:p@db.example.eu:5432/lunos" })).toThrow(/must not contain credentials/)
+  })
+
+  test("residency refuses a disallowed region before connecting", () => {
+    expect(() => gate({ jurisdiction: "US" })).toThrow(/Blocked by data-residency policy/)
+  })
+
+  test('"local" is only for a database on this computer, and passes an EU-only policy there', () => {
+    expect(gate({ url: "postgres://localhost:5432/lunos", jurisdiction: "local" }).host).toBe("localhost")
+    expect(
+      MemoryExternal.gate({
+        memory: { backend: { ...base, url: "bolt://127.0.0.1:7687", jurisdiction: "local" } } as never,
+        residency: eu,
+      }).tls,
+    ).toBe("none")
+    expect(() => gate({ jurisdiction: "local" })).toThrow(/only for a database on this computer/)
+  })
+
+  test("Memgraph stays refused", () => {
+    expect(() => gate({ type: "memgraph", url: "bolt://localhost:7687" })).toThrow(/not supported yet/)
+  })
+
+  test("a probe refused by the gate never connects, and says which stage and what to do", async () => {
+    const refused = await MemoryExternal.probe({
+      memory: { backend: { ...pg, jurisdiction: "US" } } as never,
+      residency: eu,
+    })
+    expect(refused).toMatchObject({ ok: false, error: { type: "residency", stage: "residency" } })
+    if (!refused.ok) expect(refused.error.fix).toContain("residency policy allows")
+    const nothing = await MemoryExternal.probe({
+      memory: { backend: { ...pg, url: "postgres://127.0.0.1:1/lunos", jurisdiction: "local" } } as never,
+      residency: eu,
+    })
+    expect(nothing).toMatchObject({ ok: false, error: { stage: "connect" } })
+  })
+})
+
 describe("identities", () => {
   test("the same remote in scp, ssh and https form is one project", () => {
     const forms = [
