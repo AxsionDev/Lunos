@@ -2,6 +2,7 @@ export * as CloudOrg from "./org"
 
 import { ConfigManaged } from "@/config/managed"
 import { ConfigOrgPolicy } from "@/config/org-policy"
+import { CloudAccountApi } from "./account-api"
 import { CloudAuth } from "./auth"
 import { CloudStore } from "./store"
 
@@ -111,13 +112,14 @@ async function send(org: Org, url: string, init: RequestInit & { what: string },
     signal: AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS),
   })
   if (response.ok) return response
-  const body = (await response.json().catch(() => undefined)) as
-    | { error?: { code?: string; message?: string } }
-    | undefined
+  // XCOD-275: `{ code, message, details? }`, or `{ error: { code, message } }` from an older console.
+  const found = CloudAccountApi.refusal(await response.json().catch(() => undefined))
   throw new ConsoleError(
     response.status,
-    body?.error?.code,
-    body?.error?.message ?? `${org.host} answered ${response.status} ${response.statusText}`.trim(),
+    found.code,
+    CloudAccountApi.explain(found.code, found.details, undefined, found.message) ??
+      found.message ??
+      `${org.host} answered ${response.status} ${response.statusText}`.trim(),
   )
 }
 

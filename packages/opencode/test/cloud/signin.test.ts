@@ -3,10 +3,11 @@ import fs from "fs/promises"
 import os from "os"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
-import { AccountError, needsAcceptance } from "@opencode-ai/tui/util/account"
+import { AccountError, needsAcceptance, versions } from "@opencode-ai/tui/util/account"
 import { CloudAuth } from "../../src/cloud/auth"
 import { CloudDefaults } from "../../src/cloud/defaults"
 import { CloudGate } from "../../src/cloud/gate"
+import { CloudLegal } from "../../src/cloud/legal"
 import { CloudStore } from "../../src/cloud/store"
 import { CloudTuiHost } from "../../src/cloud/tui-host"
 import * as FakeIdp from "./fixtures/fake-idp"
@@ -89,7 +90,7 @@ describe("CloudGate.resolve (XCOD-273)", () => {
 describe("CloudTuiHost (XCOD-273)", () => {
   let idp: ReturnType<typeof FakeIdp.start>
   let dir: string
-  const previous = { data: Global.Path.data, config: Global.Path.config }
+  const previous = { data: Global.Path.data, config: Global.Path.config, cache: Global.Path.cache }
   const configFile = () => path.join(Global.Path.config, "opencode.json")
 
   beforeAll(async () => {
@@ -107,6 +108,7 @@ describe("CloudTuiHost (XCOD-273)", () => {
     const config = await fs.mkdtemp(path.join(dir, "config-"))
     ;(Global.Path as { data: string }).data = data
     ;(Global.Path as { config: string }).config = config
+    ;(Global.Path as { cache: string }).cache = await fs.mkdtemp(path.join(dir, "cache-"))
     // Session sync and the account API go to the fake control plane, as global cloud.endpoint says.
     await fs.writeFile(configFile(), JSON.stringify({ cloud: { issuer: idp.origin, endpoint: idp.origin } }))
     return CloudTuiHost.create({
@@ -122,6 +124,7 @@ describe("CloudTuiHost (XCOD-273)", () => {
     idp?.stop()
     ;(Global.Path as { data: string }).data = previous.data
     ;(Global.Path as { config: string }).config = previous.config
+    ;(Global.Path as { cache: string }).cache = previous.cache
   })
 
   test("device flow → confirmed → kept in the keychain; then /logout", async () => {
@@ -172,24 +175,68 @@ describe("CloudTuiHost (XCOD-273)", () => {
   }, 20_000)
 
   test("an unconfirmed e-mail waits: nothing is kept until the address is confirmed", async () => {
-    const host = await setup({ outcomes: ["unverified"], verifyAfter: 2, serves: { verification: true } })
+    const host = await setup({ outcomes: ["unverified"], verifyAfter: 2 })
     const pending = await (await host.start({ signup: true })).wait(new AbortController().signal)
     expect(pending.verified).toBe(false)
     expect(pending.email).toBe("pat@lunos.test")
     await expect(pending.save()).rejects.toMatchObject({ kind: "unverified" })
     expect(await host.current()).toBeUndefined()
     await pending.resend()
-    expect(idp.state.resent).toBe(1)
+    expect(idp.cloud.state.sent).toBe(1)
+    expect(idp.requests.filter((r) => r.path === "/v1/account/verification").map((r) => r.method)).toEqual(["POST"])
     expect(await pending.recheck()).toBe(false)
     expect(await pending.recheck()).toBe(true)
     expect((await pending.save()).email).toBe("pat@lunos.test")
   })
 
-  test("Resend says so when Lunos Cloud doesn't serve it yet", async () => {
-    const host = await setup({ outcomes: ["unverified"] })
+  test("Resend is rate limited (1 a minute, 5 a day): says when to try again (XCOD-275)", async () => {
+    const host = await setup({ outcomes: ["unverified"], verifyAfter: 100 })
+    const pending = await (await host.start({ signup: true })).wait(new AbortController().signal)
+    await pending.resend()
+    const minute = await pending.resend().catch((error) => error)
+    expect(minute).toBeInstanceOf(AccountError)
+    expect(minute).toMatchObject({ kind: "rate_limited" })
+    expect(minute.message).toMatch(/^Too many requests\. Try again in (\d+ seconds|1 minute)\.$/)
+    // Five today already, the last over a minute ago: the daily limit, in hours.
+    const now = Date.now()
+    idp.cloud.state.verifications["u-1"] = [5, 4, 3, 2, 1].map((n) => now - n * 3_600_000 + 1_000)
+    const day = await pending.resend().catch((error) => error)
+    expect(day.message).toBe("Too many requests. Try again in 20 hours.")
+    expect(idp.cloud.state.sent).toBe(1)
+    // Already confirmed: 409 already_verified says so; nothing is sent.
+    idp.cloud.users["u-1"]!.verified = true
+    const confirmed = await pending.resend().catch((error) => error)
+    expect(confirmed.message).toStartWith("Your e-mail address is already confirmed.")
+    expect(idp.cloud.state.sent).toBe(1)
+  })
+
+  test("Resend says so when Lunos Cloud doesn't serve it yet (lunoshq #13)", async () => {
+    const host = await setup({ outcomes: ["unverified"], cloud: { ...FakeIdp.defaultCloud(), legacy: true } })
     const pending = await (await host.start({ signup: true })).wait(new AbortController().signal)
     await expect(pending.resend()).rejects.toMatchObject({ kind: "unavailable" })
   })
+
+  test("the sign-in line's plan comes from GET /v1/account, never billing (XCOD-275)", async () => {
+    let host = await setup({ cloud: { ...FakeIdp.defaultCloud(), plans: { "u-1": "pro" } } })
+    expect((await signIn(host)).plan).toBe("Pro")
+    expect(idp.requests.filter((r) => /billing|checkout|card/.test(r.path))).toEqual([])
+    expect(idp.requests.filter((r) => r.path === "/v1/account").length).toBe(1)
+    idp.stop()
+    host = await setup()
+    expect((await signIn(host)).plan).toBe("Free")
+    idp.stop()
+    // An organisation's plan says whose. An older Lunos Cloud doesn't report one: no plan, still signed in.
+    host = await setup({
+      cloud: { ...FakeIdp.defaultCloud(), plans: { "u-1": "team" }, planSources: { "u-1": "acme" } },
+    })
+    expect((await signIn(host)).plan).toBe("Team (Acme GmbH's)")
+    idp.stop()
+    host = await setup({ cloud: { ...FakeIdp.defaultCloud(), legacy: true } })
+    const older = await signIn(host)
+    expect(older.plan).toBeUndefined()
+    expect(older.email).toBe("pat@lunos.test")
+    expect(idp.requests.filter((r) => /billing/.test(r.path))).toEqual([])
+  }, 30_000)
 
   const signIn = async (host: Awaited<ReturnType<typeof setup>>) =>
     (await (await host.start({ signup: false })).wait(new AbortController().signal)).save()
@@ -229,13 +276,23 @@ describe("CloudTuiHost (XCOD-273)", () => {
     expect((await host.details()).organisations?.map((o) => o.org)).toEqual(["acme", "beta", "gamma"])
     idp.stop()
 
-    // No personal plan: Free. Before XCOD-274's server, no role or invitations, and nothing is made up.
+    // No plan of its own: Free. Before XCOD-274's server, no role or invitations, and nothing is made up.
     host = await setup({ platformRole: "support", cloud: { ...FakeIdp.defaultCloud(), without: ["invitations"] } })
     await signIn(host)
     const older = await host.details()
     expect(older.user.plan).toBe("Free")
     expect(older.invitations).toBeUndefined()
     expect(older.missing).toEqual([])
+    expect(idp.requests.filter((r) => /billing/.test(r.path))).toEqual([])
+    idp.stop()
+
+    // lunoshq #13 reports no plan: /account says so, and asks no billing route instead.
+    host = await setup({ cloud: { ...FakeIdp.defaultCloud(), legacy: true } })
+    await signIn(host)
+    const legacy = await host.details()
+    expect(legacy.user.plan).toBeUndefined()
+    expect(legacy.missing).toEqual(["Plan: this Lunos Cloud doesn't report it yet."])
+    expect(idp.requests.filter((r) => /billing/.test(r.path))).toEqual([])
   }, 20_000)
 
   test("sign out everywhere ends the provider's sessions, then signs out here", async () => {
@@ -278,12 +335,28 @@ describe("CloudTuiHost (XCOD-273)", () => {
       deleted: false,
       title: "Transfer ownership first",
       message:
-        "You're the only owner of Acme GmbH (acme). Transfer ownership first, with lunos org transfer <member> --org acme or delete the organisation. Then delete your account.",
+        "You're the only owner of Acme GmbH (acme). Transfer ownership first, with lunos org transfer <member> --org acme, or delete the organisation. Then delete your account.",
     })
     // Still signed in, still a member: Lunos Cloud refused, so nothing happened.
     expect((await host.current())?.email).toBe("pat@lunos.test")
     expect(idp.cloud.state.deletion["u-1"]).toBeUndefined()
     expect(idp.cloud.orgs.acme!.members["u-1"]).toBe("owner")
+  })
+
+  test("last_owner from lunoshq #13 (ids only in its message): still named, from the account's organisations", async () => {
+    const host = await setup({
+      cloud: {
+        ...FakeIdp.defaultCloud(),
+        legacy: true,
+        orgs: { acme: { name: "Acme GmbH", members: { "u-1": "owner", "u-2": "member" } } },
+      },
+    })
+    await signIn(host)
+    expect((await host.deleteAccount()) as { message: string }).toMatchObject({
+      deleted: false,
+      message:
+        "You're the only owner of Acme GmbH (acme). Transfer ownership first, with lunos org transfer <member> --org acme, or delete the organisation. Then delete your account.",
+    })
   })
 
   test("Delete my account where Lunos Cloud has no deletion yet: the synced data only, and it says so", async () => {
@@ -300,11 +373,15 @@ describe("CloudTuiHost (XCOD-273)", () => {
     let host = await setup({
       cloud: { ...FakeIdp.defaultCloud(), terms: { terms: "2026-10-19", privacy: "2026-10-19" } },
     })
-    expect(needsAcceptance(host.legal, await host.accepted())).toBe(true)
-    await host.accept(host.legal.version)
+    let legal = (await host.legal())!
+    expect(needsAcceptance(legal, await host.accepted())).toBe(true)
+    await host.accept(versions(legal))
     await signIn(host)
-    expect(await host.accepted()).toBe(host.legal.version)
-    expect(needsAcceptance({ ...host.legal, version: "2099-01-01" }, await host.accepted())).toBe(true)
+    expect(await host.accepted()).toEqual({ terms: "2026-10-19", privacy: "2026-10-19" })
+    expect(needsAcceptance(legal, await host.accepted())).toBe(false)
+    expect(
+      needsAcceptance({ ...legal, privacy: { ...legal.privacy, version: "2099-01-01" } }, await host.accepted()),
+    ).toBe(true)
     // Nothing recorded at Lunos Cloud yet, and the version ticked here is its current one: sent, not asked.
     expect(await host.termsCheck!()).toBeUndefined()
     expect(idp.cloud.state.termsPuts).toEqual([{ terms: "2026-10-19", privacy: "2026-10-19" }])
@@ -320,7 +397,8 @@ describe("CloudTuiHost (XCOD-273)", () => {
         accepted: { "u-1": { terms: "2026-10-19", privacy: "2026-10-19" } },
       },
     })
-    await host.accept(host.legal.version)
+    legal = (await host.legal())!
+    await host.accept(versions(legal))
     await signIn(host)
     const check = await host.termsCheck!()
     expect(check).toEqual({
@@ -328,22 +406,65 @@ describe("CloudTuiHost (XCOD-273)", () => {
       accepted: { terms: "2026-10-19", privacy: "2026-10-19" },
     })
     expect(idp.cloud.state.termsPuts).toEqual([])
-    await host.accept(host.legal.version, check!.current)
+    await host.accept(versions(legal), check!.current)
     expect(idp.cloud.state.termsPuts).toEqual([{ terms: "2026-11-01", privacy: "2026-10-19" }])
     expect(await host.termsCheck!()).toBeUndefined()
     // A version Lunos Cloud doesn't have now is refused there, and that isn't swallowed.
-    await expect(host.accept(host.legal.version, { terms: "1999-01-01", privacy: "1999-01-01" })).rejects.toThrow(
+    await expect(host.accept(versions(legal), { terms: "1999-01-01", privacy: "1999-01-01" })).rejects.toThrow(
       "Accept the current versions",
     )
     idp.stop()
 
     // Nothing recorded there, and this machine accepted another version: asked, never assumed.
     host = await setup({ cloud: { ...FakeIdp.defaultCloud(), terms: { terms: "2026-12-01", privacy: "2026-12-01" } } })
-    await host.accept(host.legal.version)
+    await host.accept({ terms: "2026-11-01", privacy: "2026-11-01" })
     await signIn(host)
     expect(await host.termsCheck!()).toEqual({ current: { terms: "2026-12-01", privacy: "2026-12-01" } })
     expect(idp.cloud.state.termsPuts).toEqual([])
   }, 30_000)
+
+  test("the Terms come from GET /v1/legal, are kept, and are used offline or with an exemption (XCOD-275)", async () => {
+    const host = await setup({
+      cloud: { ...FakeIdp.defaultCloud(), terms: { terms: "2027-01-02", privacy: "2027-03-04" } },
+    })
+    expect(await host.legal()).toEqual({
+      terms: { version: "2027-01-02", url: "https://legal.lunos.test/terms" },
+      privacy: { version: "2027-03-04", url: "https://legal.lunos.test/privacy" },
+    })
+    // Unauthenticated: no token is sent for it.
+    expect(idp.requests.filter((r) => r.path === "/v1/legal").map((r) => r.auth)).toEqual([null])
+    // A version accepted before XCOD-275 (one for both) still counts where it matches both.
+    await fs.mkdir(path.dirname(CloudTuiHost.consentFile()), { recursive: true })
+    await fs.writeFile(CloudTuiHost.consentFile(), JSON.stringify({ version: "2027-01-02" }))
+    expect(await host.accepted()).toEqual({ terms: "2027-01-02", privacy: "2027-01-02" })
+    const asked = idp.requests.length
+    idp.cloud.publish({ terms: "2027-09-09", privacy: "2027-09-09" })
+
+    // An exemption: only what's kept here, and nothing is sent; /login (asked) does ask.
+    const exempt = CloudTuiHost.create({
+      gate: { required: false, exemption: "source-build", issuer: idp.origin },
+      issuer: idp.origin,
+      clientID: "lunos-cli",
+    })
+    expect((await exempt.legal())?.terms.version).toBe("2027-01-02")
+    expect(idp.requests.length).toBe(asked)
+    expect((await exempt.legal({ asked: true }))?.terms.version).toBe("2027-09-09")
+
+    // Offline: the kept answer, nothing sent. Unreachable: the kept answer too.
+    process.env.LUNOS_OFFLINE = "1"
+    try {
+      expect((await host.legal())?.terms.version).toBe("2027-09-09")
+      expect(idp.requests.length).toBe(asked + 1)
+    } finally {
+      delete process.env.LUNOS_OFFLINE
+    }
+    idp.stop()
+    expect((await host.legal())?.terms.version).toBe("2027-09-09")
+    // Nothing kept, and nothing to ask: no Terms, so the start doesn't ask (and sign-in waits for them).
+    await fs.rm(CloudLegal.cacheFile())
+    expect(await host.legal()).toBeUndefined()
+    expect(needsAcceptance(undefined, undefined)).toBe(false)
+  }, 20_000)
 
   test("refresh: a cached sign-in holds offline; a refused refresh means signed out", async () => {
     const host = await setup()

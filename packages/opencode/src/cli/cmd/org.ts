@@ -106,9 +106,24 @@ const run = <A extends Common>(name: string, body: (args: A) => Promise<{ json: 
     const error = result.error
     const status = error instanceof CloudAccountApi.RefusedError || error instanceof Failure ? error.status : undefined
     const code = error instanceof CloudAccountApi.RefusedError || error instanceof Failure ? error.code : undefined
+    // XCOD-275: the code scripts matched before (`forbidden`), for one release.
+    const legacyCode = error instanceof CloudAccountApi.RefusedError ? error.legacyCode : undefined
     const text = error instanceof CloudAuth.SignedOutError ? "Not signed in. Run lunos login." : message(error)
     if (!args.json) return yield* fail(text)
-    out(JSON.stringify({ error: { ...(status ? { status } : {}), ...(code ? { code } : {}), message: text } }, null, 2))
+    out(
+      JSON.stringify(
+        {
+          error: {
+            ...(status ? { status } : {}),
+            ...(code ? { code } : {}),
+            ...(legacyCode ? { legacyCode } : {}),
+            message: text,
+          },
+        },
+        null,
+        2,
+      ),
+    )
     return yield* fail("")
   })
 

@@ -18,7 +18,15 @@ export const EXEMPTION_TEXT: Record<Exemption, string> = {
 export type Gate = { required: true; issuer: string } | { required: false; exemption: Exemption; issuer?: string }
 
 /** Why a sign-in step failed. Each kind has its own message and a Try again. */
-export type FailureKind = "expired" | "denied" | "offline" | "unreachable" | "unverified" | "unavailable" | "other"
+export type FailureKind =
+  | "expired"
+  | "denied"
+  | "offline"
+  | "unreachable"
+  | "unverified"
+  | "unavailable"
+  | "rate_limited"
+  | "other"
 
 export class AccountError extends Error {
   override name = "AccountError"
@@ -41,7 +49,7 @@ export type SignedIn = {
   issuer: string
   /** Where the session is kept: "the macOS Keychain", "the system keyring", … */
   kept?: string
-  /** The plan the account is on, when Lunos Cloud says (`Free`, `Lunos Pro`, …). */
+  /** The plan the account is on, when Lunos Cloud says (`Free`, `Pro`, …): `GET /v1/account`, never billing. */
   plan?: string
   /** Lines `lunos login` prints after signing in: session sync, team features. */
   notes?: string[]
@@ -66,7 +74,10 @@ export type Pending = {
   verified: boolean
   /** Asks the provider again whether the address is confirmed. */
   recheck(): Promise<boolean>
-  /** Sends the confirmation e-mail again; AccountError("unavailable") where the service can't yet. */
+  /**
+   * Sends the confirmation e-mail again; AccountError("rate_limited") when it was sent too recently,
+   * with when to try again, and AccountError("unavailable") where the service can't yet.
+   */
   resend(): Promise<void>
   /** Keeps the session (keychain) and does what `lunos login` does after it. */
   save(): Promise<SignedIn>
@@ -90,22 +101,28 @@ export type Details = {
   missing: string[]
 }
 
+/** The Terms and the Privacy notice versions, as accepted or asked for. */
+export type Versions = { terms: string; privacy: string }
+
 /** XCOD-274: the Terms and Privacy notice versions Lunos Cloud asks this account to accept. */
-export type TermsCheck = { current: { terms: string; privacy: string }; accepted?: { terms: string; privacy: string } }
+export type TermsCheck = { current: Versions; accepted?: Versions }
 
 /** What deleting the account came to: done, or refused (the last owner of an organisation) and why. */
 export type Deletion = { deleted: true; message: string } | { deleted: false; title: string; message: string }
 
-export type Legal = {
-  /** The version of the Terms and Privacy notice this build asks to accept. */
-  version: string
-  terms: string
-  privacy: string
-}
+/** XCOD-275: the Terms and the Privacy notice the sign-up box accepts, as Lunos Cloud publishes them. */
+export type Legal = { terms: { version: string; url: string }; privacy: { version: string; url: string } }
+
+export const versions = (legal: Legal): Versions => ({ terms: legal.terms.version, privacy: legal.privacy.version })
 
 export type Host = {
   gate: Gate
-  legal: Legal
+  /**
+   * XCOD-275: the current Terms and Privacy notice (`GET /v1/legal`), else the last ones kept on this
+   * machine. With an exemption only the kept ones, unless the person asked to sign in (`asked`);
+   * offline, always only the kept ones; with `cached`, only the kept ones. Undefined when there are none.
+   */
+  legal(input?: { asked?: boolean; cached?: boolean }): Promise<Legal | undefined>
   /** Who is signed in, from the stored session only: no network. */
   current(): Promise<SignedIn | undefined>
   /**
@@ -114,13 +131,13 @@ export type Host = {
    * included: the cached sign-in holds.
    */
   refresh(): Promise<"ok" | "expired" | "none">
-  /** The Terms version this account last accepted on this machine. */
-  accepted(): Promise<string | undefined>
+  /** The Terms and Privacy notice versions this account last accepted on this machine. */
+  accepted(): Promise<Versions | undefined>
   /**
    * Records the acceptance on this machine, and at Lunos Cloud when it asked for `server`'s versions
    * (it refuses any but its current ones); throws when Lunos Cloud couldn't record them.
    */
-  accept(version: string, server?: TermsCheck["current"]): Promise<void>
+  accept(accepted: Versions, server?: Versions): Promise<void>
   /**
    * XCOD-274: whether Lunos Cloud records an older acceptance than its current Terms and Privacy
    * notice (or none it can match to this machine's), so the account is asked again. Undefined when
@@ -197,6 +214,8 @@ export function failureText(kind: FailureKind, message: string): { title: string
       }
     case "unavailable":
       return { title: "Not available yet", why: message, fix: "Use the link on the sign-in page instead." }
+    case "rate_limited":
+      return { title: "Sent too recently", why: message, fix: "Check your inbox and spam folder in the meantime." }
     case "other":
       return {
         title: "Sign-in failed",
@@ -220,7 +239,11 @@ export function platformRoleText(role: string) {
   return role
 }
 
-/** Whether a new Terms version (or none accepted yet) means asking again. */
-export function needsAcceptance(legal: Legal, accepted: string | undefined) {
-  return accepted !== legal.version
+/**
+ * Whether a new Terms or Privacy notice version (or none accepted yet) means asking again. Not when
+ * the current ones aren't known (offline with nothing kept): the start doesn't wait on them.
+ */
+export function needsAcceptance(legal: Legal | undefined, accepted: Versions | undefined) {
+  if (!legal) return false
+  return accepted?.terms !== legal.terms.version || accepted?.privacy !== legal.privacy.version
 }

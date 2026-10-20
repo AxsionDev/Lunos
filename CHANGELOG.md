@@ -130,6 +130,19 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Changed
 
+- **Your plan is back in the sign-in line, and Lunos Cloud's refusals say what to do.** Signing in
+  shows "Signed in as you@example.com · Plan: Free" again. The plan comes from your account, and
+  signing in still makes no billing call. `/account` shows Free, Pro, Team or Enterprise, and whose
+  plan covers you, and shows Admin as a role alongside Owner and Member. When Lunos Cloud refuses
+  something, `lunos org` and `/account` explain it by its code, not its wording. An Admin trying an
+  Owner-only action is told that only an owner can, and whom to ask. The only owner of an
+  organisation is told which organisations, by name, to hand over first. **`lunos org --json`
+  refusals now carry `owner_required` or `admin_required` instead of `forbidden`: scripts matching
+  `forbidden` should switch to `code`; `legacyCode` is kept for one release.** The Terms and
+  the Privacy notice, with their versions and links, now come from Lunos Cloud instead of being built
+  into the app, and the last ones are kept so an offline start still works. **Resend e-mail** on the
+  Welcome screen sends the confirmation again and, if you ask too soon, says when to try again.
+  <!-- XCOD-275 -->
 - **Memory names where it's stored in plain words.** Setup, settings, `lunos memory status`,
   `/memory` and the status line say "On this computer" or "Team database: PostgreSQL". Each of them
   also repeats what leaves your computer. Your config file is unchanged. <!-- XCOD-264 -->
