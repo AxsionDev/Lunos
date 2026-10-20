@@ -129,8 +129,10 @@ export function useMemorySetup() {
     }
     let download = input.start === "storage"
     const fixed = (key: MemorySetup.Key) => MemorySetup.locked(rows, key)
+    // Over /memory (Change storage…), Esc goes back to it rather than closing everything.
+    const escape = input.start === "storage" ? input.onExit : undefined
     const show = (render: () => any, back?: () => void) =>
-      dialog.replace(render, undefined, back ? { back } : { back: input.onExit })
+      dialog.replace(render, undefined, { back: back ?? input.onExit, escape })
     const saveScope = () => input.scope
     const smallModel = () => sync.data.config.small_model ?? sync.data.config.model ?? "the main model"
 

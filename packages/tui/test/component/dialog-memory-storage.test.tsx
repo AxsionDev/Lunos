@@ -513,17 +513,27 @@ test("Change storage… with Start empty: names where the old facts stay, and mo
   }
 })
 
-// XCOD-233's window rule: ← goes back a level (here, to /memory), Esc closes the window.
-test("← on the storage step goes back to /memory", async () => {
+test("Esc and ← on the storage step go back to /memory", async () => {
   await using tmp = await tmpdir()
   const ui = await mount({ root: tmp.path, panel: TEAM, memory: TEAM_CONFIG })
   try {
     await ui.see("Change storage…")
     await ui.enter()
     await ui.see("Choose storage myself")
-    expect(ui.frame()).toContain("← back")
+    ui.app.mockInput.pressEscape()
+    await ui.see("Host: db.example.eu")
+    await ui.enter()
+    await ui.see("Choose storage myself")
+    // Deeper in: Esc still comes back to /memory, nothing is saved.
+    await ui.enter()
+    await ui.see("What this means")
+    ui.app.mockInput.pressEscape()
+    await ui.see("Host: db.example.eu")
+    await ui.enter()
+    await ui.see("Choose storage myself")
     ui.app.mockInput.pressArrow("left")
     await ui.see("Host: db.example.eu")
+    expect(ui.calls.some((call) => call.path === "/config/settings" && call.method !== "GET")).toBe(false)
   } finally {
     ui.cleanup()
   }

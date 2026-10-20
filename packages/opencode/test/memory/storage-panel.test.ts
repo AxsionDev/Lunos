@@ -1,5 +1,5 @@
 // The Storage panel at the top of /memory's Overview, and `lunos memory status` / `storage set`.
-import { describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -91,32 +91,38 @@ const testStateLayer = Layer.effectDiscard(
 const it = testEffect(Layer.mergeAll(testStateLayer, LayerNode.compile(FSUtil.node), httpApiLayer))
 
 describe("GET /memory/storage", () => {
+  // Set before the instance loads its config, so the {env:} reference resolves to it.
+  beforeAll(() => {
+    process.env.LUNOS_PANEL_TEST_PASSWORD = SECRET
+  })
+  afterAll(() => {
+    delete process.env.LUNOS_PANEL_TEST_PASSWORD
+  })
+
   it.instance(
     "a team Neo4j: host, jurisdiction and the credentials' variable names, never their values",
     Effect.gen(function* () {
       const directory = (yield* TestInstance).directory
-      process.env.LUNOS_PANEL_TEST_PASSWORD = SECRET
-      try {
-        const response = yield* requestInDirectory("/memory/storage", directory)
-        expect(response.status).toBe(200)
-        const text = JSON.stringify(yield* response.json)
-        expect(text).not.toContain(SECRET)
-        const panel = JSON.parse(text)
-        expect(panel).toMatchObject({
-          on: false,
-          place: "team",
-          vendor: "neo4j",
-          host: "graph.example.eu",
-          jurisdiction: "EU-DE",
-          tls: "verified",
-          locked: false,
-          credentials: ["LUNOS_PANEL_TEST_USER", "LUNOS_PANEL_TEST_PASSWORD"],
-          template: { name: "team-hosted", title: "Team database we host" },
-          status: { state: "off" },
-        })
-      } finally {
-        delete process.env.LUNOS_PANEL_TEST_PASSWORD
-      }
+      // Positive control: the loaded config does hold the password, so its absence below means something.
+      const config = yield* requestInDirectory("/config", directory)
+      expect(JSON.stringify(yield* config.json)).toContain(SECRET)
+      const response = yield* requestInDirectory("/memory/storage", directory)
+      expect(response.status).toBe(200)
+      const text = JSON.stringify(yield* response.json)
+      expect(text).not.toContain(SECRET)
+      const panel = JSON.parse(text)
+      expect(panel).toMatchObject({
+        on: false,
+        place: "team",
+        vendor: "neo4j",
+        host: "graph.example.eu",
+        jurisdiction: "EU-DE",
+        tls: "verified",
+        locked: false,
+        credentials: ["LUNOS_PANEL_TEST_USER", "LUNOS_PANEL_TEST_PASSWORD"],
+        template: { name: "team-hosted", title: "Team database we host" },
+        status: { state: "off" },
+      })
     }),
     {
       config: {

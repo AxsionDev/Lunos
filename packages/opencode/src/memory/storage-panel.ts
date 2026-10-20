@@ -3,6 +3,7 @@ export * as MemoryStoragePanel from "./storage-panel"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { Effect } from "effect"
+import { MemorySetup } from "@opencode-ai/core/memory-setup"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import type { ConfigMemory } from "@opencode-ai/core/config/memory"
 import { AuditLog } from "@/audit/log"
@@ -199,9 +200,8 @@ export const load = Effect.fn("MemoryStoragePanel.load")(function* (input?: {
   const { environment, templates } = yield* MemorySetupEnv.environment()
   const template = yield* Effect.promise(() => templateOf({ rows, templates, worktree: instance.worktree }))
   const type = MemoryExternal.type(cfg.memory)
-  const locked = rows.some(
-    (row) => row.locked && (row.key === "memory.backend" || row.key.startsWith("memory.backend.")),
-  )
+  // The same rule as the wizard and `lunos memory storage set`: a lock on memory or memory.backend.
+  const locked = MemorySetup.locked(rows, "memory.backend")
   const base = {
     on: verdict.on,
     ...(verdict.on ? {} : { reason: verdict.reason }),
