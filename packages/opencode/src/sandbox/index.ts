@@ -9,6 +9,7 @@ import { parse } from "jsonc-parser"
 import { AuditLog } from "@/audit/log"
 import { SandboxConfig } from "./config"
 import { SandboxDocker } from "./docker"
+import { SandboxError, SandboxFailure } from "./error"
 import { SandboxAllow } from "./allow"
 import type { SandboxEgress } from "./egress"
 import { SandboxGit } from "./git"
@@ -205,7 +206,7 @@ export function providerEnv(env: Record<string, string | undefined> = process.en
   )
 }
 
-export async function create(input: {
+type CreateInput = {
   /** Chosen by the caller when it has to know it up front (the workspace adapter); random otherwise. */
   id?: string
   directory: string
@@ -213,10 +214,19 @@ export async function create(input: {
   /** Provider ids the host holds credentials for: their API hosts go on the egress allow list. */
   providers?: readonly string[]
   log?: (line: string) => void
-}): Promise<Meta> {
+}
+
+/** XCOD-279: any failure is a SandboxError naming its step: detect, image, or create for the rest. */
+export const create = (input: CreateInput): Promise<Meta> => SandboxFailure.at("create", () => build(input))
+
+async function build(input: CreateInput): Promise<Meta> {
   const log = input.log ?? (() => {})
-  if (process.env.LUNOS_SANDBOX) throw new Error("Already running inside a sandbox; a sandbox can't start another")
-  await SandboxDocker.available(input.config.runtime)
+  if (process.env.LUNOS_SANDBOX)
+    throw new SandboxError({
+      step: "detect",
+      reason: "Already running inside a sandbox; a sandbox can't start another",
+    })
+  await SandboxFailure.at("detect", () => SandboxDocker.available(input.config.runtime))
   const repo = await SandboxGit.repo(input.directory)
   const id = input.id ?? randomBytes(4).toString("hex")
   if (!/^[a-z0-9-]{1,40}$/.test(id)) throw new Error(`Invalid sandbox id ${id}`)
@@ -224,12 +234,15 @@ export async function create(input: {
 
   // The trusted image: Lunos's own, or a sandbox.image your global or managed config set. XCOD-158:
   // it also fills the volumes, runs the egress proxy, and supplies Lunos for a devcontainer image.
-  const trusted = await SandboxDocker.image(input.config.egressImage)
-  const chosen = await devcontainerImage(repo.root, input.config, trusted, log)
-  if (!chosen.image) log(`image ${input.config.image}`)
-  const image =
-    chosen.image ??
-    (input.config.image === input.config.egressImage ? trusted : await SandboxDocker.image(input.config.image))
+  const { trusted, chosen, image } = await SandboxFailure.at("image", async () => {
+    const trusted = await SandboxDocker.image(input.config.egressImage)
+    const chosen = await devcontainerImage(repo.root, input.config, trusted, log)
+    if (!chosen.image) log(`image ${input.config.image}`)
+    const image =
+      chosen.image ??
+      (input.config.image === input.config.egressImage ? trusted : await SandboxDocker.image(input.config.image))
+    return { trusted, chosen, image }
+  })
   const managed = await SandboxConfig.managedDoc()
   const network = input.config.network
   const computed = SandboxAllow.compute({
@@ -531,10 +544,12 @@ export async function start(
   options: { secrets?: Record<string, string>; attach?: boolean; timeoutMs?: number } = {},
 ): Promise<Connection> {
   const timeoutMs = options.timeoutMs ?? 60_000
-  await SandboxDocker.start(info.id)
-  await SandboxDocker.inject(info.id, runtime(info, options.secrets ?? {}), info.identity)
+  await SandboxFailure.at("start", async () => {
+    await SandboxDocker.start(info.id)
+    await SandboxDocker.inject(info.id, runtime(info, options.secrets ?? {}), info.identity)
+  })
   if (options.attach) AuditLog.emit("sandbox.attach", auditFields(info))
-  const conn = connection(info, await SandboxDocker.hostPort(info.id))
+  const conn = connection(info, await SandboxFailure.at("connect", () => SandboxDocker.hostPort(info.id)))
   const started = Date.now()
   while (Date.now() - started < timeoutMs) {
     // Docker Desktop accepts on the published port before the server listens, and such a connection
@@ -545,9 +560,11 @@ export async function start(
     if (ok) return conn
     await sleep(250)
   }
-  throw new Error(
-    `The sandbox server didn't become healthy within ${timeoutMs / 1000}s. Last log lines:\n${await SandboxDocker.logs(info.id)}`,
-  )
+  throw new SandboxError({
+    step: "connect",
+    reason: `The sandbox server didn't become healthy within ${timeoutMs / 1000}s (its last log lines are below)`,
+    stderr: await SandboxDocker.logs(info.id).catch(() => ""),
+  })
 }
 
 /** Every session the sandbox server holds, with its messages. */

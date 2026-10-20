@@ -23,6 +23,9 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **`lunos sandbox doctor` checks whether a sandbox can start on this machine.** It lists each check
+  (Docker or Podman installed and running, Linux containers, the git repository, the workspace mode,
+  the image, and a throwaway test container) with pass or fail and, for a failure, what to do.
 - **When Lunos fails, it says where the full details are.** Every run writes a log, and a failure
   (Lunos not starting, a failed `/restart`, a sandbox that won't start, a crash, an unexpected error)
   now ends with `Full log: <path>`, a clickable link in terminals that support it, and
@@ -37,6 +40,23 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   **Open log**.
 - **Log retention settings.** Lunos keeps the last 10 runs plus failed runs from the last 14 days,
   within 50 MB. Change this with `log.retention_days` and `log.max_mb`; an organisation can lock it.
+
+### Fixed
+
+- **Turning on the sandbox can no longer lock you out of Lunos.** Before it's saved in `/settings`,
+  Lunos checks that a sandbox can start here and refuses the change with the reason and the fix
+  (for example "Docker Desktop isn't running — start it and try again"). If a restart after a
+  sandbox change still can't start, the change is undone and Lunos starts as before. When the
+  sandbox can't start, Lunos offers to start without it this time (unless your organisation
+  requires the sandbox), and `lunos --no-sandbox` skips it for one start.
+- **A sandbox that can't start now says why instead of "Unexpected error".** You see which step
+  failed, the Docker command it ran (secrets hidden), its exit code and output, and a fix for the
+  common cases: Docker not installed or not running, Windows-containers mode, WSL 2 missing, an
+  image that can't be pulled, no network, or a port in use.
+- **Sandbox on Windows:** Docker is found as `docker.exe`, and in Docker Desktop's install folder
+  when it isn't on PATH yet; the repository is copied from drive-letter paths such as `D:\work`;
+  mounted folders use paths Docker Desktop and Podman accept; and the command printed after a
+  failed restart runs in PowerShell.
 
 ## [1.18.51] - 2026-10-20
 

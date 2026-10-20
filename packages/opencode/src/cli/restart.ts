@@ -4,6 +4,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { Global } from "@opencode-ai/core/global"
 import { AuditLog } from "@/audit/log"
+import { SandboxRollback } from "@/sandbox/rollback"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { RunLog } from "@opencode-ai/core/observability/run-log"
 import type { Restarted, RestartRequest } from "@opencode-ai/tui/util/restart"
@@ -47,6 +48,11 @@ export type Handoff = Restarted & {
   sessionID?: string
   /** The manual command, printed if this start fails. */
   manual: string
+  /**
+   * XCOD-279: sandbox settings saved for this restart, with what they replaced: if the sandbox
+   * then can't start, they're undone and Lunos starts as before.
+   */
+  changes?: SandboxRollback.Change[]
 }
 
 /** Options that pick the session or the first prompt; the relaunch sets its own. */
@@ -141,9 +147,30 @@ export function quote(arg: string, platform: NodeJS.Platform) {
   return /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`
 }
 
-/** The exact command to start Lunos by hand, as printed when the relaunch fails. */
+/**
+ * The exact command to start Lunos by hand, as printed when the relaunch fails. XCOD-279: on
+ * Windows a quoted program path is only a string to PowerShell, which runs it with `&`; cmd.exe
+ * refuses the `&`, so both forms are given then.
+ */
 export function manualCommand(command: Command, platform: NodeJS.Platform) {
-  return [command.file, ...command.base, ...command.args].map((arg) => quote(arg, platform)).join(" ")
+  const line = [command.file, ...command.base, ...command.args].map((arg) => quote(arg, platform)).join(" ")
+  if (platform !== "win32" || !line.startsWith('"')) return line
+  return `& ${line}\n  (in cmd.exe: ${line})`
+}
+
+/**
+ * XCOD-279: the relaunch's environment, with one entry per name on Windows, where names differ only
+ * in case (`Path`, `PATH`): with two, which one the new Lunos (and the docker it runs) sees as PATH
+ * is up to the C runtime. The last one set wins.
+ */
+export function relaunchEnv(env: Record<string, string | undefined>, platform: NodeJS.Platform) {
+  if (platform !== "win32") return { ...env }
+  const out: Record<string, string | undefined> = {}
+  for (const [key, value] of Object.entries(env)) {
+    for (const existing of Object.keys(out)) if (existing.toUpperCase() === key.toUpperCase()) delete out[existing]
+    out[key] = value
+  }
+  return out
 }
 
 /** `cmd.exe /d /s /c "<shim> args"`, the only way to run a `.cmd` shim, with its own quoting. */
@@ -254,10 +281,12 @@ export async function relaunch(
     env?: Record<string, string | undefined>
     cwd?: string
     handoff?: string
+    /** The sandbox settings saved for this restart (XCOD-279); by default this process's journal. */
+    changes?: SandboxRollback.Change[]
   } = {},
 ) {
   const argv = input.argv ?? process.argv
-  const env = { ...(input.env ?? launchEnv) }
+  const env = relaunchEnv(input.env ?? launchEnv, deps.platform)
   const cwd = input.cwd ?? launchCwd
   const command = resolveCommand({
     execPath: input.execPath ?? process.execPath,
@@ -266,7 +295,10 @@ export async function relaunch(
     args: relaunchArgs(argv.slice(2), request),
     upgraded: Boolean(request.upgraded),
     platform: deps.platform,
-    which: (name) => Bun.which(name, { PATH: env.PATH ?? env.Path ?? "" }),
+    which: (name) =>
+      Bun.which(name, {
+        PATH: Object.entries(env).find(([key]) => key.toUpperCase() === "PATH")?.[1] ?? "",
+      }),
     exists: (file) => fs.existsSync(file),
   })
   const manual = manualCommand(command, deps.platform)
@@ -295,6 +327,7 @@ export async function relaunch(
       cancelled: request.cancelled,
       attach: request.attach,
       manual,
+      changes: input.changes ?? SandboxRollback.take(),
     })
   } catch (error) {
     return fail(`couldn't save the session handoff (${error instanceof Error ? error.message : String(error)})`)

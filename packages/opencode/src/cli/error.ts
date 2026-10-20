@@ -44,6 +44,9 @@ export function FormatError(input: unknown): string | undefined {
     return stringField(input, "message") ?? ""
   }
 
+  // SandboxError (XCOD-279): the step, the command, its exit code and stderr, and the fix
+  if (isTaggedError(input, "SandboxError")) return stringField(input, "message") || "The sandbox couldn't start"
+
   // MCPFailed: { name: string }
   if (NamedError.hasName(input, "MCPFailed")) {
     const data = isRecord(input) && isRecord(input.data) ? stringField(input.data, "name") : undefined

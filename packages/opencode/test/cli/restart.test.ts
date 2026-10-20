@@ -361,8 +361,9 @@ describe("manualCommand (XCOD-129)", () => {
     expect(Restart.manualCommand({ file: "/opt/my lunos", base: [], args: ["--prompt", "it's"] }, "linux")).toBe(
       `'/opt/my lunos' --prompt 'it'\\''s'`,
     )
+    // XCOD-279: PowerShell runs a quoted path with `&`; cmd.exe gets the plain form.
     expect(Restart.manualCommand({ file: "C:\\Program Files\\lunos.exe", base: [], args: ["-s", "x"] }, "win32")).toBe(
-      `"C:\\Program Files\\lunos.exe" -s x`,
+      `& "C:\\Program Files\\lunos.exe" -s x\n  (in cmd.exe: "C:\\Program Files\\lunos.exe" -s x)`,
     )
   })
 })
