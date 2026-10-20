@@ -122,3 +122,48 @@ describe("Claude Code's models (XCOD-254)", () => {
     expect(() => ExternalClaude.args({ model: "sonnet; rm -rf" })).toThrow(/model name/)
   })
 })
+
+describe("Claude Code's own /commands", () => {
+  const init = async (mode?: "init" | "both") => {
+    if (mode) process.env.FAKE_CLAUDE_COMMANDS = mode
+    try {
+      const { events } = await run(async () => ({ allow: true }))
+      return events.find((event) => event.type === "init")
+    } finally {
+      delete process.env.FAKE_CLAUDE_COMMANDS
+    }
+  }
+
+  test("2.1.292 lists them in its answer to initialize, not on the init line", async () => {
+    expect(await init()).toMatchObject({ type: "init", commands: ["compact", "review"] })
+  })
+
+  test("an older release that lists them on the init line still has them", async () => {
+    expect(await init("init")).toMatchObject({ type: "init", commands: ["compact", "review"] })
+  })
+
+  test("listed in both places, they are merged without repeats", async () => {
+    expect(await init("both")).toMatchObject({ type: "init", commands: ["compact", "review", "context"] })
+  })
+
+  test("only named entries of an initialize response are read", () => {
+    expect(
+      ExternalClaude.parseCommands({ commands: [{ name: "compact", builtin: true }, { description: "x" }, "y"] }),
+    ).toEqual(["compact"])
+    expect(ExternalClaude.parseCommands(undefined)).toEqual([])
+  })
+
+  test("internal and removed ones are left out of 2.1.292's real list", async () => {
+    const recording = path.join(import.meta.dir, "..", "fixtures", "external", "claude-2.1.292", "start-models.1.jsonl")
+    const answer = (await fs.readFile(recording, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .find((entry) => entry.message?.type === "control_response").message.response.response
+    const names = ExternalClaude.parseCommands(answer)
+    expect(names).toEqual(expect.arrayContaining(["compact", "code-review", "workflow-launch-exec"]))
+    expect(names).not.toContain("__remote-workflow")
+    expect(names).not.toContain("agents")
+    expect(names.length).toBe(answer.commands.length - 2)
+  })
+})
