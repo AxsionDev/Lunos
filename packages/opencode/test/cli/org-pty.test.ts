@@ -215,15 +215,18 @@ describe("lunos org (XCOD-274)", () => {
       expect(result.screen).toContain("sam@acme.example")
       result = await org(pat, ["invite", "friend@example.com"])
       expect(result.code).toBe(0)
-      for (const args of [
-        ["transfer", "sam@acme.example", "--yes"],
-        ["owners", "add", "sam@acme.example", "--yes"],
-        ["invite", "boss@example.com", "--role", "owner"],
-      ]) {
-        result = await org(pat, args)
+      for (const [args, text] of [
+        [["transfer", "sam@acme.example", "--yes"], "Only an organisation owner can do this. Ask: owner@acme.example"],
+        [["owners", "add", "sam@acme.example", "--yes"], "Only an owner can grant or take away ownership."],
+        [["invite", "boss@example.com", "--role", "owner"], "Only an owner can invite an owner."],
+      ] as const) {
+        result = await org(pat, [...args])
         expect(result.code).toBe(1)
-        expect(result.screen).toContain("Only an organisation owner can do this. Ask: owner@acme.example")
+        expect(result.screen).toContain(text)
       }
+      // Scripts get the code itself.
+      const json = await Pty.exec(["org", "transfer", "sam@acme.example", "--yes", "--json"], pat)
+      expect(JSON.parse(json.stdout).error).toMatchObject({ status: 403, code: "owner_required" })
       expect(cloud.orgs.acme!.members).toEqual({ olga: "owner", pat: "admin", sam: "member" })
     },
     TIMEOUT,

@@ -88,12 +88,19 @@ export async function allowed(issuer: string): Promise<string | undefined> {
   if (!(await CloudSyncApi.permitted(issuer))) return "your sign-in is your organisation's, not a Lunos account"
 }
 
-/** A refusal's parts, from `{ code, message, details? }` or #13's `{ error: { code, message } }`. */
+/**
+ * A refusal's parts. lunoshq (docs/errors.md) sends `{ code, message, details?, error: { code,
+ * message } }`, where the nested `error.code` is the older, more general one (`forbidden`): the
+ * top-level fields win. #13 sent only the nested object.
+ */
 export type Refusal = { code?: string; message?: string; details?: Record<string, unknown> }
 
 export function refusal(body: unknown): Refusal {
   const outer = (body ?? {}) as Record<string, unknown>
-  const inner = outer.error && typeof outer.error === "object" ? (outer.error as Record<string, unknown>) : outer
+  const inner =
+    typeof outer.code !== "string" && outer.error && typeof outer.error === "object"
+      ? (outer.error as Record<string, unknown>)
+      : outer
   const details = inner.details ?? outer.details
   return {
     code: text(inner.code),
@@ -130,27 +137,40 @@ export function named(details: Record<string, unknown> | undefined): Named[] {
 /** "Acme GmbH (acme)", or just the id where the name is the id. */
 export const orgLabel = (org: Named) => (org.name !== org.id ? `${org.name} (${org.id})` : org.id)
 
-/** Whom to ask, where the refusal lists them (`details.owners`: [{ sub, email }]). */
-const ask = (details: Record<string, unknown> | undefined) => {
+/**
+ * Whom to ask. lunoshq names the owners in its message ("… Ask: owner@acme.example"), so that is
+ * shown as it is; `details.owners` ([{ sub, email }]), where a server sends it, is used instead.
+ */
+const ask = (said: string, details: Record<string, unknown> | undefined, message: string | undefined) => {
   const owners = list(details?.owners).flatMap((item) => (text(item?.email) ? [String(item.email)] : []))
-  return owners.length ? ` Ask: ${owners.join(", ")}` : ""
+  if (owners.length) return `${said} Ask: ${owners.join(", ")}`
+  return message ?? said
 }
 
 /** Codes from before XCOD-275 that mean the same as a current one. */
-const ALIASES: Record<string, string> = { org_suspended: "suspended", email_unverified: "unverified" }
+const ALIASES: Record<string, string> = {
+  org_suspended: "suspended",
+  account_suspended: "suspended",
+  email_unverified: "unverified",
+}
 
 /**
  * What a refusal says, chosen by its code. Undefined for a code this client doesn't know (the
  * server's own message is shown then), and for `not_found`, whose message names what wasn't found.
  */
-export function explain(code: string | undefined, details?: Record<string, unknown>, retryAfter?: number) {
+export function explain(
+  code: string | undefined,
+  details?: Record<string, unknown>,
+  retryAfter?: number,
+  message?: string,
+) {
   switch (code && (ALIASES[code] ?? code)) {
     case "not_member":
       return "You aren't a member of that organisation. Ask one of its owners to invite you."
     case "owner_required":
-      return `Only an organisation owner can do this.${ask(details)}`
+      return ask("Only an organisation owner can do this.", details, message)
     case "admin_required":
-      return `Only an organisation owner or admin can do this.${ask(details)}`
+      return ask("Only an organisation owner or admin can do this.", details, message)
     case "last_owner": {
       const orgs = named(details)
       if (!orgs.length) return
@@ -188,13 +208,15 @@ export async function call(token: string, method: string, path: string, body: un
   if (!response.ok) {
     const found = refusal(await response.json().catch(() => undefined))
     if (unrouted(response.status, found)) throw new NotServedError(what)
-    const seconds = Number(response.headers.get("retry-after") ?? found.details?.retryAfter)
+    const seconds = Number(response.headers.get("retry-after") ?? found.details?.retryAfterSeconds)
     const retryAfter = Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined
     // A 429 without a code is still a rate limit.
     const code = found.code ?? (response.status === 429 ? "rate_limited" : undefined)
     throw new RefusedError(
       response.status,
-      explain(code, found.details, retryAfter) ?? found.message ?? `Lunos Cloud answered ${response.status}`,
+      explain(code, found.details, retryAfter, found.message) ??
+        found.message ??
+        `Lunos Cloud answered ${response.status}`,
       found.code,
       found.details,
       found.message,

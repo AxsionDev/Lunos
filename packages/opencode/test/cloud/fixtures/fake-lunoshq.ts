@@ -4,13 +4,14 @@
 // and refusal texts are copied from there, so the client is tested against what the server says.
 // The caller is whoever the bearer token (a JWT, unsigned here) names; nothing real is contacted.
 //
-// XCOD-275: by default it speaks the go-live contract from the ticket, written before the server
-// side landed: refusals are `{ code, message, details? }` with stable codes (not_member,
-// owner_required and admin_required with `details.owners`, last_owner with `details.orgs`, …),
-// `GET /v1/account` has `plan` and `plan_source`, `GET /v1/legal` serves the Terms and Privacy notice,
-// and `POST /v1/account/verification` is rate limited (1 a minute, 5 a day; 429 `rate_limited` with
-// Retry-After). `legacy: true` is lunoshq #13 as merged: `{ error: { code, message } }`, `forbidden`,
-// no plan, no legal, no verification route.
+// XCOD-275: by default it speaks the go-live contract (lunoshq xcod-275-server@e0842eb:
+// docs/errors.md, src/api-error.ts, src/server.ts, src/platform.ts): refusals are `{ code, message,
+// details?, error: { code, message } }`, the nested code the older, more general one; stable codes
+// not_member, owner_required and admin_required (the message naming the owners), last_owner with
+// `details.orgs`; `GET /v1/account` has `plan` and `plan_source`; `GET /v1/legal` serves the Terms and
+// Privacy notice; `POST /v1/account/verification` is rate limited (1 a minute, 5 a day; 429
+// `rate_limited` with `details.retryAfterSeconds` and Retry-After). `legacy: true` is lunoshq #13 as
+// merged: `{ error: { code, message } }`, `forbidden`, no plan, no legal, no verification route.
 
 export type Role = "owner" | "admin" | "member"
 export type Org = { name: string; members: Record<string, Role>; invites?: Record<string, Invite> }
@@ -60,6 +61,8 @@ class ApiError extends Error {
     message: string,
     readonly details?: Record<string, unknown>,
     readonly headers?: Record<string, string>,
+    /** The nested `error.code` where it differs: the older, more general code (src/api-error.ts). */
+    readonly legacy?: string,
   ) {
     super(message)
   }
@@ -120,27 +123,22 @@ export function create(options: Options = {}) {
     if (!role)
       throw legacy
         ? new ApiError(404, "not_found", `No organisation ${org}.`)
-        : new ApiError(404, "not_member", `No organisation ${org}.`)
+        : new ApiError(404, "not_member", `No organisation ${org}.`, undefined, undefined, "not_found")
     if (!(MATRIX[action] as readonly Role[]).includes(role)) throw refuse(org, action === "manage_owners")
     return role
   }
 
-  /** 403 for a role that can't: #13's `forbidden` naming the owners, or XCOD-275's code with them in details. */
-  function refuse(org: string, ownerOnly: boolean, legacyText?: string) {
-    const owners = Object.entries(orgs[org]!.members)
-      .filter(([, role]) => role === "owner")
-      .map(([sub]) => ({ sub, email: users[sub]?.email }))
-    if (legacy)
-      return new ApiError(
-        403,
-        "forbidden",
-        legacyText ?? notAllowed(ownerOnly ? "manage_owners" : "manage_members", ownerEmails(org)),
-      )
+  /** 403 for a role that can't: #13's `forbidden`, or XCOD-275's code; the message names the owners. */
+  function refuse(org: string, ownerOnly: boolean, specific?: string) {
+    const message = specific ?? notAllowed(ownerOnly ? "manage_owners" : "manage_members", ownerEmails(org))
+    if (legacy) return new ApiError(403, "forbidden", message)
     return new ApiError(
       403,
       ownerOnly ? "owner_required" : "admin_required",
-      ownerOnly ? "Only an organisation owner can do this." : "Only an organisation owner or admin can do this.",
-      { owners },
+      message,
+      undefined,
+      undefined,
+      "forbidden",
     )
   }
 
@@ -148,9 +146,14 @@ export function create(options: Options = {}) {
     if (Object.values(orgs[org]!.members).filter((role) => role === "owner").length > 1) return
     if (legacy)
       throw new ApiError(409, "conflict", "An organisation needs at least one owner. Make someone else an owner first.")
-    throw new ApiError(409, "last_owner", "An organisation needs at least one owner.", {
-      orgs: [{ id: org, name: orgs[org]!.name }],
-    })
+    throw new ApiError(
+      409,
+      "last_owner",
+      "An organisation needs at least one owner. Make someone else an owner first.",
+      { orgs: [{ id: org, name: orgs[org]!.name }] },
+      undefined,
+      "conflict",
+    )
   }
 
   const role = (value: unknown, fallback?: Role): Role => {
@@ -229,7 +232,7 @@ export function create(options: Options = {}) {
           429,
           "rate_limited",
           "Too many confirmation e-mails.",
-          { retryAfter: seconds },
+          { retryAfterSeconds: seconds, perMinute: 1, perDay: 5 },
           { "retry-after": String(seconds) },
         )
       if (sent.length && sent.at(-1)! > now - MINUTE_MS) throw limit(Math.ceil((sent.at(-1)! + MINUTE_MS - now) / 1000))
@@ -434,7 +437,7 @@ export function create(options: Options = {}) {
         Response.json(
           legacy
             ? { error: { code: "not_found", message: "No such route." } }
-            : { code: "not_found", message: "No such route." },
+            : { code: "not_found", message: "No such route.", error: { code: "not_found", message: "No such route." } },
           { status: 404 },
         )
       )
@@ -443,7 +446,12 @@ export function create(options: Options = {}) {
         return Response.json(
           legacy
             ? { error: { code: error.code, message: error.message } }
-            : { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) },
+            : {
+                code: error.code,
+                message: error.message,
+                ...(error.details ? { details: error.details } : {}),
+                error: { code: error.legacy ?? error.code, message: error.message },
+              },
           { status: error.status, headers: error.headers },
         )
       throw error

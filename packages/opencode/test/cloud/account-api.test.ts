@@ -38,7 +38,6 @@ describe("refusal codes (XCOD-275 contract)", () => {
   const cases: [string, number, Record<string, unknown> | undefined, string][] = [
     ["not_member", 404, undefined, "You aren't a member of that organisation. Ask one of its owners to invite you."],
     ["owner_required", 403, owners, "Only an organisation owner can do this. Ask: owner@acme.example"],
-    ["owner_required", 403, undefined, "Only an organisation owner can do this."],
     ["admin_required", 403, owners, "Only an organisation owner or admin can do this. Ask: owner@acme.example"],
     [
       "last_owner",
@@ -90,6 +89,36 @@ describe("refusal codes (XCOD-275 contract)", () => {
       }
     })
 
+  test("lunoshq's body: the top-level code wins over the nested, older one", async () => {
+    const error = await refused(403, {
+      code: "admin_required",
+      message: "Only an organisation owner or admin can do this. Ask: owner@acme.example",
+      error: { code: "forbidden", message: "Only an organisation owner or admin can do this. Ask: owner@acme.example" },
+    })
+    expect(error).toMatchObject({
+      code: "admin_required",
+      message: "Only an organisation owner or admin can do this. Ask: owner@acme.example",
+    })
+    const suspended = await refused(403, {
+      code: "suspended",
+      message: "x",
+      details: { scope: "account" },
+      error: { code: "account_suspended", message: "x" },
+    })
+    expect(suspended.code).toBe("suspended")
+    expect(suspended.message).toStartWith("This organisation or account is suspended")
+  })
+
+  test("owner_required / admin_required without details.owners: the server's message names whom to ask", async () => {
+    expect(
+      (await refused(403, { code: "owner_required", message: "Only an owner can transfer ownership." })).message,
+    ).toBe("Only an owner can transfer ownership.")
+    expect((await refused(403, { code: "owner_required" })).message).toBe("Only an organisation owner can do this.")
+    expect((await refused(403, { code: "admin_required" })).message).toBe(
+      "Only an organisation owner or admin can do this.",
+    )
+  })
+
   test("not_found shows the server's message, which names what wasn't found", async () => {
     expect(await refused(404, { code: "not_found", message: "No invitation to acme." })).toMatchObject({
       code: "not_found",
@@ -112,6 +141,9 @@ describe("refusal codes (XCOD-275 contract)", () => {
     expect((await refused(403, { error: { code: "org_suspended", message: "x" } })).message).toStartWith(
       "This organisation or account is suspended",
     )
+    expect((await refused(403, { error: { code: "account_suspended", message: "x" } })).message).toStartWith(
+      "This organisation or account is suspended",
+    )
     expect((await refused(403, { error: { code: "email_unverified", message: "x" } })).message).toStartWith(
       "Confirm your e-mail address first",
     )
@@ -122,7 +154,7 @@ describe("refusal codes (XCOD-275 contract)", () => {
       retryAfter: 42,
       message: "Too many requests. Try again in 42 seconds.",
     })
-    expect((await refused(429, { code: "rate_limited", details: { retryAfter: 90 } })).message).toBe(
+    expect((await refused(429, { code: "rate_limited", details: { retryAfterSeconds: 90 } })).message).toBe(
       "Too many requests. Try again in 2 minutes.",
     )
     expect((await refused(429, {}, { "retry-after": "7200" })).message).toBe("Too many requests. Try again in 2 hours.")
@@ -170,7 +202,7 @@ test("a stranger to an organisation: not_member; a route the server doesn't have
   expect(method).toBeInstanceOf(CloudAccountApi.NotServedError)
 })
 
-test("an Admin's Owner-only call: owner_required, with whom to ask from details", async () => {
+test("an Admin's Owner-only call: owner_required, naming whom to ask", async () => {
   const opts = cloud({ orgs: { acme: { name: "Acme GmbH", members: { owner: "owner", pat: "admin" } } } })
   const pat = token("pat", "pat@lunos.test")
   const transfer = await CloudOrgMembers.transfer(pat, "acme", "pat@lunos.test", "member", opts).catch((e) => e)
