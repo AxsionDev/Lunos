@@ -37500,6 +37500,182 @@
           ],
           "description": "Toggle tips on home screen"
         },
+        "tips_next": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Show another tip"
+        },
         "plugin_manager": {
           "anyOf": [
             {
@@ -40906,6 +41082,10 @@
     "whats_new": {
       "type": "boolean",
       "description": "false stops the \"What's new\" panel on the first start after an update. /whatsnew and lunos changelog still work (default: true)"
+    },
+    "tips": {
+      "type": "boolean",
+      "description": "false turns off the tips on the home screen and under the working indicator. /tips still lists them (default: true)"
     }
   },
   "additionalProperties": false,

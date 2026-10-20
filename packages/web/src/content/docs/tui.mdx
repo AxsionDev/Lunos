@@ -392,6 +392,22 @@ This command only controls whether thinking blocks are **displayed** - it does n
 
 ---
 
+### tips
+
+List every tip by category. Type to search; each tip is marked seen or new. Tips also show on the
+home screen and, once a turn has run for 3 seconds, as one line under the working indicator: a
+different one each time, and none repeats until you've seen them all. Which tips you've seen is
+kept on your computer only.
+
+```bash frame="none"
+/tips
+```
+
+`tips_next` shows another tip (unbound by default). Hide tips from the command palette, or turn
+them off with `"tips": false` in `tui.json`.
+
+---
+
 ### undo
 
 Undo last message in the conversation. Removes the most recent user message, all subsequent responses, and any file changes.
@@ -671,6 +687,7 @@ This is separate from `opencode.json`, which configures server/runtime behavior.
 - `double_escape_clear` - `false` turns off [clearing the prompt with `Esc` `Esc`](#clearing-the-prompt) (default: `true`).
 - `double_escape_ms` - Milliseconds in which the second `Esc` clears the prompt (default: `1000`).
 - `left_opens_monitor` - `false` stops ← on an empty prompt from opening the [Agent Monitor](/docs/agent-monitor) (default: `true`). `/monitor` and `<leader>o` still open it.
+- `tips` - `false` turns off the tips on the home screen and under the working indicator (default: `true`). [`/tips`](#tips) still lists them.
 - `whats_new` - `false` stops the "What's new" panel on the first start after an update (default: `true`). [`/whatsnew`](#whatsnew) and [`lunos changelog`](/docs/cli#changelog) still work.
 - `reduced_motion` - `true` turns off every animation (the home screen's moon reflection, spinners, placeholder cycling), and the in-app "Disable animations" toggle can't turn them back on. When unset, animations are off by default if `NO_COLOR` is set or `TERM=dumb`, and the toggle decides.
 

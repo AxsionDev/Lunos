@@ -38,6 +38,17 @@ export async function repo(directory: string): Promise<Repo> {
 }
 
 /**
+ * XCOD-279: the repository as a file:// URL for git to fetch from (a plain path would ignore
+ * --depth). On Windows `rev-parse` gives `D:/dir`, and `file://D:/dir` reads `D:` as a host name:
+ * there it's `file:///D:/dir`.
+ */
+export function fileUrl(root: string, platform: NodeJS.Platform = process.platform) {
+  if (platform !== "win32") return `file://${root}`
+  const forward = root.replaceAll("\\", "/")
+  return /^[A-Za-z]:/.test(forward) ? `file:///${forward}` : `file:${forward}`
+}
+
+/**
  * Build the workspace the sandbox starts with: a fresh repository holding only `base` (depth 1),
  * with the host's uncommitted changes (staged, unstaged and untracked-but-not-ignored) applied.
  */
@@ -47,7 +58,7 @@ export async function seed(input: Repo & { into: string; branch: string }) {
   // host's core.autocrlf says (it defaults to true on Windows, which would write CRLF).
   await git(["-C", input.into, "config", "core.autocrlf", "false"])
   await git(["-C", input.into, "config", "core.eol", "lf"])
-  await git(["-C", input.into, "fetch", "--quiet", "--depth=1", `file://${input.root}`, input.base])
+  await git(["-C", input.into, "fetch", "--quiet", "--depth=1", fileUrl(input.root), input.base])
   await git(["-C", input.into, "checkout", "--quiet", "-b", input.branch, "FETCH_HEAD"])
   await git(["-C", input.into, "config", "user.name", "Lunos sandbox"])
   await git(["-C", input.into, "config", "user.email", "sandbox@lunos.invalid"])

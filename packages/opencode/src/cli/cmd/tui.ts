@@ -215,14 +215,13 @@ export const TuiThreadCommand = cmd({
         process.exitCode = 1
         return
       }
-      await runSandboxedTui(resolveThreadDirectory(args.project), {
-        continue: args.continue,
-        session: args.session,
-        fork: args.fork,
-        keep: args.keep,
-        rm: args.rm,
-      })
-      return
+      // XCOD-279: "host" when the sandbox couldn't start and Lunos starts without it instead.
+      const ran = await runSandboxedTui(
+        resolveThreadDirectory(args.project),
+        { continue: args.continue, session: args.session, fork: args.fork, keep: args.keep, rm: args.rm },
+        restarted,
+      )
+      if (ran !== "host") return
     }
     if (args.replay === true) {
       UI.error("--replay is not supported; replay is enabled by default")
