@@ -21,6 +21,23 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **When Lunos fails, it says where the full details are.** Every run writes a log, and a failure
+  (Lunos not starting, a failed `/restart`, a sandbox that won't start, a crash, an unexpected error)
+  now ends with `Full log: <path>`, a clickable link in terminals that support it, and
+  `Report it: lunos bug-report <id>`. The log has the full error with its causes, and each command
+  Lunos ran with its exit code and output, so nothing has to be run again with extra flags. API keys,
+  tokens and passwords are removed, and your prompts are never written to it.
+- **`lunos logs` and `lunos bug-report`.** `lunos logs` lists recent runs; `lunos logs <id>` shows
+  one, `--open` opens it, and `--dir` prints where logs are kept. `lunos bug-report [id]` packs a
+  run's log with the version and the relevant config, secrets removed, into a zip you can check and
+  attach to an issue yourself. Nothing is uploaded. In the TUI, `/logs` lists them, and an error
+  about something running in the background (such as an MCP server that didn't start) has
+  **Open log**.
+- **Log retention settings.** Lunos keeps the last 10 runs plus failed runs from the last 14 days,
+  within 50 MB. Change this with `log.retention_days` and `log.max_mb`; an organisation can lock it.
+
 ## [1.18.51] - 2026-10-20
 
 ### Added

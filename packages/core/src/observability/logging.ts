@@ -1,22 +1,24 @@
 import { Formatter, Logger, type LogLevel } from "effect"
-import path from "path"
-import { Global } from "../global"
 import { runID } from "./shared"
+import { RunLog } from "./run-log"
 
 function formatter(id: string = runID) {
   return Logger.map(Logger.formatStructured, (output) => {
     const messages = Array.isArray(output.message) ? output.message : [output.message]
-    return [
-      ["timestamp", output.timestamp],
-      ["level", output.level],
-      ["run", id],
-      ...messages.flatMap((value) => (plain(value) ? flatten(value) : [["message", value] as const])),
-      ...(output.cause === undefined ? [] : [["cause", output.cause] as const]),
-      ...flatten(output.spans),
-      ...flatten(output.annotations),
-    ]
-      .map(([key, value]) => `${key}=${format(value)}`)
-      .join(" ")
+    // Redacted like everything else in a run log: a logged header or command line can carry a key.
+    return RunLog.redact(
+      [
+        ["timestamp", output.timestamp],
+        ["level", output.level],
+        ["run", id],
+        ...messages.flatMap((value) => (plain(value) ? flatten(value) : [["message", value] as const])),
+        ...(output.cause === undefined ? [] : [["cause", output.cause] as const]),
+        ...flatten(output.spans),
+        ...flatten(output.annotations),
+      ]
+        .map(([key, value]) => `${key}=${format(value)}`)
+        .join(" "),
+    )
   })
 }
 
@@ -46,7 +48,8 @@ function format(input: unknown) {
   return /^[^\s="\\]+$/.test(value) ? value : JSON.stringify(value)
 }
 
-export function fileLogger(file = path.join(Global.Path.log, "opencode.log"), id: string = runID) {
+/** Into this run's log (`RunLog`), or the shared `opencode.log` for a process without one. */
+export function fileLogger(file = RunLog.target(), id: string = runID) {
   // Do not set batchWindow to 0; it causes high idle CPU usage.
   return Logger.toFile(formatter(id), file, { flag: "a" })
 }

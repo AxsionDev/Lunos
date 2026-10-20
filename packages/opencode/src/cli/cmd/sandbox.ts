@@ -8,6 +8,7 @@ import { Sandbox } from "@/sandbox"
 import { SandboxConfig } from "@/sandbox/config"
 import { AuditLog } from "@/audit/log"
 import { RunEnding } from "./run/ending"
+import { Failure } from "../failure"
 
 // XCOD-144 slice 1: `--sandbox` on `lunos` and `lunos run`, and `lunos sandbox list|attach|destroy`.
 // The host side never loads a project instance for a sandboxed run (that would initialise the
@@ -229,7 +230,11 @@ const prepare = Effect.promise(async () => {
 
 const attempt = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (error) => error }).pipe(
-    Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))),
+    Effect.catch((error) => {
+      // XCOD-280: the stack and cause go to the run log before the message becomes a CliError.
+      Failure.record("sandbox", error)
+      return fail(error instanceof Error ? error.message : String(error))
+    }),
   )
 
 export const SandboxListCommand = effectCmd({

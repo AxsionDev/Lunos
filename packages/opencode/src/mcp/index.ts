@@ -538,6 +538,18 @@ const layer = Layer.effect(
 
               const result = yield* create(key, mcp)
               s.status[key] = result.status
+              // XCOD-280: a server that didn't start says so, with its details in the run log.
+              if (result.status.status === "failed") {
+                yield* Effect.logError("MCP server failed to start", { key, error: result.status.error })
+                yield* events
+                  .publish(TuiEvent.ToastShow, {
+                    title: "MCP server failed",
+                    message: `"${key}" didn't start: ${result.status.error}`,
+                    variant: "error",
+                    duration: 10000,
+                  })
+                  .pipe(Effect.ignore)
+              }
               if (result.mcpClient) {
                 s.clients[key] = result.mcpClient
                 s.defs[key] = result.defs!

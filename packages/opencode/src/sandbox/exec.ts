@@ -1,6 +1,8 @@
 // XCOD-144: the one place the sandbox shells out (docker, git, tar). Arguments are always passed as
 // an argv array, never through a shell.
 
+import { RunLog } from "@opencode-ai/core/observability/run-log"
+
 export type Result = { code: number; stdout: string; stderr: string }
 
 export type Options = {
@@ -25,6 +27,8 @@ export async function run(cmd: string[], options: Options = {}): Promise<Result>
     new Response(proc.stderr).text(),
     proc.exited,
   ])
+  // XCOD-280: into the run log, with its output (redacted) when it failed.
+  RunLog.command({ cmd, code, stdout, stderr })
   return { code, stdout, stderr }
 }
 

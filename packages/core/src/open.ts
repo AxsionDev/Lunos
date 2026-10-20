@@ -6,3 +6,8 @@ export function openUrl(input: string) {
     return Promise.reject(new Error(`Only http and https links can be opened in the browser: ${input}`))
   return open(url.href)
 }
+
+/** XCOD-280: a local file (a log) in the system's viewer for its type. */
+export function openPath(file: string) {
+  return open(file)
+}

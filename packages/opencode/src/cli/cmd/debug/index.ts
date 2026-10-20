@@ -34,8 +34,26 @@ export const DebugCommand = cmd({
       .command(InfoCommand)
       .command(PathsCommand)
       .command(WaitCommand)
+      .command(CrashCommand)
       .demandCommand(),
   async handler() {},
+})
+
+// XCOD-280: what an unexpected error does to a plain command (the log, and the link to it).
+const CrashCommand = cmd({
+  command: "crash <kind>",
+  describe: false,
+  builder: (yargs) =>
+    yargs.positional("kind", { type: "string", choices: ["exception", "rejection"], demandOption: true }),
+  async handler(args) {
+    const error = new Error("Deliberate crash (lunos debug crash)", { cause: new Error("the cause") })
+    if (args.kind === "rejection") void Promise.reject(error)
+    else
+      setTimeout(() => {
+        throw error
+      })
+    await Bun.sleep(5000)
+  },
 })
 
 const WaitCommand = effectCmd({

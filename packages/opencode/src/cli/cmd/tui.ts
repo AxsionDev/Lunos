@@ -19,6 +19,8 @@ import { Restart } from "../restart"
 import { CloudGate } from "@/cloud/gate"
 import { CloudTuiHost } from "@/cloud/tui-host"
 import { requireLineSignIn } from "./cloud"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
+import { Failure } from "../failure"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -294,7 +296,10 @@ export const TuiThreadCommand = cmd({
 
       const worker = new Worker(file, {
         env: Object.fromEntries(
-          Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+          // XCOD-280: the worker writes into this run's log (and only the worker: its children don't get it).
+          Object.entries({ ...process.env, [RunLog.ENV]: RunLog.current()?.file }).filter(
+            (entry): entry is [string, string] => entry[1] !== undefined,
+          ),
         ),
       })
       const client = Rpc.client<typeof rpc>(worker)
@@ -304,6 +309,16 @@ export const TuiThreadCommand = cmd({
       process.on("SIGUSR2", reload)
 
       let stopped = false
+      // XCOD-280: the worker runs the server, MCP, LSP and the memory sidecar. If it dies, the TUI
+      // can't go on: put the terminal back and say where the log is.
+      const crashed = (error: unknown) => {
+        if (stopped) return
+        stopped = true
+        Failure.record("the worker", error, "Lunos's background worker stopped unexpectedly.")
+        process.exit(1)
+      }
+      worker.addEventListener("error", (event) => crashed(event.error ?? new Error(event.message)))
+      worker.addEventListener("close", () => crashed(new Error("The worker thread exited")))
       const stop = async () => {
         if (stopped) return
         stopped = true
@@ -358,6 +373,7 @@ export const TuiThreadCommand = cmd({
         const { Effect } = await import("effect")
         const { run } = await import("../tui/layer")
         const { createLegacyTuiPluginHost } = await import("@/plugin/tui/runtime")
+        Failure.setFullscreen(true)
         await Effect.runPromise(
           run({
             url: transport.url,
@@ -395,6 +411,7 @@ export const TuiThreadCommand = cmd({
           }),
         )
       } finally {
+        Failure.setFullscreen(false)
         await stop()
       }
     } finally {

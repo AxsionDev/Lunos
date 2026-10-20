@@ -365,6 +365,54 @@
       },
       "additionalProperties": false
     },
+    "LogConfig": {
+      "type": "object",
+      "properties": {
+        "retention_days": {
+          "minimum": 0,
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "enum": ["NaN"]
+            },
+            {
+              "type": "string",
+              "enum": ["Infinity"]
+            },
+            {
+              "type": "string",
+              "enum": ["-Infinity"]
+            }
+          ],
+          "description": "Days a failed run's log is kept, beyond the newest 10 runs. Default 14"
+        },
+        "max_mb": {
+          "exclusiveMinimum": 0,
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "enum": ["NaN"]
+            },
+            {
+              "type": "string",
+              "enum": ["Infinity"]
+            },
+            {
+              "type": "string",
+              "enum": ["-Infinity"]
+            }
+          ],
+          "description": "Most space all run logs together may take, in MB; the oldest are removed first. Default 50"
+        }
+      },
+      "additionalProperties": false
+    },
     "ConfigV2.Residency": {
       "type": "object",
       "properties": {
@@ -1340,7 +1388,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)"
+          "description": "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, log, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)"
         },
         "shell": {
           "type": "string",
@@ -1637,6 +1685,10 @@
           },
           "additionalProperties": false,
           "description": "Sandboxed runs: the Lunos server and everything it spawns run in a Docker container"
+        },
+        "log": {
+          "$ref": "#/$defs/LogConfig",
+          "description": "How long run logs are kept: failed runs' logs for retention_days, all within max_mb"
         },
         "residency": {
           "$ref": "#/$defs/ConfigV2.Residency",
