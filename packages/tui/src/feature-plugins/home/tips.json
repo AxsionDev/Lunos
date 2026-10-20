@@ -775,7 +775,7 @@
   {
     "id": "choose-claude-code-permission",
     "category": "Claude Code & Codex",
-    "text": "Choose Claude Code's permission mode from a list in {highlight}/settings external{/highlight}",
+    "text": "Choose Claude Code's permission mode from a list in {highlight}/settings models{/highlight}, under External sessions",
     "requires": ["external.enabled"],
     "config": ["external.claude.permission_mode"]
   },

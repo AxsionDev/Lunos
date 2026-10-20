@@ -136,6 +136,23 @@ export function parts(text: string): TipPart[] {
   return result
 }
 
+/** The parts cut to `width` characters, ending in "…" when anything was cut. */
+export function truncate(list: readonly TipPart[], width: number): TipPart[] {
+  const total = list.reduce((sum, part) => sum + part.text.length, 0)
+  if (total <= width) return [...list]
+  const result: TipPart[] = []
+  let room = Math.max(0, width - 1)
+  for (const part of list) {
+    if (room <= 0) break
+    const text = part.text.slice(0, room)
+    result.push({ ...part, text })
+    room -= text.length
+  }
+  const last = result.at(-1)
+  if (last) last.text = last.text.trimEnd() + "…"
+  return result
+}
+
 /** The text as shown, without markup. */
 export function plain(text: string) {
   return parts(text)
@@ -199,7 +216,13 @@ export function seeded(seed: number) {
 export function draw(
   current: Deck,
   ids: readonly string[],
-  input: { eligible: ReadonlySet<string>; random: () => number; preferred?: ReadonlySet<string> },
+  input: {
+    eligible: ReadonlySet<string>
+    random: () => number
+    preferred?: ReadonlySet<string>
+    /** false: draw nothing rather than start a new round (a narrow draw leaves the round's long tips). */
+    restart?: boolean
+  },
 ): { id?: string; deck: Deck } {
   const known = new Set(ids)
   const drawn = current.drawn.filter((id) => known.has(id))
@@ -214,7 +237,10 @@ export function draw(
     return [...open.filter((id) => input.preferred!.has(id)), ...open.filter((id) => !input.preferred!.has(id))]
   }
   let round = { pending, drawn }
-  if (!candidates(pending).length) round = { pending: shuffle(ids, input.random), drawn: [] }
+  if (!candidates(pending).length) {
+    if (input.restart === false) return { deck: { ...current, pending, drawn } }
+    round = { pending: shuffle(ids, input.random), drawn: [] }
+  }
   const order = candidates(round.pending)
   // Never the tip just shown, unless it is the only one.
   const id = order.find((item) => item !== current.last) ?? order[0]

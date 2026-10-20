@@ -83,6 +83,54 @@ describe("XCOD-278 deck", () => {
   })
 })
 
+describe("XCOD-278 working line", () => {
+  test("a draw for the working line only takes tips that fit, and leaves the rest of the round", () => {
+    const key = keys()
+    const texts = new Map(Tips.TIPS.map((tip) => [tip.id, Tips.render(tip.text, key)]))
+    const all = new Set(eligibleIds(SIGNED_IN))
+    const fits = new Set([...all].filter((id) => Tips.plain(texts.get(id)!).length <= 72))
+    const random = Tips.seeded(80)
+    let deck = Tips.EMPTY_DECK
+    const shown: string[] = []
+    for (;;) {
+      const result = Tips.draw(
+        deck,
+        Tips.TIPS.map((tip) => tip.id),
+        { eligible: fits, random, restart: false },
+      )
+      deck = result.deck
+      if (!result.id) break
+      shown.push(result.id)
+    }
+    expect(shown.length).toBe(fits.size)
+    expect(shown.every((id) => Tips.plain(texts.get(id)!).length <= 72)).toBe(true)
+    // The long ones are still to come, on the home screen.
+    const home = Tips.draw(
+      deck,
+      Tips.TIPS.map((tip) => tip.id),
+      { eligible: all, random },
+    )
+    expect(fits.has(home.id!)).toBe(false)
+  })
+
+  test("a line too narrow for the tip is cut at the end with an ellipsis", () => {
+    const parts = Tips.parts("Run {highlight}/lsp{/highlight} to see every language server")
+    expect(Tips.truncate(parts, 100)).toEqual(parts)
+    expect(Tips.truncate(parts, 12)).toEqual([
+      { text: "Run ", highlight: false },
+      { text: "/lsp", highlight: true },
+      { text: " to…", highlight: false },
+    ])
+    expect(
+      Tips.plain(
+        Tips.truncate(parts, 20)
+          .map((part) => `${part.text}`)
+          .join(""),
+      ),
+    ).toHaveLength(20)
+  })
+})
+
 describe("XCOD-278 context", () => {
   const texts = (context: Tips.Context) => {
     const ids = new Set(eligibleIds(context))

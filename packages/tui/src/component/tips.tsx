@@ -13,6 +13,9 @@ import * as Tips from "../util/tips"
 
 /** How long a turn runs before a tip shows under the working indicator. */
 export const WORKING_TIP_DELAY = 3000
+const WORKING_TIP_INDENT = 3
+/** Below this much room, any tip is drawn and cut with "…"; with more, only one that fits. */
+const WORKING_TIP_MIN_ROOM = 50
 
 /** Feature flags a tip's `requires: flag:<name>` can name, and whether each is on. */
 const FLAGS: Record<string, boolean> = {
@@ -86,15 +89,18 @@ function createTipStore(input: {
     render(tip: Tips.Tip) {
       return Tips.render(tip.text, key)
     },
-    /** Draws the next tip and records it; undefined until kv has loaded, so nothing is written over it. */
-    next(where: "home" | "working" = "working") {
+    /**
+     * Draws the next tip and records it; undefined until kv has loaded, so nothing is written over it.
+     * `width`: only tips that fit it are drawn; the others stay in this round for the home screen.
+     */
+    next(where: "home" | "working" = "working", width?: number) {
       if (!input.kv.ready) return
       const context = input.context()
       const rendered = new Map<string, string>()
       for (const tip of Tips.TIPS) {
         if (!Tips.eligible(tip, context)) continue
         const text = store.render(tip)
-        if (text) rendered.set(tip.id, text)
+        if (text && (width === undefined || Tips.plain(text).length <= width)) rendered.set(tip.id, text)
       }
       let deck = Tips.deck(input.kv.get("tips_deck"))
       if (!counted) {
@@ -105,6 +111,7 @@ function createTipStore(input: {
         eligible: new Set(rendered.keys()),
         random: Math.random,
         preferred: deck.starts <= Tips.FIRST_STEPS_STARTS ? preferred : undefined,
+        restart: width === undefined,
       })
       input.kv.set("tips_deck", result.deck)
       const text = result.id ? rendered.get(result.id) : undefined
@@ -120,12 +127,14 @@ function createTipStore(input: {
   return store
 }
 
-/** A tip's text, its commands and keys highlighted. */
-export function TipText(props: { text: string; wrap?: boolean }) {
+/** A tip's text, its commands and keys highlighted; with `width`, one line cut to it. */
+export function TipText(props: { text: string; width?: number }) {
   const { theme } = useTheme()
+  const parts = () =>
+    props.width === undefined ? Tips.parts(props.text) : Tips.truncate(Tips.parts(props.text), props.width)
   return (
-    <text flexShrink={1} wrapMode={props.wrap === false ? "none" : "word"} truncate={props.wrap === false}>
-      <For each={Tips.parts(props.text)}>
+    <text flexShrink={1} wrapMode={props.width === undefined ? "word" : "none"}>
+      <For each={parts()}>
         {(part) => <span style={{ fg: part.highlight ? theme.text : theme.textMuted }}>{part.text}</span>}
       </For>
     </text>
@@ -140,25 +149,40 @@ export function WorkingTip(props: { busy: Accessor<boolean> }) {
   const store = useTipStore()
   const { theme } = useTheme()
   const [tip, setTip] = createSignal<string>()
+  const [width, setWidth] = createSignal(0)
+  // The line's room: the prompt's width less the indent and "Tip: ".
+  const room = () => Math.max(0, width() - WORKING_TIP_INDENT - 5)
   createEffect(
     on(props.busy, (busy) => {
       setTip(undefined)
       if (!busy || !store.enabled()) return
-      const timer = setTimeout(() => setTip(store.next()), WORKING_TIP_DELAY)
+      // Only a tip that fits is drawn; in a very narrow terminal, any tip, cut with "…".
+      const timer = setTimeout(
+        () => setTip(store.next("working", room() >= WORKING_TIP_MIN_ROOM ? room() : undefined)),
+        WORKING_TIP_DELAY,
+      )
       onCleanup(() => clearTimeout(timer))
     }),
   )
   return (
-    <Show when={tip() && store.enabled() ? tip() : undefined}>
-      {(text) => (
-        <box paddingLeft={3} flexDirection="row" width="100%">
-          <text flexShrink={0} fg={theme.warning}>
-            Tip:{" "}
-          </text>
-          <TipText text={text()} wrap={false} />
-        </box>
-      )}
-    </Show>
+    <box
+      width="100%"
+      flexDirection="row"
+      onSizeChange={function () {
+        setWidth(this.width)
+      }}
+    >
+      <Show when={tip() && store.enabled() ? tip() : undefined}>
+        {(text) => (
+          <box paddingLeft={WORKING_TIP_INDENT} flexDirection="row">
+            <text flexShrink={0} fg={theme.warning}>
+              Tip:{" "}
+            </text>
+            <TipText text={text()} width={room()} />
+          </box>
+        )}
+      </Show>
+    </box>
   )
 }
 

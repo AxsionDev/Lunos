@@ -38,6 +38,17 @@ function slashCommands() {
   return names
 }
 
+/** `/settings <section>`'s names: each section's slug and aliases, and `account`. */
+function settingsSections() {
+  const names = new Set(["account"])
+  const text = read("packages/tui/src/util/settings-sections.ts")
+  for (const match of text.matchAll(/slug: "([\w-]+)", aliases: \[([^\]]*)\]/g)) {
+    names.add(match[1]!)
+    for (const alias of match[2]!.matchAll(/"([\w-]+)"/g)) names.add(alias[1]!)
+  }
+  return names
+}
+
 type CliNode = { children: Map<string, CliNode>; options: Set<string> }
 
 /** The `lunos` command tree, from the modules src/index.ts registers, with each command's options. */
@@ -135,6 +146,7 @@ type Registry = {
   config: JsonSchema[]
   keybinds: Set<string>
   env: string
+  sections: Set<string>
 }
 
 /** GitHub comment triggers: a `/word` that isn't a TUI command, checked against the workflow handler. */
@@ -155,6 +167,9 @@ export function validate(tips: readonly Tip[], registry: Registry) {
         if (GITHUB_TRIGGERS.has(name)) continue
         if (!registry.slash.has(name)) fail(tip, `no /${name} command`)
       }
+      // `/settings <section>` falls back to the settings home on an unknown name, so check it here.
+      const section = /(?:^|\s)\/settings\s+([a-z]+)/.exec(text)?.[1]
+      if (section && !registry.sections.has(section)) fail(tip, `no /settings section "${section}"`)
       // `{env:VAR_NAME}` is config syntax, its name a placeholder.
       for (const match of text.matchAll(/(?<!\{env:)\b([A-Z][A-Z0-9]*_[A-Z0-9_]+)\b/g))
         if (!registry.env.includes(`"${match[1]}"`)) fail(tip, `no environment variable ${match[1]}`)
@@ -194,6 +209,7 @@ describe("tips", async () => {
     config: [JSON.parse(read("schemas/config.json")), JSON.parse(read("schemas/tui.json"))],
     keybinds: new Set(Object.keys(TuiKeybind.Definitions)),
     env: [...sources("packages/core/src"), ...sources("packages/opencode/src")].join("\n"),
+    sections: settingsSections(),
   }
 
   test("XCOD-278: every tip names commands, subcommands, options, config keys and keybinds that exist", () => {
@@ -216,6 +232,9 @@ describe("tips", async () => {
     ])
     expect(validate([tip("Set it", ["memory.nope"])], registry)).toEqual(['fake: no config key "memory.nope"'])
     expect(validate([tip("Press {key:agent_cycle}")], registry)).toEqual(['fake: no keybind "agent_cycle"'])
+    expect(validate([tip("Run {highlight}/settings external{/highlight}")], registry)).toEqual([
+      'fake: no /settings section "external"',
+    ])
     expect(validate([tip("Set {highlight}LUNOS_NOPE_NOPE=1{/highlight}")], registry)).toEqual([
       "fake: no environment variable LUNOS_NOPE_NOPE",
     ])
