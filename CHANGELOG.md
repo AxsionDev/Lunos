@@ -21,6 +21,21 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **See what memory uses at the top of `/memory`, and change it from there.** The Overview tab now
+  opens with a Storage panel: on this computer (with the path, size on disk, and the model and its
+  region), a database in Docker (with the container's name, image and whether it's running), a team
+  database (host, jurisdiction and TLS; credentials are never shown, only the variable names they
+  come from) or a managed cloud database (provider, region and whether your residency policy allows
+  it). It shows the template that set it up and its live status. **Change storage…** opens the
+  templates and storage cards and asks whether to move your facts or start empty. **Move my facts**
+  counts them on both sides, and **Start empty** says where the old ones stay. **Test connection**
+  updates "checked", **Start container** restarts a stopped Docker database, and **Open in
+  Settings** goes to Settings › Memory. When your organisation sets the storage, the panel says so.
+  `lunos memory status` prints the same block, and `lunos memory storage set --template <name>` or
+  `--backend <type>`, with `--move` or `--empty`, changes it from a script. <!-- XCOD-277 -->
+
 ## [1.18.51] - 2026-10-20
 
 ### Added

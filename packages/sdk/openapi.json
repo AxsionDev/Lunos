@@ -8156,6 +8156,168 @@
         ]
       }
     },
+    "/memory/storage": {
+      "get": {
+        "tags": ["memory"],
+        "operationId": "memory.storage.get",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What memory uses, and its status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryStoragePanel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "What memory uses now: on this computer, a database in Docker, a team database or a managed cloud database, the template that set it up, and its live status. Credentials are never included, only the names of the environment variables or files they come from.",
+        "summary": "Memory storage",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.storage.get({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/storage/test": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.storage.test",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The result of the test",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryStorageStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "For a database: connect, write, read and delete a probe. On this computer: the memory check (remember, recall and remove a test fact). Never touches stored facts.",
+        "summary": "Test the memory storage",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.storage.test({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/memory/storage/start": {
+      "post": {
+        "tags": ["memory"],
+        "operationId": "memory.storage.start",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the container started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryStorageStartResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Start the stopped Docker or Podman container of the memory template in use.",
+        "summary": "Start the memory database container",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.memory.storage.start({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/memory/setup/backend": {
       "post": {
         "tags": ["memory"],
@@ -24949,6 +25111,9 @@
           "backend": {
             "$ref": "#/components/schemas/MemoryBackendConfig"
           },
+          "template": {
+            "type": "string"
+          },
           "templates": {
             "$ref": "#/components/schemas/MemoryTemplatesConfig"
           }
@@ -29995,6 +30160,253 @@
         "required": ["facts", "noteParagraphs", "notes", "failed"],
         "additionalProperties": false
       },
+      "MemoryStorageStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["connected", "unreachable", "unchecked", "off"]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "fix": {
+                "type": "string"
+              }
+            },
+            "required": ["stage", "message"],
+            "additionalProperties": false
+          },
+          "at": {
+            "type": "string"
+          },
+          "ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "server": {
+            "type": "string"
+          }
+        },
+        "required": ["state"],
+        "additionalProperties": false
+      },
+      "MemoryStoragePanel": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "place": {
+            "type": "string",
+            "enum": ["embedded", "docker", "team", "cloud"]
+          },
+          "vendor": {
+            "type": "string",
+            "enum": ["embedded", "neo4j", "postgres", "memgraph"]
+          },
+          "template": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string",
+                "enum": ["user", "project"]
+              }
+            },
+            "required": ["name", "title"],
+            "additionalProperties": false
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "leaves": {
+            "type": "string"
+          },
+          "encryption": {
+            "type": "string",
+            "enum": ["os-keychain", "off"]
+          },
+          "retentionDays": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              }
+            },
+            "required": ["id"],
+            "additionalProperties": false
+          },
+          "url": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "jurisdiction": {
+            "type": "string"
+          },
+          "tls": {
+            "type": "string",
+            "enum": ["verified", "unverified", "none"]
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "credentials": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provider": {
+            "type": "string"
+          },
+          "residency": {
+            "type": "object",
+            "properties": {
+              "allowed": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": ["allowed"],
+            "additionalProperties": false
+          },
+          "container": {
+            "type": "object",
+            "properties": {
+              "tool": {
+                "type": "string",
+                "enum": ["docker", "podman"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["running", "stopped", "missing", "no-docker"]
+              },
+              "project": {
+                "type": "string"
+              }
+            },
+            "required": ["tool", "state", "project"],
+            "additionalProperties": false
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemoryStorageStatus"
+          }
+        },
+        "required": ["on", "place", "locked", "leaves", "encryption", "status"],
+        "additionalProperties": false
+      },
+      "MemoryStorageStartResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": ["ok"],
+        "additionalProperties": false
+      },
       "MemorySetupInput": {
         "type": "object",
         "properties": {
@@ -30408,6 +30820,30 @@
                 "enum": ["Infinity", "-Infinity", "NaN"]
               }
             ]
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "How many facts there were to move"
           },
           "output": {
             "type": "string"

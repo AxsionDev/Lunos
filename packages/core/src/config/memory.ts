@@ -129,6 +129,10 @@ export const Info = Schema.Struct({
     description:
       "Where memory is stored (XCOD-134): on this computer (the default), or a team database (Neo4j or PostgreSQL)",
   }),
+  template: Schema.String.pipe(Schema.optional).annotate({
+    description:
+      'The memory template that set up this storage, e.g. "neo4j-docker". Written when a template is applied, so /memory and lunos memory status can show it; absent means set up by hand',
+  }),
   templates: Templates.pipe(Schema.optional).annotate({
     description:
       "Memory setup templates (XCOD-264): your organisation's own, and built-in ones to hide. Read from managed config only, as written: {env:} references in a template stay references",
