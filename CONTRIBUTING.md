@@ -201,6 +201,31 @@ bun turbo typecheck
 alarm you. What matters is whether your change adds a failure that the latest `dev` run doesn't
 have; reviewers check that against the `test` workflow's run on `dev`.
 
+### Start-up time
+
+`lunos` shows its home screen and prompt before the server, plugins, MCP servers or LSP are ready.
+Keep it that way: **nothing new may be awaited before the first frame unless a trace shows it costs
+under 20 ms.** Load what's slow after the first frame, or lazily when its feature is first used.
+
+To see where the time goes:
+
+```bash
+lunos debug startup                       # starts the TUI, quits after the first frame, prints the timeline
+LUNOS_STARTUP_TRACE=1 lunos               # the same timeline, printed when you quit
+LUNOS_STARTUP_TRACE=/tmp/start.json lunos # written to a file (JSON for a .json path)
+```
+
+Each phase shows its start, how long it took, and whether the first frame waited for it. Time a
+compiled build (`bun run --cwd packages/opencode script/build.ts --single`), not `bun dev`: from
+source, module loading is mostly transpiling.
+
+CI holds the start path down with a budget test, and keeps its traces as the `startup-trace`
+artifact. To run it locally:
+
+```bash
+cd packages/opencode && LUNOS_STARTUP_BUDGET=1 bun test test/cli/startup-pty.test.ts -t budget
+```
+
 ### Setting up a Debugger
 
 Bun debugging is currently rough around the edges. We hope this guide helps you get set up and avoid some pain points.

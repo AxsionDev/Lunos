@@ -10,6 +10,7 @@ import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
 import {
   InstallationVersion,
   manualInstallCommand,
@@ -37,7 +38,7 @@ import {
   Show,
   on,
 } from "solid-js"
-import { TuiPathsProvider, TuiStartupProvider, TuiTerminalEnvironmentProvider, useTuiStartup } from "./context/runtime"
+import { TuiPathsProvider, TuiStartupProvider, TuiTerminalEnvironmentProvider } from "./context/runtime"
 import { DialogProvider, useDialog } from "./ui/dialog"
 import { DialogProvider as DialogProviderConnect, DialogProviders } from "./component/dialog-provider"
 import { ErrorComponent } from "./component/error-component"
@@ -48,7 +49,7 @@ import { ProjectProvider, useProject } from "./context/project"
 import { EditorContextProvider } from "./context/editor"
 import { useEvent } from "./context/event"
 import { SDKProvider, useSDK } from "./context/sdk"
-import { StartupLoading } from "./component/startup-loading"
+import { StartupStatus } from "./component/startup-status"
 import { SyncProvider, useSync } from "./context/sync"
 import { DataProvider } from "./context/data"
 import { LocationProvider } from "./context/location"
@@ -127,6 +128,8 @@ import type { Host as AccountHost } from "./util/account"
 
 registerOpencodeSpinner()
 
+const THEME_MODE_WAIT = 200
+
 const appGlobalBindingCommands = [
   "session.list",
   "session.new",
@@ -195,6 +198,8 @@ export type TuiInput = {
   restart?: RestartHost
   /** XCOD-129: set when this process is the relaunch of a `/restart`. */
   restarted?: Restarted & { sessionID?: string }
+  /** XCOD-276: quit once this settles (`lunos debug startup`). */
+  quit?: Promise<void>
   /** Called once the TUI has loaded its data: a relaunch counts as started from here. */
   onStarted?: () => void
   /** XCOD-273: the Lunos account (Welcome screen, /login, /logout, /account), run by the CLI process. */
@@ -232,19 +237,21 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       const renderer = yield* Effect.acquireRelease(
         Effect.tryPromise({
           try: () =>
-            createCliRenderer({
-              externalOutputMode: "passthrough",
-              targetFps: 60,
-              gatherStats: false,
-              exitOnCtrlC: false,
-              useKittyKeyboard: {},
-              autoFocus: false,
-              openConsoleOnError: false,
-              useMouse: !Flag.OPENCODE_DISABLE_MOUSE && input.config.mouse,
-              consoleOptions: {
-                keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
-              },
-            }),
+            StartupTrace.span("create renderer", () =>
+              createCliRenderer({
+                externalOutputMode: "passthrough",
+                targetFps: 60,
+                gatherStats: false,
+                exitOnCtrlC: false,
+                useKittyKeyboard: {},
+                autoFocus: false,
+                openConsoleOnError: false,
+                useMouse: !Flag.OPENCODE_DISABLE_MOUSE && input.config.mouse,
+                consoleOptions: {
+                  keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
+                },
+              }),
+            ),
           catch: (error) => (error instanceof Error ? error : new Error(String(error))),
         }),
         (renderer) =>
@@ -275,14 +282,19 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
         () => Effect.sync(() => process.off("SIGHUP", onSighup)),
       )
       renderer.once("destroy", () => Deferred.doneUnsafe(shutdown, Effect.void))
+      void input.quit?.then(() => destroyRenderer(renderer))
       const pluginRuntime = createPluginRuntime()
 
       yield* Effect.tryPromise(async () => {
         // Prewarm palette before ThemeProvider mounts so `system` theme avoids a first-paint fallback flash.
         void renderer.getPalette({ size: 16 }).catch(() => undefined)
-        const mode = (await renderer.waitForThemeMode(1000)) ?? "dark"
+        // XCOD-276: a terminal answers this in a few ms or never; a later answer still switches the theme
+        // mode (ThemeProvider listens), so a silent terminal costs 200 ms, not a second, on every start.
+        const mode =
+          (await StartupTrace.span("terminal theme mode", () => renderer.waitForThemeMode(THEME_MODE_WAIT))) ?? "dark"
         if (renderer.isDestroyed) return
 
+        const mount = StartupTrace.begin("mount app")
         await render(() => {
           return (
             <ExitProvider
@@ -397,6 +409,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
             </ExitProvider>
           )
         }, renderer)
+        mount()
       })
       yield* Deferred.await(shutdown)
       return { epilogue: exit.epilogue, reason: exit.reason }
@@ -420,7 +433,6 @@ function App(props: {
   restarted?: Restarted & { sessionID?: string }
   onStarted?: () => void
 }) {
-  const startup = useTuiStartup()
   const tuiConfig = useTuiConfig()
   const route = useRoute()
   const dimensions = useTerminalDimensions()
@@ -463,6 +475,7 @@ function App(props: {
     }),
   )
   const [ready, setReady] = createSignal(false)
+  const plugins = StartupTrace.begin("load tui plugins", { blocking: false })
   // XCOD-147: set only by this session's update check, never from persisted state, so the notice
   // can't outlive a switch that turned checks off.
   const [availableVersion, setAvailableVersion] = createSignal<string | undefined>()
@@ -483,6 +496,7 @@ function App(props: {
       console.error("Failed to load TUI plugins", error)
     })
     .finally(() => {
+      plugins()
       setReady(true)
     })
 
@@ -1632,6 +1646,22 @@ function App(props: {
   // in its provider's onMount, which runs first) and the handler above both exist.
   onMount(() => props.onListening?.())
 
+  // XCOD-276: the start-up timeline ends at the first frame that shows the home screen (or Welcome).
+  createEffect(() => {
+    const welcome = account.blocks() && account.phase() === "welcome"
+    if (!welcome && !(shown() && !account.blocks())) return
+    renderer.once("frame", () => StartupTrace.firstFrame(welcome ? "first frame (welcome)" : "first frame"))
+    renderer.requestRender()
+  })
+
+  // XCOD-276: the home screen doesn't wait for plugins or the server: plugin slots fill in as plugins
+  // load. A session waits for its data, and a plugin's own screen for the plugins.
+  const shown = createMemo(() => {
+    if (route.data.type === "session") return sync.ready
+    if (route.data.type === "plugin") return ready()
+    return true
+  })
+
   const plugin = createMemo(() => {
     if (!ready()) return
     if (route.data.type !== "plugin") return
@@ -1668,13 +1698,13 @@ function App(props: {
       <Show when={account.blocks() && account.phase() === "welcome"}>
         <Welcome />
       </Show>
-      <Show when={ready() && !account.blocks()}>
+      <Show when={!account.blocks()}>
         <box flexGrow={1} minHeight={0} flexDirection="column">
           <Switch>
             <Match when={route.data.type === "home"}>
               <Home />
             </Match>
-            <Match when={route.data.type === "session"}>
+            <Match when={route.data.type === "session" && sync.ready}>
               <Show when={route.data.type === "session" ? route.data.sessionID : undefined} keyed>
                 {(_) => <Session />}
               </Show>
@@ -1682,6 +1712,7 @@ function App(props: {
           </Switch>
           {plugin()}
         </box>
+        <StartupStatus plugins={ready} />
         <Show when={upgrading()} fallback={<UpdateNotice version={updateNotice()} />}>
           <UpdateProgress progress={upgrading()} />
         </Show>
@@ -1689,9 +1720,6 @@ function App(props: {
           <pluginRuntime.Slot name="app_bottom" />
         </box>
         <pluginRuntime.Slot name="app" />
-      </Show>
-      <Show when={!startup.skipInitialLoading}>
-        <StartupLoading ready={ready} />
       </Show>
     </box>
   )

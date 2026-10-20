@@ -163,6 +163,8 @@ export type Options = {
   binary?: string
   /** Reuse a HOME from an earlier run (a second start after /logout, say). */
   home?: string
+  /** Answer the terminal's colour queries (OSC 10/11) as a real terminal does, dark. */
+  answerColors?: boolean
 }
 
 const opencode = path.resolve(import.meta.dir, "../../..")
@@ -264,9 +266,16 @@ export async function launch(options: Options = {}) {
       env,
     },
   )
+  let asked = 0
   pty.onData((data) => {
     raw += data
     screen.write(data)
+    if (!options.answerColors) return
+    // XCOD-276: without an answer the TUI waits out its theme-mode timeout; a real terminal answers.
+    const queries = raw.slice(Math.max(0, asked - 8))
+    asked = raw.length
+    if (queries.includes("\x1b]10;?")) pty.write("\x1b]10;rgb:ffff/ffff/ffff\x07")
+    if (queries.includes("\x1b]11;?")) pty.write("\x1b]11;rgb:0000/0000/0000\x07")
   })
   pty.onExit((event) => (exited = event.exitCode))
 

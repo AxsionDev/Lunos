@@ -1085,6 +1085,20 @@ export function Prompt(props: PromptProps) {
   let submitting = false
   const account = useContext(AccountContext)
 
+  // XCOD-276: the prompt works before the server has answered. A prompt sent before then is queued
+  // ("Starting…" under it) and sent the moment the data is in; the text stays in the box meanwhile.
+  const [queued, setQueued] = createSignal(false)
+  createEffect(
+    on(
+      () => sync.status,
+      (status) => {
+        if (status === "loading" || !queued()) return
+        setQueued(false)
+        void submit()
+      },
+    ),
+  )
+
   async function submit() {
     // Prevent overlapping invocations (e.g. a double-pressed Enter, or the
     // input's native onSubmit racing another dispatch). Without this guard,
@@ -1164,6 +1178,10 @@ export function Prompt(props: PromptProps) {
     if (workspace.creating() || move.creating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
+    if (sync.status === "loading") {
+      setQueued(true)
+      return false
+    }
     // XCOD-273: signed out where the official build needs an account (`lunos logout` in another
     // terminal, say), a prompt shows the Welcome screen instead of failing; the draft stays.
     if (account && !(await account.check())) return false
@@ -1961,7 +1979,11 @@ export function Prompt(props: PromptProps) {
                   when={!external() && local.mode.current()}
                   fallback={
                     <Show when={!external()}>
-                      <box height={1} />
+                      <Show when={sync.status === "loading"} fallback={<box height={1} />}>
+                        <text fg={theme.textMuted}>
+                          {queued() ? "Starting… your prompt is sent once ready" : "Starting…"}
+                        </text>
+                      </Show>
                     </Show>
                   }
                 >

@@ -72,6 +72,23 @@ jobs:
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 
+      # The work the TUI's first frame waits for stays under budget (CONTRIBUTING.md, "Start-up time").
+      - name: Start-up budget
+        if: runner.os == 'Linux'
+        working-directory: packages/opencode
+        run: bun test test/cli/startup-pty.test.ts -t "budget"
+        env:
+          LUNOS_STARTUP_BUDGET: "1"
+          LUNOS_STARTUP_TRACE_DIR: ${{ runner.temp }}/startup-trace
+
+      - name: Upload start-up trace
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: startup-trace
+          path: ${{ runner.temp }}/startup-trace
+          if-no-files-found: ignore
+
       - name: Check generated client
         if: runner.os == 'Linux'
         working-directory: packages/client

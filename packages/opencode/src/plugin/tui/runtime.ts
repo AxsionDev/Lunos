@@ -23,6 +23,7 @@ import { TuiConfig } from "@/config/tui"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { errorData, errorMessage } from "@opencode-ai/tui/util/error"
 import { isRecord } from "@opencode-ai/tui/util/record"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
 import { resolveHostAttentionSoundPaths } from "@/config/tui-host-attention"
 import {
   readPackageThemes,
@@ -536,12 +537,15 @@ async function activatePluginEntry(state: RuntimeState, plugin: PluginEntry, per
 
   const scope = createPluginScope(plugin.load, plugin.id, state.dispose_timeout_ms)
   const api = pluginApi(state, plugin, scope, plugin.id)
+  // XCOD-276: each plugin's load is in the start-up timeline, so a slow one is named there.
+  const loaded = StartupTrace.begin(`tui plugin ${plugin.id}`, { blocking: false })
   const ok = await Promise.resolve()
     .then(async () => {
       await syncPluginThemes(plugin)
       await plugin.plugin(api, plugin.load.options, plugin.meta)
       return true
     })
+    .finally(loaded)
     .catch((error) => {
       fail("failed to initialize tui plugin", {
         path: plugin.load.spec,

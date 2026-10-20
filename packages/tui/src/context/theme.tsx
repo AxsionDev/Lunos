@@ -145,7 +145,13 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
     }
 
     onMount(() => {
-      void Promise.allSettled([resolveSystemTheme(store.mode), syncCustomThemes()]).finally(() => {
+      const system = resolveSystemTheme(store.mode)
+      const custom = syncCustomThemes()
+      // XCOD-276: the first frame waits only for what the active theme is made of: the terminal's
+      // palette for "system" (a terminal that doesn't answer costs its whole timeout), the theme files
+      // for a custom theme. Otherwise both arrive behind it.
+      const wait = [store.active === "system" ? system : undefined, hasTheme(store.active) ? undefined : custom]
+      void Promise.allSettled(wait).finally(() => {
         setStore("ready", true)
       })
     })
