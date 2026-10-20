@@ -14,6 +14,7 @@ import { SessionTurn } from "@opencode-ai/session-ui/session-turn"
 import { FileSSR } from "@opencode-ai/session-ui/file-ssr"
 import { getWorkerPools } from "@opencode-ai/session-ui/pierre/worker"
 import { toData, type EmbedMessage, type EmbedSession } from "./data"
+import { applyLunosTheme } from "./theme"
 
 export type EmbedInput = {
   session: EmbedSession
@@ -66,7 +67,8 @@ function App(props: { input: EmbedInput }) {
   )
 }
 
-/** Renders the session read-only into `el`; returns a dispose function. */
+/** Renders the session read-only into `el`, in the dark Catppuccin look (./theme); returns a dispose function. */
 export function mount(el: HTMLElement, input: EmbedInput): () => void {
+  applyLunosTheme(el)
   return render(() => <App input={input} />, el)
 }
