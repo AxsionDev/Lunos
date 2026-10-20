@@ -1,5 +1,4 @@
-import { MemoryStorage } from "@opencode-ai/core/memory-storage"
-import type { MemoryStats } from "@opencode-ai/sdk/v2"
+import type { MemoryStats, MemoryStoragePanel } from "@opencode-ai/sdk/v2"
 
 // XCOD-252: /memory's Overview and Activity tabs as list rows. Each count carries the drill-down
 // key its fact ids are under in `stats.groups`; selecting it opens the Facts tab on exactly those.
@@ -25,26 +24,32 @@ export function sparkline(values: readonly number[]) {
 const pct = (value: number | null | undefined) =>
   value === null || value === undefined ? "n/a" : `${Math.round(value * 100)}%`
 
-export function statusLine(stats: MemoryStats) {
-  const s = stats.status
-  const backend = MemoryStorage.short(s.backend)
+/**
+ * The Storage panel's actions, first on the Overview: Change storage… (not when the organisation set
+ * the storage), Test connection, Start container (a stopped one), Open in Settings. With memory off,
+ * Set up memory… and what memory does.
+ */
+export function storageRows(panel: MemoryStoragePanel | undefined, on: boolean): Row[] {
+  const category = "Storage"
+  if (!on || panel?.on === false)
+    return [
+      { title: "Set up memory…", value: "+storage.setup", category, footer: "the setup wizard" },
+      { title: "What memory does", value: "+storage.docs", category, footer: "docs.lunos.tech" },
+    ]
+  if (!panel) return []
   return [
-    s.on ? "Memory: on" : `Memory: off (${s.reason})`,
-    backend,
-    s.encryption === "os-keychain" ? "encrypted" : "not encrypted",
-    s.retentionDays ? `kept ${s.retentionDays} days` : "kept until removed",
-  ].join(" · ")
+    ...(panel.locked ? [] : [{ title: "Change storage…", value: "+storage.change", category }]),
+    { title: "Test connection", value: "+storage.test", category },
+    ...(panel.container?.state === "stopped"
+      ? [{ title: "Start container", value: "+storage.start", category, footer: panel.container.name }]
+      : []),
+    { title: "Open in Settings", value: "+storage.settings", category, footer: "Settings › Memory" },
+  ]
 }
 
 export function overviewRows(stats: MemoryStats): Row[] {
-  const rows: Row[] = [
-    { title: statusLine(stats), value: "status", category: "Status" },
-    {
-      title: `Leaves the computer: ${MemoryStorage.leaves(stats.status.backend.type, undefined, stats.status.backend.host ?? undefined)}`,
-      value: "leaves",
-      category: "Status",
-    },
-  ]
+  // Where memory is stored and what leaves the computer are in the Storage panel above the list.
+  const rows: Row[] = []
   for (const scope of stats.scopes) {
     const category = scope.scope === "project" ? "Project memory" : "User memory"
     if (scope.error) {

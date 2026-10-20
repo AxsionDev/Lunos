@@ -102,8 +102,9 @@ export const environment = Effect.fn("MemorySetupEnv.environment")(function* (in
   const docker = yield* Effect.promise(() => MemoryTemplate.detect())
   const environment: MemoryStorage.Environment = {
     paths: {
-      ...(scopes.includes("project") ? { project: MemoryStore.dir("project", ctx.worktree) } : {}),
-      ...(scopes.includes("user") ? { user: MemoryStore.dir("user", ctx.worktree) } : {}),
+      // The project's root, as memory uses it: outside git the worktree is "/", and the directory is meant.
+      ...(scopes.includes("project") ? { project: MemoryStore.dir("project", MemoryStore.projectRoot(ctx)) } : {}),
+      ...(scopes.includes("user") ? { user: MemoryStore.dir("user", MemoryStore.projectRoot(ctx)) } : {}),
     },
     ...(model ? { model } : {}),
     ...(docker ? { docker } : {}),

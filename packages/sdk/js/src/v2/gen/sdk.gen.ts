@@ -220,6 +220,12 @@ import type {
   MemorySetupTestResponses,
   MemoryStatsErrors,
   MemoryStatsResponses,
+  MemoryStorageGetErrors,
+  MemoryStorageGetResponses,
+  MemoryStorageStartErrors,
+  MemoryStorageStartResponses,
+  MemoryStorageTestErrors,
+  MemoryStorageTestResponses,
   ModelRef,
   MoveSessionDestination,
   OutputFormat,
@@ -4621,6 +4627,98 @@ export class Question extends HeyApiClient {
   }
 }
 
+export class Storage extends HeyApiClient {
+  /**
+   * Memory storage
+   *
+   * What memory uses now: on this computer, a database in Docker, a team database or a managed cloud database, the template that set it up, and its live status. Credentials are never included, only the names of the environment variables or files they come from.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryStorageGetResponses, MemoryStorageGetErrors, ThrowOnError>({
+      url: "/memory/storage",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Test the memory storage
+   *
+   * For a database: connect, write, read and delete a probe. On this computer: the memory check (remember, recall and remove a test fact). Never touches stored facts.
+   */
+  public test<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryStorageTestResponses, MemoryStorageTestErrors, ThrowOnError>({
+      url: "/memory/storage/test",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Start the memory database container
+   *
+   * Start the stopped Docker or Podman container of the memory template in use.
+   */
+  public start<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryStorageStartResponses, MemoryStorageStartErrors, ThrowOnError>({
+      url: "/memory/storage/start",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Setup extends HeyApiClient {
   /**
    * Check a memory database
@@ -5202,6 +5300,11 @@ export class Memory extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _storage?: Storage
+  get storage(): Storage {
+    return (this._storage ??= new Storage({ client: this.client }))
   }
 
   private _setup?: Setup

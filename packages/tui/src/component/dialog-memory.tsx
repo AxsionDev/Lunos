@@ -1,5 +1,8 @@
 import { TextAttributes } from "@opentui/core"
-import { createEffect, createMemo, createResource, createSignal } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js"
+import { openUrl } from "@opencode-ai/core/open"
+import { MemoryStorage } from "@opencode-ai/core/memory-storage"
+import type { MemoryStoragePanel } from "@opencode-ai/sdk/v2"
 import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
@@ -11,7 +14,9 @@ import { exportMemory } from "./dialog-memory-export"
 import { importMemory } from "./dialog-memory-import"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogSettings } from "./dialog-settings"
-import { activityRows, idsFor, overviewRows } from "../util/memory-stats"
+import { DialogConfirm } from "../ui/dialog-confirm"
+import { useMemorySetup } from "./dialog-memory-setup"
+import { activityRows, idsFor, overviewRows, storageRows } from "../util/memory-stats"
 
 // XCOD-252: /memory opens on Overview, with Activity and Facts (the browser below) beside it.
 // The range applies to everything time-based and is kept for the session.
@@ -20,6 +25,67 @@ const TABS: Tab[] = ["overview", "activity", "facts"]
 const TAB_LABEL: Record<Tab, string> = { overview: "Overview", activity: "Activity", facts: "Facts" }
 const RANGES = [7, 30, 90, undefined] as const
 let range: number | undefined = 30
+const DOCS = "https://docs.lunos.tech/docs/memory/"
+
+/** The Storage panel: what memory uses, its status, and the details, in a bordered box. */
+export function StoragePanel(props: { panel?: MemoryStoragePanel; error?: string; testing?: boolean }) {
+  const { theme } = useTheme()
+  const color = () => {
+    const state = props.panel?.status.state
+    return state === "connected" ? theme.success : state === "unreachable" ? theme.error : theme.textMuted
+  }
+  const panel = () => props.panel as MemoryStorage.Panel | undefined
+  return (
+    <box
+      border
+      borderStyle="rounded"
+      borderColor={theme.border}
+      paddingLeft={1}
+      paddingRight={1}
+      flexShrink={0}
+      flexDirection="row"
+    >
+      <box width={10} flexShrink={0}>
+        <text fg={theme.textMuted}>Storage</text>
+      </box>
+      <box flexDirection="column" flexGrow={1} flexShrink={1}>
+        <Show
+          when={panel()}
+          fallback={<text fg={theme.textMuted}>{props.error ? `can't be read: ${props.error}` : "Loading…"}</text>}
+        >
+          {(shown) => (
+            <>
+              <box flexDirection="row" justifyContent="space-between">
+                <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                  {MemoryStorage.panelTitle(shown())}
+                </text>
+                <text fg={props.testing ? theme.textMuted : color()}>
+                  {props.testing ? "… testing" : MemoryStorage.panelStatus(shown())}
+                </text>
+              </box>
+              <For each={MemoryStorage.panelLines(shown())}>
+                {(line) => (
+                  <text
+                    fg={
+                      line.startsWith("✗")
+                        ? theme.error
+                        : line === "Set by your organisation"
+                          ? theme.warning
+                          : theme.textMuted
+                    }
+                    wrapMode="word"
+                  >
+                    {line}
+                  </text>
+                )}
+              </For>
+            </>
+          )}
+        </Show>
+      </box>
+    </box>
+  )
+}
 
 // XCOD-94: the memory browser. Lists every remembered fact with where it came from (read from
 // the provenance ledger, so opening it never starts memory), shows the entities and relationships
@@ -40,8 +106,21 @@ export function DialogMemory(props: { tab?: Tab; filter?: { label: string; ids: 
   const outdateHint = useCommandShortcut("dialog.memory.outdate")
   const [toOutdate, setToOutdate] = createSignal<string>()
   dialog.setSize("large")
+  const memorySetup = useMemorySetup()
 
   const [loadError, setLoadError] = createSignal<unknown>()
+  // The Storage panel, loaded on its own: a slow or unreachable database never holds up the counts.
+  const [storageError, setStorageError] = createSignal<string>()
+  const [testing, setTesting] = createSignal(false)
+  const [panel, { mutate: setPanel }] = createResource(() =>
+    sdk.client.memory.storage
+      .get({}, { throwOnError: true })
+      .then((result) => result.data)
+      .catch((error) => {
+        setStorageError(errorMessage(error))
+        return undefined
+      }),
+  )
   const [toForget, setToForget] = createSignal<string>()
   const [highlighted, setHighlighted] = createSignal<string>()
 
@@ -241,15 +320,66 @@ export function DialogMemory(props: { tab?: Tab; filter?: { label: string; ids: 
     const data = stats()
     if (!data) return []
     const rows = tab() === "overview" ? overviewRows(data) : activityRows(data, factText)
-    const off =
-      tab() === "overview" && !data.status.on
-        ? [{ title: "Set up memory in Settings → Memory", value: "+settings", category: "Status" }]
-        : []
-    return [
-      ...rows.map((row) => ({ title: row.title, value: row.value, category: row.category, footer: row.footer })),
-      ...off,
-    ]
+    const storage = tab() === "overview" ? storageRows(panel(), data.status.on) : []
+    return [...storage, ...rows].map((row) => ({
+      title: row.title,
+      value: row.value,
+      category: row.category,
+      footer: row.footer,
+    }))
   })
+
+  // The panel's actions. Change storage and Set up memory open the setup wizard over /memory; Esc
+  // there (or finishing) comes back here, with the panel read again.
+  const back = () => dialog.replace(() => <DialogMemory />)
+  const wizard = async (start?: "storage") => {
+    const result = await sdk.client.config.settings().catch(() => undefined)
+    const rows = result?.data?.rows
+    if (!rows) return toast.show({ variant: "error", message: "Couldn't load the settings from the server" })
+    const source = rows.find((row) => row.key === "memory.backend.type" || row.key === "memory.enabled")?.source
+    memorySetup({ scope: source === "project" ? "project" : "user", rows, onExit: back, start })
+  }
+  const testConnection = async () => {
+    if (testing()) return
+    setTesting(true)
+    const result = await sdk.client.memory.storage
+      .test({}, { throwOnError: true })
+      .then((got) => got.data)
+      .catch((error) => ({ state: "unreachable" as const, error: { stage: "server", message: errorMessage(error) } }))
+      .finally(() => setTesting(false))
+    if (!result) return
+    const current = panel()
+    if (current) setPanel({ ...current, status: result })
+    if (result.state === "connected")
+      toast.show({
+        variant: "success",
+        message: `Connected${result.server ? ` to ${result.server}` : ""}${result.ms !== undefined ? ` (${result.ms} ms)` : ""}`,
+      })
+    else toast.show({ variant: "error", title: "The test failed", message: result.error?.message ?? "No reason given" })
+  }
+  const startContainer = async () => {
+    const box = panel()?.container
+    if (!box?.name) return
+    const ok = await DialogConfirm.show(dialog, "Start container", `Run ${box.tool} start ${box.name}?`)
+    if (ok !== true) return back()
+    const result = await sdk.client.memory.storage
+      .start({}, { throwOnError: true })
+      .then((got) => got.data)
+      .catch((error) => ({ ok: false, error: errorMessage(error) }))
+    if (result?.ok) toast.show({ variant: "success", message: `Started ${box.name}` })
+    else
+      toast.show({ variant: "error", title: "The container didn't start", message: result?.error ?? "No reason given" })
+    back()
+  }
+  const storageAction = (value: string) => {
+    if (value === "+storage.change") return void wizard("storage")
+    if (value === "+storage.setup") return void wizard()
+    if (value === "+storage.test") return void testConnection()
+    if (value === "+storage.start") return void startContainer()
+    if (value === "+storage.docs") return void openUrl(DOCS).catch(() => toast.show({ variant: "info", message: DOCS }))
+    if (value === "+storage.settings")
+      return dialog.replace(() => <DialogSettings tab="settings" area="Memory" sub="Overview" />)
+  }
 
   if (tab() !== "facts")
     return (
@@ -259,6 +389,9 @@ export function DialogMemory(props: { tab?: Tab; filter?: { label: string; ids: 
           tab() === "overview" ? "What's in memory, where it came from" : "How memory grows and what is recalled"
         }
         options={statsOptions()}
+        header={
+          tab() === "overview" ? <StoragePanel panel={panel()} error={storageError()} testing={testing()} /> : undefined
+        }
         skipFilter
         emptyView={
           loadError() ? (
@@ -270,8 +403,7 @@ export function DialogMemory(props: { tab?: Tab; filter?: { label: string; ids: 
           )
         }
         onSelect={(option) => {
-          if (option.value === "+settings")
-            return dialog.replace(() => <DialogSettings tab="settings" focus="memory.enabled" />)
+          if (option.value.startsWith("+storage.")) return storageAction(option.value)
           const data = stats()
           if (!data) return
           const row = (tab() === "overview" ? overviewRows(data) : activityRows(data, factText)).find(

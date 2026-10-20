@@ -27,6 +27,8 @@ export interface DialogSelectProps<T> {
   /** Text the search box opens with, already applied to the list (XCOD-251's `/marketplace <words>`). */
   initialFilter?: string
   footer?: JSX.Element
+  /** Shown between the title (and search box) and the list, e.g. /memory's Storage panel. */
+  header?: JSX.Element
   emptyView?: JSX.Element
   options: DialogSelectOption<T>[]
   flat?: boolean
@@ -648,6 +650,11 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
           </box>
         </Show>
       </box>
+      <Show when={props.header}>
+        <box paddingLeft={4} paddingRight={4} flexShrink={0}>
+          {props.header}
+        </box>
+      </Show>
       <box flexGrow={1} flexShrink={1}>
         <Show
           when={grouped().length > 0}

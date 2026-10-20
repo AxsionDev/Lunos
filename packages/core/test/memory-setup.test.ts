@@ -150,3 +150,42 @@ describe("memory storage choice (XCOD-264)", () => {
     expect(writes).toContainEqual({ key: "memory.backend.database", unset: true })
   })
 })
+
+describe("the template is recorded", () => {
+  const team = {
+    enabled: true,
+    backend: {
+      type: "neo4j",
+      url: "bolt://localhost:7687",
+      jurisdiction: "local",
+      username: "{env:NEO4J_USER}",
+      password: "{env:NEO4J_PASSWORD}",
+    },
+    encryption: "off" as const,
+    template: "neo4j-docker",
+  }
+
+  test("applying a template writes memory.template; choosing by hand removes it; unchanged writes nothing", () => {
+    const draft = { ...MemorySetup.initial(undefined), template: "just-me" }
+    expect(MemorySetup.writes(draft, undefined, [])).toContainEqual({ key: "memory.template", value: "just-me" })
+    expect(MemorySetup.writes(MemorySetup.initial(team), team, [])).toEqual([])
+    const custom = { ...MemorySetup.initial(team), backend: { type: "embedded" as const }, template: undefined }
+    expect(MemorySetup.writes(custom, team, [])).toContainEqual({ key: "memory.template", unset: true })
+  })
+
+  test("it is locked with memory.backend", () => {
+    const draft = { ...MemorySetup.initial(team), template: "team-hosted" }
+    const rows = [{ key: "memory.backend", locked: true }]
+    expect(MemorySetup.writes(draft, team, rows).some((write) => write.key === "memory.template")).toBe(false)
+  })
+
+  test("Start empty names where the old facts stay", () => {
+    expect(MemorySetup.startEmpty(team)).toBe(
+      "Start empty: the new storage starts with no facts; the old ones stay, untouched, in Neo4j in Docker on this computer (localhost:7687).",
+    )
+    expect(MemorySetup.location({ ...team, template: undefined })).toBe("Team database: Neo4j at localhost:7687")
+    expect(MemorySetup.location({ enabled: true }, { project: "/repo/.opencode/memory/graph" })).toBe(
+      "/repo/.opencode/memory/graph",
+    )
+  })
+})

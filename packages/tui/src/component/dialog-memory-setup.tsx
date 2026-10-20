@@ -103,7 +103,9 @@ export function useMemorySetup() {
   const clipboard = useClipboard()
   const { theme } = useTheme()
 
-  return (input: { scope: Scope; rows: readonly SettingRow[]; onExit: () => void }) => {
+  // `start: "storage"`: /memory's Change storage…, straight to "Where should memory be stored?", with
+  // Esc there going back to /memory and the check run before the summary.
+  return (input: { scope: Scope; rows: readonly SettingRow[]; onExit: () => void; start?: "storage" }) => {
     const memory = sync.data.config.memory as Parameters<typeof MemorySetup.initial>[0]
     const rows = input.rows as readonly MemorySetup.Row[]
     const stop = MemorySetup.blocked(rows, memory)
@@ -125,10 +127,12 @@ export function useMemorySetup() {
         .catch(() => undefined)
       return env ?? { environment: { paths: {}, localModels: [] }, templates: [] }
     }
-    let download = false
+    let download = input.start === "storage"
     const fixed = (key: MemorySetup.Key) => MemorySetup.locked(rows, key)
+    // Over /memory (Change storage…), Esc goes back to it rather than closing everything.
+    const escape = input.start === "storage" ? input.onExit : undefined
     const show = (render: () => any, back?: () => void) =>
-      dialog.replace(render, undefined, back ? { back } : { back: input.onExit })
+      dialog.replace(render, undefined, { back: back ?? input.onExit, escape })
     const saveScope = () => input.scope
     const smallModel = () => sync.data.config.small_model ?? sync.data.config.model ?? "the main model"
 
@@ -160,7 +164,11 @@ export function useMemorySetup() {
       show(
         () => (
           <DialogSelect
-            title="Set up memory · 2 of 6 · Where should memory be stored?"
+            title={
+              input.start === "storage"
+                ? "Change storage · Where should memory be stored?"
+                : "Set up memory · 2 of 6 · Where should memory be stored?"
+            }
             skipFilter
             current={draft.backend.type === "embedded" && !template ? "choose" : undefined}
             options={[
@@ -174,7 +182,7 @@ export function useMemorySetup() {
             onSelect={(option) => void (option.value === "template" ? templates() : cards())}
           />
         ),
-        step1,
+        input.start === "storage" ? input.onExit : step1,
       )
     }
 
@@ -216,6 +224,8 @@ export function useMemorySetup() {
                 const card = list.find((item) => item.kind === option.value)!
                 if (card.unavailable)
                   return toast.show({ variant: "info", message: `${card.title}: ${card.unavailable}`, duration: 5000 })
+                // Chosen by hand: no template ("Custom").
+                draft.template = undefined
                 if (card.kind === "embedded") {
                   draft.backend = { type: "embedded" }
                   template = undefined
@@ -461,6 +471,7 @@ export function useMemorySetup() {
 
     const applyTemplate = async (item: MemorySetupTemplate) => {
       const { environment: machine } = await environment()
+      draft.template = item.name
       const values: { localModel?: string; vendor?: MemorySetup.Database } = {}
       if (item.requires?.includes("local-model")) {
         values.localModel =
@@ -918,7 +929,10 @@ export function useMemorySetup() {
       ]
       const meaning =
         draft.enabled && card ? ["", `Stored: ${card.title}. What this means:`, ...MemoryStorage.meaning(card)] : []
-      const moving = switching ? ["", `You're switching storage. ${MemorySetup.MOVE}`, MemorySetup.START_EMPTY] : []
+      const old = MemorySetup.location(memory, machine.paths)
+      const moving = switching
+        ? ["", `You're switching storage. ${MemorySetup.MOVE}`, MemorySetup.startEmpty(memory, machine.paths)]
+        : []
       show(
         () => (
           <box flexDirection="column">
@@ -933,7 +947,7 @@ export function useMemorySetup() {
                       {
                         title: "Save and start empty",
                         value: "save",
-                        description: "the old facts stay where they are",
+                        description: `the old facts stay in ${old}`,
                       },
                     ]
                   : [
@@ -991,7 +1005,7 @@ export function useMemorySetup() {
       }
       toast.show({
         variant: "success",
-        message: `Moved ${result.facts ?? 0} fact(s), each with where it came from. The old copy is unchanged.`,
+        message: `Moved ${result.facts ?? 0}${result.expected !== undefined ? ` of ${result.expected}` : ""} fact(s), each with where it came from. The old copy is unchanged.`,
         duration: 8000,
       })
       return true
@@ -1035,7 +1049,8 @@ export function useMemorySetup() {
       input.onExit()
     }
 
-    step1()
+    if (input.start === "storage") step2()
+    else step1()
   }
 }
 

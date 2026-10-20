@@ -24,7 +24,7 @@ import { CloudOrg } from "@/cloud/org"
 import { CloudShare } from "@/cloud/share"
 import { MemoryStatsCommand } from "./memory-stats"
 import { MemoryCheckCommand, MemorySetupCommand } from "./memory-setup"
-import { MemoryTemplatesCommand } from "./memory-storage"
+import { MemoryStorageCommand, MemoryTemplatesCommand } from "./memory-storage"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 
 // XCOD-94: the review surface for long-term memory. `list`, `show`, `status`, `verify` and `export`
@@ -247,9 +247,14 @@ export const MemoryStatusCommand = effectCmd({
     const external = where.type !== "embedded"
     // Off means off: with an external database, nothing is opened to count facts (XCOD-134).
     const health = external && !verdict.on ? [] : yield* memory.verify({ origin: "cli" })
+    // The same Storage block as /memory's Overview: what it uses, the template, its status.
+    const { MemoryStoragePanel } = yield* Effect.promise(() => import("@/memory/storage-panel"))
+    const panel = yield* MemoryStoragePanel.load({ where })
     const lines = [
-      verdict.on ? "Memory is on." : `Memory is off: ${verdict.reason}.`,
-      ...backendLines(where),
+      ...(verdict.on ? ["Memory is on."] : []),
+      ...MemoryStorage.panelText(panel),
+      ...(verdict.on ? [] : ["          Set it up with: lunos memory setup"]),
+      ...scopeLines(where),
       `Retention: ${retention.days ? `${retention.days} day(s), then ${retention.graceDays} day(s) before deletion` : "none (facts don't expire unless they have their own date)"}.`,
       `Encryption: ${encryption === "os-keychain" ? `the ledger is encrypted with a key in the OS keychain (${MemoryKey.describe()}); the engine's database files are not` : "off"}.`,
       ...healthLines(health, encryption, external),
@@ -266,34 +271,13 @@ export const MemoryStatusCommand = effectCmd({
   }),
 })
 
-/** XCOD-134: where memory is kept, whether it can be reached, and each scope's count and last write. */
-function backendLines(where: Memory.Where) {
-  if (where.type === "embedded")
-    return [
-      `Stored: ${MemoryStorage.label("embedded")}.`,
-      `  Leaves the computer: ${MemoryStorage.leaves("embedded")}`,
-      ...where.scopes.map(
-        (item) =>
-          `  ${item.scope}: ${item.error ? `can't be read: ${item.error}` : `${item.facts} fact(s), last write ${item.lastWrite ?? "never"}`}`,
-      ),
-    ]
-  const tls =
-    where.tls === "verified"
-      ? "TLS"
-      : where.tls === "unverified"
-        ? "TLS, certificate not verified"
-        : where.tls === "none"
-          ? "no TLS"
-          : undefined
-  const details = [`jurisdiction ${where.jurisdiction ?? "not set"}`, tls, where.readOnly ? "read-only" : undefined]
+/** XCOD-134: each scope's count and last write, and any warning about the connection. */
+function scopeLines(where: Memory.Where) {
   return [
-    `Stored: ${MemoryStorage.label(where.type)}${where.host ? ` at ${where.host}` : ""} (${details.filter(Boolean).join(", ")}).`,
-    `  Leaves the computer: ${MemoryStorage.leaves(where.type, undefined, where.host)}`,
-    ...where.warnings.map((warning) => `  WARNING: ${warning}.`),
-    `  connection: ${where.connection ?? "not opened"}`,
+    ...where.warnings.map((warning) => `WARNING: ${warning}.`),
     ...where.scopes.map(
       (item) =>
-        `  ${item.scope}: ${item.error ? `can't be read: ${item.error}` : `${item.facts} fact(s), last write ${item.lastWrite ?? "never"}`}`,
+        `${item.scope}: ${item.error ? `can't be read: ${item.error}` : `${item.facts} fact(s), last write ${item.lastWrite ?? "never"}`}`,
     ),
   ]
 }
@@ -751,6 +735,7 @@ export const MemoryCommand = cmd({
       .command(MemoryCheckCommand)
       .command(MemorySetupCommand)
       .command(MemoryTemplatesCommand)
+      .command(MemoryStorageCommand)
       .demandCommand(),
   handler: () => {},
 })

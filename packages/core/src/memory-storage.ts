@@ -348,3 +348,195 @@ export function files(template: Template, values: { password: string; port?: num
     example: env.map(([key, value]) => `${key}=${value === "{password}" ? "" : fill(value)}`).join("\n") + "\n",
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// The Storage panel: what memory uses now, and its live status. The server fills `Panel` from the
+// config and this machine (credentials as reference names only, never values); /memory's Overview
+// and `lunos memory status` print it through `panelLines`, so both say the same thing.
+
+export type Place = "embedded" | "docker" | "team" | "cloud"
+
+export type ContainerState = "running" | "stopped" | "missing" | "no-docker"
+
+export type Panel = {
+  on: boolean
+  /** Why memory is off. */
+  reason?: string
+  place: Place
+  vendor?: Kind
+  /** The template that set it up; undefined means set up by hand ("Custom"). */
+  template?: { name: string; title: string; scope?: "user" | "project" }
+  /** memory.backend is set by the organisation: it can't be changed here. */
+  locked: boolean
+  leaves: string
+  encryption: "os-keychain" | "off"
+  retentionDays?: number
+  /** On this computer. */
+  paths?: string[]
+  bytes?: number
+  model?: { id: string; region?: string }
+  /** A database: its URL without credentials, host, region and TLS. */
+  url?: string
+  host?: string
+  jurisdiction?: string
+  tls?: "verified" | "unverified" | "none"
+  readOnly?: boolean
+  /** Where the credentials come from: `{env:…}` variable names or `{file:…}` paths, never values. */
+  credentials?: string[]
+  /** Managed cloud. */
+  provider?: string
+  residency?: { allowed: boolean; reason?: string }
+  /** A database in Docker. */
+  container?: { tool: "docker" | "podman"; name?: string; image?: string; state: ContainerState; project: string }
+  status: {
+    state: "connected" | "unreachable" | "unchecked" | "off"
+    error?: { stage: string; message: string; fix?: string }
+    /** ISO time of the last check. */
+    at?: string
+    ms?: number
+    server?: string
+  }
+}
+
+const VENDOR: Record<Kind, string> = { embedded: "", neo4j: "Neo4j", postgres: "PostgreSQL", memgraph: "Memgraph" }
+
+/** "Neo4j Aura" for its hosts, else the vendor. */
+export function cloudProvider(vendor: Kind | undefined, host: string | undefined) {
+  if (host && /\.neo4j\.io$/i.test(host)) return "Neo4j Aura"
+  if (host && /\.rds\.amazonaws\.com$/i.test(host)) return "Amazon RDS"
+  if (host && /\.postgres\.database\.azure\.com$/i.test(host)) return "Azure Database for PostgreSQL"
+  if (host && /\.supabase\.(co|com)$/i.test(host)) return "Supabase"
+  if (host && /\.neon\.tech$/i.test(host)) return "Neon"
+  return vendor ? `${VENDOR[vendor]} (managed)` : "managed database"
+}
+
+/** "{env:NEO4J_PASSWORD}" → "NEO4J_PASSWORD"; "{file:~/pw}" → "file ~/pw". Anything else isn't shown. */
+export function reference(value: unknown) {
+  if (typeof value !== "string") return undefined
+  const env = /^\{env:([^}]+)\}$/.exec(value.trim())
+  if (env) return env[1]
+  const file = /^\{file:([^}]+)\}$/.exec(value.trim())
+  if (file) return `file ${file[1]}`
+  return undefined
+}
+
+/** The panel's title: "On this computer", "Neo4j in Docker on this computer", "Team database: Neo4j". */
+export function panelTitle(panel: Panel) {
+  if (!panel.on) return "Memory is off"
+  if (panel.place === "embedded") return label("embedded")
+  if (panel.place === "docker")
+    return panel.template?.title ?? `${VENDOR[panel.vendor ?? "neo4j"]} in Docker on this computer`
+  if (panel.place === "cloud")
+    return `Managed cloud database: ${panel.provider ?? cloudProvider(panel.vendor, panel.host)}`
+  return label(panel.vendor)
+}
+
+/** The status, as words with a symbol: never colour alone. */
+export function panelStatus(panel: Panel) {
+  switch (panel.status.state) {
+    case "connected":
+      return "● connected"
+    case "unreachable":
+      return "✗ unreachable"
+    case "off":
+      return "○ memory off"
+    default:
+      return "○ not checked yet"
+  }
+}
+
+/** "just now", "2 min ago", "3 h ago", "4 days ago". */
+export function ago(at: string, now = Date.now()) {
+  const seconds = Math.max(0, Math.round((now - new Date(at).getTime()) / 1000))
+  if (seconds < 60) return "just now"
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h ago`
+  const days = Math.floor(seconds / 86_400)
+  return `${days} day${days === 1 ? "" : "s"} ago`
+}
+
+/** 1536 → "1.5 KB". */
+export function size(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ["KB", "MB", "GB", "TB"]
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit++
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`
+}
+
+const TLS = { verified: "TLS on", unverified: "TLS on (certificate not verified)", none: "TLS off" } as const
+
+const CONTAINER: Record<ContainerState, string> = {
+  running: "● running",
+  stopped: "○ stopped",
+  missing: "✗ missing (not created yet, or removed)",
+  "no-docker": "✗ Docker or Podman not found",
+}
+
+/** The panel's lines under its title and status, the same in the TUI and `lunos memory status`. */
+export function panelLines(panel: Panel, now = Date.now()) {
+  if (!panel.on) return [`${panel.reason ? `${panel.reason}. ` : ""}Nothing is remembered or recalled.`]
+  const lines: string[] = []
+  if (panel.place === "embedded") {
+    lines.push(
+      `Path: ${panel.paths?.length ? panel.paths.join(" and ") : "the Lunos memory directory"}${panel.bytes !== undefined ? ` · ${size(panel.bytes)} on disk` : ""}`,
+    )
+    lines.push(
+      `Model: ${panel.model ? `${panel.model.id}${panel.model.region ? ` (${panel.model.region})` : ""}` : "none configured yet"}`,
+    )
+  } else {
+    const where = panel.place === "docker" ? (panel.url ?? panel.host) : panel.host
+    lines.push(
+      [
+        where ? `${panel.place === "docker" ? "" : "Host: "}${where}` : undefined,
+        panel.place === "docker" ? undefined : `jurisdiction ${panel.jurisdiction ?? "not set"}`,
+        panel.place !== "docker" && panel.tls ? TLS[panel.tls] : undefined,
+        panel.readOnly ? "read-only" : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    )
+    if (panel.container)
+      lines.push(
+        `Container: ${panel.container.name ?? panel.container.project}${panel.container.image ? ` (${panel.container.image})` : ""} · ${CONTAINER[panel.container.state]}`,
+      )
+    if (panel.place === "cloud")
+      lines.push(
+        `Provider: ${panel.provider ?? cloudProvider(panel.vendor, panel.host)} · region ${panel.jurisdiction ?? "not set"} · residency: ${panel.residency ? (panel.residency.allowed ? "allowed" : `blocked (${panel.residency.reason ?? "by your policy"})`) : "not checked"}`,
+      )
+    if (panel.credentials?.length) lines.push(`Credentials: from ${panel.credentials.join(" and ")} (never shown)`)
+  }
+  const checked = panel.status.at
+    ? ` · checked ${ago(panel.status.at, now)}${panel.status.ms !== undefined ? ` (${panel.status.ms} ms)` : ""}`
+    : ""
+  lines.push(
+    `Status: ${panelStatus(panel).slice(2)}${panel.status.server ? ` to ${panel.status.server}` : ""}${checked}`,
+  )
+  if (panel.status.error) {
+    lines.push(`✗ ${panel.status.error.stage}: ${panel.status.error.message}`)
+    if (panel.status.error.fix) lines.push(`Fix: ${panel.status.error.fix}`)
+  }
+  lines.push(`Leaves the computer: ${panel.leaves}`)
+  lines.push(
+    [
+      `Template: ${panel.template?.name ?? "Custom"}`,
+      panel.template?.scope ? `scope: ${panel.template.scope}` : undefined,
+      `encryption: ${panel.place !== "embedded" ? "n/a (on the server)" : panel.encryption === "os-keychain" ? "on (OS keychain)" : "off"}`,
+      panel.retentionDays ? `kept ${panel.retentionDays} days` : "kept until removed",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  )
+  if (panel.locked) lines.push("Set by your organisation")
+  return lines
+}
+
+/** The panel as plain text, for a terminal: the title and status, then the lines under them. */
+export function panelText(panel: Panel, now = Date.now()) {
+  const pad = "          "
+  return [`Storage   ${panelTitle(panel)}   ${panelStatus(panel)}`, ...panelLines(panel, now).map((line) => pad + line)]
+}

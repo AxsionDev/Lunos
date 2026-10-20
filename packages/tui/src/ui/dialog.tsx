@@ -78,6 +78,11 @@ export type DialogNav = {
   /** Part of the /settings window even without a way back (its top level). */
   nav?: boolean
   /**
+   * What Esc does instead of closing the window: a window opened over another screen (/memory's
+   * Change storage…) goes back to it.
+   */
+  escape?: () => void
+  /**
    * `generation` when the opener was set up. A replace from a flow that was still running when the
    * window was closed (a save that finished after Esc) is dropped instead of reopening it.
    */
@@ -89,6 +94,7 @@ type Entry = {
   onClose?: () => void
   nav?: boolean
   back?: () => void
+  escape?: () => void
 }
 
 /** A focused text field whose cursor isn't at its start: ← belongs to it, not to navigation. */
@@ -158,6 +164,7 @@ function init() {
             renderer.clearSelection()
           }
           const current = store.stack.at(-1)
+          if (current?.escape) return current.escape()
           if (current?.nav) return closeAll()
           current?.onClose?.()
           setStore("stack", store.stack.slice(0, -1))
@@ -210,9 +217,11 @@ function init() {
       if (nav && (nav.back || nav.nav)) {
         entry.nav = true
         entry.back = nav.back
+        entry.escape = nav.escape
       } else if (top?.nav) {
         entry.nav = true
         entry.back = top.back
+        entry.escape = top.escape
       }
       if (store.stack.length === 0) {
         focus = renderer.currentFocusedRenderable
@@ -226,7 +235,9 @@ function init() {
     },
     /** Esc's meaning for the current screen, also used by the "esc" labels and the backdrop. */
     dismiss() {
-      if (store.stack.at(-1)?.nav) return closeAll()
+      const current = store.stack.at(-1)
+      if (current?.escape) return current.escape()
+      if (current?.nav) return closeAll()
       api.clear()
     },
     back,
