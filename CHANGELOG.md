@@ -23,6 +23,19 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Manage your organisation's people with `lunos org`, and see your role in `/account`.** Owners
+  and admins list members and pending invitations, invite by e-mail (invitations last 7 days), revoke
+  invitations and remove people; owners also make or remove owners and transfer ownership. Anyone
+  can list their organisations, see whom to ask, leave, and accept or decline the invitations
+  waiting for them. Lunos Cloud checks every action against your role, and when yours can't do it
+  you're told whom to ask, such as "Only an organisation owner can do this. Ask:
+  owner@acme.example". `--json` prints results and refusals for scripts, and `--yes` skips the
+  confirmation. `/account` now shows your role in each organisation ("Owner · Acme GmbH"), your
+  plan, and your invitations with Accept and Decline. **Delete my account** now deletes the account
+  itself 30 days later, after you type `delete` to confirm, and signs you out; the only owner of an
+  organisation is told to transfer ownership first. When the Terms or the Privacy notice change,
+  Lunos Cloud records which version you accepted, and the next start asks you to accept the new one.
+  See "Organisations and roles" in the docs. <!-- XCOD-274 -->
 - **Sign in with a free Lunos account, from inside the TUI.** The official build now opens on a
   Welcome screen the first time: tick the Terms and Privacy notice, choose Create a free account or
   Sign in, and confirm the code shown in large letters (with a QR code) in your browser. New

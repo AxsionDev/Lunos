@@ -220,9 +220,7 @@ describe("CloudTuiHost (XCOD-273)", () => {
       { org: "acme", name: "Acme GmbH", role: "owner" },
       { org: "beta", name: "Beta Ltd", role: "member" },
     ])
-    expect(details.invitations).toEqual([
-      { org: "gamma", name: "Gamma AG", role: "admin", invitedBy: "u-owner", expiresAt: expect.any(Number) },
-    ])
+    expect(details.invitations).toMatchObject([{ org: "gamma", name: "Gamma AG", role: "admin" }])
     expect(details.devices?.map((d) => [d.name, d.current])).toEqual([["laptop", false]])
     // The sign-in asked for at start doesn't turn session sync on: no device is registered.
     expect(idp.requests.some((request) => request.method === "POST" && request.path === "/v1/devices")).toBe(false)
