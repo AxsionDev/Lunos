@@ -283,6 +283,8 @@ export async function relaunch(
     handoff?: string
     /** The sandbox settings saved for this restart (XCOD-279); by default this process's journal. */
     changes?: SandboxRollback.Change[]
+    /** XCOD-281: start again without the sandbox after this failure, or with it (Retry). */
+    sandbox?: Handoff["sandbox"]
   } = {},
 ) {
   const argv = input.argv ?? process.argv
@@ -328,6 +330,8 @@ export async function relaunch(
       attach: request.attach,
       manual,
       changes: input.changes ?? SandboxRollback.take(),
+      ...(input.sandbox ? { sandbox: input.sandbox } : {}),
+      ...(request.queued ? { queued: true } : {}),
     })
   } catch (error) {
     return fail(`couldn't save the session handoff (${error instanceof Error ? error.message : String(error)})`)

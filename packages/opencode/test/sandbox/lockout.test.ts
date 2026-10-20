@@ -18,7 +18,8 @@ import { SandboxExec } from "../../src/sandbox/exec"
 import { SandboxGit } from "../../src/sandbox/git"
 import { SandboxPreflight } from "../../src/sandbox/preflight"
 import { SandboxRollback } from "../../src/sandbox/rollback"
-import { checkLines, fallback } from "../../src/cli/cmd/sandbox"
+import { checkLines, failed } from "../../src/cli/cmd/sandbox"
+import { SandboxDisabled } from "../../src/sandbox/disabled"
 import { tmpdir } from "../fixture/fixture"
 
 const STOPPED =
@@ -371,23 +372,20 @@ describe("never locked out", () => {
     return { dir, file }
   }
 
+  // XCOD-281 replaced the "Start without the sandbox?" question: the TUI is already open, so the
+  // sandbox is turned off here (local state) and Lunos starts again without it.
   test("after /restart, the sandbox change is undone and Lunos starts as before", async () => {
-    let paused = 0
     const { dir, file } = await project({ enabled: true })
     await using _ = dir
     const changes = [
       { key: "sandbox.enabled", file, path: ["sandbox", "enabled"], had: true, previous: false, value: true },
     ]
-    const ask = async () => {
-      throw new Error("not asked: the rollback decides")
-    }
-    expect(
-      await fallback(failure, dir.path, changes, ask, true, async () => {
-        paused++
-      }),
-    ).toBe("host")
-    expect(paused).toBe(1)
+    const state = failed(failure, dir.path, changes)
+    expect(state.status).toBe("failed")
+    expect(state.status === "failed" && state.failure.reason).toContain("`sandbox.enabled` was undone")
     expect(JSON.parse(readFileSync(file, "utf8")).sandbox.enabled).toBe(false)
+    // Off in the config again, so nothing is left in local state either.
+    expect(SandboxDisabled.get(dir.path)).toBeUndefined()
   })
 
   test("a change edited since isn't touched", () => {
@@ -398,26 +396,27 @@ describe("never locked out", () => {
     ).toEqual([])
   })
 
-  test("interactive: Yes starts without the sandbox, Quit doesn't start", async () => {
-    const { dir } = await project({ enabled: true })
+  test("a failure turns the sandbox off here, with the reason and fix, and no config file changes", async () => {
+    const { dir, file } = await project({ enabled: true })
     await using _ = dir
-    expect(await fallback(failure, dir.path, [], async () => "yes", true)).toBe("host")
-    expect(await fallback(failure, dir.path, [], async () => "quit", true)).toBe("quit")
-    expect(process.exitCode).toBe(1)
+    const before = readFileSync(file)
+    const stopped = new SandboxError({ step: "detect", reason: "docker info failed", stderr: STOPPED })
+    const state = failed(stopped, dir.path)
+    expect(state).toMatchObject({ status: "failed", failure: { reason: "docker info failed" } })
+    expect(state.status === "failed" && state.failure.fix).toContain("isn't running")
+    expect(SandboxDisabled.get(dir.path)).toMatchObject({ reason: "docker info failed" })
+    expect(readFileSync(file).equals(before)).toBe(true)
+    SandboxDisabled.clear(dir.path)
   })
 
-  test("non-interactive: the error stands (exit 1 with the reason)", async () => {
-    const { dir } = await project({ enabled: true })
-    await using _ = dir
-    await expect(fallback(failure, dir.path, [], async () => "yes", false)).rejects.toBe(failure)
-  })
-
-  test("sandbox.required: no fallback, no rollback", async () => {
+  test("sandbox.required: no fallback, no rollback, nothing turned off", async () => {
     const { dir, file } = await project({ required: true })
     await using _ = dir
     const changes = [{ key: "sandbox.required", file, path: ["sandbox", "required"], had: false, value: true }]
-    await expect(fallback(failure, dir.path, changes, async () => "yes", true)).rejects.toBe(failure)
+    const state = failed(failure, dir.path, changes)
+    expect(state).toMatchObject({ status: "blocked", failure: { requiredBy: "config" } })
     expect(JSON.parse(readFileSync(file, "utf8")).sandbox.required).toBe(true)
+    expect(SandboxDisabled.get(dir.path)).toBeUndefined()
   })
 })
 

@@ -20,7 +20,7 @@ import { open } from "node:fs/promises"
 import { Effect } from "effect"
 import { UI } from "../ui"
 import { effectCmd, fail } from "../effect-cmd"
-import { wanted as sandboxWanted } from "./sandbox"
+import { wanted as sandboxWanted, strictArg } from "./sandbox"
 import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
@@ -306,7 +306,8 @@ export const RunCommand = effectCmd({
       })
       .option("sandbox", {
         type: "boolean",
-        describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
+        describe:
+          "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>. If it can't start, the run warns and goes on without it; --sandbox=strict fails instead",
       })
       .option("unattended", {
         // XCOD-211: set by `lunos agent run`. Nobody can answer a permission prompt, so each one is
@@ -340,7 +341,11 @@ export const RunCommand = effectCmd({
         coerce: cloudSecretNames,
         describe:
           "with --cloud: send this environment variable to the worker for this run (repeat it, or NAME,NAME); nothing else is sent",
-      }),
+      })
+      // XCOD-281: `--sandbox=strict` is --sandbox that may not fall back; yargs would read it as false.
+      .middleware((argv) => {
+        if (strictArg()) argv.sandbox = true
+      }, true),
   handler: Effect.fn("Cli.run")(function* (args) {
     if (args.sandbox === false && !args.attach) {
       const { refuseHost } = yield* Effect.promise(() => import("./sandbox"))
@@ -368,6 +373,13 @@ export const RunCommand = effectCmd({
               } as never)
             },
             { keep: args.keep, rm: args.rm },
+            // XCOD-281: a sandbox that can't start warns and runs here, unless --sandbox=strict or required.
+            {
+              strict: strictArg(),
+              host: async () => {
+                await RunCommand.handler!({ ...args, sandbox: false } as never)
+              },
+            },
           ),
         catch: (error) => error,
       }).pipe(Effect.catch((error) => failRecorded(error)))

@@ -43,6 +43,7 @@
     "./util/persistence": "./src/util/persistence.ts",
     "./util/record": "./src/util/record.ts",
     "./util/restart": "./src/util/restart.ts",
+    "./util/sandbox": "./src/util/sandbox.ts",
     "./util/account": "./src/util/account.ts",
     "./logo": "./src/logo.ts",
     "./ui/dialog": "./src/ui/dialog.tsx",

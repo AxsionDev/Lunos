@@ -5,6 +5,8 @@ import type { SettingRow, SettingsSnapshot } from "@opencode-ai/sdk/v2"
 import { versionDetail } from "@opencode-ai/core/installation/version"
 import { useTheme } from "../context/theme"
 import { useSDK } from "../context/sdk"
+import { useSandbox } from "../context/sandbox"
+import { DialogLog } from "./dialog-logs"
 import { useSync } from "../context/sync"
 import { useLocal } from "../context/local"
 import { useRoute } from "../context/route"
@@ -112,6 +114,31 @@ export function DialogSettings(props: {
   const [highlighted, setHighlighted] = createSignal<string | undefined>(props.focus)
   const tabsOf = () => (props.area ? (Sections.SUBTABS[props.area] ?? []) : [])
   const [sub, setSub] = createSignal<string | undefined>(props.sub ?? tabsOf()[0])
+  // XCOD-281: the sandbox's last failure, while it's off after one (or required and not running).
+  const sandbox = useSandbox()
+  const sandboxFailure = () => {
+    const state = sandbox.state()
+    return state?.status === "off" || state?.status === "blocked" ? state.failure : undefined
+  }
+  function sandboxAction(action: string) {
+    const failure = sandboxFailure()
+    if (action === "log") return dialog.replace(() => <DialogLog file={failure?.log?.file} />)
+    if (action === "reenable") {
+      sandbox.host?.reenable()
+      return toast.show({
+        variant: "success",
+        message: "The sandbox is on again from the next start. Retry starts it now.",
+      })
+    }
+    if (action === "retry") {
+      dialog.clear()
+      return void keymap.dispatchCommand("sandbox.retry")
+    }
+    if (action === "doctor") {
+      dialog.clear()
+      return void keymap.dispatchCommand("sandbox.doctor")
+    }
+  }
   /** The Settings home: a list of sections, unless something is typed. */
   const atHome = () => !props.section && !props.area
 
@@ -823,6 +850,23 @@ export function DialogSettings(props: {
         })),
         ...list,
       ]
+    // XCOD-281: Permissions › Sandbox starts with the last failure, while it holds the sandbox off.
+    const failure = sandboxFailure()
+    if (props.area === "Permissions" && sub() === "Sandbox" && !query() && failure)
+      return [
+        {
+          title: `Last failure: ${failure.fix ?? failure.reason}`,
+          value: "+sandbox.log",
+          description: `${new Date(failure.time).toLocaleString()}${failure.log ? ` · ${failure.log.file}` : ""}`,
+          footer: "open log",
+        },
+        ...(sandbox.state()?.status === "off"
+          ? [{ title: "Re-enable the sandbox", value: "+sandbox.reenable", footer: "from the next start" }]
+          : []),
+        { title: "Retry the sandbox now", value: "+sandbox.retry" },
+        { title: "Run doctor", value: "+sandbox.doctor", footer: "lunos sandbox doctor" },
+        ...list,
+      ]
     if (props.area !== MEMORY || sub() !== "Overview" || query()) return list
     // Memory › Overview: the status, the guided setup and the analytics.
     const config = sync.data.config.memory
@@ -1010,6 +1054,7 @@ export function DialogSettings(props: {
                     generation,
                   })
                 if (option.value === "+memory.analytics") return dialog.replace(() => <DialogMemory />)
+                if (option.value.startsWith("+sandbox.")) return sandboxAction(option.value.slice("+sandbox.".length))
                 if (option.value.startsWith("+external.consent."))
                   return pickConsent(option.value.slice("+external.consent.".length) as "claude" | "codex")
                 // A search result from the home opens its section and sub-tab, on that row.
