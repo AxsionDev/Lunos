@@ -4,9 +4,11 @@ import { MemorySetup } from "@opencode-ai/core/memory-setup"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import type { Residency } from "@opencode-ai/core/residency"
 import type { ConfigMemory } from "@opencode-ai/core/config/memory"
-import { effectCmd } from "../effect-cmd"
+import { cmd } from "./cmd"
+import { effectCmd, fail } from "../effect-cmd"
 import { writeStdoutEffect } from "../stdout"
 import type { MemoryTemplate } from "@/memory/template"
+import type { CheckResult } from "./memory-setup"
 
 // The memory modules are imported when used, not when the CLI loads (like memory-setup.ts does).
 const external = () => import("@/memory/external").then((mod) => mod.MemoryExternal)
@@ -157,12 +159,17 @@ async function choose(input: {
       say(`${card.title}: ${card.unavailable}.`)
       continue
     }
+    // Chosen by hand: no template ("Custom").
     if (card.kind === "embedded") {
-      const draft = { ...input.draft, backend: { type: "embedded" as const } }
+      const draft = { ...input.draft, backend: { type: "embedded" as const }, template: undefined }
       if (draft.encryption === "off") draft.encryption = "os-keychain"
       return { kind: "ok", draft }
     }
-    return database({ ...input, type: card.kind as MemorySetup.Database })
+    return database({
+      ...input,
+      draft: { ...input.draft, template: undefined },
+      type: card.kind as MemorySetup.Database,
+    })
   }
 }
 
@@ -248,6 +255,8 @@ async function applyTemplate(input: {
     }
   if (template.unavailable)
     return { kind: "fail", message: `${template.title} can't be used here: ${template.unavailable}` }
+  // Recorded as memory.template, so /memory and lunos memory status can say which template set it up.
+  const base = { ...input.draft, template: template.name }
   say(`${template.title}${template.description ? `: ${template.description}` : ""}`)
   say(`Leaves the computer: ${template.leaves}.`)
 
@@ -282,7 +291,7 @@ async function applyTemplate(input: {
     if (!interactive && (!args.url || !args.jurisdiction))
       return { kind: "fail", message: `${template.title} needs --url and --jurisdiction with --yes` }
     const memory = MemoryStorage.memoryOf(template, { vendor: type })
-    const draft = MemorySetup.apply(input.draft, memory)
+    const draft = MemorySetup.apply(base, memory)
     if (!interactive) {
       const backend = {
         type,
@@ -306,7 +315,7 @@ async function applyTemplate(input: {
   }
 
   const memory = MemoryStorage.memoryOf(template, values)
-  const draft = MemorySetup.apply(input.draft, memory)
+  const draft = MemorySetup.apply(base, memory)
   if (!template.compose) return { kind: "ok", draft }
 
   // A Docker template: preview everything, write after confirming, start only when asked.
@@ -407,4 +416,171 @@ export const MemoryTemplatesCommand = effectCmd({
     ])
     yield* writeStdoutEffect(lines.join(EOL) + EOL)
   }),
+})
+
+/**
+ * `lunos memory storage set`: what /memory's Change storage… does. A template (`--template`) or a
+ * storage (`--backend`), then, when that moves memory somewhere else, what happens to the facts you
+ * have: `--move` (export and import them, every fact with its provenance, counted) or `--empty` (the
+ * old storage is left untouched). With `--yes` one of the two is required: nothing is guessed.
+ */
+export const MemoryStorageSetCommand = effectCmd({
+  command: "set",
+  describe:
+    "change where memory is stored, from a template or a storage; --move or --empty says what happens to your facts",
+  builder: (yargs) =>
+    yargs
+      .option("template", { type: "string", describe: "a template (see lunos memory templates)" })
+      .option("backend", {
+        type: "string",
+        choices: ["embedded", "neo4j", "postgres"],
+        describe: "the storage: embedded (on this computer), neo4j or postgres",
+      })
+      .option("url", { type: "string", describe: "a database's URL" })
+      .option("jurisdiction", { type: "string", describe: 'where the database runs, e.g. "EU-DE"' })
+      .option("vendor", { type: "string", choices: ["neo4j", "postgres"], describe: "team templates: the database" })
+      .option("move", { type: "boolean", describe: "move the facts you have to the new storage" })
+      .option("empty", { type: "boolean", describe: "start empty; the old storage is left untouched" })
+      .option("yes", { type: "boolean", describe: "don't ask: needs --move or --empty when the storage changes" })
+      .option("project", { type: "boolean", describe: "save to this project's config instead of your user config" })
+      .option("start", { type: "boolean", describe: "with a Docker template and --yes: start the database" })
+      .option("check", { type: "boolean", default: true, describe: "run the memory check (--no-check skips it)" })
+      .check((argv) => {
+        if (!argv.template === !argv.backend) throw new Error("Give one of --template or --backend")
+        if (argv.move && argv.empty) throw new Error("--move and --empty can't be used together")
+        return true
+      }),
+  handler: Effect.fn("Cli.memory.storage.set")(function* (args: {
+    template?: string
+    backend?: string
+    url?: string
+    jurisdiction?: string
+    vendor?: string
+    move?: boolean
+    empty?: boolean
+    yes?: boolean
+    project?: boolean
+    start?: boolean
+    check?: boolean
+  }) {
+    const { ConfigSettings } = yield* Effect.promise(() => import("@/config/settings"))
+    const { Config } = yield* Effect.promise(() => import("@/config/config"))
+    const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))
+    const { MemorySetupEnv } = yield* Effect.promise(() => import("@/memory/setup-env"))
+    const { MemorySetupCheck } = yield* Effect.promise(() => import("@/memory/setup-check"))
+    const { AuditLog } = yield* Effect.promise(() => import("@/audit/log"))
+    const Setup = yield* Effect.promise(() => import("./memory-setup"))
+    const prompts = yield* Effect.promise(() => import("@clack/prompts"))
+    const print = (text: string) => writeStdoutEffect(text + EOL)
+
+    if (!args.yes && !process.stdin.isTTY)
+      return yield* fail("lunos memory storage set asks before saving. Run it in a terminal, or add --yes")
+    const instance = yield* InstanceRef
+    const ctx = { directory: instance?.directory ?? process.cwd(), worktree: instance?.worktree }
+    const config = yield* Config.Service.use((cfg) => cfg.get())
+    const origins = yield* Config.Service.use((cfg) => cfg.origins())
+    const locked = yield* Effect.promise(() => ConfigSettings.lockedKeys())
+    const rows = yield* Effect.promise(() => ConfigSettings.list({ config, origins, locked, ctx }))
+    const memory = config.memory as Parameters<typeof MemorySetup.initial>[0]
+    if (MemorySetup.locked(rows, "memory.backend"))
+      return yield* fail("Set by your organisation: memory.backend is locked, so the storage can't be changed here")
+    const stop = MemorySetup.blocked(rows, memory)
+    if (stop) return yield* fail(stop)
+    const scope = args.project ? ("project" as const) : ("user" as const)
+    const residency = AuditLog.residency(config)
+    const env = yield* MemorySetupEnv.environment()
+    let draft: MemorySetup.Draft = { ...MemorySetup.initial(memory), enabled: true }
+    let started: Record<string, string> | undefined
+    let notStarted = false
+
+    if (args.template) {
+      const outcome = yield* Effect.promise(() =>
+        storage({ prompts, env, draft, residency, worktree: ctx.worktree ?? ctx.directory, args }),
+      )
+      if (outcome.kind === "cancel") return yield* print("Cancelled. Nothing was saved.")
+      if (outcome.kind === "fail") return yield* fail(outcome.message)
+      draft = outcome.draft
+      started = outcome.template?.env
+      notStarted =
+        !outcome.template &&
+        draft.backend.type !== "embedded" &&
+        !!MemoryStorage.find(env.templates, args.template)?.compose
+    } else if (args.backend === "embedded") {
+      draft = { ...draft, backend: { type: "embedded" }, template: undefined }
+      if (draft.encryption === "off" && !memory?.encryption) draft.encryption = "os-keychain"
+    } else {
+      const type = args.backend as MemorySetup.Database
+      if (!args.url || !args.jurisdiction) return yield* fail(`--backend ${type} needs --url and --jurisdiction`)
+      const current = memory?.backend?.type === type ? memory.backend : undefined
+      const backend = {
+        type,
+        url: args.url,
+        jurisdiction: args.jurisdiction,
+        username: current?.username ?? DEFAULT_USER[type],
+        password: current?.password ?? DEFAULT_PASSWORD[type],
+      }
+      const tested = yield* Effect.promise(() => test({ memory: { backend, encryption: "off" }, residency }))
+      if (!tested.ok && (tested.error.stage === "settings" || tested.error.stage === "residency"))
+        return yield* fail(`That database can't be used: ${tested.error.message}`)
+      draft = { ...draft, backend, encryption: "off", template: undefined }
+    }
+
+    const writes = MemorySetup.writes(draft, memory, rows)
+    if (!writes.length) return yield* print("Memory already uses that storage. Nothing changed.")
+    let how: "move" | "empty" | undefined
+    if (MemorySetup.switching(memory, draft)) {
+      if (args.move) how = "move"
+      else if (args.empty) how = "empty"
+      else if (args.yes)
+        return yield* fail(
+          "You're switching storage: add --move (move the facts you have) or --empty (start empty; the old ones stay where they are)",
+        )
+      else {
+        const picked = yield* Effect.promise(() =>
+          prompts.select({
+            message: "You're switching storage. What happens to the facts you have?",
+            options: [
+              { value: "move", label: "Move my facts", hint: MemorySetup.MOVE.replace(/^Move my facts: /, "") },
+              {
+                value: "empty",
+                label: "Start empty",
+                hint: `the old facts stay in ${MemorySetup.location(memory, env.environment.paths)}`,
+              },
+            ],
+          }),
+        )
+        if (prompts.isCancel(picked)) return yield* print("Cancelled. Nothing was saved.")
+        how = picked as "move" | "empty"
+      }
+    } else if (args.move) yield* print("Memory wasn't in use before, so there are no facts to move.")
+
+    // After switching, the memory check, against what is about to be saved.
+    if (args.check && !notStarted) {
+      yield* print("Checking memory works with the new storage…")
+      const check = (yield* Effect.promise(() =>
+        MemorySetupCheck.run({ directory: ctx.directory, memory: MemorySetup.block(draft), env: started }),
+      )) as CheckResult
+      yield* print(Setup.checkLine(check))
+      if (!check.ok) process.exitCode = 1
+    }
+    if (!args.yes) {
+      const save = yield* Effect.promise(() =>
+        prompts.confirm({
+          message: `Save ${writes.map((write) => ("unset" in write ? `${write.key} (remove)` : `${write.key} = ${write.value}`)).join(", ")} to the ${scope} config?`,
+        }),
+      )
+      if (prompts.isCancel(save) || save !== true) return yield* print("Cancelled. Nothing was saved.")
+    }
+    if (how === "move") yield* Setup.moveOrFail(MemorySetup.block(draft), started)
+    if (how === "empty") yield* print(MemorySetup.startEmpty(memory, env.environment.paths))
+    yield* Setup.saveWrites({ writes, scope, ctx, locked, via: "lunos memory storage set" })
+    yield* print(`Saved ${writes.length} setting(s) to the ${scope} config. Restart Lunos for memory to use them.`)
+  }),
+})
+
+export const MemoryStorageCommand = cmd({
+  command: "storage",
+  describe: "change where memory is stored (lunos memory status shows where it is now)",
+  builder: (yargs) => yargs.command(MemoryStorageSetCommand).demandCommand(),
+  handler: () => {},
 })

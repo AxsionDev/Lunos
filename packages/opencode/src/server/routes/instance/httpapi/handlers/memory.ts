@@ -33,6 +33,7 @@ import { MemorySetupCheck } from "@/memory/setup-check"
 import { MemorySetupEnv } from "@/memory/setup-env"
 import { MemoryTemplate } from "@/memory/template"
 import { MemoryMove } from "@/memory/move"
+import { MemoryStoragePanel } from "@/memory/storage-panel"
 import { MemoryStorage } from "@opencode-ai/core/memory-storage"
 import type { ConfigMemory } from "@opencode-ai/core/config/memory"
 
@@ -331,11 +332,13 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
         }).pipe(Effect.result)
         if (exported._tag === "Failure")
           return { ok: false, error: `Could not read the facts to move: ${exported.failure.message}` }
-        if (!exported.success.manifest.counts.facts.total) return { ok: true, facts: 0, output: "No facts to move." }
+        const expected = exported.success.manifest.counts.facts.total
+        if (!expected) return { ok: true, facts: 0, expected, output: "No facts to move." }
         for (const scope of SCOPES) yield* memory.release(scope)
-        return yield* Effect.promise(() =>
+        const moved = yield* Effect.promise(() =>
           MemoryMove.run({ directory: instance.directory, memory: ctx.payload.memory, to, bundle, env }),
         )
+        return { ...MemoryMove.counted(moved, expected), expected }
       }).pipe(Effect.ensuring(Effect.promise(() => fs.rm(dir, { recursive: true, force: true }))))
     })
 
@@ -438,7 +441,20 @@ export const memoryHandlers = HttpApiBuilder.group(InstanceHttpApi, "memory", (h
       }
     })
 
+    const storage = Effect.fn("MemoryHttpApi.storage")(function* () {
+      return yield* MemoryStoragePanel.load()
+    })
+    const storageTest = Effect.fn("MemoryHttpApi.storageTest")(function* () {
+      return yield* MemoryStoragePanel.test()
+    })
+    const storageStart = Effect.fn("MemoryHttpApi.storageStart")(function* () {
+      return yield* MemoryStoragePanel.startContainer()
+    })
+
     return handlers
+      .handle("storage", storage)
+      .handle("storageTest", storageTest)
+      .handle("storageStart", storageStart)
       .handle("stats", stats)
       .handle("setupBackend", setupBackend)
       .handle("setupCheck", setupCheck)

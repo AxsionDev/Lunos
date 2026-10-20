@@ -23,6 +23,19 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **See what memory uses at the top of `/memory`, and change it from there.** The Overview tab now
+  opens with a Storage panel: on this computer (with the path, size on disk, and the model and its
+  region), a database in Docker (with the container's name, image and whether it's running), a team
+  database (host, jurisdiction and TLS; credentials are never shown, only the variable names they
+  come from) or a managed cloud database (provider, region and whether your residency policy allows
+  it). It shows the template that set it up and its live status. **Change storage…** opens the
+  templates and storage cards and asks whether to move your facts or start empty. **Move my facts**
+  counts them on both sides, and **Start empty** says where the old ones stay. **Test connection**
+  updates "checked", **Start container** restarts a stopped Docker database, and **Open in
+  Settings** goes to Settings › Memory. When your organisation sets the storage, the panel says so.
+  `lunos memory status` prints the same block, and `lunos memory storage set --template <name>` or
+  `--backend <type>`, with `--move` or `--empty`, changes it from a script. <!-- XCOD-277 -->
+
 - **`lunos sandbox doctor` checks whether a sandbox can start on this machine.** It lists each check
   (Docker or Podman installed and running, Linux containers, the git repository, the workspace mode,
   the image, and a throwaway test container) with pass or fail and, for a failure, what to do.
@@ -40,6 +53,16 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   **Open log**.
 - **Log retention settings.** Lunos keeps the last 10 runs plus failed runs from the last 14 days,
   within 50 MB. Change this with `log.retention_days` and `log.max_mb`; an organisation can lock it.
+- **A different tip every time.** The home screen shows a new tip on each start, and a turn that
+  runs for more than 3 seconds shows one line under the working indicator. Tips come from a deck
+  shuffled for you, so none repeats until you've seen them all, and the same tip never shows twice
+  in a row. There are now over 230 tips about Lunos itself: the Agent Monitor, the marketplace,
+  memory, Claude Code and Codex sessions, language servers, sandboxes, your account and more. Tips
+  only appear when they apply to you (memory tips once memory is on, nothing about a feature your
+  organisation has turned off), and a tip shows your own key when you've changed a keybind. `/tips`
+  lists every tip by category, searchable, with the ones you've seen marked; `tips_next` (unbound
+  by default) shows another; "Hide tips" stays, and `"tips": false` in `tui.json` turns them off.
+  Which tips you've seen is kept on your computer only. <!-- XCOD-278 -->
 
 ### Fixed
 

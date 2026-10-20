@@ -353,6 +353,29 @@ will notice.
 `bun script/check-changelog.ts --lint` (run on every pull request) fails on a ticket id outside a
 comment, or a user-facing entry without a bold lead.
 
+### Writing TUI tips
+
+Tips live in `packages/tui/src/feature-plugins/home/tips.json`: an `id`, a `category`, the `text`,
+and optionally `requires` and `config`.
+
+- **One sentence, at most 110 characters**, as shown (keys filled in). No full stop at the end.
+- **Start with a verb or the command,** and say what you get: "Run `/lsp` to see every language
+  server…", not "There is an LSP panel".
+- **Commands in `{highlight}…{/highlight}`;** keys as `{key:<keybind name>}` (the name from
+  `tui.json`'s `keybinds`, such as `command_list`), never typed out. A tip whose key is set to
+  `none` is skipped.
+- **No ticket ids** and no "parity", "compliant" or "certified".
+- **`id` is permanent:** the deck in each user's kv stores ids, so never reuse or rename one.
+- **`requires`** lists conditions that must all hold: `memory.on`, `memory.off`, `external.enabled`,
+  `signedIn`, `notWindows`, `mcp.configured`, `lsp.on`, `share.enabled`, `plugin:<name>` or
+  `flag:<name>`. Mark a tip for a feature that hasn't shipped `flag:<name>`; it stays hidden until
+  that flag exists and is on.
+- **`config`** names every config key the text mentions, as a dotted path (`memory.retention.days`).
+
+`packages/opencode/test/cli/tips.test.ts` fails when a tip names a `/command`, a `lunos` subcommand
+or option, a config key, a keybind or an environment variable that doesn't exist, and
+`packages/tui/test/util/tips.test.ts` checks the rules above.
+
 ## Feature Requests
 
 For net-new functionality, start with a design conversation. Open an issue describing the problem, your proposed approach (optional), and why it belongs in Lunos. The core team will help decide whether it should move forward; please wait for that approval instead of opening a feature PR directly.

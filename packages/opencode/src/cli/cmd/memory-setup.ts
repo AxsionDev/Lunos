@@ -417,33 +417,9 @@ export const MemorySetupCommand = effectCmd({
       )
       if (cancelled(save) || save !== true) return yield* quit()
     }
-    if (how === "empty") yield* say(MemorySetup.START_EMPTY)
-    if (how === "move") {
-      const moved = yield* moveFacts(MemorySetup.block(draft), template?.env)
-      if (!moved.ok) return yield* fail(`Your facts weren't moved, and nothing was saved: ${moved.error}`)
-      yield* say(`Moved ${moved.facts ?? 0} fact(s), each with where it came from. The old copy is unchanged.`)
-    }
-    for (const write of writes) {
-      // The same validation and locks as `lunos settings set`; a refusal stops before the next key.
-      yield* Effect.tryPromise({
-        try: () =>
-          "unset" in write
-            ? ConfigSettings.unset({ key: write.key, scope, ctx, locked: lockedKeys, via: "lunos memory setup" })
-            : ConfigSettings.set({
-                key: write.key,
-                value: write.value,
-                scope,
-                ctx,
-                locked: lockedKeys,
-                via: "lunos memory setup",
-              }),
-        catch: (error) => error,
-      }).pipe(
-        Effect.catch((error) =>
-          fail(`${write.key} not saved: ${error instanceof Error ? error.message : String(error)}`),
-        ),
-      )
-    }
+    if (how === "empty") yield* say(MemorySetup.startEmpty(memory, storageEnv.environment.paths))
+    if (how === "move") yield* moveOrFail(MemorySetup.block(draft), template?.env)
+    yield* saveWrites({ writes, scope, ctx, locked: lockedKeys, via: "lunos memory setup" })
     yield* say(
       writes.length
         ? `Saved ${writes.length} setting(s) to the ${scope} config. Restart Lunos for memory to use them.`
@@ -460,6 +436,43 @@ function hostOf(url: string) {
     return undefined
   }
 }
+
+/** Move my facts, or stop before anything is saved: "Moved 3 of 3 fact(s)…". */
+export const moveOrFail = Effect.fn("Cli.memory.setup.moveOrFail")(function* (
+  block: Record<string, unknown>,
+  env: Record<string, string> | undefined,
+) {
+  const moved = yield* moveFacts(block, env)
+  if (!moved.ok) return yield* fail(`Your facts weren't moved, and nothing was saved: ${moved.error}`)
+  yield* print(
+    `Moved ${moved.facts ?? 0}${moved.expected ? ` of ${moved.expected}` : ""} fact(s), each with where it came from. The old copy is unchanged.`,
+  )
+})
+
+/** The settings writes, through the same validation and locks as `lunos settings set`; a refusal stops before the next key. */
+export const saveWrites = Effect.fn("Cli.memory.setup.save")(function* (input: {
+  writes: readonly { key: string; value?: string; unset?: true }[]
+  scope: "user" | "project"
+  ctx: { directory: string; worktree?: string }
+  locked: Awaited<ReturnType<typeof import("@/config/settings").ConfigSettings.lockedKeys>>
+  via: string
+}) {
+  const { ConfigSettings } = yield* Effect.promise(() => import("@/config/settings"))
+  for (const write of input.writes) {
+    const common = { key: write.key, scope: input.scope, ctx: input.ctx, locked: input.locked, via: input.via }
+    yield* Effect.tryPromise({
+      try: () =>
+        write.unset || write.value === undefined
+          ? ConfigSettings.unset(common)
+          : ConfigSettings.set({ ...common, value: write.value }),
+      catch: (error) => error,
+    }).pipe(
+      Effect.catch((error) =>
+        fail(`${write.key} not saved: ${error instanceof Error ? error.message : String(error)}`),
+      ),
+    )
+  }
+})
 
 /** Move my facts: export from the storage in use now, import into the new one in a fresh process. */
 const moveFacts = Effect.fn("Cli.memory.setup.move")(function* (
@@ -486,9 +499,10 @@ const moveFacts = Effect.fn("Cli.memory.setup.move")(function* (
     }).pipe(Effect.result)
     if (exported._tag === "Failure")
       return { ok: false, error: `could not read the facts to move: ${exported.failure.message}` }
-    if (!exported.success.manifest.counts.facts.total) return { ok: true, facts: 0 }
-    yield* print(`Moving ${exported.success.manifest.counts.facts.total} fact(s)…`)
-    return yield* Effect.promise(() =>
+    const expected = exported.success.manifest.counts.facts.total
+    if (!expected) return { ok: true, facts: 0, expected }
+    yield* print(`Moving ${expected} fact(s)…`)
+    const moved = yield* Effect.promise(() =>
       MemoryMove.run({
         directory: process.cwd(),
         memory: block,
@@ -497,6 +511,7 @@ const moveFacts = Effect.fn("Cli.memory.setup.move")(function* (
         env,
       }),
     )
+    return { ...MemoryMove.counted(moved, expected), expected }
   }).pipe(Effect.ensuring(Effect.promise(() => fs.rm(dir, { recursive: true, force: true }))))
 })
 

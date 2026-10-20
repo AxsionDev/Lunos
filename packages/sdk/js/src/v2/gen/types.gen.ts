@@ -1763,6 +1763,7 @@ export type MemoryConfig = {
   }
   encryption?: "off" | "os-keychain"
   backend?: MemoryBackendConfig
+  template?: string
   templates?: MemoryTemplatesConfig
 }
 
@@ -3357,6 +3358,64 @@ export type MemoryImportResult = {
   }>
 }
 
+export type MemoryStorageStatus = {
+  state: "connected" | "unreachable" | "unchecked" | "off"
+  error?: {
+    stage: string
+    message: string
+    fix?: string
+  }
+  at?: string
+  ms?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  server?: string
+}
+
+export type MemoryStoragePanel = {
+  on: boolean
+  reason?: string
+  place: "embedded" | "docker" | "team" | "cloud"
+  vendor?: "embedded" | "neo4j" | "postgres" | "memgraph"
+  template?: {
+    name: string
+    title: string
+    scope?: "user" | "project"
+  }
+  locked: boolean
+  leaves: string
+  encryption: "os-keychain" | "off"
+  retentionDays?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  paths?: Array<string>
+  bytes?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  model?: {
+    id: string
+    region?: string
+  }
+  url?: string
+  host?: string
+  jurisdiction?: string
+  tls?: "verified" | "unverified" | "none"
+  readOnly?: boolean
+  credentials?: Array<string>
+  provider?: string
+  residency?: {
+    allowed: boolean
+    reason?: string
+  }
+  container?: {
+    tool: "docker" | "podman"
+    name?: string
+    image?: string
+    state: "running" | "stopped" | "missing" | "no-docker"
+    project: string
+  }
+  status: MemoryStorageStatus
+}
+
+export type MemoryStorageStartResult = {
+  ok: boolean
+  error?: string
+}
+
 export type MemorySetupInput = {
   /**
    * The memory block the wizard would save (memory.enabled, model, backend, retention, encryption)
@@ -3468,6 +3527,10 @@ export type MemorySetupStartResult = {
 export type MemorySetupMoveResult = {
   ok: boolean
   facts?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  /**
+   * How many facts there were to move
+   */
+  expected?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
   output?: string
   error?: string
 }
@@ -11820,6 +11883,90 @@ export type MemoryOutdateResponses = {
 }
 
 export type MemoryOutdateResponse = MemoryOutdateResponses[keyof MemoryOutdateResponses]
+
+export type MemoryStorageGetData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/storage"
+}
+
+export type MemoryStorageGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemoryStorageGetError = MemoryStorageGetErrors[keyof MemoryStorageGetErrors]
+
+export type MemoryStorageGetResponses = {
+  /**
+   * What memory uses, and its status
+   */
+  200: MemoryStoragePanel
+}
+
+export type MemoryStorageGetResponse = MemoryStorageGetResponses[keyof MemoryStorageGetResponses]
+
+export type MemoryStorageTestData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/storage/test"
+}
+
+export type MemoryStorageTestErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemoryStorageTestError = MemoryStorageTestErrors[keyof MemoryStorageTestErrors]
+
+export type MemoryStorageTestResponses = {
+  /**
+   * The result of the test
+   */
+  200: MemoryStorageStatus
+}
+
+export type MemoryStorageTestResponse = MemoryStorageTestResponses[keyof MemoryStorageTestResponses]
+
+export type MemoryStorageStartData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/memory/storage/start"
+}
+
+export type MemoryStorageStartErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type MemoryStorageStartError = MemoryStorageStartErrors[keyof MemoryStorageStartErrors]
+
+export type MemoryStorageStartResponses = {
+  /**
+   * Whether the container started
+   */
+  200: MemoryStorageStartResult
+}
+
+export type MemoryStorageStartResponse = MemoryStorageStartResponses[keyof MemoryStorageStartResponses]
 
 export type MemorySetupBackendData = {
   body?: MemorySetupInput

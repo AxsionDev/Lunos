@@ -29,7 +29,14 @@ export function withoutCwd(execArgv: readonly string[]) {
   return out
 }
 
-export type Result = { ok: boolean; output: string; facts?: number; error?: string }
+export type Result = {
+  ok: boolean
+  output: string
+  facts?: number
+  /** Facts the new storage already had (the preview's duplicates): not written again. */
+  already?: number
+  error?: string
+}
 
 export async function run(input: {
   directory: string
@@ -62,7 +69,29 @@ export async function run(input: {
     proc.exited,
   ]).finally(() => clearTimeout(timer))
   const facts = /Moved (\d+) fact/.exec(out)
-  if (code === 0) return { ok: true, output: out.trim(), facts: facts ? Number(facts[1]) : undefined }
+  const already = /\d+ new, (\d+) duplicate/.exec(out)
+  if (code === 0)
+    return {
+      ok: true,
+      output: out.trim(),
+      facts: facts ? Number(facts[1]) : undefined,
+      ...(already ? { already: Number(already[1]) } : {}),
+    }
   const last = (err.trim() || out.trim()).split("\n").filter(Boolean).at(-1)
   return { ok: false, output: out.trim(), error: last ?? `lunos memory migrate exited with ${code}` }
+}
+
+/**
+ * The count check: every fact exported must have arrived. A move that reports fewer (or none) fails,
+ * so nothing is saved and the old storage stays the one in use.
+ */
+export function counted(result: Result, expected: number): Result {
+  if (!result.ok) return result
+  const arrived = (result.facts ?? 0) + (result.already ?? 0)
+  if (arrived >= expected) return result
+  return {
+    ...result,
+    ok: false,
+    error: `Only ${arrived} of ${expected} fact(s) are in the new storage. Nothing was saved; the old storage is still in use`,
+  }
 }

@@ -74,13 +74,36 @@ Press **?** on the storage step to answer two questions:
 
 Choosing a team database runs **Test connection** before you go on. Lunos runs the same checks as connecting (the URL, TLS, credentials by reference, and the jurisdiction against your residency policy). It then connects, writes a probe, reads it back and deletes it. The probe is written in a namespace of its own, so it never touches a stored fact. A failure names the stage (`settings`, `residency`, `connect`, `write`, `read` or `delete`) and what to do. A residency refusal can't be saved. A failed connection can be saved anyway, for a database that isn't up yet.
 
+## See what memory uses
+
+`/memory` opens on Overview, with a **Storage** panel at the top. It shows what memory uses (on this computer, a database in Docker, a team database, or a managed cloud database) and the template that set it up, or _Custom_ when you chose by hand. It also shows the live status: connected, unreachable (with the stage and what to do), not checked yet, or memory off.
+
+- **On this computer:** the memory path, its size on disk, and the model that extracts facts with its region.
+- **A database in Docker:** the URL, and the container's name, image and state (running, stopped or missing), read with `docker` or `podman`. A stopped container offers **Start container**, which runs `docker start` after you confirm.
+- **A team database:** the host, jurisdiction, TLS and read-only setting. Credentials are never shown, only the names of the environment variables or files they come from.
+- **A managed cloud database:** the provider, region, and whether your residency policy allows it.
+
+Under the panel are **Change storage…**, **Test connection** and **Open in Settings**. Test connection runs the checks above for a database, or the memory check (remember, recall and remove a test fact) on this computer, and updates "checked". When your organisation sets the storage, the panel says **Set by your organisation**, and Change storage… isn't offered. With memory off, the panel offers **Set up memory…** instead.
+
+`lunos memory status` prints the same Storage block.
+
 ## Switching storage later
 
-Change the storage from **/settings → Memory → Change memory setup…**, or by running `lunos memory setup` again. It shows the same cards. If memory is already on and the storage changes, the summary asks what happens to your facts:
+Change the storage from `/memory` with **Change storage…**, from **/settings → Memory → Change memory setup…**, by running `lunos memory setup` again, or with `lunos memory storage set`. They show the same cards and templates. If memory is already on and the storage changes, the summary asks what happens to your facts:
 
 - **Move my facts.** Every fact is exported from the storage in use now, through the same bundle as `lunos memory export`. It's then imported into the new storage with `lunos memory migrate --from-bundle`. Moving into a team database keeps each fact's id and provenance as they were. Moving onto this computer keeps the provenance; the facts are extracted again with your model, so they get new ids. The old copy is left where it is.
-- **Start empty.** The new storage starts with no facts; the old ones stay where they are.
+- **Start empty.** The new storage starts with no facts. The old ones stay, untouched, and the summary says where.
 
-The move happens before the new settings are saved. If it fails, nothing is saved.
+The move happens before the new settings are saved, and the facts are counted on both sides. If it fails, or a fact is missing, nothing is saved.
+
+From a script:
+
+```sh
+lunos memory storage set --template neo4j-docker --start --move --yes
+lunos memory storage set --backend postgres --url postgres://db.internal:5432/lunos --jurisdiction EU-DE --empty --yes
+lunos memory storage set --backend embedded --move --yes
+```
+
+With `--yes`, a change of storage needs `--move` or `--empty`. Applying a template records its name as `memory.template`, which is how `/memory` knows which template set it up.
 
 See also: [Memory templates](memory-templates.md), and [External memory database](deployment/self-hosted.md#external-memory-database) for the full security notes on team databases.

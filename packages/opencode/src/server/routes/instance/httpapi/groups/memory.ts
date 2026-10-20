@@ -331,6 +331,7 @@ export const MemorySetupTemplatePlan = Schema.Struct({
 export const MemorySetupMoveResult = Schema.Struct({
   ok: Schema.Boolean,
   facts: Schema.optional(Schema.Number),
+  expected: Schema.optional(Schema.Number).annotate({ description: "How many facts there were to move" }),
   output: Schema.optional(Schema.String),
   error: Schema.optional(Schema.String),
 }).annotate({ identifier: "MemorySetupMoveResult" })
@@ -361,6 +362,63 @@ export const MemorySetupCheckResult = Schema.Struct({
   log: Schema.optional(Schema.NullOr(Schema.String)),
   diagnostics: Schema.optional(Schema.String),
 }).annotate({ identifier: "MemorySetupCheckResult" })
+
+// The Storage panel at the top of /memory's Overview: what memory uses and its live status.
+export const MemoryStorageStatus = Schema.Struct({
+  state: Schema.Literals(["connected", "unreachable", "unchecked", "off"]),
+  error: Schema.optional(
+    Schema.Struct({ stage: Schema.String, message: Schema.String, fix: Schema.optional(Schema.String) }),
+  ),
+  at: Schema.optional(Schema.String),
+  ms: Schema.optional(Schema.Number),
+  server: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemoryStorageStatus" })
+
+export const MemoryStoragePanel = Schema.Struct({
+  on: Schema.Boolean,
+  reason: Schema.optional(Schema.String),
+  place: Schema.Literals(["embedded", "docker", "team", "cloud"]),
+  vendor: Schema.optional(Schema.Literals(["embedded", "neo4j", "postgres", "memgraph"])),
+  template: Schema.optional(
+    Schema.Struct({
+      name: Schema.String,
+      title: Schema.String,
+      scope: Schema.optional(Schema.Literals(["user", "project"])),
+    }),
+  ),
+  locked: Schema.Boolean,
+  leaves: Schema.String,
+  encryption: Schema.Literals(["os-keychain", "off"]),
+  retentionDays: Schema.optional(Schema.Number),
+  paths: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  bytes: Schema.optional(Schema.Number),
+  model: Schema.optional(Schema.Struct({ id: Schema.String, region: Schema.optional(Schema.String) })),
+  url: Schema.optional(Schema.String),
+  host: Schema.optional(Schema.String),
+  jurisdiction: Schema.optional(Schema.String),
+  tls: Schema.optional(Schema.Literals(["verified", "unverified", "none"])),
+  readOnly: Schema.optional(Schema.Boolean),
+  credentials: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+    description: "Where the credentials come from: {env:} variable names or {file:} paths, never values",
+  }),
+  provider: Schema.optional(Schema.String),
+  residency: Schema.optional(Schema.Struct({ allowed: Schema.Boolean, reason: Schema.optional(Schema.String) })),
+  container: Schema.optional(
+    Schema.Struct({
+      tool: Schema.Literals(["docker", "podman"]),
+      name: Schema.optional(Schema.String),
+      image: Schema.optional(Schema.String),
+      state: Schema.Literals(["running", "stopped", "missing", "no-docker"]),
+      project: Schema.String,
+    }),
+  ),
+  status: MemoryStorageStatus,
+}).annotate({ identifier: "MemoryStoragePanel" })
+
+export const MemoryStorageStartResult = Schema.Struct({
+  ok: Schema.Boolean,
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "MemoryStorageStartResult" })
 
 export const MemoryApi = HttpApi.make("memory")
   .add(
@@ -455,6 +513,38 @@ export const MemoryApi = HttpApi.make("memory")
             summary: "Mark a fact outdated",
             description:
               "Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.",
+          }),
+        ),
+        HttpApiEndpoint.get("storage", `${root}/storage`, {
+          query: WorkspaceRoutingQuery,
+          success: described(MemoryStoragePanel, "What memory uses, and its status"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.storage.get",
+            summary: "Memory storage",
+            description:
+              "What memory uses now: on this computer, a database in Docker, a team database or a managed cloud database, the template that set it up, and its live status. Credentials are never included, only the names of the environment variables or files they come from.",
+          }),
+        ),
+        HttpApiEndpoint.post("storageTest", `${root}/storage/test`, {
+          query: WorkspaceRoutingQuery,
+          success: described(MemoryStorageStatus, "The result of the test"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.storage.test",
+            summary: "Test the memory storage",
+            description:
+              "For a database: connect, write, read and delete a probe. On this computer: the memory check (remember, recall and remove a test fact). Never touches stored facts.",
+          }),
+        ),
+        HttpApiEndpoint.post("storageStart", `${root}/storage/start`, {
+          query: WorkspaceRoutingQuery,
+          success: described(MemoryStorageStartResult, "Whether the container started"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "memory.storage.start",
+            summary: "Start the memory database container",
+            description: "Start the stopped Docker or Podman container of the memory template in use.",
           }),
         ),
         HttpApiEndpoint.post("setupBackend", `${root}/setup/backend`, {
