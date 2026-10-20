@@ -140,6 +140,29 @@ export function FormatError(input: unknown): string | undefined {
   return undefined
 }
 
+/**
+ * An error nothing above recognises, for the screen: the error and what caused it, one line each.
+ * A thrown value that isn't an Error says what it was (`non-Error value thrown (string): …`) instead
+ * of a bare value or `{}`. The stack and the full cause chain go to the run log (`RunLog.describe`).
+ */
 export function FormatUnknownError(input: unknown): string {
-  return errorFormat(input)
+  const lines: string[] = []
+  const seen = new Set<unknown>()
+  for (
+    let current = input, depth = 0;
+    (depth === 0 || current !== undefined) && depth < 5 && !seen.has(current);
+    depth++
+  ) {
+    seen.add(current)
+    const prefix = depth === 0 ? "" : "caused by: "
+    if (!(current instanceof Error)) {
+      lines.push(`${prefix}non-Error value thrown (${typeOf(current)}): ${errorFormat(current)}`)
+      break
+    }
+    lines.push(prefix + (current.message ? `${current.name}: ${current.message}` : current.name))
+    current = current.cause
+  }
+  return lines.join("\n")
 }
+
+const typeOf = (value: unknown) => (value === null ? "null" : Array.isArray(value) ? "array" : typeof value)

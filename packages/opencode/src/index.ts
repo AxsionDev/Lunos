@@ -23,7 +23,7 @@ import { LspCommand } from "./cli/cmd/lsp"
 import { UI } from "./cli/ui"
 import { InstallationVersion, versionVerbose } from "@opencode-ai/core/installation/version"
 import { Offline } from "@opencode-ai/core/offline"
-import { FormatError } from "./cli/error"
+import { FormatError, FormatUnknownError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { DebugCommand } from "./cli/cmd/debug"
 import { StatsCommand } from "./cli/cmd/stats"
@@ -40,7 +40,6 @@ import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
-import { errorMessage } from "./util/error"
 import { PluginCommand } from "./cli/cmd/plug"
 import { MarketplaceCommand } from "./cli/cmd/marketplace"
 import { AuditCommand } from "./cli/cmd/audit"
@@ -49,9 +48,11 @@ import { SettingsCommand } from "./cli/cmd/settings"
 import { SyncCommand } from "./cli/cmd/sync"
 import { SandboxCommand } from "./cli/cmd/sandbox"
 import { LicensesCommand } from "./cli/cmd/licenses"
+import { BugReportCommand, LogsCommand } from "./cli/cmd/logs"
 import { Heap } from "./cli/heap"
 import { brandHelp } from "./cli/brand"
 import { Restart } from "./cli/restart"
+import { Failure } from "./cli/failure"
 import { StartupTrace } from "@opencode-ai/core/startup-trace"
 
 // XCOD-276: every static import above has run by now.
@@ -65,6 +66,9 @@ if (args.length === 2 && args.includes("--verbose") && (args.includes("--version
   process.stdout.write(versionVerbose() + EOL + Offline.report() + EOL)
   process.exit(0)
 }
+
+// XCOD-280: this run's log, before anything can log or fail, so every failure can say where it is.
+Failure.start(args)
 
 // Plain one-shot commands get the once-a-day "new version" stderr line. The TUI has its own
 // reminder, and long-running servers or the update flow itself shouldn't print it.
@@ -207,6 +211,8 @@ const cli = yargs(args)
   .command(SyncCommand)
   .command(SandboxCommand)
   .command(LicensesCommand)
+  .command(LogsCommand)
+  .command(BugReportCommand)
   .command(DbCommand)
   .fail((msg, err) => {
     if (
@@ -245,8 +251,12 @@ try {
   if (formatted) UI.error(formatted)
   if (formatted === undefined) {
     UI.error("Unexpected error" + EOL)
-    process.stderr.write(errorMessage(e) + EOL)
+    process.stderr.write(FormatUnknownError(e) + EOL)
   }
+  // XCOD-280: the full error goes to the run log, and the output ends with where it is. A command's
+  // own refusal (CliError) or a cancelled prompt isn't a failure worth a log, unless it recorded one.
+  const refusal = typeof e === "object" && e !== null && "_tag" in e && e._tag === "CliError"
+  if (formatted !== "" && !refusal) Failure.record("the command", e)
   process.exitCode = 1
 } finally {
   // XCOD-129: a relaunch after /restart that failed to start says how to start Lunos by hand.

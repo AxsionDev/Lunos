@@ -1767,6 +1767,17 @@ export type MemoryConfig = {
   templates?: MemoryTemplatesConfig
 }
 
+export type LogConfig = {
+  /**
+   * Days a failed run's log is kept, beyond the newest 10 runs. Default 14
+   */
+  retention_days?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  /**
+   * Most space all run logs together may take, in MB; the oldest are removed first. Default 50
+   */
+  max_mb?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
 export type BlankString = string
 
 export type ExternalConfig = {
@@ -2159,6 +2170,7 @@ export type Config = {
       tmp?: string
     }
   }
+  log?: LogConfig
   residency?: ConfigV2Residency
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal

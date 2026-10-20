@@ -31,6 +31,8 @@ export const KNOWN = [
   // XCOD-157: an organisation can require sandboxed runs.
   "sandbox",
   "sandbox.required",
+  // How long run logs are kept (log.retention_days, log.max_mb).
+  "log",
   // XCOD-213: an organisation's curated Recommended model list.
   "recommended",
   // XCOD-204: an organisation can turn off driving Claude Code / Codex CLI.

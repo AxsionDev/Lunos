@@ -63,6 +63,7 @@ import { DialogStatus } from "./component/dialog-status"
 import { takeSettingsRequest } from "./util/settings-sections"
 import { DialogSettings } from "./component/dialog-settings"
 import { DialogDebug } from "./component/dialog-debug"
+import { DialogLogs } from "./component/dialog-logs"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogLsp } from "./component/dialog-lsp"
@@ -475,6 +476,15 @@ function App(props: {
     }),
   )
   const [ready, setReady] = createSignal(false)
+  // XCOD-280: LUNOS_DEBUG_CRASH=tui makes the TUI crash once it's up, to check what a crash leaves
+  // behind (the crash screen, then the log link when Lunos exits).
+  if (process.env.LUNOS_DEBUG_CRASH === "tui") {
+    const [crash, setCrash] = createSignal(false)
+    setTimeout(() => setCrash(true), 1500)
+    createEffect(() => {
+      if (crash()) throw new Error("Deliberate crash (LUNOS_DEBUG_CRASH=tui)")
+    })
+  }
   // XCOD-147: set only by this session's update check, never from persisted state, so the notice
   // can't outlive a switch that turned checks off.
   const [availableVersion, setAvailableVersion] = createSignal<string | undefined>()
@@ -1255,6 +1265,15 @@ function App(props: {
         category: "System",
       },
       {
+        name: "opencode.logs",
+        title: "View logs",
+        slashName: "logs",
+        run: () => {
+          dialog.replace(() => <DialogLogs />)
+        },
+        category: "System",
+      },
+      {
         name: "theme.switch",
         title: "Switch theme",
         slashName: "themes",
@@ -1533,6 +1552,8 @@ function App(props: {
       message: evt.properties.message,
       variant: evt.properties.variant,
       duration: evt.properties.duration,
+      // XCOD-280: an error the server reports is a background failure (an MCP server, a plugin…).
+      log: evt.properties.variant === "error",
     })
   })
 

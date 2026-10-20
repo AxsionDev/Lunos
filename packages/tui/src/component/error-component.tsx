@@ -6,6 +6,7 @@ import { useClipboard } from "../context/clipboard"
 import { versionDetail, versionLabel } from "@opencode-ai/core/installation/version"
 import { useExit } from "../context/exit"
 import { describeOS, describeTerminal } from "../util/system"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
 
 export function ErrorComponent(props: { error: Error; reset: () => void; mode?: "dark" | "light" }) {
   const term = useTerminalDimensions()
@@ -39,6 +40,10 @@ export function ErrorComponent(props: { error: Error; reset: () => void; mode?: 
         error: "#e06c75",
         success: "#7fd88f",
       }
+
+  // The full error goes to this run's log; Lunos prints its path when it exits.
+  RunLog.failure("the TUI", props.error)
+  const log = RunLog.current()
 
   const message = props.error.message || "An unknown error occurred."
   const stack = props.error.stack || "No stack trace available."
@@ -113,6 +118,7 @@ export function ErrorComponent(props: { error: Error; reset: () => void; mode?: 
           <Show when={showSubtext()}>
             <text fg={colors.muted}>An unexpected error stopped the session.</text>
           </Show>
+          <Show when={log}>{(log) => <text fg={colors.muted}>Full log: {log().file}</text>}</Show>
         </box>
 
         {/* Error message panel */}

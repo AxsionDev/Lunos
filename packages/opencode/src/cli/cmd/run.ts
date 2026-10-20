@@ -25,6 +25,8 @@ import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
+import { Failure } from "../failure"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
 import { RunBudget } from "@/agent/run-budget"
 import { RunEnding } from "./run/ending"
@@ -98,6 +100,12 @@ function messageError(data: unknown) {
   if (!data || typeof data !== "object" || !("info" in data)) return undefined
   const info = (data as { info?: { error?: unknown } }).info
   return info?.error ?? undefined
+}
+
+/** XCOD-280: the full error goes to the run log before its message becomes the command's failure. */
+const failRecorded = (error: unknown) => {
+  Failure.record("lunos run", error)
+  return fail(error instanceof Error ? error.message : String(error))
 }
 
 function formatRunError(error: unknown) {
@@ -362,7 +370,7 @@ export const RunCommand = effectCmd({
             { keep: args.keep, rm: args.rm },
           ),
         catch: (error) => error,
-      }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
+      }).pipe(Effect.catch((error) => failRecorded(error)))
     }
     if (args.cloud) {
       if (args.attach) return yield* fail("--cloud cannot be used with --attach")
@@ -393,7 +401,7 @@ export const RunCommand = effectCmd({
             },
           ),
         catch: (error) => error,
-      }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
+      }).pipe(Effect.catch((error) => failRecorded(error)))
     }
     const { Agent } = yield* Effect.promise(() => import("@/agent/agent"))
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
@@ -977,6 +985,7 @@ export const RunCommand = effectCmd({
                 err = String(props.error.data.message)
               }
               error = error ? error + EOL + err : err
+              RunLog.failure("lunos run: the session", props.error)
               if (emitError(props.error)) continue
               UI.error(err)
             }
@@ -1064,6 +1073,7 @@ export const RunCommand = effectCmd({
             // XCOD-236: Ctrl+C on an attached run stops its server, which closes this stream.
             if (RunEnding.interrupted) return
             console.error(e)
+            RunLog.failure("lunos run: the event stream", e)
             process.exitCode = 1
           })
           // XCOD-236: an attached run (--attach, --cloud, --sandbox) ends in error as a local one

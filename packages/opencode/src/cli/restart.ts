@@ -6,6 +6,7 @@ import { Global } from "@opencode-ai/core/global"
 import { AuditLog } from "@/audit/log"
 import { SandboxRollback } from "@/sandbox/rollback"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
 import type { Restarted, RestartRequest } from "@opencode-ai/tui/util/restart"
 
 /**
@@ -224,6 +225,8 @@ export function markStarted() {
 export function reportFailedStart(write: (text: string) => void = (text) => process.stderr.write(text)) {
   if (!taken || started) return false
   started = true
+  // XCOD-280: the run log's link follows this message (printed on exit).
+  RunLog.failure("starting again after /restart", new Error("Lunos didn't start again after /restart"))
   write(
     `\nLunos didn't start again after /restart. Nothing will be retried.\nStart it yourself with:\n  ${taken.manual}\n`,
   )
@@ -300,6 +303,7 @@ export async function relaunch(
   })
   const manual = manualCommand(command, deps.platform)
   const fail = (reason: string) => {
+    RunLog.failure("/restart", new Error(`Lunos couldn't restart: ${reason}`))
     deps.write(TERMINAL_RESET)
     deps.error(`Lunos couldn't restart: ${reason}\nNothing will be retried. Start it yourself with:\n  ${manual}\n`)
     return deps.exit(1)
@@ -403,6 +407,8 @@ export function defaultDeps(): RelaunchDeps {
     },
     exit: (code) => process.exit(code),
     flush: async () => {
+      // The relaunch writes a run log of its own; this one ends here (exec skips the exit handler).
+      RunLog.finish(0)
       await Promise.race([AuditLog.flush(), Bun.sleep(3000)])
     },
   }
