@@ -6,6 +6,9 @@ import { UI } from "../ui"
 import { writeStdoutEffect } from "../stdout"
 import { Sandbox } from "@/sandbox"
 import { SandboxConfig } from "@/sandbox/config"
+import { SandboxError, SandboxFailure } from "@/sandbox/error"
+import { SandboxPreflight } from "@/sandbox/preflight"
+import { SandboxRollback } from "@/sandbox/rollback"
 import { AuditLog } from "@/audit/log"
 import { RunEnding } from "./run/ending"
 
@@ -135,30 +138,51 @@ async function conclude(
     )
 }
 
+/**
+ * Create and start a sandbox for `directory`. XCOD-279: anything that goes wrong here is a
+ * SandboxError naming its step; nothing has run in the sandbox yet, so a caller can still start
+ * without it.
+ */
+async function launch(directory: string, lifecycle: Lifecycle) {
+  const { info, stored } = await SandboxFailure.at("create", async () => {
+    const override = lifecycleOverride(lifecycle)
+    const loaded = SandboxConfig.load(directory)
+    const config = { ...loaded, on_finish: override ?? loaded.on_finish }
+    await hostAudit()
+    await pruneExpired()
+    say("starting")
+    const stored = await credentials()
+    const info = await Sandbox.create({ directory, config, providers: Object.keys(stored), log: say })
+    return { info, stored }
+  })
+  say(`${info.id}: image ${info.image.digest ?? info.image.id}, on_finish ${info.on_finish}`)
+  try {
+    const conn = await Sandbox.start(info, { secrets: secrets(stored) })
+    return { info, conn }
+  } catch (error) {
+    await Sandbox.retain(info, "start failed").catch(() => {})
+    say(`kept ${info.id} (stopped) for inspection; \`lunos sandbox destroy ${info.id}\` removes it`)
+    throw SandboxFailure.wrap("start", error)
+  }
+}
+
 /** Create and start a sandbox for `directory`, run `client` against it, then conclude. */
 export async function runSandboxed(
   directory: string,
   client: (conn: Sandbox.Connection) => Promise<void>,
   lifecycle: Lifecycle = {},
 ) {
-  const override = lifecycleOverride(lifecycle)
-  const loaded = SandboxConfig.load(directory)
-  const config = { ...loaded, on_finish: override ?? loaded.on_finish }
-  await hostAudit()
-  await pruneExpired()
-  say("starting")
-  const stored = await credentials()
-  const info = await Sandbox.create({ directory, config, providers: Object.keys(stored), log: say })
+  const { info, conn } = await launch(directory, lifecycle)
+  await session(info, conn, client)
+}
+
+/** Run `client` against a started sandbox, then hand the results back and apply the lifecycle policy. */
+async function session(
+  info: Sandbox.Meta,
+  conn: Sandbox.Connection,
+  client: (conn: Sandbox.Connection) => Promise<void>,
+) {
   const policy = info.on_finish
-  say(`${info.id}: image ${info.image.digest ?? info.image.id}, on_finish ${policy}`)
-  let conn: Sandbox.Connection
-  try {
-    conn = await Sandbox.start(info, { secrets: secrets(stored) })
-  } catch (error) {
-    await Sandbox.retain(info, "start failed")
-    say(`kept ${info.id} (stopped) for inspection; \`lunos sandbox destroy ${info.id}\` removes it`)
-    throw error
-  }
   say(`server ${conn.url}, workspace ${conn.directory}`)
   // Interrupted: there are no results to hand back, so keep the sandbox (stopped) rather than lose it.
   let stopping: Promise<unknown> | undefined
@@ -214,11 +238,98 @@ async function attachTui(conn: Sandbox.Connection, args: { continue?: boolean; s
   } as never)
 }
 
+/**
+ * The TUI in a sandbox. XCOD-279: when the sandbox can't start, Lunos must still be usable. "host"
+ * tells the caller to start without it: after undoing the sandbox change a /restart was made for,
+ * or when the user says so. Under sandbox.required, or without a terminal to ask in, the error
+ * stands. "quit" when the user chose not to start at all.
+ */
 export async function runSandboxedTui(
   directory: string,
   args: { continue?: boolean; session?: string; fork?: boolean } & Lifecycle,
-) {
-  await runSandboxed(directory, (conn) => attachTui(conn, args), args)
+  restarted?: { changes?: SandboxRollback.Change[] },
+): Promise<"sandbox" | "host" | "quit"> {
+  // A wrong pair of flags isn't the sandbox failing to start: refused before anything, with no way round it.
+  try {
+    lifecycleOverride(args)
+  } catch (error) {
+    throw new SandboxError({ reason: SandboxFailure.describe(error) })
+  }
+  let started: Awaited<ReturnType<typeof launch>>
+  try {
+    started = await launch(directory, args)
+  } catch (error) {
+    return fallback(SandboxFailure.wrap("create", error), directory, restarted?.changes ?? [])
+  }
+  await session(started.info, started.conn, (conn) => attachTui(conn, args))
+  return "sandbox"
+}
+
+export async function fallback(
+  error: SandboxError,
+  directory: string,
+  changes: readonly SandboxRollback.Change[],
+  ask: (error: SandboxError) => Promise<"yes" | "quit"> = askHost,
+  interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY),
+  pause: () => Promise<void> = pressEnter,
+): Promise<"host" | "quit"> {
+  const config = SandboxConfig.load(directory)
+  if (config.required) {
+    say(
+      `sandbox.required is set${config.requiredBy === "managed" ? " by your organisation" : ""}, so Lunos doesn't start without one`,
+    )
+    throw error
+  }
+  // A /restart for a sandbox change that can't start: put the old value back and start as before.
+  const undone = SandboxRollback.revert(changes.filter((change) => change.path[0] === "sandbox"))
+  if (undone.length) {
+    UI.error(
+      `Your change to ${undone.map((key) => `\`${key}\``).join(", ")} was undone because Lunos couldn't start with it: ${error.reason}`,
+    )
+    UI.println(error.message)
+    if (!wanted({}, directory)) {
+      // The TUI's screen would cover this at once: wait until it has been read.
+      if (interactive) await pause()
+      return "host"
+    }
+  }
+  if (!interactive) {
+    say("`lunos --no-sandbox` starts Lunos without the sandbox")
+    throw error
+  }
+  const choice = await ask(error)
+  if (choice === "quit") {
+    process.exitCode = 1
+    return "quit"
+  }
+  say("starting without the sandbox this time; `lunos --no-sandbox` does that from the start")
+  return "host"
+}
+
+async function pressEnter() {
+  const readline = await import("node:readline/promises")
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  await rl.question("Press Enter to start Lunos with your previous settings. ")
+  rl.close()
+}
+
+/** "The sandbox couldn't start: <reason>. Start without the sandbox this time?" until Yes or Quit. */
+async function askHost(error: SandboxError): Promise<"yes" | "quit"> {
+  const prompts = await import("@clack/prompts")
+  UI.error(`The sandbox couldn't start: ${error.summary}`)
+  while (true) {
+    const choice = await prompts.select({
+      message: "Start without the sandbox this time? (`lunos --no-sandbox` skips it for one start)",
+      options: [
+        { value: "yes", label: "Yes" },
+        { value: "details", label: "Show details" },
+        { value: "quit", label: "Quit" },
+      ],
+    })
+    if (prompts.isCancel(choice) || choice === "quit") return "quit"
+    if (choice === "yes") return "yes"
+    UI.println(error.message)
+  }
 }
 
 /** Every `lunos sandbox` subcommand runs these first. */
@@ -229,8 +340,41 @@ const prepare = Effect.promise(async () => {
 
 const attempt = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (error) => error }).pipe(
-    Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))),
+    Effect.catch((error) => fail(SandboxFailure.describe(error))),
   )
+
+/** XCOD-279: one check as `lunos sandbox doctor` prints it, with the command and output when it failed. */
+export function checkLines(check: SandboxPreflight.Check) {
+  const mark = { pass: "pass", fail: "FAIL", skip: "skip" }[check.status]
+  return [
+    `${mark}  ${check.name}: ${check.detail}`,
+    ...(check.status === "fail" && check.error?.command ? [`        command: ${check.error.command}`] : []),
+    ...(check.status === "fail" && check.error?.code !== undefined ? [`        exit code: ${check.error.code}`] : []),
+    ...(check.status === "fail" && check.error?.stderr
+      ? check.error.stderr.split("\n").map((line) => `        | ${line}`)
+      : []),
+    ...(check.fix ? [`      fix: ${check.fix}`] : []),
+  ]
+}
+
+export const SandboxDoctorCommand = effectCmd({
+  command: "doctor",
+  describe: "check that a sandbox can start here: each check, pass or fail, with a fix",
+  instance: false,
+  handler: Effect.fn("Cli.sandbox.doctor")(function* () {
+    const checks = yield* attempt(() =>
+      SandboxPreflight.run({ directory: process.env.PWD ?? process.cwd(), full: true }),
+    )
+    yield* writeStdoutEffect(checks.flatMap(checkLines).join(EOL) + EOL)
+    const failed = checks.filter((check) => check.status === "fail").length
+    if (failed)
+      return yield* fail(
+        `${failed} check${failed === 1 ? "" : "s"} failed: a sandbox can't start here until ${failed === 1 ? "it's" : "they're"} fixed. ` +
+          "`lunos --no-sandbox` starts Lunos without one.",
+      )
+    yield* writeStdoutEffect(`A sandbox can start here.${EOL}`)
+  }),
+})
 
 export const SandboxListCommand = effectCmd({
   command: "list",
@@ -364,6 +508,7 @@ export const SandboxCommand = cmd({
       .command(SandboxStopCommand)
       .command(SandboxDestroyCommand)
       .command(SandboxPruneCommand)
+      .command(SandboxDoctorCommand)
       .command(SandboxEgressCommand)
       .demandCommand(),
   async handler() {},
