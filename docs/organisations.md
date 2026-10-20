@@ -130,7 +130,7 @@ Only an owner can transfer ownership, and only to someone who is already a membe
   }
   ```
 
-- **Scripts matching `forbidden` must update** to `owner_required` or `admin_required`. For one release the JSON also carries `legacyCode` with the older code (`forbidden`, or `not_found` for `not_member`).
+- **Scripts matching `forbidden` should switch to `code`** (`owner_required` or `admin_required`); `legacyCode` is kept for one release, with the older code (`forbidden`, or `not_found` for `not_member`).
 - `remove`, `leave`, `revoke`, `owners remove` and `transfer` ask before they change anything. `--yes` answers for you. Without a terminal, they refuse unless you pass `--yes`.
 - `LUNOS_TOKEN` signs a script in without `lunos login`, as for the other cloud commands.
 

@@ -138,7 +138,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   Owner-only action is told that only an owner can, and whom to ask. The only owner of an
   organisation is told which organisations, by name, to hand over first. **`lunos org --json`
   refusals now carry `owner_required` or `admin_required` instead of `forbidden`: scripts matching
-  `forbidden` must update.** For one release they also carry `legacyCode: "forbidden"`. The Terms and
+  `forbidden` should switch to `code`; `legacyCode` is kept for one release.** The Terms and
   the Privacy notice, with their versions and links, now come from Lunos Cloud instead of being built
   into the app, and the last ones are kept so an offline start still works. **Resend e-mail** on the
   Welcome screen sends the confirmation again and, if you ask too soon, says when to try again.
