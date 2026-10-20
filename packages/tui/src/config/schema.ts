@@ -109,5 +109,9 @@ export const Info = Schema.Struct({
     description:
       'false stops the "What\'s new" panel on the first start after an update. /whatsnew and lunos changelog still work (default: true)',
   }),
+  tips: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "false turns off the tips on the home screen and under the working indicator. /tips still lists them (default: true)",
+  }),
 })
 export type Info = Schema.Schema.Type<typeof Info>

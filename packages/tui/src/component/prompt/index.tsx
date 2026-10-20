@@ -32,6 +32,7 @@ import { EmptyBorder, SplitBorder } from "../../ui/border"
 import { useTuiPaths, useTuiTerminalEnvironment } from "../../context/runtime"
 import { useClipboard } from "../../context/clipboard"
 import { Spinner } from "../spinner"
+import { WorkingTip } from "../tips"
 import { useSDK } from "../../context/sdk"
 import { useRoute } from "../../context/route"
 import { useProject } from "../../context/project"
@@ -2234,6 +2235,8 @@ export function Prompt(props: PromptProps) {
             </box>
           </Show>
         </box>
+        {/* XCOD-278: a tip under the working indicator once a turn has run a while. */}
+        <WorkingTip busy={() => props.sessionID !== undefined && status().type !== "idle"} />
       </box>
       <Autocomplete
         sessionID={props.sessionID}
