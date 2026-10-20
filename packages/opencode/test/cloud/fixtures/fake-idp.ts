@@ -18,8 +18,6 @@ export type Options = {
   email?: string
   /** The `lunos_platform_role` claim in the access token (display only; Lunos Cloud's own record wins). */
   platformRole?: string
-  /** Sending the confirmation e-mail again isn't served by Lunos Cloud; set to fake that it is. */
-  serves?: { verification?: boolean }
   /** Lunos Cloud's accounts and organisations (fake-lunoshq.ts); `defaultCloud` when not set. */
   cloud?: FakeLunoshq.Options
 }
@@ -43,7 +41,7 @@ export function start(options: Options = {}) {
   let userinfoCalls = 0
   let verified = true
   const cloud = FakeLunoshq.create(options.cloud ?? defaultCloud(email))
-  const state = { sessionsEnded: false, revoked: [] as string[], resent: 0 }
+  const state = { sessionsEnded: false, revoked: [] as string[] }
   const access = () =>
     jwt({
       sub: "u-1",
@@ -111,10 +109,6 @@ export function start(options: Options = {}) {
       }
       if (url.pathname === "/account/sessions" && req.method === "DELETE") {
         state.sessionsEnded = true
-        return new Response(null, { status: 204 })
-      }
-      if (url.pathname === "/v1/account/verification" && options.serves?.verification) {
-        state.resent++
         return new Response(null, { status: 204 })
       }
       // Lunos Cloud (lunoshq): the account, organisations and session sync's devices.

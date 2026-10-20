@@ -71,8 +71,16 @@ export async function requireLineSignIn() {
   out("Create a free Lunos account to start. No card needed.")
   out(dim("Free: the full harness, CLI, TUI, desktop app and every local feature. Paid plans add cloud features."))
   const { CloudTuiHost } = await import("@/cloud/tui-host")
-  const legal = CloudTuiHost.LEGAL
-  out(dim(`Terms: ${legal.terms}  ·  Privacy notice: ${legal.privacy}`))
+  // XCOD-275: the versions and links are Lunos Cloud's (GET /v1/legal), never built in.
+  const host = CloudTuiHost.create({ gate, issuer, clientID })
+  const legal = await host.legal({ asked: true })
+  out(
+    dim(
+      legal
+        ? `Terms (${legal.terms.version}): ${legal.terms.url}  ·  Privacy notice (${legal.privacy.version}): ${legal.privacy.url}`
+        : "The Terms and the Privacy notice couldn't be fetched from Lunos Cloud; you'll be asked to accept them once they can be.",
+    ),
+  )
   // The same consent as the Welcome screen's checkbox: asked, never assumed.
   const { createInterface } = await import("readline/promises")
   const rl = createInterface({ input: process.stdin, output: process.stdout })
@@ -87,7 +95,7 @@ export async function requireLineSignIn() {
   }
   return lineSignIn({ issuer, clientID, browser: true, syncLocked: false, sync: false }).then(
     async () => {
-      await CloudTuiHost.create({ gate, issuer, clientID }).accept(legal.version)
+      if (legal) await host.accept({ terms: legal.terms.version, privacy: legal.privacy.version })
       return true
     },
     (error: unknown) => {

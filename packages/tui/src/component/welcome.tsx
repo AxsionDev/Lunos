@@ -16,6 +16,7 @@ import {
   failureText,
   maskEmail,
   signedInLine,
+  versions,
   type DeviceFlow,
   type FailureKind,
   type Pending,
@@ -76,6 +77,17 @@ export function Welcome() {
     controller?.abort()
   })
 
+  // XCOD-275: the Terms and Privacy notice to show come from Lunos Cloud; /login asks for them even
+  // with an exemption, since the person chose to sign in.
+  const [fetched, setFetched] = createSignal(account.legal() !== undefined)
+  onMount(() => {
+    if (account.legal()) return
+    void account.loadLegal(account.optional()).finally(() => setFetched(true))
+  })
+
+  /** The current Terms, asked for again if they aren't known yet. */
+  const legal = async () => account.legal() ?? (await account.loadLegal(true))
+
   // The one-time offline exemption: no network at start means work continues, with a notice.
   onMount(() => {
     if (probed || account.optional() || account.reason() === "terms") return
@@ -104,7 +116,9 @@ export function Welcome() {
 
   async function begin(signup: boolean) {
     if (!ticked()) return setHint("Tick the box to accept the Terms and the Privacy notice first (space).")
-    await host.accept(host.legal.version).catch(() => undefined)
+    // Without them (offline, nothing kept), nothing is recorded: the next start that has them asks.
+    const current = await legal()
+    if (current) await host.accept(versions(current)).catch(() => undefined)
     go({ kind: "starting", signup })
     const flow = await host.start({ signup }).catch((error) => fail(error, () => begin(signup)))
     if (!flow) return
@@ -169,16 +183,22 @@ export function Welcome() {
               run: () => {
                 if (!ticked()) return setHint("Tick the box to accept the new version first (space).")
                 // XCOD-274: what Lunos Cloud asked for is recorded there; a refusal stays on this screen.
-                void host.accept(host.legal.version, account.terms()?.current).then(
-                  () => {
-                    const user = account.user()
-                    if (user) account.signedIn(user)
-                  },
-                  (error: unknown) =>
-                    setHint(
-                      `Couldn't record it at Lunos Cloud: ${error instanceof Error ? error.message : String(error)} Try again.`,
-                    ),
-                )
+                const asked = account.terms()?.current
+                const current = account.legal()
+                const accepted = current ? versions(current) : asked
+                if (!accepted) return
+                const done = () => {
+                  const user = account.user()
+                  if (user) account.signedIn(user)
+                }
+                // XCOD-275: new versions seen at start (GET /v1/legal) are recorded there too, so the
+                // next start doesn't ask again; where Lunos Cloud can't be reached, on this machine only.
+                void host.accept(accepted, asked ?? accepted).then(done, (error: unknown) => {
+                  if (!asked) return host.accept(accepted).then(done)
+                  setHint(
+                    `Couldn't record it at Lunos Cloud: ${error instanceof Error ? error.message : String(error)} Try again.`,
+                  )
+                })
               },
             },
             {
@@ -279,6 +299,24 @@ export function Welcome() {
     </text>
   )
 
+  const links = () => (
+    <Show
+      when={account.legal()}
+      fallback={muted(
+        fetched()
+          ? "The Terms and the Privacy notice couldn't be fetched from Lunos Cloud; you'll be asked to accept them once they can be."
+          : "Getting the Terms and the Privacy notice from Lunos Cloud…",
+      )}
+    >
+      {(current) => (
+        <box flexDirection="column">
+          {muted(`Terms (${current().terms.version}): ${current().terms.url}`)}
+          {muted(`Privacy notice (${current().privacy.version}): ${current().privacy.url}`)}
+        </box>
+      )}
+    </Show>
+  )
+
   return (
     <box flexGrow={1} alignItems="center" justifyContent="center" paddingLeft={2} paddingRight={2}>
       <box width="100%" maxWidth={90} flexDirection="column" gap={1}>
@@ -290,10 +328,9 @@ export function Welcome() {
             <text fg={theme.text} wrapMode="word">
               {account.terms()
                 ? `The Terms or the Privacy notice changed (Terms ${account.terms()!.current.terms}, Privacy notice ${account.terms()!.current.privacy}${account.terms()!.accepted ? `; you accepted Terms ${account.terms()!.accepted!.terms}, Privacy notice ${account.terms()!.accepted!.privacy}` : ""}). Accept them to keep using your account.`
-                : `The Terms or the Privacy notice changed (version ${host.legal.version}). Accept them to keep using your account.`}
+                : `The Terms or the Privacy notice changed (Terms ${account.legal()?.terms.version ?? "?"}, Privacy notice ${account.legal()?.privacy.version ?? "?"}). Accept them to keep using your account.`}
             </text>
-            {muted(`Terms: ${host.legal.terms}`)}
-            {muted(`Privacy notice: ${host.legal.privacy}`)}
+            {links()}
           </Match>
           <Match when={step().kind === "intro"}>
             <Show when={account.reason() === "expired"}>
@@ -307,10 +344,7 @@ export function Welcome() {
               {muted(COPY.paid)}
               {muted(COPY.local)}
             </box>
-            <box flexDirection="column">
-              {muted(`Terms: ${host.legal.terms}`)}
-              {muted(`Privacy notice: ${host.legal.privacy}`)}
-            </box>
+            {links()}
           </Match>
           <Match when={step().kind === "starting"}>
             <text fg={theme.textMuted}>Asking the sign-in service for a code…</text>

@@ -15,9 +15,11 @@ import {
   type Pending,
   type SignedIn,
   type TermsCheck,
+  type Versions,
 } from "@opencode-ai/tui/util/account"
 import { CloudAccountApi } from "./account-api"
 import { CloudAuth } from "./auth"
+import { CloudLegal } from "./legal"
 import { CloudOidc } from "./oidc"
 import { CloudSignin } from "./signin"
 import { CloudStore } from "./store"
@@ -29,23 +31,15 @@ import { CloudSyncApi } from "./sync-api"
  * the TUI calls none of it, so no Lunos service is contacted.
  */
 
-/**
- * The Terms and Privacy notice the sign-up checkbox accepts. A new version asks again at the next
- * start. Placeholder URLs and version until the legal pack is published (counsel's review pending).
- */
-export const LEGAL: Legal = {
-  version: "2026-10-19",
-  terms: "https://lunos.tech/terms",
-  privacy: "https://lunos.tech/privacy",
-}
-
-/** Where this machine remembers the accepted version; Lunos Cloud keeps its own record (XCOD-274). */
+/** Where this machine remembers the accepted versions; Lunos Cloud keeps its own record (XCOD-274). */
 export const consentFile = () => path.join(Global.Path.data, "cloud", "consent.json")
 
 const fail = (error: unknown): never => {
   if (error instanceof AccountError) throw error
   const message = error instanceof Error ? error.message : String(error)
   if (error instanceof CloudAccountApi.NotServedError) throw new AccountError("unavailable", message)
+  if (error instanceof CloudAccountApi.RefusedError && error.status === 429)
+    throw new AccountError("rate_limited", message)
   throw new AccountError(CloudSignin.classify(error), message)
 }
 
@@ -69,27 +63,28 @@ async function signedIn(session: CloudStore.Session): Promise<SignedIn> {
   }
 }
 
-const PLANS: Record<string, string> = { free: "Free", pro: "Pro", team: "Team", business: "Business" }
+const PLANS: Record<string, string> = { free: "Free", pro: "Pro", team: "Team", enterprise: "Enterprise" }
 const planName = (id: string) => PLANS[id] ?? id[0]!.toUpperCase() + id.slice(1)
 
 /**
- * The plan line for /account: the personal plan (`GET /v1/billing/usage`), or the organisation whose
- * plan the account uses. Its plan's name is the owners' to see (billing is owner-only), so it isn't asked.
+ * XCOD-275: the plan line, from `GET /v1/account` (`plan`, `plan_source`): "Free", or "Team (Acme
+ * GmbH's)" for an organisation's plan. Never a billing call. Undefined where Lunos Cloud doesn't say.
  */
-async function plan(token: string, account: CloudAccountApi.Account, missing: string[]) {
-  const subject = account.billingSubject
-  if (!subject) return void missing.push("Plan: billing isn't turned on for this Lunos Cloud.")
-  if (subject.startsWith("org:")) {
-    const org = account.organizations.find((item) => item.org === subject.slice(4))
-    return `your organisation's (${org?.name ?? subject.slice(4)})`
-  }
-  return CloudAccountApi.plan(token).then(planName, (error: unknown) => {
-    missing.push(`Plan: ${error instanceof Error ? error.message : String(error)}`)
-    return undefined
-  })
+export function plan(account: CloudAccountApi.Account) {
+  if (!account.plan) return undefined
+  const source = account.planSource
+  if (!source || source === "personal") return planName(account.plan)
+  const org = account.organizations.find((item) => item.org === source)
+  return `${planName(account.plan)} (${org?.name ?? source}'s)`
 }
 
-function pending(confirmed: CloudSignin.Confirmed, legal: Legal, strict: boolean): Pending {
+/** The plan for the sign-in line: one `GET /v1/account`, where Lunos Cloud may be asked; never fails the sign-in. */
+async function signInPlan(confirmed: CloudSignin.Confirmed) {
+  if (await CloudAccountApi.allowed(confirmed.issuer)) return undefined
+  return CloudAccountApi.account(confirmed.tokens.access_token, { timeoutMs: 5_000 }).then(plan, () => undefined)
+}
+
+function pending(confirmed: CloudSignin.Confirmed, strict: boolean): Pending {
   let state = confirmed
   return {
     email: confirmed.user.email,
@@ -109,32 +104,39 @@ function pending(confirmed: CloudSignin.Confirmed, legal: Legal, strict: boolean
         throw new AccountError("unverified", "The e-mail address isn't confirmed yet.")
       const notes: string[] = []
       const kept = await CloudSignin.keep(state, { syncLocked: false, sync: false, print: (line) => notes.push(line) })
-      // Lunos Cloud is told after this, by the start's Terms check (termsCheck): it has its own versions.
-      await remember(legal.version)
+      // The box ticked before the sign-in was remembered then (accept); Lunos Cloud is told after this,
+      // by the start's Terms check (termsCheck).
       return {
         sub: state.user.sub,
         email: state.user.email,
         name: state.user.name,
         issuer: state.issuer,
         kept: CloudSignin.where(kept.backend),
+        plan: await signInPlan(state),
         notes,
       }
     },
   }
 }
 
-/** The accepted version, on this machine. */
-async function remember(version: string) {
+/** The accepted versions, on this machine. */
+async function remember(accepted: Versions) {
   const where = consentFile()
   await fs.mkdir(path.dirname(where), { recursive: true, mode: 0o700 })
-  await fs.writeFile(where, JSON.stringify({ version, at: new Date().toISOString() }), { mode: 0o600 })
+  await fs.writeFile(where, JSON.stringify({ ...accepted, at: new Date().toISOString() }), { mode: 0o600 })
 }
 
-async function accepted() {
+async function accepted(): Promise<Versions | undefined> {
   const raw = await fs.readFile(consentFile(), "utf8").catch(() => undefined)
   if (!raw) return undefined
   try {
-    return text((JSON.parse(raw) as { version?: unknown }).version)
+    const stored = JSON.parse(raw) as { terms?: unknown; privacy?: unknown; version?: unknown }
+    const terms = text(stored.terms)
+    const privacy = text(stored.privacy)
+    if (terms && privacy) return { terms, privacy }
+    // Before XCOD-275 one version stood for both.
+    const version = text(stored.version)
+    return version ? { terms: version, privacy: version } : undefined
   } catch {
     return undefined
   }
@@ -163,7 +165,7 @@ async function termsCheck(): Promise<TermsCheck | undefined> {
   if (!terms?.needsAcceptance) return undefined
   const check = { current: terms.current, accepted: terms.accepted }
   const local = await accepted()
-  if (terms.accepted || local !== terms.current.terms || local !== terms.current.privacy) return check
+  if (terms.accepted || local?.terms !== terms.current.terms || local?.privacy !== terms.current.privacy) return check
   return CloudAccountApi.acceptTerms(token, terms.current, { timeoutMs: 5_000 }).then(
     () => undefined,
     // Refused: ask, so the acceptance it records is one the user gave. Unreachable: the next start asks.
@@ -173,11 +175,16 @@ async function termsCheck(): Promise<TermsCheck | undefined> {
 
 const ROLE_TEXT: Record<string, string> = { owner: "an owner", admin: "an admin", member: "a member" }
 
-export function create(input: { gate: Gate; issuer: string; clientID: string; legal?: Legal }): Host {
-  const legal = input.legal ?? LEGAL
+export function create(input: { gate: Gate; issuer: string; clientID: string }): Host {
   return {
     gate: input.gate,
-    legal,
+    async legal(ask): Promise<Legal | undefined> {
+      // An exemption contacts no Lunos service at start; /login (asked) does, where Lunos Cloud may be
+      // asked at all (not for an organisation's issuer without cloud.endpoint).
+      const network =
+        (input.gate.required || ask?.asked === true) && (await CloudSyncApi.permitted(input.issuer).catch(() => false))
+      return CloudLegal.current({ network, timeoutMs: input.gate.required && !ask?.asked ? 3_000 : undefined })
+    },
     async current() {
       const session = await CloudStore.load()
       return session ? signedIn(session) : undefined
@@ -194,12 +201,12 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
         })
     },
     accepted,
-    async accept(version, server) {
+    async accept(versions, server) {
       if (server) {
         const token = await cloudToken("Recording your acceptance of the Terms").catch(fail)
         if (token) await CloudAccountApi.acceptTerms(token, server).catch(fail)
       }
-      await remember(version)
+      await remember(versions)
     },
     termsCheck,
     async probe() {
@@ -217,7 +224,6 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
         wait: async (signal) =>
           pending(
             await CloudSignin.complete(started, signal).catch(fail),
-            legal,
             // The account the Welcome screen asks for needs a confirmed address; an organisation's doesn't.
             !(input.gate.required === false && input.gate.exemption === "org-issuer"),
           ),
@@ -270,7 +276,8 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
         current: item.id === device,
         revoked: item.revokedAt !== undefined,
       }))
-      user.plan = await plan(fresh.tokens.access_token, account, missing)
+      user.plan = plan(account)
+      if (!user.plan) missing.push("Plan: this Lunos Cloud doesn't report it yet.")
       return details
     },
     async logoutEverywhere() {
@@ -302,16 +309,19 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
       const result = await CloudAccountApi.deleteAccount(fresh.tokens.access_token).catch(async (error: unknown) => {
         if (!(error instanceof CloudAccountApi.LastOwnerError)) return fail(error)
         // Nothing changed at Lunos Cloud: you stay signed in, and are told which organisations to hand over.
-        const orgs = await CloudAccountApi.account(fresh.tokens.access_token)
-          .then((account) => account.organizations)
-          .catch(() => [])
-        const named = error.orgs.map((id) => {
-          const name = orgs.find((item) => item.org === id)?.name
-          return name && name !== id ? `${name} (${id})` : id
-        })
+        // Their names come with the refusal (`details.orgs`); from an older server, only ids, so look them up.
+        const known = error.orgs.some((org) => org.name !== org.id)
+          ? []
+          : await CloudAccountApi.account(fresh.tokens.access_token)
+              .then((account) => account.organizations)
+              .catch(() => [])
+        const orgs = error.orgs.map((org) => ({
+          id: org.id,
+          name: known.find((item) => item.org === org.id)?.name ?? org.name,
+        }))
         return {
-          refused: named.length
-            ? `You're the only owner of ${named.join(", ")}. Transfer ownership first, with lunos org transfer <member> --org ${error.orgs[0]} or delete the organisation. Then delete your account.`
+          refused: orgs.length
+            ? `${CloudAccountApi.explain("last_owner", { orgs })} Then delete your account.`
             : error.message,
         }
       })

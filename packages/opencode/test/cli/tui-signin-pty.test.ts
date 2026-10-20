@@ -89,8 +89,18 @@ describe("Welcome screen (XCOD-273)", () => {
   test(
     "first start: the copy, the free/paid line, an unticked Terms box; Create account runs the device flow into home",
     async () => {
-      await start({ env: OFFICIAL, fake: { pendingPolls: 3 } })
-      const screen = await tui!.waitFor("Welcome to Lunos")
+      // XCOD-275: the Terms and Privacy notice are Lunos Cloud's (GET /v1/legal); these versions
+      // exist nowhere in the client.
+      await start({
+        env: OFFICIAL,
+        fake: {
+          pendingPolls: 3,
+          cloud: { ...FakeIdp.defaultCloud(), terms: { terms: "2027-02-03", privacy: "2027-02-04" } },
+        },
+      })
+      await tui!.waitFor("Welcome to Lunos")
+      const screen = await tui!.waitFor("Terms (2027-02-03): https://legal.lunos.test/terms")
+      expect(screen).toContain("Privacy notice (2027-02-04): https://legal.lunos.test/privacy")
       expect(screen).toContain("Create a free Lunos account to start. No card needed.")
       expect(screen).toContain("Free: the full harness, CLI, TUI, desktop app and every local feature.")
       expect(screen).toContain("Paid plans add cloud features")
@@ -111,28 +121,55 @@ describe("Welcome screen (XCOD-273)", () => {
       const until = Date.now() + 5_000
       while (!(await tui!.opened()) && Date.now() < until) await Bun.sleep(100)
       expect(await tui!.opened()).toContain(`${idp!.origin}/activate?user_code=WXYZ-2345`)
-      expect(await tui!.waitFor("Signed in as pat@lunos.test")).toContain("Session kept in the test keychain.")
+      // XCOD-275: the plan is back in the sign-in line, from GET /v1/account.
+      expect(await tui!.waitFor("Signed in as pat@lunos.test · Plan: Free")).toContain(
+        "Session kept in the test keychain.",
+      )
       await tui!.waitFor("Ask anything")
       expect(JSON.parse(JSON.parse(await tui!.keychain()).secret).tokens.refresh_token).toBe("rt-1")
       // No card or billing call, ever.
       expect(idp!.requests.filter((request) => /billing|checkout|card/.test(request.path))).toEqual([])
       expect(proxy.lunos()).toEqual([])
+      // The versions recorded at Lunos Cloud are the ones it published, once.
+      const until2 = Date.now() + 10_000
+      while (!idp!.cloud.state.termsPuts.length && Date.now() < until2) await Bun.sleep(100)
+      expect(idp!.cloud.state.termsPuts).toEqual([{ terms: "2027-02-03", privacy: "2027-02-04" }])
     },
     TIMEOUT,
   )
 
   test(
-    "a new account waits for the e-mail to be confirmed, offers Resend, then continues by itself",
+    "a new account waits for the e-mail to be confirmed, offers Resend (rate limited), then continues by itself",
     async () => {
-      await start({ env: OFFICIAL, fake: { outcomes: ["unverified"], verifyAfter: 2 } })
+      await start({ env: OFFICIAL, fake: { outcomes: ["unverified"], verifyAfter: 5 } })
       await tui!.waitFor("Welcome to Lunos")
       await acceptAnd("Sign in")
       await tui!.waitFor("Check your inbox at p…@lunos.test; this screen")
       await choose("Resend e-mail")
-      // Lunos Cloud doesn't send it again yet: the screen says so instead of pretending.
-      await tui!.waitFor("isn't available from Lunos Cloud yet")
-      await tui!.waitFor("Signed in as pat@lunos.test", 30_000)
+      await tui!.waitFor("Sent again.")
+      expect(idp!.cloud.state.sent).toBe(1)
+      // XCOD-275: once a minute: the second says when to try again, and nothing more is sent.
+      await choose("Resend e-mail")
+      expect(await tui!.waitFor("Too many requests.")).toMatch(/Try again in (\d+ seconds|1 minute)\./)
+      expect(idp!.cloud.state.sent).toBe(1)
+      await tui!.waitFor("Signed in as pat@lunos.test", 60_000)
       await tui!.waitFor("Ask anything")
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "Resend against lunoshq #13, which doesn't serve it: the screen says so instead of pretending",
+    async () => {
+      await start({
+        env: OFFICIAL,
+        fake: { outcomes: ["unverified"], verifyAfter: 3, cloud: { ...FakeIdp.defaultCloud(), legacy: true } },
+      })
+      await tui!.waitFor("Welcome to Lunos")
+      await acceptAnd("Sign in")
+      await tui!.waitFor("Check your inbox at p…@lunos.test; this screen")
+      await choose("Resend e-mail")
+      await tui!.waitFor("isn't available from Lunos Cloud yet")
     },
     TIMEOUT,
   )
@@ -315,6 +352,18 @@ describe("Welcome screen (XCOD-273)", () => {
   )
 
   test(
+    "/account and the sign-in line: the plan from GET /v1/account, and Admin as your role (XCOD-275)",
+    async () => {
+      const account = await openAccount({ cloud: { ...FakeIdp.defaultCloud(), plans: { "u-1": "pro" } } })
+      expect(account).toContain("Plan: Pro")
+      // Pat is an Admin of Acme GmbH (FakeIdp.defaultCloud).
+      expect(account).toContain("Organisations: Admin · Acme GmbH")
+      expect(idp!.requests.filter((request) => /billing/.test(request.path))).toEqual([])
+    },
+    TIMEOUT,
+  )
+
+  test(
     "Delete my account as an organisation's only owner: refused, named, still signed in (XCOD-274)",
     async () => {
       await openAccount({
@@ -392,11 +441,23 @@ describe("Welcome screen (XCOD-273)", () => {
         env: { ...proxied, ...OFFICIAL },
       })
       const screen = (await tui.waitFor("The Terms or the Privacy notice changed")).replace(/\s+/g, " ")
-      expect(screen).toContain("(Terms 2026-11-01, Privacy notice 2026-10-19; you accepted Terms 2026-10-19")
+      // XCOD-275: the start sees the new version itself (GET /v1/legal), before Lunos Cloud's record is asked.
+      expect(screen).toContain("(Terms 2026-11-01, Privacy notice 2026-10-19)")
+      expect(screen).toContain("Terms (2026-11-01): https://legal.lunos.test/terms")
       expect(screen).toContain("[ ] I accept the Terms")
       await acceptAnd("Continue")
       await tui.waitFor("Ask anything")
       expect(idp!.cloud.state.termsPuts.at(-1)).toEqual({ terms: "2026-11-01", privacy: "2026-10-19" })
+      // Recorded at Lunos Cloud as well as here: the next start doesn't ask again.
+      await tui.stop()
+      tui = await Pty.launch({
+        home: tui.home,
+        config: { cloud: { issuer: idp!.origin, endpoint: idp!.origin } },
+        env: { ...proxied, ...OFFICIAL },
+      })
+      await tui.waitFor("Ask anything")
+      await Bun.sleep(3_000)
+      expect(tui.screen.text()).not.toContain("The Terms or the Privacy notice changed")
     },
     TIMEOUT,
   )

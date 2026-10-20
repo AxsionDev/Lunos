@@ -27,13 +27,32 @@ What each role can do in an organisation:
 | Billing: plan, seats, invoices, payment method               |   ✓   |   —   |   —    |
 | Delete the organisation                                      |   ✓   |   —   |   —    |
 
-Lunos Cloud checks every request against your role, on its servers. `lunos org` and the TUI don't decide anything themselves: they send the request and show the answer. When your role can't do something, Lunos Cloud says whom to ask:
+Lunos Cloud checks every request against your role, on its servers. `lunos org` and the TUI don't decide anything themselves: they send the request and show the answer. When your role can't do something, Lunos Cloud says whom to ask. An Admin trying an Owner-only action sees:
 
 ```
 Error: Only an organisation owner can do this. Ask: owner@acme.example
 ```
 
-An organisation you aren't in answers as if it didn't exist (`No organisation acme.`).
+An organisation you aren't in answers as if it didn't exist (`You aren't a member of that organisation.`).
+
+### Refusal codes
+
+Each refusal carries a stable code, and `lunos org`, `/account` and scripts go by the code, never by the wording:
+
+| Code                   | What it means                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| `not_found`            | There's no such member or invitation (the message says which).                                |
+| `not_member`           | You aren't a member of that organisation.                                                     |
+| `owner_required`       | Only an owner can do this (billing, ownership, making owners). Admins get this too.           |
+| `admin_required`       | Only an owner or admin can do this (members, invitations, policy).                            |
+| `last_owner`           | You're the only owner of the organisations named. Transfer ownership first.                   |
+| `suspended`            | The organisation or account is suspended.                                                     |
+| `unverified`           | Your e-mail address isn't confirmed yet.                                                      |
+| `reauth_required`      | The action needs a recent sign-in: sign in again, then retry.                                 |
+| `break_glass_required` | Lunos platform staff only: the action needs an active break-glass grant.                      |
+| `rate_limited`         | Too many requests, such as resending the confirmation e-mail; the message says when to retry. |
+
+An older Lunos Cloud that sends no code is shown in its own words.
 
 ## Your organisations
 
@@ -62,7 +81,7 @@ lunos org leave                             # leave the organisation yourself
 
 You can name people by e-mail address or by their account id. `lunos org remove me` is the same as `lunos org leave`.
 
-An organisation always has at least one owner. Its last owner can't leave, be removed or be made a member until someone else is an owner.
+An organisation always has at least one owner. Its last owner can't leave, be removed or be made a member until someone else is an owner (`last_owner`, naming the organisation).
 
 ## Invitations
 
@@ -103,7 +122,7 @@ Only an owner can transfer ownership, and only to someone who is already a membe
   {
     "error": {
       "status": 403,
-      "code": "forbidden",
+      "code": "admin_required",
       "message": "Only an organisation owner or admin can do this. Ask: owner@acme.example"
     }
   }

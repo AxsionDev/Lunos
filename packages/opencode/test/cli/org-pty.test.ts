@@ -6,7 +6,7 @@ import * as FakeLunoshq from "../cloud/fixtures/fake-lunoshq"
 import * as Pty from "./fixtures/tui-pty"
 
 // XCOD-274: `lunos org` from source in a pty at 120x45 (and without a terminal, as a script runs it),
-// against a fake Lunos Cloud with lunoshq #13's contract on 127.0.0.1. The sign-in is seeded in the
+// against a fake Lunos Cloud with lunoshq's contract (XCOD-275's refusal codes) on 127.0.0.1. The sign-in is seeded in the
 // stand-in keychain; anything else the CLI tries to reach goes to a recording proxy that refuses it.
 // Lunos Cloud decides every permission: a Member's Owner-only action is refused there, and shown.
 
@@ -186,11 +186,60 @@ describe("lunos org (XCOD-274)", () => {
       const olga = await signedIn("olga")
       let result = await org(olga, ["leave", "--org", "beta", "--yes"])
       expect(result.code).toBe(1)
-      expect(result.screen).toContain("An organisation needs at least one owner. Make someone else an owner first.")
+      // XCOD-275: last_owner names the organisation from details, not from the message. The line is
+      // wider than the pty, so it's read whole from stderr.
+      expect(result.screen).toContain("You're the only owner of Beta Ltd (beta).")
+      const whole = await Pty.exec(["org", "leave", "--org", "beta", "--yes"], olga)
+      expect(whole.stderr.replace(/\s+/g, " ")).toContain(
+        "You're the only owner of Beta Ltd (beta). Transfer ownership first, with lunos org transfer <member> --org beta, or delete the organisation.",
+      )
       const eve = await signedIn("eve")
       result = await org(eve, ["owners", "--org", "acme"])
       expect(result.code).toBe(1)
-      expect(result.screen).toContain("No organisation acme.")
+      expect(result.screen).toContain("You aren't a member of that organisation. Ask one of its owners to invite you.")
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "an Admin (XCOD-275): shown as Admin, manages members, and Owner-only actions say owner_required's text",
+    async () => {
+      start({
+        orgs: { acme: { name: "Acme GmbH", members: { olga: "owner", pat: "admin", sam: "member" } } },
+      })
+      const pat = await signedIn("pat")
+      let result = await org(pat, ["list"])
+      expect(result.screen).toMatch(/Admin · Acme GmbH \(acme\)/)
+      result = await org(pat, ["members"])
+      expect(result.code).toBe(0)
+      expect(result.screen).toContain("sam@acme.example")
+      result = await org(pat, ["invite", "friend@example.com"])
+      expect(result.code).toBe(0)
+      for (const args of [
+        ["transfer", "sam@acme.example", "--yes"],
+        ["owners", "add", "sam@acme.example", "--yes"],
+        ["invite", "boss@example.com", "--role", "owner"],
+      ]) {
+        result = await org(pat, args)
+        expect(result.code).toBe(1)
+        expect(result.screen).toContain("Only an organisation owner can do this. Ask: owner@acme.example")
+      }
+      expect(cloud.orgs.acme!.members).toEqual({ olga: "owner", pat: "admin", sam: "member" })
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "lunoshq #13 (no XCOD-275 codes): refusals are shown in the server's own words",
+    async () => {
+      start({ legacy: true })
+      const pat = await signedIn("pat")
+      let result = await org(pat, ["transfer", "sam@acme.example", "--yes"])
+      expect(result.code).toBe(1)
+      expect(result.screen).toContain("Only an organisation owner can do this. Ask: owner@acme.example")
+      const olga = await signedIn("olga")
+      result = await org(olga, ["leave", "--org", "beta", "--yes"])
+      expect(result.screen).toContain("An organisation needs at least one owner. Make someone else an owner first.")
     },
     TIMEOUT,
   )
@@ -234,7 +283,7 @@ describe("lunos org in a script (XCOD-274)", () => {
       expect(JSON.parse(result.stdout)).toEqual({
         error: {
           status: 403,
-          code: "forbidden",
+          code: "admin_required",
           message: "Only an organisation owner or admin can do this. Ask: owner@acme.example",
         },
       })

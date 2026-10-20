@@ -1,6 +1,6 @@
 import { createSignal, onMount } from "solid-js"
 import { createSimpleContext } from "./helper"
-import { needsAcceptance, type Exemption, type Host, type SignedIn, type TermsCheck } from "../util/account"
+import { needsAcceptance, type Exemption, type Host, type Legal, type SignedIn, type TermsCheck } from "../util/account"
 
 // XCOD-273: who is signed in to Lunos here, and whether the Welcome screen stands in front of the
 // app. Without a host (`lunos attach` to an older server, plugins' tests) or with an exemption, the
@@ -24,6 +24,13 @@ export const {
     const [user, setUser] = createSignal<SignedIn>()
     // XCOD-274: the versions Lunos Cloud asks to accept, when its record is older than its current ones.
     const [terms, setTerms] = createSignal<TermsCheck>()
+    // XCOD-275: the current Terms and Privacy notice, from Lunos Cloud (or the last ones kept here).
+    const [legal, setLegal] = createSignal<Legal>()
+    const loadLegal = async (asked = false) => {
+      const found = await host?.legal({ asked }).catch(() => undefined)
+      if (found) setLegal(found)
+      return found ?? legal()
+    }
     // Set when the start found no network: the one-time "Offline" exemption (no Welcome this run).
     const [exempt, setExempt] = createSignal<Exemption | undefined>(
       host && host.gate.required === false ? host.gate.exemption : undefined,
@@ -50,9 +57,11 @@ export const {
       if (!host || !required) return
       void (async () => {
         const signed = await host.current().catch(() => undefined)
+        // The Welcome screen asks for the current Terms itself.
         if (!signed) return welcome("signed-out")
         setUser(signed)
-        if (needsAcceptance(host.legal, await host.accepted().catch(() => undefined))) return welcome("terms")
+        const current = await loadLegal()
+        if (needsAcceptance(current, await host.accepted().catch(() => undefined))) return welcome("terms")
         setPhase("ready")
         // Checked against the provider in the background: offline, the cached sign-in holds.
         if ((await host.refresh().catch(() => "ok")) === "expired") {
@@ -71,6 +80,9 @@ export const {
       user,
       exempt,
       terms,
+      legal,
+      /** Asks for the current Terms again; `asked`: the person chose to sign in, so even an exemption may ask. */
+      loadLegal,
       /** Whether the Welcome screen stands in front of the app (or is about to). */
       blocks() {
         return phase() !== "ready" && (asked() || (required && !exempt()))
