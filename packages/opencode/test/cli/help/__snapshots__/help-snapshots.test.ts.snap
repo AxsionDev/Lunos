@@ -471,6 +471,8 @@ Commands:
   lunos memory setup           set up memory in a few steps, each with a recommended answer
   lunos memory templates       list the memory setup templates (lunos memory setup --template
                                <name>)
+  lunos memory storage         change where memory is stored (lunos memory status shows where it is
+                               now)
 
 Options:
   -h, --help        show help                                                              [boolean]

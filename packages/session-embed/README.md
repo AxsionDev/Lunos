@@ -37,6 +37,16 @@ Sizes at XCOD-185 (raw size, gzip in the third column):
 
 Most of the CSS is base64 fonts inlined by `@opencode-ai/ui`; the rules themselves are about 307 kB (370 kB before Tailwind's scan was narrowed to `session-ui` and `ui`).
 
+## Look
+
+`mount` sets the dark Catppuccin look on the element it renders into (`src/theme.ts`, XCOD-272):
+`@opencode-ai/ui`'s Catppuccin theme, dark variant (Mocha), as CSS custom properties on that element
+only, with `color-scheme: dark`, whatever the computer's light or dark setting. The host's `:root`
+and the rest of its page keep their own variables. This matches app.lunos.tech, which is dark only in
+the same palette. The fonts are `'IBM Plex Sans'` and `'JetBrains Mono'` when the host provides them
+(app.lunos.tech does), then the system fonts. Tooltips and popovers that `@opencode-ai/ui` renders into
+`document.body` are outside the element, so they keep the host's variables.
+
 ## Host requirements
 
 The stylesheet inlines its fonts as base64 `data:` URIs (done by `@opencode-ai/ui`), so the host CSP needs at least:

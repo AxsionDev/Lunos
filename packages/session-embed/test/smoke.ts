@@ -109,7 +109,8 @@ async function executablePath() {
 const browser = await chromium.launch({ executablePath: await executablePath() })
 const errors: string[] = []
 try {
-  const page = await browser.newPage()
+  // A light-mode computer: the embed must still be dark (XCOD-272), and only inside its element.
+  const page = await browser.newPage({ colorScheme: "light" })
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()))
   page.on("pageerror", (e) => errors.push(String(e)))
   await page.addInitScript(() =>
@@ -126,6 +127,19 @@ try {
     if (tool === 0) throw new Error("no tool row rendered")
   }
   await assertRendered()
+  const look = await page.evaluate(() => {
+    const root = document.getElementById("root")!
+    const v = (el: Element, name: string) => getComputedStyle(el).getPropertyValue(name).trim()
+    return {
+      inside: v(root, "--background-base"),
+      outside: v(document.documentElement, "--background-base"),
+      scheme: getComputedStyle(root).colorScheme,
+    }
+  })
+  if (look.scheme !== "dark")
+    throw new Error(`the embed isn't dark on a light-mode computer: color-scheme ${look.scheme}`)
+  if (look.inside === look.outside)
+    throw new Error(`the embed's theme leaked to :root, or never applied: ${look.inside}`)
   await page.evaluate(() => (window as any).__dispose())
   const left = await page.locator("#root").innerHTML()
   if (left.trim() !== "") throw new Error(`container not empty after dispose: ${left.slice(0, 200)}`)
@@ -135,7 +149,7 @@ try {
   await assertRendered()
   if (errors.length) throw new Error(`console errors:\n${errors.join("\n")}`)
   console.log(
-    "smoke ok: user text, assistant text and tool row rendered under the app CSP; dispose emptied the container; re-mount rendered; no console errors",
+    "smoke ok: user text, assistant text and tool row rendered under the app CSP; dark Catppuccin on a light-mode page, on the mount element only; dispose emptied the container; re-mount rendered; no console errors",
   )
 } finally {
   await browser.close()

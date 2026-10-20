@@ -25,6 +25,8 @@ export type Draft = {
   /** undefined: keep facts until they're removed. */
   retentionDays?: number
   encryption: "os-keychain" | "off"
+  /** The template that set up the storage; undefined when it was chosen by hand ("Custom"). */
+  template?: string
 }
 
 /** The keys the wizard writes. An organisation lock on any of them makes that step fixed. */
@@ -53,6 +55,7 @@ type MemoryConfig = {
   }
   retention?: { days?: number }
   encryption?: "os-keychain" | "off"
+  template?: string
 }
 
 export function locked(rows: readonly Row[], key: Key) {
@@ -87,6 +90,7 @@ export function initial(memory: MemoryConfig | undefined): Draft {
     retentionDays: memory?.retention?.days,
     // The OS keychain holds one person's key; a shared database is encrypted on the server instead.
     encryption: memory?.encryption ?? (external ? "off" : "os-keychain"),
+    template: memory?.template,
   }
 }
 
@@ -139,6 +143,12 @@ export function writes(draft: Draft, memory: MemoryConfig | undefined, rows: rea
   set("memory.model", draft.model, memory?.model)
   set("memory.retention.days", draft.retentionDays ? String(draft.retentionDays) : undefined, memory?.retention?.days)
   set("memory.encryption", draft.encryption, memory?.encryption ?? "off")
+  // Recorded next to the backend (and locked with it), so /memory can say which template set it up.
+  if (!locked(rows, "memory.backend")) {
+    if (draft.template === undefined) {
+      if (memory?.template !== undefined) out.push({ key: "memory.template", unset: true })
+    } else if (memory?.template !== draft.template) out.push({ key: "memory.template", value: draft.template })
+  }
   return out
 }
 
@@ -203,6 +213,27 @@ export function apply(draft: Draft, memory: Record<string, unknown>): Draft {
     ...(typeof memory.model === "string" && memory.model ? { model: memory.model } : {}),
     ...(memory.encryption === "off" || memory.encryption === "os-keychain" ? { encryption: memory.encryption } : {}),
   }
+}
+
+/** Where the facts are now, for "Start empty: the old ones stay in …". */
+export function location(memory: MemoryConfig | undefined, paths?: { project?: string; user?: string }) {
+  if (database(memory?.backend?.type)) {
+    let host = memory.backend.url ?? ""
+    try {
+      host = new URL(host).host
+    } catch {}
+    // A Docker template's database says so: "Neo4j in Docker on this computer (localhost:7687)".
+    const docker = MemoryStorage.BUILTIN.find((item) => item.name === memory.template && item.compose)
+    if (docker) return `${docker.title}${host ? ` (${host})` : ""}`
+    return `${MemoryStorage.label(memory.backend.type)}${host ? ` at ${host}` : ""}`
+  }
+  const list = [paths?.project, paths?.user].filter(Boolean)
+  return list.length ? list.join(" and ") : "memory on this computer"
+}
+
+/** Start empty, naming where the old facts stay. */
+export function startEmpty(memory: MemoryConfig | undefined, paths?: { project?: string; user?: string }) {
+  return `Start empty: the new storage starts with no facts; the old ones stay, untouched, in ${location(memory, paths)}.`
 }
 
 /**
