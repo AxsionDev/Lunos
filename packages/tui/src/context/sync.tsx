@@ -25,6 +25,7 @@ import { useProject } from "./project"
 import { useEvent } from "./event"
 import { useSDK } from "./sdk"
 import { useTuiStartup } from "./runtime"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
 import { createSimpleContext } from "./helper"
 import { useExit } from "./exit"
 import { useArgs } from "./args"
@@ -63,6 +64,9 @@ export const {
   provider: SyncProvider,
 } = createSimpleContext({
   name: "Sync",
+  // XCOD-276: the home screen and prompt show before the server has answered; `ready` (and `status`)
+  // say when the data is in. A prompt sent before then waits for it (component/prompt).
+  blocking: false,
   init: () => {
     const startup = useTuiStartup()
     const kv = useKV()
@@ -448,8 +452,12 @@ export const {
     const exit = useExit()
     const args = useArgs()
 
+    let traced = false
     async function bootstrap(input: { fatal?: boolean } = {}) {
       const fatal = input.fatal ?? true
+      // Only the first load is part of start-up; later ones (a reconnect) aren't traced.
+      const loaded = traced ? () => {} : StartupTrace.begin("load session data", { blocking: false })
+      traced = true
       const workspace = project.workspace.current()
       const projectPromise = project.sync()
       const sessionListPromise = projectPromise.then(() => listSessions())
@@ -515,6 +523,7 @@ export const {
           })
         })
         .then(() => {
+          loaded()
           if (store.status !== "complete") setStore("status", "partial")
           // non-blocking
           void Promise.all([

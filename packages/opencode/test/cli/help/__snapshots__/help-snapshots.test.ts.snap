@@ -128,19 +128,20 @@ exports[`opencode CLI help-text snapshots every documented command emits stable 
 debugging and troubleshooting tools
 
 Commands:
-  lunos debug config        show resolved configuration
-  lunos debug lsp           LSP debugging utilities
-  lunos debug rg            ripgrep debugging utilities
-  lunos debug file          file system debugging utilities
-  lunos debug scrap         list all known projects
-  lunos debug skill         list all available skills
-  lunos debug snapshot      snapshot debugging utilities
-  lunos debug startup       print startup timing
-  lunos debug agent <name>  show agent configuration details
-  lunos debug v2            debug v2 catalog and built-in plugins
-  lunos debug info          show version, platform and install details to paste into a bug report
-  lunos debug paths         show global paths (data, config, cache, state)
-  lunos debug wait          wait indefinitely (for debugging)
+  lunos debug config             show resolved configuration
+  lunos debug lsp                LSP debugging utilities
+  lunos debug rg                 ripgrep debugging utilities
+  lunos debug file               file system debugging utilities
+  lunos debug scrap              list all known projects
+  lunos debug skill              list all available skills
+  lunos debug snapshot           snapshot debugging utilities
+  lunos debug startup [project]  time the TUI's start, phase by phase, to its first frame
+  lunos debug agent <name>       show agent configuration details
+  lunos debug v2                 debug v2 catalog and built-in plugins
+  lunos debug info               show version, platform and install details to paste into a bug
+                                 report
+  lunos debug paths              show global paths (data, config, cache, state)
+  lunos debug wait               wait indefinitely (for debugging)
 
 Options:
   -h, --help        show help                                                              [boolean]

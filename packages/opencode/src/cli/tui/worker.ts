@@ -14,6 +14,10 @@ import { Effect } from "effect"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
 import { SessionPeers } from "@/session/peers"
 import { RunLog } from "@opencode-ai/core/observability/run-log"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
+
+// XCOD-276: this worker started `performance.now()` ago; its imports have all run by now.
+StartupTrace.record("load server modules", StartupTrace.now() - performance.now(), undefined, { blocking: false })
 
 Heap.start()
 
@@ -35,6 +39,7 @@ GlobalBus.on("event", (event) => {
   Rpc.emit("global.event", event)
 })
 
+let traced = 0
 let server: Awaited<ReturnType<typeof Server.listen>> | undefined
 
 export const rpc = {
@@ -49,13 +54,22 @@ export const rpc = {
       headers,
       body: input.body,
     })
+    const end =
+      traced++ < 60
+        ? StartupTrace.begin(`${input.method} ${new URL(input.url).pathname}`, { blocking: false })
+        : undefined
     const response = await Server.Default().app.fetch(request)
     const body = await response.text()
+    end?.()
     return {
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
       body,
     }
+  },
+  /** XCOD-276: this thread's start-up phases, for the TUI's timeline. */
+  trace() {
+    return StartupTrace.phases()
   },
   snapshot() {
     const result = writeHeapSnapshot("server.heapsnapshot")

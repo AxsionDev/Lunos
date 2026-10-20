@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url"
 import { Schema } from "effect"
 import { parse } from "jsonc-parser"
 import { RunLog } from "@opencode-ai/core/observability/run-log"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
 import { ConfigLog } from "@opencode-ai/core/config/log"
 import { ConfigManaged } from "@/config/managed"
 import { SandboxConfig } from "@/sandbox/config"
@@ -127,6 +128,8 @@ export function start(args: readonly string[], directory = process.env.PWD ?? pr
   if (!wanted(args) || RunLog.current()) return
   const found = secrets(directory)
   RunLog.start({ argv: args, lines: { cwd: directory } })
+  // XCOD-276: the log header carries the start-up timeline recorded so far.
+  RunLog.setPhases(() => StartupTrace.format())
   RunLog.note("config layers", found.length ? found : "(none)")
   RunLog.prune(retention())
   process.on("exit", (code) => {

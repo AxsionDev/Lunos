@@ -64,6 +64,18 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   by default) shows another; "Hide tips" stays, and `"tips": false` in `tui.json` turns them off.
   Which tips you've seen is kept on your computer only. <!-- XCOD-278 -->
 
+### Changed
+
+- **`lunos` shows its home screen about a second sooner.** The screen and the prompt no longer wait
+  for the local server, plugins or MCP servers: on a Mac a warm start now draws in about half a
+  second instead of one and a half. You can type straight away; a prompt you send before Lunos is
+  ready waits under the prompt ("Starting… your prompt is sent once ready") and goes out as soon as
+  it can. The "Loading plugins…" box is gone: what's still loading shows as one quiet line at the
+  bottom ("plugins loading · MCP connecting… (3)"), and MCP servers that didn't connect are named
+  there for a few seconds. In a terminal that doesn't report its colours, start-up no longer waits a
+  full second for it. To see where the time goes, run `lunos debug startup`, or start with
+  `LUNOS_STARTUP_TRACE=1`. <!-- XCOD-276 -->
+
 ### Fixed
 
 - **Turning on the sandbox can no longer lock you out of Lunos.** Before it's saved in `/settings`,

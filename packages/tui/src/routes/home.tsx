@@ -42,6 +42,9 @@ export function Home() {
   })
 
   const bind = (r: PromptRef | undefined) => {
+    // XCOD-276: plugins load after the first frame; one that replaces the prompt keeps what was typed.
+    const previous = ref()
+    if (r && previous && previous !== r && previous.current.input && !r.current.input) r.set(previous.current)
     setRef(r)
     promptRef.set(r)
     if (once || !r) return

@@ -53,6 +53,10 @@ import { Heap } from "./cli/heap"
 import { brandHelp } from "./cli/brand"
 import { Restart } from "./cli/restart"
 import { Failure } from "./cli/failure"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
+
+// XCOD-276: every static import above has run by now.
+StartupTrace.record("load cli modules", 0)
 
 const args = hideBin(process.argv)
 
@@ -160,7 +164,9 @@ const cli = yargs(args)
 
     // XCOD-254: `lunos mcp bridge` is started by Claude Code / Codex for every turn; it stays quiet.
     const bridge = command === "mcp" && opts._[1] === "bridge"
-    if (!pendingNotice && !bridge && NOTICE_COMMANDS.has(String(opts._[0] ?? ""))) {
+    // XCOD-276: `lunos debug startup` starts the TUI and times it; it starts exactly as `lunos` does.
+    const startup = command === "debug" && opts._[1] === "startup"
+    if (!pendingNotice && !bridge && !startup && NOTICE_COMMANDS.has(String(opts._[0] ?? ""))) {
       pendingNotice = import("./cli/upgrade").then(({ notice }) => notice({ until: commandFinished })).catch(() => {})
     }
   })

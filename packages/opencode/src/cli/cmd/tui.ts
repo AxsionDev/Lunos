@@ -19,6 +19,7 @@ import { Restart } from "../restart"
 import { CloudGate } from "@/cloud/gate"
 import { CloudTuiHost } from "@/cloud/tui-host"
 import { requireLineSignIn } from "./cloud"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
 import { RunLog } from "@opencode-ai/core/observability/run-log"
 import { Failure } from "../failure"
 
@@ -74,6 +75,24 @@ export function resolveThreadDirectory(project?: string, envPWD = process.env.PW
   const root = Filesystem.resolve(envPWD ?? cwd)
   if (project) return Filesystem.resolve(path.isAbsolute(project) ? project : path.join(root, project))
   return Filesystem.resolve(cwd)
+}
+
+/**
+ * XCOD-276: `lunos debug startup` sets `quit`: the TUI quits once the timeline is complete. `settle`
+ * is how long after the first frame the timeline keeps collecting, so work behind it shows up too.
+ */
+export const startupProbe: { settle: number; quit?: boolean } = { settle: 3000 }
+
+/**
+ * Once the first frame is up and the work behind it had `settle` ms: adds the server's phases and
+ * writes the timeline to its file. Printed to the terminal only after the TUI has left it.
+ */
+async function collectStartupTrace(client: RpcClient) {
+  await StartupTrace.waitFirstFrame()
+  await Bun.sleep(startupProbe.settle)
+  StartupTrace.add(await withTimeout(client.call("trace", undefined), 1000).catch(() => []))
+  const file = StartupTrace.target()
+  if (file) await Bun.write(file, StartupTrace.serialize(file)).catch(() => {})
 }
 
 export const TuiThreadCommand = cmd({
@@ -168,8 +187,9 @@ export const TuiThreadCommand = cmd({
   handler: async (args) => {
     // XCOD-129: taken before anything else, so the worker and its children never inherit it.
     const restarted = Restart.takeHandoff()
+    StartupTrace.mark("tui command", { blocking: true })
     // XCOD-144: the server and everything it spawns run in a container; only the TUI stays here.
-    const { wanted, runSandboxedTui, refuseHost } = await import("./sandbox")
+    const { wanted, runSandboxedTui, refuseHost } = await StartupTrace.span("import sandbox", () => import("./sandbox"))
     if (args.sandbox === false) {
       const refused = await refuseHost("`lunos --no-sandbox`", resolveThreadDirectory(args.project))
       if (refused) {
@@ -178,7 +198,7 @@ export const TuiThreadCommand = cmd({
         return
       }
     }
-    if (wanted(args, resolveThreadDirectory(args.project))) {
+    if (StartupTrace.trace("sandbox decision", () => wanted(args, resolveThreadDirectory(args.project)))) {
       const unsupported = [
         ["--mini", args.mini],
         ["--prompt", args.prompt !== undefined],
@@ -274,7 +294,7 @@ export const TuiThreadCommand = cmd({
       : undefined
     watchdog?.unref?.()
     try {
-      const { TuiConfig } = await import("@/config/tui")
+      const { TuiConfig } = await StartupTrace.span("import tui config", () => import("@/config/tui"))
       if (args.fork && !args.continue && !args.session) {
         UI.error("--fork requires --continue or --session")
         process.exitCode = 1
@@ -284,7 +304,7 @@ export const TuiThreadCommand = cmd({
       // Resolve relative --project paths from PWD, then use the real cwd after
       // chdir so the thread and worker share the same directory key.
       const next = resolveThreadDirectory(args.project)
-      const file = await target()
+      const file = await StartupTrace.span("find worker", target)
       try {
         process.chdir(next)
       } catch {
@@ -293,15 +313,17 @@ export const TuiThreadCommand = cmd({
       }
       const cwd = Filesystem.resolve(process.cwd())
 
+      const startWorker = StartupTrace.begin("start worker")
       // XCOD-280: the worker writes into this run's log (it takes RunLog.ENV out of its environment, so
-      // its children don't get it).
+      // its children don't get it). XCOD-276: it reports its start-up phases on this process's clock.
       const worker = new Worker(file, {
         env: Object.fromEntries(
           Object.entries(process.env)
-            .concat([[RunLog.ENV, RunLog.current()?.file]])
+            .concat([[RunLog.ENV, RunLog.current()?.file]], Object.entries(StartupTrace.originEnv()))
             .filter((entry): entry is [string, string] => entry[1] !== undefined),
         ),
       })
+      startWorker()
       const client = Rpc.client<typeof rpc>(worker)
       const reload = () => {
         client.call("reload", undefined).catch(() => {})
@@ -327,8 +349,9 @@ export const TuiThreadCommand = cmd({
         worker.terminate()
       }
 
-      const prompt = await input(args.prompt)
-      const config = await TuiConfig.get()
+      const collected = StartupTrace.enabled() ? collectStartupTrace(client) : undefined
+      const prompt = await StartupTrace.span("read piped input", () => input(args.prompt))
+      const config = await StartupTrace.span("tui config", () => TuiConfig.get())
 
       const network = resolveNetworkOptionsNoConfig(args)
       const external = hasArg("--port") || hasArg("--hostname") || network.mdns === true
@@ -349,13 +372,15 @@ export const TuiThreadCommand = cmd({
           }
 
       try {
-        await validateSession({
-          url: transport.url,
-          sessionID: args.session,
-          directory: cwd,
-          fetch: transport.fetch,
-          headers,
-        })
+        await StartupTrace.span("validate session", () =>
+          validateSession({
+            url: transport.url,
+            sessionID: args.session,
+            directory: cwd,
+            fetch: transport.fetch,
+            headers,
+          }),
+        )
       } catch (error) {
         UI.error(errorMessage(error))
         process.exitCode = 1
@@ -370,9 +395,12 @@ export const TuiThreadCommand = cmd({
       if (external) setTimeout(checkUpgrade, 1000).unref?.()
 
       try {
+        const imported = StartupTrace.begin("import tui")
         const { Effect } = await import("effect")
         const { run } = await import("../tui/layer")
         const { createLegacyTuiPluginHost } = await import("@/plugin/tui/runtime")
+        imported()
+        const gate = await StartupTrace.span("sign-in gate", () => CloudGate.current())
         Failure.setFullscreen(true)
         await Effect.runPromise(
           run({
@@ -387,6 +415,7 @@ export const TuiThreadCommand = cmd({
             pluginHost: createLegacyTuiPluginHost(),
             restart: { request: (request) => (restartRequest = request) },
             restarted: restarted && { ...restarted },
+            quit: startupProbe.quit ? collected : undefined,
             onStarted() {
               clearTimeout(watchdog)
               Restart.markStarted()
@@ -396,7 +425,7 @@ export const TuiThreadCommand = cmd({
             headers: transport.headers,
             events: transport.events,
             // XCOD-273: the Lunos account, run here in the CLI process (the Welcome screen's sign-in).
-            account: CloudTuiHost.create(await CloudGate.current()),
+            account: CloudTuiHost.create(gate),
             args: {
               continue: args.continue,
               sessionID: args.session,
@@ -420,6 +449,9 @@ export const TuiThreadCommand = cmd({
         unguard?.()
       } catch {}
     }
+    // `lunos debug startup` prints it as its output; LUNOS_STARTUP_TRACE=1 alongside the TUI's.
+    if (StartupTrace.enabled() && !StartupTrace.target())
+      (startupProbe.quit ? process.stdout : process.stderr).write(StartupTrace.format() + "\n")
     if (process.exitCode) Restart.reportFailedStart()
     // XCOD-129: the TUI has exited and the worker (MCP, LSP, memory sidecar, local server) is shut
     // down; start Lunos again in its place.

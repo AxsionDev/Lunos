@@ -22,7 +22,8 @@ import { createStore, produce } from "solid-js/store"
 import { createSimpleContext } from "./helper"
 import { useSDK } from "./sdk"
 import { useEvent } from "./event"
-import { createSignal, onCleanup, onMount } from "solid-js"
+import { createEffect, createSignal, onCleanup, onMount, useContext } from "solid-js"
+import { SyncContext } from "./sync"
 
 type LocationData = {
   agent?: AgentV2Info[]
@@ -548,7 +549,13 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       },
     }
 
-    onMount(() => {
+    // XCOD-276: the screen no longer waits for the session data, so this waits for it instead: asked
+    // alongside it, these requests slowed down the ones the prompt needs.
+    const sync = useContext(SyncContext)
+    let refreshed = false
+    createEffect(() => {
+      if (refreshed || sync?.status === "loading") return
+      refreshed = true
       void Promise.allSettled([
         result.location.refresh(),
         result.location.agent.refresh(),
