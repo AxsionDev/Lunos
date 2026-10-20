@@ -102,7 +102,7 @@ describe("the transport while the sandbox starts", () => {
 
   test("a cancelled request stops waiting", async () => {
     const background = SandboxBackground.start({
-      launch: () => new Promise(() => {}),
+      launch: () => new Promise<{ url: string; headers: Record<string, string> }>(() => {}),
       failed: () => ({ status: "failed", failure: { reason: "x", time: "" } }),
     })
     const abort = new AbortController()

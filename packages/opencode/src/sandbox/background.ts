@@ -73,10 +73,9 @@ export function start<C extends Connection>(input: Input<C>) {
     const target = await wait(request.signal)
     const url = new URL(request.url)
     const next = new Request(new URL(url.pathname + url.search, target.url), request)
-    for (const [name, value] of Object.entries(target.headers))
-      next.headers.set(name, value)
-      // As the SDK does for its own fetch: the event stream stays open for as long as the TUI runs.
-    ;(next as Request & { timeout?: boolean }).timeout = false
+    for (const [name, value] of Object.entries(target.headers)) next.headers.set(name, value)
+    // As the SDK does for its own fetch: the event stream stays open for as long as the TUI runs.
+    Object.assign(next, { timeout: false })
     return globalThis.fetch(next)
   }) as typeof globalThis.fetch
 

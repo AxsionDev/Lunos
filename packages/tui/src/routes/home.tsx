@@ -58,6 +58,16 @@ export function Home() {
     once = true
   }
 
+  // XCOD-281: the home screen is up before the app navigates here with a restart's draft (the
+  // first frame doesn't wait), so the prompt is already bound when it arrives.
+  createEffect(() => {
+    const r = ref()
+    const prompt = route.prompt
+    if (once || !r || !prompt) return
+    r.set(prompt)
+    once = true
+  })
+
   // Wait for sync and model store to be ready before auto-submitting --prompt
   createEffect(() => {
     const r = ref()
