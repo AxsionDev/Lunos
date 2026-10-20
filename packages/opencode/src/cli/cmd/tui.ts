@@ -293,12 +293,13 @@ export const TuiThreadCommand = cmd({
       }
       const cwd = Filesystem.resolve(process.cwd())
 
+      // XCOD-280: the worker writes into this run's log (it takes RunLog.ENV out of its environment, so
+      // its children don't get it).
       const worker = new Worker(file, {
         env: Object.fromEntries(
-          // XCOD-280: the worker writes into this run's log (and only the worker: its children don't get it).
-          Object.entries({ ...process.env, [RunLog.ENV]: RunLog.current()?.file }).filter(
-            (entry): entry is [string, string] => entry[1] !== undefined,
-          ),
+          Object.entries(process.env)
+            .concat([[RunLog.ENV, RunLog.current()?.file]])
+            .filter((entry): entry is [string, string] => entry[1] !== undefined),
         ),
       })
       const client = Rpc.client<typeof rpc>(worker)
