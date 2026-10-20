@@ -21,6 +21,8 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+## [1.18.52] - 2026-10-20
+
 ### Added
 
 - **See what memory uses at the top of `/memory`, and change it from there.** The Overview tab now
@@ -74,7 +76,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   bottom ("plugins loading · MCP connecting… (3)"), and MCP servers that didn't connect are named
   there for a few seconds. In a terminal that doesn't report its colours, start-up no longer waits a
   full second for it. To see where the time goes, run `lunos debug startup`, or start with
-  `LUNOS_STARTUP_TRACE=1`. <!-- XCOD-276 -->
+  `LUNOS_STARTUP_TRACE=1`. <!-- XCOD-276 --> <!-- highlight -->
 
 ### Fixed
 
@@ -83,7 +85,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   (for example "Docker Desktop isn't running — start it and try again"). If a restart after a
   sandbox change still can't start, the change is undone and Lunos starts as before. When the
   sandbox can't start, Lunos offers to start without it this time (unless your organisation
-  requires the sandbox), and `lunos --no-sandbox` skips it for one start.
+  requires the sandbox), and `lunos --no-sandbox` skips it for one start. <!-- highlight -->
 - **A sandbox that can't start now says why instead of "Unexpected error".** You see which step
   failed, the Docker command it ran (secrets hidden), its exit code and output, and a fix for the
   common cases: Docker not installed or not running, Windows-containers mode, WSL 2 missing, an
