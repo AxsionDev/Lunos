@@ -226,7 +226,12 @@ describe("lunos org (XCOD-274)", () => {
       }
       // Scripts get the code itself.
       const json = await Pty.exec(["org", "transfer", "sam@acme.example", "--yes", "--json"], pat)
-      expect(JSON.parse(json.stdout).error).toMatchObject({ status: 403, code: "owner_required" })
+      // Scripts that matched "forbidden" keep working for a release: legacyCode.
+      expect(JSON.parse(json.stdout).error).toMatchObject({
+        status: 403,
+        code: "owner_required",
+        legacyCode: "forbidden",
+      })
       expect(cloud.orgs.acme!.members).toEqual({ olga: "owner", pat: "admin", sam: "member" })
     },
     TIMEOUT,
@@ -287,6 +292,7 @@ describe("lunos org in a script (XCOD-274)", () => {
         error: {
           status: 403,
           code: "admin_required",
+          legacyCode: "forbidden",
           message: "Only an organisation owner or admin can do this. Ask: owner@acme.example",
         },
       })

@@ -54,6 +54,8 @@ export class RefusedError extends Error {
     readonly details?: Record<string, unknown>,
     readonly serverMessage?: string,
     readonly retryAfter?: number,
+    /** The nested `error.code` where it differs: the older, more general code (`forbidden`). */
+    readonly legacyCode?: string,
   ) {
     super(message)
   }
@@ -93,7 +95,7 @@ export async function allowed(issuer: string): Promise<string | undefined> {
  * message } }`, where the nested `error.code` is the older, more general one (`forbidden`): the
  * top-level fields win. #13 sent only the nested object.
  */
-export type Refusal = { code?: string; message?: string; details?: Record<string, unknown> }
+export type Refusal = { code?: string; message?: string; details?: Record<string, unknown>; legacyCode?: string }
 
 export function refusal(body: unknown): Refusal {
   const outer = (body ?? {}) as Record<string, unknown>
@@ -102,10 +104,13 @@ export function refusal(body: unknown): Refusal {
       ? (outer.error as Record<string, unknown>)
       : outer
   const details = inner.details ?? outer.details
+  const nested =
+    outer.error && typeof outer.error === "object" ? text((outer.error as Record<string, unknown>).code) : undefined
   return {
     code: text(inner.code),
     message: text(inner.message),
     details: details && typeof details === "object" ? (details as Record<string, unknown>) : undefined,
+    legacyCode: nested && nested !== text(inner.code) ? nested : undefined,
   }
 }
 
@@ -184,6 +189,8 @@ export function explain(
       return "This needs an active break-glass grant, which only Lunos platform staff can request."
     case "reauth_required":
       return "This needs a recent sign-in. Sign in again (lunos login, or /login in the TUI), then try again."
+    case "already_verified":
+      return "Your e-mail address is already confirmed. Choose I've confirmed it, or sign in again."
     case "rate_limited":
       return retryAfter !== undefined
         ? `Too many requests. Try again in ${wait(retryAfter)}.`
@@ -221,6 +228,7 @@ export async function call(token: string, method: string, path: string, body: un
       found.details,
       found.message,
       retryAfter,
+      found.legacyCode,
     )
   }
   if (response.status === 204) return undefined

@@ -203,6 +203,11 @@ describe("CloudTuiHost (XCOD-273)", () => {
     const day = await pending.resend().catch((error) => error)
     expect(day.message).toBe("Too many requests. Try again in 20 hours.")
     expect(idp.cloud.state.sent).toBe(1)
+    // Already confirmed: 409 already_verified says so; nothing is sent.
+    idp.cloud.users["u-1"]!.verified = true
+    const confirmed = await pending.resend().catch((error) => error)
+    expect(confirmed.message).toStartWith("Your e-mail address is already confirmed.")
+    expect(idp.cloud.state.sent).toBe(1)
   })
 
   test("Resend says so when Lunos Cloud doesn't serve it yet (lunoshq #13)", async () => {

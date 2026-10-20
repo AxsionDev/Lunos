@@ -97,12 +97,17 @@ describe("refusal codes (XCOD-275 contract)", () => {
     })
     expect(error).toMatchObject({
       code: "admin_required",
+      legacyCode: "forbidden",
       message: "Only an organisation owner or admin can do this. Ask: owner@acme.example",
     })
+    // Where both agree there's no legacy code to keep.
+    expect((await refused(404, { code: "not_found", message: "x", error: { code: "not_found" } })).legacyCode).toBe(
+      undefined,
+    )
     const suspended = await refused(403, {
       code: "suspended",
       message: "x",
-      details: { scope: "account" },
+      details: { scope: "org", org: "acme" },
       error: { code: "account_suspended", message: "x" },
     })
     expect(suspended.code).toBe("suspended")
@@ -116,6 +121,12 @@ describe("refusal codes (XCOD-275 contract)", () => {
     expect((await refused(403, { code: "owner_required" })).message).toBe("Only an organisation owner can do this.")
     expect((await refused(403, { code: "admin_required" })).message).toBe(
       "Only an organisation owner or admin can do this.",
+    )
+  })
+
+  test("already_verified (409) says the address is confirmed", async () => {
+    expect((await refused(409, { code: "already_verified", message: "x" })).message).toStartWith(
+      "Your e-mail address is already confirmed.",
     )
   })
 

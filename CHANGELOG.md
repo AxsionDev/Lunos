@@ -136,8 +136,9 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   plan covers you, and shows Admin as a role alongside Owner and Member. When Lunos Cloud refuses
   something, `lunos org` and `/account` explain it by its code, not its wording. An Admin trying an
   Owner-only action is told that only an owner can, and whom to ask. The only owner of an
-  organisation is told which organisations, by name, to hand over first. With `--json`, refusals now
-  carry codes such as `owner_required` and `admin_required` instead of `forbidden`. The Terms and
+  organisation is told which organisations, by name, to hand over first. **`lunos org --json`
+  refusals now carry `owner_required` or `admin_required` instead of `forbidden`: scripts matching
+  `forbidden` must update.** For one release they also carry `legacyCode: "forbidden"`. The Terms and
   the Privacy notice, with their versions and links, now come from Lunos Cloud instead of being built
   into the app, and the last ones are kept so an offline start still works. **Resend e-mail** on the
   Welcome screen sends the confirmation again and, if you ask too soon, says when to try again.

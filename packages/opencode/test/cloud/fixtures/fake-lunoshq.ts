@@ -10,13 +10,13 @@
 // not_member, owner_required and admin_required (the message naming the owners), last_owner with
 // `details.orgs`; `GET /v1/account` has `plan` and `plan_source`; `GET /v1/legal` serves the Terms and
 // Privacy notice; `POST /v1/account/verification` is rate limited (1 a minute, 5 a day; 429
-// `rate_limited` with `details.retryAfterSeconds` and Retry-After). `legacy: true` is lunoshq #13 as
+// `rate_limited` with `details.retryAfterSeconds` and Retry-After; 200 `{ sent, remainingToday }`, 409 `already_verified`). `legacy: true` is lunoshq #13 as
 // merged: `{ error: { code, message } }`, `forbidden`, no plan, no legal, no verification route.
 
 export type Role = "owner" | "admin" | "member"
 export type Org = { name: string; members: Record<string, Role>; invites?: Record<string, Invite> }
 export type Invite = { role: Role; invitedBy: string; createdAt: number }
-export type User = { email: string; platformRole?: "user" | "global_admin" }
+export type User = { email: string; platformRole?: "user" | "global_admin"; verified?: boolean }
 
 export type Options = {
   users?: Record<string, User>
@@ -225,6 +225,7 @@ export function create(options: Options = {}) {
       return Response.json({ terms: body.terms, privacy: body.privacy, acceptedAt: accepted[sub]!.at })
     }
     if (path === "/v1/account/verification" && method === "POST" && !without.has("verification")) {
+      if (users[sub]?.verified) throw new ApiError(409, "already_verified", "Your e-mail address is already verified.")
       const now = Date.now()
       const sent = (state.verifications[sub] ??= []).filter((at) => at > now - DAY_MS)
       const limit = (seconds: number) =>
@@ -239,7 +240,7 @@ export function create(options: Options = {}) {
       if (sent.length >= 5) throw limit(Math.ceil((sent[0]! + DAY_MS - now) / 1000))
       state.verifications[sub] = [...sent, now]
       state.sent++
-      return new Response(null, { status: 204 })
+      return Response.json({ sent: true, remainingToday: Math.max(0, 5 - sent.length - 1) })
     }
     if (path === "/v1/account/deletion" && method === "POST" && !without.has("deletion")) {
       const only = Object.entries(orgs)

@@ -51,6 +51,7 @@ Each refusal carries a stable code, and `lunos org`, `/account` and scripts go b
 | `reauth_required`      | The action needs a recent sign-in: sign in again, then retry.                                 |
 | `break_glass_required` | Lunos platform staff only: the action needs an active break-glass grant.                      |
 | `rate_limited`         | Too many requests, such as resending the confirmation e-mail; the message says when to retry. |
+| `already_verified`     | Your e-mail address is already confirmed, so no new e-mail is sent.                           |
 
 An older Lunos Cloud that sends no code is shown in its own words.
 
@@ -123,11 +124,13 @@ Only an owner can transfer ownership, and only to someone who is already a membe
     "error": {
       "status": 403,
       "code": "admin_required",
+      "legacyCode": "forbidden",
       "message": "Only an organisation owner or admin can do this. Ask: owner@acme.example"
     }
   }
   ```
 
+- **Scripts matching `forbidden` must update** to `owner_required` or `admin_required`. For one release the JSON also carries `legacyCode` with the older code (`forbidden`, or `not_found` for `not_member`).
 - `remove`, `leave`, `revoke`, `owners remove` and `transfer` ask before they change anything. `--yes` answers for you. Without a terminal, they refuse unless you pass `--yes`.
 - `LUNOS_TOKEN` signs a script in without `lunos login`, as for the other cloud commands.
 
