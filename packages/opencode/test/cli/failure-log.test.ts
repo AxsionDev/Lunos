@@ -208,7 +208,22 @@ describe("a failing sandboxed run (the reported case: Docker not running)", () =
       expect(zip).toBe(path.join(result.logDir, `lunos-bug-report-${id}.zip`))
       expect(Bun.spawnSync(["unzip", "-t", zip]).exitCode).toBe(0)
       const names = Bun.spawnSync(["unzip", "-Z1", zip]).stdout.toString().trim().split("\n")
-      expect(names).toEqual([path.basename(file), "version.txt", "config.json", "system.txt", "README.txt"])
+      expect(names).toEqual([
+        path.basename(file),
+        "version.txt",
+        "config.json",
+        "system.txt",
+        "sandbox-doctor.txt",
+        "README.txt",
+      ])
+      // The doctor's checks, with the failing one's command, exit code and fix; and the runtime's version.
+      const doctor = Bun.spawnSync(["unzip", "-p", zip, "sandbox-doctor.txt"]).stdout.toString()
+      expect(doctor).toContain("lunos sandbox doctor")
+      expect(doctor).toMatch(/FAIL {2}\S/)
+      expect(doctor).toContain("nonexistent-lunos-test.sock")
+      expect(doctor).toContain("command: docker info")
+      expect(doctor).toContain("exit code: 1")
+      expect(Bun.spawnSync(["unzip", "-p", zip, "system.txt"]).stdout.toString()).toContain("docker version")
       const contents = Bun.spawnSync(["unzip", "-p", zip]).stdout.toString()
       for (const seed of Object.values(SEEDS)) expect(contents).not.toContain(seed)
       expect(contents).toContain('"sandbox"')

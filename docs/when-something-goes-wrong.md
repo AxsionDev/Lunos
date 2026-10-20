@@ -65,7 +65,8 @@ This makes a zip, next to the logs unless you pass `--output <file>`, containing
 - the run's log;
 - `version.txt`: what `lunos --version --verbose` prints, and whether offline mode is on;
 - `config.json`: the config keys that help explain a failure (model, providers, MCP servers, plugins, sandbox, residency, audit, memory, sharing, updates, server, LSP and logs), with every secret, environment and header value removed;
-- `system.txt`: the OS, the Node and Bun versions, and the `docker` / `podman` versions.
+- `system.txt`: the OS, the Node and Bun versions, and the `docker` / `podman` versions;
+- `sandbox-doctor.txt`: what `lunos sandbox doctor` checks, pass or fail, with the command, exit code and fix for a failed check. The bug report skips the doctor's slow checks (pulling the image and starting a test container), so it changes nothing on your machine.
 
 It prints the zip's path. Look through it, then attach it to an issue yourself. `--issue` opens a new GitHub issue page filled in with the Lunos version, your OS and the log id. Nothing is attached or uploaded for you.
 

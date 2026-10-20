@@ -10,6 +10,8 @@ import { SandboxConfig } from "@/sandbox/config"
 import { Zip } from "@/util/zip"
 import { redactConfig } from "./debug/redact"
 import { Failure } from "../failure"
+import { SandboxPreflight } from "@/sandbox/preflight"
+import { checkLines } from "./sandbox"
 
 /**
  * XCOD-280: `lunos logs` and `lunos bug-report`. Every run of Lunos writes a log (`RunLog`); a
@@ -123,6 +125,23 @@ function system() {
   ].join(EOL)
 }
 
+/**
+ * What `lunos sandbox doctor` checks, without its slow, side-effecting part (pulling the image and
+ * starting a test container): nothing a bug report makes should change this machine.
+ */
+export async function doctor(directory: string) {
+  try {
+    const checks = await SandboxPreflight.run({ directory, full: false })
+    return [
+      "lunos sandbox doctor (quick checks; `lunos sandbox doctor` also pulls the image and starts a test container)",
+      "",
+      ...checks.flatMap(checkLines),
+    ].join(EOL)
+  } catch (error) {
+    return `lunos sandbox doctor couldn't run: ${error instanceof Error ? error.message : String(error)}`
+  }
+}
+
 /** The GitHub issue form, pre-filled with the version, OS and log id only: never the log itself. */
 export function issueURL(id: string) {
   const url = new URL("https://github.com/AxsionDev/Lunos/issues/new?template=bug-report.yml")
@@ -146,6 +165,7 @@ export async function bugReport(input: { id?: string; output?: string; directory
     { name: "version.txt", data: versionVerbose() + EOL + Offline.report() + EOL },
     { name: "config.json", data: reportConfig(input.directory) + EOL },
     { name: "system.txt", data: RunLog.redact(system()) + EOL },
+    { name: "sandbox-doctor.txt", data: RunLog.redact(await doctor(input.directory)) + EOL },
     {
       name: "README.txt",
       data:
@@ -175,7 +195,7 @@ export const BugReportCommand = {
     process.stdout.write(made.file + EOL)
     process.stderr.write(
       `Made ${Failure.link(made.file)}${EOL}` +
-        `It contains the log of run ${made.entry.id}, the version, the config (secrets removed) and system details.${EOL}` +
+        `It contains the log of run ${made.entry.id}, the version, the config (secrets removed), system details and the sandbox checks.${EOL}` +
         `Check it, then attach it to an issue: nothing was uploaded.${EOL}`,
     )
     if (!args.issue) {
