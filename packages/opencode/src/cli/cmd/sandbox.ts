@@ -144,10 +144,10 @@ async function conclude(
  * without it.
  */
 async function launch(directory: string, lifecycle: Lifecycle) {
-  const override = lifecycleOverride(lifecycle)
-  const loaded = SandboxConfig.load(directory)
-  const config = { ...loaded, on_finish: override ?? loaded.on_finish }
   const { info, stored } = await SandboxFailure.at("create", async () => {
+    const override = lifecycleOverride(lifecycle)
+    const loaded = SandboxConfig.load(directory)
+    const config = { ...loaded, on_finish: override ?? loaded.on_finish }
     await hostAudit()
     await pruneExpired()
     say("starting")
@@ -249,12 +249,17 @@ export async function runSandboxedTui(
   args: { continue?: boolean; session?: string; fork?: boolean } & Lifecycle,
   restarted?: { changes?: SandboxRollback.Change[] },
 ): Promise<"sandbox" | "host" | "quit"> {
+  // A wrong pair of flags isn't the sandbox failing to start: refused before anything, with no way round it.
+  try {
+    lifecycleOverride(args)
+  } catch (error) {
+    throw new SandboxError({ reason: SandboxFailure.describe(error) })
+  }
   let started: Awaited<ReturnType<typeof launch>>
   try {
     started = await launch(directory, args)
   } catch (error) {
-    if (!SandboxFailure.isSandboxError(error)) throw error
-    return fallback(error, directory, restarted?.changes ?? [])
+    return fallback(SandboxFailure.wrap("create", error), directory, restarted?.changes ?? [])
   }
   await session(started.info, started.conn, (conn) => attachTui(conn, args))
   return "sandbox"
@@ -266,6 +271,7 @@ export async function fallback(
   changes: readonly SandboxRollback.Change[],
   ask: (error: SandboxError) => Promise<"yes" | "quit"> = askHost,
   interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY),
+  pause: () => Promise<void> = pressEnter,
 ): Promise<"host" | "quit"> {
   const config = SandboxConfig.load(directory)
   if (config.required) {
@@ -281,7 +287,11 @@ export async function fallback(
       `Your change to ${undone.map((key) => `\`${key}\``).join(", ")} was undone because Lunos couldn't start with it: ${error.reason}`,
     )
     UI.println(error.message)
-    if (!wanted({}, directory)) return "host"
+    if (!wanted({}, directory)) {
+      // The TUI's screen would cover this at once: wait until it has been read.
+      if (interactive) await pause()
+      return "host"
+    }
   }
   if (!interactive) {
     say("`lunos --no-sandbox` starts Lunos without the sandbox")
@@ -294,6 +304,13 @@ export async function fallback(
   }
   say("starting without the sandbox this time; `lunos --no-sandbox` does that from the start")
   return "host"
+}
+
+async function pressEnter() {
+  const readline = await import("node:readline/promises")
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  await rl.question("Press Enter to start Lunos with your previous settings. ")
+  rl.close()
 }
 
 /** "The sandbox couldn't start: <reason>. Start without the sandbox this time?" until Yes or Quit. */

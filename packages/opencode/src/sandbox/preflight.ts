@@ -157,11 +157,14 @@ export async function run(input: {
   return checks
 }
 
-/** Why the sandbox can't be turned on here (the first failed check, and its fix), or undefined. */
+/**
+ * Why the sandbox can't be turned on here, or undefined. Short enough for a toast: the fix first
+ * when there is one, else the failed check's reason; `doctor` shows the command and its output.
+ */
 export async function refusal(directory: string, config?: SandboxConfig.Resolved) {
   const failed = (await run({ directory, full: false, config })).find((check) => check.status === "fail")
   if (!failed) return undefined
-  return `${failed.name}: ${failed.detail}${failed.fix ? `\n${failed.fix}` : ""}\n\`lunos sandbox doctor\` runs every check.`
+  return `${failed.fix ?? `${failed.name}: ${failed.detail}`}\n\`lunos sandbox doctor\` shows every check and the details.`
 }
 
 export * as SandboxPreflight from "./preflight"

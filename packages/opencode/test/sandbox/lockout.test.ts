@@ -48,6 +48,9 @@ exit 2
   return dir
 }
 
+// The fake docker is a shell script, and some cases use sh and sleep: not on a Windows runner.
+const posixOnly = process.platform === "win32"
+
 let savedPath: string | undefined
 beforeEach(() => {
   savedPath = process.env.PATH
@@ -116,7 +119,7 @@ describe("the error says what failed", () => {
 })
 
 describe("running commands", () => {
-  test("a command that isn't installed, or fails, is a SandboxError with its output", async () => {
+  test.skipIf(posixOnly)("a command that isn't installed, or fails, is a SandboxError with its output", async () => {
     const missing = await SandboxExec.run(["lunos-no-such-command-xyz", "--version"]).catch((error) => error)
     expect(missing).toBeInstanceOf(SandboxError)
     expect(missing.message).toContain("the lunos-no-such-command-xyz command wasn't found on PATH")
@@ -127,7 +130,7 @@ describe("running commands", () => {
     expect(failed.message).toContain("| boom")
   })
 
-  test("a command that doesn't answer is stopped", async () => {
+  test.skipIf(posixOnly)("a command that doesn't answer is stopped", async () => {
     const result = await SandboxExec.run(["sleep", "5"], { timeout: 200 })
     expect(result.timedOut).toBe(true)
     expect(result.stderr).toContain("no answer within 0.2s")
@@ -193,7 +196,7 @@ describe("running commands", () => {
   })
 })
 
-describe("finding Docker", () => {
+describe.skipIf(posixOnly)("finding Docker", () => {
   test("Docker Desktop stopped: the reason, the command and the fix", async () => {
     usePath(await fakeDocker("stopped"))
     const error = await SandboxDocker.available().catch((error) => error)
@@ -248,7 +251,7 @@ describe("Windows paths", () => {
     expect(SandboxGit.fileUrl("/home/me/repo", "linux")).toBe("file:///home/me/repo")
   })
 
-  test("without getuid (Windows) the sandbox runs as its default user", async () => {
+  test.skipIf(posixOnly)("without getuid (Windows) the sandbox runs as its default user", async () => {
     usePath(await fakeDocker("ok"))
     await SandboxDocker.available()
     const identity = await SandboxDocker.mountIdentity("docker", { platform: "win32", uid: undefined, gid: undefined })
@@ -256,7 +259,7 @@ describe("Windows paths", () => {
   })
 })
 
-describe("preflight and doctor", () => {
+describe.skipIf(posixOnly)("preflight and doctor", () => {
   test("Docker Desktop stopped: the check fails with the fix, and later ones are skipped", async () => {
     await using project = await tmpdir({ git: true })
     usePath(await fakeDocker("stopped"))
@@ -271,7 +274,8 @@ describe("preflight and doctor", () => {
     expect(printed).toContain("FAIL  container engine running:")
     expect(printed).toContain("fix: ")
     const refusal = await SandboxPreflight.refusal(project.path)
-    expect(refusal).toContain("isn't running — start it and try again")
+    expect(refusal).toStartWith("Docker Desktop isn't running — start it and try again.")
+    expect(refusal).not.toContain("pipe")
     expect(refusal).toContain("lunos sandbox doctor")
   })
 
@@ -316,7 +320,7 @@ describe("turning the sandbox on in settings", () => {
     ConfigSettings.sandboxPreflight.refusal = async () => "container engine running: Docker Desktop isn't running"
     await expect(
       ConfigSettings.set({ key: "sandbox.enabled", value: "true", scope: "user", ctx: ctx(), locked: [] }),
-    ).rejects.toThrow("The sandbox can't start here, so it wasn't turned on: container engine running")
+    ).rejects.toThrow("The sandbox wasn't turned on: container engine running")
     expect(existsSync(path.join(root, "user", "opencode.json"))).toBe(false)
     // Turning it off is never checked.
     ConfigSettings.sandboxPreflight.refusal = async () => {
@@ -368,6 +372,7 @@ describe("never locked out", () => {
   }
 
   test("after /restart, the sandbox change is undone and Lunos starts as before", async () => {
+    let paused = 0
     const { dir, file } = await project({ enabled: true })
     await using _ = dir
     const changes = [
@@ -376,7 +381,12 @@ describe("never locked out", () => {
     const ask = async () => {
       throw new Error("not asked: the rollback decides")
     }
-    expect(await fallback(failure, dir.path, changes, ask, false)).toBe("host")
+    expect(
+      await fallback(failure, dir.path, changes, ask, true, async () => {
+        paused++
+      }),
+    ).toBe("host")
+    expect(paused).toBe(1)
     expect(JSON.parse(readFileSync(file, "utf8")).sandbox.enabled).toBe(false)
   })
 
@@ -455,7 +465,7 @@ describe("restart", () => {
   })
 })
 
-test("the fake docker is what ran", async () => {
+test.skipIf(posixOnly)("the fake docker is what ran", async () => {
   // A positive control for the tests above: with the fake first on PATH, `docker` is the fake.
   usePath(await fakeDocker("ok"))
   expect((await $`docker --version`.text()).trim()).toBe("Docker version 27.3.1, build ce12230")

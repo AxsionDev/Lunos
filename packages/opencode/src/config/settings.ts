@@ -1167,7 +1167,7 @@ export async function set(input: {
   // XCOD-279: turning the sandbox on is checked first; a sandbox that can't start here isn't saved.
   if (changed && turnsSandboxOn(item.key, value)) {
     const problem = await sandboxPreflight.refusal(input.ctx.directory)
-    if (problem) throw new SettingError(`The sandbox can't start here, so it wasn't turned on: ${problem}`, "invalid")
+    if (problem) throw new SettingError(`The sandbox wasn't turned on: ${problem}`, "invalid")
   }
   if (changed) {
     await fs.mkdir(path.dirname(file), { recursive: true })
