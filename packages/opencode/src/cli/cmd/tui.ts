@@ -313,13 +313,12 @@ export const TuiThreadCommand = cmd({
       const cwd = Filesystem.resolve(process.cwd())
 
       const startWorker = StartupTrace.begin("start worker")
+      // The worker reports its start-up phases on this process's clock.
+      Object.assign(process.env, StartupTrace.originEnv())
       const worker = new Worker(file, {
-        env: {
-          ...Object.fromEntries(
-            Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
-          ),
-          ...StartupTrace.originEnv(),
-        },
+        env: Object.fromEntries(
+          Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+        ),
       })
       startWorker()
       const client = Rpc.client<typeof rpc>(worker)
@@ -383,12 +382,11 @@ export const TuiThreadCommand = cmd({
       if (external) setTimeout(checkUpgrade, 1000).unref?.()
 
       try {
-        const { Effect } = await StartupTrace.span("import effect", () => import("effect"))
-        const { run } = await StartupTrace.span("import tui", () => import("../tui/layer"))
-        const { createLegacyTuiPluginHost } = await StartupTrace.span(
-          "import tui plugin runtime",
-          () => import("@/plugin/tui/runtime"),
-        )
+        const imported = StartupTrace.begin("import tui")
+        const { Effect } = await import("effect")
+        const { run } = await import("../tui/layer")
+        const { createLegacyTuiPluginHost } = await import("@/plugin/tui/runtime")
+        imported()
         const gate = await StartupTrace.span("sign-in gate", () => CloudGate.current())
         await Effect.runPromise(
           run({
