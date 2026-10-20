@@ -252,11 +252,16 @@ export function parseModels(response: unknown): Model[] {
 /**
  * The tool's own /commands in an `initialize` response (`response.commands`: `{ name, description, … }`).
  * Claude Code 2.1.292 lists them only there; older releases list them as `slash_commands` on `init`.
+ * Its internal ones (`__…`) and ones it describes as "(removed)" aren't for users, so they're left out.
  */
 export function parseCommands(response: unknown): string[] {
   const list = (response as { commands?: unknown } | undefined)?.commands
   if (!Array.isArray(list)) return []
-  return list.flatMap((item: any) => (typeof item?.name === "string" && item.name ? [item.name] : []))
+  return list.flatMap((item: any) => {
+    if (typeof item?.name !== "string" || !item.name || item.name.startsWith("__")) return []
+    if (typeof item.description === "string" && /^\s*\(removed\)/i.test(item.description)) return []
+    return [item.name]
+  })
 }
 
 /**

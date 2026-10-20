@@ -152,4 +152,18 @@ describe("Claude Code's own /commands", () => {
     ).toEqual(["compact"])
     expect(ExternalClaude.parseCommands(undefined)).toEqual([])
   })
+
+  test("internal and removed ones are left out of 2.1.292's real list", async () => {
+    const recording = path.join(import.meta.dir, "..", "fixtures", "external", "claude-2.1.292", "start-models.1.jsonl")
+    const answer = (await fs.readFile(recording, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .find((entry) => entry.message?.type === "control_response").message.response.response
+    const names = ExternalClaude.parseCommands(answer)
+    expect(names).toEqual(expect.arrayContaining(["compact", "code-review", "workflow-launch-exec"]))
+    expect(names).not.toContain("__remote-workflow")
+    expect(names).not.toContain("agents")
+    expect(names.length).toBe(answer.commands.length - 2)
+  })
 })
