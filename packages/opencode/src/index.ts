@@ -17,6 +17,7 @@ import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
 import { LoginCommand, LogoutCommand, WhoamiCommand } from "./cli/cmd/cloud"
 import { CloudCommand } from "./cli/cmd/cloud-git-token"
+import { OrgCommand } from "./cli/cmd/org"
 import { ExternalCommand } from "./cli/cmd/external"
 import { LspCommand } from "./cli/cmd/lsp"
 import { UI } from "./cli/ui"
@@ -182,6 +183,7 @@ const cli = yargs(args)
   .command(LogoutCommand)
   .command(WhoamiCommand)
   .command(CloudCommand)
+  .command(OrgCommand)
   .command(ExternalCommand)
   .command(LspCommand)
   .command(StatsCommand)

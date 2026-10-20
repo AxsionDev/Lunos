@@ -111,9 +111,7 @@ describe("Welcome screen (XCOD-273)", () => {
       const until = Date.now() + 5_000
       while (!(await tui!.opened()) && Date.now() < until) await Bun.sleep(100)
       expect(await tui!.opened()).toContain(`${idp!.origin}/activate?user_code=WXYZ-2345`)
-      expect(await tui!.waitFor("Signed in as pat@lunos.test · Plan: Free")).toContain(
-        "Session kept in the test keychain.",
-      )
+      expect(await tui!.waitFor("Signed in as pat@lunos.test")).toContain("Session kept in the test keychain.")
       await tui!.waitFor("Ask anything")
       expect(JSON.parse(JSON.parse(await tui!.keychain()).secret).tokens.refresh_token).toBe("rt-1")
       // No card or billing call, ever.
@@ -212,10 +210,11 @@ describe("Welcome screen (XCOD-273)", () => {
       await acceptAnd("Sign in")
       await tui!.waitFor("Ask anything")
       await slash("/account")
-      const account = await tui!.waitFor("Organisations: acme (admin)")
+      const account = await tui!.waitFor("Organisations: Admin · Acme GmbH")
       expect(account).toContain("Pat Lunos · pat@lunos.test")
       expect(account).toContain("Plan: Free")
-      expect(account).toContain("Lunos role: support")
+      // Lunos Cloud's record of the role (XCOD-274), not the token's claim.
+      expect(account).toContain("Role: User")
       expect(account).toContain("Devices: laptop (linux)")
       expect(account).toContain("Sign out everywhere")
       expect(account).toContain("Delete my account")
@@ -248,29 +247,156 @@ describe("Welcome screen (XCOD-273)", () => {
     TIMEOUT,
   )
 
+  /** Signs in through the Welcome screen and opens /account. */
+  async function openAccount(fake: FakeIdp.Options = {}) {
+    await start({ env: OFFICIAL, fake })
+    await tui!.waitFor("Welcome to Lunos")
+    await acceptAnd("Sign in")
+    await tui!.waitFor("Ask anything")
+    await slash("/account")
+    return tui!.waitFor("Organisations:")
+  }
+
+  /**
+   * Chooses an option in a dialog just opened (the first is highlighted): the options are the rows
+   * under its "Search" line, down to the first empty one.
+   */
+  async function pick(label: string) {
+    const screen = tui!.screen.text().split("\n")
+    const search = screen.findIndex((line) => line.trim() === "Search")
+    const rows: string[] = []
+    for (let i = search + 2; i < screen.length && screen[i]!.trim(); i++) rows.push(screen[i]!)
+    const at = rows.findIndex((line) => line.includes(label))
+    if (search < 0 || at < 0) throw new Error(`No "${label}" to pick. Screen:\n${screen.join("\n")}`)
+    for (let i = 0; i < at; i++) {
+      tui!.press(KEY.down)
+      await Bun.sleep(100)
+    }
+    await Bun.sleep(150)
+    tui!.press(KEY.enter)
+  }
+
+  async function reopenAccount() {
+    tui!.press(KEY.escape)
+    await Bun.sleep(300)
+    await slash("/account")
+    return tui!.waitFor("Organisations:")
+  }
+
+  /** Chooses /account's "Delete my account" and types `word` to confirm. */
+  async function deleteAccount(word: string) {
+    await pick("Delete my account")
+    await tui!.waitFor("Type delete to confirm")
+    await tui!.type(word)
+    await Bun.sleep(200)
+    tui!.press(KEY.enter)
+  }
+
   test(
-    "Delete my account (confirmed) asks Lunos Cloud, signs out and says what's left",
+    "Delete my account: typed confirmation, Lunos Cloud deletes it, signed out and the keychain cleared (XCOD-274)",
+    async () => {
+      await openAccount()
+      // A wrong word deletes nothing.
+      await deleteAccount("nope")
+      await tui!.waitFor("Your account wasn't deleted")
+      expect(idp!.cloud.state.deletion["u-1"]).toBeUndefined()
+      tui!.press(KEY.enter)
+      await reopenAccount()
+      await deleteAccount("delete")
+      const deleted = (await tui!.waitFor("Account deleted")).replace(/\s+/g, " ")
+      expect(deleted).toMatch(/Your Lunos account will be deleted on \d{4}-\d\d-\d\d\./)
+      expect(idp!.cloud.state.deletion["u-1"]).toBeNumber()
+      expect(idp!.requests.some((r) => r.method === "POST" && r.path === "/v1/account/deletion")).toBe(true)
+      expect(await tui!.keychain()).toBe("")
+      tui!.press(KEY.enter)
+      await tui!.waitFor("Welcome to Lunos")
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "Delete my account as an organisation's only owner: refused, named, still signed in (XCOD-274)",
+    async () => {
+      await openAccount({
+        cloud: {
+          ...FakeIdp.defaultCloud(),
+          orgs: { acme: { name: "Acme GmbH", members: { "u-1": "owner", "u-owner": "member" } } },
+        },
+      })
+      await deleteAccount("delete")
+      const refused = (await tui!.waitFor("Transfer ownership first")).replace(/\s+/g, " ")
+      expect(refused).toContain("You're the only owner of Acme GmbH (acme).")
+      expect(refused).toContain("lunos org transfer <member> --org acme")
+      expect(idp!.cloud.state.deletion["u-1"]).toBeUndefined()
+      expect(await tui!.keychain()).not.toBe("")
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "/account: your role in each organisation, and invitations to accept or decline (XCOD-274)",
+    async () => {
+      const invite = (role: "admin" | "member") => ({ role, invitedBy: "u-owner", createdAt: Date.now() })
+      const account = await openAccount({
+        cloud: {
+          ...FakeIdp.defaultCloud(),
+          orgs: {
+            acme: { name: "Acme GmbH", members: { "u-1": "owner" } },
+            beta: { name: "Beta Ltd", members: { "u-owner": "owner", "u-1": "member" } },
+            gamma: {
+              name: "Gamma AG",
+              members: { "u-owner": "owner" },
+              invites: { "pat@lunos.test": invite("admin") },
+            },
+            delta: {
+              name: "Delta SA",
+              members: { "u-owner": "owner" },
+              invites: { "pat@lunos.test": invite("member") },
+            },
+          },
+        },
+      })
+      expect(account).toContain("Organisations: Owner · Acme GmbH, Member · Beta Ltd")
+      expect(account).toContain("Invitations: Delta SA (as member), Gamma AG (as admin)")
+      expect(account).toContain("Accept the invitation to Gamma AG")
+      expect(account).toContain("Decline the invitation to Delta SA")
+      await pick("Accept the invitation to Gamma AG")
+      await tui!.waitFor("You joined Gamma AG as an admin.")
+      await tui!.waitFor("Admin · Gamma AG")
+      await reopenAccount()
+      await pick("Decline the invitation to Delta SA")
+      await tui!.waitFor("Declined the invitation to Delta SA.")
+      expect(idp!.cloud.orgs.gamma!.members["u-1"]).toBe("admin")
+      expect(idp!.cloud.orgs.delta!.members["u-1"]).toBeUndefined()
+      expect(idp!.cloud.orgs.delta!.invites!["pat@lunos.test"]).toBeUndefined()
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "Terms: a newer version at Lunos Cloud asks again at the next start, and the acceptance is recorded there (XCOD-274)",
     async () => {
       await start({ env: OFFICIAL })
       await tui!.waitFor("Welcome to Lunos")
       await acceptAnd("Sign in")
       await tui!.waitFor("Ask anything")
-      await slash("/account")
-      await tui!.waitFor("Organisations: acme")
-      // Sign out, Sign out everywhere, Delete my account.
-      for (const key of [KEY.down, KEY.down]) {
-        tui!.press(key)
-        await Bun.sleep(100)
-      }
-      tui!.press(KEY.enter)
-      await tui!.waitFor("Delete your Lunos account?")
-      // Confirm is highlighted; Cancel is one step left.
-      await Bun.sleep(200)
-      tui!.press(KEY.enter)
-      const deleted = (await tui!.waitFor("Account deleted")).replace(/\s+/g, " ")
-      expect(deleted).toContain("Deleting the sign-in itself isn't available from Lunos Cloud yet")
-      expect(idp!.state.deleted).toBe(true)
-      expect(await tui!.keychain()).toBe("")
+      // The box ticked at sign-in is recorded at Lunos Cloud, once.
+      const until = Date.now() + 10_000
+      while (!idp!.cloud.state.termsPuts.length && Date.now() < until) await Bun.sleep(100)
+      expect(idp!.cloud.state.termsPuts).toEqual([{ terms: "2026-10-19", privacy: "2026-10-19" }])
+      await tui!.stop()
+      idp!.cloud.publish({ terms: "2026-11-01", privacy: "2026-10-19" })
+      tui = await Pty.launch({
+        home: tui!.home,
+        config: { cloud: { issuer: idp!.origin, endpoint: idp!.origin } },
+        env: { ...proxied, ...OFFICIAL },
+      })
+      const screen = (await tui.waitFor("The Terms or the Privacy notice changed")).replace(/\s+/g, " ")
+      expect(screen).toContain("(Terms 2026-11-01, Privacy notice 2026-10-19; you accepted Terms 2026-10-19")
+      expect(screen).toContain("[ ] I accept the Terms")
+      await acceptAnd("Continue")
+      await tui.waitFor("Ask anything")
+      expect(idp!.cloud.state.termsPuts.at(-1)).toEqual({ terms: "2026-11-01", privacy: "2026-10-19" })
     },
     TIMEOUT,
   )

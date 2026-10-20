@@ -1,7 +1,10 @@
 // XCOD-273: a fake OpenID Connect provider (device grant, userinfo, revocation, Keycloak's account
 // sessions API) and a fake Lunos Cloud account API, on 127.0.0.1, for the sign-in tests. The real
 // auth.lunos.tech is never contacted. One server plays both, so a test sets `cloud.issuer` and
-// `cloud.endpoint` to the same origin.
+// `cloud.endpoint` to the same origin. XCOD-274: Lunos Cloud's routes are fake-lunoshq.ts's, with
+// lunoshq #13's contract; by default the signed-in account (u-1) is an Admin of Acme GmbH.
+
+import * as FakeLunoshq from "./fake-lunoshq"
 
 export type Outcome = "ok" | "denied" | "expired" | "unverified" | "pending"
 
@@ -13,11 +16,19 @@ export type Options = {
   /** Userinfo says unverified this many times before it says verified (for "unverified"). */
   verifyAfter?: number
   email?: string
-  plan?: { id: string; name: string } | null
-  /** Routes Lunos Cloud doesn't serve yet answer 404 unless set. */
-  serves?: { consent?: boolean; verification?: boolean; identityDelete?: boolean }
+  /** The `lunos_platform_role` claim in the access token (display only; Lunos Cloud's own record wins). */
   platformRole?: string
+  /** Sending the confirmation e-mail again isn't served by Lunos Cloud; set to fake that it is. */
+  serves?: { verification?: boolean }
+  /** Lunos Cloud's accounts and organisations (fake-lunoshq.ts); `defaultCloud` when not set. */
+  cloud?: FakeLunoshq.Options
 }
+
+/** Pat (u-1, the account the device flow signs in) is an Admin of Acme GmbH, whose owner is Olga. */
+export const defaultCloud = (email = "pat@lunos.test"): FakeLunoshq.Options => ({
+  users: { "u-1": { email }, "u-owner": { email: "owner@acme.example" } },
+  orgs: { acme: { name: "Acme GmbH", members: { "u-owner": "owner", "u-1": "admin" } } },
+})
 
 export type Request = { method: string; path: string; auth: string | null; body?: string }
 
@@ -31,8 +42,8 @@ export function start(options: Options = {}) {
   let polls = 0
   let userinfoCalls = 0
   let verified = true
-  let devices = [{ id: "dev-other", name: "laptop", platform: "linux", syncEnabled: true, createdAt: 1 }]
-  const state = { deleted: false, sessionsEnded: false, revoked: [] as string[], consent: [] as unknown[], resent: 0 }
+  const cloud = FakeLunoshq.create(options.cloud ?? defaultCloud(email))
+  const state = { sessionsEnded: false, revoked: [] as string[], resent: 0 }
   const access = () =>
     jwt({
       sub: "u-1",
@@ -102,38 +113,13 @@ export function start(options: Options = {}) {
         state.sessionsEnded = true
         return new Response(null, { status: 204 })
       }
-      // Lunos Cloud (lunoshq): the account and session sync's devices.
-      if (url.pathname === "/v1/account" && req.method === "GET")
-        return Response.json({
-          sub: "u-1",
-          email,
-          organizations: [{ org: "acme", role: "admin" }],
-          devices,
-          ...(options.plan === null ? {} : { plan: options.plan ?? { id: "free", name: "Free" } }),
-        })
-      if (url.pathname === "/v1/account" && req.method === "DELETE") {
-        state.deleted = true
-        return Response.json({
-          sessions: 2,
-          devices: devices.length,
-          ...(options.serves?.identityDelete ? { identity: "scheduled" } : {}),
-        })
-      }
-      if (url.pathname === "/v1/account/consent" && options.serves?.consent) {
-        state.consent.push(JSON.parse(body ?? "{}"))
-        return new Response(null, { status: 204 })
-      }
       if (url.pathname === "/v1/account/verification" && options.serves?.verification) {
         state.resent++
         return new Response(null, { status: 204 })
       }
-      if (url.pathname === "/v1/devices" && req.method === "GET") return Response.json({ devices })
-      if (url.pathname === "/v1/devices" && req.method === "POST") {
-        const device = { id: "dev-this", name: "this", platform: process.platform, syncEnabled: true, createdAt: 2 }
-        devices = [...devices, device]
-        return Response.json(device, { status: 201 })
-      }
-      return Response.json({ error: { code: "not_found", message: "No such route" } }, { status: 404 })
+      // Lunos Cloud (lunoshq): the account, organisations and session sync's devices.
+      if (url.pathname.startsWith("/v1/")) return cloud.handle(req, url, body)
+      return Response.json({ error: { code: "not_found", message: "No such route." } }, { status: 404 })
     },
   })
   return {
@@ -141,6 +127,7 @@ export function start(options: Options = {}) {
     origin: `http://127.0.0.1:${server.port}`,
     requests,
     state,
+    cloud,
     stop: () => server.stop(true),
   }
 }

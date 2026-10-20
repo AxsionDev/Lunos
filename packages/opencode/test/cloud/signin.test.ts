@@ -124,7 +124,7 @@ describe("CloudTuiHost (XCOD-273)", () => {
     ;(Global.Path as { config: string }).config = previous.config
   })
 
-  test("device flow → confirmed → kept in the keychain, with the plan; then /logout", async () => {
+  test("device flow → confirmed → kept in the keychain; then /logout", async () => {
     const host = await setup()
     expect(await host.current()).toBeUndefined()
     const flow = await host.start({ signup: true })
@@ -134,7 +134,9 @@ describe("CloudTuiHost (XCOD-273)", () => {
     const pending = await flow.wait(new AbortController().signal)
     expect(pending.verified).toBe(true)
     const user = await pending.save()
-    expect(user).toMatchObject({ email: "pat@lunos.test", plan: "Free", kept: "the test keychain" })
+    expect(user).toMatchObject({ email: "pat@lunos.test", kept: "the test keychain" })
+    // No billing call while signing in (XCOD-273): the plan is /account's.
+    expect(idp.requests.filter((request) => /billing|checkout|card/.test(request.path))).toEqual([])
     // In the (stand-in) keychain, not in session.json.
     const keychain = JSON.parse(await fs.readFile(CloudStore.testKeychain(), "utf8"))
     expect(JSON.parse(keychain.secret).tokens.refresh_token).toBe("rt-1")
@@ -189,58 +191,159 @@ describe("CloudTuiHost (XCOD-273)", () => {
     await expect(pending.resend()).rejects.toMatchObject({ kind: "unavailable" })
   })
 
-  test("/account: user, plan, organisations with roles, devices, the platform role; missing parts are named", async () => {
-    let host = await setup({ platformRole: "support" })
-    await (await (await host.start({ signup: false })).wait(new AbortController().signal)).save()
+  const signIn = async (host: Awaited<ReturnType<typeof setup>>) =>
+    (await (await host.start({ signup: false })).wait(new AbortController().signal)).save()
+
+  test("/account: user, plan, role, organisations with roles and names, invitations, devices (XCOD-274)", async () => {
+    let host = await setup({
+      platformRole: "support",
+      cloud: {
+        ...FakeIdp.defaultCloud(),
+        orgs: {
+          acme: { name: "Acme GmbH", members: { "u-owner": "owner", "u-1": "owner" } },
+          beta: { name: "Beta Ltd", members: { "u-owner": "owner", "u-1": "member" } },
+          gamma: {
+            name: "Gamma AG",
+            members: { "u-owner": "owner" },
+            invites: { "pat@lunos.test": { role: "admin", invitedBy: "u-owner", createdAt: Date.now() } },
+          },
+        },
+        plans: { "u-1": "pro" },
+      },
+    })
+    await signIn(host)
     const details = await host.details()
-    expect(details.user.plan).toBe("Free")
-    expect(details.platformRole).toBe("support")
-    expect(details.organisations).toEqual([{ org: "acme", role: "admin" }])
+    expect(details.user.plan).toBe("Pro")
+    // Lunos Cloud's record, not the token's claim ("support" grants nothing).
+    expect(details.platformRole).toBe("user")
+    expect(details.organisations).toEqual([
+      { org: "acme", name: "Acme GmbH", role: "owner" },
+      { org: "beta", name: "Beta Ltd", role: "member" },
+    ])
+    expect(details.invitations).toMatchObject([{ org: "gamma", name: "Gamma AG", role: "admin" }])
     expect(details.devices?.map((d) => [d.name, d.current])).toEqual([["laptop", false]])
     // The sign-in asked for at start doesn't turn session sync on: no device is registered.
     expect(idp.requests.some((request) => request.method === "POST" && request.path === "/v1/devices")).toBe(false)
     expect(details.missing).toEqual([])
+    expect(await host.answerInvitation!("gamma", true)).toBe("You joined Gamma AG as an admin.")
+    expect((await host.details()).organisations?.map((o) => o.org)).toEqual(["acme", "beta", "gamma"])
     idp.stop()
 
-    host = await setup({ plan: null })
-    await (await (await host.start({ signup: false })).wait(new AbortController().signal)).save()
-    expect((await host.details()).missing).toEqual(["Plan: Lunos Cloud doesn't report it yet."])
-  })
+    // No personal plan: Free. Before XCOD-274's server, no role or invitations, and nothing is made up.
+    host = await setup({ platformRole: "support", cloud: { ...FakeIdp.defaultCloud(), without: ["invitations"] } })
+    await signIn(host)
+    const older = await host.details()
+    expect(older.user.plan).toBe("Free")
+    expect(older.invitations).toBeUndefined()
+    expect(older.missing).toEqual([])
+  }, 20_000)
 
   test("sign out everywhere ends the provider's sessions, then signs out here", async () => {
     const host = await setup()
-    await (await (await host.start({ signup: false })).wait(new AbortController().signal)).save()
+    await signIn(host)
     expect(await host.logoutEverywhere()).toEqual({ ended: true })
     expect(idp.state.sessionsEnded).toBe(true)
     expect(await host.current()).toBeUndefined()
   })
 
-  test("Delete my account: Lunos Cloud deletes it, and the screen says what's left", async () => {
-    let host = await setup()
-    await (await (await host.start({ signup: false })).wait(new AbortController().signal)).save()
+  test("Delete my account: POST /v1/account/deletion, then signed out and the keychain cleared (XCOD-274)", async () => {
+    const host = await setup()
+    await signIn(host)
     const result = await host.deleteAccount()
-    expect(idp.state.deleted).toBe(true)
-    expect(result.message).toContain("Deleting the sign-in itself isn't available from Lunos Cloud yet")
+    expect(result).toMatchObject({ deleted: true })
+    expect(result.message).toMatch(/^Your Lunos account will be deleted on \d{4}-\d\d-\d\d\. /)
+    expect(idp.cloud.state.deletion["u-1"]).toBeNumber()
+    expect(
+      idp.requests
+        .filter((r) => r.path.startsWith("/v1/account") && r.method !== "GET")
+        .map((r) => `${r.method} ${r.path}`),
+    ).toEqual(["POST /v1/account/deletion"])
     expect(await host.current()).toBeUndefined()
-    idp.stop()
-
-    host = await setup({ serves: { identityDelete: true } })
-    await (await (await host.start({ signup: false })).wait(new AbortController().signal)).save()
-    expect((await host.deleteAccount()).message).toBe(
-      "Your Lunos account will be deleted within 30 days. You're signed out.",
-    )
+    expect(await Bun.file(CloudStore.testKeychain()).exists()).toBe(false)
   })
 
-  test("the accepted Terms version is kept; a new version asks again; consent goes to Lunos Cloud where served", async () => {
-    const host = await setup({ serves: { consent: true } })
+  test("Delete my account as an organisation's only owner: 409 last_owner, named, and nothing changes", async () => {
+    const host = await setup({
+      cloud: {
+        ...FakeIdp.defaultCloud(),
+        orgs: {
+          acme: { name: "Acme GmbH", members: { "u-1": "owner", "u-2": "member" } },
+          beta: { name: "Beta Ltd", members: { "u-1": "owner", "u-owner": "owner" } },
+        },
+      },
+    })
+    await signIn(host)
+    const result = await host.deleteAccount()
+    expect(result).toEqual({
+      deleted: false,
+      title: "Transfer ownership first",
+      message:
+        "You're the only owner of Acme GmbH (acme). Transfer ownership first, with lunos org transfer <member> --org acme or delete the organisation. Then delete your account.",
+    })
+    // Still signed in, still a member: Lunos Cloud refused, so nothing happened.
+    expect((await host.current())?.email).toBe("pat@lunos.test")
+    expect(idp.cloud.state.deletion["u-1"]).toBeUndefined()
+    expect(idp.cloud.orgs.acme!.members["u-1"]).toBe("owner")
+  })
+
+  test("Delete my account where Lunos Cloud has no deletion yet: the synced data only, and it says so", async () => {
+    const host = await setup({ cloud: { ...FakeIdp.defaultCloud(), without: ["deletion"] } })
+    await signIn(host)
+    const result = await host.deleteAccount()
+    expect(result).toMatchObject({ deleted: true })
+    expect(result.message).toContain("This Lunos Cloud doesn't delete the account itself yet")
+    expect(idp.cloud.state.deletedData).toEqual(["u-1"])
+    expect(await host.current()).toBeUndefined()
+  })
+
+  test("Terms: the box ticked at sign-in is sent to Lunos Cloud once; an older record asks again (XCOD-274)", async () => {
+    let host = await setup({
+      cloud: { ...FakeIdp.defaultCloud(), terms: { terms: "2026-10-19", privacy: "2026-10-19" } },
+    })
     expect(needsAcceptance(host.legal, await host.accepted())).toBe(true)
     await host.accept(host.legal.version)
-    await (await (await host.start({ signup: true })).wait(new AbortController().signal)).save()
+    await signIn(host)
     expect(await host.accepted()).toBe(host.legal.version)
-    expect(needsAcceptance(host.legal, await host.accepted())).toBe(false)
     expect(needsAcceptance({ ...host.legal, version: "2099-01-01" }, await host.accepted())).toBe(true)
-    expect(idp.state.consent).toEqual([{ terms: host.legal.version, privacy: host.legal.version }])
-  })
+    // Nothing recorded at Lunos Cloud yet, and the version ticked here is its current one: sent, not asked.
+    expect(await host.termsCheck!()).toBeUndefined()
+    expect(idp.cloud.state.termsPuts).toEqual([{ terms: "2026-10-19", privacy: "2026-10-19" }])
+    expect(await host.termsCheck!()).toBeUndefined()
+    expect(idp.cloud.state.termsPuts).toHaveLength(1)
+    idp.stop()
+
+    // Lunos Cloud records an older version than its current one: asked again, then its versions are sent.
+    host = await setup({
+      cloud: {
+        ...FakeIdp.defaultCloud(),
+        terms: { terms: "2026-11-01", privacy: "2026-10-19" },
+        accepted: { "u-1": { terms: "2026-10-19", privacy: "2026-10-19" } },
+      },
+    })
+    await host.accept(host.legal.version)
+    await signIn(host)
+    const check = await host.termsCheck!()
+    expect(check).toEqual({
+      current: { terms: "2026-11-01", privacy: "2026-10-19" },
+      accepted: { terms: "2026-10-19", privacy: "2026-10-19" },
+    })
+    expect(idp.cloud.state.termsPuts).toEqual([])
+    await host.accept(host.legal.version, check!.current)
+    expect(idp.cloud.state.termsPuts).toEqual([{ terms: "2026-11-01", privacy: "2026-10-19" }])
+    expect(await host.termsCheck!()).toBeUndefined()
+    // A version Lunos Cloud doesn't have now is refused there, and that isn't swallowed.
+    await expect(host.accept(host.legal.version, { terms: "1999-01-01", privacy: "1999-01-01" })).rejects.toThrow(
+      "Accept the current versions",
+    )
+    idp.stop()
+
+    // Nothing recorded there, and this machine accepted another version: asked, never assumed.
+    host = await setup({ cloud: { ...FakeIdp.defaultCloud(), terms: { terms: "2026-12-01", privacy: "2026-12-01" } } })
+    await host.accept(host.legal.version)
+    await signIn(host)
+    expect(await host.termsCheck!()).toEqual({ current: { terms: "2026-12-01", privacy: "2026-12-01" } })
+    expect(idp.cloud.state.termsPuts).toEqual([])
+  }, 30_000)
 
   test("refresh: a cached sign-in holds offline; a refused refresh means signed out", async () => {
     const host = await setup()

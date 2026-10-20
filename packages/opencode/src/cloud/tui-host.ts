@@ -7,12 +7,14 @@ import { openUrl } from "@opencode-ai/core/open"
 import {
   AccountError,
   type Details,
+  type Deletion,
   type DeviceFlow,
   type Gate,
   type Host,
   type Legal,
   type Pending,
   type SignedIn,
+  type TermsCheck,
 } from "@opencode-ai/tui/util/account"
 import { CloudAccountApi } from "./account-api"
 import { CloudAuth } from "./auth"
@@ -37,7 +39,7 @@ export const LEGAL: Legal = {
   privacy: "https://lunos.tech/privacy",
 }
 
-/** Where this machine remembers the accepted version; Lunos Cloud keeps its own record once it can. */
+/** Where this machine remembers the accepted version; Lunos Cloud keeps its own record (XCOD-274). */
 export const consentFile = () => path.join(Global.Path.data, "cloud", "consent.json")
 
 const fail = (error: unknown): never => {
@@ -67,12 +69,24 @@ async function signedIn(session: CloudStore.Session): Promise<SignedIn> {
   }
 }
 
-/** The plan Lunos Cloud reports, when it may be asked and answers. */
-async function plan(issuer: string, token: string) {
-  if (await CloudAccountApi.allowed(issuer)) return undefined
-  return CloudAccountApi.account(token, { timeoutMs: 5_000 })
-    .then((account) => account.plan?.name)
-    .catch(() => undefined)
+const PLANS: Record<string, string> = { free: "Free", pro: "Pro", team: "Team", business: "Business" }
+const planName = (id: string) => PLANS[id] ?? id[0]!.toUpperCase() + id.slice(1)
+
+/**
+ * The plan line for /account: the personal plan (`GET /v1/billing/usage`), or the organisation whose
+ * plan the account uses. Its plan's name is the owners' to see (billing is owner-only), so it isn't asked.
+ */
+async function plan(token: string, account: CloudAccountApi.Account, missing: string[]) {
+  const subject = account.billingSubject
+  if (!subject) return void missing.push("Plan: billing isn't turned on for this Lunos Cloud.")
+  if (subject.startsWith("org:")) {
+    const org = account.organizations.find((item) => item.org === subject.slice(4))
+    return `your organisation's (${org?.name ?? subject.slice(4)})`
+  }
+  return CloudAccountApi.plan(token).then(planName, (error: unknown) => {
+    missing.push(`Plan: ${error instanceof Error ? error.message : String(error)}`)
+    return undefined
+  })
 }
 
 function pending(confirmed: CloudSignin.Confirmed, legal: Legal, strict: boolean): Pending {
@@ -95,31 +109,69 @@ function pending(confirmed: CloudSignin.Confirmed, legal: Legal, strict: boolean
         throw new AccountError("unverified", "The e-mail address isn't confirmed yet.")
       const notes: string[] = []
       const kept = await CloudSignin.keep(state, { syncLocked: false, sync: false, print: (line) => notes.push(line) })
-      await recordConsent(state.issuer, state.tokens.access_token, legal.version)
+      // Lunos Cloud is told after this, by the start's Terms check (termsCheck): it has its own versions.
+      await remember(legal.version)
       return {
         sub: state.user.sub,
         email: state.user.email,
         name: state.user.name,
         issuer: state.issuer,
         kept: CloudSignin.where(kept.backend),
-        plan: await plan(state.issuer, state.tokens.access_token),
         notes,
       }
     },
   }
 }
 
-/**
- * The accepted version, on this machine, and at Lunos Cloud where it records consent (XCOD-274:
- * `PUT /v1/account/consent`). Until it does, this machine's record is the only one.
- */
-async function recordConsent(issuer: string, token: string | undefined, version: string) {
+/** The accepted version, on this machine. */
+async function remember(version: string) {
   const where = consentFile()
   await fs.mkdir(path.dirname(where), { recursive: true, mode: 0o700 })
   await fs.writeFile(where, JSON.stringify({ version, at: new Date().toISOString() }), { mode: 0o600 })
-  if (!token || (await CloudAccountApi.allowed(issuer))) return
-  await CloudAccountApi.consent(token, version, { timeoutMs: 5_000 }).catch(() => undefined)
 }
+
+async function accepted() {
+  const raw = await fs.readFile(consentFile(), "utf8").catch(() => undefined)
+  if (!raw) return undefined
+  try {
+    return text((JSON.parse(raw) as { version?: unknown }).version)
+  } catch {
+    return undefined
+  }
+}
+
+/** The stored session's fresh token, when Lunos Cloud may be asked; undefined otherwise. */
+async function cloudToken(what: string) {
+  const session = await CloudStore.load()
+  if (!session || (await CloudAccountApi.allowed(session.issuer))) return undefined
+  return (await CloudAuth.session(what)).tokens.access_token
+}
+
+/**
+ * XCOD-274: Lunos Cloud's record of the accepted Terms and Privacy notice (`GET /v1/account`). Asks
+ * again when it records an older version than its current one. When it records none, and the
+ * version accepted on this machine is exactly its current one (the box ticked at sign-in), that
+ * acceptance is sent (`PUT /v1/account/terms`) instead of asking twice. Nothing is asked when Lunos
+ * Cloud can't be reached or doesn't serve the record yet: the start never waits on it.
+ */
+async function termsCheck(): Promise<TermsCheck | undefined> {
+  const token = await cloudToken("Checking the Terms").catch(() => undefined)
+  if (!token) return undefined
+  const terms = await CloudAccountApi.account(token, { timeoutMs: 5_000 })
+    .then((account) => account.terms)
+    .catch(() => undefined)
+  if (!terms?.needsAcceptance) return undefined
+  const check = { current: terms.current, accepted: terms.accepted }
+  const local = await accepted()
+  if (terms.accepted || local !== terms.current.terms || local !== terms.current.privacy) return check
+  return CloudAccountApi.acceptTerms(token, terms.current, { timeoutMs: 5_000 }).then(
+    () => undefined,
+    // Refused: ask, so the acceptance it records is one the user gave. Unreachable: the next start asks.
+    (error: unknown) => (error instanceof CloudAccountApi.RefusedError ? check : undefined),
+  )
+}
+
+const ROLE_TEXT: Record<string, string> = { owner: "an owner", admin: "an admin", member: "a member" }
 
 export function create(input: { gate: Gate; issuer: string; clientID: string; legal?: Legal }): Host {
   const legal = input.legal ?? LEGAL
@@ -141,19 +193,15 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
           return kind === "offline" || kind === "unreachable" ? ("ok" as const) : ("expired" as const)
         })
     },
-    async accepted() {
-      const raw = await fs.readFile(consentFile(), "utf8").catch(() => undefined)
-      if (!raw) return undefined
-      try {
-        return text((JSON.parse(raw) as { version?: unknown }).version)
-      } catch {
-        return undefined
+    accepted,
+    async accept(version, server) {
+      if (server) {
+        const token = await cloudToken("Recording your acceptance of the Terms").catch(fail)
+        if (token) await CloudAccountApi.acceptTerms(token, server).catch(fail)
       }
+      await remember(version)
     },
-    async accept(version) {
-      const session = await CloudStore.load()
-      await recordConsent(session?.issuer ?? input.issuer, session?.tokens.access_token, version)
-    },
+    termsCheck,
     async probe() {
       return CloudOidc.discover(input.issuer)
         .then(() => "ok" as const)
@@ -207,7 +255,14 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
       })
       if (!account) return details
       const device = (await CloudSyncApi.load())?.device.id
+      // Lunos Cloud's record decides the role; the token's claim is only a fallback (it grants nothing).
+      if (account.platformRole) details.platformRole = account.platformRole
       details.organisations = account.organizations
+      details.invitations = await CloudAccountApi.invitations(fresh.tokens.access_token).catch((error: unknown) => {
+        if (!(error instanceof CloudAccountApi.NotServedError))
+          missing.push(`Invitations: ${error instanceof Error ? error.message : String(error)}`)
+        return undefined
+      })
       details.devices = account.devices.map((item) => ({
         id: item.id,
         name: item.name,
@@ -215,8 +270,7 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
         current: item.id === device,
         revoked: item.revokedAt !== undefined,
       }))
-      if (account.plan) user.plan = account.plan.name
-      else missing.push("Plan: Lunos Cloud doesn't report it yet.")
+      user.plan = await plan(fresh.tokens.access_token, account, missing)
       return details
     },
     async logoutEverywhere() {
@@ -239,22 +293,53 @@ export function create(input: { gate: Gate; issuer: string; clientID: string; le
         ? { ended: true }
         : { ended: false, message: `Signed out here, but other devices couldn't be signed out: ${ended}.` }
     },
-    async deleteAccount() {
+    async deleteAccount(): Promise<Deletion> {
       const session = await CloudStore.load()
       if (!session) throw new AccountError("other", "Not signed in.")
       const refused = await CloudAccountApi.allowed(session.issuer)
       if (refused) throw new AccountError("unavailable", `Lunos Cloud can't be asked: ${refused}.`)
       const fresh = await CloudAuth.session("Deleting your account").catch(fail)
-      const result = await CloudAccountApi.deleteAccount(fresh.tokens.access_token).catch(fail)
+      const result = await CloudAccountApi.deleteAccount(fresh.tokens.access_token).catch(async (error: unknown) => {
+        if (!(error instanceof CloudAccountApi.LastOwnerError)) return fail(error)
+        // Nothing changed at Lunos Cloud: you stay signed in, and are told which organisations to hand over.
+        const orgs = await CloudAccountApi.account(fresh.tokens.access_token)
+          .then((account) => account.organizations)
+          .catch(() => [])
+        const named = error.orgs.map((id) => {
+          const name = orgs.find((item) => item.org === id)?.name
+          return name && name !== id ? `${name} (${id})` : id
+        })
+        return {
+          refused: named.length
+            ? `You're the only owner of ${named.join(", ")}. Transfer ownership first, with lunos org transfer <member> --org ${error.orgs[0]} or delete the organisation. Then delete your account.`
+            : error.message,
+        }
+      })
+      if ("refused" in result)
+        return { deleted: false, title: "Transfer ownership first", message: result.refused ?? "" }
       await CloudSignin.logout()
       await fs.rm(consentFile(), { force: true })
-      if (result.identity === "deleted") return { message: "Your Lunos account is deleted, and you're signed out." }
-      if (result.identity === "scheduled")
-        return { message: "Your Lunos account will be deleted within 30 days. You're signed out." }
+      if (result.dueAt !== undefined)
+        return {
+          deleted: true,
+          message: `Your Lunos account will be deleted on ${new Date(result.dueAt).toISOString().slice(0, 10)}. Your synced sessions and devices are deleted now, you've left your organisations, and you're signed out.`,
+        }
       return {
+        deleted: true,
         message:
-          "Your synced sessions and devices are deleted and you're signed out. Deleting the sign-in itself isn't available from Lunos Cloud yet, so your login stays until it is.",
+          "Your synced sessions and devices are deleted and you're signed out. This Lunos Cloud doesn't delete the account itself yet, so your sign-in stays until it does.",
       }
+    },
+    async answerInvitation(org, accept) {
+      const token = await cloudToken(accept ? "Accepting an invitation" : "Declining an invitation").catch(fail)
+      if (!token) throw new AccountError("unavailable", "Lunos Cloud can't be asked from here.")
+      const invitation = (await CloudAccountApi.invitations(token).catch(() => [])).find((item) => item.org === org)
+      const joined = await CloudAccountApi.answerInvitation(token, org, accept).catch(fail)
+      const name = invitation?.name ?? org
+      if (!accept) return `Declined the invitation to ${name}.`
+      return joined
+        ? `You joined ${name}${invitation?.role ? ` as ${ROLE_TEXT[invitation.role] ?? invitation.role}` : ""}.`
+        : `You're already a member of ${name}.`
     },
   }
 }
