@@ -1064,6 +1064,32 @@ async function writable(input: { key: string; locked?: ReadonlyArray<string>; vi
   return item
 }
 
+/** XCOD-279: whether saving `key` = `value` turns the sandbox on (or makes it required). */
+export function turnsSandboxOn(key: string, value: unknown) {
+  if (key === "sandbox.enabled" || key === "sandbox.required") return value === true
+  if (key !== "sandbox" || !value || typeof value !== "object") return false
+  const sandbox = value as { enabled?: unknown; required?: unknown }
+  return sandbox.enabled === true || sandbox.required === true
+}
+
+/**
+ * XCOD-279: the sandbox side of saving a setting, loaded on demand (the sandbox modules shell out to
+ * Docker). Replaceable in tests. Inside a sandbox there's no Docker to check, and the change only
+ * reaches the sandbox's own copy of the config.
+ */
+export const sandboxPreflight = {
+  async refusal(directory: string): Promise<string | undefined> {
+    const { SandboxConfig } = await import("@/sandbox/config")
+    if (SandboxConfig.inside()) return undefined
+    const { SandboxPreflight } = await import("@/sandbox/preflight")
+    return SandboxPreflight.refusal(directory)
+  },
+  async record(change: import("@/sandbox/rollback").Change) {
+    const { SandboxRollback } = await import("@/sandbox/rollback")
+    SandboxRollback.record(change)
+  },
+}
+
 export async function set(input: {
   key: string
   value: unknown
@@ -1138,9 +1164,19 @@ export async function set(input: {
       "invalid",
     )
   const changed = updated !== before
+  // XCOD-279: turning the sandbox on is checked first; a sandbox that can't start here isn't saved.
+  if (changed && turnsSandboxOn(item.key, value)) {
+    const problem = await sandboxPreflight.refusal(input.ctx.directory)
+    if (problem) throw new SettingError(`The sandbox wasn't turned on: ${problem}`, "invalid")
+  }
   if (changed) {
     await fs.mkdir(path.dirname(file), { recursive: true })
     await fs.writeFile(file, updated)
+  }
+  // XCOD-279: what a sandbox change replaced, so a restart that can't start with it can undo it.
+  if (changed && item.restart && jsonPath[0] === "sandbox" && item.target === "config") {
+    const previous = ConfigPolicy.get(rawDoc(before), jsonPath.join("."))
+    await sandboxPreflight.record({ key: item.key, file, path: jsonPath, had: previous !== undefined, previous, value })
   }
   // XCOD-256: saving Codex's sandbox or approval policy moves a legacy permission_mode in this file.
   for (const write of ConfigExternal.migrate(item.key, ConfigPolicy.get(rawDoc(before), "external.codex") as never)) {

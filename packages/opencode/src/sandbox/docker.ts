@@ -1,4 +1,5 @@
 import { SandboxExec } from "./exec"
+import { SandboxError, SandboxFailure } from "./error"
 import type { SandboxConfig } from "./config"
 import { PROXY_PORT } from "./egress"
 
@@ -135,21 +136,38 @@ export type Binds = {
 }
 export const NO_BINDS: Binds = { protect: [], outside: [], extra: [] }
 
+/**
+ * XCOD-279: a path on this machine as the runtime's `--mount source=` wants it. On Windows, Docker
+ * Desktop takes `D:/dir` (never the mixed `D:\dir/.git`), and Podman, whose engine runs in a WSL 2
+ * machine, sees drive D: at `/mnt/d`.
+ */
+export function hostPath(file: string, platform: NodeJS.Platform = process.platform, on: Runtime["engine"] = engine()) {
+  if (platform !== "win32") return file
+  const forward = file.replaceAll("\\", "/")
+  const drive = /^([A-Za-z]):(?:\/(.*))?$/.exec(forward)
+  if (!drive) return forward
+  const rest = (drive[2] ?? "").replace(/\/+$/, "")
+  return on === "podman"
+    ? `/mnt/${drive[1].toLowerCase()}${rest ? `/${rest}` : ""}`
+    : `${drive[1].toUpperCase()}:/${rest}`
+}
+
 const bind = (source: string, target: string, readonly: boolean) => [
   "--mount",
   `type=bind,source=${source},target=${target}${readonly ? ",readonly" : ""}`,
 ]
 
-export function bindArgs(binds: Binds) {
+export function bindArgs(binds: Binds, platform: NodeJS.Platform = process.platform, on: Runtime["engine"] = engine()) {
+  const local = (file: string) => hostPath(file, platform, on)
   return [
-    ...(binds.root ? bind(binds.root, WORKSPACE, false) : []),
+    ...(binds.root ? bind(local(binds.root), WORKSPACE, false) : []),
     ...(binds.root
       ? binds.protect.flatMap((item) =>
-          bind(`${binds.root}/${item}`, `${WORKSPACE}/${item.split("\\").join("/")}`, true),
+          bind(local(`${binds.root}/${item}`), `${WORKSPACE}/${item.split("\\").join("/")}`, true),
         )
       : []),
-    ...binds.outside.flatMap((item) => bind(item, item, true)),
-    ...binds.extra.flatMap((item) => bind(item.source, item.target, true)),
+    ...binds.outside.flatMap((item) => bind(local(item), item, true)),
+    ...binds.extra.flatMap((item) => bind(local(item.source), item.target, true)),
   ]
 }
 
@@ -158,17 +176,83 @@ export const current = () => runtime
 const docker = (args: string[], options?: SandboxExec.Options) => SandboxExec.check([bin(), ...args], options)
 const run = (args: string[], options?: SandboxExec.Options) => SandboxExec.run([bin(), ...args], options)
 
-async function probe(name: Runtime["name"]): Promise<Runtime | string> {
+/** XCOD-279: how long a probe waits; `docker info` can hang while Docker Desktop is starting. */
+export const PROBE_TIMEOUT = 20_000
+
+/** How far a runtime got before it turned out unusable, and why. */
+export type Unusable = { name: Runtime["name"]; stage: "installed" | "running" | "linux"; error: SandboxError }
+const STAGES: Unusable["stage"][] = ["installed", "running", "linux"]
+
+async function probe(name: Runtime["name"]): Promise<Runtime | Unusable> {
   // `podman info` has no .ServerVersion; .Version.Version is podman's. Both print "podman" for a
   // podman-docker shim's `--version`, which is how a shim installed as `docker` is recognised.
-  const version = await SandboxExec.run([name, "--version"]).catch(() => undefined)
-  if (!version || version.code !== 0) return `the ${name} command was not found`
+  const versionCmd = [name, "--version"]
+  const version = await SandboxExec.run(versionCmd, { timeout: PROBE_TIMEOUT }).catch((error: unknown) =>
+    SandboxFailure.wrap("detect", error),
+  )
+  if (version instanceof SandboxError) return { name, stage: "installed", error: version }
+  if (version.code !== 0)
+    return { name, stage: "installed", error: SandboxFailure.wrap("detect", SandboxExec.failure(versionCmd, version)) }
   const actual = /podman/i.test(version.stdout) ? "podman" : name
-  const format = actual === "podman" ? "{{.Version.Version}}" : "{{.ServerVersion}}"
-  const info = await SandboxExec.run([name, "info", "--format", format]).catch(() => undefined)
-  if (!info || info.code !== 0)
-    return `${name} is installed but not running: ${info?.stderr.trim().split("\n")[0] ?? "no response"}`
-  return { name, engine: actual, version: `${actual} ${info.stdout.trim()}` }
+  // XCOD-279: the OS too. In Windows-containers mode Docker answers, and the run only failed later.
+  const format = actual === "podman" ? "{{.Version.Version}}|{{.Host.OS}}" : "{{.ServerVersion}}|{{.OSType}}"
+  const infoCmd = [name, "info", "--format", format]
+  const info = await SandboxExec.run(infoCmd, { timeout: PROBE_TIMEOUT }).catch((error: unknown) =>
+    SandboxFailure.wrap("detect", error),
+  )
+  if (info instanceof SandboxError) return { name, stage: "running", error: info }
+  if (info.code !== 0) {
+    const output = info.stderr.trim() || info.stdout.trim()
+    const first = output
+      .split(/\r?\n/)
+      .find((line) => line.trim())
+      ?.trim()
+    return {
+      name,
+      stage: "running",
+      error: new SandboxError({
+        step: "detect",
+        reason: `${name} is installed but its engine ${info.timedOut ? "didn't answer" : "isn't running"}${first ? `: ${first}` : ""}`,
+        command: infoCmd,
+        code: info.code,
+        stderr: output,
+        fix:
+          SandboxFailure.diagnose(output) ??
+          (info.timedOut
+            ? `${name} isn't answering: if it's still starting, wait until it's ready and try again.`
+            : undefined),
+      }),
+    }
+  }
+  const [answer, os = ""] = info.stdout.trim().split("|")
+  if (os && os.trim().toLowerCase() !== "linux")
+    return {
+      name,
+      stage: "linux",
+      error: new SandboxError({
+        step: "detect",
+        reason: `${name} runs ${os.trim()} containers, and the sandbox is a Linux container`,
+        command: infoCmd,
+        fix: os.trim().toLowerCase() === "windows" ? SandboxFailure.diagnose("Windows-containers mode") : undefined,
+      }),
+    }
+  return { name, engine: actual, version: `${actual} ${answer.trim()}` }
+}
+
+/** Every runtime tried, in order, and the first usable one. Sets the runtime the other commands use. */
+export async function detect(preferred?: Runtime["name"]) {
+  const order: Runtime["name"][] = preferred ? [preferred] : ["docker", "podman"]
+  const tried: Unusable[] = []
+  for (const name of order) {
+    const found = await probe(name)
+    if ("stage" in found) {
+      tried.push(found)
+      continue
+    }
+    runtime = found
+    return { runtime: found, tried }
+  }
+  return { runtime: undefined, tried }
 }
 
 /**
@@ -176,21 +260,21 @@ async function probe(name: Runtime["name"]): Promise<Runtime | string> {
  * was tried and why each failed, when neither is usable: a sandboxed run never falls back to the host.
  */
 export async function available(preferred?: Runtime["name"]) {
-  const order: Runtime["name"][] = preferred ? [preferred] : ["docker", "podman"]
-  const reasons: string[] = []
-  for (const name of order) {
-    const found = await probe(name)
-    if (typeof found !== "string") {
-      runtime = found
-      return found.version
-    }
-    reasons.push(found)
-  }
-  throw new Error(
-    `Sandboxed runs need Docker or Podman, and ${preferred ? `${preferred} (sandbox.runtime) isn't` : "neither is"} available: ` +
-      reasons.join("; ") +
-      ". Install Docker Desktop, Docker Engine or Podman and start it, then try again. Nothing was run on this machine.",
-  )
+  const { runtime: found, tried } = await detect(preferred)
+  if (found) return found.version
+  // The fix comes from the runtime that got furthest: a stopped Docker says more than a missing Podman.
+  const best = [...tried].sort((a, b) => STAGES.indexOf(b.stage) - STAGES.indexOf(a.stage))[0]
+  throw new SandboxError({
+    step: "detect",
+    reason:
+      `Sandboxed runs need Docker or Podman, and ${preferred ? `${preferred} (sandbox.runtime) isn't` : "neither is"} usable: ` +
+      tried.map((item) => item.error.reason).join("; ") +
+      ". Nothing was run on this machine.",
+    command: best.error.command,
+    code: best.error.code,
+    stderr: best.error.stderr,
+    fix: best.error.fix ?? SandboxFailure.diagnose("command was not found"),
+  })
 }
 
 export type Image = { ref: string; id: string; digest?: string }
@@ -200,17 +284,32 @@ export async function image(ref: string): Promise<Image> {
   const inspect = () => SandboxExec.run([bin(), "image", "inspect", ref, "--format", "{{.Id}}|{{json .RepoDigests}}"])
   let result = await inspect()
   if (result.code !== 0) {
-    const pull = await SandboxExec.run([bin(), "pull", ref])
-    if (pull.code !== 0)
-      throw new Error(
-        `Couldn't get the sandbox image ${ref}: ${pull.stderr.trim()}. ` +
+    const pullCmd = [bin(), "pull", ref]
+    const pull = await SandboxExec.run(pullCmd)
+    if (pull.code !== 0) {
+      const output = pull.stderr.trim() || pull.stdout.trim()
+      throw new SandboxError({
+        step: "image",
+        reason: `Couldn't get the sandbox image ${ref}: ${
+          output
+            .split(/\r?\n/)
+            .find((line) => line.trim())
+            ?.trim() ?? `exit code ${pull.code}`
+        }`,
+        command: pullCmd,
+        code: pull.code,
+        stderr: output,
+        fix:
+          SandboxFailure.diagnose(output) ??
           `Build one locally with \`bun run packages/opencode/script/sandbox-image.ts\` (tags lunos-sandbox:local) ` +
-          `and set "sandbox": { "image": "lunos-sandbox:local" }, or point sandbox.image at an image you can pull. ` +
-          `Set it in your global config (~/.config/opencode/opencode.json) or managed config: the network ` +
-          `policy's proxy runs from that image too, and ignores an image a repository's config chooses.`,
-      )
+            `and set "sandbox": { "image": "lunos-sandbox:local" }, or point sandbox.image at an image you can pull. ` +
+            `Set it in your global config (~/.config/opencode/opencode.json) or managed config: the network ` +
+            `policy's proxy runs from that image too, and ignores an image a repository's config chooses.`,
+      })
+    }
     result = await inspect()
-    if (result.code !== 0) throw new Error(`docker image inspect ${ref} failed: ${result.stderr.trim()}`)
+    if (result.code !== 0)
+      throw SandboxFailure.wrap("image", SandboxExec.failure([bin(), "image", "inspect", ref], result))
   }
   const [id, digests] = result.stdout.trim().split("|")
   const digest = (JSON.parse(digests || "[]") as string[])[0]
@@ -234,6 +333,8 @@ export function createArgs(input: {
   engine?: Runtime["engine"]
   identity?: Identity
   binds?: Binds
+  /** This machine's platform, for the mount paths; the current one by default. */
+  platform?: NodeJS.Platform
 }) {
   const network = input.network ?? "open"
   const identity = input.identity ?? DEFAULT_IDENTITY
@@ -295,7 +396,7 @@ export function createArgs(input: {
     `${volumeName(input.id)}:${ROOT}`,
     "--volume",
     `${policyVolumeName(input.id)}:${POLICY_DIR}:ro`,
-    ...bindArgs(binds),
+    ...bindArgs(binds, input.platform, input.engine ?? engine()),
     "--workdir",
     input.workdir,
     "--cpus",
@@ -544,16 +645,18 @@ export async function logs(id: string, tail = 40) {
 
 /** `docker logs`, straight to this process's stdout and stderr; `follow` streams until it stops. */
 export async function streamLogs(id: string, options: { tail?: number; follow?: boolean } = {}) {
-  const proc = Bun.spawn(
-    [
-      bin(),
-      "logs",
-      ...(options.tail !== undefined ? ["--tail", String(options.tail)] : []),
-      ...(options.follow ? ["--follow"] : []),
-      containerName(id),
-    ],
-    { stdout: "inherit", stderr: "inherit", stdin: "ignore" },
-  )
+  const target = SandboxExec.spawnable(SandboxExec.resolve(bin()) ?? bin(), [
+    "logs",
+    ...(options.tail !== undefined ? ["--tail", String(options.tail)] : []),
+    ...(options.follow ? ["--follow"] : []),
+    containerName(id),
+  ])
+  const proc = Bun.spawn(target.argv, {
+    stdout: "inherit",
+    stderr: "inherit",
+    stdin: "ignore",
+    windowsVerbatimArguments: target.verbatim,
+  })
   return proc.exited
 }
 
