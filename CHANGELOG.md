@@ -21,6 +21,8 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+## [1.18.51] - 2026-10-20
+
 ### Added
 
 - **Manage your organisation's people with `lunos org`, and see your role in `/account`.** Owners
@@ -47,14 +49,14 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   need no account: managed `"auth": { "required": false }`, an organisation's own `cloud.issuer`,
   `LUNOS_OFFLINE=1`, `lunos run`, non-interactive terminals, `CI=true` and builds from source skip
   it and contact no Lunos service. In CI, cloud features take a token from `LUNOS_TOKEN`.
-  <!-- XCOD-273 -->
+  <!-- XCOD-273 --> <!-- highlight -->
 - **Watch and steer all your agents from one screen.** Press ← on an empty prompt (or type
   `/monitor`) to open the Agent Monitor: every session on this computer on the right, grouped into
   waiting for you, running, completed and failed, with what each waiting one asks. Approve or deny
   from the list, or stop a session. The prompt in the centre starts a new session and keeps you in
   the monitor, or sends to the sessions you tag, as in `@2 run the tests`. A busy session gets the
   prompt when its turn ends, and a session another Lunos runs gets it through that Lunos. A prompt
-  never approves a tool call. <!-- XCOD-262 -->
+  never approves a tool call. <!-- XCOD-262 --> <!-- highlight -->
 - **The same Agent Monitor in the desktop app and the web UI.** The Sessions window now lists
   every session by status on the right (waiting for you with what each asks, running, completed,
   failed, each counted and numbered), with Approve and Deny on the row. The prompt in the centre
@@ -77,11 +79,12 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Deleting a session also deletes the prompts queued for it.** Prompts that were queued for a
   session and never sent no longer stay on disk after you delete it, whichever way you delete it.
   The confirmation says how many go with it. Archiving keeps them. <!-- XCOD-269 -->
-- Single session deletes (from the app, the terminal UI, the API or `lunos session delete`) are
-  now written to the audit log as `session.delete`, with how many queued prompts went with them.
+- **Deleting a single session is now audited.** Deletes from the app, the terminal UI, the API or
+  `lunos session delete` are written to the audit log as `session.delete`, with how many queued
+  prompts went with them.
   <!-- XCOD-269 -->
-- **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory, if you
-  agree.** The first time per tool and project, Lunos asks: Share, Not now, or Never for this tool.
+- **Claude Code and Codex sessions can use your Lunos MCP servers, skills and memory.** Only if
+  you agree: the first time per tool and project, Lunos asks Share, Not now, or Never for this tool.
   Their results are sent to Anthropic or OpenAI with your prompts, so nothing is offered until you
   choose Share. Each call asks in Lunos unless your permission rules allow that tool by name, and
   follows your residency policy and plugin hooks. Every call is written to the audit log. The
@@ -127,6 +130,24 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   throwaway HOME and redacted before anything is written, plus contract tests that replay the
   recordings against the adapters. They are skipped until the recordings are added.
   <!-- internal --> <!-- XCOD-270 -->
+- **Stop every session at once, and clear finished ones out of `/sessions`.** "stop all" stops every
+  running or waiting session in the current view (state filter and search), including Claude Code
+  and Codex sessions and those running in another Lunos window, after one confirmation that counts
+  them; pending approvals are rejected with "Stopped from /sessions" so no tool is left waiting.
+  "clear list" archives the finished, idle and failed ones: they're hidden from `/sessions`, the
+  session list and quick switch, but nothing is deleted, and "undo" or "show archived" → "unarchive"
+  brings them back. "stop all & clear" does both, and "delete archived" removes archived sessions
+  for good after you type their count. Both ship without a key (bind `dialog.sessions.stop_all` and
+  `dialog.sessions.clear` in `tui.json`); they're always in the view's footer, reachable with Tab.
+  From scripts: `lunos session stop --all [--project]`, `lunos session archive --finished
+[--older-than 7d]` and `lunos session unarchive <id|--all>`, each with `--yes`. Bulk actions are
+  written to the audit log as `session.stop`, `session.archive` and `session.delete`. <!-- XCOD-265 -->
+- **The same Stop all and Clear list in the desktop Sessions window and on the web.** The Sessions
+  window has Stop all, Clear list and Stop all & clear buttons, with the same counts and the same
+  confirmation as `/sessions`; when the sessions in view span several projects, Stop all can be kept
+  to one of them. Rows that couldn't be stopped say why. Undo brings back what Clear hid, Show
+  archived lists archived sessions with Unarchive on each, and Delete archived asks you to type the
+  count first. <!-- XCOD-265 -->
 
 ### Changed
 
@@ -180,24 +201,6 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   <!-- XCOD-264 -->
 - Every published release notifies lunos.tech with the tagged CHANGELOG.md, and a daily check fails
   when lunos.tech/changelog falls behind the latest release. <!-- XCOD-261 --> <!-- internal -->
-- **Stop every session at once, and clear finished ones out of `/sessions`.** "stop all" stops every
-  running or waiting session in the current view (state filter and search), including Claude Code
-  and Codex sessions and those running in another Lunos window, after one confirmation that counts
-  them; pending approvals are rejected with "Stopped from /sessions" so no tool is left waiting.
-  "clear list" archives the finished, idle and failed ones: they're hidden from `/sessions`, the
-  session list and quick switch, but nothing is deleted, and "undo" or "show archived" → "unarchive"
-  brings them back. "stop all & clear" does both, and "delete archived" removes archived sessions
-  for good after you type their count. Both ship without a key (bind `dialog.sessions.stop_all` and
-  `dialog.sessions.clear` in `tui.json`); they're always in the view's footer, reachable with Tab.
-  From scripts: `lunos session stop --all [--project]`, `lunos session archive --finished
-[--older-than 7d]` and `lunos session unarchive <id|--all>`, each with `--yes`. Bulk actions are
-  written to the audit log as `session.stop`, `session.archive` and `session.delete`. <!-- XCOD-265 -->
-- **The same Stop all and Clear list in the desktop Sessions window and on the web.** The Sessions
-  window has Stop all, Clear list and Stop all & clear buttons, with the same counts and the same
-  confirmation as `/sessions`; when the sessions in view span several projects, Stop all can be kept
-  to one of them. Rows that couldn't be stopped say why. Undo brings back what Clear hid, Show
-  archived lists archived sessions with Unarchive on each, and Delete archived asks you to type the
-  count first. <!-- XCOD-265 -->
 
 ## [1.18.50] - 2026-10-19
 
