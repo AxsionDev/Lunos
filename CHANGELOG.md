@@ -21,6 +21,19 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **A different tip every time.** The home screen shows a new tip on each start, and a turn that
+  runs for more than 3 seconds shows one line under the working indicator. Tips come from a deck
+  shuffled for you, so none repeats until you've seen them all, and the same tip never shows twice
+  in a row. There are now over 230 tips about Lunos itself: the Agent Monitor, the marketplace,
+  memory, Claude Code and Codex sessions, language servers, sandboxes, your account and more. Tips
+  only appear when they apply to you (memory tips once memory is on, nothing about a feature your
+  organisation has turned off), and a tip shows your own key when you've changed a keybind. `/tips`
+  lists every tip by category, searchable, with the ones you've seen marked; `tips_next` (unbound
+  by default) shows another; "Hide tips" stays, and `"tips": false` in `tui.json` turns them off.
+  Which tips you've seen is kept on your computer only. <!-- XCOD-278 -->
+
 ## [1.18.51] - 2026-10-20
 
 ### Added

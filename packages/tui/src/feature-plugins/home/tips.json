@@ -1,0 +1,1285 @@
+[
+  {
+    "id": "providers-connect-ai-provider",
+    "category": "Getting started",
+    "text": "Run {highlight}/providers{/highlight} to connect an AI provider and start coding"
+  },
+  {
+    "id": "models-pick-model-session",
+    "category": "Getting started",
+    "text": "Run {highlight}/models{/highlight} to pick the model for this session"
+  },
+  {
+    "id": "init-generate-project-rules",
+    "category": "Getting started",
+    "text": "Run {highlight}/init{/highlight} to generate project rules ({highlight}AGENTS.md{/highlight}) from your codebase"
+  },
+  {
+    "id": "commit-agents-md-git",
+    "category": "Getting started",
+    "text": "Commit {highlight}AGENTS.md{/highlight} to Git so your whole team's agents follow the same rules"
+  },
+  {
+    "id": "help-command-shortcut",
+    "category": "Getting started",
+    "text": "Run {highlight}/help{/highlight} to see every command and its shortcut"
+  },
+  {
+    "id": "command-list-open-command",
+    "category": "Getting started",
+    "text": "Press {key:command_list} to open the command palette and search any action"
+  },
+  {
+    "id": "settings-lunos-setting-grouped",
+    "category": "Getting started",
+    "text": "Run {highlight}/settings{/highlight} to see every Lunos setting grouped by area"
+  },
+  {
+    "id": "status-mcp-servers-language",
+    "category": "Getting started",
+    "text": "Run {highlight}/status{/highlight} to see your MCP servers, language servers, formatters and plugins in one place"
+  },
+  {
+    "id": "themes-change-colour-theme",
+    "category": "Getting started",
+    "text": "Run {highlight}/themes{/highlight} to change the colour theme; Catppuccin is the default"
+  },
+  {
+    "id": "whatsnew-changed-since-last",
+    "category": "Getting started",
+    "text": "Run {highlight}/whatsnew{/highlight} to see what changed since your last version"
+  },
+  {
+    "id": "type-file-name-fuzzy",
+    "category": "Prompting",
+    "text": "Type {highlight}@{/highlight} and a file name to fuzzy-search and attach files to your prompt"
+  },
+  {
+    "id": "start-message-shell-command",
+    "category": "Prompting",
+    "text": "Start a message with {highlight}!{/highlight} to run a shell command, e.g. {highlight}!git status{/highlight}"
+  },
+  {
+    "id": "input-newline-new-line",
+    "category": "Prompting",
+    "text": "Press {key:input_newline} to add a new line without sending"
+  },
+  {
+    "id": "esc-twice-clear-prompt",
+    "category": "Prompting",
+    "text": "Press {highlight}Esc{/highlight} twice to clear the prompt; {key:input_undo} brings it back",
+    "config": ["double_escape_clear"]
+  },
+  {
+    "id": "empty-prompt-bring-back",
+    "category": "Prompting",
+    "text": "Press {highlight}↑{/highlight} on an empty prompt to bring back your previous prompts"
+  },
+  {
+    "id": "paste-image-screenshot-straight",
+    "category": "Prompting",
+    "text": "Paste an image or screenshot straight into the prompt to show the agent what you mean"
+  },
+  {
+    "id": "input-paste-paste-images",
+    "category": "Prompting",
+    "text": "Press {key:input_paste} to paste images from your clipboard into the prompt"
+  },
+  {
+    "id": "drag-drop-images-pdfs",
+    "category": "Prompting",
+    "text": "Drag and drop images or PDFs into the terminal to add them as context"
+  },
+  {
+    "id": "editor-write-long-prompt",
+    "category": "Prompting",
+    "text": "Run {highlight}/editor{/highlight} to write a long prompt in your own {highlight}$EDITOR{/highlight}"
+  },
+  {
+    "id": "agent-name-prompt-hand",
+    "category": "Prompting",
+    "text": "Use {highlight}@agent-name{/highlight} in a prompt to hand part of the task to a specific subagent"
+  },
+  {
+    "id": "specific-name-file-function",
+    "category": "Prompting",
+    "text": "Be specific: name the file, the function and the expected result for faster, cheaper turns"
+  },
+  {
+    "id": "ask-agent-write-plan",
+    "category": "Prompting",
+    "text": "Ask the agent to write a plan first, then say \"go\": fewer surprises on big changes"
+  },
+  {
+    "id": "mention-test-command-prompt",
+    "category": "Prompting",
+    "text": "Mention the test command in your prompt so the agent can verify its own change"
+  },
+  {
+    "id": "review-review-uncommitted-changes",
+    "category": "Prompting",
+    "text": "Use {highlight}/review{/highlight} to review uncommitted changes, a branch or a pull request"
+  },
+  {
+    "id": "input-undo-undo-changes",
+    "category": "Prompting",
+    "text": "Press {key:input_undo} to undo changes in your prompt"
+  },
+  {
+    "id": "new-start-fresh-session",
+    "category": "Sessions",
+    "text": "Run {highlight}/new{/highlight} to start a fresh session without closing Lunos"
+  },
+  {
+    "id": "sessions-session-computer-across",
+    "category": "Sessions",
+    "text": "Run {highlight}/sessions{/highlight} to see every session on this computer, across all projects"
+  },
+  {
+    "id": "group-sessions-sessions-move",
+    "category": "Sessions",
+    "text": "Group sessions in {highlight}/sessions{/highlight}: move them into groups and collapse what you're not working on"
+  },
+  {
+    "id": "sessions-stop-all-stop",
+    "category": "Sessions",
+    "text": "In {highlight}/sessions{/highlight}, use stop all to stop every running session at once"
+  },
+  {
+    "id": "sessions-clear-list-archives",
+    "category": "Sessions",
+    "text": "In {highlight}/sessions{/highlight}, clear list archives finished sessions, and show archived brings them back"
+  },
+  {
+    "id": "rename-give-current-session",
+    "category": "Sessions",
+    "text": "Run {highlight}/rename{/highlight} to give the current session a name you'll recognise later"
+  },
+  {
+    "id": "undo-revert-last-message",
+    "category": "Sessions",
+    "text": "Run {highlight}/undo{/highlight} to revert the last message and its file changes"
+  },
+  {
+    "id": "redo-restore-just-undid",
+    "category": "Sessions",
+    "text": "Run {highlight}/redo{/highlight} to restore what you just undid"
+  },
+  {
+    "id": "compact-summarise-long-session",
+    "category": "Sessions",
+    "text": "Run {highlight}/compact{/highlight} to summarise a long session before it hits the context limit"
+  },
+  {
+    "id": "fork-branch-session-try",
+    "category": "Sessions",
+    "text": "Run {highlight}/fork{/highlight} to branch a session and try a different approach without losing the first"
+  },
+  {
+    "id": "share-share-session-unshare",
+    "category": "Sessions",
+    "text": "Run {highlight}/share{/highlight} to share a session, and {highlight}/unshare{/highlight} to take it down again",
+    "requires": ["share.enabled"]
+  },
+  {
+    "id": "share-cloud-share-sessions",
+    "category": "Sessions",
+    "text": "Set {highlight}\"share\": \"cloud\"{/highlight} to share sessions only with your organisation's Lunos console",
+    "requires": ["signedIn"],
+    "config": ["share"]
+  },
+  {
+    "id": "lunos-continue-resume-last",
+    "category": "Sessions",
+    "text": "Run {highlight}lunos --continue{/highlight} to resume your last session from the terminal"
+  },
+  {
+    "id": "session-interrupt-twice-stop",
+    "category": "Sessions",
+    "text": "Press {key:session_interrupt} twice to stop the agent mid-turn"
+  },
+  {
+    "id": "session-background-send-running",
+    "category": "Sessions",
+    "text": "Press {key:session_background} to send running subagents to the background and keep working"
+  },
+  {
+    "id": "lunos-session-stop-all",
+    "category": "Sessions",
+    "text": "Run {highlight}lunos session stop --all{/highlight} to stop every session from a script"
+  },
+  {
+    "id": "lunos-session-archive-finished",
+    "category": "Sessions",
+    "text": "Run {highlight}lunos session archive --finished{/highlight} to tidy up old sessions from the terminal"
+  },
+  {
+    "id": "resume-list-pin-continue",
+    "category": "Sessions",
+    "text": "Run {highlight}/resume{/highlight} to list, pin and continue sessions"
+  },
+  {
+    "id": "session-pin-toggle-session",
+    "category": "Sessions",
+    "text": "Press {key:session_pin_toggle} in the session list to pin a session to the top"
+  },
+  {
+    "id": "session-quick-switch-1",
+    "category": "Sessions",
+    "text": "Press {key:session_quick_switch_1} to {key:session_quick_switch_9} to switch between pinned sessions"
+  },
+  {
+    "id": "export-save-conversation-markdown",
+    "category": "Sessions",
+    "text": "Run {highlight}/export{/highlight} to save the conversation as Markdown"
+  },
+  {
+    "id": "timeline-jump-any-message",
+    "category": "Sessions",
+    "text": "Run {highlight}/timeline{/highlight} to jump to any message in the session"
+  },
+  {
+    "id": "session-parent-go-subagent",
+    "category": "Sessions",
+    "text": "Press {key:session_parent} to go from a subagent's session back to its parent"
+  },
+  {
+    "id": "session-child-first-open",
+    "category": "Sessions",
+    "text": "Press {key:session_child_first} to open the first subagent session of a turn"
+  },
+  {
+    "id": "empty-prompt-open-agent",
+    "category": "Agent Monitor",
+    "text": "Press {highlight}←{/highlight} on an empty prompt to open the Agent Monitor with every session on this computer",
+    "config": ["left_opens_monitor"]
+  },
+  {
+    "id": "monitor-which-sessions-are",
+    "category": "Agent Monitor",
+    "text": "Run {highlight}/monitor{/highlight} to see which sessions are waiting for your answer"
+  },
+  {
+    "id": "agent-monitor-type-2",
+    "category": "Agent Monitor",
+    "text": "In the Agent Monitor, type {highlight}@2{/highlight} to send your prompt to session number 2"
+  },
+  {
+    "id": "agent-monitor-prompt-without",
+    "category": "Agent Monitor",
+    "text": "In the Agent Monitor, a prompt without a tag starts a brand-new session"
+  },
+  {
+    "id": "agent-monitor-monitor-approve",
+    "category": "Agent Monitor",
+    "text": "In the Agent Monitor, press {key:monitor.approve} or {key:monitor.deny} to answer a waiting request"
+  },
+  {
+    "id": "tag-several-sessions-agent",
+    "category": "Agent Monitor",
+    "text": "Tag several sessions with {highlight}@{/highlight} in the Agent Monitor to send the same prompt to all of them"
+  },
+  {
+    "id": "agent-monitor-prompt-running",
+    "category": "Agent Monitor",
+    "text": "In the Agent Monitor, a prompt to a running session is queued and sent when its turn ends"
+  },
+  {
+    "id": "sessions-waiting-answer-always",
+    "category": "Agent Monitor",
+    "text": "Sessions waiting for your answer always sit at the top of the Agent Monitor"
+  },
+  {
+    "id": "switch-plan-agent-get",
+    "category": "Agents & subagents",
+    "text": "Switch to the Plan agent to get suggestions without any file changes"
+  },
+  {
+    "id": "mode-cycle-cycle-between",
+    "category": "Agents & subagents",
+    "text": "Press {key:mode_cycle} to cycle between your primary agents"
+  },
+  {
+    "id": "agents-agent-does-edit",
+    "category": "Agents & subagents",
+    "text": "Run {highlight}/agents{/highlight} to see every agent, what it does, and edit it with proper controls"
+  },
+  {
+    "id": "lunos-agent-create-guided",
+    "category": "Agents & subagents",
+    "text": "Run {highlight}lunos agent create{/highlight} for a guided way to build a new agent"
+  },
+  {
+    "id": "lunos-agent-export-share",
+    "category": "Agents & subagents",
+    "text": "Run {highlight}lunos agent export{/highlight} to share an agent, with its MCP servers and skills, as a bundle"
+  },
+  {
+    "id": "lunos-agent-import-bring",
+    "category": "Agents & subagents",
+    "text": "Run {highlight}lunos agent import{/highlight} to bring in an agent from a teammate; Claude Code agents work too"
+  },
+  {
+    "id": "md-files-opencode-agents",
+    "category": "Agents & subagents",
+    "text": "Add {highlight}.md{/highlight} files to {highlight}.opencode/agents/{/highlight} to define project-specific agents"
+  },
+  {
+    "id": "give-each-agent-own",
+    "category": "Agents & subagents",
+    "text": "Give each agent its own permissions for edit, bash and web access"
+  },
+  {
+    "id": "agent-temperature-0-0",
+    "category": "Agents & subagents",
+    "text": "Set an agent's {highlight}temperature{/highlight} from 0.0 (focused) to 1.0 (creative)",
+    "config": ["agent.temperature"]
+  },
+  {
+    "id": "limit-agent-steps-cap",
+    "category": "Agents & subagents",
+    "text": "Limit an agent's {highlight}steps{/highlight} to cap how many tool calls it makes per request",
+    "config": ["agent.steps"]
+  },
+  {
+    "id": "pick-subagent-model-settings",
+    "category": "Agents & subagents",
+    "text": "Pick the subagent model in {highlight}/settings{/highlight} with the same model picker as the main agent",
+    "config": ["subagent.model"]
+  },
+  {
+    "id": "lunos-agent-name-schedule",
+    "category": "Agents & subagents",
+    "text": "Run {highlight}lunos agent run <name> --schedule{/highlight} to run an agent unattended on a schedule"
+  },
+  {
+    "id": "tools-bash-false-turn",
+    "category": "Agents & subagents",
+    "text": "Set {highlight}\"tools\": {\"bash\": false}{/highlight} to turn off a tool for every agent",
+    "config": ["tools"]
+  },
+  {
+    "id": "mcp-false-under-tools",
+    "category": "Agents & subagents",
+    "text": "Set {highlight}\"mcp_*\": false{/highlight} under {highlight}tools{/highlight} to turn off every tool from one MCP server",
+    "config": ["tools"]
+  },
+  {
+    "id": "override-global-tool-settings",
+    "category": "Agents & subagents",
+    "text": "Override the global tool settings in one agent's configuration",
+    "config": ["agent.tools"]
+  },
+  {
+    "id": "models-blocked-residency-policy",
+    "category": "Models",
+    "text": "Models blocked by your residency policy are marked \"blocked by policy\" in the model picker"
+  },
+  {
+    "id": "model-filter-cycle-model",
+    "category": "Models",
+    "text": "Press {key:model_filter_cycle} in the model picker to filter by Recommended, Large or Small"
+  },
+  {
+    "id": "model-cycle-recent-switch",
+    "category": "Models",
+    "text": "Press {key:model_cycle_recent} to switch between your recently used models"
+  },
+  {
+    "id": "model-config-choose-default",
+    "category": "Models",
+    "text": "Set {highlight}model{/highlight} in your config to choose your default model",
+    "config": ["model"]
+  },
+  {
+    "id": "small-model-quick-background",
+    "category": "Models",
+    "text": "Set {highlight}small_model{/highlight} for quick background tasks like titles and summaries",
+    "config": ["small_model"]
+  },
+  {
+    "id": "lunos-auth-list-provider",
+    "category": "Models",
+    "text": "Run {highlight}lunos auth list{/highlight} to see every provider you've connected"
+  },
+  {
+    "id": "bring-own-key-connect",
+    "category": "Models",
+    "text": "Bring your own key: connect any of 75+ providers with {highlight}/providers{/highlight}"
+  },
+  {
+    "id": "local-model-through-ollama",
+    "category": "Models",
+    "text": "Use a local model through Ollama or LM Studio to keep prompts on your machine"
+  },
+  {
+    "id": "if-organisation-locks-model",
+    "category": "Models",
+    "text": "If your organisation locks a model, Lunos tells you which one and why"
+  },
+  {
+    "id": "variant-cycle-switch-reasoning",
+    "category": "Models",
+    "text": "Press {key:variant_cycle} to switch reasoning effort without changing the model"
+  },
+  {
+    "id": "memory-lunos-remembers-where",
+    "category": "Memory",
+    "text": "Run {highlight}/memory{/highlight} to see what Lunos remembers, where each fact came from and how it's used"
+  },
+  {
+    "id": "turn-memory-settings-memory",
+    "category": "Memory",
+    "text": "Turn on memory in {highlight}/settings memory{/highlight}: the setup wizard recommends an answer at each step",
+    "requires": ["memory.off"]
+  },
+  {
+    "id": "pick-where-memory-lives",
+    "category": "Memory",
+    "text": "Pick where memory lives: this computer, fully local, Neo4j or PostgreSQL in Docker, or a team database",
+    "requires": ["memory.off"]
+  },
+  {
+    "id": "keep-memory-computer-only",
+    "category": "Memory",
+    "text": "Keep memory on this computer: only the fact text goes to your model, to pull out names and links",
+    "requires": ["memory.off"]
+  },
+  {
+    "id": "choose-fully-local-memory",
+    "category": "Memory",
+    "text": "Choose the fully local memory template to keep memory and its model on your computer",
+    "requires": ["memory.off"]
+  },
+  {
+    "id": "lunos-memory-check-prove",
+    "category": "Memory",
+    "text": "Run {highlight}lunos memory check{/highlight} to prove memory works end to end",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "lunos-memory-status-where",
+    "category": "Memory",
+    "text": "Run {highlight}lunos memory status{/highlight} to see where memory is stored, its size and its health",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "lunos-memory-stats-json",
+    "category": "Memory",
+    "text": "Run {highlight}lunos memory stats --json{/highlight} for the numbers {highlight}/memory{/highlight} shows, ready for scripts",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "memory-facts-never-recalled",
+    "category": "Memory",
+    "text": "In {highlight}/memory{/highlight}, facts never recalled in 14 days are good candidates to clean up",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "mark-fact-outdated-memory",
+    "category": "Memory",
+    "text": "Mark a fact outdated in {highlight}/memory{/highlight}: it's kept for history but no longer recalled",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "lunos-memory-search-words",
+    "category": "Memory",
+    "text": "Run {highlight}lunos memory search <words>{/highlight} to search memory the way the agent does",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "lunos-memory-export-back",
+    "category": "Memory",
+    "text": "Run {highlight}lunos memory export{/highlight} to back up memory, and {highlight}lunos memory import{/highlight} to restore it",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "imported-facts-are-labelled",
+    "category": "Memory",
+    "text": "Imported facts are labelled as imported, with where they came from",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "memory-encryption-os-keychain",
+    "category": "Memory",
+    "text": "Set {highlight}memory.encryption{/highlight} to {highlight}os-keychain{/highlight} to encrypt the fact ledger with a key in your keychain",
+    "requires": ["memory.on"],
+    "config": ["memory.encryption"]
+  },
+  {
+    "id": "lunos-memory-verify-check",
+    "category": "Memory",
+    "text": "Run {highlight}lunos memory verify{/highlight} to check memory's integrity hashes",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "memory-retention-days-let",
+    "category": "Memory",
+    "text": "Set {highlight}memory.retention.days{/highlight} to let old facts expire on their own",
+    "requires": ["memory.on"],
+    "config": ["memory.retention.days"]
+  },
+  {
+    "id": "memory-statistics-are-computed",
+    "category": "Memory",
+    "text": "Memory statistics are computed on your computer; nothing about them is sent anywhere",
+    "requires": ["memory.on"]
+  },
+  {
+    "id": "lunos-memory-templates-list",
+    "category": "Memory",
+    "text": "Run {highlight}lunos memory templates{/highlight} to list the ready-made memory setups"
+  },
+  {
+    "id": "marketplace-browse-plugins-skills",
+    "category": "Marketplace & plugins",
+    "text": "Run {highlight}/marketplace{/highlight} to browse plugins, skills, hooks and MCP servers"
+  },
+  {
+    "id": "marketplace-mcp-jump-straight",
+    "category": "Marketplace & plugins",
+    "text": "Run {highlight}/marketplace mcp{/highlight} to jump straight to MCP servers"
+  },
+  {
+    "id": "marketplace-words-search-kind",
+    "category": "Marketplace & plugins",
+    "text": "Run {highlight}/marketplace <words>{/highlight} to search every kind of extension at once"
+  },
+  {
+    "id": "marketplace-installed-ve-installed",
+    "category": "Marketplace & plugins",
+    "text": "Run {highlight}/marketplace installed{/highlight} to see what you've installed and what has updates"
+  },
+  {
+    "id": "tab-marketplace-move-between",
+    "category": "Marketplace & plugins",
+    "text": "Use {highlight}Tab{/highlight} in the marketplace to move between its tabs: Plugins, Skills, Hooks, MCP and more"
+  },
+  {
+    "id": "marketplace-hook-row-shows",
+    "category": "Marketplace & plugins",
+    "text": "In the marketplace, a hook's row shows the command it runs, so you can check it before installing"
+  },
+  {
+    "id": "marketplace-mcp-tab-each",
+    "category": "Marketplace & plugins",
+    "text": "In the marketplace's MCP tab, each server shows whether your policy allows it"
+  },
+  {
+    "id": "marketplace-install-shows-preview",
+    "category": "Marketplace & plugins",
+    "text": "Every marketplace install shows a preview first; nothing changes until you confirm"
+  },
+  {
+    "id": "lunos-marketplace-owner-repo",
+    "category": "Marketplace & plugins",
+    "text": "Run {highlight}lunos marketplace add <owner/repo>{/highlight} to add another marketplace"
+  },
+  {
+    "id": "lunos-plugin-search-words",
+    "category": "Marketplace & plugins",
+    "text": "Run {highlight}lunos plugin search <words>{/highlight} to find plugins from the terminal"
+  },
+  {
+    "id": "plugins-turn-installed-plugins",
+    "category": "Marketplace & plugins",
+    "text": "Run {highlight}/plugins{/highlight} to turn installed plugins on or off"
+  },
+  {
+    "id": "organisation-can-limit-installs",
+    "category": "Marketplace & plugins",
+    "text": "Your organisation can limit installs to its own allow-list with {highlight}marketplace_allow{/highlight}",
+    "config": ["marketplace_allow"]
+  },
+  {
+    "id": "marketplace-works-offline-cache",
+    "category": "Marketplace & plugins",
+    "text": "The marketplace works offline from its cache and tells you how old the cache is"
+  },
+  {
+    "id": "write-plugin-send-os",
+    "category": "Marketplace & plugins",
+    "text": "Write a plugin to send an OS notification when a session finishes"
+  },
+  {
+    "id": "write-plugin-stop-lunos",
+    "category": "Marketplace & plugins",
+    "text": "Write a plugin to stop Lunos from reading sensitive files"
+  },
+  {
+    "id": "md-files-opencode-commands",
+    "category": "Skills, commands & hooks",
+    "text": "Add {highlight}.md{/highlight} files to {highlight}.opencode/commands/{/highlight} to create your own slash commands"
+  },
+  {
+    "id": "arguments-1-2-custom",
+    "category": "Skills, commands & hooks",
+    "text": "Use {highlight}$ARGUMENTS{/highlight}, {highlight}$1{/highlight} and {highlight}$2{/highlight} in custom commands for dynamic input"
+  },
+  {
+    "id": "backticks-command-file-inject",
+    "category": "Skills, commands & hooks",
+    "text": "Use backticks in a command file to inject shell output, e.g. {highlight}!`git status`{/highlight}"
+  },
+  {
+    "id": "find-skills-reusable-instructions",
+    "category": "Skills, commands & hooks",
+    "text": "Find skills, reusable instructions the agent loads when a task needs them, in {highlight}/marketplace skills{/highlight}"
+  },
+  {
+    "id": "hooks-own-scripts-agent",
+    "category": "Skills, commands & hooks",
+    "text": "Add {highlight}hooks{/highlight} to run your own scripts on agent events, for example before every Bash command",
+    "config": ["hooks"]
+  },
+  {
+    "id": "hook-denies-tool-call",
+    "category": "Skills, commands & hooks",
+    "text": "A hook that denies a tool call stops it: use hooks to enforce team rules"
+  },
+  {
+    "id": "create-ts-files-opencode",
+    "category": "Skills, commands & hooks",
+    "text": "Create {highlight}.ts{/highlight} files in {highlight}.opencode/tools/{/highlight} to give the agent new tools"
+  },
+  {
+    "id": "write-custom-tools-call",
+    "category": "Skills, commands & hooks",
+    "text": "Write custom tools that call scripts in any language, such as Python or Go"
+  },
+  {
+    "id": "ts-files-opencode-plugins",
+    "category": "Skills, commands & hooks",
+    "text": "Add {highlight}.ts{/highlight} files to {highlight}.opencode/plugins/{/highlight} to react to Lunos events"
+  },
+  {
+    "id": "connect-mcp-servers-mcp",
+    "category": "MCP",
+    "text": "Connect MCP servers in the {highlight}mcp{/highlight} section of your config, local or remote",
+    "config": ["mcp"]
+  },
+  {
+    "id": "mcps-which-mcp-servers",
+    "category": "MCP",
+    "text": "Run {highlight}/mcps{/highlight} to see which MCP servers are connected and which failed"
+  },
+  {
+    "id": "mcp-servers-region-residency",
+    "category": "MCP",
+    "text": "MCP servers in a region your residency policy forbids are refused, with the reason"
+  },
+  {
+    "id": "mcp-prompts-show-up",
+    "category": "MCP",
+    "text": "MCP prompts show up as slash commands marked {highlight}:mcp{/highlight}"
+  },
+  {
+    "id": "install-mcp-servers-marketplace",
+    "category": "MCP",
+    "text": "Install MCP servers from {highlight}/marketplace mcp{/highlight} instead of editing config by hand"
+  },
+  {
+    "id": "lsp-language-server-running",
+    "category": "LSP & code intelligence",
+    "text": "Run {highlight}/lsp{/highlight} to see every language server: running, failed (with the reason) or not started"
+  },
+  {
+    "id": "lsp-default-agent-sees",
+    "category": "LSP & code intelligence",
+    "text": "LSP is on by default: the agent sees compiler errors after its edits and fixes them in the same turn",
+    "requires": ["lsp.on"]
+  },
+  {
+    "id": "language-servers-already-machine",
+    "category": "LSP & code intelligence",
+    "text": "Language servers already on your machine are used first, before anything is downloaded"
+  },
+  {
+    "id": "lsp-false-turn-language",
+    "category": "LSP & code intelligence",
+    "text": "Set {highlight}\"lsp\": false{/highlight} to turn language servers off completely",
+    "requires": ["lsp.on"],
+    "config": ["lsp"]
+  },
+  {
+    "id": "opencode-disable-lsp-download",
+    "category": "LSP & code intelligence",
+    "text": "Set {highlight}OPENCODE_DISABLE_LSP_DOWNLOAD=true{/highlight} to use only language servers you already have"
+  },
+  {
+    "id": "lunos-lsp-status-file",
+    "category": "LSP & code intelligence",
+    "text": "Run {highlight}lunos lsp status --file <path>{/highlight} to start a file's language servers and see their state"
+  },
+  {
+    "id": "custom-language-server-lsp",
+    "category": "LSP & code intelligence",
+    "text": "Add a custom language server in the {highlight}lsp{/highlight} section of your config with its command and extensions",
+    "config": ["lsp"]
+  },
+  {
+    "id": "formatters-after-agent-edits",
+    "category": "LSP & code intelligence",
+    "text": "Formatters run after the agent's edits; configure them in the {highlight}formatter{/highlight} section",
+    "config": ["formatter"]
+  },
+  {
+    "id": "formatter-false-turn-off",
+    "category": "LSP & code intelligence",
+    "text": "Set {highlight}\"formatter\": false{/highlight} to turn off the built-in formatters",
+    "config": ["formatter"]
+  },
+  {
+    "id": "type-claude-task-hand",
+    "category": "Claude Code & Codex",
+    "text": "Type {highlight}/claude <task>{/highlight} to hand a task to your own Claude Code, with approvals in Lunos",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "type-codex-task-hand",
+    "category": "Claude Code & Codex",
+    "text": "Type {highlight}/codex <task>{/highlight} to hand a task to Codex CLI from the Lunos prompt",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "claude-codex-own-start",
+    "category": "Claude Code & Codex",
+    "text": "Run {highlight}/claude{/highlight} or {highlight}/codex{/highlight} on its own to start a new session or continue a recent one",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "lunos-external-list-check",
+    "category": "Claude Code & Codex",
+    "text": "Run {highlight}lunos external list{/highlight} to check whether Claude Code and Codex are installed and signed in",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "claude-code-codex-session",
+    "category": "Claude Code & Codex",
+    "text": "In a Claude Code or Codex session, {highlight}/models{/highlight} lists that tool's own models",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "lunos-commands-claude-code",
+    "category": "Claude Code & Codex",
+    "text": "Use your Lunos commands in Claude Code and Codex sessions; on a name clash, add {highlight}:lunos{/highlight}",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "claude-code-codex-sessions",
+    "category": "Claude Code & Codex",
+    "text": "Claude Code and Codex sessions use their own accent colour, so you know where a prompt goes",
+    "requires": ["external.enabled"],
+    "config": ["external_accent"]
+  },
+  {
+    "id": "choose-claude-code-permission",
+    "category": "Claude Code & Codex",
+    "text": "Choose Claude Code's permission mode from a list in {highlight}/settings external{/highlight}",
+    "requires": ["external.enabled"],
+    "config": ["external.claude.permission_mode"]
+  },
+  {
+    "id": "external-tools-default-manual",
+    "category": "Claude Code & Codex",
+    "text": "External tools default to manual approval: every edit and command asks in Lunos",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "lunos-doesn-t-write",
+    "category": "Claude Code & Codex",
+    "text": "Lunos doesn't write to your {highlight}~/.claude{/highlight} or {highlight}~/.codex{/highlight} configuration",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "lunos-external-stop-session",
+    "category": "Claude Code & Codex",
+    "text": "Run {highlight}lunos external stop <session>{/highlight} to stop an external session from the terminal",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "settings-enter-section-open",
+    "category": "Settings & config",
+    "text": "In {highlight}/settings{/highlight}, press Enter on a section to open it, {highlight}←{/highlight} to go back and {highlight}Esc{/highlight} to close"
+  },
+  {
+    "id": "type-settings-find-any",
+    "category": "Settings & config",
+    "text": "Type in {highlight}/settings{/highlight} to find any setting by name"
+  },
+  {
+    "id": "settings-memory-jump-straight",
+    "category": "Settings & config",
+    "text": "Run {highlight}/settings memory{/highlight} to jump straight to a section"
+  },
+  {
+    "id": "schema-config-files-get",
+    "category": "Settings & config",
+    "text": "Add {highlight}$schema{/highlight} to your config files to get autocomplete in your editor",
+    "config": ["$schema"]
+  },
+  {
+    "id": "env-var-name-config",
+    "category": "Settings & config",
+    "text": "Use {highlight}{env:VAR_NAME}{/highlight} in config to read secrets from environment variables"
+  },
+  {
+    "id": "file-path-config-include",
+    "category": "Settings & config",
+    "text": "Use {highlight}{file:path}{/highlight} in config to include a file's contents"
+  },
+  {
+    "id": "instructions-config-load-extra",
+    "category": "Settings & config",
+    "text": "Use {highlight}instructions{/highlight} in config to load extra rules files for the agent",
+    "config": ["instructions"]
+  },
+  {
+    "id": "put-tui-settings-tui",
+    "category": "Settings & config",
+    "text": "Put TUI settings in {highlight}tui.json{/highlight} and everything else in your main config"
+  },
+  {
+    "id": "lunos-debug-paths-where",
+    "category": "Settings & config",
+    "text": "Run {highlight}lunos debug paths{/highlight} to see where Lunos keeps its config, data and cache"
+  },
+  {
+    "id": "override-any-keybind-tui",
+    "category": "Settings & config",
+    "text": "Override any keybind in {highlight}tui.json{/highlight} under {highlight}keybinds{/highlight}",
+    "config": ["keybinds"]
+  },
+  {
+    "id": "keybind-none-turn-off",
+    "category": "Settings & config",
+    "text": "Set a keybind to {highlight}none{/highlight} to turn it off completely"
+  },
+  {
+    "id": "turn-scroll-acceleration-tui",
+    "category": "Settings & config",
+    "text": "Turn on {highlight}scroll_acceleration{/highlight} in {highlight}tui.json{/highlight} for smoother scrolling",
+    "config": ["scroll_acceleration"]
+  },
+  {
+    "id": "settings-organisation-locks-show",
+    "category": "Settings & config",
+    "text": "Settings your organisation locks show as managed and can't be changed in {highlight}/settings{/highlight}"
+  },
+  {
+    "id": "some-settings-need-restart",
+    "category": "Settings & config",
+    "text": "Some settings need a restart: {highlight}/settings{/highlight} marks them with ↻"
+  },
+  {
+    "id": "lunos-debug-config-final",
+    "category": "Settings & config",
+    "text": "Run {highlight}lunos debug config{/highlight} to see the final config after every layer is merged"
+  },
+  {
+    "id": "theme-system-tui-json",
+    "category": "Settings & config",
+    "text": "Set {highlight}\"theme\": \"system\"{/highlight} in {highlight}tui.json{/highlight} to match your terminal's colours",
+    "config": ["theme"]
+  },
+  {
+    "id": "create-json-theme-files",
+    "category": "Settings & config",
+    "text": "Create JSON theme files in {highlight}.opencode/themes/{/highlight} for your own colours"
+  },
+  {
+    "id": "give-custom-theme-dark",
+    "category": "Settings & config",
+    "text": "Give a custom theme dark and light variants, and it follows your terminal's mode"
+  },
+  {
+    "id": "numeric-xterm-colour-codes",
+    "category": "Settings & config",
+    "text": "Use numeric xterm colour codes 0-255 in a custom theme's JSON"
+  },
+  {
+    "id": "messages-toggle-conceal-show",
+    "category": "Settings & config",
+    "text": "Press {key:messages_toggle_conceal} to show or hide code blocks in messages"
+  },
+  {
+    "id": "tips-false-tui-json",
+    "category": "Settings & config",
+    "text": "Set {highlight}\"tips\": false{/highlight} in {highlight}tui.json{/highlight} to turn tips off",
+    "config": ["tips"]
+  },
+  {
+    "id": "residency-policy-keep-model",
+    "category": "Privacy, residency & audit",
+    "text": "Set a {highlight}residency{/highlight} policy to keep model calls in the regions you allow",
+    "config": ["residency"]
+  },
+  {
+    "id": "memory-setup-shows-leaves",
+    "category": "Privacy, residency & audit",
+    "text": "Memory setup shows what leaves your computer before you turn memory on",
+    "requires": ["memory.off"]
+  },
+  {
+    "id": "audit-enabled-record-model",
+    "category": "Privacy, residency & audit",
+    "text": "Set {highlight}audit.enabled{/highlight} to record model calls, tool runs and permission decisions",
+    "config": ["audit.enabled"]
+  },
+  {
+    "id": "memory-recalls-are-audited",
+    "category": "Privacy, residency & audit",
+    "text": "Memory recalls are audited as ids and counts only, never the text of your query"
+  },
+  {
+    "id": "permission-external-directory-protects",
+    "category": "Privacy, residency & audit",
+    "text": "Permission {highlight}external_directory{/highlight} protects files outside your project",
+    "config": ["permission.external_directory"]
+  },
+  {
+    "id": "permission-doom-loop-stops",
+    "category": "Privacy, residency & audit",
+    "text": "Permission {highlight}doom_loop{/highlight} stops the agent from repeating the same tool call forever",
+    "config": ["permission.doom_loop"]
+  },
+  {
+    "id": "patterns-like-git-allow",
+    "category": "Privacy, residency & audit",
+    "text": "Use patterns like {highlight}\"git *\": \"allow\"{/highlight} under {highlight}permission.bash{/highlight} for fine-grained rules",
+    "config": ["permission.bash"]
+  },
+  {
+    "id": "rm-rf-deny-under",
+    "category": "Privacy, residency & audit",
+    "text": "Set {highlight}\"rm -rf *\": \"deny\"{/highlight} under {highlight}permission.bash{/highlight} to block destructive commands",
+    "config": ["permission.bash"]
+  },
+  {
+    "id": "git-push-ask-under",
+    "category": "Privacy, residency & audit",
+    "text": "Set {highlight}\"git push\": \"ask\"{/highlight} under {highlight}permission.bash{/highlight} to approve every push first",
+    "config": ["permission.bash"]
+  },
+  {
+    "id": "lunos-offline-1-make",
+    "category": "Privacy, residency & audit",
+    "text": "Use {highlight}LUNOS_OFFLINE=1{/highlight} to make sure Lunos makes no network calls of its own"
+  },
+  {
+    "id": "point-lunos-own-sign",
+    "category": "Privacy, residency & audit",
+    "text": "Point Lunos at your own sign-in and console with {highlight}cloud.issuer{/highlight} and {highlight}cloud.endpoint{/highlight}",
+    "config": ["cloud.issuer", "cloud.endpoint"]
+  },
+  {
+    "id": "organisation-can-push-one",
+    "category": "Privacy, residency & audit",
+    "text": "Your organisation can push one policy to every laptop with managed config"
+  },
+  {
+    "id": "allow-once-allow-always",
+    "category": "Privacy, residency & audit",
+    "text": "Allow once, allow always or reject, and tell the agent why you rejected so it can adjust"
+  },
+  {
+    "id": "lunos-sandbox-agent-works",
+    "category": "Sandbox",
+    "text": "Run {highlight}lunos --sandbox{/highlight} so the agent works in a Docker container, not directly on your machine"
+  },
+  {
+    "id": "sandbox-results-come-back",
+    "category": "Sandbox",
+    "text": "With the sandbox, results come back as a branch you can review before merging",
+    "config": ["sandbox.results"]
+  },
+  {
+    "id": "sandbox-network-access-follows",
+    "category": "Sandbox",
+    "text": "Sandbox network access follows your residency policy; change it with {highlight}sandbox.network{/highlight}",
+    "config": ["sandbox.network"]
+  },
+  {
+    "id": "sandbox-resources-cap-sandbox",
+    "category": "Sandbox",
+    "text": "Use {highlight}sandbox.resources{/highlight} to cap the sandbox's CPUs and memory",
+    "config": ["sandbox.resources"]
+  },
+  {
+    "id": "create-free-lunos-account",
+    "category": "Account & organisations",
+    "text": "Create a free Lunos account to start; no card needed"
+  },
+  {
+    "id": "account-plan-organisations-role",
+    "category": "Account & organisations",
+    "text": "Run {highlight}/account{/highlight} to see your plan, your organisations and your role in each",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "login-sign-logout-sign",
+    "category": "Account & organisations",
+    "text": "Run {highlight}/login{/highlight} to sign in and {highlight}/logout{/highlight} to sign out"
+  },
+  {
+    "id": "accept-organisation-invitations-account",
+    "category": "Account & organisations",
+    "text": "Accept organisation invitations in {highlight}/account{/highlight} or with {highlight}lunos org accept <org>{/highlight}",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "invite-teammates-organisation-own",
+    "category": "Account & organisations",
+    "text": "Invite teammates to an organisation you own with {highlight}lunos org invite <email>{/highlight}",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "lunos-org-members-who",
+    "category": "Account & organisations",
+    "text": "Run {highlight}lunos org members{/highlight} to see who's in your organisation",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "lunos-org-leave-leave",
+    "category": "Account & organisations",
+    "text": "Run {highlight}lunos org leave{/highlight} to leave an organisation you no longer work with",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "sign-kept-os-keychain",
+    "category": "Account & organisations",
+    "text": "Your sign-in is kept in your OS keychain where there is one, else in a file only you can read",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "delete-account-any-time",
+    "category": "Account & organisations",
+    "text": "Delete your account any time from {highlight}/account{/highlight}",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "lunos-cloud-task-lunos",
+    "category": "Lunos Cloud",
+    "text": "Run {highlight}lunos run --cloud{/highlight} to run a task on a Lunos Cloud worker; results come back as a branch",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "lunos-cloud-runs-own",
+    "category": "Lunos Cloud",
+    "text": "Lunos Cloud runs in its own EU data centre, operated by ITService EOOD in Bulgaria"
+  },
+  {
+    "id": "start-cloud-agents-github",
+    "category": "Lunos Cloud",
+    "text": "Start cloud agents from GitHub, GitLab or Forgejo with triggers",
+    "requires": ["flag:cloud-triggers"]
+  },
+  {
+    "id": "schedule-cloud-agents-nightly",
+    "category": "Lunos Cloud",
+    "text": "Schedule cloud agents to run nightly: set it up in triggers",
+    "requires": ["flag:cloud-triggers"]
+  },
+  {
+    "id": "lunos-sync-status-whether",
+    "category": "Lunos Cloud",
+    "text": "Run {highlight}lunos sync status{/highlight} to see whether this directory's sessions sync to your Lunos space",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "session-sync-never-uploads",
+    "category": "Lunos Cloud",
+    "text": "Session sync never uploads {highlight}.env{/highlight} files, keys or {highlight}auth.json{/highlight}",
+    "requires": ["signedIn"]
+  },
+  {
+    "id": "paths-sync-exclude-keep",
+    "category": "Lunos Cloud",
+    "text": "Add paths to {highlight}sync.exclude{/highlight} to keep them out of session sync",
+    "requires": ["signedIn"],
+    "config": ["sync.exclude"]
+  },
+  {
+    "id": "lunos-task-non-interactive",
+    "category": "CLI & scripting",
+    "text": "Use {highlight}lunos run \"<task>\"{/highlight} for non-interactive scripting"
+  },
+  {
+    "id": "lunos-f-file-ts",
+    "category": "CLI & scripting",
+    "text": "Use {highlight}lunos run -f file.ts{/highlight} to attach files from the command line"
+  },
+  {
+    "id": "lunos-format-json-machine",
+    "category": "CLI & scripting",
+    "text": "Use {highlight}lunos run --format json{/highlight} for machine-readable output in scripts"
+  },
+  {
+    "id": "lunos-serve-headless-api",
+    "category": "CLI & scripting",
+    "text": "Run {highlight}lunos serve{/highlight} for headless API access to Lunos"
+  },
+  {
+    "id": "lunos-attach-url-connect",
+    "category": "CLI & scripting",
+    "text": "Use {highlight}lunos run --attach <url>{/highlight} to connect to a Lunos server that's already running"
+  },
+  {
+    "id": "pipe-text-into-lunos",
+    "category": "CLI & scripting",
+    "text": "Pipe text into Lunos: {highlight}git diff | lunos run \"review this\"{/highlight}"
+  },
+  {
+    "id": "lunos-github-install-up",
+    "category": "CLI & scripting",
+    "text": "Run {highlight}lunos github install{/highlight} to set up the GitHub workflow for your repository"
+  },
+  {
+    "id": "comment-lunos-github-issue",
+    "category": "CLI & scripting",
+    "text": "Comment {highlight}/lunos{/highlight} on a GitHub issue or pull request to have Lunos act on it"
+  },
+  {
+    "id": "comment-lunos-fix-issue",
+    "category": "CLI & scripting",
+    "text": "Comment {highlight}/lunos fix this{/highlight} on an issue to have Lunos open a pull request"
+  },
+  {
+    "id": "ci-lunos-never-asks",
+    "category": "CLI & scripting",
+    "text": "In CI, Lunos never asks you to sign in; set {highlight}LUNOS_TOKEN{/highlight} to use cloud features"
+  },
+  {
+    "id": "update-update-lunos-without",
+    "category": "Updates & changelog",
+    "text": "Run {highlight}/update{/highlight} to update Lunos without leaving the TUI"
+  },
+  {
+    "id": "lunos-update-update-lunos",
+    "category": "Updates & changelog",
+    "text": "Run {highlight}lunos update{/highlight} to update Lunos and see what changed since your version"
+  },
+  {
+    "id": "lunos-changelog-since-version",
+    "category": "Updates & changelog",
+    "text": "Run {highlight}lunos changelog --since <version>{/highlight} to see everything since a version you had"
+  },
+  {
+    "id": "whats-new-false-tui",
+    "category": "Updates & changelog",
+    "text": "Set {highlight}\"whats_new\": false{/highlight} in {highlight}tui.json{/highlight} to skip the What's new panel",
+    "config": ["whats_new"]
+  },
+  {
+    "id": "leader-then-key-reach",
+    "category": "Keyboard",
+    "text": "Press {key:leader} then a key to reach most commands; it's the leader key"
+  },
+  {
+    "id": "session-list-list-sessions",
+    "category": "Keyboard",
+    "text": "Press {key:session_list} to list sessions"
+  },
+  {
+    "id": "session-new-start-new",
+    "category": "Keyboard",
+    "text": "Press {key:session_new} to start a new session"
+  },
+  {
+    "id": "messages-first-messages-last",
+    "category": "Keyboard",
+    "text": "Press {key:messages_first} and {key:messages_last} to jump to the start or end of a session"
+  },
+  {
+    "id": "messages-copy-copy-last",
+    "category": "Keyboard",
+    "text": "Press {key:messages_copy} to copy the last message"
+  },
+  {
+    "id": "sidebar-toggle-show-hide",
+    "category": "Keyboard",
+    "text": "Press {key:sidebar_toggle} to show or hide the sidebar"
+  },
+  {
+    "id": "session-timeline-jump-any",
+    "category": "Keyboard",
+    "text": "Press {key:session_timeline} to jump to any point in the session"
+  },
+  {
+    "id": "terminal-suspend-suspend-lunos",
+    "category": "Keyboard",
+    "text": "Press {key:terminal_suspend} to suspend Lunos and get your shell back; {highlight}fg{/highlight} returns",
+    "requires": ["notWindows"]
+  },
+  {
+    "id": "input-clear-clear-prompt",
+    "category": "Keyboard",
+    "text": "Press {key:input_clear} to clear the prompt"
+  },
+  {
+    "id": "theme-list-switch-themes",
+    "category": "Keyboard",
+    "text": "Press {key:theme_list} to switch themes"
+  },
+  {
+    "id": "messages-page-up-messages",
+    "category": "Keyboard",
+    "text": "Press {key:messages_page_up} and {key:messages_page_down} to scroll through the conversation"
+  },
+  {
+    "id": "session-export-export-session",
+    "category": "Keyboard",
+    "text": "Press {key:session_export} to export the session to your editor"
+  },
+  {
+    "id": "tips-next-another-tip",
+    "category": "Keyboard",
+    "text": "Press {key:tips_next} to see another tip"
+  },
+  {
+    "id": "lunos-debug-lsp-diagnostics",
+    "category": "Troubleshooting",
+    "text": "Run {highlight}lunos debug lsp diagnostics <file>{/highlight} to see what a language server reports"
+  },
+  {
+    "id": "print-logs-detailed-logs",
+    "category": "Troubleshooting",
+    "text": "Use {highlight}--print-logs{/highlight} to see detailed logs on stderr"
+  },
+  {
+    "id": "if-memory-setup-fails",
+    "category": "Troubleshooting",
+    "text": "If memory setup fails, Details shows the step, the reason and the log file"
+  },
+  {
+    "id": "copy-diagnostics-after-failed",
+    "category": "Troubleshooting",
+    "text": "Use Copy diagnostics after a failed memory setup to include safe details in a bug report"
+  },
+  {
+    "id": "if-claude-code-session",
+    "category": "Troubleshooting",
+    "text": "If a Claude Code session can't start, {highlight}lunos external list{/highlight} tells you what's missing",
+    "requires": ["external.enabled"]
+  },
+  {
+    "id": "stuck-long-turn-session",
+    "category": "Troubleshooting",
+    "text": "Press {key:session_interrupt} twice to stop a long turn, then {highlight}/undo{/highlight} if you need to"
+  },
+  {
+    "id": "if-plugin-misbehaves-turn",
+    "category": "Troubleshooting",
+    "text": "If a plugin misbehaves, turn it off in {highlight}/plugins{/highlight}"
+  },
+  {
+    "id": "lunos-debug-info-version",
+    "category": "Troubleshooting",
+    "text": "Run {highlight}lunos debug info{/highlight} for version and platform details to paste into a bug report"
+  },
+  {
+    "id": "tips-tip-search-them",
+    "category": "Troubleshooting",
+    "text": "Run {highlight}/tips{/highlight} to see every tip, search them and find the ones you haven't seen"
+  }
+]
