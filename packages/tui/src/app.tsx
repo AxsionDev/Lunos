@@ -475,7 +475,6 @@ function App(props: {
     }),
   )
   const [ready, setReady] = createSignal(false)
-  const plugins = StartupTrace.begin("load tui plugins", { blocking: false })
   // XCOD-147: set only by this session's update check, never from persisted state, so the notice
   // can't outlive a switch that turned checks off.
   const [availableVersion, setAvailableVersion] = createSignal<string | undefined>()
@@ -485,6 +484,10 @@ function App(props: {
       ? version
       : undefined
   })
+  // XCOD-276: plugins load behind the first frame. They start before the session data is in, so
+  // `api.state.ready` can still be false when a plugin starts; the built-in ones read state reactively.
+  // Starting here, not later, sets up the plugin slots that hold the home screen's logo and prompt.
+  const plugins = StartupTrace.begin("load tui plugins", { blocking: false })
   props.pluginHost
     .start({
       api,

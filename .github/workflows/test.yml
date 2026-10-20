@@ -74,7 +74,8 @@ jobs:
 
       # The work the TUI's first frame waits for stays under budget (CONTRIBUTING.md, "Start-up time").
       - name: Start-up budget
-        if: runner.os == 'Linux'
+        # Runs even when the unit tests above fail (dev has known failures).
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
         working-directory: packages/opencode
         run: bun test test/cli/startup-pty.test.ts -t "budget"
         env:
