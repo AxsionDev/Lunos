@@ -664,7 +664,11 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Security
 
-- **No request to upstream opencode's services on any default path**. There is no
+- **Affected by a keyless fallback to upstream opencode.** With no model provider set up,
+  `lunos run` still sent its first prompt to upstream opencode's hosted free tier, which refused
+  it. Fixed in v1.18.46; upgrade. <!-- XCOD-221 -->
+
+- **No request to upstream opencode's services on any default path, once a model provider is set up**. There is no
   OpenCode Console sign-in (`lunos account login` needs a URL you run) and no shared free-tier key
   for the `opencode` provider. The model catalogue comes from models.dev. A build without the
   embedded web UI says so instead of loading upstream's hosted one, and the local server no longer
@@ -780,6 +784,17 @@ false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `auto
 
 ## [1.18.40] - 2026-09-26
 
+### Security
+
+- **Affected: the desktop app once attached to this release.** It installed as "OpenCode" and
+  updated itself to upstream opencode, without Lunos's residency enforcement or audit log. The
+  CLI is not affected. Its files have been removed; if you installed it, uninstall it. From
+  v1.18.41 the desktop app ships as Lunos and updates only from Lunos releases.
+
+- **Affected by a residency check on the provider ID only.** A residency policy judged a provider
+  by its ID only, so an EU-tagged provider pointed at another host with `baseURL` still passed an
+  EU-only policy. Fixed in v1.18.41; upgrade. <!-- XCOD-138 -->
+
 ### Changed
 
 - **The built-in marketplace matches what lunos.tech publishes.** `marketplace.json` v1.2.0 adds a
@@ -796,6 +811,17 @@ false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `auto
 - The v1 plugin loader logs v2 plugin files at DEBUG instead of reporting them as errors. <!-- XCOD-96 -->
 
 ## [1.18.39] - 2026-09-25
+
+### Security
+
+- **Affected: the desktop app once attached to this release.** It installed as "OpenCode" and
+  updated itself to upstream opencode, without Lunos's residency enforcement or audit log. The
+  CLI is not affected. Its files have been removed; if you installed it, uninstall it. From
+  v1.18.41 the desktop app ships as Lunos and updates only from Lunos releases.
+
+- **Affected by a residency check on the provider ID only.** A residency policy judged a provider
+  by its ID only, so an EU-tagged provider pointed at another host with `baseURL` still passed an
+  EU-only policy. Fixed in v1.18.41; upgrade. <!-- XCOD-138 -->
 
 ### Added
 
@@ -895,6 +921,11 @@ false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `auto
 
 ### Security
 
+- **Affected: the desktop app once attached to this release.** It installed as "OpenCode" and
+  updated itself to upstream opencode, without Lunos's residency enforcement or audit log. The
+  CLI is not affected. Its files have been removed; if you installed it, uninstall it. From
+  v1.18.41 the desktop app ships as Lunos and updates only from Lunos releases.
+
 - **Fixes a local file disclosure from v1.18.37.** A marketplace MCP entry whose URL or header
   names carried config substitution tokens (`{file:…}`, `{env:…}`) could make Lunos read a local
   file and send it to the entry's server. Such entries are now refused.
@@ -916,11 +947,23 @@ false`, `LUNOS_DISABLE_AUTOUPDATE=1`, `LUNOS_OFFLINE=1` or a policy-locked `auto
 
 ### Security
 
+- **Affected: the desktop app once attached to this release.** It installed as "OpenCode" and
+  updated itself to upstream opencode, without Lunos's residency enforcement or audit log. The
+  CLI is not affected. Its files have been removed; if you installed it, uninstall it. From
+  v1.18.41 the desktop app ships as Lunos and updates only from Lunos releases.
+
 - **Affected by a local file disclosure** when installing an MCP server by name from a
   third-party marketplace. Fixed in v1.18.38; see that release's notes for how to check your
   config.
 
 ## [1.18.35] - 2026-09-21
+
+### Security
+
+- **Affected: the desktop app once attached to this release.** It installed as "OpenCode" and
+  updated itself to upstream opencode, without Lunos's residency enforcement or audit log. The
+  CLI is not affected. Its files have been removed; if you installed it, uninstall it. From
+  v1.18.41 the desktop app ships as Lunos and updates only from Lunos releases.
 
 ### Fixed
 
