@@ -168,10 +168,17 @@ export function Welcome() {
               label: "Continue",
               run: () => {
                 if (!ticked()) return setHint("Tick the box to accept the new version first (space).")
-                void host.accept(host.legal.version).then(() => {
-                  const user = account.user()
-                  if (user) account.signedIn(user)
-                })
+                // XCOD-274: what Lunos Cloud asked for is recorded there; a refusal stays on this screen.
+                void host.accept(host.legal.version, account.terms()?.current).then(
+                  () => {
+                    const user = account.user()
+                    if (user) account.signedIn(user)
+                  },
+                  (error: unknown) =>
+                    setHint(
+                      `Couldn't record it at Lunos Cloud: ${error instanceof Error ? error.message : String(error)} Try again.`,
+                    ),
+                )
               },
             },
             {
@@ -281,8 +288,9 @@ export function Welcome() {
         <Switch>
           <Match when={step().kind === "intro" && account.reason() === "terms"}>
             <text fg={theme.text} wrapMode="word">
-              The Terms or the Privacy notice changed (version {host.legal.version}). Accept them to keep using your
-              account.
+              {account.terms()
+                ? `The Terms or the Privacy notice changed (Terms ${account.terms()!.current.terms}, Privacy notice ${account.terms()!.current.privacy}${account.terms()!.accepted ? `; you accepted Terms ${account.terms()!.accepted!.terms}, Privacy notice ${account.terms()!.accepted!.privacy}` : ""}). Accept them to keep using your account.`
+                : `The Terms or the Privacy notice changed (version ${host.legal.version}). Accept them to keep using your account.`}
             </text>
             {muted(`Terms: ${host.legal.terms}`)}
             {muted(`Privacy notice: ${host.legal.privacy}`)}

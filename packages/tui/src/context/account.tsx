@@ -1,6 +1,6 @@
 import { createSignal, onMount } from "solid-js"
 import { createSimpleContext } from "./helper"
-import { needsAcceptance, type Exemption, type Host, type SignedIn } from "../util/account"
+import { needsAcceptance, type Exemption, type Host, type SignedIn, type TermsCheck } from "../util/account"
 
 // XCOD-273: who is signed in to Lunos here, and whether the Welcome screen stands in front of the
 // app. Without a host (`lunos attach` to an older server, plugins' tests) or with an exemption, the
@@ -22,6 +22,8 @@ export const {
     const [phase, setPhase] = createSignal<"checking" | "welcome" | "ready">(required ? "checking" : "ready")
     const [reason, setReason] = createSignal<WelcomeReason>("signed-out")
     const [user, setUser] = createSignal<SignedIn>()
+    // XCOD-274: the versions Lunos Cloud asks to accept, when its record is older than its current ones.
+    const [terms, setTerms] = createSignal<TermsCheck>()
     // Set when the start found no network: the one-time "Offline" exemption (no Welcome this run).
     const [exempt, setExempt] = createSignal<Exemption | undefined>(
       host && host.gate.required === false ? host.gate.exemption : undefined,
@@ -35,6 +37,15 @@ export const {
       setPhase("welcome")
     }
 
+    // In the background, once the app shows: a Lunos Cloud that records an older acceptance asks again.
+    const checkTerms = async () => {
+      if (!host?.termsCheck || !required || exempt()) return
+      const check = await host.termsCheck().catch(() => undefined)
+      if (!check || phase() !== "ready") return
+      setTerms(check)
+      welcome("terms")
+    }
+
     onMount(() => {
       if (!host || !required) return
       void (async () => {
@@ -46,8 +57,9 @@ export const {
         // Checked against the provider in the background: offline, the cached sign-in holds.
         if ((await host.refresh().catch(() => "ok")) === "expired") {
           setUser(undefined)
-          welcome("expired")
+          return welcome("expired")
         }
+        await checkTerms()
       })()
     })
 
@@ -58,6 +70,7 @@ export const {
       reason,
       user,
       exempt,
+      terms,
       /** Whether the Welcome screen stands in front of the app (or is about to). */
       blocks() {
         return phase() !== "ready" && (asked() || (required && !exempt()))
@@ -81,9 +94,13 @@ export const {
       },
       /** Signed in (or the new Terms accepted): the app shows. */
       signedIn(next: SignedIn) {
+        // A sign-in asks Lunos Cloud about the Terms; accepting them just now doesn't ask again.
+        const fresh = reason() !== "terms"
         setUser(next)
+        setTerms(undefined)
         setAsked(false)
         setPhase("ready")
+        if (fresh) void checkTerms()
       },
       /** No network at start: continue without signing in, this run only. */
       continueOffline() {

@@ -72,19 +72,29 @@ export type Pending = {
   save(): Promise<SignedIn>
 }
 
-export type Organisation = { org: string; role?: string }
+/** XCOD-274: an organisation and your role in it ("owner", "admin", "member"), as Lunos Cloud says. */
+export type Organisation = { org: string; name?: string; role?: string; suspended?: boolean }
 export type Device = { id: string; name: string; platform?: string; current?: boolean; revoked?: boolean }
+/** An invitation to join an organisation, waiting for you to accept or decline it. */
+export type Invitation = { org: string; name: string; role?: string; expiresAt?: number }
 
 /** What /account shows. A part Lunos Cloud doesn't serve yet says so instead of being made up. */
 export type Details = {
   user: SignedIn
-  /** `lunos_platform_role` from the access token, when present. */
+  /** "user" or "global_admin": Lunos Cloud's record, or else the token's `lunos_platform_role` claim. */
   platformRole?: string
   organisations?: Organisation[]
+  invitations?: Invitation[]
   devices?: Device[]
   /** Parts not shown, and why (offline, another issuer, not served yet). */
   missing: string[]
 }
+
+/** XCOD-274: the Terms and Privacy notice versions Lunos Cloud asks this account to accept. */
+export type TermsCheck = { current: { terms: string; privacy: string }; accepted?: { terms: string; privacy: string } }
+
+/** What deleting the account came to: done, or refused (the last owner of an organisation) and why. */
+export type Deletion = { deleted: true; message: string } | { deleted: false; title: string; message: string }
 
 export type Legal = {
   /** The version of the Terms and Privacy notice this build asks to accept. */
@@ -106,7 +116,17 @@ export type Host = {
   refresh(): Promise<"ok" | "expired" | "none">
   /** The Terms version this account last accepted on this machine. */
   accepted(): Promise<string | undefined>
-  accept(version: string): Promise<void>
+  /**
+   * Records the acceptance on this machine, and at Lunos Cloud when it asked for `server`'s versions
+   * (it refuses any but its current ones); throws when Lunos Cloud couldn't record them.
+   */
+  accept(version: string, server?: TermsCheck["current"]): Promise<void>
+  /**
+   * XCOD-274: whether Lunos Cloud records an older acceptance than its current Terms and Privacy
+   * notice (or none it can match to this machine's), so the account is asked again. Undefined when
+   * nothing is to accept, or Lunos Cloud can't be asked (offline, an organisation's sign-in).
+   */
+  termsCheck?(): Promise<TermsCheck | undefined>
   /** Whether the sign-in service can be reached; "offline" at start means the one-time offline exemption. */
   probe(): Promise<"ok" | FailureKind>
   start(input: { signup: boolean }): Promise<DeviceFlow>
@@ -116,8 +136,10 @@ export type Host = {
   details(): Promise<Details>
   /** Ends every session of this account at the provider, then signs out here. */
   logoutEverywhere(): Promise<{ ended: boolean; message?: string }>
-  /** Asks Lunos Cloud to delete the account, then signs out here. */
-  deleteAccount(): Promise<{ message: string }>
+  /** Asks Lunos Cloud to delete the account, then signs out here; not when it refuses. */
+  deleteAccount(): Promise<Deletion>
+  /** XCOD-274: accepts or declines an invitation to an organisation; says what happened. */
+  answerInvitation?(org: string, accept: boolean): Promise<string>
 }
 
 /** "p…@example.com": enough to recognise the address on a shared screen. */
@@ -182,6 +204,20 @@ export function failureText(kind: FailureKind, message: string): { title: string
         fix: "Try again. If it keeps failing, run lunos login to see more.",
       }
   }
+}
+
+/** "Owner · Acme GmbH": your role in an organisation, for /account (XCOD-274). */
+export function organisationLine(item: Organisation) {
+  const role = item.role ? item.role[0]!.toUpperCase() + item.role.slice(1) : undefined
+  const name = item.name ?? item.org
+  return `${role ? `${role} · ` : ""}${name}${item.suspended ? " (suspended)" : ""}`
+}
+
+/** "Global Admin" for Lunos platform staff; "User" for everyone else. */
+export function platformRoleText(role: string) {
+  if (role === "global_admin") return "Global Admin"
+  if (role === "user") return "User"
+  return role
 }
 
 /** Whether a new Terms version (or none accepted yet) means asking again. */
