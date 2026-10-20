@@ -13,6 +13,7 @@ import { ExternalDetect } from "./detect"
  * against Claude Code 2.1.292 (test/external/fixtures/claude-stream.jsonl):
  *
  *   host → { type: "control_request", request_id, request: { subtype: "initialize" } }
+ *   tool → { type: "control_response", response: { subtype: "success", request_id, response: { commands, models, … } } }
  *   host → { type: "user", message: { role: "user", content }, parent_tool_use_id: null }
  *   tool → { type: "control_request", request_id, request: { subtype: "can_use_tool", tool_name, input, … } }
  *   host → { type: "control_response", response: { subtype: "success", request_id, response: { behavior, … } } }
@@ -249,6 +250,16 @@ export function parseModels(response: unknown): Model[] {
 }
 
 /**
+ * The tool's own /commands in an `initialize` response (`response.commands`: `{ name, description, … }`).
+ * Claude Code 2.1.292 lists them only there; older releases list them as `slash_commands` on `init`.
+ */
+export function parseCommands(response: unknown): string[] {
+  const list = (response as { commands?: unknown } | undefined)?.commands
+  if (!Array.isArray(list)) return []
+  return list.flatMap((item: any) => (typeof item?.name === "string" && item.name ? [item.name] : []))
+}
+
+/**
  * XCOD-254: the models this Claude Code offers, from its answer to the host's `initialize` (as the
  * Agent SDK's `supportedModels()` reads them). No prompt is sent, so no model is called; the process
  * is stopped once it has answered. Empty when it doesn't list them in time.
@@ -314,9 +325,14 @@ export function start(options: Options): Running {
       resolve(event)
     }
     const lines = createInterface({ input: child.stdout! })
+    // Its /commands from the answer to initialize, merged into the `init` event with any it lists there.
+    let commands: string[] = []
     lines.on("line", (line) => {
       const parsed = parse(line)
+      if (parsed.raw?.type === "control_response" && parsed.raw.response?.request_id === "lunos-init")
+        commands = parseCommands(parsed.raw.response.response)
       for (const event of parsed.events) {
+        if (event.type === "init") event.commands = [...new Set([...commands, ...event.commands])]
         if (event.type === "result") {
           options.onEvent?.(event)
           finish(event)

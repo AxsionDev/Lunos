@@ -28,6 +28,15 @@ if (process.argv[2] === "auth" && process.argv[3] === "status") {
 const lines = readFileSync(path.join(import.meta.dir, "claude-stream.jsonl"), "utf8")
   .trim()
   .split("\n")
+// Claude Code 2.1.292 lists its /commands in its answer to initialize, and not on the init line.
+// FAKE_CLAUDE_COMMANDS=init lists them on the init line instead (`slash_commands`), as older releases
+// did; =both lists them in both places, with one more on the init line.
+const commands = process.env.FAKE_CLAUDE_COMMANDS
+if (commands === "init" || commands === "both")
+  lines[0] = JSON.stringify({
+    ...JSON.parse(lines[0]!),
+    slash_commands: commands === "init" ? ["compact", "review"] : ["review", "context"],
+  })
 const input = createInterface({ input: process.stdin })
 const received: string[] = []
 const waiters: ((line: string) => void)[] = []
@@ -40,9 +49,9 @@ input.on("line", (line) => {
 const nextLine = () =>
   new Promise<string>((resolve) => (received.length ? resolve(received.shift()!) : waiters.push(resolve)))
 
-// XCOD-254: initialize is answered at once, as Claude Code does, with the models it offers. Not
-// recorded: shaped as the Agent SDK's initialize response (`models: { value, displayName,
-// description }[]`). FAKE_CLAUDE_MODELS=none answers without them, like a release that doesn't list them.
+// XCOD-254: initialize is answered at once, as Claude Code does, with its /commands and the models it
+// offers, shaped as 2.1.292 answers (test/fixtures/external/claude-2.1.292/start-models.1.jsonl).
+// FAKE_CLAUDE_MODELS=none answers without models, like a release that doesn't list them.
 const init = JSON.parse(await nextLine())
 console.log(
   JSON.stringify({
@@ -51,7 +60,17 @@ console.log(
       subtype: "success",
       request_id: init.request_id,
       response: {
-        commands: [],
+        commands:
+          commands === "init"
+            ? []
+            : [
+                {
+                  name: "compact",
+                  description: "Free up context by summarizing the conversation so far",
+                  builtin: true,
+                },
+                { name: "review", description: "Review a pull request", builtin: true },
+              ],
         ...(process.env.FAKE_CLAUDE_MODELS === "none"
           ? {}
           : {

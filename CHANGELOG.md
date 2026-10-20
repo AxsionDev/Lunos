@@ -159,6 +159,10 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Fixed
 
+- **Claude Code's own commands appear in `/claude` autocomplete again with Claude Code 2.1.292.**
+  That release lists them in its answer to Lunos's opening request instead of in its first session
+  message, so Lunos found none. Older Claude Code releases still work. <!-- XCOD-270 -->
+
 - **The memory setup check says what went wrong.** A failed check no longer stops at "Memory
   remember failed:" with nothing after it. It names the step that failed (for example extraction or
   the embedding model), why, and what to do: choose another `memory.model` when the model returns
