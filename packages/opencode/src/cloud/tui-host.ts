@@ -182,7 +182,9 @@ export function create(input: { gate: Gate; issuer: string; clientID: string }):
       // An exemption contacts no Lunos service at start; /login (asked) does, where Lunos Cloud may be
       // asked at all (not for an organisation's issuer without cloud.endpoint).
       const network =
-        (input.gate.required || ask?.asked === true) && (await CloudSyncApi.permitted(input.issuer).catch(() => false))
+        !ask?.cached &&
+        (input.gate.required || ask?.asked === true) &&
+        (await CloudSyncApi.permitted(input.issuer).catch(() => false))
       return CloudLegal.current({ network, timeoutMs: input.gate.required && !ask?.asked ? 3_000 : undefined })
     },
     async current() {

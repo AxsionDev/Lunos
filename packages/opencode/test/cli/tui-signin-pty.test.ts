@@ -487,6 +487,49 @@ describe("Welcome screen (XCOD-273)", () => {
     },
     TIMEOUT,
   )
+
+  test(
+    "a signed-in start never waits for GET /v1/legal: the Terms kept here decide it (XCOD-275)",
+    async () => {
+      await start({ env: OFFICIAL })
+      await tui!.waitFor("Welcome to Lunos")
+      await acceptAnd("Sign in")
+      await tui!.waitFor("Ask anything")
+      await tui!.stop()
+      // Lunos Cloud takes the request and never answers.
+      const pending: string[] = []
+      let asked = 0
+      const hung = Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        fetch: (req) => {
+          const at = new URL(req.url).pathname
+          pending.push(at)
+          if (at === "/v1/legal" && !asked) asked = Date.now()
+          return new Promise<Response>(() => {})
+        },
+      })
+      try {
+        tui = await Pty.launch({
+          home: tui!.home,
+          config: { cloud: { issuer: idp!.origin, endpoint: `http://127.0.0.1:${hung.port}` } },
+          env: { ...proxied, ...OFFICIAL },
+        })
+        await tui.waitFor("Ask anything")
+        const shown = Date.now()
+        // The app showed while /v1/legal was still unanswered (waiting on it would take its 3 s
+        // timeout), and nothing asked for the Terms again.
+        const until = Date.now() + 10_000
+        while (!asked && Date.now() < until) await Bun.sleep(50)
+        expect(asked).toBeGreaterThan(0)
+        expect(shown - asked).toBeLessThan(2_000)
+        expect(tui.screen.text()).not.toContain("The Terms or the Privacy notice changed")
+      } finally {
+        hung.stop(true)
+      }
+    },
+    TIMEOUT,
+  )
 })
 
 describe("the Welcome screen can't be bypassed (XCOD-273)", () => {

@@ -120,11 +120,10 @@ export type Host = {
   /**
    * XCOD-275: the current Terms and Privacy notice (`GET /v1/legal`), else the last ones kept on this
    * machine. With an exemption only the kept ones, unless the person asked to sign in (`asked`);
-   * offline, always only the kept ones. Undefined when there are none.
+   * offline, always only the kept ones; with `cached`, only the kept ones. Undefined when there are none.
    */
-  legal(input?: {
-    asked?: boolean
-  }): Promise<Legal | undefined> /** Who is signed in, from the stored session only: no network. */
+  legal(input?: { asked?: boolean; cached?: boolean }): Promise<Legal | undefined>
+  /** Who is signed in, from the stored session only: no network. */
   current(): Promise<SignedIn | undefined>
   /**
    * Refreshes the stored session when it is due and the provider can be reached. Returns "expired"

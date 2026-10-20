@@ -60,9 +60,15 @@ export const {
         // The Welcome screen asks for the current Terms itself.
         if (!signed) return welcome("signed-out")
         setUser(signed)
-        const current = await loadLegal()
-        if (needsAcceptance(current, await host.accepted().catch(() => undefined))) return welcome("terms")
+        // XCOD-275: the start never waits on the network: the Terms kept here decide it, and Lunos
+        // Cloud's current ones (GET /v1/legal) are asked for once the app shows.
+        const kept = await host.legal({ cached: true }).catch(() => undefined)
+        if (kept) setLegal(kept)
+        const accepted = await host.accepted().catch(() => undefined)
+        if (needsAcceptance(kept, accepted)) return welcome("terms")
         setPhase("ready")
+        const current = await loadLegal()
+        if (phase() === "ready" && needsAcceptance(current, accepted)) return welcome("terms")
         // Checked against the provider in the background: offline, the cached sign-in holds.
         if ((await host.refresh().catch(() => "ok")) === "expired") {
           setUser(undefined)
