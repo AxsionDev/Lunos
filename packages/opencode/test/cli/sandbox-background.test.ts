@@ -53,6 +53,16 @@ describe("a prompt queued while the sandbox starts", () => {
           directory: workspace,
         })
 
+        // The event stream, opened while starting, goes through the same waiting transport.
+        const events: string[] = []
+        const stream = (async () => {
+          const subscription = await sdk.global.event()
+          for await (const event of subscription.stream) {
+            events.push((event as { payload?: { type?: string } }).payload?.type ?? "")
+            if (events.includes("session.idle") || events.includes("session.status")) return
+          }
+        })()
+
         // Sent while starting: the session and the prompt wait.
         const sent = (async () => {
           const session = await sdk.session.create({}, { throwOnError: true })
@@ -75,6 +85,9 @@ describe("a prompt queued while the sandbox starts", () => {
           "from the sandbox",
         )
         expect(yield* Effect.promise(() => exists(path.join(host, "edited.txt")))).toBe(false)
+        // The TUI's live updates arrive through it too.
+        yield* Effect.promise(() => Promise.race([stream, Bun.sleep(10_000)]))
+        expect(events.some((type) => type.startsWith("session."))).toBe(true)
         yield* Effect.promise(() => fs.rm(host, { recursive: true, force: true }))
       }),
     90_000,

@@ -233,7 +233,8 @@ export const TuiThreadCommand = cmd({
       })
       .option("sandbox", {
         type: "boolean",
-        describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
+        describe:
+          "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>. If it can't start, Lunos goes on without it; --sandbox=strict waits for it instead",
       })
       .option("keep", {
         type: "boolean",
@@ -242,13 +243,18 @@ export const TuiThreadCommand = cmd({
       .option("rm", {
         type: "boolean",
         describe: "with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says",
-      }),
+      })
+      // XCOD-281: `--sandbox=strict` (see sandbox.ts `strictArg`) is --sandbox without a fallback;
+      // yargs would read it as false. The module isn't imported here, to keep start-up light.
+      .middleware((argv) => {
+        if (process.argv.includes("--sandbox=strict")) argv.sandbox = true
+      }, true),
   handler: async (args) => {
     // XCOD-129: taken before anything else, so the worker and its children never inherit it.
     const restarted = Restart.takeHandoff()
     StartupTrace.mark("tui command", { blocking: true })
     // XCOD-144: the server and everything it spawns run in a container; only the TUI stays here.
-    const { startsSandboxed, sandboxTui, sandboxOff, refuseHost } = await StartupTrace.span(
+    const { startsSandboxed, sandboxTui, sandboxOff, refuseHost, strictArg } = await StartupTrace.span(
       "import sandbox",
       () => import("./sandbox"),
     )
@@ -286,7 +292,11 @@ export const TuiThreadCommand = cmd({
         return
       }
       try {
-        sandbox = await sandboxTui(resolveThreadDirectory(args.project), { keep: args.keep, rm: args.rm }, restarted)
+        sandbox = await sandboxTui(
+          resolveThreadDirectory(args.project),
+          { keep: args.keep, rm: args.rm, strict: strictArg() },
+          restarted,
+        )
       } catch (error) {
         UI.error(errorMessage(error))
         process.exitCode = 1
@@ -510,7 +520,11 @@ export const TuiThreadCommand = cmd({
     if (process.exitCode) Restart.reportFailedStart()
     // XCOD-129: the TUI has exited and the worker (MCP, LSP, memory sidecar, local server) is shut
     // down; start Lunos again in its place.
-    else if (restartRequest) await Restart.relaunch(...relaunchFor(restartRequest, sandbox?.host.state()))
+    else if (restartRequest) {
+      // XCOD-281: this run ends here when the sandbox failed; its log says so (`lunos logs`).
+      if (restartRequest.sandbox === "failed") RunLog.finish(1)
+      await Restart.relaunch(...relaunchFor(restartRequest, sandbox?.host.state()))
+    }
     process.exit()
   },
 })

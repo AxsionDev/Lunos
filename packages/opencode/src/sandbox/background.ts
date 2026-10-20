@@ -20,6 +20,8 @@ export type Input<C extends Connection> = {
   ready?: (connection: C) => SandboxState | void
   reenable?: () => void
   doctor?: () => Promise<string>
+  /** Starts once this settles (the TUI's first frame). */
+  after?: Promise<unknown>
 }
 
 export function start<C extends Connection>(input: Input<C>) {
@@ -37,10 +39,12 @@ export function start<C extends Connection>(input: Input<C>) {
   function attempt() {
     if (running || connection) return running
     set({ status: "starting" })
-    running = input
-      .launch((detail) => {
-        if (state.status === "starting") set({ status: "starting", detail })
-      })
+    running = Promise.resolve(input.after)
+      .then(() =>
+        input.launch((detail) => {
+          if (state.status === "starting") set({ status: "starting", detail })
+        }),
+      )
       .then(
         (started) => {
           connection = started

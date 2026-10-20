@@ -17,6 +17,7 @@ import { AuditLog } from "@/audit/log"
 import { RunEnding } from "./run/ending"
 import { Failure } from "../failure"
 import { RunLog } from "@opencode-ai/core/observability/run-log"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
 
 // XCOD-144 slice 1: `--sandbox` on `lunos` and `lunos run`, and `lunos sandbox list|attach|destroy`.
 // The host side never loads a project instance for a sandboxed run (that would initialise the
@@ -301,10 +302,13 @@ export function failed(
   error: unknown,
   directory: string,
   changes: readonly SandboxRollback.Change[] = [],
+  strict = false,
 ): SandboxState {
   const wrapped = SandboxFailure.wrap("create", error)
   RunLog.failure("sandbox", wrapped)
   const failure = failureInfo(wrapped, directory)
+  // `--sandbox=strict` asks for no fallback, as a requirement does.
+  if (strict && !failure.requiredBy) failure.requiredBy = "flag"
   if (failure.requiredBy) return { status: "blocked", failure }
   const undone = SandboxRollback.revert(changes.filter((change) => change.path[0] === "sandbox"))
   if (undone.length) {
@@ -366,7 +370,7 @@ export async function doctor(directory: string) {
  */
 export async function sandboxTui(
   directory: string,
-  args: Lifecycle,
+  args: Lifecycle & { strict?: boolean },
   restarted?: { changes?: SandboxRollback.Change[] },
 ) {
   // A wrong pair of flags isn't the sandbox failing to start: refused before anything, with no way round it.
@@ -395,7 +399,9 @@ export async function sandboxTui(
       SandboxDisabled.clear(directory)
       return { status: "ready", id: info?.id ?? "" }
     },
-    failed: (error) => failed(error, directory, restarted?.changes ?? []),
+    failed: (error) => failed(error, directory, restarted?.changes ?? [], args.strict),
+    // The first frame goes first: nothing of the sandbox's start-up competes with it.
+    after: Promise.race([StartupTrace.waitFirstFrame(), Bun.sleep(1000)]),
     reenable: () => SandboxDisabled.clear(directory),
     doctor: () => doctor(directory),
   })

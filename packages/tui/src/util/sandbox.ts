@@ -12,8 +12,8 @@ export type SandboxFailure = {
   time: string
   /** The run log that has the full error. */
   log?: { id: string; file: string }
-  /** Set under sandbox.required: who required it. */
-  requiredBy?: "managed" | "config"
+  /** Set when nothing may run without it: sandbox.required (managed or config), or `--sandbox=strict`. */
+  requiredBy?: "managed" | "config" | "flag"
 }
 
 export type SandboxState =
@@ -80,7 +80,11 @@ export function failureToast(failure: SandboxFailure) {
 /** The banner under sandbox.required. */
 export function requiredBanner(failure: SandboxFailure) {
   const by =
-    failure.requiredBy === "managed" ? "Your organisation requires the sandbox" : "The sandbox is required here"
+    failure.requiredBy === "managed"
+      ? "Your organisation requires the sandbox"
+      : failure.requiredBy === "flag"
+        ? "You started Lunos with --sandbox=strict"
+        : "The sandbox is required here"
   return [
     `${by}, and it couldn't start: ${failure.reason}`,
     failure.fix ? `Fix: ${failure.fix}` : "Fix: run `lunos sandbox doctor` to see what's wrong.",

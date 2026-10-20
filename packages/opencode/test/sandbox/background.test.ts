@@ -84,6 +84,7 @@ describe("the transport while the sandbox starts", () => {
       },
       ready: () => ({ status: "ready", id: "abcd1234" }),
     })
+    await Bun.sleep(10)
     expect(background.host.state()).toEqual({ status: "starting", detail: "copying the project" })
     const response = background.fetch("http://opencode.internal/session?directory=%2Fworkspace%2Fapp")
     let settled = false

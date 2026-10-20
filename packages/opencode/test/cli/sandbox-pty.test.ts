@@ -229,18 +229,50 @@ describe.skipIf(process.platform === "win32")("the sandbox starts in the backgro
   )
 })
 
+describe.skipIf(process.platform === "win32")("the sandbox failing at once", () => {
+  test(
+    "no delay (Docker missing or stopped): the TUI opens, starts again without it, and shows the toast",
+    async () => {
+      const h = await home({ sandbox: { enabled: true } }, 0)
+      run = await Pty.launch({ home: h.home, env: env() })
+      await run.waitFor("Lunos is running WITHOUT the sandbox.", 30_000)
+      await run.waitFor("no sandbox · sandbox off after a failure on")
+      await run.waitFor("Ask anything")
+      expect(run.exited()).toBeUndefined()
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "`lunos --sandbox=strict`: no fallback; blocked with the banner, as when it's required",
+    async () => {
+      const h = await home({}, 0)
+      const asks = asked
+      run = await Pty.launch({ home: h.home, env: env(), extraArgs: ["--sandbox=strict"] })
+      const screen = await run.waitFor("You started Lunos with --sandbox=strict, and it couldn't start", 30_000)
+      expect(screen).toContain("Prompts can't run until it starts.")
+      expect(screen).not.toContain("WITHOUT the sandbox")
+      expect(await flag(h.dirs.state)).toBeUndefined()
+      expect(asked).toBe(asks)
+    },
+    TIMEOUT,
+  )
+})
+
 describe.skipIf(process.platform === "win32")("`lunos run` with the sandbox failing", () => {
   test(
     "warns in one line and runs without it; --sandbox=strict exits 1 with the reason",
     async () => {
       const h = await home({ sandbox: { enabled: true } }, 0)
       const options = { home: h.home, env: env() }
+      const before = asked
       const loose = await Pty.exec(["run", "--sandbox", "hello"], options)
       expect(loose.stdout + loose.stderr).toMatch(
         /sandbox failed, running without it: Docker Desktop isn't running.*log: /,
       )
-      // It went on: the model was asked.
-      expect(asked).toBeGreaterThan(0)
+      // It went on, here: the project instance loaded and the model was asked.
+      expect(asked).toBeGreaterThan(before)
+      expect(loose.stderr).not.toMatch(/No context found|InstanceContext|instance/i)
       const strict = await Pty.exec(["run", "--sandbox=strict", "hello"], options)
       expect(strict.code).toBe(1)
       expect(strict.stdout + strict.stderr).toContain("The sandbox couldn't start")
