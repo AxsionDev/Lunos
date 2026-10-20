@@ -34,7 +34,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   tokens and passwords are removed, and your prompts are never written to it.
 - **`lunos logs` and `lunos bug-report`.** `lunos logs` lists recent runs; `lunos logs <id>` shows
   one, `--open` opens it, and `--dir` prints where logs are kept. `lunos bug-report [id]` packs a
-  run's log with the version and the relevant config, secrets removed, into a zip you can check and
+  run's log with the version, the relevant config (secrets removed) and the sandbox checks into a zip you can check and
   attach to an issue yourself. Nothing is uploaded. In the TUI, `/logs` lists them, and an error
   about something running in the background (such as an MCP server that didn't start) has
   **Open log**.
