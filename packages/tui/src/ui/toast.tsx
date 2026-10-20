@@ -4,11 +4,15 @@ import { useTheme } from "../context/theme"
 import { useTerminalDimensions } from "@opentui/solid"
 import { SplitBorder } from "./border"
 import { TextAttributes } from "@opentui/core"
+import { useDialog } from "./dialog"
+import { DialogLog } from "../component/dialog-logs"
 export type ToastOptions = {
   title?: string
   message: string
   variant: "info" | "success" | "warning" | "error"
   duration: number
+  /** XCOD-280: a background failure: the toast offers "Open log", which shows this run's log. */
+  log?: boolean
 }
 type ToastInput = Omit<ToastOptions, "duration"> & { duration?: number }
 
@@ -16,6 +20,7 @@ export function Toast() {
   const toast = useToast()
   const { theme } = useTheme()
   const dimensions = useTerminalDimensions()
+  const dialog = useDialog()
 
   return (
     <Show when={toast.currentToast}>
@@ -44,6 +49,19 @@ export function Toast() {
           <text fg={theme.text} wrapMode="word" width="100%">
             {current().message}
           </text>
+          <Show when={current().log}>
+            <text
+              marginTop={1}
+              fg={theme.primary}
+              attributes={TextAttributes.UNDERLINE}
+              onMouseUp={() => {
+                toast.dismiss()
+                dialog.replace(() => <DialogLog />)
+              }}
+            >
+              Open log (/logs)
+            </text>
+          </Show>
         </box>
       )}
     </Show>
@@ -76,6 +94,10 @@ function init() {
         variant: "error",
         message: "An unknown error has occurred",
       })
+    },
+    dismiss() {
+      if (timeoutHandle) clearTimeout(timeoutHandle)
+      setStore("currentToast", null)
     },
     get currentToast(): ToastOptions | null {
       return store.currentToast

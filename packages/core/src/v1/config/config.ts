@@ -25,6 +25,7 @@ import { ConfigSync } from "../../config/sync"
 import { ConfigExternal } from "../../config/external"
 import { ConfigMemory } from "../../config/memory"
 import { ConfigSandbox } from "../../config/sandbox"
+import { ConfigLog } from "../../config/log"
 
 export type Layout = ConfigLayoutV1.Layout
 
@@ -44,7 +45,7 @@ export const Info = Schema.Struct({
   }),
   $locked: Schema.optional(Schema.Array(Schema.String)).annotate({
     description:
-      "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)",
+      "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, log, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)",
   }),
   shell: Schema.optional(Schema.String).annotate({ description: "Default shell to use for terminal and bash tool" }),
   logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
@@ -101,6 +102,9 @@ export const Info = Schema.Struct({
   }),
   sandbox: Schema.optional(ConfigSandbox.Info).annotate({
     description: "Sandboxed runs: the Lunos server and everything it spawns run in a Docker container",
+  }),
+  log: Schema.optional(ConfigLog.Info).annotate({
+    description: "How long run logs are kept: failed runs' logs for retention_days, all within max_mb",
   }),
   residency: Schema.optional(ConfigResidency.Info).annotate({
     description:

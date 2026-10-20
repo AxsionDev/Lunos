@@ -30,6 +30,7 @@ import { ConfigSync } from "./config/sync"
 import { ConfigExternal } from "./config/external"
 import { ConfigMemory } from "./config/memory"
 import { ConfigSandbox } from "./config/sandbox"
+import { ConfigLog } from "./config/log"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
 import { ConfigV1 } from "./v1/config/config"
@@ -141,6 +142,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   sandbox: ConfigSandbox.Info.pipe(Schema.optional).annotate({
     description: "Sandboxed runs: the Lunos server and everything it spawns run in a Docker container",
+  }),
+  log: ConfigLog.Info.pipe(Schema.optional).annotate({
+    description: "How long run logs are kept: failed runs' logs for retention_days, all within max_mb",
   }),
   residency: ConfigResidency.Info.pipe(Schema.optional).annotate({
     description:

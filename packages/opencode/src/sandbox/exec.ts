@@ -1,6 +1,7 @@
 import path from "node:path"
 import { existsSync } from "node:fs"
 import { SandboxError, describe, diagnose } from "./error"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
 
 // XCOD-144: the one place the sandbox shells out (docker, git, tar). Arguments are always passed as
 // an argv array, never through a shell (a Windows .cmd/.bat shim excepted, see `spawnable`).
@@ -146,9 +147,16 @@ export async function run(cmd: string[], options: Options = {}): Promise<Result>
       new Response(proc.stderr).text(),
       proc.exited,
     ])
-    if (!timedOut) return { code, stdout, stderr }
+    // XCOD-280: into the run log (the command as asked for, not a cmd.exe wrapper), with its output
+    // (redacted) when it failed.
+    if (!timedOut) {
+      RunLog.command({ cmd, code, stdout, stderr })
+      return { code, stdout, stderr }
+    }
     const note = `no answer within ${options.timeout! / 1000}s, so it was stopped`
-    return { code, stdout, stderr: stderr.trim() ? `${stderr.trim()}\n(${note})` : note, timedOut }
+    const result = { code, stdout, stderr: stderr.trim() ? `${stderr.trim()}\n(${note})` : note, timedOut }
+    RunLog.command({ cmd, code: null, stdout, stderr: result.stderr })
+    return result
   } finally {
     clearTimeout(timer)
   }

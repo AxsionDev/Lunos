@@ -25120,6 +25120,60 @@
         },
         "additionalProperties": false
       },
+      "LogConfig": {
+        "type": "object",
+        "properties": {
+          "retention_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "Days a failed run's log is kept, beyond the newest 10 runs. Default 14"
+          },
+          "max_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "Most space all run logs together may take, in MB; the oldest are removed first. Default 50"
+          }
+        },
+        "additionalProperties": false
+      },
       "BlankString": {
         "type": "string",
         "pattern": "^\\s*$"
@@ -26181,6 +26235,9 @@
               }
             },
             "additionalProperties": false
+          },
+          "log": {
+            "$ref": "#/components/schemas/LogConfig"
           },
           "residency": {
             "$ref": "#/components/schemas/ConfigV2Residency"

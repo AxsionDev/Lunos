@@ -13,15 +13,22 @@ import { AppRuntime } from "@/effect/app-runtime"
 import { Effect } from "effect"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
 import { SessionPeers } from "@/session/peers"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
 
 Heap.start()
 
-const onUnhandledRejection = (_error: unknown) => {}
+// XCOD-280: kept running as before, but the error is in the run log.
+const onUnhandledRejection = (error: unknown) =>
+  RunLog.note("an unhandled promise rejection in the worker (Lunos kept running)", RunLog.describe(error))
 
-const onUncaughtException = (_error: Error) => {}
+const onUncaughtException = (error: Error) =>
+  RunLog.note("an unhandled exception in the worker (Lunos kept running)", RunLog.describe(error))
 
 process.on("unhandledRejection", onUnhandledRejection)
 process.on("uncaughtException", onUncaughtException)
+
+// XCOD-280: LUNOS_DEBUG_CRASH=worker stops this worker once the TUI is up, as a crash would.
+if (process.env.LUNOS_DEBUG_CRASH === "worker") setTimeout(() => process.exit(3), 3000)
 
 // Subscribe to global events and forward them via RPC
 GlobalBus.on("event", (event) => {

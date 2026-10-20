@@ -11,6 +11,8 @@ import { SandboxPreflight } from "@/sandbox/preflight"
 import { SandboxRollback } from "@/sandbox/rollback"
 import { AuditLog } from "@/audit/log"
 import { RunEnding } from "./run/ending"
+import { Failure } from "../failure"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
 
 // XCOD-144 slice 1: `--sandbox` on `lunos` and `lunos run`, and `lunos sandbox list|attach|destroy`.
 // The host side never loads a project instance for a sandboxed run (that would initialise the
@@ -283,6 +285,8 @@ export async function fallback(
   // A /restart for a sandbox change that can't start: put the old value back and start as before.
   const undone = SandboxRollback.revert(changes.filter((change) => change.path[0] === "sandbox"))
   if (undone.length) {
+    // XCOD-280: recovered (Lunos starts as before), so in the log without the failure footer.
+    RunLog.note("the sandbox couldn't start; the change was undone", RunLog.describe(error))
     UI.error(
       `Your change to ${undone.map((key) => `\`${key}\``).join(", ")} was undone because Lunos couldn't start with it: ${error.reason}`,
     )
@@ -299,9 +303,11 @@ export async function fallback(
   }
   const choice = await ask(error)
   if (choice === "quit") {
+    Failure.record("sandbox", error)
     process.exitCode = 1
     return "quit"
   }
+  RunLog.note("the sandbox couldn't start; started without it", RunLog.describe(error))
   say("starting without the sandbox this time; `lunos --no-sandbox` does that from the start")
   return "host"
 }
@@ -340,7 +346,11 @@ const prepare = Effect.promise(async () => {
 
 const attempt = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (error) => error }).pipe(
-    Effect.catch((error) => fail(SandboxFailure.describe(error))),
+    Effect.catch((error) => {
+      // XCOD-280: the stack and cause go to the run log before the message becomes a CliError.
+      Failure.record("sandbox", error)
+      return fail(SandboxFailure.describe(error))
+    }),
   )
 
 /** XCOD-279: one check as `lunos sandbox doctor` prints it, with the command and output when it failed. */

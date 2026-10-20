@@ -9,12 +9,12 @@ To debug issues with Lunos, start by checking the logs and local data it stores 
 
 ## Logs
 
-Log files are written to:
+Every run of Lunos writes a log, and when something fails the error ends with its path (`Full log: …`) and the command to report it (`Report it: lunos bug-report <id>`). Log files are written to:
 
 - **macOS/Linux**: `~/.local/share/opencode/log/`
 - **Windows**: Press `WIN+R` and paste `%USERPROFILE%\.local\share\opencode\log`
 
-Log files are named with timestamps (e.g., `2025-01-09T123456.log`) and the most recent 10 log files are kept.
+Each run's log is named `lunos-<date>-<time>-<id>.log`. `lunos logs` lists recent runs, `lunos logs <id>` shows one, and `lunos bug-report <id>` packs one, with secrets removed, into a zip to attach to an issue. The last 10 runs are kept, plus failed runs from the last 14 days (`log.retention_days`, `log.max_mb`). See [When something goes wrong](https://github.com/AxsionDev/Lunos/blob/dev/docs/when-something-goes-wrong.md) for what a log contains and what is never in it.
 
 You can set the log level with the `--log-level` command-line option to get more detailed debug information. For example, `opencode --log-level DEBUG`.
 
