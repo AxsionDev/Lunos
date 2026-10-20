@@ -167,8 +167,8 @@ export type Options = {
 
 const opencode = path.resolve(import.meta.dir, "../../..")
 
-/** Runs `lunos` (the TUI) from source in a pty, isolated: HOME, XDG, managed config, the keychain. */
-export async function launch(options: Options = {}) {
+/** A throwaway HOME, its XDG and project directories, and the isolated environment to run `lunos` in. */
+export async function prepare(options: Options = {}) {
   const home = options.home ?? (await fs.mkdtemp(path.join(os.tmpdir(), "lunos-tui-pty-")))
   const dirs = {
     config: path.join(home, ".config"),
@@ -225,6 +225,30 @@ export async function launch(options: Options = {}) {
     ...options.env,
   }
   await Bun.$`git init -q .`.cwd(dirs.project).quiet()
+  return { home, dirs, env, opened }
+}
+
+/** Runs `lunos` without a terminal (stdin closed, output captured), as a script would (XCOD-274). */
+export async function exec(args: string[], options: Options = {}) {
+  const { dirs, env } = await prepare(options)
+  const child = Bun.spawn([process.execPath, "run", "--cwd", opencode, "src/index.ts", ...args], {
+    cwd: dirs.project,
+    env,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
+  return { stdout, stderr, code }
+}
+
+/** Runs `lunos` (the TUI) from source in a pty, isolated: HOME, XDG, managed config, the keychain. */
+export async function launch(options: Options = {}) {
+  const { home, dirs, env, opened } = await prepare(options)
   const screen = new Screen()
   let raw = ""
   let exited: number | undefined

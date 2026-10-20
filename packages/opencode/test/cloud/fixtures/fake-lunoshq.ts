@@ -70,7 +70,7 @@ export function create(options: Options = {}) {
   const users: Record<string, User> = structuredClone(options.users ?? {})
   const orgs: Record<string, Org> = structuredClone(options.orgs ?? {})
   for (const org of Object.values(orgs)) org.invites ??= {}
-  const current = options.terms ?? { terms: "2026-10-19", privacy: "2026-10-19" }
+  let current = options.terms ?? { terms: "2026-10-19", privacy: "2026-10-19" }
   const accepted: Record<string, { terms: string; privacy: string; at: number } | null> = Object.fromEntries(
     Object.entries(options.accepted ?? {}).map(([sub, value]) => [sub, value ? { ...value, at: 1 } : null]),
   )
@@ -365,7 +365,9 @@ export function create(options: Options = {}) {
     }
   }
 
-  return { handle, requests, state, orgs, users, accepted }
+  /** A new Terms or Privacy notice version (LUNOSHQ_TERMS_VERSION, LUNOSHQ_PRIVACY_VERSION). */
+  const publish = (next: { terms: string; privacy: string }) => void (current = next)
+  return { handle, requests, state, orgs, users, accepted, publish }
 }
 
 export type FakeLunoshq = ReturnType<typeof create>
