@@ -251,7 +251,12 @@ describe("lunos org in a script (XCOD-274)", () => {
 
       // Signed out: says so, and nothing is sent.
       const before = cloud.requests.length
-      result = await Pty.exec(["org", "list"], { env: { HTTPS_PROXY: proxy.url, HTTP_PROXY: proxy.url } })
+      const signedOut = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-org-pty-"))
+      homes.push(signedOut)
+      result = await Pty.exec(["org", "list"], {
+        home: signedOut,
+        env: { HTTPS_PROXY: proxy.url, HTTP_PROXY: proxy.url },
+      })
       expect(result.code).toBe(1)
       expect(result.stderr).toContain("Not signed in. Run lunos login.")
       expect(cloud.requests.length).toBe(before)

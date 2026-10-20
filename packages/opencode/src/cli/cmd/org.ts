@@ -23,11 +23,16 @@ const day = (ms: number | undefined) => (ms === undefined ? "" : new Date(ms).to
 
 type Common = { org?: string; json: boolean; yes: boolean }
 
-const common = <T>(yargs: Argv<T>) =>
+const output = <T>(yargs: Argv<T>) =>
   yargs
-    .option("org", { type: "string", describe: "the organisation's id (default: your only organisation)" })
     .option("json", { type: "boolean", default: false, describe: "print JSON" })
     .option("yes", { type: "boolean", default: false, describe: "don't ask for confirmation (for scripts)" })
+
+const common = <T>(yargs: Argv<T>) =>
+  output(yargs).option("org", {
+    type: "string",
+    describe: "the organisation's id (default: your only organisation)",
+  })
 
 /** A failure to show: Lunos Cloud's refusal (its status, code and words) or a local one. */
 class Failure extends Error {
@@ -327,7 +332,7 @@ const answer = (accept: boolean) =>
     describe: accept ? "accept an invitation to an organisation" : "decline an invitation to an organisation",
     instance: false,
     builder: (yargs) =>
-      common(yargs).positional("org", { type: "string", demandOption: true, describe: "the organisation's id" }),
+      output(yargs).positional("org", { type: "string", demandOption: true, describe: "the organisation's id" }),
     handler: run(accept ? "accept" : "decline", async (args: Common & { org: string }) => {
       const who = await token(accept ? "Accepting an invitation" : "Declining an invitation")
       const joined = await CloudAccountApi.answerInvitation(who.token, args.org, accept)
