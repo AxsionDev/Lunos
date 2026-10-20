@@ -4,7 +4,7 @@ import fs from "fs/promises"
 import os from "os"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
-import { loginSync } from "@/cli/cmd/cloud"
+import { CloudSignin } from "@/cloud/signin"
 import { CloudSyncApi } from "@/cloud/sync-api"
 import * as Fake from "./fixtures/fake-sync-plane"
 
@@ -38,7 +38,7 @@ const opts = { fetch: recording, token: async () => Fake.TOKEN, sub: Fake.SUB }
 const print = (line: string) => printed.push(line)
 
 test("an organisation's identity provider without cloud.endpoint: no registration, no request", async () => {
-  await loginSync({ issuer: "https://idp.example.org/realms/acme", locked: false, print, opts })
+  await CloudSignin.loginSync({ issuer: "https://idp.example.org/realms/acme", locked: false, print, opts })
   expect(printed).toEqual(["Session sync needs cloud.endpoint for your organisation's identity provider."])
   expect(calls).toEqual([])
   expect(await CloudSyncApi.load()).toBeUndefined()
@@ -46,8 +46,8 @@ test("an organisation's identity provider without cloud.endpoint: no registratio
 
 test("with cloud.endpoint set: registers, and the notice is shown once", async () => {
   await fs.writeFile(globalConfig(), JSON.stringify({ cloud: { endpoint: plane.url } }))
-  await loginSync({ issuer: "https://idp.example.org/realms/acme", locked: false, print, opts })
-  await loginSync({ issuer: "https://idp.example.org/realms/acme", locked: false, print, opts })
+  await CloudSignin.loginSync({ issuer: "https://idp.example.org/realms/acme", locked: false, print, opts })
+  await CloudSignin.loginSync({ issuer: "https://idp.example.org/realms/acme", locked: false, print, opts })
   expect(printed).toEqual([CloudSyncApi.NOTICE])
   expect(calls.every((u) => u.startsWith(plane.url))).toBe(true)
   expect((await CloudSyncApi.load())!.noticeShown).toBe(true)
@@ -55,7 +55,7 @@ test("with cloud.endpoint set: registers, and the notice is shown once", async (
 
 test("an organisation policy locking sync off: the policy line, not the notice", async () => {
   await fs.writeFile(globalConfig(), JSON.stringify({ cloud: { endpoint: plane.url } }))
-  await loginSync({ issuer: "https://idp.example.org/realms/acme", locked: true, print, opts })
+  await CloudSignin.loginSync({ issuer: "https://idp.example.org/realms/acme", locked: true, print, opts })
   expect(printed).toEqual(["Your organisation's policy keeps session sync off."])
   expect((await CloudSyncApi.load())!.noticeShown).toBe(false)
 })

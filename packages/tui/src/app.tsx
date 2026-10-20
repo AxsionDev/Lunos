@@ -120,6 +120,10 @@ import {
 } from "./util/restart"
 import { DialogSelect } from "./ui/dialog-select"
 import { listed } from "./util/sessions-overview"
+import { AccountProvider, useAccount } from "./context/account"
+import { Welcome } from "./component/welcome"
+import { DialogAccount } from "./component/dialog-account"
+import type { Host as AccountHost } from "./util/account"
 
 registerOpencodeSpinner()
 
@@ -193,6 +197,8 @@ export type TuiInput = {
   restarted?: Restarted & { sessionID?: string }
   /** Called once the TUI has loaded its data: a relaunch counts as started from here. */
   onStarted?: () => void
+  /** XCOD-273: the Lunos account (Welcome screen, /login, /logout, /account), run by the CLI process. */
+  account?: AccountHost
 }
 
 function errorMessage(error: unknown) {
@@ -318,63 +324,66 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                             <ArgsProvider {...input.args}>
                               <KVProvider>
                                 <ToastProvider>
-                                  <RouteProvider
-                                    initialRoute={
-                                      input.args.continue
-                                        ? {
-                                            type: "session",
-                                            sessionID: "dummy",
-                                          }
-                                        : undefined
-                                    }
-                                  >
-                                    <TuiConfigProvider config={input.config}>
-                                      <PluginRuntimeProvider value={pluginRuntime}>
-                                        <SDKProvider
-                                          url={input.url}
-                                          directory={input.directory}
-                                          fetch={input.fetch}
-                                          headers={input.headers}
-                                          events={input.events}
-                                        >
-                                          <PermissionProvider>
-                                            <ProjectProvider>
-                                              <SyncProvider>
-                                                <DataProvider>
-                                                  <ThemeProvider mode={mode}>
-                                                    <LocalProvider>
-                                                      <PromptStashProvider>
-                                                        <DialogProvider>
-                                                          <FrecencyProvider>
-                                                            <PromptHistoryProvider>
-                                                              <PromptRefProvider>
-                                                                <EditorContextProvider>
-                                                                  <LocationProvider>
-                                                                    <App
-                                                                      onSnapshot={input.onSnapshot}
-                                                                      onListening={input.onListening}
-                                                                      pluginHost={input.pluginHost}
-                                                                      restart={restartHost}
-                                                                      restarted={input.restarted}
-                                                                      onStarted={input.onStarted}
-                                                                    />
-                                                                  </LocationProvider>
-                                                                </EditorContextProvider>
-                                                              </PromptRefProvider>
-                                                            </PromptHistoryProvider>
-                                                          </FrecencyProvider>
-                                                        </DialogProvider>
-                                                      </PromptStashProvider>
-                                                    </LocalProvider>
-                                                  </ThemeProvider>
-                                                </DataProvider>
-                                              </SyncProvider>
-                                            </ProjectProvider>
-                                          </PermissionProvider>
-                                        </SDKProvider>
-                                      </PluginRuntimeProvider>
-                                    </TuiConfigProvider>
-                                  </RouteProvider>
+                                  {/* XCOD-273: above the dialogs, which /account and /settings open. */}
+                                  <AccountProvider host={input.account}>
+                                    <RouteProvider
+                                      initialRoute={
+                                        input.args.continue
+                                          ? {
+                                              type: "session",
+                                              sessionID: "dummy",
+                                            }
+                                          : undefined
+                                      }
+                                    >
+                                      <TuiConfigProvider config={input.config}>
+                                        <PluginRuntimeProvider value={pluginRuntime}>
+                                          <SDKProvider
+                                            url={input.url}
+                                            directory={input.directory}
+                                            fetch={input.fetch}
+                                            headers={input.headers}
+                                            events={input.events}
+                                          >
+                                            <PermissionProvider>
+                                              <ProjectProvider>
+                                                <SyncProvider>
+                                                  <DataProvider>
+                                                    <ThemeProvider mode={mode}>
+                                                      <LocalProvider>
+                                                        <PromptStashProvider>
+                                                          <DialogProvider>
+                                                            <FrecencyProvider>
+                                                              <PromptHistoryProvider>
+                                                                <PromptRefProvider>
+                                                                  <EditorContextProvider>
+                                                                    <LocationProvider>
+                                                                      <App
+                                                                        onSnapshot={input.onSnapshot}
+                                                                        onListening={input.onListening}
+                                                                        pluginHost={input.pluginHost}
+                                                                        restart={restartHost}
+                                                                        restarted={input.restarted}
+                                                                        onStarted={input.onStarted}
+                                                                      />
+                                                                    </LocationProvider>
+                                                                  </EditorContextProvider>
+                                                                </PromptRefProvider>
+                                                              </PromptHistoryProvider>
+                                                            </FrecencyProvider>
+                                                          </DialogProvider>
+                                                        </PromptStashProvider>
+                                                      </LocalProvider>
+                                                    </ThemeProvider>
+                                                  </DataProvider>
+                                                </SyncProvider>
+                                              </ProjectProvider>
+                                            </PermissionProvider>
+                                          </SDKProvider>
+                                        </PluginRuntimeProvider>
+                                      </TuiConfigProvider>
+                                    </RouteProvider>
+                                  </AccountProvider>
                                 </ToastProvider>
                               </KVProvider>
                             </ArgsProvider>
@@ -432,6 +441,7 @@ function App(props: {
   const pluginRuntime = usePluginRuntime()
   const attention = createTuiAttention({ renderer, config: tuiConfig, kv })
   const clipboard = useClipboard()
+  const account = useAccount()
 
   const api = createTuiApi(
     createTuiApiAdapters({
@@ -648,7 +658,8 @@ function App(props: {
 
   createEffect(
     on(
-      () => sync.status === "complete" && sync.data.provider.length === 0,
+      // XCOD-273: not over the Welcome screen; it opens once the screen is passed.
+      () => sync.status === "complete" && sync.data.provider.length === 0 && !account.blocks(),
       (isEmpty, wasEmpty) => {
         // only trigger when we transition into an empty-provider state
         if (!isEmpty || wasEmpty) return
@@ -657,10 +668,16 @@ function App(props: {
     ),
   )
 
+  // XCOD-273: nothing opens over the Welcome screen: the command palette, a keybind's dialog, or
+  // `lunos settings`'s settings window are closed while it stands.
+  createEffect(() => {
+    if (account.blocks() && dialog.stack.length > 0) dialog.clear()
+  })
+
   // XCOD-248: after the effect above, so a "connect a provider" dialog opens first and the panel waits.
   createEffect(() => {
     const since = pendingWhatsNew()
-    if (!since || sync.status !== "complete" || dialog.stack.length > 0) return
+    if (!since || sync.status !== "complete" || dialog.stack.length > 0 || account.blocks()) return
     setPendingWhatsNew(undefined)
     showWhatsNew(since)
   })
@@ -1125,6 +1142,58 @@ function App(props: {
             },
           ]
         : []),
+      ...(account.host
+        ? [
+            {
+              // XCOD-273: the Welcome screen's sign-in, at any time.
+              name: "account.login",
+              title: "Sign in to your Lunos account",
+              slashName: "login",
+              run: async () => {
+                dialog.clear()
+                if (account.exempt() === "offline")
+                  return toast.show({
+                    variant: "warning",
+                    message: "Offline mode (LUNOS_OFFLINE) is on: signing in is off.",
+                  })
+                const signed = await account.host?.current()
+                if (signed)
+                  return toast.show({
+                    variant: "info",
+                    message: `Already signed in as ${signed.email ?? signed.sub}. /logout first to switch account.`,
+                  })
+                account.login()
+              },
+              category: "Account",
+            },
+            {
+              name: "account.logout",
+              title: "Sign out of your Lunos account",
+              slashName: "logout",
+              run: async () => {
+                dialog.clear()
+                const result = await account.host?.logout()
+                toast.show({
+                  variant: "info",
+                  message:
+                    result?.revoked === false
+                      ? "Signed out here; the sign-in service couldn't be told."
+                      : "Signed out.",
+                })
+                account.signedOut()
+              },
+              category: "Account",
+            },
+            {
+              name: "account.show",
+              title: "Your Lunos account",
+              desc: "Plan, organisations, devices; sign out everywhere; delete the account",
+              slashName: "account",
+              run: () => dialog.replace(() => <DialogAccount />),
+              category: "Account",
+            },
+          ]
+        : []),
       {
         // XCOD-128: every configuration option in one place; /config is Claude Code's name for it.
         name: "settings.open",
@@ -1134,6 +1203,9 @@ function App(props: {
         run: () => {
           // XCOD-259: `/settings <section> [sub-tab]` lands there; an unknown name shows the home.
           const request = takeSettingsRequest()
+          // XCOD-273: /settings account is /account.
+          if (account.host && request && "unknown" in request && /^account/i.test(request.unknown))
+            return dialog.replace(() => <DialogAccount />)
           if (request && "unknown" in request)
             toast.show({ variant: "warning", message: `No settings section "${request.unknown}"` })
           const area = request && "category" in request ? request : undefined
@@ -1537,6 +1609,8 @@ function App(props: {
 
     const skipped = kv.get("skipped_version")
     if (skipped && !isVersionGreater(version, skipped)) return
+    // XCOD-273: not over the Welcome screen; the bottom-right notice still says an update exists.
+    if (account.blocks()) return
 
     const choice = await DialogConfirm.show(
       dialog,
@@ -1590,7 +1664,11 @@ function App(props: {
       <Show when={Flag.OPENCODE_SHOW_TTFD}>
         <TimeToFirstDraw />
       </Show>
-      <Show when={ready()}>
+      {/* XCOD-273: the Welcome screen stands in front of the app, without waiting for plugins or sync. */}
+      <Show when={account.blocks() && account.phase() === "welcome"}>
+        <Welcome />
+      </Show>
+      <Show when={ready() && !account.blocks()}>
         <box flexGrow={1} minHeight={0} flexDirection="column">
           <Switch>
             <Match when={route.data.type === "home"}>

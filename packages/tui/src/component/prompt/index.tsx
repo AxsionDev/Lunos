@@ -10,7 +10,18 @@ import {
 } from "@opentui/core"
 import { useAnimationsEnabled } from "../../context/motion"
 import type { CommandContext } from "@opentui/keymap"
-import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  onMount,
+  createSignal,
+  onCleanup,
+  on,
+  Show,
+  Switch,
+  Match,
+  useContext,
+} from "solid-js"
 import { registerOpencodeSpinner } from "../register-spinner"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -56,6 +67,7 @@ import { DialogSkill } from "../dialog-skill"
 import { DialogMemory } from "../dialog-memory"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
+import { AccountContext } from "../../context/account"
 import type { Binding } from "@opentui/keymap"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
 import { useTuiConfig } from "../../config"
@@ -1071,6 +1083,8 @@ export function Prompt(props: PromptProps) {
   })
 
   let submitting = false
+  const account = useContext(AccountContext)
+
   async function submit() {
     // Prevent overlapping invocations (e.g. a double-pressed Enter, or the
     // input's native onSubmit racing another dispatch). Without this guard,
@@ -1150,6 +1164,9 @@ export function Prompt(props: PromptProps) {
     if (workspace.creating() || move.creating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
+    // XCOD-273: signed out where the official build needs an account (`lunos logout` in another
+    // terminal, say), a prompt shows the Welcome screen instead of failing; the draft stays.
+    if (account && !(await account.check())) return false
     // XCOD-94: bare /memory opens the memory browser, before any session is created.
     // `/memory off|on` has arguments and goes to the server like any other command.
     if (store.prompt.input.trim() === "/memory") {

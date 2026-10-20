@@ -1,6 +1,6 @@
 import { TextAttributes } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
-import { For, Match, Show, Switch, createMemo, createResource, createSignal, onMount } from "solid-js"
+import { For, Match, Show, Switch, createMemo, createResource, createSignal, onMount, useContext } from "solid-js"
 import type { SettingRow, SettingsSnapshot } from "@opencode-ai/sdk/v2"
 import { versionDetail } from "@opencode-ai/core/installation/version"
 import { useTheme } from "../context/theme"
@@ -32,6 +32,8 @@ import { DialogMemory } from "./dialog-memory"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogProviders } from "./dialog-provider"
 import { StatusServers } from "./dialog-status"
+import { DialogAccount } from "./dialog-account"
+import { AccountContext } from "../context/account"
 import {
   AGENT_NAME,
   TABS,
@@ -94,6 +96,7 @@ export function DialogSettings(props: {
 }) {
   const sdk = useSDK()
   const dialog = useDialog()
+  const account = useContext(AccountContext)
   const toast = useToast()
   const themeState = useTheme()
   const { theme } = themeState
@@ -764,16 +767,30 @@ export function DialogSettings(props: {
     // XCOD-259: the home is a list of sections, each with what's set and its badges.
     if (atHome() && !query()) {
       const all = snapshot()?.rows ?? []
-      return Sections.SECTIONS.map((item) => {
-        const mine = all.filter((row) => row.category === item.category)
-        const marks = Sections.badges(mine, pendingRestart)
-        return {
-          title: item.category,
-          value: `+area:${item.category}`,
-          description: Sections.summary(item.category, mine),
-          footer: marks || `${mine.length} settings`,
-        }
-      })
+      // XCOD-273: the Lunos account heads the list (it's /account; nothing in it is a config key).
+      const user = account?.user()
+      const head = account?.host
+        ? [
+            {
+              title: "Account",
+              value: "+account",
+              description: user ? `${user.email ?? user.sub}${user.plan ? ` · ${user.plan}` : ""}` : "Not signed in",
+              footer: "/account",
+            },
+          ]
+        : []
+      return head.concat(
+        Sections.SECTIONS.map((item) => {
+          const mine = all.filter((row) => row.category === item.category)
+          const marks = Sections.badges(mine, pendingRestart)
+          return {
+            title: item.category,
+            value: `+area:${item.category}`,
+            description: Sections.summary(item.category, mine),
+            footer: marks || `${mine.length} settings`,
+          }
+        }),
+      )
     }
     const list = shown().map((row) => {
       const value =
@@ -979,6 +996,19 @@ export function DialogSettings(props: {
               onMove={(option) => setHighlighted(option.value)}
               onSelect={(option) => {
                 if (option.value.startsWith("+area:")) return openArea(option.value.slice("+area:".length))
+                if (option.value === "+account")
+                  return dialog.replace(() => <DialogAccount />, undefined, {
+                    back: () =>
+                      dialog.replace(
+                        () => <DialogSettings tab="settings" focus="+account" scope={scope()} />,
+                        undefined,
+                        {
+                          nav: true,
+                          generation,
+                        },
+                      ),
+                    generation,
+                  })
                 if (option.value === "+memory.analytics") return dialog.replace(() => <DialogMemory />)
                 if (option.value.startsWith("+external.consent."))
                   return pickConsent(option.value.slice("+external.consent.".length) as "claude" | "codex")

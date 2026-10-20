@@ -108,6 +108,10 @@ lunos --version
 curl -fsSL https://raw.githubusercontent.com/AxsionDev/Lunos/dev/install | bash
 ```
 
+**Free. Sign in with a free Lunos account.** The first start asks you to create one or sign in;
+no card is needed, and every local feature is free. Self-hosted, offline and CI use need no account:
+see [Using Lunos without an account](docs/without-account.md).
+
 **npm 12 needs `--allow-scripts=lunos-ai`.** npm 12 no longer runs install scripts by default,
 so without the flag the package installs but its postinstall (which fetches the `lunos` binary)
 is skipped, and `lunos` exits with "lunos-ai's postinstall script was not run". Earlier npm
@@ -204,6 +208,8 @@ this repository:
 - [Data residency controls](docs/data-residency.md) — restricting provider jurisdictions, and the
   egress audit log
 - [Model provider jurisdictions](docs/provider-jurisdictions.md) — where each provider processes data
+- [Your Lunos account](docs/account.md) and
+  [using Lunos without an account](docs/without-account.md) (self-hosted, offline, CI)
 - [Trust pack](docs/trust/README.md) — security overview, supply chain, CRA readiness and pre-filled
   CAIQ answers for procurement and security reviewers
 - [`SECURITY.md`](SECURITY.md) — threat model and vulnerability reporting

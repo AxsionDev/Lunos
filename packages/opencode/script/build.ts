@@ -229,6 +229,9 @@ for (const item of targets) {
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
+      // XCOD-273: the official distribution asks for a free Lunos account at start (with exemptions);
+      // only the release pipeline sets this. A build from source leaves it off.
+      LUNOS_OFFICIAL_BUILD: JSON.stringify(process.env.LUNOS_OFFICIAL_BUILD === "1"),
       LUNOS_UPSTREAM_VERSION: JSON.stringify(pkg.lunos?.upstreamVersion ?? ""),
       // Written by script/upstream-sync.ts on each upstream merge (XCOD-118); absent until the first one.
       LUNOS_UPSTREAM_SYNC: JSON.stringify("upstreamSync" in pkg.lunos ? pkg.lunos.upstreamSync : null),

@@ -20,6 +20,7 @@ import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
 import { ConfigSubagent } from "../../config/subagent"
 import { ConfigCloud } from "../../config/cloud"
+import { ConfigAuth } from "../../config/auth"
 import { ConfigSync } from "../../config/sync"
 import { ConfigExternal } from "../../config/external"
 import { ConfigMemory } from "../../config/memory"
@@ -153,6 +154,9 @@ export const Info = Schema.Struct({
   }),
   cloud: Schema.optional(ConfigCloud.Info).annotate({
     description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",
+  }),
+  auth: Schema.optional(ConfigAuth.Info).annotate({
+    description: "Whether the TUI needs a Lunos account to start (XCOD-273). Only read from managed config",
   }),
   sync: Schema.optional(ConfigSync.Info).annotate({
     description: "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }",

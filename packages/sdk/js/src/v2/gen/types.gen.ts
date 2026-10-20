@@ -1816,6 +1816,10 @@ export type CloudConfig = {
   auto_team?: boolean
 }
 
+export type AuthConfig = {
+  required?: boolean
+}
+
 export type SyncOptions = {
   project?: string
   exclude?: Array<string>
@@ -2190,6 +2194,7 @@ export type Config = {
   default_agent?: string
   external?: ExternalConfig
   cloud?: CloudConfig
+  auth?: AuthConfig
   sync?: SyncConfig
   subagent?: SubagentConfig
   subagent_depth?: number

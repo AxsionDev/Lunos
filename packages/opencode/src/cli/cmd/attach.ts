@@ -1,4 +1,6 @@
 import { cmd } from "./cmd"
+import { CloudGate } from "@/cloud/gate"
+import { CloudTuiHost } from "@/cloud/tui-host"
 import { UI } from "@/cli/ui"
 import { errorMessage } from "@opencode-ai/tui/util/error"
 import { validateSession } from "../tui/validate-session"
@@ -143,6 +145,8 @@ export const AttachCommand = cmd({
         restart: { attach: args.url, request: (request) => (restartRequest = request) },
         restarted: restarted && { ...restarted },
         onStarted: () => Restart.markStarted(),
+        // XCOD-273: the account is this machine's, whichever server the TUI attaches to.
+        account: CloudTuiHost.create(await CloudGate.current()),
         args: {
           continue: args.continue,
           sessionID: args.session,

@@ -42,6 +42,7 @@
     "./util/persistence": "./src/util/persistence.ts",
     "./util/record": "./src/util/record.ts",
     "./util/restart": "./src/util/restart.ts",
+    "./util/account": "./src/util/account.ts",
     "./logo": "./src/logo.ts",
     "./ui/dialog": "./src/ui/dialog.tsx",
     "./ui/spinner": "./src/ui/spinner.ts",
@@ -63,8 +64,9 @@
     "fuzzysort": "catalog:",
     "opentui-spinner": "catalog:",
     "remeda": "catalog:",
+    "solid-js": "catalog:",
     "strip-ansi": "7.1.2",
-    "solid-js": "catalog:"
+    "uqr": "0.1.3"
   },
   "devDependencies": {
     "@tsconfig/bun": "catalog:",

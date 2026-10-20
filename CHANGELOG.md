@@ -23,6 +23,18 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Sign in with a free Lunos account, from inside the TUI.** The official build now opens on a
+  Welcome screen the first time: tick the Terms and Privacy notice, choose Create a free account or
+  Sign in, and confirm the code shown in large letters (with a QR code) in your browser. New
+  accounts confirm their e-mail address, and the screen moves on by itself. No card is ever asked
+  for, and every local feature stays free. Each failure (an expired code, a denial, being offline,
+  the sign-in service unreachable, an unconfirmed address) says what happened and offers Try again.
+  `/login`, `/logout` and `/account` (plan, organisations, devices, sign out everywhere, delete the
+  account) work at any time, and `/settings` has an Account entry. Self-hosted, offline and CI use
+  need no account: managed `"auth": { "required": false }`, an organisation's own `cloud.issuer`,
+  `LUNOS_OFFLINE=1`, `lunos run`, non-interactive terminals, `CI=true` and builds from source skip
+  it and contact no Lunos service. In CI, cloud features take a token from `LUNOS_TOKEN`.
+  <!-- XCOD-273 -->
 - **Watch and steer all your agents from one screen.** Press ← on an empty prompt (or type
   `/monitor`) to open the Agent Monitor: every session on this computer on the right, grouped into
   waiting for you, running, completed and failed, with what each waiting one asks. Approve or deny

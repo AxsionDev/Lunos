@@ -580,6 +580,16 @@
       },
       "additionalProperties": false
     },
+    "AuthConfig": {
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "description": "Whether the TUI asks you to sign in to a free Lunos account before the first session (default true in the official build, false in a build from source). Only read from managed config; false skips the sign-in screen and makes no Lunos account call"
+        }
+      },
+      "additionalProperties": false
+    },
     "SyncOptions": {
       "type": "object",
       "properties": {
@@ -1768,6 +1778,10 @@
         "cloud": {
           "$ref": "#/$defs/CloudConfig",
           "description": "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)"
+        },
+        "auth": {
+          "$ref": "#/$defs/AuthConfig",
+          "description": "Whether the TUI needs a Lunos account to start (XCOD-273). Only read from managed config"
         },
         "sync": {
           "$ref": "#/$defs/SyncConfig",

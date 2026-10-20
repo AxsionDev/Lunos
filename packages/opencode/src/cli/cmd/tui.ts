@@ -16,6 +16,9 @@ import { validateSession } from "../tui/validate-session"
 import { win32InstallCtrlCGuard } from "@opencode-ai/tui/terminal-win32"
 import type { RestartRequest } from "@opencode-ai/tui/util/restart"
 import { Restart } from "../restart"
+import { CloudGate } from "@/cloud/gate"
+import { CloudTuiHost } from "@/cloud/tui-host"
+import { requireLineSignIn } from "./cloud"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -187,6 +190,11 @@ export const TuiThreadCommand = cmd({
         process.exitCode = 1
         return
       }
+      // XCOD-273: the official build's account check, in line mode (no Welcome screen here yet).
+      if (!(await requireLineSignIn())) {
+        process.exitCode = 1
+        return
+      }
       await runSandboxedTui(resolveThreadDirectory(args.project), {
         continue: args.continue,
         session: args.session,
@@ -219,6 +227,11 @@ export const TuiThreadCommand = cmd({
         return
       }
 
+      // XCOD-273: --mini has no Welcome screen; the same sign-in runs in line mode first.
+      if (!(await requireLineSignIn())) {
+        process.exitCode = 1
+        return
+      }
       const { runMini } = await import("./run")
       await runMini({
         directory: resolveThreadDirectory(args.project),
@@ -366,6 +379,8 @@ export const TuiThreadCommand = cmd({
             fetch: transport.fetch,
             headers: transport.headers,
             events: transport.events,
+            // XCOD-273: the Lunos account, run here in the CLI process (the Welcome screen's sign-in).
+            account: CloudTuiHost.create(await CloudGate.current()),
             args: {
               continue: args.continue,
               sessionID: args.session,

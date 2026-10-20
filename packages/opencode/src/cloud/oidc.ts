@@ -39,6 +39,8 @@ export interface User {
   email?: string
   name?: string
   preferred_username?: string
+  /** XCOD-273: whether the provider has confirmed the e-mail address; undefined when it doesn't say. */
+  email_verified?: boolean
   /** Organisations the provider puts in the token (Keycloak `organization`, Zitadel roles…). */
   organizations?: string[]
 }
@@ -59,12 +61,39 @@ function trimmed(issuer: string) {
   return issuer.replace(/\/+$/, "")
 }
 
+/** No request to the provider waits longer than this (a hung connection must not hang a sign-in). */
+export const TIMEOUT_MS = 15_000
+
+/**
+ * XCOD-273: why a request never got an answer. `offline`: this machine has no network (the name
+ * didn't resolve, no route); `unreachable`: the network works but the provider didn't answer
+ * (refused, timed out). The sign-in screen says which, so the user knows what to fix.
+ */
+export function networkCode(error: unknown): "offline" | "unreachable" {
+  const code = String((error as { code?: unknown })?.code ?? "")
+  if (/^(ENOTFOUND|EAI_AGAIN|EAI_NONAME|ENETUNREACH|ENETDOWN|EHOSTUNREACH|NetworkUnreachable)$/i.test(code))
+    return "offline"
+  return "unreachable"
+}
+
+function reached(url: string, error: unknown): never {
+  throw new OidcError(
+    `Couldn't reach ${url}: ${error instanceof Error ? error.message : String(error)}`,
+    networkCode(error),
+  )
+}
+
 export async function discover(issuer: string, fetcher: Fetch = fetch): Promise<Discovery> {
   const url = `${trimmed(issuer)}/.well-known/openid-configuration`
-  const response = await fetcher(url, { headers: { accept: "application/json" } }).catch((error: unknown) => {
-    throw new OidcError(`Couldn't reach ${url}: ${error instanceof Error ? error.message : String(error)}`)
-  })
-  if (!response.ok) throw new OidcError(`${url} answered ${response.status}; is ${issuer} an OpenID Connect issuer?`)
+  const response = await fetcher(url, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  }).catch((error: unknown) => reached(url, error))
+  if (!response.ok)
+    throw new OidcError(
+      `${url} answered ${response.status}; is ${issuer} an OpenID Connect issuer?`,
+      response.status >= 500 ? "unreachable" : "not_oidc",
+    )
   const doc = (await response.json()) as Partial<Discovery>
   if (!doc.device_authorization_endpoint || !doc.token_endpoint)
     throw new OidcError(
@@ -83,7 +112,8 @@ async function post(url: string, body: URLSearchParams, fetcher: Fetch) {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
     body,
-  })
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  }).catch((error: unknown) => reached(url, error))
   const json = (await response.json().catch(() => ({}))) as Record<string, unknown>
   return { ok: response.ok, status: response.status, json }
 }
@@ -161,12 +191,24 @@ export async function waitForTokens(
   device: DeviceCode,
   options: { fetcher?: Fetch; sleep?: (ms: number) => Promise<unknown>; signal?: AbortSignal } = {},
 ): Promise<Tokens> {
-  const sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
+  // The default wait ends early on cancel, so a cancelled sign-in stops at once rather than after the interval.
+  const sleep =
+    options.sleep ??
+    ((ms: number) =>
+      new Promise((resolve) => {
+        const stop = () => (clearTimeout(timer), resolve(undefined))
+        const timer = setTimeout(() => {
+          options.signal?.removeEventListener("abort", stop)
+          resolve(undefined)
+        }, ms)
+        options.signal?.addEventListener("abort", stop, { once: true })
+      }))
   let interval = Math.max(1, device.interval ?? 5)
   const deadline = Date.now() + device.expires_in * 1000
   while (Date.now() < deadline) {
     if (options.signal?.aborted) throw new OidcError("Sign-in cancelled", "cancelled")
     await sleep(interval * 1000)
+    if (options.signal?.aborted) throw new OidcError("Sign-in cancelled", "cancelled")
     const result = await pollOnce(discovery, clientID, device, options.fetcher)
     if (result.status === "ok") return result.tokens
     if (result.status === "slow_down") interval += 5
@@ -223,7 +265,8 @@ export async function user(discovery: Discovery, tokens: Tokens, fetcher: Fetch 
   if (discovery.userinfo_endpoint) {
     const response = await fetcher(discovery.userinfo_endpoint, {
       headers: { authorization: `Bearer ${tokens.access_token}`, accept: "application/json" },
-    })
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    }).catch((error: unknown) => reached(discovery.userinfo_endpoint!, error))
     if (response.status === 401) throw new OidcError("The session has expired or was revoked", "unauthorized")
     if (response.ok) info = (await response.json()) as Record<string, unknown>
   }
@@ -234,6 +277,10 @@ export async function user(discovery: Discovery, tokens: Tokens, fetcher: Fetch 
     email: merged.email ? String(merged.email) : undefined,
     name: merged.name ? String(merged.name) : undefined,
     preferred_username: merged.preferred_username ? String(merged.preferred_username) : undefined,
+    email_verified:
+      merged.email_verified === undefined
+        ? undefined
+        : merged.email_verified === true || merged.email_verified === "true",
     organizations: organizations(merged) ?? organizations(claims(tokens.access_token)),
   }
 }
