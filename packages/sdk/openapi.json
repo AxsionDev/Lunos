@@ -2610,7 +2610,7 @@
             }
           }
         },
-        "description": "For each session: its message, subagent and queued-prompt counts, whether it's shared, and the external tool that keeps its own history. Changes nothing.",
+        "description": "For each session: its message, subagent and queued-prompt counts, whether it's shared, the console shares made from it (revoked when it's deleted), and the external tool that keeps its own history. Changes nothing.",
         "summary": "Preview deleting sessions",
         "requestBody": {
           "content": {
@@ -28441,6 +28441,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "sharesRevoked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": ["deleted", "skipped"],
@@ -28466,6 +28472,22 @@
           },
           "tool": {
             "type": "string"
+          },
+          "consoleShares": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["id"],
+              "additionalProperties": false
+            }
           }
         },
         "required": ["id", "messages", "children", "queued", "shared"],
@@ -28482,6 +28504,9 @@
           },
           "sync": {
             "type": "boolean"
+          },
+          "console": {
+            "type": "string"
           }
         },
         "required": ["items", "sync"],

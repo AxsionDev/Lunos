@@ -439,6 +439,10 @@ opencode session list
 Delete sessions for good: their history, subagent sessions and queued prompts. Files in your
 projects are never touched, and a Claude Code or Codex session keeps that tool's own history. A
 shared session's link is removed first, and with session sync on, the synced copy is deleted too.
+Console shares made from a session or its subagents with `lunos share` (or `/share` to your
+organisation's console) are revoked first; if one can't be, the session is kept and the reason is
+printed. Console shares made before Lunos recorded which session they came from aren't linked to it
+and stay live: find them with `lunos share list` and revoke them with `lunos share revoke <id>`.
 
 ```bash
 opencode session delete <sessionID...>
@@ -449,14 +453,15 @@ It prints what it deleted and what it skipped, and why.
 
 ##### Flags
 
-| Flag                                       | Short | Description                                                         |
-| ------------------------------------------ | ----- | ------------------------------------------------------------------- |
-| <nobr><code>{"--archived"}</code></nobr>   |       | Delete every archived session instead of the ids given              |
-| <nobr><code>{"--older-than"}</code></nobr> |       | With `--archived`: only those last active before this, e.g. `30d`   |
-| <nobr><code>{"--project"}</code></nobr>    |       | With `--archived`: only sessions of the project at this path        |
-| <nobr><code>{"--stop"}</code></nobr>       |       | Stop running or waiting sessions first (otherwise they are skipped) |
-| <nobr><code>{"--keep-cloud"}</code></nobr> |       | Keep the synced copies on Lunos Cloud                               |
-| <nobr><code>{"--yes"}</code></nobr>        | `-y`  | Don't ask for confirmation (needed with `--archived` in a script)   |
+| Flag                                        | Short | Description                                                           |
+| ------------------------------------------- | ----- | --------------------------------------------------------------------- |
+| <nobr><code>{"--archived"}</code></nobr>    |       | Delete every archived session instead of the ids given                |
+| <nobr><code>{"--older-than"}</code></nobr>  |       | With `--archived`: only those last active before this, e.g. `30d`     |
+| <nobr><code>{"--project"}</code></nobr>     |       | With `--archived`: only sessions of the project at this path          |
+| <nobr><code>{"--stop"}</code></nobr>        |       | Stop running or waiting sessions first (otherwise they are skipped)   |
+| <nobr><code>{"--keep-cloud"}</code></nobr>  |       | Keep the synced copies on Lunos Cloud                                 |
+| <nobr><code>{"--keep-shares"}</code></nobr> |       | Leave the console shares made from them live instead of revoking them |
+| <nobr><code>{"--yes"}</code></nobr>         | `-y`  | Don't ask for confirmation (needed with `--archived` in a script)     |
 
 ---
 

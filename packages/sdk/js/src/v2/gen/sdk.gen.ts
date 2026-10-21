@@ -1486,7 +1486,7 @@ export class SessionBulk extends HeyApiClient {
   /**
    * Preview deleting sessions
    *
-   * For each session: its message, subagent and queued-prompt counts, whether it's shared, and the external tool that keeps its own history. Changes nothing.
+   * For each session: its message, subagent and queued-prompt counts, whether it's shared, the console shares made from it (revoked when it's deleted), and the external tool that keeps its own history. Changes nothing.
    */
   public preview<ThrowOnError extends boolean = false>(
     parameters?: {

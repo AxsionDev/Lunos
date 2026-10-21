@@ -2791,6 +2791,7 @@ export type SessionBulkDeleteResult = {
   deleted: Array<string>
   skipped: Array<SessionBulkFailure>
   stopped?: Array<string>
+  sharesRevoked?: Array<string>
 }
 
 export type SessionBulkPreviewItem = {
@@ -2800,11 +2801,16 @@ export type SessionBulkPreviewItem = {
   queued: number
   shared: boolean
   tool?: string
+  consoleShares?: Array<{
+    id: string
+    url?: string
+  }>
 }
 
 export type SessionBulkPreviewResult = {
   items: Array<SessionBulkPreviewItem>
   sync: boolean
+  console?: string
 }
 
 export type NotFoundError = {
