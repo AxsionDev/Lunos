@@ -40,6 +40,8 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   `git config --global --add safe.directory <path>` command that fixes it. Any other Git failure
   shows Git's error instead of a guess.
 
+## [1.18.53] - 2026-10-21
+
 ### Changed
 
 - **With the sandbox on, `lunos` opens straight away and the sandbox starts behind it.** The line at
