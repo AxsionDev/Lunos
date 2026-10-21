@@ -40,7 +40,7 @@ import { useSync } from "../../context/sync"
 import { useEvent } from "../../context/event"
 import { editorSelectionKey, useEditorContext, type EditorSelection } from "../../context/editor"
 import { normalizePromptContent, openEditor } from "../../editor"
-import { useExit } from "../../context/exit"
+import { EXIT_WORDS, exitIntent, useExternalExit } from "../external-exit"
 import { promptOffsetWidth } from "../../prompt/display"
 import { createStore, produce, unwrap } from "solid-js/store"
 import { usePromptHistory, type PromptInfo } from "../../prompt/history"
@@ -69,7 +69,7 @@ import { DialogMemory } from "../dialog-memory"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
 import { AccountContext } from "../../context/account"
-import type { Binding } from "@opentui/keymap"
+import { stringifyKeyStroke, type Binding } from "@opentui/keymap"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
 import { useTuiConfig } from "../../config"
 import { usePromptWorkspace } from "./workspace"
@@ -232,7 +232,7 @@ export function Prompt(props: PromptProps) {
   const paletteShortcut = useCommandShortcut("command.palette.show")
   const undoShortcut = useCommandShortcut("input.undo")
   const renderer = useRenderer()
-  const exit = useExit()
+  const externalExit = useExternalExit()
   const dimensions = useTerminalDimensions()
   const themeState = useTheme()
   const { theme, syntax } = themeState
@@ -999,6 +999,41 @@ export function Prompt(props: PromptProps) {
     ],
   }))
 
+  // XCOD-286: the exit keys that also clear the prompt (ctrl+c) interrupt a working tool, as in the
+  // tool. A configured "ctrl+c,ctrl+d" is one binding; split, so each key knows which it is.
+  const keyNames = (binding: { key: unknown }) =>
+    typeof binding.key === "string"
+      ? binding.key
+          .split(",")
+          .map((key) => key.trim())
+          .filter(Boolean)
+      : [stringifyKeyStroke(binding.key as Parameters<typeof stringifyKeyStroke>[0])]
+  const interruptKeys = createMemo(() => new Set(tuiConfig.keybinds.get("prompt.clear").flatMap(keyNames)))
+  // XCOD-286: in a Claude Code / Codex session the exit keys (ctrl+c, ctrl+d, <leader>q) on an empty
+  // prompt close that session, not Lunos. ctrl+c while the tool works interrupts it first, as in the
+  // tool; the others ask before stopping it. app.tsx's global binding stands aside while this is live.
+  useBindings(() => ({
+    target: inputTarget,
+    enabled:
+      inputTarget() !== undefined &&
+      !props.disabled &&
+      !!external() &&
+      store.mode === "normal" &&
+      !auto()?.visible &&
+      !hasContent(),
+    priority: 10,
+    bindings: tuiConfig.keybinds.get("app.exit").flatMap((binding) =>
+      keyNames(binding).map((key) => ({
+        ...binding,
+        key: typeof binding.key === "string" ? key : binding.key,
+        cmd: () => {
+          if (!props.sessionID) return
+          void externalExit.close(props.sessionID, interruptKeys().has(key) ? "interrupt" : "exit")
+        },
+      })),
+    ),
+  }))
+
   useBindings(() => {
     return {
       target: inputTarget,
@@ -1324,7 +1359,7 @@ export function Prompt(props: PromptProps) {
     }
     // XCOD-262: the Agent Monitor sends the prompt itself, as text: to the sessions it tags, or as a
     // new session it stays beside. The local commands above, and exit, still run here first.
-    if (props.onIntercept && !["exit", "quit", ":q"].includes(store.prompt.input.trim())) {
+    if (props.onIntercept && !EXIT_WORDS.has(store.prompt.input.trim())) {
       if (store.mode === "shell") {
         toast.show({ variant: "info", message: "Shell commands run in a session: open one to use !" })
         return false
@@ -1354,16 +1389,22 @@ export function Prompt(props: PromptProps) {
       input.clear()
       return true
     }
-    const agent = local.mode.current()
-    if (!agent) return false
-    const trimmed = store.prompt.input.trim()
-    if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
-      void exit()
+    // XCOD-286: in a Claude Code / Codex session `exit`, `quit`, `:q` and `/exit` (the tool's own
+    // included) close that session; `/exit:lunos` quits Lunos. Before the external branch below,
+    // which would send them to the tool as typed.
+    const external = props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined
+    const intent = exitIntent(store.prompt.input, !!external)
+    if (intent) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      if (intent === "close" && props.sessionID) void externalExit.close(props.sessionID)
+      else void externalExit.quit()
       return true
     }
+    const agent = local.mode.current()
+    if (!agent) return false
     // XCOD-218: in an external session the text goes to Claude Code / Codex as typed, its own
     // /commands included; no Lunos model is involved.
-    const external = props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined
     if (props.sessionID && external) {
       const text = store.prompt.input
       // XCOD-254: a Lunos command (`/name`, or `/name:lunos` on a clash) is expanded by Lunos, and the
@@ -2242,11 +2283,20 @@ export function Prompt(props: PromptProps) {
             <Match when={true}>
               {props.hint ?? (
                 <Show when={props.sessionID} fallback={<text />}>
-                  <box marginLeft={1}>
+                  {/* XCOD-286: in an external session this side gives way (cut, one line), so the exit hint
+                      and the commands on the right stay whole. */}
+                  <box
+                    marginLeft={1}
+                    {...(external() ? { flexShrink: 1, minWidth: 0, marginRight: 2, overflow: "hidden" as const } : {})}
+                  >
                     {/* XCOD-254: an external session shows what the Lunos bridge offers instead of the directory. */}
                     <Show
                       when={bridgeLine(external()?.bridge)}
-                      fallback={<text fg={theme.textMuted}>{location()?.directory ?? paths.cwd}</text>}
+                      fallback={
+                        <text fg={theme.textMuted} wrapMode={external() ? "none" : undefined}>
+                          {location()?.directory ?? paths.cwd}
+                        </text>
+                      }
                     >
                       {(line) => (
                         <text fg={line().warning ? theme.warning : theme.textMuted} wrapMode="none">
@@ -2260,7 +2310,7 @@ export function Prompt(props: PromptProps) {
             </Match>
           </Switch>
           <Show when={status().type !== "retry"}>
-            <box gap={2} flexDirection="row">
+            <box gap={2} flexDirection="row" flexShrink={external() ? 0 : undefined}>
               <Show when={external()}>
                 {(marker) => (
                   <text fg={accent() ?? theme.text} wrapMode="none" flexShrink={0}>
@@ -2290,6 +2340,13 @@ export function Prompt(props: PromptProps) {
                       </text>
                     </Match>
                   </Switch>
+                  {/* XCOD-286: here exit closes the tool's session; quitting Lunos is explicit. */}
+                  <Show when={external()}>
+                    <text fg={theme.text} wrapMode="none" flexShrink={0}>
+                      exit <span style={{ fg: theme.textMuted }}>closes</span> · /exit:lunos{" "}
+                      <span style={{ fg: theme.textMuted }}>quits Lunos</span>
+                    </text>
+                  </Show>
                   <text fg={theme.text}>
                     {paletteShortcut()} <span style={{ fg: theme.textMuted }}>commands</span>
                   </text>

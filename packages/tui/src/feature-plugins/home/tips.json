@@ -754,6 +754,12 @@
     "requires": ["external.enabled"]
   },
   {
+    "id": "exit-closes-external-session",
+    "category": "Claude Code & Codex",
+    "text": "In a Claude Code or Codex session, {highlight}exit{/highlight} closes that session and returns to Lunos; {highlight}/exit:lunos{/highlight} quits Lunos",
+    "requires": ["external.enabled"]
+  },
+  {
     "id": "claude-code-codex-session",
     "category": "Claude Code & Codex",
     "text": "In a Claude Code or Codex session, {highlight}/models{/highlight} lists that tool's own models",

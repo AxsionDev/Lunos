@@ -34,6 +34,13 @@ export function DialogHelp() {
           Press {commandShortcut()} to see all available actions and commands in any context.
         </text>
       </box>
+      {/* XCOD-286 */}
+      <box paddingBottom={1}>
+        <text fg={theme.textMuted}>
+          In a Claude Code or Codex session, <span style={{ fg: theme.text }}>exit</span> (or /exit, ctrl+d) closes that
+          session and returns to Lunos; <span style={{ fg: theme.text }}>/exit:lunos</span> quits Lunos.
+        </text>
+      </box>
       <Show when={tuiConfig.double_escape_clear}>
         <box paddingBottom={1}>
           <text fg={theme.textMuted}>
