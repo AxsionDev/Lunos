@@ -276,12 +276,16 @@ export async function status(state: State, session: string, opts: Options = {}):
 export async function removeSession(session: string, opts: Options & { state?: State } = {}): Promise<RemoveResult> {
   const state = opts.state ?? (await load())
   if (!state || !state.device.syncEnabled) return { ok: true, deleted: false }
-  // Nothing still queued for it is uploaded after this.
-  await CloudSyncQueue.drop(session, "deleted").catch(() => undefined)
+  // Once there is no synced copy, nothing still queued for the session is uploaded. Only then: a
+  // failed call leaves the session (and its sync) as it was, to try again.
+  const forget = () => CloudSyncQueue.drop(session, "deleted").catch(() => undefined)
   const found = await status(state, session, opts)
   if (!found.ok) return found
-  if (!found.session || found.deleted) return { ok: true, deleted: false }
-  return settle(async () => {
+  if (!found.session || found.deleted) {
+    await forget()
+    return { ok: true, deleted: false }
+  }
+  const result = await settle(async () => {
     const { token } = await who(opts)
     const res = await request(
       state.endpoint,
@@ -296,4 +300,6 @@ export async function removeSession(session: string, opts: Options & { state?: S
     if (!res.ok) return failure(res)
     return { ok: true as const, deleted: true }
   })
+  if (result.ok) await forget()
+  return result
 }

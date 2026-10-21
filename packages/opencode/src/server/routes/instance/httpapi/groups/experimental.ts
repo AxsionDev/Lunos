@@ -267,7 +267,7 @@ export const SessionBulkDeletePayload = Schema.Struct({
   archivedOnly: Schema.optional(Schema.Boolean),
   /** Stop the running and waiting ones first; otherwise they are skipped. */
   stop: Schema.optional(Schema.Boolean),
-  /** Leave the synced copy on Lunos Cloud. */
+  /** false deletes the synced copy on Lunos Cloud too. Defaults to true: synced copies are left. */
   keepCloud: Schema.optional(Schema.Boolean),
   /** For the audit log: one session, or many at once (the default). */
   origin: Schema.optional(Schema.Literals(["single", "bulk"])),

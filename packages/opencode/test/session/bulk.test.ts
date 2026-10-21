@@ -489,6 +489,29 @@ describe("SessionBulk.remove (XCOD-284)", () => {
     }),
   )
 
+  it.instance("a Lunos session that ran Claude Code doesn't leave its tool row behind; the transcript stays", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const transcript = path.join(path.dirname(SessionPeers.dir()), "claude-linked", "cc-9.jsonl")
+      yield* Effect.promise(async () => {
+        await fs.mkdir(path.dirname(transcript), { recursive: true })
+        await Bun.write(transcript, "{}\n")
+      })
+      yield* Effect.promise(() => ExternalRegistry.save(external({ sessionID: "cc-9" })))
+      const session = yield* sessions.create({
+        title: "with Claude Code",
+        metadata: { external: { tool: "claude", session: "cc-9" } },
+      } as never)
+      expect(yield* listed()).toContain(session.id)
+      expect(yield* listed()).not.toContain("external:cc-9")
+      yield* SessionBulk.remove({ sessionIDs: [session.id], archivedOnly: false, cloud: noCloud })
+      expect(yield* listed()).not.toContain(session.id)
+      expect(yield* listed()).not.toContain("external:cc-9")
+      expect(yield* Effect.promise(() => Bun.file(transcript).text())).toBe("{}\n")
+      yield* Effect.promise(() => fs.rm(path.dirname(transcript), { recursive: true }))
+    }),
+  )
+
   it.instance("a shared session is unshared first; if that fails it isn't deleted", () =>
     Effect.gen(function* () {
       const sessions = yield* SessionNs.Service

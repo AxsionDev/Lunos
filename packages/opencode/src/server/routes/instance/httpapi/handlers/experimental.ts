@@ -304,6 +304,9 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     }) {
       return yield* SessionBulk.remove({
         ...ctx.payload,
+        // Callers from before XCOD-284 (Delete archived in the TUI and the desktop/web app) never
+        // reached Lunos Cloud: they still don't unless they ask.
+        keepCloud: ctx.payload.keepCloud ?? true,
         reason: ctx.payload.stop ? "Stopped to delete it" : undefined,
         unshare: shareSvc.unshare,
       }).pipe(Effect.provideService(Session.Service, sessions))

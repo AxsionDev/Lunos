@@ -497,8 +497,9 @@ async function mountList(server: ReturnType<typeof fakeServer>) {
   return ui
 }
 // XCOD-284: Delete in /sessions. Rows here are newest first under the Ungrouped heading: d1, d2, d3, d4.
-const finished = (extra: Partial<SessionOverviewItem>[] = []) =>
-  ["d1", "d2", "d3", "d4"].map((id, index) => row(id, { updated: Date.now() - index * 60_000, ...extra[index] }))
+// The marked rows outlive a view (as in the app), so the test that marks rows uses ids of its own.
+const finished = (extra: Partial<SessionOverviewItem>[] = [], prefix = "d") =>
+  [1, 2, 3, 4].map((n, index) => row(`${prefix}${n}`, { updated: Date.now() - index * 60_000, ...extra[index] }))
 
 test("XCOD-284: ctrl+d on one session asks once, Cancel first (Enter cancels), then deletes just it", async () => {
   const server = fakeServer({ sessions: finished(), preview: { d1: { messages: 42 } } })
@@ -538,7 +539,7 @@ test("XCOD-284: ctrl+d on one session asks once, Cancel first (Enter cancels), t
 })
 
 test("XCOD-284: space marks rows (n selected), ctrl+d deletes exactly those after the typed count", async () => {
-  const server = fakeServer({ sessions: finished() })
+  const server = fakeServer({ sessions: finished([], "m") })
   const ui = await mountList(server)
   try {
     for (const step of ["down", "space", "down", "space", "down", "down", "space"]) {
@@ -547,10 +548,10 @@ test("XCOD-284: space marks rows (n selected), ctrl+d deletes exactly those afte
       await Bun.sleep(40)
     }
     await wait(() => ui.frame().includes("3 selected"))
-    expect(ui.frame()).toContain("[x] title d1")
-    expect(ui.frame()).toContain("[x] title d2")
-    expect(ui.frame()).not.toContain("[x] title d3")
-    expect(ui.frame()).toContain("[x] title d4")
+    expect(ui.frame()).toContain("[x] title m1")
+    expect(ui.frame()).toContain("[x] title m2")
+    expect(ui.frame()).not.toContain("[x] title m3")
+    expect(ui.frame()).toContain("[x] title m4")
     // Unmark and mark again: a toggle.
     ui.app.mockInput.pressKey(" ")
     await wait(() => ui.frame().includes("2 selected"))
@@ -579,11 +580,11 @@ test("XCOD-284: space marks rows (n selected), ctrl+d deletes exactly those afte
     await ui.enter()
     await wait(() => server.calls.some((call) => call.path === "delete"))
     const call = server.calls.find((each) => each.path === "delete")!
-    expect(call.body.sessionIDs.toSorted()).toEqual(["d1", "d2", "d4"])
+    expect(call.body.sessionIDs.toSorted()).toEqual(["m1", "m2", "m4"])
     expect(call.body.origin).toBe("bulk")
     await wait(() => ui.toast() === "Deleted 3 sessions")
-    await wait(() => !ui.frame().includes("title d1"))
-    expect(server.sessions.map((item) => item.id)).toEqual(["d3"])
+    await wait(() => !ui.frame().includes("title m1"))
+    expect(server.sessions.map((item) => item.id)).toEqual(["m3"])
     expect(ui.frame()).not.toContain("selected")
   } finally {
     ui.cleanup()
@@ -600,11 +601,15 @@ test("XCOD-284: Delete all shown deletes only what the search shows; space still
   })
   const ui = await mountList(server)
   try {
-    // Typed key by key, as a person types (space included: it isn't "select" while searching).
-    await Bun.sleep(100)
-    for (const ch of "beta t") {
+    // Typed key by key, as a person types (space included: it isn't "select" while searching). The
+    // search box takes focus a moment after the view opens: the first key is sent until it lands.
+    for (let attempt = 0; attempt < 20 && !ui.frame().includes("6 sessions b "); attempt++) {
+      ui.app.mockInput.pressKey("b")
+      await wait(() => ui.frame().includes("6 sessions b "), 300).catch(() => undefined)
+    }
+    for (const ch of "eta t") {
       ui.app.mockInput.pressKey(ch)
-      await Bun.sleep(30)
+      await Bun.sleep(40)
     }
     await wait(() => ui.frame().includes("beta two") && !ui.frame().includes("title d1"))
     expect(ui.frame()).toContain("Sessions — all projects · 6 sessions beta t ")

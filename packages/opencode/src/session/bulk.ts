@@ -362,6 +362,10 @@ export const remove = Effect.fn("SessionBulk.remove")(function* (input: RemoveIn
     if (removed) queued += held
     if (removed) result.deleted.push(id)
     else result.skipped.push({ id, reason: "no such session" })
+    // A Claude Code / Codex session Lunos ran (XCOD-218) would be listed on its own once its Lunos
+    // session is gone: its registry entry, Lunos's own file, goes too. The tool's transcript stays.
+    const linked = SessionOverview.externalOf(info)?.session
+    if (removed && linked) yield* Effect.promise(() => ExternalRegistry.remove(linked).catch(() => undefined))
   }
   if (result.deleted.length)
     AuditLog.emit("session.delete", {
@@ -386,7 +390,8 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
   unshare?: RemoveInput["unshare"]
   cloud?: CloudRemove
 }) {
-  return yield* remove({ ...input, archivedOnly: true, origin: "bulk" })
+  // As before XCOD-284, synced copies are left unless the caller asks (keepCloud: false).
+  return yield* remove({ ...input, keepCloud: input.keepCloud ?? true, archivedOnly: true, origin: "bulk" })
 })
 
 /**

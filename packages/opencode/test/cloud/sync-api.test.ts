@@ -4,6 +4,7 @@ import os from "os"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import { CloudSyncApi } from "@/cloud/sync-api"
+import { CloudSyncQueue } from "@/cloud/sync-queue"
 
 let server: ReturnType<typeof Bun.serve>
 let seen: Array<{ method: string; path: string; auth: string | null; body: string }>
@@ -45,6 +46,10 @@ beforeEach(async () => {
         return Response.json({ session: "cs_1", lastSeq: 3 })
       if (req.method === "GET" && url.pathname.endsWith("/sessions/ses_never")) return Response.json({ lastSeq: 0 })
       if (req.method === "DELETE" && url.pathname === "/v1/sessions/cs_1") return Response.json({ ok: true })
+      if (req.method === "GET" && url.pathname.endsWith("/sessions/ses_flaky"))
+        return Response.json({ session: "cs_flaky", lastSeq: 1 })
+      if (req.method === "DELETE" && url.pathname === "/v1/sessions/cs_flaky")
+        return Response.json({ error: { code: "internal", message: "try later" } }, { status: 500 })
       return new Response("no", { status: 404 })
     },
   })
@@ -199,4 +204,13 @@ test("XCOD-284: removeSession deletes the synced copy by its control-plane id, a
   // A server that refuses: a failure, not a throw.
   const failed = await CloudSyncApi.removeSession("ses_other", { ...opts(), state })
   expect(failed).toMatchObject({ ok: false, status: 404 })
+})
+
+test("XCOD-284: a failed delete of the synced copy leaves the session's sync running", async () => {
+  const state = await CloudSyncApi.register(opts())
+  expect(await CloudSyncApi.removeSession("ses_flaky", { ...opts(), state })).toMatchObject({ ok: false, status: 500 })
+  expect((await CloudSyncQueue.cursor("ses_flaky"))?.stopped).toBeUndefined()
+  // Deleted: nothing queued for it is uploaded any more.
+  await CloudSyncApi.removeSession("ses_synced", { ...opts(), state })
+  expect((await CloudSyncQueue.cursor("ses_synced"))?.stopped).toBe("deleted")
 })
