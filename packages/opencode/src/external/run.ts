@@ -31,6 +31,8 @@ export interface Options {
   ask: ExternalClaude.Options["ask"]
   /** XCOD-285: Lunos policy before the tool's permission mode (Claude Code's PreToolUse hook). */
   policy?: ExternalClaude.Options["policy"]
+  /** Claude Code said it won't apply that hook (`hooks_applied: false`). */
+  onHooksNotApplied?: ExternalClaude.Options["onHooksNotApplied"]
   onEvent?: ExternalClaude.Options["onEvent"]
 }
 

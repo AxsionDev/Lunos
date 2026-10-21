@@ -773,6 +773,23 @@ const scenarios: Scenario[] = [
       headers: ctx.headers(),
     }))
     .json(404, object, "status"),
+  // XCOD-285 §4: a tool's own configuration. Only refusals are exercised here, so neither tool is started:
+  // a tool Lunos doesn't drive, and a server name the tools can't take (refused before any spawn).
+  http.protected
+    .get("/experimental/external/config/{tool}", "experimental.external.config")
+    .at((ctx) => ({
+      path: route("/experimental/external/config/{tool}", { tool: "vim" }),
+      headers: ctx.headers(),
+    }))
+    .status(400, undefined, "status"),
+  http.protected
+    .post("/experimental/external/config/{tool}/command", "experimental.external.configCommand")
+    .at((ctx) => ({
+      path: route("/experimental/external/config/{tool}/command", { tool: "claude" }),
+      headers: ctx.headers(),
+      body: { action: "mcp.add", name: "not a name", target: "npx x", run: false },
+    }))
+    .json(400, object, "status"),
   // XCOD-262: the Agent Monitor's prompt to an existing session.
   http.protected
     .post("/experimental/session/{sessionID}/enqueue", "experimental.session.enqueue")

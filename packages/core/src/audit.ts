@@ -91,6 +91,9 @@ export const EVENTS = [
   // tools' arguments or results: each bridged call is also a `tool.run` like a native one.
   "external.bridge",
   "external.consent",
+  // XCOD-285: a confirmed change to Claude Code's or Codex's own configuration, made with the tool's
+  // own command (tool, action, server name, scope, the file it changes, whether it succeeded).
+  "external.config",
   // XCOD-186: a run dispatched to a Lunos Cloud worker (worker id, endpoint, region, repo, size,
   // the secret names sent), its end (outcome, results branch, active seconds), or a dispatch refused
   // before any code left the machine (offline, residency, unpushed commit). Never secret values.

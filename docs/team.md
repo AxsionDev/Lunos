@@ -141,6 +141,15 @@ residency check, the audit record, sanitize and the link. `list` and `revoke` ca
 (those start with `ses_`), so `lunos share <session-id>` is unchanged. They upload nothing, so they
 work with sharing off: you can always take back what you shared.
 
+Deleting a session (`/sessions`, the Agent Monitor, `lunos session delete`) revokes the console
+shares made from it and its subagents first, because the console doesn't know which session a share
+came from: this machine remembers it (share ids, URLs and the console, never content, in
+`console-shares.json` in the data directory). If a share can't be revoked (signed out, the console
+unreachable, or a share on a console that isn't the one configured here), the session is kept and
+the reason is shown; `lunos session delete --keep-shares` deletes it and leaves the shares live.
+Shares made before this was recorded, or from another machine, aren't linked to the session: find
+them with `lunos share list` and revoke them with `lunos share revoke <id>`.
+
 Members see shares on the console's _Shares_ page, shown as text: nothing in them is run or
 rendered as HTML. A link is signed (HMAC over its id, the share and its expiry) and checked against
 the console's records, so it stops working when it expires (30 days unless asked for less, and never

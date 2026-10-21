@@ -2610,7 +2610,7 @@
             }
           }
         },
-        "description": "For each session: its message, subagent and queued-prompt counts, whether it's shared, and the external tool that keeps its own history. Changes nothing.",
+        "description": "For each session: its message, subagent and queued-prompt counts, whether it's shared, the console shares made from it (revoked when it's deleted), and the external tool that keeps its own history. Changes nothing.",
         "summary": "Preview deleting sessions",
         "requestBody": {
           "content": {
@@ -3536,6 +3536,168 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.external.consent({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/external/config/{tool}": {
+      "get": {
+        "tags": ["experimental"],
+        "operationId": "experimental.external.config",
+        "parameters": [
+          {
+            "name": "tool",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "enum": ["claude", "codex"]
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The tool's configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalConfigView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Claude Code's or Codex's own configuration as the installed tool reports it (model, permissions, instruction files, MCP servers, hooks, agents or profiles), with the layer and file each comes from where the tool says. No prompt is sent and the user's hooks don't run. Refused like starting a session under external.enabled and the residency policy. Secrets are never returned.",
+        "summary": "Claude Code or Codex configuration",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.external.config({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/external/config/{tool}/command": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.external.configCommand",
+        "parameters": [
+          {
+            "name": "tool",
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "enum": ["claude", "codex"]
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The tool's command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalConfigCommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Add or remove an MCP server with the tool's own command (claude mcp add -s …, codex mcp remove …). With run false, returns the exact command and the file it changes, and runs nothing; with run true, runs it and returns the tool's output. Lunos never writes the tool's files itself. Audited as external.config.",
+        "summary": "Change Claude Code or Codex configuration with its own command",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["mcp.add", "mcp.remove"]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "string"
+                  },
+                  "run": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["action", "name", "run"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.external.configCommand({\n  ...\n})"
           }
         ]
       }
@@ -28479,6 +28641,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "sharesRevoked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": ["deleted", "skipped"],
@@ -28504,6 +28672,22 @@
           },
           "tool": {
             "type": "string"
+          },
+          "consoleShares": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["id"],
+              "additionalProperties": false
+            }
           }
         },
         "required": ["id", "messages", "children", "queued", "shared"],
@@ -28520,6 +28704,9 @@
           },
           "sync": {
             "type": "boolean"
+          },
+          "console": {
+            "type": "string"
           }
         },
         "required": ["items", "sync"],
@@ -28637,6 +28824,151 @@
           }
         },
         "required": ["tool", "label", "models", "fallback"],
+        "additionalProperties": false
+      },
+      "ExternalConfigSource": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": ["label"],
+        "additionalProperties": false
+      },
+      "ExternalConfigItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExternalConfigSource"
+          },
+          "open": {
+            "type": "string"
+          },
+          "remove": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "name"],
+        "additionalProperties": false
+      },
+      "ExternalConfigSection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalConfigItem"
+            }
+          },
+          "note": {
+            "type": "string"
+          },
+          "add": {
+            "type": "object",
+            "properties": {
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": "boolean"
+              }
+            },
+            "required": ["scopes", "url"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "title", "items"],
+        "additionalProperties": false
+      },
+      "ExternalConfigView": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "enum": ["claude", "codex"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalConfigSection"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["tool", "label", "sections", "notes"],
+        "additionalProperties": false
+      },
+      "ExternalConfigCommandResult": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "ran": {
+            "type": "boolean"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "string"
+          }
+        },
+        "required": ["command", "ran"],
         "additionalProperties": false
       },
       "PermissionRequest": {

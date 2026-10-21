@@ -36,7 +36,7 @@ describe("the tool's calls as Lunos hooks see them (XCOD-254)", () => {
   })
 
   test("a hook's error is the refusal the tool gets", () => {
-    expect(ExternalHooks.refusal(new Error("no rm -rf"))).toBe("Refused by a Lunos hook: no rm -rf")
+    expect(ExternalHooks.refusal(new Error("no rm -rf"))).toBe("Refused by a Lunos plugin hook: no rm -rf")
   })
 })
 

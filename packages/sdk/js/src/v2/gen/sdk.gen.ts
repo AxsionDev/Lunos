@@ -56,6 +56,10 @@ import type {
   ExperimentalConsoleSwitchOrgResponses,
   ExperimentalControlPlaneMoveSessionErrors,
   ExperimentalControlPlaneMoveSessionResponses,
+  ExperimentalExternalConfigCommandErrors,
+  ExperimentalExternalConfigCommandResponses,
+  ExperimentalExternalConfigErrors,
+  ExperimentalExternalConfigResponses,
   ExperimentalExternalConsentErrors,
   ExperimentalExternalConsentResponses,
   ExperimentalExternalModeErrors,
@@ -1486,7 +1490,7 @@ export class SessionBulk extends HeyApiClient {
   /**
    * Preview deleting sessions
    *
-   * For each session: its message, subagent and queued-prompt counts, whether it's shared, and the external tool that keeps its own history. Changes nothing.
+   * For each session: its message, subagent and queued-prompt counts, whether it's shared, the console shares made from it (revoked when it's deleted), and the external tool that keeps its own history. Changes nothing.
    */
   public preview<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1956,6 +1960,93 @@ export class External extends HeyApiClient {
       ThrowOnError
     >({
       url: "/experimental/external/consent",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Claude Code or Codex configuration
+   *
+   * Claude Code's or Codex's own configuration as the installed tool reports it (model, permissions, instruction files, MCP servers, hooks, agents or profiles), with the layer and file each comes from where the tool says. No prompt is sent and the user's hooks don't run. Refused like starting a session under external.enabled and the residency policy. Secrets are never returned.
+   */
+  public config<ThrowOnError extends boolean = false>(
+    parameters: {
+      tool: "claude" | "codex"
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "tool" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalExternalConfigResponses,
+      ExperimentalExternalConfigErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/config/{tool}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Change Claude Code or Codex configuration with its own command
+   *
+   * Add or remove an MCP server with the tool's own command (claude mcp add -s …, codex mcp remove …). With run false, returns the exact command and the file it changes, and runs nothing; with run true, runs it and returns the tool's output. Lunos never writes the tool's files itself. Audited as external.config.
+   */
+  public configCommand<ThrowOnError extends boolean = false>(
+    parameters: {
+      tool: "claude" | "codex"
+      directory?: string
+      workspace?: string
+      action?: "mcp.add" | "mcp.remove"
+      name?: string
+      scope?: string
+      target?: string
+      run?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "tool" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "action" },
+            { in: "body", key: "name" },
+            { in: "body", key: "scope" },
+            { in: "body", key: "target" },
+            { in: "body", key: "run" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalConfigCommandResponses,
+      ExperimentalExternalConfigCommandErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/config/{tool}/command",
       ...options,
       ...params,
       headers: {

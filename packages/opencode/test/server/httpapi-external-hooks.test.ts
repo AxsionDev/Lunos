@@ -5,6 +5,7 @@ import { afterEach, describe, expect } from "bun:test"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { Audit } from "@opencode-ai/core/audit"
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import { Config, Effect, Fiber, Layer } from "effect"
 import { HttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/unstable/http"
@@ -92,12 +93,13 @@ export const Guard = async () => ({
   },
   event: async ({ event }) => {
     if (event.type === "session.idle") record({ hook: "event", type: event.type, sessionID: event.properties.sessionID })
+    if (event.type === "tui.toast.show") record({ hook: "event", type: event.type, title: event.properties.title, message: event.properties.message, variant: event.properties.variant })
   },
 })
 `
 
 /** Project config: the plugin, the fakes, and nothing shared through the bridge (so no consent question). */
-const setup = (directory: string, share: Record<string, boolean> = {}) =>
+const setup = (directory: string, share: Record<string, boolean> = {}, extra: Record<string, unknown> = {}) =>
   Effect.gen(function* () {
     const hookLog = path.join(directory, "hooks.log")
     const plugin = path.join(directory, "guard-plugin.ts")
@@ -114,6 +116,7 @@ const setup = (directory: string, share: Record<string, boolean> = {}) =>
             codex: { path: FAKE_CODEX },
             share: { mcp: false, skills: false, memory: false, ...share },
           },
+          ...extra,
         }),
       ),
     )
@@ -172,6 +175,14 @@ const replies = (log: string, method?: string) =>
     ),
   )
 
+/** The answer Lunos gave to Claude Code's PreToolUse hook for the Bash call, and whether the call ran. */
+const hookAnswer = (log: string) =>
+  readLog(log).then(
+    (lines) =>
+      lines.find((line) => line.response?.request_id === "hook_toolu_bash")?.response.response.hookSpecificOutput,
+  )
+const ran = (log: string) => readLog(log).then((lines) => lines.find((line) => line.ran !== undefined))
+
 describe("Lunos hooks on external sessions (XCOD-254)", () => {
   it.instance(
     "Claude Code: a Lunos pre-tool hook refuses Bash rm -rf without asking; other calls ask, then run the post-tool hook",
@@ -186,12 +197,18 @@ describe("Lunos hooks on external sessions (XCOD-254)", () => {
 
         process.env.FAKE_CLAUDE_BASH = "rm -rf build"
         const refused = yield* turn(directory, sessionID, "Clean the build")
-        // Refused by the hook before Lunos asked: no approval, and Claude Code is told why.
+        // Refused by the hook before Lunos asked: no approval, and Claude Code is told why. Since the
+        // policy check runs the plugin hooks, the refusal is the PreToolUse hook's answer and Claude Code
+        // never asks for approval at all.
         expect(refused.asked).toEqual([])
         let sent = yield* Effect.promise(() => replies(log, "claude"))
-        expect(sent.map((line) => line.response.response)).toEqual([
-          { behavior: "deny", message: "Refused by a Lunos hook: rm -rf is not allowed in this project" },
-        ])
+        expect(sent).toEqual([])
+        expect(yield* Effect.promise(() => hookAnswer(log))).toEqual({
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: "Refused by a Lunos plugin hook: rm -rf is not allowed in this project",
+        })
+        expect(yield* Effect.promise(() => ran(log))).toEqual({ ran: false, hooked: true })
         let hooks = yield* hooksAfterIdle(hookLog, sessionID)
         expect(hooks.filter((entry) => entry.hook !== "event")).toEqual([
           {
@@ -312,6 +329,113 @@ describe("Lunos hooks on external sessions (XCOD-254)", () => {
         ).toEqual([
           ["mcp__github__create_issue", "mcp-9", { title: "Bug" }],
           ["mcp__github__create_issue", "mcp-9", { title: "Bug" }],
+        ])
+      }),
+    { git: true },
+    30_000,
+  )
+})
+
+describe("Lunos plugin hooks on calls Claude Code allows without asking", () => {
+  it.instance(
+    "acceptEdits/auto: a plugin's pre-tool hook still refuses rm -rf, says it's a Lunos plugin, and is audited",
+    () =>
+      Effect.gen(function* () {
+        const { directory } = yield* TestInstance
+        const auditPath = path.join(directory, "audit.log")
+        const hookLog = yield* setup(directory, {}, { audit: { enabled: true, path: auditPath } })
+        const log = path.join(directory, "fake-claude.log")
+        process.env.FAKE_CLAUDE_LOG = log
+        // The tool's mode allows the call by itself: no can_use_tool, so only the PreToolUse hook reaches Lunos.
+        process.env.FAKE_CLAUDE_AUTO_ALLOW = "1"
+        process.env.FAKE_CLAUDE_BASH = "rm -rf build"
+        const created = yield* call(directory, SessionPaths.create, { metadata: { external: { tool: "claude" } } })
+        const sessionID = created.body.id as string
+
+        const refused = yield* turn(directory, sessionID, "Clean the build")
+        expect(refused.asked).toEqual([])
+        expect(yield* Effect.promise(() => replies(log, "claude"))).toEqual([])
+        expect(yield* Effect.promise(() => hookAnswer(log))).toEqual({
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: "Refused by a Lunos plugin hook: rm -rf is not allowed in this project",
+        })
+        expect(yield* Effect.promise(() => ran(log))).toEqual({ ran: false, hooked: true })
+        const hooks = yield* hooksAfterIdle(hookLog, sessionID)
+        // Once before the call, and no after hook: it never ran.
+        expect(hooks.filter((entry) => entry.hook !== "event")).toEqual([
+          {
+            hook: "before",
+            tool: "bash",
+            external: "claude",
+            callID: "toolu_bash",
+            args: { command: "rm -rf build", description: "Run a command" },
+          },
+        ])
+        yield* Effect.promise(() => Audit.flush())
+        const audited = yield* Effect.promise(() => readLog(auditPath))
+        expect(audited).toContainEqual(
+          expect.objectContaining({
+            event: "permission.decision",
+            session: sessionID,
+            permission: "external",
+            patterns: ["claude:Bash rm -rf build"],
+            decision: "denied by plugin hook",
+          }),
+        )
+
+        // A harmless call passes the hook once (not again at an approval) and runs; the after hook sees it.
+        yield* Effect.promise(() => fs.rm(log, { force: true }))
+        process.env.FAKE_CLAUDE_BASH = "ls"
+        const allowed = yield* turn(directory, sessionID, "List files")
+        expect(allowed.asked).toEqual([])
+        expect(yield* Effect.promise(() => hookAnswer(log))).toBeUndefined()
+        expect(yield* Effect.promise(() => ran(log))).toEqual({ ran: true, hooked: false })
+        const after = yield* Effect.promise(() => readLog(hookLog))
+        expect(after.filter((entry) => entry.hook !== "event").slice(1)).toEqual([
+          {
+            hook: "before",
+            tool: "bash",
+            external: "claude",
+            callID: "toolu_bash",
+            args: { command: "ls", description: "Run a command" },
+          },
+          { hook: "after", tool: "bash", callID: "toolu_bash", output: "(ran)" },
+        ])
+        // Nothing to warn about: this Claude Code applies the hook.
+        expect(after.filter((entry) => entry.type === "tui.toast.show")).toEqual([])
+      }),
+    { git: true },
+    30_000,
+  )
+
+  it.instance(
+    "a Claude Code that answers hooks_applied: false gets a warning; calls it allows by itself then skip the plugin hooks",
+    () =>
+      Effect.gen(function* () {
+        const { directory } = yield* TestInstance
+        const hookLog = yield* setup(directory)
+        const log = path.join(directory, "fake-claude.log")
+        process.env.FAKE_CLAUDE_LOG = log
+        process.env.FAKE_CLAUDE_OLD = "1"
+        process.env.FAKE_CLAUDE_AUTO_ALLOW = "1"
+        process.env.FAKE_CLAUDE_BASH = "rm -rf build"
+        const created = yield* call(directory, SessionPaths.create, { metadata: { external: { tool: "claude" } } })
+        const sessionID = created.body.id as string
+
+        yield* turn(directory, sessionID, "Clean the build")
+        // The documented gap: the tool ran it without asking anyone, so no Lunos hook saw it before.
+        expect(yield* Effect.promise(() => ran(log))).toEqual({ ran: true, hooked: false })
+        const hooks = yield* hooksAfterIdle(hookLog, sessionID)
+        expect(hooks.filter((entry) => entry.hook === "before")).toEqual([])
+        expect(hooks.filter((entry) => entry.type === "tui.toast.show")).toEqual([
+          {
+            hook: "event",
+            type: "tui.toast.show",
+            title: "Lunos rules not applied",
+            message: expect.stringContaining("hooks_applied: false"),
+            variant: "warning",
+          },
         ])
       }),
     { git: true },

@@ -48,8 +48,12 @@ export function call(tool: ExternalDetect.Tool, name: string, input: unknown) {
   return { tool: NAMES[tool][name] ?? name, args }
 }
 
-/** The message a tool gets when a Lunos hook refuses its call. */
+/**
+ * The message a tool gets when a Lunos plugin's `tool.execute.before` hook (or a config `hooks` entry)
+ * refuses its call, so the tool and the user can tell it from the tool's own hooks and from a Lunos
+ * permission rule ("Blocked by Lunos policy").
+ */
 export function refusal(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
-  return `Refused by a Lunos hook: ${message}`
+  return `Refused by a Lunos plugin hook: ${message}`
 }
