@@ -147,6 +147,61 @@ export const ExternalConsentPayload = Schema.Struct({
   answer: Schema.Literals(["share", "never", "ask"]),
 })
 
+// XCOD-285 §4: Settings › External sessions › Claude Code / Codex, each tool's configuration as it reports it.
+export const ExternalConfigSource = Schema.Struct({
+  scope: Schema.optional(Schema.String),
+  file: Schema.optional(Schema.String),
+  label: Schema.String,
+}).annotate({ identifier: "ExternalConfigSource" })
+
+export const ExternalConfigItem = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  value: Schema.optional(Schema.String),
+  detail: Schema.optional(Schema.String),
+  status: Schema.optional(Schema.String),
+  /** Missing: the tool doesn't say where it comes from ("source unknown"). */
+  source: Schema.optional(ExternalConfigSource),
+  /** An existing file to open in the user's editor. */
+  open: Schema.optional(Schema.String),
+  remove: Schema.optional(Schema.Struct({ scope: Schema.optional(Schema.String) })),
+}).annotate({ identifier: "ExternalConfigItem" })
+
+export const ExternalConfigSection = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  items: Schema.mutable(Schema.Array(ExternalConfigItem)),
+  note: Schema.optional(Schema.String),
+  add: Schema.optional(Schema.Struct({ scopes: Schema.mutable(Schema.Array(Schema.String)), url: Schema.Boolean })),
+}).annotate({ identifier: "ExternalConfigSection" })
+
+export const ExternalConfigView = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  label: Schema.String,
+  version: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+  sections: Schema.mutable(Schema.Array(ExternalConfigSection)),
+  notes: Schema.mutable(Schema.Array(Schema.String)),
+}).annotate({ identifier: "ExternalConfigView" })
+
+export const ExternalConfigCommandPayload = Schema.Struct({
+  action: Schema.Literals(["mcp.add", "mcp.remove"]),
+  name: Schema.String,
+  scope: Schema.optional(Schema.String),
+  /** For mcp.add: a URL, or the command that starts the server. */
+  target: Schema.optional(Schema.String),
+  /** false: only say what would run and which file it changes. true: run it (after the user confirmed). */
+  run: Schema.Boolean,
+})
+
+export const ExternalConfigCommandResult = Schema.Struct({
+  command: Schema.String,
+  file: Schema.optional(Schema.String),
+  ran: Schema.Boolean,
+  ok: Schema.optional(Schema.Boolean),
+  output: Schema.optional(Schema.String),
+}).annotate({ identifier: "ExternalConfigCommandResult" })
+
 // XCOD-254: /models in a Claude Code or Codex session lists the tool's models.
 export const ExternalModel = Schema.Struct({
   id: Schema.String,
@@ -330,6 +385,8 @@ export const ExperimentalPaths = {
   externalModel: "/experimental/external/:sessionID/model",
   externalMode: "/experimental/external/:sessionID/mode",
   externalConsent: "/experimental/external/consent",
+  externalConfig: "/experimental/external/config/:tool",
+  externalConfigCommand: "/experimental/external/config/:tool/command",
   peerStop: "/experimental/peer/:sessionID/stop",
   peerAsks: "/experimental/peer/:sessionID/asks",
   peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
@@ -781,6 +838,32 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Share Lunos with Claude Code or Codex",
             description:
               "Whether Lunos's MCP servers, skills and memory are offered to Claude Code or Codex sessions in this project (share), never offered without asking (never), or asked about in the next session (ask). Kept on this machine, never in config. Audited as external.consent.",
+          }),
+        ),
+        HttpApiEndpoint.get("externalConfig", ExperimentalPaths.externalConfig, {
+          params: { tool: Schema.Literals(["claude", "codex"]) },
+          query: WorkspaceRoutingQuery,
+          success: described(ExternalConfigView, "The tool's configuration"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.config",
+            summary: "Claude Code or Codex configuration",
+            description:
+              "Claude Code's or Codex's own configuration as the installed tool reports it (model, permissions, instruction files, MCP servers, hooks, agents or profiles), with the layer and file each comes from where the tool says. No prompt is sent and the user's hooks don't run. Refused like starting a session under external.enabled and the residency policy. Secrets are never returned.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalConfigCommand", ExperimentalPaths.externalConfigCommand, {
+          params: { tool: Schema.Literals(["claude", "codex"]) },
+          query: WorkspaceRoutingQuery,
+          payload: ExternalConfigCommandPayload,
+          success: described(ExternalConfigCommandResult, "The tool's command"),
+          error: [InvalidRequestError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.configCommand",
+            summary: "Change Claude Code or Codex configuration with its own command",
+            description:
+              "Add or remove an MCP server with the tool's own command (claude mcp add -s …, codex mcp remove …). With run false, returns the exact command and the file it changes, and runs nothing; with run true, runs it and returns the tool's output. Lunos never writes the tool's files itself. Audited as external.config.",
           }),
         ),
         HttpApiEndpoint.post("peerStop", ExperimentalPaths.peerStop, {

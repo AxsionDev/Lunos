@@ -73,10 +73,15 @@ export function command(file: string, args: string[]) {
   return { file, args, shell: false }
 }
 
-export function run(file: string, args: string[], timeoutMs = 15_000) {
+export function run(file: string, args: string[], timeoutMs = 15_000, cwd?: string) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve) => {
     const cmd = command(file, args)
-    const child = spawn(cmd.file, cmd.args, { env: environment(), shell: cmd.shell, stdio: ["ignore", "pipe", "pipe"] })
+    const child = spawn(cmd.file, cmd.args, {
+      env: environment(),
+      shell: cmd.shell,
+      stdio: ["ignore", "pipe", "pipe"],
+      ...(cwd ? { cwd } : {}),
+    })
     let stdout = ""
     let stderr = ""
     child.stdout.on("data", (chunk) => (stdout += chunk))

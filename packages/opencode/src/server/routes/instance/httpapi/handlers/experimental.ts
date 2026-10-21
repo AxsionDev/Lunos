@@ -22,6 +22,7 @@ import { InstanceHttpApi } from "../api"
 import {
   PeerAsks,
   ConsoleSwitchPayload,
+  ExternalConfigCommandPayload,
   SessionEnqueuePayload,
   SessionTakeoverPayload,
   SessionGroupCreatePayload,
@@ -51,6 +52,8 @@ import { ExternalPolicy } from "@/external/policy"
 import { ExternalRun } from "@/external/run"
 import { ExternalSession } from "@/external/session"
 import { ExternalConsent } from "@/external/consent"
+import { ExternalConfig } from "@/external/config"
+import { ConfigExternal } from "@opencode-ai/core/config/external"
 import { GlobalBus } from "@/bus/global"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
 
@@ -453,6 +456,89 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return true
     })
 
+    // XCOD-285 §4: the tool's own configuration, read from the installed tool. Gated like starting a
+    // session (reading starts the tool, which reaches its vendor), but a refusal here isn't audited.
+    const externalConfigTool = Effect.fn("ExperimentalHttpApi.externalConfigTool")(function* (
+      tool: "claude" | "codex",
+    ) {
+      const cfg = yield* config.get()
+      const refused = ExternalPolicy.evaluate(tool, cfg)
+      if (refused) return { cfg, error: refused.message }
+      const status = yield* Effect.promise(() => ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, cfg)))
+      if (!status.installed || status.outdated || !status.path)
+        return { cfg, error: status.hint ?? status.outdated ?? `${status.label} isn't usable here` }
+      return { cfg, status, executable: status.path }
+    })
+
+    const externalConfig = Effect.fn("ExperimentalHttpApi.externalConfig")(function* (ctx: {
+      params: { tool: "claude" | "codex" }
+    }) {
+      const { tool } = ctx.params
+      const found = yield* externalConfigTool(tool)
+      const label = ExternalDetect.TOOLS[tool].label
+      if (!found.executable) return { tool, label, error: found.error, sections: [], notes: [] }
+      const instance = yield* InstanceState.context
+      const launch = ConfigExternal.launch(tool, found.cfg.external)
+      return yield* Effect.promise(() =>
+        ExternalConfig.read({
+          tool,
+          executable: found.executable,
+          cwd: instance.directory,
+          version: found.status.version,
+          lunos: launch,
+        }),
+      )
+    })
+
+    const externalConfigCommand = Effect.fn("ExperimentalHttpApi.externalConfigCommand")(function* (ctx: {
+      params: { tool: "claude" | "codex" }
+      payload: typeof ExternalConfigCommandPayload.Type
+    }) {
+      const { tool } = ctx.params
+      // A name the tool can't take is refused before the tool is started at all.
+      if (!ExternalConfig.SAFE_NAME.test(ctx.payload.name.trim()))
+        return yield* Effect.fail(
+          new InvalidRequestError({ message: `"${ctx.payload.name}" isn't a server name the tool accepts here` }),
+        )
+      const found = yield* externalConfigTool(tool)
+      if (!found.executable)
+        return yield* Effect.fail(new InvalidRequestError({ message: found.error ?? "Not available" }))
+      const executable = found.executable
+      const instance = yield* InstanceState.context
+      const cwd = instance.directory
+      // What the tool's own --help and config say, asked again here: nothing the client sends is trusted.
+      const context = yield* Effect.promise(async () => {
+        if (tool === "claude") {
+          const help = await ExternalDetect.run(executable, ["mcp", "add", "--help"])
+          return { cwd, scopes: help.code === 0 ? ExternalConfig.claudeAddHelp(help.stdout).scopes : [] }
+        }
+        return { cwd, userFile: await ExternalConfig.codexUserFile({ executable, cwd }) }
+      })
+      if (tool === "codex" && !context.userFile)
+        return yield* Effect.fail(new InvalidRequestError({ message: "Codex didn't say where its user config is" }))
+      const planned = yield* Effect.try({
+        try: () =>
+          ExternalConfig.plan(tool, ctx.payload, {
+            ...context,
+            shell: ExternalDetect.command(executable, []).shell,
+          }),
+        catch: (cause) => new InvalidRequestError({ message: cause instanceof Error ? cause.message : String(cause) }),
+      })
+      const base = { command: planned.command, ...(planned.file ? { file: planned.file } : {}) }
+      if (!ctx.payload.run) return { ...base, ran: false }
+      const result = yield* Effect.promise(() => ExternalConfig.run(executable, planned, cwd))
+      ExternalPolicy.record(found.cfg, "external.config", {
+        tool,
+        provider: ExternalDetect.TOOLS[tool].provider,
+        action: ctx.payload.action,
+        name: ctx.payload.name,
+        ...(ctx.payload.scope ? { scope: ctx.payload.scope } : {}),
+        ...(planned.file ? { file: planned.file } : {}),
+        ok: result.ok,
+      })
+      return { ...base, ran: true, ok: result.ok, output: result.output }
+    })
+
     // XCOD-234: sessions another Lunos process runs; that process does the work (and the audit).
     const peer = <A>(sessionID: string, path: string, init?: { method?: string; body?: unknown }) =>
       Effect.tryPromise({
@@ -638,6 +724,8 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("externalModel", externalModel)
       .handle("externalMode", externalMode)
       .handle("externalConsent", externalConsent)
+      .handle("externalConfig", externalConfig)
+      .handle("externalConfigCommand", externalConfigCommand)
       .handle("peerStop", peerStop)
       .handle("peerAsks", peerAsks)
       .handle("peerPermissionReply", peerPermissionReply)

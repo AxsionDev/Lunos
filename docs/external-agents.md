@@ -176,6 +176,28 @@ An empty value means the default. `auto` lets Claude Code's own classifier appro
 
 `external.codex.permission_mode` (one field for either a sandbox or an approval policy) still works while the new keys are unset. Saving either new key moves it: its value goes to whichever of the two it names.
 
+### The tools' own configuration
+
+`/settings` → Models & agents → External sessions → **Claude Code's own configuration** (or **Codex CLI's own configuration**) shows the tool's own settings as the installed tool reports them. Each value shows where it comes from: the scope (user, project, local, plugin, managed) and the file, when the tool says. A value the tool doesn't attribute is marked **source unknown**. Lunos doesn't guess.
+
+| Tool        | What's shown                                                                                            | Where Lunos gets it                                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code | Model, permission mode, output style, CLAUDE.md files, MCP servers, hooks, agents, settings files       | Claude Code's answers to its host protocol: its settings layers, CLAUDE.md files, MCP servers with their scope, and hooks with their source |
+| Codex CLI   | Model, reasoning effort, approval policy, sandbox, AGENTS.md files, MCP servers, profiles, config files | `codex app-server`: `config/read` with the layer each value comes from, and the AGENTS.md files a new thread here would load                |
+
+Claude Code names a settings layer (user, project, local), not a file. Lunos shows the file Claude Code documents for that layer, and only when the file exists. It doesn't say where an agent comes from either. Lunos looks for the agent's file in `.claude/agents` and `~/.claude/agents`, and otherwise marks it source unknown. Codex lists its `[profiles.*]` tables and the profile in use, but not its other profile files (`<name>.config.toml`), so those aren't shown. A release that doesn't answer one of these requests has that part hidden.
+
+The permission mode and sandbox shown are the tool's own defaults. Lunos's sessions still start in `external.claude.permission_mode`, `external.codex.sandbox` and `external.codex.approval_policy`, and the view says so next to them.
+
+**Changes go through the tool's own commands only.** MCP servers can be added and removed with `claude mcp add -s <scope>` / `claude mcp remove`, or `codex mcp add` / `codex mcp remove`. Lunos shows the exact command and the file the tool will change, for example `claude mcp add -s user docs -- npx -y docs-mcp` changing `~/.claude.json`. It runs only after you confirm, and then shows the tool's own output. The change is written to the audit log as `external.config`. To add a server that needs environment variables or headers, use a terminal, so they're never shown in Lunos. Where the tool has no command (model, permission mode, hooks, profiles), **Open in your editor** opens the file the tool names, if it exists. Lunos never writes `~/.claude`, `~/.codex` or the project's tool files itself.
+
+Reading is gated like starting a session: under `external.enabled: false`, or a residency policy that refuses the vendor, nothing is started and the reason is shown. Nothing is read until you open the view. Secrets aren't shown: no settings `env`, no MCP server arguments, environment or headers, and URLs without their query.
+
+Reading starts the tool without a prompt, so no model is called:
+
+- **Claude Code** runs with your hooks off (`--settings {"disableAllHooks":true}`) and without saving a session (`--no-session-persistence`). Claude Code itself still updates `~/.claude.json` and connects to your MCP servers when it starts, as it does on any start.
+- **Codex** runs `codex app-server` with an ephemeral thread and no turn. Codex itself still refreshes its caches in its home folder when it starts.
+
 ## Data residency and policy
 
 These tools send your code to their vendors: Claude Code to Anthropic, Codex CLI to OpenAI. Under a residency policy that doesn't allow the vendor's region (for example `"residency": { "allow": ["eu"] }`), Lunos **refuses to start** them, with a message saying why. This applies even if you've pointed the tool at another endpoint in its own settings, because Lunos can't see that configuration.

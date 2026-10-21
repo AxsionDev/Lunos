@@ -34,7 +34,7 @@ function auditFile(config: Config) {
 
 export function record(
   config: Config,
-  event: "external.session" | "external.denied" | "external.bridge" | "external.consent",
+  event: "external.session" | "external.denied" | "external.bridge" | "external.consent" | "external.config",
   fields: Audit.Fields,
 ) {
   const file = auditFile(config)
