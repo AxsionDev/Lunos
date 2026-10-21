@@ -618,11 +618,19 @@ export const ShellTool = Tool.define(
       },
       ctx: Tool.Context,
     ) {
-      // A server this session didn't start already answers there: starting another would either
-      // fail on the port or, worse, "pass" its readiness check against the wrong process.
+      // Something already answers there: starting another would either fail on the port or, worse,
+      // "pass" its readiness check against the wrong process. Often it is this session's own
+      // server from an earlier attempt, still running the old code; say so, so it gets restarted
+      // rather than moved to another port.
       if (input.readyUrl && (yield* Effect.promise(() => BackgroundShell.answers(input.readyUrl!)))) {
+        const url = input.readyUrl
+        const mine = BackgroundShell.list(ctx.sessionID).find(
+          (item) => item.status === "running" && BackgroundShell.owns(item, url) !== false,
+        )
         throw new Error(
-          `Not started: ${input.readyUrl.href} already answers, so a process this session didn't start is listening there. Use another port, or ask the user before stopping that process; never stop it yourself.`,
+          mine
+            ? `Not started: your background process ${mine.id} (${mine.command}) is already serving ${url.href}. If it should run your latest changes, stop it with the ${ProcessToolID} tool, then start again.`
+            : `Not started: ${url.href} already answers, so a process this session didn't start is listening there. Use another port, or ask the user before stopping that process; never stop it yourself.`,
         )
       }
       const info = BackgroundShell.start({

@@ -1273,6 +1273,41 @@ describe("tool.shell background", () => {
       }),
     )
 
+    it.live("points at the session's own server when it already holds the port", () =>
+      Effect.gen(function* () {
+        const dir = yield* tmpdirScoped()
+        const file = yield* server(dir)
+        const port = freePort()
+        const args = {
+          command: `PORT=${port} ${bin} ${quote(file)}`,
+          background: true,
+          ready_url: `http://127.0.0.1:${port}/`,
+          timeout: 20_000,
+        }
+        const first = yield* runIn(dir, run(args))
+        const id = first.metadata.background!.id
+        const err = yield* runIn(dir, fail(args))
+        expect(err.message).toContain(`your background process ${id}`)
+        expect(err.message).not.toContain("didn't start")
+        yield* runIn(dir, processTool({ action: "stop", id }))
+      }),
+    )
+
+    it.live("a denied bash permission starts nothing in the background", () =>
+      runIn(
+        projectRoot,
+        Effect.gen(function* () {
+          const before = BackgroundShell.list().length
+          const err = yield* fail(
+            { command: "sleep 30", background: true },
+            { ...ctx, ask: () => Effect.die(new Error("denied by rule")) },
+          )
+          expect(err.message).toContain("denied by rule")
+          expect(BackgroundShell.list().length).toBe(before)
+        }),
+      ),
+    )
+
     it.live("keep leaves it running past the end of the turn", () =>
       runIn(
         projectRoot,
