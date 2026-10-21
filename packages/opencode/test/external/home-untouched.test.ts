@@ -6,6 +6,7 @@ import os from "os"
 import path from "path"
 import { ExternalClaude } from "../../src/external/claude"
 import { ExternalCodex } from "../../src/external/codex"
+import { ExternalConfig } from "../../src/external/config"
 
 // XCOD-285 acceptance: no file under ~/.claude or ~/.codex changes without a confirmed tool command or
 // the user's own edit. Lunos-driven turns, including every "don't ask again" answer, run against the
@@ -154,5 +155,76 @@ describe("~/.claude and ~/.codex are untouched by Lunos-driven turns (XCOD-285)"
       })
     expect(asked).toBeGreaterThanOrEqual(3)
     expect(await snapshot(dir)).toEqual(before)
+  })
+})
+
+// XCOD-285 §4: Settings › External sessions › Claude Code / Codex reads each tool's configuration and
+// changes it only with the tool's own command, once the user confirmed it. Reading, and showing the
+// command, leave ~/.claude and ~/.codex byte-identical; a confirmed command changes exactly the file it named.
+describe("the tools' configuration view leaves ~/.claude and ~/.codex untouched unless a confirmed command ran (XCOD-285 §4)", () => {
+  test("reading both tools changes no file, and Claude Code is read with hooks off", async () => {
+    const dir = await home()
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-work-"))
+    const log = path.join(cwd, "..", `fake-claude-${path.basename(cwd)}.jsonl`)
+    const before = await snapshot(dir)
+    await withHome(dir, { FAKE_CLAUDE_LOG: log }, async () => {
+      const claude = await ExternalConfig.read({ tool: "claude", executable: FAKE_CLAUDE, cwd })
+      const codex = await ExternalConfig.read({ tool: "codex", executable: FAKE_CODEX, cwd })
+      expect(claude.sections.length).toBeGreaterThan(0)
+      expect(codex.sections.length).toBeGreaterThan(0)
+    })
+    expect(await snapshot(dir)).toEqual(before)
+    expect(await snapshot(cwd)).toEqual({})
+    const argv = (await fs.readFile(log, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line).argv as string[] | undefined)
+      .find((value) => value?.includes("--settings"))!
+    // The settings file Lunos passed is gone after the read; it held only disableAllHooks.
+    expect(argv).toContain("--no-session-persistence")
+    expect(argv[argv.indexOf("--settings") + 1]).toMatch(/settings\.json$/)
+  })
+
+  test("a command shown but not confirmed changes nothing", async () => {
+    const dir = await home()
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-work-"))
+    const before = await snapshot(dir)
+    const claude = ExternalConfig.plan(
+      "claude",
+      { action: "mcp.add", name: "docs", scope: "user", target: "npx docs-mcp" },
+      { cwd, home: dir, scopes: ["local", "user", "project"] },
+    )
+    const codex = ExternalConfig.plan(
+      "codex",
+      { action: "mcp.add", name: "docs", target: "npx docs-mcp" },
+      { cwd, userFile: path.join(dir, ".codex", "config.toml") },
+    )
+    expect(claude.file).toBe(path.join(dir, ".claude.json"))
+    expect(codex.file).toBe(path.join(dir, ".codex", "config.toml"))
+    expect(await snapshot(dir)).toEqual(before)
+  })
+
+  test("a confirmed command changes exactly the file it named, and nothing else", async () => {
+    const dir = await home()
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-work-"))
+    const before = await snapshot(dir)
+    const claude = ExternalConfig.plan(
+      "claude",
+      { action: "mcp.add", name: "docs", scope: "user", target: "npx docs-mcp" },
+      { cwd, home: dir, scopes: ["local", "user", "project"] },
+    )
+    const codex = ExternalConfig.plan(
+      "codex",
+      { action: "mcp.add", name: "docs", target: "https://mcp.example.com/mcp" },
+      { cwd, userFile: path.join(dir, ".codex", "config.toml") },
+    )
+    await withHome(dir, {}, async () => {
+      expect((await ExternalConfig.run(FAKE_CLAUDE, claude, cwd)).ok).toBe(true)
+      expect((await ExternalConfig.run(FAKE_CODEX, codex, cwd)).ok).toBe(true)
+    })
+    const after = await snapshot(dir)
+    const changed = Object.keys({ ...before, ...after }).filter((key) => before[key] !== after[key])
+    expect(changed.sort()).toEqual([path.relative(dir, claude.file!), path.relative(dir, codex.file!)].sort())
+    expect(await snapshot(cwd)).toEqual({})
   })
 })

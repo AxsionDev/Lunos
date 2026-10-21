@@ -16,6 +16,52 @@ if (process.argv.includes("--version")) {
 // XCOD-285: FAKE_CLAUDE_OLD=1 is an older Claude Code with fewer features: fewer permission modes in
 // --help (no plan), no `permission_suggestions` on its approvals, and it ignores the host's hooks.
 const old = process.env.FAKE_CLAUDE_OLD === "1"
+// XCOD-285 §4: `claude mcp add|remove`, as 2.1.304 does them: the server goes into the file for its scope
+// ($HOME/.claude.json for user and local, the project's .mcp.json for project), and the command says
+// which ("File modified: …"). Their --help lists the scopes and transports as 2.1.304's does.
+if (process.argv[2] === "mcp") {
+  const sub = process.argv[3]
+  if (process.argv.includes("--help")) {
+    if (sub === "add")
+      console.log(
+        'Usage: claude mcp add [options] <name> <commandOrUrl> [args...]\n  -s, --scope <scope>          Configuration scope (local, user, or project)\n                               (default: "local")\n  -t, --transport <transport>  Transport type (stdio, sse, http). Defaults to\n                               stdio if not specified.',
+      )
+    else if (sub === "remove")
+      console.log(
+        "Usage: claude mcp remove [options] <name>\n  -s, --scope <scope>  Configuration scope (local, user, or project) - if not\n                       specified, removes from whichever scope it exists in",
+      )
+    process.exit(0)
+  }
+  const rest = process.argv.slice(4)
+  const flag = (name: string) => (rest.includes(name) ? rest[rest.indexOf(name) + 1] : undefined)
+  const scope = flag("-s") ?? "local"
+  const file =
+    scope === "project" ? path.join(process.cwd(), ".mcp.json") : path.join(process.env.HOME ?? "", ".claude.json")
+  const positional = rest.filter(
+    (word, index) => !word.startsWith("-") && !["-s", "--transport"].includes(rest[index - 1] ?? ""),
+  )
+  const name = positional[0]!
+  const { existsSync, writeFileSync } = await import("fs")
+  const data = existsSync(file) ? JSON.parse(readFileSync(file, "utf8") || "{}") : {}
+  const servers = scope === "local" ? ((data.projects ??= {})[process.cwd()] ??= {}) : data
+  servers.mcpServers ??= {}
+  if (sub === "remove") {
+    if (!servers.mcpServers[name]) {
+      console.error(`No MCP server named "${name}" in ${scope} scope`)
+      process.exit(1)
+    }
+    delete servers.mcpServers[name]
+  } else
+    servers.mcpServers[name] = rest.includes("--transport")
+      ? { type: flag("--transport"), url: positional[1] }
+      : { type: "stdio", command: rest[rest.indexOf("--") + 1], args: rest.slice(rest.indexOf("--") + 2) }
+  writeFileSync(file, JSON.stringify(data, null, 2) + "\n")
+  console.log(
+    `${sub === "remove" ? "Removed" : "Added"} MCP server ${name} ${sub === "remove" ? "from" : "to"} ${scope} config`,
+  )
+  console.log(`File modified: ${file}`)
+  process.exit(0)
+}
 if (process.argv.includes("--help")) {
   // XCOD-254: FAKE_CLAUDE_MCP=1 also lists --mcp-config, as a Claude Code that can take the Lunos bridge.
   // XCOD-285: the --permission-mode choices as 2.1.304's --help wraps them (an older set with FAKE_CLAUDE_OLD).
@@ -24,7 +70,9 @@ if (process.argv.includes("--help")) {
       (old
         ? '\n--permission-mode <mode>  Permission mode to use for the session\n    (choices: "acceptEdits",\n    "bypassPermissions", "default")'
         : '\n--permission-mode <mode>  Permission mode to use for the session\n    (choices: "acceptEdits", "auto",\n    "bypassPermissions", "manual", "dontAsk", "plan")') +
-      (process.env.FAKE_CLAUDE_MCP === "1" ? "\n--mcp-config <configs...>" : ""),
+      (process.env.FAKE_CLAUDE_MCP === "1" ? "\n--mcp-config <configs...>" : "") +
+      // XCOD-285 §4: what reading the configuration without running hooks or saving a session needs.
+      (old ? "" : "\n--no-session-persistence\n--settings <file-or-json>"),
   )
   process.exit(0)
 }
@@ -56,6 +104,39 @@ input.on("line", (line) => {
 const nextLine = () =>
   new Promise<string>((resolve) => (received.length ? resolve(received.shift()!) : waiters.push(resolve)))
 
+// XCOD-285 §4: a configuration read (--no-session-persistence, no prompt) answers initialize and the
+// control requests with 2.1.304's recorded replies (test/fixtures/external/claude-2.1.304/config-view.json),
+// <home> and <project> being $HOME and the working directory. A release without them
+// (FAKE_CLAUDE_CONFIG=none) answers them with the error 2.1.304 gives an unknown request.
+if (process.argv.includes("--no-session-persistence")) {
+  const recorded = JSON.parse(
+    readFileSync(
+      path.join(import.meta.dir, "..", "..", "fixtures", "external", "claude-2.1.304", "config-view.json"),
+      "utf8",
+    )
+      .replaceAll("<home>", process.env.HOME ?? "")
+      .replaceAll("<project>", process.cwd()),
+  ).replies
+  input.on("close", () => process.exit(0))
+  for (;;) {
+    const message = JSON.parse(await nextLine())
+    const subtype = message.request?.subtype
+    if (message.type !== "control_request" || typeof subtype !== "string") continue
+    const known = subtype === "initialize" || (process.env.FAKE_CLAUDE_CONFIG !== "none" && subtype in recorded)
+    console.log(
+      JSON.stringify({
+        type: "control_response",
+        response: known
+          ? { subtype: "success", request_id: message.request_id, response: recorded[subtype] }
+          : {
+              subtype: "error",
+              request_id: message.request_id,
+              error: `Unsupported control request subtype: ${subtype}`,
+            },
+      }),
+    )
+  }
+}
 // XCOD-254: initialize is answered at once, as Claude Code does, with its /commands and the models it
 // offers, shaped as 2.1.292 answers (test/fixtures/external/claude-2.1.292/start-models.1.jsonl).
 // FAKE_CLAUDE_MODELS=none answers without models, like a release that doesn't list them.

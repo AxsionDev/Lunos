@@ -143,10 +143,10 @@ export function parseModels(result: unknown): ExternalClaude.Model[] {
 }
 
 /**
- * XCOD-254: the models this Codex offers, from the app server's `model/list` (a few pages at most).
- * No thread is started, so no model is called. Empty when it doesn't list them in time.
+ * A short-lived `codex app-server` for questions that start no turn (models, configuration): JSON-RPC
+ * requests over stdio, answered by id. `close` stops it; `exited` resolves when it ends on its own.
  */
-export function models(options: { executable: string; cwd: string; timeoutMs?: number }) {
+export function appServer(options: { executable: string; cwd: string }) {
   const cmd = ExternalDetect.command(options.executable, ["app-server"])
   const child = spawn(cmd.file, cmd.args, {
     cwd: options.cwd,
@@ -179,13 +179,31 @@ export function models(options: { executable: string; cwd: string; timeoutMs?: n
     waiting.get(message.id)?.(message)
     waiting.delete(message.id)
   })
-  const list = async () => {
-    await request("initialize", { clientInfo: { name: "lunos", version: "1" } })
+  const exited = new Promise<void>((resolve) => {
+    child.on("error", () => resolve())
+    child.on("close", () => resolve())
+  })
+  /** initialize, then the `initialized` notification; resolves with initialize's result. */
+  const initialize = async () => {
+    const result = await request("initialize", { clientInfo: { name: "lunos", version: "1" } })
     write({ method: "initialized" })
+    return result
+  }
+  return { child, request, initialize, exited, close: () => child.kill() }
+}
+
+/**
+ * XCOD-254: the models this Codex offers, from the app server's `model/list` (a few pages at most).
+ * No thread is started, so no model is called. Empty when it doesn't list them in time.
+ */
+export function models(options: { executable: string; cwd: string; timeoutMs?: number }) {
+  const server = appServer(options)
+  const list = async () => {
+    await server.initialize()
     const result: ExternalClaude.Model[] = []
     let cursor: string | undefined
     for (let page = 0; page < 5; page++) {
-      const response = await request("model/list", cursor ? { cursor } : {})
+      const response = await server.request("model/list", cursor ? { cursor } : {})
       result.push(...parseModels(response))
       cursor = response?.nextCursor ?? undefined
       if (!cursor) break
@@ -196,13 +214,10 @@ export function models(options: { executable: string; cwd: string; timeoutMs?: n
   const timeout = new Promise<ExternalClaude.Model[]>((resolve) => {
     timer = setTimeout(() => resolve([]), options.timeoutMs ?? 15_000)
   })
-  const exited = new Promise<ExternalClaude.Model[]>((resolve) => {
-    child.on("error", () => resolve([]))
-    child.on("close", () => resolve([]))
-  })
+  const exited = server.exited.then((): ExternalClaude.Model[] => [])
   return Promise.race([list().catch(() => []), timeout, exited]).finally(() => {
     clearTimeout(timer)
-    child.kill()
+    server.close()
   })
 }
 
