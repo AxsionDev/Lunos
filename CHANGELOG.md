@@ -21,6 +21,14 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A repository Git doesn't trust no longer looks like "not a git repository" to the sandbox.** On
+  Windows, Git refuses to work in a repository owned by another user, which is common on a second
+  drive such as `D:`. The sandbox now says so, shows Git's own message, and gives the
+  `git config --global --add safe.directory <path>` command that fixes it. Any other Git failure
+  shows Git's error instead of a guess.
+
 ### Changed
 
 - **With the sandbox on, `lunos` opens straight away and the sandbox starts behind it.** The line at
