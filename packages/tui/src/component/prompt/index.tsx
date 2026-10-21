@@ -91,6 +91,8 @@ import {
 import { lunosCommand, MAPPED, UNAVAILABLE } from "../../util/external-commands"
 import * as Sections from "../../util/settings-sections"
 import { requestSettings } from "../../util/settings-sections"
+import { useSandbox } from "../../context/sandbox"
+import { holds, SEND_QUESTION } from "../../util/sandbox"
 import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
 import { DialogExternal, useExternalCommand, useStartExternal } from "../dialog-external"
 
@@ -205,6 +207,7 @@ export function Prompt(props: PromptProps) {
   const route = useRoute()
   const project = useProject()
   const sync = useSync()
+  const sandbox = useSandbox()
   const tuiConfig = useTuiConfig()
   // XCOD-260: in a Claude Code / Codex session the prompt says where it goes, in the tool's accent.
   const external = createMemo(() => (props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined))
@@ -1088,17 +1091,54 @@ export function Prompt(props: PromptProps) {
 
   // XCOD-276: the prompt works before the server has answered. A prompt sent before then is queued
   // ("Starting…" under it) and sent the moment the data is in; the text stays in the box meanwhile.
-  const [queued, setQueued] = createSignal(false)
+  // XCOD-281: one draft, as before. While the sandbox is starting (or required and not running) it
+  // also waits: it's only ever sent to the sandbox's server, never to this computer.
+  const [queued, setQueuedSignal] = createSignal(false)
+  const setQueued = (value: boolean) => {
+    setQueuedSignal(value)
+    sandbox.setQueued(value)
+  }
+  const sandboxHolds = () => holds(sandbox.state())
   createEffect(
     on(
-      () => sync.status,
-      (status) => {
-        if (status === "loading" || !queued()) return
+      () => [sync.status, sandboxHolds()] as const,
+      ([status, held]) => {
+        if (status === "loading" || held || !queued()) return
         setQueued(false)
         void submit()
       },
     ),
   )
+
+  // XCOD-281: started again without the sandbox, the prompt that was waiting for it is back in the
+  // box. Asked once: it's never sent to this computer unless the user says so.
+  let askedSend = false
+  createEffect(() => {
+    const state = sandbox.state()
+    if (askedSend || state?.status !== "off" || !state.queued || !sandbox.queued()) return
+    if (!store.prompt.input.trim()) return
+    askedSend = true
+    dialog.replace(
+      () => (
+        <DialogSelect<"send" | "discard">
+          title={SEND_QUESTION}
+          renderFilter={false}
+          options={[
+            { value: "send", title: "Send" },
+            { value: "discard", title: "Discard" },
+          ]}
+          onSelect={(option) => {
+            dialog.clear()
+            sandbox.setQueued(false)
+            if (option.value === "send") return void submit()
+            input.clear()
+            setStore("prompt", { input: "", parts: [] })
+          }}
+        />
+      ),
+      () => sandbox.setQueued(false),
+    )
+  })
 
   async function submit() {
     // Prevent overlapping invocations (e.g. a double-pressed Enter, or the
@@ -1179,7 +1219,7 @@ export function Prompt(props: PromptProps) {
     if (workspace.creating() || move.creating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
-    if (sync.status === "loading") {
+    if (sync.status === "loading" || sandboxHolds()) {
       setQueued(true)
       return false
     }
@@ -1982,7 +2022,13 @@ export function Prompt(props: PromptProps) {
                     <Show when={!external()}>
                       <Show when={sync.status === "loading"} fallback={<box height={1} />}>
                         <text fg={theme.textMuted}>
-                          {queued() ? "Starting… your prompt is sent once ready" : "Starting…"}
+                          {sandbox.state()?.status === "starting" || sandbox.state()?.status === "blocked"
+                            ? queued()
+                              ? "Waiting for sandbox… your prompt is sent once it's ready"
+                              : "Waiting for sandbox…"
+                            : queued()
+                              ? "Starting… your prompt is sent once ready"
+                              : "Starting…"}
                         </text>
                       </Show>
                     </Show>

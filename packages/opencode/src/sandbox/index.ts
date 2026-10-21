@@ -94,6 +94,10 @@ export type Handoff = {
 
 export const branchName = (id: string) => `lunos/sandbox/${id}`
 
+/** Where `relative` (from the repository root) is inside the container. */
+export const workdirOf = (relative: string) =>
+  path.posix.join(SandboxDocker.WORKSPACE, relative.split(path.sep).join("/"))
+
 const metaDir = () => path.join(Global.Path.state, "sandbox")
 const metaFile = (id: string) => path.join(metaDir(), `${id}.json`)
 export const resultsDir = (root: string, id: string) => path.join(root, ".opencode", "sandbox", id)
@@ -292,7 +296,7 @@ async function build(input: CreateInput): Promise<Meta> {
       : await SandboxGit.tree({ gitDir: repo.gitDir, workTree: seed, startTree: baseTree })
 
     const password = randomBytes(24).toString("base64url")
-    const workdir = path.posix.join(SandboxDocker.WORKSPACE, repo.relative.split(path.sep).join("/"))
+    const workdir = workdirOf(repo.relative)
     const result: Meta = {
       id,
       root: repo.root,

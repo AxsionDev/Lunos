@@ -174,7 +174,8 @@ describe("a failing sandboxed run (the reported case: Docker not running)", () =
   test.skipIf(!hasDocker)(
     "prints the reason, Full log and the report command; the log has the docker command, exit code, stderr and stack",
     async () => {
-      const result = await lunos(["run", "--sandbox", SEEDS.prompt], { env: seededEnv })
+      // XCOD-281: without `strict`, a run warns and goes on without the sandbox; strict still fails.
+      const result = await lunos(["run", "--sandbox=strict", SEEDS.prompt], { env: seededEnv })
       expect(result.code).toBe(1)
       expect(result.stderr).toContain("Sandboxed runs need Docker or Podman")
       expect(result.stderr).toContain("Fix: ")

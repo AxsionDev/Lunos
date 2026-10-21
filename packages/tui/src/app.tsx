@@ -63,7 +63,10 @@ import { DialogStatus } from "./component/dialog-status"
 import { takeSettingsRequest } from "./util/settings-sections"
 import { DialogSettings } from "./component/dialog-settings"
 import { DialogDebug } from "./component/dialog-debug"
-import { DialogLogs } from "./component/dialog-logs"
+import { DialogLog, DialogLogs } from "./component/dialog-logs"
+import { SandboxStatus } from "./component/sandbox-status"
+import { SandboxProvider, useSandbox } from "./context/sandbox"
+import { failureToast, type SandboxHost } from "./util/sandbox"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogLsp } from "./component/dialog-lsp"
@@ -205,6 +208,8 @@ export type TuiInput = {
   onStarted?: () => void
   /** XCOD-273: the Lunos account (Welcome screen, /login, /logout, /account), run by the CLI process. */
   account?: AccountHost
+  /** XCOD-281: the sandbox starting behind the TUI, or turned off after a failure. */
+  sandbox?: SandboxHost
 }
 
 function errorMessage(error: unknown) {
@@ -351,48 +356,50 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                     >
                                       <TuiConfigProvider config={input.config}>
                                         <PluginRuntimeProvider value={pluginRuntime}>
-                                          <SDKProvider
-                                            url={input.url}
-                                            directory={input.directory}
-                                            fetch={input.fetch}
-                                            headers={input.headers}
-                                            events={input.events}
-                                          >
-                                            <PermissionProvider>
-                                              <ProjectProvider>
-                                                <SyncProvider>
-                                                  <DataProvider>
-                                                    <ThemeProvider mode={mode}>
-                                                      <LocalProvider>
-                                                        <PromptStashProvider>
-                                                          <DialogProvider>
-                                                            <FrecencyProvider>
-                                                              <PromptHistoryProvider>
-                                                                <PromptRefProvider>
-                                                                  <EditorContextProvider>
-                                                                    <LocationProvider>
-                                                                      <App
-                                                                        onSnapshot={input.onSnapshot}
-                                                                        onListening={input.onListening}
-                                                                        pluginHost={input.pluginHost}
-                                                                        restart={restartHost}
-                                                                        restarted={input.restarted}
-                                                                        onStarted={input.onStarted}
-                                                                      />
-                                                                    </LocationProvider>
-                                                                  </EditorContextProvider>
-                                                                </PromptRefProvider>
-                                                              </PromptHistoryProvider>
-                                                            </FrecencyProvider>
-                                                          </DialogProvider>
-                                                        </PromptStashProvider>
-                                                      </LocalProvider>
-                                                    </ThemeProvider>
-                                                  </DataProvider>
-                                                </SyncProvider>
-                                              </ProjectProvider>
-                                            </PermissionProvider>
-                                          </SDKProvider>
+                                          <SandboxProvider host={input.sandbox}>
+                                            <SDKProvider
+                                              url={input.url}
+                                              directory={input.directory}
+                                              fetch={input.fetch}
+                                              headers={input.headers}
+                                              events={input.events}
+                                            >
+                                              <PermissionProvider>
+                                                <ProjectProvider>
+                                                  <SyncProvider>
+                                                    <DataProvider>
+                                                      <ThemeProvider mode={mode}>
+                                                        <LocalProvider>
+                                                          <PromptStashProvider>
+                                                            <DialogProvider>
+                                                              <FrecencyProvider>
+                                                                <PromptHistoryProvider>
+                                                                  <PromptRefProvider>
+                                                                    <EditorContextProvider>
+                                                                      <LocationProvider>
+                                                                        <App
+                                                                          onSnapshot={input.onSnapshot}
+                                                                          onListening={input.onListening}
+                                                                          pluginHost={input.pluginHost}
+                                                                          restart={restartHost}
+                                                                          restarted={input.restarted}
+                                                                          onStarted={input.onStarted}
+                                                                        />
+                                                                      </LocationProvider>
+                                                                    </EditorContextProvider>
+                                                                  </PromptRefProvider>
+                                                                </PromptHistoryProvider>
+                                                              </FrecencyProvider>
+                                                            </DialogProvider>
+                                                          </PromptStashProvider>
+                                                        </LocalProvider>
+                                                      </ThemeProvider>
+                                                    </DataProvider>
+                                                  </SyncProvider>
+                                                </ProjectProvider>
+                                              </PermissionProvider>
+                                            </SDKProvider>
+                                          </SandboxProvider>
                                         </PluginRuntimeProvider>
                                       </TuiConfigProvider>
                                     </RouteProvider>
@@ -455,6 +462,7 @@ function App(props: {
   const attention = createTuiAttention({ renderer, config: tuiConfig, kv })
   const clipboard = useClipboard()
   const account = useAccount()
+  const sandbox = useSandbox()
 
   const api = createTuiApi(
     createTuiApiAdapters({
@@ -603,12 +611,14 @@ function App(props: {
     })
     // XCOD-128: `lunos settings` starts on the settings screen.
     if (args.settings) dialog.replace(() => <DialogSettings tab={args.settings} />)
-    if (props.restarted)
+    // XCOD-281: a start without the sandbox right after it failed isn't a restart the user asked for.
+    if (props.restarted && !props.restarted.sandbox)
       toast.show({
         variant: "success",
         message: restartBanner(props.restarted, InstallationVersion),
         duration: 8000,
       })
+    announceSandbox()
     // XCOD-248: the first start of a newer version shows what changed since the one seen before.
     const whatsNew = whatsNewOnStart({
       current: InstallationVersion,
@@ -745,7 +755,71 @@ function App(props: {
     return false
   }
 
-  async function restart(fresh: boolean) {
+  // XCOD-281: the sandbox failed behind the TUI: start again without it, handing over the prompt in
+  // the box (and whether it was waiting to be sent). It's never sent to this computer from here.
+  createEffect(
+    on(
+      () => sandbox.state()?.status,
+      (status) => {
+        if (status !== "failed") return
+        const host = props.restart
+        if (!host) return
+        const draft = restartDraft(promptRef.current?.current)
+        host.request({ fresh: true, draft, cancelled: [], sandbox: "failed", queued: !!draft && sandbox.queued() })
+        exit()
+      },
+    ),
+  )
+
+  /** The sticky toast, once, right after the sandbox failed. Later starts only show the badge. */
+  function announceSandbox() {
+    const state = sandbox.state()
+    if (state?.status !== "off" || !state.announce) return
+    toast.show({
+      variant: "warning",
+      sticky: true,
+      message: failureToast(state.failure),
+      actions: [
+        { label: "Open log", onSelect: () => openSandboxLog() },
+        { label: "Retry", onSelect: () => retrySandbox() },
+        {
+          label: "Settings",
+          onSelect: () => dialog.replace(() => <DialogSettings area="Permissions" sub="Sandbox" />),
+        },
+      ],
+    })
+  }
+
+  function openSandboxLog() {
+    const state = sandbox.state()
+    const file = state && "failure" in state ? state.failure.log?.file : undefined
+    dialog.replace(() => <DialogLog file={file} />)
+  }
+
+  /**
+   * XCOD-281: Retry. Required (blocked): start it again here. Off after a failure: Lunos restarts into
+   * the sandbox with a new session; this session stays on this computer.
+   */
+  function retrySandbox() {
+    const state = sandbox.state()
+    if (state?.status === "blocked") {
+      sandbox.host?.retry()
+      return
+    }
+    if (state?.status === "off") void restart(true, "retry")
+  }
+
+  async function sandboxDoctor() {
+    const host = sandbox.host
+    if (!host) return
+    dialog.clear()
+    toast.show({ variant: "info", message: "Checking whether a sandbox can start here…" })
+    const report = await host.doctor().catch((error) => (error instanceof Error ? error.message : String(error)))
+    toast.dismiss()
+    dialog.replace(() => <DialogAlert title="Sandbox doctor" message={report} />)
+  }
+
+  async function restart(fresh: boolean, sandboxRestart?: "retry") {
     const host = props.restart
     if (!host) {
       toast.show({ variant: "warning", message: "Restart isn't available in this client." })
@@ -825,7 +899,14 @@ function App(props: {
     const sessionID = route.data.type === "session" ? route.data.sessionID : undefined
     // Read last: while waiting, the user may have typed more, or sent what was there.
     const draft = restartDraft(promptRef.current?.current)
-    host.request({ sessionID: fresh ? undefined : sessionID, fresh, draft, cancelled, upgraded: upgradedTo() })
+    host.request({
+      sessionID: fresh ? undefined : sessionID,
+      fresh,
+      draft,
+      cancelled,
+      upgraded: upgradedTo(),
+      ...(sandboxRestart ? { sandbox: sandboxRestart } : {}),
+    })
     if (host.attach)
       toast.show({
         variant: "info",
@@ -1376,6 +1457,28 @@ function App(props: {
             },
           ]
         : []),
+      // XCOD-281: the sandbox's Retry, its doctor and the last failure's log, from the keyboard.
+      ...(sandbox.host
+        ? [
+            {
+              name: "sandbox.retry",
+              title: "Retry the sandbox",
+              slashName: "sandbox-retry",
+              run: () => {
+                dialog.clear()
+                retrySandbox()
+              },
+              category: "System",
+            },
+            {
+              name: "sandbox.doctor",
+              title: "Check the sandbox (lunos sandbox doctor)",
+              slashName: "sandbox-doctor",
+              run: () => void sandboxDoctor(),
+              category: "System",
+            },
+          ]
+        : []),
       {
         name: "app.exit",
         title: "Exit the app",
@@ -1737,6 +1840,7 @@ function App(props: {
           {plugin()}
         </box>
         <StartupStatus plugins={ready} />
+        <SandboxStatus retry={retrySandbox} openLog={openSandboxLog} />
         <Show when={upgrading()} fallback={<UpdateNotice version={updateNotice()} />}>
           <UpdateProgress progress={upgrading()} />
         </Show>

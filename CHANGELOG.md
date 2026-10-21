@@ -21,6 +21,26 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- **With the sandbox on, `lunos` opens straight away and the sandbox starts behind it.** The line at
+  the bottom shows "Sandbox starting…", then "Sandbox ready". A prompt you send meanwhile says
+  "Waiting for sandbox…" and goes to the sandbox once it's up. Nothing runs on your computer while it
+  starts.
+- **A sandbox that can't start no longer stops Lunos.** Lunos turns the sandbox off for this project
+  on this computer and starts without it. A toast that stays until you close it gives the reason, with
+  Open log, Retry and Settings. Your config files are never changed. A prompt that was waiting is
+  put back, and Lunos asks before sending it without the sandbox. While the sandbox is off, the bottom
+  line says "no sandbox" with Retry. Later starts don't show the toast again. Settings › Permissions
+  › Sandbox shows the last failure, with Re-enable, Retry and Run doctor. Changing any sandbox
+  setting turns it back on.
+- **When your organisation or project requires the sandbox, Lunos still opens.** A banner explains
+  why prompts can't run, how to fix it and where the log is, with Retry and Open log. Nothing runs on
+  your computer.
+- **`lunos run` warns and carries on without a sandbox that can't start.** It prints one line with
+  the reason and the log path. `--sandbox=strict` or a required sandbox makes it fail instead, as
+  before.
+
 ## [1.18.52] - 2026-10-20
 
 ### Added

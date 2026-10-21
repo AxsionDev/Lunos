@@ -15,6 +15,7 @@ import { ServerAuth } from "@/server/auth"
 import { validateSession } from "../tui/validate-session"
 import { win32InstallCtrlCGuard } from "@opencode-ai/tui/terminal-win32"
 import type { RestartRequest } from "@opencode-ai/tui/util/restart"
+import type { SandboxState } from "@opencode-ai/tui/util/sandbox"
 import { Restart } from "../restart"
 import { CloudGate } from "@/cloud/gate"
 import { CloudTuiHost } from "@/cloud/tui-host"
@@ -87,12 +88,70 @@ export const startupProbe: { settle: number; quit?: boolean } = { settle: 3000 }
  * Once the first frame is up and the work behind it had `settle` ms: adds the server's phases and
  * writes the timeline to its file. Printed to the terminal only after the TUI has left it.
  */
-async function collectStartupTrace(client: RpcClient) {
+async function collectStartupTrace(client: RpcClient | undefined) {
   await StartupTrace.waitFirstFrame()
   await Bun.sleep(startupProbe.settle)
-  StartupTrace.add(await withTimeout(client.call("trace", undefined), 1000).catch(() => []))
+  // XCOD-281: with the sandbox starting behind the TUI there is no worker here.
+  if (client) StartupTrace.add(await withTimeout(client.call("trace", undefined), 1000).catch(() => []))
   const file = StartupTrace.target()
   if (file) await Bun.write(file, StartupTrace.serialize(file)).catch(() => {})
+}
+
+/** The worker that runs the server, MCP, LSP and the memory sidecar on this computer. */
+function startWorker(file: string | URL) {
+  const begun = StartupTrace.begin("start worker")
+  // XCOD-280: the worker writes into this run's log (it takes RunLog.ENV out of its environment, so
+  // its children don't get it). XCOD-276: it reports its start-up phases on this process's clock.
+  const worker = new Worker(file, {
+    env: Object.fromEntries(
+      Object.entries(process.env)
+        .concat([[RunLog.ENV, RunLog.current()?.file]], Object.entries(StartupTrace.originEnv()))
+        .filter((entry): entry is [string, string] => entry[1] !== undefined),
+    ),
+  })
+  begun()
+  const client = Rpc.client<typeof rpc>(worker)
+  const reload = () => {
+    client.call("reload", undefined).catch(() => {})
+  }
+  process.on("SIGUSR2", reload)
+
+  let stopped = false
+  // XCOD-280: the worker runs the server, MCP, LSP and the memory sidecar. If it dies, the TUI
+  // can't go on: put the terminal back and say where the log is.
+  const crashed = (error: unknown) => {
+    if (stopped) return
+    stopped = true
+    Failure.record("the worker", error, "Lunos's background worker stopped unexpectedly.")
+    process.exit(1)
+  }
+  worker.addEventListener("error", (event) => crashed(event.error ?? new Error(event.message)))
+  worker.addEventListener("close", () => crashed(new Error("The worker thread exited")))
+  const stop = async () => {
+    if (stopped) return
+    stopped = true
+    process.off("SIGUSR2", reload)
+    await withTimeout(client.call("shutdown", undefined), 5000).catch(() => {})
+    worker.terminate()
+  }
+  return { client, stop }
+}
+
+/**
+ * XCOD-281: how a restart relaunches. After the sandbox failed: without it, carrying the failure for
+ * the toast. A Retry: with it. A sandboxed session doesn't outlive its sandbox (its results were
+ * just handed back), so a sandboxed restart starts a new session.
+ */
+export function relaunchFor(
+  request: RestartRequest,
+  sandbox?: SandboxState,
+): [RestartRequest, undefined?, { sandbox?: Restart.Handoff["sandbox"] }?] {
+  const fresh = { ...request, sessionID: undefined, fresh: true }
+  if (request.sandbox === "failed" && sandbox?.status === "failed")
+    return [fresh, undefined, { sandbox: { failed: sandbox.failure } }]
+  if (request.sandbox === "retry") return [fresh, undefined, { sandbox: { retry: true } }]
+  if (sandbox && sandbox.status !== "off") return [fresh]
+  return [request]
 }
 
 export const TuiThreadCommand = cmd({
@@ -174,7 +233,8 @@ export const TuiThreadCommand = cmd({
       })
       .option("sandbox", {
         type: "boolean",
-        describe: "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>",
+        describe:
+          "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>. If it can't start, Lunos goes on without it; --sandbox=strict waits for it instead",
       })
       .option("keep", {
         type: "boolean",
@@ -183,13 +243,21 @@ export const TuiThreadCommand = cmd({
       .option("rm", {
         type: "boolean",
         describe: "with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says",
-      }),
+      })
+      // XCOD-281: `--sandbox=strict` (see sandbox.ts `strictArg`) is --sandbox without a fallback;
+      // yargs would read it as false. The module isn't imported here, to keep start-up light.
+      .middleware((argv) => {
+        if (process.argv.includes("--sandbox=strict")) argv.sandbox = true
+      }, true),
   handler: async (args) => {
     // XCOD-129: taken before anything else, so the worker and its children never inherit it.
     const restarted = Restart.takeHandoff()
     StartupTrace.mark("tui command", { blocking: true })
     // XCOD-144: the server and everything it spawns run in a container; only the TUI stays here.
-    const { wanted, runSandboxedTui, refuseHost } = await StartupTrace.span("import sandbox", () => import("./sandbox"))
+    const { startsSandboxed, sandboxTui, sandboxOff, refuseHost, strictArg } = await StartupTrace.span(
+      "import sandbox",
+      () => import("./sandbox"),
+    )
     if (args.sandbox === false) {
       const refused = await refuseHost("`lunos --no-sandbox`", resolveThreadDirectory(args.project))
       if (refused) {
@@ -198,7 +266,13 @@ export const TuiThreadCommand = cmd({
         return
       }
     }
-    if (StartupTrace.trace("sandbox decision", () => wanted(args, resolveThreadDirectory(args.project)))) {
+    // XCOD-281: the sandbox starts behind the TUI, which talks to nothing else meanwhile.
+    let sandbox: Awaited<ReturnType<typeof sandboxTui>> | undefined
+    if (
+      StartupTrace.trace("sandbox decision", () =>
+        startsSandboxed(args, resolveThreadDirectory(args.project), restarted?.sandbox),
+      )
+    ) {
       const unsupported = [
         ["--mini", args.mini],
         ["--prompt", args.prompt !== undefined],
@@ -217,14 +291,22 @@ export const TuiThreadCommand = cmd({
         process.exitCode = 1
         return
       }
-      // XCOD-279: "host" when the sandbox couldn't start and Lunos starts without it instead.
-      const ran = await runSandboxedTui(
-        resolveThreadDirectory(args.project),
-        { continue: args.continue, session: args.session, fork: args.fork, keep: args.keep, rm: args.rm },
-        restarted,
-      )
-      if (ran !== "host") return
+      try {
+        sandbox = await sandboxTui(
+          resolveThreadDirectory(args.project),
+          { keep: args.keep, rm: args.rm, strict: strictArg() },
+          restarted,
+        )
+      } catch (error) {
+        UI.error(errorMessage(error))
+        process.exitCode = 1
+        return
+      }
     }
+    // XCOD-281: on this computer because the sandbox failed (now, or on an earlier start): the badge,
+    // and right after the failure the toast.
+    const sandboxHost =
+      sandbox?.host ?? sandboxOff(resolveThreadDirectory(args.project), restarted?.sandbox, restarted?.queued)
     if (args.replay === true) {
       UI.error("--replay is not supported; replay is enabled by default")
       process.exitCode = 1
@@ -313,41 +395,10 @@ export const TuiThreadCommand = cmd({
       }
       const cwd = Filesystem.resolve(process.cwd())
 
-      const startWorker = StartupTrace.begin("start worker")
-      // XCOD-280: the worker writes into this run's log (it takes RunLog.ENV out of its environment, so
-      // its children don't get it). XCOD-276: it reports its start-up phases on this process's clock.
-      const worker = new Worker(file, {
-        env: Object.fromEntries(
-          Object.entries(process.env)
-            .concat([[RunLog.ENV, RunLog.current()?.file]], Object.entries(StartupTrace.originEnv()))
-            .filter((entry): entry is [string, string] => entry[1] !== undefined),
-        ),
-      })
-      startWorker()
-      const client = Rpc.client<typeof rpc>(worker)
-      const reload = () => {
-        client.call("reload", undefined).catch(() => {})
-      }
-      process.on("SIGUSR2", reload)
-
-      let stopped = false
-      // XCOD-280: the worker runs the server, MCP, LSP and the memory sidecar. If it dies, the TUI
-      // can't go on: put the terminal back and say where the log is.
-      const crashed = (error: unknown) => {
-        if (stopped) return
-        stopped = true
-        Failure.record("the worker", error, "Lunos's background worker stopped unexpectedly.")
-        process.exit(1)
-      }
-      worker.addEventListener("error", (event) => crashed(event.error ?? new Error(event.message)))
-      worker.addEventListener("close", () => crashed(new Error("The worker thread exited")))
-      const stop = async () => {
-        if (stopped) return
-        stopped = true
-        process.off("SIGUSR2", reload)
-        await withTimeout(client.call("shutdown", undefined), 5000).catch(() => {})
-        worker.terminate()
-      }
+      // XCOD-281: sandboxed, the server and everything it starts run in the container; no worker here.
+      const worker = sandbox ? undefined : startWorker(file)
+      const client: RpcClient | undefined = worker?.client
+      const stop = async () => worker?.stop()
 
       const collected = StartupTrace.enabled() ? collectStartupTrace(client) : undefined
       const prompt = await StartupTrace.span("read piped input", () => input(args.prompt))
@@ -358,41 +409,51 @@ export const TuiThreadCommand = cmd({
 
       const headers = external ? ServerAuth.headers() : undefined
 
-      const transport = external
-        ? {
-            url: (await client.call("server", network)).url,
-            fetch: undefined,
-            events: undefined,
-            headers,
-          }
-        : {
-            url: "http://opencode.internal",
-            fetch: createWorkerFetch(client),
-            events: createEventSource(client),
-          }
+      const transport = sandbox
+        ? { url: "http://opencode.internal", fetch: sandbox.fetch, events: undefined, headers: undefined }
+        : external
+          ? {
+              url: (await client!.call("server", network)).url,
+              fetch: undefined,
+              events: undefined,
+              headers,
+            }
+          : {
+              url: "http://opencode.internal",
+              fetch: createWorkerFetch(client!),
+              events: createEventSource(client!),
+            }
 
-      try {
-        await StartupTrace.span("validate session", () =>
-          validateSession({
-            url: transport.url,
-            sessionID: args.session,
-            directory: cwd,
-            fetch: transport.fetch,
-            headers,
-          }),
-        )
-      } catch (error) {
-        UI.error(errorMessage(error))
-        process.exitCode = 1
-        return
-      }
+      // XCOD-281: the sandbox's server isn't there yet; a session that doesn't exist opens as an error there.
+      if (!sandbox)
+        try {
+          await StartupTrace.span("validate session", () =>
+            validateSession({
+              url: transport.url,
+              sessionID: args.session,
+              directory: cwd,
+              fetch: transport.fetch,
+              headers,
+            }),
+          )
+        } catch (error) {
+          UI.error(errorMessage(error))
+          process.exitCode = 1
+          return
+        }
 
       // XCOD-147: the update check announces its result with a one-off event. Sent before the TUI
       // listens, it was silently lost, so a fast (or cached) answer never reached the screen. With
       // the in-process worker the check starts once the TUI is listening; an external server keeps
       // the old delay.
-      const checkUpgrade = () => void client.call("checkUpgrade", { directory: cwd }).catch(() => {})
+      const checkUpgrade = () => void client?.call("checkUpgrade", { directory: cwd }).catch(() => {})
       if (external) setTimeout(checkUpgrade, 1000).unref?.()
+      // XCOD-281: a slow image pull isn't a failed start: a relaunch counts as started at its first frame.
+      if (sandbox)
+        void StartupTrace.waitFirstFrame().then(() => {
+          clearTimeout(watchdog)
+          Restart.markStarted()
+        })
 
       try {
         const imported = StartupTrace.begin("import tui")
@@ -405,9 +466,10 @@ export const TuiThreadCommand = cmd({
         await Effect.runPromise(
           run({
             url: transport.url,
-            onListening: external ? undefined : checkUpgrade,
+            onListening: external || sandbox ? undefined : checkUpgrade,
             async onSnapshot() {
               const tui = writeHeapSnapshot("tui.heapsnapshot")
+              if (!client) return [tui]
               const server = await client.call("snapshot", undefined)
               return [tui, server]
             },
@@ -420,7 +482,8 @@ export const TuiThreadCommand = cmd({
               clearTimeout(watchdog)
               Restart.markStarted()
             },
-            directory: cwd,
+            directory: sandbox?.directory ?? cwd,
+            sandbox: sandboxHost,
             fetch: transport.fetch,
             headers: transport.headers,
             events: transport.events,
@@ -452,10 +515,16 @@ export const TuiThreadCommand = cmd({
     // `lunos debug startup` prints it as its output; LUNOS_STARTUP_TRACE=1 alongside the TUI's.
     if (StartupTrace.enabled() && !StartupTrace.target())
       (startupProbe.quit ? process.stdout : process.stderr).write(StartupTrace.format() + "\n")
+    // XCOD-281: the sandbox's results come back (or a sandbox still starting is kept) before anything else.
+    await sandbox?.finish()
     if (process.exitCode) Restart.reportFailedStart()
     // XCOD-129: the TUI has exited and the worker (MCP, LSP, memory sidecar, local server) is shut
     // down; start Lunos again in its place.
-    else if (restartRequest) await Restart.relaunch(restartRequest)
+    else if (restartRequest) {
+      // XCOD-281: this run ends here when the sandbox failed; its log says so (`lunos logs`).
+      if (restartRequest.sandbox === "failed") RunLog.finish(1)
+      await Restart.relaunch(...relaunchFor(restartRequest, sandbox?.host.state()))
+    }
     process.exit()
   },
 })

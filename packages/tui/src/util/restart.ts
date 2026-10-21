@@ -1,4 +1,5 @@
 import type { PromptInfo } from "../prompt/history"
+import type { SandboxFailure } from "./sandbox"
 
 /**
  * XCOD-129: `/restart`. The TUI decides *whether* to restart (asking first when a turn or a
@@ -15,6 +16,13 @@ export type RestartRequest = {
   cancelled: string[]
   /** Set when `/update` installed this version during the session: relaunch the new install. */
   upgraded?: string
+  /**
+   * XCOD-281: "failed": the sandbox couldn't start, so start again without it. "retry": start again
+   * with it (Retry after a failure).
+   */
+  sandbox?: "failed" | "retry"
+  /** XCOD-281: the draft was sent while the sandbox was starting, and waits to be sent. */
+  queued?: boolean
 }
 
 /** What the relaunched process gets back from the one that restarted. */
@@ -26,6 +34,10 @@ export type Restarted = {
   cancelled: string[]
   /** Set in attach mode: the server this client was attached to, which kept running. */
   attach?: string
+  /** XCOD-281: this start is without the sandbox because it just failed, or a Retry of it. */
+  sandbox?: { failed?: SandboxFailure; retry?: boolean }
+  /** XCOD-281: the draft was a prompt waiting for the sandbox: ask before sending it to the host. */
+  queued?: boolean
 }
 
 /** What the TUI's host passes in to offer `/restart`. Without it the command isn't offered. */
