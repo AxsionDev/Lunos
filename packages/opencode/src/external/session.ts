@@ -601,6 +601,8 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                 status: "running",
                 input: (event.input ?? {}) as Record<string, unknown>,
                 title: event.name,
+                // XCOD-285: edits as diffs, todos as a checklist, as the tool shows them.
+                metadata: ExternalNative.render(tool, event.name, event.input),
                 time: { start: Date.now() },
               },
             }
@@ -619,7 +621,7 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                   input: part.state.input,
                   output: event.output,
                   title: part.state.title ?? "",
-                  metadata: {},
+                  metadata: part.state.metadata ?? {},
                   time: { start, end: Date.now() },
                 }
             enqueue(sessions.updatePart({ ...part }))

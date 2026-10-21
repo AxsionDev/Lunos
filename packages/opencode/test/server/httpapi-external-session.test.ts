@@ -472,6 +472,10 @@ describe("external session (XCOD-218)", () => {
         const hook = sent.find((line) => line.response?.request_id === "hook_toolu_bash").response.response
         expect(hook.hookSpecificOutput.permissionDecisionReason).toMatch(/^Blocked by Lunos policy/)
         const messages = (yield* call(directory, pathFor(SessionPaths.messages, { sessionID }))).body as any[]
+        // The recorded Write is shown as a diff of the file, as Claude Code shows it.
+        const write = messages.flatMap((m) => m.parts).findLast((part: any) => part.tool === "claude:Write")
+        expect(write.state.metadata).toMatchObject({ verb: "Write" })
+        expect(write.state.metadata.diff).toContain("+hi")
         const bash = messages.flatMap((m) => m.parts).find((part: any) => part.tool === "claude:Bash")
         expect(bash.state).toMatchObject({ status: "error" })
         expect(bash.state.error).toMatch(/Lunos policy/)

@@ -91,6 +91,7 @@ In a Claude Code session the keys follow the tool's, as far as the installed rel
 
 - **`shift+tab`** cycles Claude Code's permission mode through the modes your Claude Code's `--help` lists, in the tool's order: its default (`default`, or `manual` in newer releases), then `acceptEdits`, then `plan`. A mode that skips or auto-decides approvals (`bypassPermissions`, `dontAsk`, `auto`) is never in the cycle. A turn that's running switches at once, and the next turns start in the chosen mode. The key is Lunos's `mode_cycle_reverse` keybind, so rebinding that rebinds this; outside a Claude Code session it cycles Lunos agents as before.
 - **The status line** (bottom right) reads `Lunos · Claude Code · <model> · <mode>`, with the mode left out while it's the tool's default.
+- **Edits and todos:** Claude Code's `Edit` and `Write` calls show as a diff of the file, and its `TodoWrite` as a checklist, in Lunos's own diff and todo views and your theme.
 
 Codex has no permission mode to cycle: its sandbox and approval policy are set per thread (see [Choosing the settings for every run](#choosing-the-settings-for-every-run)), so `shift+tab` does nothing there.
 

@@ -2574,14 +2574,17 @@ function Edit(props: ToolProps) {
     return ctx.width > 120 ? "split" : "unified"
   })
 
-  const ft = createMemo(() => filetype(stringValue(props.input.filePath)))
+  // XCOD-285: a Claude Code Edit / Write names its file and verb in the metadata the server adds.
+  const filePath = createMemo(() => stringValue(props.input.filePath) ?? stringValue(props.metadata.filePath))
+  const verb = createMemo(() => stringValue(props.metadata.verb) ?? "Edit")
+  const ft = createMemo(() => filetype(filePath()))
 
   const diffContent = createMemo(() => stringValue(props.metadata.diff) ?? "")
 
   return (
     <Switch>
       <Match when={stringValue(props.metadata.diff) !== undefined}>
-        <BlockTool title={"← Edit " + pathFormatter.format(stringValue(props.input.filePath))} part={props.part}>
+        <BlockTool title={`← ${verb()} ` + pathFormatter.format(filePath())} part={props.part}>
           <box paddingLeft={1}>
             <diff
               diff={diffContent()}
@@ -2603,12 +2606,12 @@ function Edit(props: ToolProps) {
               removedLineNumberBg={theme.diffRemovedLineNumberBg}
             />
           </box>
-          <Diagnostics diagnostics={props.metadata.diagnostics} filePath={stringValue(props.input.filePath) ?? ""} />
+          <Diagnostics diagnostics={props.metadata.diagnostics} filePath={filePath() ?? ""} />
         </BlockTool>
       </Match>
       <Match when={true}>
-        <InlineTool icon="←" pending="Preparing edit…" complete={stringValue(props.input.filePath)} part={props.part}>
-          Edit {pathFormatter.format(stringValue(props.input.filePath))} {input({ replaceAll: props.input.replaceAll })}
+        <InlineTool icon="←" pending="Preparing edit…" complete={filePath()} part={props.part}>
+          {verb()} {pathFormatter.format(filePath())} {input({ replaceAll: props.input.replaceAll })}
         </InlineTool>
       </Match>
     </Switch>
@@ -2850,8 +2853,18 @@ const toolDisplays = new Set([
   "execute",
 ])
 
+/**
+ * XCOD-285: Claude Code's own tools shown the way it shows them, with Lunos's renderers: Edit and Write
+ * as a diff, TodoWrite as a checklist (the server adds the diff and todos, ExternalNative.render).
+ */
+const externalDisplays: Record<string, string> = {
+  "claude:Edit": "edit",
+  "claude:Write": "edit",
+  "claude:TodoWrite": "todowrite",
+}
+
 export function toolDisplay(tool: string) {
-  return toolDisplays.has(tool) ? tool : "generic"
+  return toolDisplays.has(tool) ? tool : (externalDisplays[tool] ?? "generic")
 }
 
 function recordValue(value: unknown): Record<string, unknown> | undefined {

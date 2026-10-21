@@ -31,3 +31,12 @@ test("the docs keep the line that Lunos isn't affiliated with Anthropic or OpenA
   for (const doc of ["external-agents.md", "external-what-lunos-adds.md"])
     expect(readFileSync(path.join(ROOT, "docs", doc), "utf8")).toContain(line)
 })
+
+test("Claude Code's Edit and Write render as diffs and its TodoWrite as a checklist (XCOD-285)", async () => {
+  const { toolDisplay } = await import("../../src/routes/session/index")
+  expect(toolDisplay("claude:Edit")).toBe("edit")
+  expect(toolDisplay("claude:Write")).toBe("edit")
+  expect(toolDisplay("claude:TodoWrite")).toBe("todowrite")
+  expect(toolDisplay("claude:Bash")).toBe("generic")
+  expect(toolDisplay("codex:FileChange")).toBe("generic")
+})

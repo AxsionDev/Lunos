@@ -326,3 +326,35 @@ describe("the tool's own 'don't ask again' and mode switch, end to end against t
     }
   })
 })
+
+describe("the tool's edits and todos shown as it shows them (XCOD-285)", () => {
+  test("Edit and Write carry a diff of the file, TodoWrite its checklist; Codex and other tools keep the generic view", () => {
+    const edit = ExternalNative.render("claude", "Edit", {
+      file_path: "/work/a.ts",
+      old_string: "const a = 1\n",
+      new_string: "const a = 2\n",
+    })
+    expect(edit).toMatchObject({ verb: "Edit", filePath: "/work/a.ts" })
+    expect(String(edit.diff)).toContain("-const a = 1")
+    expect(String(edit.diff)).toContain("+const a = 2")
+    const write = ExternalNative.render("claude", "Write", { file_path: "/work/hello.txt", content: "hi" })
+    expect(write).toMatchObject({ verb: "Write", filePath: "/work/hello.txt" })
+    expect(String(write.diff)).toContain("+hi")
+    expect(
+      ExternalNative.render("claude", "TodoWrite", {
+        todos: [
+          { content: "Read the code", status: "completed", activeForm: "Reading the code" },
+          { content: "Fix it", status: "in_progress", activeForm: "Fixing it" },
+          { nonsense: true },
+        ],
+      }),
+    ).toEqual({
+      todos: [
+        { content: "Read the code", status: "completed" },
+        { content: "Fix it", status: "in_progress" },
+      ],
+    })
+    expect(ExternalNative.render("claude", "Bash", { command: "ls" })).toEqual({})
+    expect(ExternalNative.render("codex", "FileChange", { changes: [] })).toEqual({})
+  })
+})

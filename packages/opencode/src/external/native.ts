@@ -1,6 +1,7 @@
 export * as ExternalNative from "./native"
 
 import { ConfigExternal } from "@opencode-ai/core/config/external"
+import { createTwoFilesPatch } from "diff"
 import type { ExternalClaude } from "./claude"
 import type { ExternalDetect } from "./detect"
 
@@ -106,3 +107,29 @@ export function mode(suggestions: readonly ExternalClaude.Suggestion[] | undefin
 /** XCOD-285: Shift+Tab's cycle lives with the config's modes (ConfigExternal.cycle / next), shared with the TUI. */
 export const cycle = ConfigExternal.cycle
 export const next = ConfigExternal.next
+
+/**
+ * XCOD-285: what Lunos's own renderers need to show one of the tool's calls the way the tool does:
+ * Claude Code's Edit and Write as a diff of the file (`diff`, `filePath`, `verb`), its TodoWrite as a
+ * checklist (`todos`). Input shapes are the Agent SDK's (`FileEditInput`, `FileWriteInput`,
+ * `TodoWriteInput`). Anything else (and Codex, whose file changes aren't unified diffs for new files)
+ * keeps the generic view: an empty object.
+ */
+export function render(tool: ExternalDetect.Tool, name: string, input: unknown): Record<string, unknown> {
+  if (tool !== "claude" || !input || typeof input !== "object") return {}
+  const value = input as Record<string, unknown>
+  const file = typeof value.file_path === "string" ? value.file_path : undefined
+  if (name === "Edit" && file && typeof value.old_string === "string" && typeof value.new_string === "string")
+    return { verb: "Edit", filePath: file, diff: createTwoFilesPatch(file, file, value.old_string, value.new_string) }
+  if (name === "Write" && file && typeof value.content === "string")
+    return { verb: "Write", filePath: file, diff: createTwoFilesPatch(file, file, "", value.content) }
+  if (name === "TodoWrite" && Array.isArray(value.todos))
+    return {
+      todos: value.todos.flatMap((item: any) =>
+        typeof item?.content === "string" && typeof item?.status === "string"
+          ? [{ content: item.content, status: item.status }]
+          : [],
+      ),
+    }
+  return {}
+}
