@@ -2391,6 +2391,7 @@ export type SettingsSnapshot = {
       network: string
       results?: string
       workspace?: string
+      source?: string
       expires?: string
       handedOff?: string
     }>

@@ -32,7 +32,7 @@ With `OPENCODE_EXPERIMENTAL_WORKSPACES=1`, `/sandbox` in the TUI moves the sessi
 
 ## What happens
 
-1. **Copy.** Your repository is copied into a new Docker volume: the current commit (depth 1), with your uncommitted changes applied — staged, unstaged, and untracked files that aren't gitignored. Ignored files (`.env`, `node_modules`, build output) are **not** copied. Your working tree is never mounted into the container, read-write or read-only, unless you choose [`workspace: "mount"`](#mounting-your-working-tree-reduced-isolation). The copy has to be a git repository with at least one commit.
+1. **Copy.** Your repository is copied into a new Docker volume: the current commit (depth 1), with your uncommitted changes applied — staged, unstaged, and untracked files that aren't gitignored. Ignored files (`.env`, `node_modules`, build output) are **not** copied. Your working tree is never mounted into the container, read-write or read-only, unless you choose [`workspace: "mount"`](#mounting-your-working-tree-reduced-isolation). Outside a git repository, see [A folder that isn't a git repository](#a-folder-that-isnt-a-git-repository).
 2. **Run.** A container starts from the sandbox image, running `lunos serve`. Sessions, subagents, background jobs, tool calls, `bash` commands, and the MCP and LSP servers are all started by that server, so they run inside the container; no Lunos server runs on your machine. The client on your machine talks to it over a port bound to `127.0.0.1`, protected by a random password.
 3. **Hand back.** When the work is done — `lunos run` has finished, or you quit the TUI — Lunos:
    - writes every session's transcript (`transcript.json`) and a run summary (`summary.json`: image digest, resource limits, base commit, changed files) to `.opencode/sandbox/<id>/` in your repository (ignored by git by default);
@@ -43,6 +43,21 @@ With `OPENCODE_EXPERIMENTAL_WORKSPACES=1`, `/sandbox` in the TUI moves the sessi
 If you interrupt a run (Ctrl-C), the agent stops at once; there are no results to hand back, so the sandbox is kept, stopped. `lunos sandbox destroy <id>` removes it.
 
 A task counts as **failed** when `lunos run` exits with an error, or when any session's last reply ended in an error (a provider error, for example). That is what `destroy_on_success` looks at.
+
+## A folder that isn't a git repository
+
+The sandbox works in any folder, documents included, not only in a git repository. In a folder that isn't in a repository (or is in one with no commits yet):
+
+- **Nothing is written into the folder.** Lunos keeps a private git repository for it in its own state directory (`sandbox/folders/` under `~/.local/state/opencode`, or `$XDG_STATE_HOME/opencode`), and uses it to copy the folder in and to hold the results. No `.git`, no `.opencode`, no config file appears in your folder.
+- **The copy is byte for byte.** Line endings and binary files (`.docx`, `.pdf`, images) arrive exactly as they are, whatever a `.gitattributes` in the folder or Git's `core.autocrlf` says.
+- **What's left out:** whatever the folder's `.gitignore` files list, and by default `node_modules`, `.venv`, `venv`, `__pycache__`, `dist`, `build`, `target`, `out`, `bin`, `obj`, `.next`, `.angular`, `.gradle`, `.cache`, `coverage` and a few others. A `.gitignore` brings one back: `!bin/`.
+- **Limits:** a folder of more than 50,000 files or 2 GB (after the excludes) is refused with the count and "add a .gitignore", instead of a copy that never ends. So is a folder holding another git repository: it would arrive as an empty folder. Leave it out with a `.gitignore`, or start Lunos inside it.
+- **The results aren't written into the folder automatically.** When the work is done Lunos tells you; `lunos sandbox apply <id>` then writes the files the agent changed into the folder, byte for byte, and deletes what it deleted. It works after the sandbox is destroyed. It refuses, writing nothing, when you changed one of those files yourself since the sandbox started; files the agent didn't touch don't matter. Applying twice does nothing the second time.
+- The transcript and summary go to Lunos's state directory too (`sandbox/results/<id>/`), and `sandbox.results: "patch"` writes `changes.patch` there.
+
+A repository Git refuses to open (one owned by another user, for example) is never treated as a plain folder: you get Git's error and the fix.
+
+`lunos sandbox doctor` shows which one you're in: `workspace: git repository (…)` or `workspace: plain folder (N files, X MB)`, after a `git installed` check. The sandbox needs Git installed in both cases.
 
 ## Requiring sandboxes (organisations)
 
@@ -234,7 +249,7 @@ So a residency policy set in your global config, or locked by your organisation,
 
 ## Audit
 
-With the audit trail on (`audit.enabled`, or a residency policy), the host records each sandbox's lifecycle as `sandbox.create`, `sandbox.attach`, `sandbox.finish`, `sandbox.retain`, `sandbox.destroy` and `sandbox.prune` events, with the image and its digest, the resource limits, the lifecycle policy and the outcome. Never file contents. See [the audit log](audit-log.md).
+With the audit trail on (`audit.enabled`, or a residency policy), the host records each sandbox's lifecycle as `sandbox.create`, `sandbox.attach`, `sandbox.finish`, `sandbox.retain`, `sandbox.destroy`, `sandbox.prune` and `sandbox.apply` events, with the image and its digest, the resource limits, the lifecycle policy and the outcome. Never file contents. See [the audit log](audit-log.md).
 
 These events go to the audit log your **global or managed** config names, never one the repository's config names: the repository is the code being sandboxed.
 

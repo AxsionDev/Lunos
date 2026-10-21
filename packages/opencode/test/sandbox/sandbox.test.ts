@@ -227,9 +227,13 @@ describe("copy mode and the result handoff", () => {
     ).rejects.toThrow()
   })
 
-  test("copy mode refuses a directory that isn't a git repository", async () => {
+  // XCOD-282 replaced "copy mode refuses a directory that isn't a git repository": such a folder is
+  // now copied through a shadow repository (see folder.test.ts).
+  test("copy mode takes a directory that isn't a git repository as a plain folder", async () => {
     await using tmp = await tmpdir()
-    await expect(SandboxGit.repo(tmp.path)).rejects.toThrow("isn't in one")
+    const repo = await SandboxGit.repo(tmp.path)
+    expect(repo.source).toBe("folder")
+    expect(repo.relative).toBe("")
   })
 
   test('a repository git refuses (safe.directory) says so and how to trust it, not "isn\'t in one"', () => {

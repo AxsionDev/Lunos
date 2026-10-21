@@ -37,6 +37,14 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Deletes from `/sessions`, the Agent Monitor and `lunos session delete` are in the audit log as
   `session.delete` with where they came from, the count and the ids (never titles or content), how
   many were stopped first and how many synced copies were deleted. <!-- XCOD-284 --> <!-- internal -->
+- **The sandbox works in any folder, not only in a git repository.** Point it at a folder of
+  documents or a project without Git, and it is copied in byte for byte (Word files, PDFs and
+  images included), leaving out what the folder's `.gitignore` lists plus `node_modules`, build
+  output and similar. Nothing is written into the folder: when the work is done,
+  `lunos sandbox apply <id>` writes the agent's changes back, and refuses if you changed the same
+  files in the meantime. A folder that is too big, or that holds another git repository, is
+  refused up front with what to do. `lunos sandbox doctor` now shows whether you are in a git
+  repository or a plain folder, and checks that Git is installed.
 
 ### Fixed
 

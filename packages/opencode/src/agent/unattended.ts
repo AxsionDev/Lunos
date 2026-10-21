@@ -202,7 +202,9 @@ export async function run(input: {
 export function handedBack(output: string) {
   const plain = output.replace(/\x1b\[[0-9;]*m/g, "")
   return (
-    plain.match(/results on branch (\S+)/)?.[1] ?? plain.match(/the agent's changes are in (\S+) \(git apply\)/)?.[1]
+    plain.match(/results on branch (\S+)/)?.[1] ??
+    plain.match(/(lunos sandbox apply \S+) writes them into it/)?.[1] ??
+    plain.match(/the agent's changes are in (\S+) \(git apply\)/)?.[1]
   )
 }
 

@@ -181,17 +181,20 @@ export function usePromptWorkspace(sessionID?: string) {
       })
       return
     }
+    const folder = known?.source === "folder"
     const where =
       known?.workspace === "mount"
         ? "the agent's changes are already in your working tree (workspace mount)"
-        : results === "patch"
-          ? `the agent's changes are in .opencode/sandbox/${id}/changes.patch (git apply)`
-          : results === "none"
-            ? 'its changes weren\'t handed back (sandbox.results is "none")'
-            : `the agent's changes are on branch ${space.branch ?? `lunos/sandbox/${id}`}`
+        : folder && results !== "none"
+          ? `the folder isn't a git repository, so nothing was written into it: \`lunos sandbox apply ${id}\` writes the agent's changes`
+          : results === "patch"
+            ? `the agent's changes are in .opencode/sandbox/${id}/changes.patch (git apply)`
+            : results === "none"
+              ? 'its changes weren\'t handed back (sandbox.results is "none")'
+              : `the agent's changes are on branch ${space.branch ?? `lunos/sandbox/${id}`}`
     toast.show({
       variant: "success",
-      message: `Sandbox ${id} ended: ${where}. Transcript and summary in .opencode/sandbox/${id}/.`,
+      message: `Sandbox ${id} ended: ${where}. ${folder ? "Its transcript and summary are in Lunos's state folder." : `Transcript and summary in .opencode/sandbox/${id}/.`}`,
     })
   }
 
