@@ -5,10 +5,12 @@ import http from "node:http"
 import https from "node:https"
 import path from "node:path"
 import { registerDisposer } from "@/effect/instance-registry"
+import { AuditLog } from "@/audit/log"
 
 // XCOD-288: long-running commands (dev servers, watchers) the agent starts so it can check its own
 // work before handing back. Each one is owned by the session that started it and is stopped:
 // - by the agent (the `process` tool),
+// - at the end of the turn that started it, unless the agent kept it (`process` action "keep"),
 // - when its session is deleted (Session.remove),
 // - when the Lunos instance for its directory is disposed,
 // - when this Lunos process exits (a synchronous SIGKILL of the process group),
@@ -46,6 +48,8 @@ export type Info = {
   error?: string
   /** Whether a watchdog inside the process group guards against this Lunos process dying. */
   watchdog: boolean
+  /** Kept past the end of the turn that started it (the agent left the app running for the user). */
+  keep: boolean
 }
 
 type Entry = {
@@ -60,6 +64,9 @@ let exitHooked = false
 
 // An instance being disposed (its directory closed, the server shutting down) takes its processes.
 registerDisposer((directory) => stopDirectory(directory))
+
+/** Why a background command was stopped, for the audit trail. */
+export type Reason = "agent" | "turn_end" | "session_deleted" | "instance_disposed" | "expired"
 
 function hookExit() {
   if (exitHooked) return
@@ -134,7 +141,8 @@ export function start(input: StartInput): Info {
   const id = "bg_" + randomBytes(4).toString("hex")
   fs.mkdirSync(input.logDir, { recursive: true })
   const log = path.join(input.logDir, `${id}.log`)
-  const fd = fs.openSync(log, "a")
+  // Owner-only: dev servers print secrets, and the temp directory may be shared.
+  const fd = fs.openSync(log, "a", 0o600)
   const lifetimeMs = input.lifetimeMs ?? LIFETIME_MS
   const watchdog = watchable(input.shell)
   // A hint most dev servers honour (CRA, many Express templates, Nuxt, Astro...). The bind is
@@ -175,6 +183,7 @@ export function start(input: StartInput): Info {
     expiresAt: now + lifetimeMs,
     status: "running",
     watchdog,
+    keep: false,
   }
   const exited = new Promise<void>((resolve) => {
     child.once("exit", (code, signal) => {
@@ -194,6 +203,7 @@ export function start(input: StartInput): Info {
   const timer = setTimeout(() => void stop(id, "expired"), lifetimeMs)
   timer.unref?.()
   entries.set(id, { info, child, timer, exited })
+  AuditLog.emit("process.start", { id, session: info.sessionID, pid: info.pid, command: info.command, cwd: info.cwd })
   return info
 }
 
@@ -209,12 +219,13 @@ export function list(sessionID?: string) {
 }
 
 /** TERM to the whole process group, KILL after a grace period if anything in it is still alive. */
-export async function stop(id: string, reason: "stopped" | "expired" = "stopped") {
+export async function stop(id: string, reason: Reason = "agent") {
   const entry = entries.get(id)
   if (!entry) return
   clearTimeout(entry.timer)
   if (entry.info.status !== "running") return entry.info
-  entry.info.status = reason
+  entry.info.status = reason === "expired" ? "expired" : "stopped"
+  AuditLog.emit("process.stop", { id, session: entry.info.sessionID, pid: entry.info.pid, reason })
   killGroup(entry.info.pid, "SIGTERM")
   const graceful = await Promise.race([
     entry.exited.then(() => true),
@@ -225,14 +236,26 @@ export async function stop(id: string, reason: "stopped" | "expired" = "stopped"
 }
 
 export async function stopSession(sessionID: string) {
-  await Promise.all(list(sessionID).map((info) => stop(info.id)))
+  await Promise.all(list(sessionID).map((info) => stop(info.id, "session_deleted")))
+}
+
+/**
+ * The end of a session's turn: whatever it started and didn't keep is stopped, so a dev server the
+ * agent used for its checks doesn't outlive the turn by accident.
+ */
+export async function endTurn(sessionID: string) {
+  await Promise.all(
+    list(sessionID)
+      .filter((info) => info.status === "running" && !info.keep)
+      .map((info) => stop(info.id, "turn_end")),
+  )
 }
 
 export async function stopDirectory(directory: string) {
   await Promise.all(
     list()
       .filter((info) => info.directory === directory)
-      .map((info) => stop(info.id)),
+      .map((info) => stop(info.id, "instance_disposed")),
   )
 }
 
@@ -309,6 +332,25 @@ function probe(url: URL, host: string, signal: AbortSignal) {
     req.once("error", (error) => resolve({ error: error.message }))
     req.end()
   })
+}
+
+/** Whether something already answers at `url`, before anything was started for it. */
+export async function answers(url: URL) {
+  const host = url.hostname.replace(/^\[|\]$/g, "")
+  const hosts = host.toLowerCase() === "localhost" ? ["127.0.0.1", "::1"] : [host]
+  for (const item of hosts) {
+    const result = await probe(url, item, AbortSignal.timeout(ATTEMPT_TIMEOUT_MS))
+    if ("status" in result) return true
+  }
+  return false
+}
+
+/** Whether the process group listens on `url`'s port; undefined where that can't be checked. */
+export function owns(info: Info, url: URL) {
+  const result = listening(info)
+  if (!result.checked) return undefined
+  const port = url.port || (url.protocol === "https:" ? "443" : "80")
+  return result.addresses.some((address) => address.slice(address.lastIndexOf(":") + 1) === port)
 }
 
 export type ReadyResult =

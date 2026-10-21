@@ -9,9 +9,9 @@ import { BackgroundShell } from "./shell/background"
 export const ID = "process"
 
 export const Parameters = Schema.Struct({
-  action: Schema.Literals(["list", "output", "wait", "stop"]).annotate({
+  action: Schema.Literals(["list", "output", "wait", "stop", "keep"]).annotate({
     description:
-      "list: this session's background processes. output: a process's recent output. wait: wait for `url` to answer. stop: stop a process and everything it started.",
+      "list: this session's background processes. output: a process's recent output. wait: wait for `url` to answer. stop: stop a process and everything it started. keep: leave it running after this turn ends.",
   }),
   id: Schema.optional(Schema.String).annotate({
     description: "The background process ID (bg_...), as returned by the shell tool. Required except for list.",
@@ -34,9 +34,10 @@ const DESCRIPTION = `Manage the background commands you started with the shell t
 - list: every background process of this session, with its status.
 - output: the recent output of one process (\`lines\`, default 40). The full output is in its log file, readable with the Read tool.
 - wait: wait until \`url\` (localhost, 127.0.0.1 or [::1] only) answers with any HTTP response, the process exits, or \`timeout\` passes.
-- stop: stop a process and everything it started. Stop what you started once you have checked it, unless the user asked to keep it running.
+- stop: stop a process and everything it started.
+- keep: leave a process running after your turn ends, for the user to try. Only when the user asked for it or it is clearly useful, and then say in your reply that it is still running and at which URL.
 
-Background processes also stop when the session is deleted, when Lunos exits, and after ${BackgroundShell.LIFETIME_MS / 60_000} minutes.`
+Background processes stop at the end of the turn that started them unless kept, and in any case when the session is deleted, when Lunos exits, and after ${BackgroundShell.LIFETIME_MS / 60_000} minutes.`
 
 function age(ms: number) {
   const s = Math.round(ms / 1000)
@@ -65,6 +66,20 @@ export function describeListening(listening: BackgroundShell.Listening) {
   const line = `Listening on: ${listening.addresses.join(", ")}.`
   if (listening.exposed.length === 0) return line
   return `${line}\nWARNING: ${listening.exposed.join(", ")} can be reached from other machines. Restart it bound to 127.0.0.1 (e.g. --host 127.0.0.1, or the framework's host option) before going further.`
+}
+
+/** Waits for `url`, then says whether it answered, and from where the process group listens. */
+export async function checkReady(info: BackgroundShell.Info, url: URL, timeoutMs: number, abort?: AbortSignal) {
+  const ready = await BackgroundShell.waitReady(info, url, timeoutMs, abort)
+  const lines = [describeReady(ready, url, timeoutMs)]
+  if (!ready.ready) return lines
+  const listening = BackgroundShell.listening(info)
+  lines.push(describeListening(listening))
+  if (BackgroundShell.owns(info, url) === false)
+    lines.push(
+      `WARNING: this process doesn't listen on ${url.host}; the answer came from another process. Don't take it as proof that this one works.`,
+    )
+  return lines
 }
 
 /** The text the model sees about one background process. */
@@ -126,12 +141,23 @@ export const ProcessTool = Tool.define<typeof Parameters, Metadata, never>(
           }
         }
 
+        if (params.action === "keep") {
+          if (info.status === "running") info.keep = true
+          return {
+            title: `keep ${info.id}`,
+            metadata: { id: info.id, status: info.status },
+            output: report(info, [
+              info.status === "running"
+                ? `Kept: it keeps running after this turn, until it is stopped, the session is deleted, Lunos exits, or ${new Date(info.expiresAt).toLocaleTimeString()} (its ${BackgroundShell.LIFETIME_MS / 60_000}-minute limit). Tell the user it is still running and where.`
+                : "Not kept: it is no longer running.",
+            ]),
+          }
+        }
+
         if (!params.url) throw new Error("wait needs the `url` to check.")
         const url = BackgroundShell.parseReadyUrl(params.url)
         const timeout = params.timeout ?? BackgroundShell.READY_TIMEOUT_MS
-        const ready = yield* Effect.promise(() => BackgroundShell.waitReady(info, url, timeout, ctx.abort))
-        const extra = [describeReady(ready, url, timeout)]
-        if (ready.ready) extra.push(describeListening(BackgroundShell.listening(info)))
+        const extra = yield* Effect.promise(() => checkReady(info, url, timeout, ctx.abort))
         return {
           title: `wait for ${url.href}`,
           metadata: { id: info.id, status: info.status },

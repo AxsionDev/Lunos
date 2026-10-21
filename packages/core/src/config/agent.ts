@@ -22,4 +22,6 @@ export class Info extends Schema.Class<Info>("ConfigV2.Agent")({
   steps: PositiveInt.pipe(Schema.optional),
   disabled: Schema.Boolean.pipe(Schema.optional),
   permissions: Permission.Ruleset.pipe(Schema.optional),
+  /** XCOD-288: Build checks its work before handing back unless this is false. */
+  verify: Schema.Boolean.pipe(Schema.optional),
 }) {}

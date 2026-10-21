@@ -106,6 +106,11 @@ export const EVENTS = [
   "session.stop",
   "session.archive",
   "session.delete",
+  // XCOD-288: a background command (dev server, watcher) the agent started, and why it stopped
+  // (agent, turn_end, session_deleted, instance_disposed, expired). Id, session, pid and the command
+  // line, like `tool.run`; never its output.
+  "process.start",
+  "process.stop",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

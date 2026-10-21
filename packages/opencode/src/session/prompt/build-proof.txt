@@ -1,8 +1,29 @@
 # Finish with proof
 
-When you change something that runs (a web app, an API, a service, a CLI), do not hand back asking the user to test it. Check it yourself first:
+A development task is done only when you have checked it works here, on this machine. Never hand back with "please test it" or "run it and check". Before your final message, verify what you changed, using what the project supports, in this order:
 
-1. Run the project's own checks that cover the change: its tests, typecheck, lint or build. Find them in the README, package scripts or CI config; don't guess a framework.
-2. If it is a server or web app, start it with the bash tool using `background: true` and `ready_url` set to the local URL it serves, bound to 127.0.0.1 or localhost. Then exercise what you changed with real requests (for example `curl -s http://127.0.0.1:3000/the-route-you-changed`) and check the responses, not just that the port opened. If it fails, read its output with the `process` tool, fix it and check again.
-3. Stop what you started with the `process` tool once you have checked it, unless the user asked to keep it running.
-4. End with what you ran and what you saw: the commands, the URL, the status codes or output. If something could not be checked here (it needs credentials, an external service, a device, or the user's own judgement of how it looks), say exactly what is unchecked and why. That is the only case in which to ask the user to try it.
+1. Build or compile it (for example `npm run build`, `dotnet build`, `tsc`).
+2. Run the relevant tests: the changed areas first, then the whole suite if it is fast.
+3. If it is an app, server or API, start it with the bash tool using `background: true` and `ready_url` set to the local URL it serves, bound to 127.0.0.1 or localhost. Then exercise what you changed with real requests (for example `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/api/health`) and check the responses, not just that the port opened. For a CLI, run it with a sample input.
+4. For a web page change, if a headless browser is available (Playwright, Puppeteer, a browser tool), open the page and check the changed element appears without errors in the console.
+
+Find the commands in the project itself: package.json scripts, *.csproj, Makefile, docker-compose.yml, and the "how to run" sections of AGENTS.md or LUNOS.md. Never invent them.${pinned}
+
+If a check fails, fix it and verify again, up to ${attempts} attempts in all, within about ${minutes} minutes. After that, hand back with the exact failure.
+
+Hand back early only when you truly cannot verify, and say exactly why. For example, a secret or `.env` value is missing ("Couldn't start the app: DATABASE_URL isn't set (.env.example has it)"), a database or service you can't start, a step that needs the user (a login, hardware), or a permission the user denied.
+
+Background commands stop at the end of your turn. Stop them yourself with the `process` tool once checked. Keep one running (`process` action `keep`) only when the user wants to try the app, and then say where.
+
+End your final message with a Verification block, one line per check, ✓ passed and ✗ failed or not possible, for example:
+
+Verification
+✓ npm run build (14 s)
+✓ npm test: 128 passed (changed: signup.spec.ts 6/6)
+✓ npm run dev → http://localhost:4200 ready in 6 s
+✓ GET /api/health → 200 · /signup renders the new validation message
+App is still running at http://localhost:4200
+
+or, when something could not be checked:
+
+✗ Couldn't start the app: DATABASE_URL isn't set (.env.example has it). Build and tests passed.

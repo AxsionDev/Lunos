@@ -6,6 +6,7 @@ import { spawn } from "node:child_process"
 import { BackgroundShell } from "../../src/tool/shell/background"
 import { buildProof } from "../../src/session/prompt"
 import { Permission } from "../../src/permission"
+import { ConfigPolicy } from "../../src/config/policy"
 
 // XCOD-288: background commands for dev servers: start, readiness, cleanup.
 
@@ -161,6 +162,38 @@ describe("BackgroundShell", () => {
     expect(await until(() => !alive(info.pid), 5000)).toBe(true)
   }, 30_000)
 
+  test("the end of a turn stops what it started, except what was kept", async () => {
+    const used = start(posix ? "sleep 30" : "ping -n 30 127.0.0.1", { sessionID: "ses_turn" })
+    const kept = start(posix ? "sleep 30" : "ping -n 30 127.0.0.1", { sessionID: "ses_turn" })
+    const other = start(posix ? "sleep 30" : "ping -n 30 127.0.0.1", { sessionID: "ses_busy" })
+    kept.keep = true
+    await BackgroundShell.endTurn("ses_turn")
+    expect(used.status).toBe("stopped")
+    expect(await until(() => !alive(used.pid), 5000)).toBe(true)
+    expect(kept.status).toBe("running")
+    expect(alive(kept.pid)).toBe(true)
+    expect(other.status).toBe("running")
+  }, 30_000)
+
+  test("refuses to call a port this session didn't start ready", async () => {
+    const stranger = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("someone else") })
+    try {
+      expect(await BackgroundShell.answers(new URL(`http://127.0.0.1:${stranger.port}/`))).toBe(true)
+      const info = start(posix ? "sleep 30" : "ping -n 30 127.0.0.1")
+      if (posix && Bun.which("lsof"))
+        expect(BackgroundShell.owns(info, new URL(`http://127.0.0.1:${stranger.port}/`))).toBe(false)
+    } finally {
+      stranger.stop(true)
+    }
+    expect(await BackgroundShell.answers(new URL("http://127.0.0.1:9/"))).toBe(false)
+  }, 30_000)
+
+  test("its log file is readable by the owner only", () => {
+    if (!posix) return
+    const info = start("echo secret")
+    expect(fs.statSync(info.log).mode & 0o777).toBe(0o600)
+  })
+
   test("stopping a session stops only that session's processes", async () => {
     const mine = start(posix ? "sleep 30" : "ping -n 30 127.0.0.1", { sessionID: "ses_mine" })
     const other = start(posix ? "sleep 30" : "ping -n 30 127.0.0.1", { sessionID: "ses_other" })
@@ -221,10 +254,59 @@ describe("buildProof", () => {
   test("only for the build agent, and only when it may use the shell", () => {
     const allow = Permission.fromConfig({ bash: "allow" })
     const deny = Permission.fromConfig({ bash: "deny" })
-    expect(buildProof({ name: "build", permission: allow })).toBe(true)
-    expect(buildProof({ name: "plan", permission: allow })).toBe(false)
-    expect(buildProof({ name: "build", permission: deny })).toBe(false)
-    expect(buildProof({ name: "build", permission: allow }, deny)).toBe(false)
+    expect(buildProof({ name: "build", permission: allow })).toContain("# Finish with proof")
+    expect(buildProof({ name: "plan", permission: allow })).toBeUndefined()
+    expect(buildProof({ name: "build", permission: deny })).toBeUndefined()
+    expect(buildProof({ name: "build", permission: allow }, deny)).toBeUndefined()
+  })
+
+  test("pins the project's verify commands, attempts and time budget", () => {
+    const text = buildProof({ name: "build", permission: [] }, undefined, {
+      verify: {
+        build: "npm run build",
+        test: "npm test",
+        start: "npm run dev",
+        ready: "http://localhost:4200",
+        check: ["GET /api/health -> 200"],
+        max_attempts: 5,
+        timeout: 4,
+      },
+    })!
+    for (const part of [
+      "- build: `npm run build`",
+      "- test: `npm test`",
+      "- start (in the background): `npm run dev`",
+      "- ready when this answers: http://localhost:4200",
+      "- check: GET /api/health -> 200",
+      "up to 5 attempts",
+      "about 4 minutes",
+    ])
+      expect(text).toContain(part)
+    expect(text).not.toContain("${")
+    const plain = buildProof({ name: "build", permission: [] })!
+    expect(plain).toContain("up to 3 attempts")
+    expect(plain).toContain("about 10 minutes")
+    expect(plain).not.toContain("This project pins")
+  })
+
+  test("agent.build.verify: false restores handing back without verifying", () => {
+    expect(
+      buildProof({ name: "build", permission: [] }, undefined, { agent: { build: { verify: false } } }),
+    ).toBeUndefined()
+    expect(
+      buildProof({ name: "build", permission: [] }, undefined, { agent: { build: { verify: true } } }),
+    ).toBeDefined()
+  })
+
+  test("an organisation can lock verify and agent.build.verify", () => {
+    expect(ConfigPolicy.unknownKeys(["verify", "agent.build.verify"])).toEqual([])
+    type Doc = { agent?: { build?: { verify?: boolean } }; verify?: { test?: string } }
+    const user: Doc = { agent: { build: { verify: false } }, verify: { test: "echo skip" } }
+    const managed = { agent: { build: { verify: true } }, verify: { test: "npm test" } }
+    const next = ConfigPolicy.apply(user as Record<string, unknown>, managed, ["agent.build.verify", "verify"]) as Doc
+    expect(next.agent?.build?.verify).toBe(true)
+    expect(next.verify?.test).toBe("npm test")
+    expect(buildProof({ name: "build", permission: [] }, undefined, next)).toContain("`npm test`")
   })
 
   test("the process tool goes with the shell permission", () => {

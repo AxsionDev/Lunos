@@ -707,6 +707,47 @@
       },
       "additionalProperties": false
     },
+    "VerifyConfig": {
+      "type": "object",
+      "properties": {
+        "build": {
+          "type": "string",
+          "description": "Command that builds or compiles the project, e.g. \"npm run build\" or \"dotnet build\""
+        },
+        "test": {
+          "type": "string",
+          "description": "Command that runs the tests, e.g. \"npm test\""
+        },
+        "start": {
+          "type": "string",
+          "description": "Command that starts the app, run in the background, e.g. \"npm run dev\""
+        },
+        "ready": {
+          "type": "string",
+          "description": "Local URL that answers once the app is up, e.g. \"http://localhost:4200\""
+        },
+        "check": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Requests to make against the running app and the status they must return, e.g. [\"GET /api/health -> 200\"]"
+        },
+        "max_attempts": {
+          "exclusiveMinimum": 0,
+          "type": "integer",
+          "maximum": 9007199254740991,
+          "description": "How many times the agent fixes a failed check and verifies again before handing back with the failure (default 3)"
+        },
+        "timeout": {
+          "exclusiveMinimum": 0,
+          "type": "integer",
+          "maximum": 9007199254740991,
+          "description": "Time budget for verification in minutes, in total (default 10)"
+        }
+      },
+      "additionalProperties": false
+    },
     "PermissionActionConfig": {
       "type": "string",
       "enum": ["ask", "allow", "deny"]
@@ -859,6 +900,10 @@
         },
         "permission": {
           "$ref": "#/$defs/PermissionConfig"
+        },
+        "verify": {
+          "type": "boolean",
+          "description": "Build agent: check the work (build, tests, start the app and try it) before handing back (default true). false restores handing back without checking (XCOD-288)"
         }
       }
     },
@@ -1846,6 +1891,10 @@
         "subagent": {
           "$ref": "#/$defs/SubagentConfig",
           "description": "How subagents choose their model: inherit, small_model, a fixed model, or per task"
+        },
+        "verify": {
+          "$ref": "#/$defs/VerifyConfig",
+          "description": "How the Build agent checks its work before handing back: build, test and start commands, the ready URL and checks (XCOD-288)"
         },
         "subagent_depth": {
           "minimum": 0,

@@ -89,14 +89,46 @@ IMPORTANT:
 - This tool provides your final answer - no further actions are taken after calling it`
 
 import BUILD_PROOF from "./prompt/build-proof.txt"
+import { BackgroundShell } from "@/tool/shell/background"
+
+type VerifyConfig = {
+  build?: string
+  test?: string
+  start?: string
+  ready?: string
+  check?: readonly string[]
+  max_attempts?: number
+  timeout?: number
+}
 
 /**
- * XCOD-288: the build agent finishes with proof (it runs and checks what it changed) rather than
- * asking the user to test. Only where it can: a session whose shell is denied gets no such advice.
+ * XCOD-288: the build agent finishes with proof (it builds, tests, starts and tries what it changed)
+ * rather than asking the user to test. Not for other agents, not where the shell is denied, and not
+ * when `agent.build.verify` is false. Commands pinned in `verify` replace what it would look up.
  */
-export function buildProof(agent: { name: string; permission: PermissionV1.Ruleset }, session?: PermissionV1.Ruleset) {
-  if (agent.name !== "build") return false
-  return !Permission.disabled([ShellID.ToolID], Permission.merge(agent.permission, session ?? [])).has(ShellID.ToolID)
+export function buildProof(
+  agent: { name: string; permission: PermissionV1.Ruleset },
+  session?: PermissionV1.Ruleset,
+  cfg: { verify?: VerifyConfig; agent?: Record<string, { verify?: boolean } | undefined> } = {},
+) {
+  if (agent.name !== "build") return
+  if (cfg.agent?.[agent.name]?.verify === false) return
+  const ruleset = Permission.merge(agent.permission, session ?? [])
+  if (Permission.disabled([ShellID.ToolID], ruleset).has(ShellID.ToolID)) return
+  const verify = cfg.verify ?? {}
+  const pinned = [
+    verify.build ? `- build: \`${verify.build}\`` : undefined,
+    verify.test ? `- test: \`${verify.test}\`` : undefined,
+    verify.start ? `- start (in the background): \`${verify.start}\`` : undefined,
+    verify.ready ? `- ready when this answers: ${verify.ready}` : undefined,
+    ...(verify.check ?? []).map((check) => `- check: ${check}`),
+  ].filter((line): line is string => line !== undefined)
+  return BUILD_PROOF.replace(
+    "${pinned}",
+    pinned.length ? `\n\nThis project pins these; use them instead of looking for your own:\n${pinned.join("\n")}` : "",
+  )
+    .replace("${attempts}", String(verify.max_attempts ?? 3))
+    .replace("${minutes}", String(verify.timeout ?? 10))
 }
 
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
@@ -1359,12 +1391,13 @@ const layer = Layer.effect(
               sys.mcp(agent, session.permission),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
+            const proof = buildProof(agent, session.permission, yield* config.get())
             const system = [
               ...env,
               ...instructions,
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...(skills ? [skills] : []),
-              ...(buildProof(agent, session.permission) ? [BUILD_PROOF] : []),
+              ...(proof ? [proof] : []),
             ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
@@ -1453,7 +1486,13 @@ const layer = Layer.effect(
             input.sessionID,
           ),
         )
-      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+      return yield* state.ensureRunning(
+        input.sessionID,
+        lastAssistant(input.sessionID),
+        // XCOD-288: background commands this turn started and didn't keep stop with it, however
+        // it ends (finished, failed or interrupted).
+        runLoop(input.sessionID).pipe(Effect.ensuring(Effect.promise(() => BackgroundShell.endTurn(input.sessionID)))),
+      )
     })
 
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(

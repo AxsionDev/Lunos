@@ -23,7 +23,7 @@ import { ShellPrompt, type Parameters } from "./shell/prompt"
 import { BashArity } from "@/permission/arity"
 import { Global } from "@opencode-ai/core/global"
 import { BackgroundShell } from "./shell/background"
-import { describeListening, describeReady, ID as ProcessToolID, report } from "./process"
+import { checkReady, ID as ProcessToolID, report } from "./process"
 
 export { Parameters } from "./shell/prompt"
 
@@ -618,6 +618,13 @@ export const ShellTool = Tool.define(
       },
       ctx: Tool.Context,
     ) {
+      // A server this session didn't start already answers there: starting another would either
+      // fail on the port or, worse, "pass" its readiness check against the wrong process.
+      if (input.readyUrl && (yield* Effect.promise(() => BackgroundShell.answers(input.readyUrl!)))) {
+        throw new Error(
+          `Not started: ${input.readyUrl.href} already answers, so a process this session didn't start is listening there. Use another port, or ask the user before stopping that process; never stop it yourself.`,
+        )
+      }
       const info = BackgroundShell.start({
         sessionID: ctx.sessionID,
         directory: input.directory,
@@ -629,11 +636,7 @@ export const ShellTool = Tool.define(
       })
       const extra: string[] = []
       if (input.readyUrl) {
-        const ready = yield* Effect.promise(() =>
-          BackgroundShell.waitReady(info, input.readyUrl!, input.timeout, ctx.abort),
-        )
-        extra.push(describeReady(ready, input.readyUrl, input.timeout))
-        if (ready.ready) extra.push(describeListening(BackgroundShell.listening(info)))
+        extra.push(...(yield* Effect.promise(() => checkReady(info, input.readyUrl!, input.timeout, ctx.abort))))
       } else {
         yield* Effect.promise(() => BackgroundShell.settle(info))
       }
@@ -643,7 +646,7 @@ export const ShellTool = Tool.define(
       }
       if (info.status === "running") {
         extra.push(
-          `It keeps running after this call. Use the ${ProcessToolID} tool (id ${info.id}) to read its output, wait for it, or stop it.`,
+          `It keeps running after this call, until the end of this turn unless kept. Use the ${ProcessToolID} tool (id ${info.id}) to read its output, wait for it, stop it, or keep it running for the user.`,
         )
       }
       const output = report(info, extra)

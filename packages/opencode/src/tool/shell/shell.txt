@@ -14,7 +14,8 @@ ${commandSection}
 - Never run a dev server or watcher in the foreground: it blocks until the timeout and is then killed. Never background it yourself with `&`, `nohup` or `disown`.
 - Set `background: true` instead, and `ready_url` to the local URL it serves (e.g. http://127.0.0.1:3000/). The call returns once that URL answers, the command exits, or `timeout` passes, with the process ID, its recent output and the addresses it listens on.
 - Bind servers to 127.0.0.1 or localhost (e.g. `--host 127.0.0.1`), never 0.0.0.0. HOST=127.0.0.1 is already set for background commands.
-- Use the `process` tool to read its output, wait for it again, or stop it. Stop what you started once you have checked it, unless the user asked to keep it running. Background commands also stop when the session is deleted, when Lunos exits, and after 60 minutes.
+- If the URL already answers before the command starts, it isn't started: another process holds that port. Pick another port; never stop a process you didn't start.
+- Use the `process` tool to read its output, wait for it again, stop it, or keep it. Background commands stop at the end of your turn unless you keep them (only when the user wants the app left running; then say so and give the URL), and in any case when the session is deleted, when Lunos exits, and after 60 minutes.
 
 # Git and GitHub
 - Only commit, amend, push, or create PRs when explicitly requested.

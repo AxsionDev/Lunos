@@ -67,6 +67,8 @@ export const KNOWN = [
   "small_model",
   "subagent",
   "subagent.model",
+  // XCOD-288: the commands the Build agent verifies its work with (plus `agent.<name>.verify`).
+  "verify",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */
@@ -74,7 +76,7 @@ export function isKnown(key: string) {
   return (
     (KNOWN as ReadonlyArray<string>).includes(key) ||
     /^permission\.[^.]+$/.test(key) ||
-    /^agent\.[^.]+\.model$/.test(key)
+    /^agent\.[^.]+\.(model|verify)$/.test(key)
   )
 }
 

@@ -50,6 +50,8 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   recommended: "Models & agents",
   default_agent: "Models & agents",
   subagent: "Models & agents",
+  // XCOD-288: how the Build agent checks its work before handing back.
+  verify: "Models & agents",
   cloud: "Advanced / experimental",
   auth: "Advanced / experimental",
   sync: "Advanced / experimental",
@@ -122,6 +124,7 @@ export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
 const SUBTAB: Record<string, string> = {
   agent: "Agents",
   agent_import: "Agents",
+  verify: "Agents",
   default_agent: "Agents",
   mode: "Agents",
   subagent_depth: "Agents",

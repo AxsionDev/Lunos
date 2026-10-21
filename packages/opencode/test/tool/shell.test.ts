@@ -9,6 +9,7 @@ import { Config } from "@/config/config"
 import { Shell } from "@opencode-ai/core/shell"
 import { ShellTool } from "../../src/tool/shell"
 import { ProcessTool, type Parameters as ProcessParameters } from "../../src/tool/process"
+import { BackgroundShell } from "../../src/tool/shell/background"
 import { Filesystem } from "@/util/filesystem"
 import { provideInstance, testInstanceStoreLayer, tmpdirScoped } from "../fixture/fixture"
 import type { Permission } from "../../src/permission"
@@ -1258,6 +1259,34 @@ describe("tool.shell background", () => {
         )
         expect(after).toBe("refused")
       }),
+    )
+
+    it.live("doesn't start when something else already answers at ready_url", () =>
+      Effect.gen(function* () {
+        const stranger = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("not ours") })
+        yield* Effect.addFinalizer(() => Effect.sync(() => stranger.stop(true)))
+        const err = yield* runIn(
+          projectRoot,
+          fail({ command: "echo should-not-run", background: true, ready_url: `http://127.0.0.1:${stranger.port}/` }),
+        )
+        expect(err.message).toContain("already answers")
+      }),
+    )
+
+    it.live("keep leaves it running past the end of the turn", () =>
+      runIn(
+        projectRoot,
+        Effect.gen(function* () {
+          const result = yield* run({ command: "sleep 30", background: true })
+          const id = result.metadata.background!.id
+          const kept = yield* processTool({ action: "keep", id })
+          expect(kept.output).toContain("Kept:")
+          yield* Effect.promise(() => BackgroundShell.endTurn(ctx.sessionID))
+          expect(BackgroundShell.get(id)?.status).toBe("running")
+          yield* processTool({ action: "stop", id })
+          expect(BackgroundShell.get(id)?.status).toBe("stopped")
+        }),
+      ),
     )
 
     it.live("reports a background command that fails at once", () =>
