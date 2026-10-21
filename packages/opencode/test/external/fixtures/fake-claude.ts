@@ -13,10 +13,17 @@ if (process.argv.includes("--version")) {
   console.log("2.1.292 (Claude Code)")
   process.exit(0)
 }
+// XCOD-285: FAKE_CLAUDE_OLD=1 is an older Claude Code with fewer features: fewer permission modes in
+// --help (no plan), no `permission_suggestions` on its approvals, and it ignores the host's hooks.
+const old = process.env.FAKE_CLAUDE_OLD === "1"
 if (process.argv.includes("--help")) {
   // XCOD-254: FAKE_CLAUDE_MCP=1 also lists --mcp-config, as a Claude Code that can take the Lunos bridge.
+  // XCOD-285: the --permission-mode choices as 2.1.304's --help wraps them (an older set with FAKE_CLAUDE_OLD).
   console.log(
     "--input-format <format>\n--output-format <format>\n--permission-prompts <target>" +
+      (old
+        ? '\n--permission-mode <mode>  Permission mode to use for the session\n    (choices: "acceptEdits",\n    "bypassPermissions", "default")'
+        : '\n--permission-mode <mode>  Permission mode to use for the session\n    (choices: "acceptEdits", "auto",\n    "bypassPermissions", "manual", "dontAsk", "plan")') +
       (process.env.FAKE_CLAUDE_MCP === "1" ? "\n--mcp-config <configs...>" : ""),
   )
   process.exit(0)
@@ -86,6 +93,50 @@ console.log(
 )
 // then the user prompt
 await nextLine()
+// XCOD-285: the host's PreToolUse hook, when it registered one (Claude Code 2.1.304 answers
+// `hooks_applied: true`); an older release ignores it. Resolves with the hook's deny reason, if any.
+const policyHook: string | undefined = old ? undefined : init.request?.hooks?.PreToolUse?.[0]?.hookCallbackIds?.[0]
+async function preToolUse(name: string, input: unknown, id: string) {
+  if (!policyHook) return undefined
+  console.log(
+    JSON.stringify({
+      type: "control_request",
+      request_id: `hook_${id}`,
+      request: {
+        subtype: "hook_callback",
+        callback_id: policyHook,
+        input: { hook_event_name: "PreToolUse", tool_name: name, tool_input: input, tool_use_id: id },
+        tool_use_id: id,
+      },
+    }),
+  )
+  const answer = JSON.parse(await nextLine())
+  const output = answer.response?.response?.hookSpecificOutput
+  return output?.permissionDecision === "deny" ? String(output.permissionDecisionReason ?? "denied by hook") : undefined
+}
+// XCOD-285: FAKE_CLAUDE_HOLD=1 starts, then answers set_permission_mode (with the status line 2.1.304
+// prints after it, test/fixtures/external/claude-2.1.304/policy-hook-mode.1.jsonl) until stdin closes.
+if (process.env.FAKE_CLAUDE_HOLD === "1") {
+  const mode = process.argv[process.argv.indexOf("--permission-mode") + 1]
+  console.log(JSON.stringify({ ...JSON.parse(lines[0]!), permissionMode: mode }))
+  input.on("line", () => undefined)
+  for (;;) {
+    const line = await Promise.race([nextLine(), new Promise<undefined>((resolve) => input.on("close", resolve))])
+    if (line === undefined) break
+    const message = JSON.parse(line)
+    if (message.request?.subtype !== "set_permission_mode") continue
+    console.log(
+      JSON.stringify({
+        type: "control_response",
+        response: { subtype: "success", request_id: message.request_id, response: { mode: message.request.mode } },
+      }),
+    )
+    console.log(
+      JSON.stringify({ type: "system", subtype: "status", status: null, permissionMode: message.request.mode }),
+    )
+  }
+  process.exit(0)
+}
 // XCOD-254: FAKE_CLAUDE_BASH=<command> runs that command through Bash the way Claude Code would:
 // announce the tool_use, ask the host with can_use_tool, report the tool_result (the host's refusal
 // when denied; the command isn't run either way), then end the turn with the recorded result.
@@ -99,14 +150,43 @@ if (bash) {
       message: { role: "assistant", content: [{ type: "tool_use", id: "toolu_bash", name: "Bash", input: args }] },
     }),
   )
-  console.log(
-    JSON.stringify({
-      type: "control_request",
-      request_id: "req_bash",
-      request: { subtype: "can_use_tool", tool_name: "Bash", input: args, tool_use_id: "toolu_bash" },
-    }),
-  )
-  const answer = JSON.parse(await nextLine()).response?.response ?? {}
+  // XCOD-285: a hook's deny wins before anything else; FAKE_CLAUDE_AUTO_ALLOW=1 is a permission mode
+  // that allows the call without asking (no can_use_tool); FAKE_CLAUDE_SUGGEST adds the rule Claude Code
+  // offers for "don't ask again", aimed at a settings file (`localSettings`) as it would be.
+  const hooked = await preToolUse("Bash", args, "toolu_bash")
+  const suggest = process.env.FAKE_CLAUDE_SUGGEST
+  const answer: { behavior?: string; message?: string } = hooked
+    ? { behavior: "deny", message: hooked }
+    : process.env.FAKE_CLAUDE_AUTO_ALLOW === "1"
+      ? { behavior: "allow" }
+      : await (async () => {
+          console.log(
+            JSON.stringify({
+              type: "control_request",
+              request_id: "req_bash",
+              request: {
+                subtype: "can_use_tool",
+                tool_name: "Bash",
+                input: args,
+                tool_use_id: "toolu_bash",
+                ...(suggest && !old
+                  ? {
+                      permission_suggestions: [
+                        {
+                          type: "addRules",
+                          rules: [{ toolName: "Bash", ruleContent: suggest }],
+                          behavior: "allow",
+                          destination: "localSettings",
+                        },
+                      ],
+                    }
+                  : {}),
+              },
+            }),
+          )
+          return JSON.parse(await nextLine()).response?.response ?? {}
+        })()
+  record(JSON.stringify({ ran: answer.behavior === "allow", hooked: !!hooked }))
   const allowed = answer.behavior === "allow"
   console.log(
     JSON.stringify({
@@ -184,6 +264,14 @@ if (process.argv.includes("--model") && chosen) {
   const first = JSON.parse(lines[0]!)
   lines[0] = JSON.stringify({ ...first, model: chosen })
 }
+if (old)
+  for (const [index, line] of lines.entries()) {
+    const message = JSON.parse(line)
+    if (message.request?.permission_suggestions) {
+      delete message.request.permission_suggestions
+      lines[index] = JSON.stringify(message)
+    }
+  }
 // XCOD-218: FAKE_CLAUDE_DELAY_MS slows the replay, so a test can stop a turn while it runs.
 const delay = Number(process.env.FAKE_CLAUDE_DELAY_MS ?? 0)
 for (const line of lines) {

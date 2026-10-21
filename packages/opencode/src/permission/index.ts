@@ -40,6 +40,23 @@ export function evaluate(permission: string, pattern: string, ...rulesets: Permi
   return match(permission, pattern, ...rulesets) ?? { action: "ask", permission, pattern: "*" }
 }
 
+/**
+ * XCOD-285: the deny rule (the organisation's locked rules included) that refuses `permission` on any
+ * of `patterns`, without asking anyone; undefined when none does. For a check that runs where `ask`
+ * doesn't (an external tool's own permission mode would allow the call without asking), so it judges
+ * deny the way `ask` does: a ruleset deny, or a locked deny.
+ */
+export function denied(permission: string, patterns: readonly string[], ruleset: PermissionV1.Ruleset) {
+  const locked = lockedRules()
+  for (const pattern of patterns) {
+    const base = evaluate(permission, pattern, ruleset)
+    if (base.action === "deny") return base
+    const lockedRule = match(permission, pattern, locked)
+    if (lockedRule?.action === "deny") return lockedRule
+  }
+  return undefined
+}
+
 const TRUNCATED = path.join(TRUNCATION_DIR, "*")
 
 /**

@@ -165,7 +165,10 @@ const hooksAfterIdle = (file: string, sessionID: string) =>
 const replies = (log: string, method?: string) =>
   readLog(log).then((lines) =>
     lines.filter((line) =>
-      method === "claude" ? line.type === "control_response" : line.id !== undefined && !line.method && line.result,
+      // XCOD-285: the answers to Lunos's policy hook (`hook_…`) are left out; only approvals count here.
+      method === "claude"
+        ? line.type === "control_response" && !String(line.response?.request_id).startsWith("hook_")
+        : line.id !== undefined && !line.method && line.result,
     ),
   )
 

@@ -58,10 +58,12 @@ import type {
   ExperimentalControlPlaneMoveSessionResponses,
   ExperimentalExternalConsentErrors,
   ExperimentalExternalConsentResponses,
+  ExperimentalExternalModeErrors,
   ExperimentalExternalModelErrors,
   ExperimentalExternalModelResponses,
   ExperimentalExternalModelsErrors,
   ExperimentalExternalModelsResponses,
+  ExperimentalExternalModeResponses,
   ExperimentalExternalStopErrors,
   ExperimentalExternalStopResponses,
   ExperimentalExternalToolsErrors,
@@ -1817,6 +1819,49 @@ export class External extends HeyApiClient {
       ThrowOnError
     >({
       url: "/experimental/external/{sessionID}/model",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Switch an external session's permission mode
+   *
+   * Claude Code's permission mode for an external session, as Shift+Tab cycles it in the tool: the running turn switches now (set_permission_mode) and later turns start in it. Modes that skip approvals are refused. Omit it to go back to external.claude.permission_mode.
+   */
+  public mode<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      mode?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "mode" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalModeResponses,
+      ExperimentalExternalModeErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/mode",
       ...options,
       ...params,
       headers: {

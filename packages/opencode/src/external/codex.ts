@@ -212,6 +212,21 @@ const APPROVAL_METHODS: Record<string, string> = {
   "item/permissions/requestApproval": "Permissions",
 }
 
+/**
+ * XCOD-285: the decisions Codex's app server takes for a command or file-change approval, from the
+ * protocol schema 0.160.1 generates (`codex app-server generate-json-schema`, kept in
+ * test/fixtures/external/codex-0.160.1/approval-decisions.json): accept, acceptForSession, decline
+ * (the turn carries on) and cancel (the turn stops). Its execpolicy and network-policy amendments are
+ * left out: they persist into Codex's own config, which Lunos never has it change on its own.
+ */
+export const DECISIONS = ["accept", "acceptForSession", "decline", "cancel"] as const
+
+/** The wire decision for a Lunos answer. */
+export function decision(answer: PermissionDecision): (typeof DECISIONS)[number] {
+  if (answer.allow) return answer.always ? "acceptForSession" : "accept"
+  return answer.interrupt ? "cancel" : "decline"
+}
+
 const ALLOW = /^(allow|accept|approve|yes|run)\b/i
 const DECLINE = /^(decline|deny|reject|cancel|no)\b/i
 /** Options that would also approve later calls, which only the user can choose in Lunos. */
@@ -354,13 +369,14 @@ export function start(options: Options): Running {
           input,
           description: params.reason ?? undefined,
           toolUseID: params.itemId,
+          decisions: [...DECISIONS],
         }
         void options
           .ask(permission)
           .catch((error: unknown) => ({ allow: false as const, message: String(error) }))
-          .then((decision) => {
-            if (!decision.allow) denied.push({ tool, id: params.itemId })
-            write({ id: message.id, result: { decision: decision.allow ? "accept" : "decline" } })
+          .then((answer) => {
+            if (!answer.allow) denied.push({ tool, id: params.itemId })
+            write({ id: message.id, result: { decision: decision(answer) } })
           })
         return
       }

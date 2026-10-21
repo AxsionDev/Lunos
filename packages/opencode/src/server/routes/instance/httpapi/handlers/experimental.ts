@@ -407,6 +407,18 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return true
     })
 
+    const externalMode = Effect.fn("ExperimentalHttpApi.externalMode")(function* (ctx: {
+      params: { sessionID: string }
+      payload: { mode?: string }
+    }) {
+      const marker = yield* externalMarker(ctx.params.sessionID)
+      const mode = ctx.payload.mode?.trim() || undefined
+      const invalid = mode ? ExternalSession.invalidMode(marker.tool, mode, undefined) : undefined
+      if (invalid) return yield* Effect.fail(new InvalidRequestError({ message: invalid }))
+      yield* ExternalSession.setMode(sessions, SessionID.make(ctx.params.sessionID), mode)
+      return true
+    })
+
     // XCOD-254: the answer to sharing Lunos with a tool in this project, as `lunos external share`.
     const externalConsent = Effect.fn("ExperimentalHttpApi.externalConsent")(function* (ctx: {
       payload: { tool: "claude" | "codex"; answer: "share" | "never" | "ask" }
@@ -608,6 +620,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("externalTools", externalTools)
       .handle("externalModels", externalModels)
       .handle("externalModel", externalModel)
+      .handle("externalMode", externalMode)
       .handle("externalConsent", externalConsent)
       .handle("peerStop", peerStop)
       .handle("peerAsks", peerAsks)
