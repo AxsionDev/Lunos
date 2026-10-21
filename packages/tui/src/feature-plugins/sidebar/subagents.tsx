@@ -98,12 +98,13 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
     ),
   )
   // Names and animals follow creation order, the same on every surface and after a restart.
-  const created = createMemo(() =>
-    list()
-      .map((item) => ({ id: item.id, at: api.state.session.get(item.id)?.time.created ?? item.started ?? 0 }))
-      .toSorted((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-      .map((item) => item.id),
-  )
+  const created = createMemo(() => {
+    const items = list().map((item) => ({ id: item.id, at: api.state.session.get(item.id)?.time.created }))
+    // One source for every entry: the child sessions' creation times when all are known, else launch
+    // order. Mixing the two could swap two parallel siblings' names as their sessions load.
+    if (items.some((item) => item.at === undefined)) return items.map((item) => item.id)
+    return items.toSorted((a, b) => a.at! - b.at! || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map((item) => item.id)
+  })
   const looks = createMemo(() => assignAvatars(created()))
   const nameOf = (item: SubagentEntry) =>
     funNames() ? looks().get(item.id)!.name : plainName(created().indexOf(item.id))
