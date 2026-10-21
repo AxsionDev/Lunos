@@ -436,11 +436,27 @@ opencode session list
 
 #### delete
 
-Delete an Lunos session.
+Delete sessions for good: their history, subagent sessions and queued prompts. Files in your
+projects are never touched, and a Claude Code or Codex session keeps that tool's own history. A
+shared session's link is removed first, and with session sync on, the synced copy is deleted too.
 
 ```bash
-opencode session delete <sessionID>
+opencode session delete <sessionID...>
+opencode session delete --archived --older-than 30d --yes
 ```
+
+It prints what it deleted and what it skipped, and why.
+
+##### Flags
+
+| Flag                                       | Short | Description                                                         |
+| ------------------------------------------ | ----- | ------------------------------------------------------------------- |
+| <nobr><code>{"--archived"}</code></nobr>   |       | Delete every archived session instead of the ids given              |
+| <nobr><code>{"--older-than"}</code></nobr> |       | With `--archived`: only those last active before this, e.g. `30d`   |
+| <nobr><code>{"--project"}</code></nobr>    |       | With `--archived`: only sessions of the project at this path        |
+| <nobr><code>{"--stop"}</code></nobr>       |       | Stop running or waiting sessions first (otherwise they are skipped) |
+| <nobr><code>{"--keep-cloud"}</code></nobr> |       | Keep the synced copies on Lunos Cloud                               |
+| <nobr><code>{"--yes"}</code></nobr>        | `-y`  | Don't ask for confirmation (needed with `--archived` in a script)   |
 
 ---
 

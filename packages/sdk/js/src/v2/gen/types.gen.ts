@@ -2790,6 +2790,21 @@ export type SessionBulkArchiveResult = {
 export type SessionBulkDeleteResult = {
   deleted: Array<string>
   skipped: Array<SessionBulkFailure>
+  stopped?: Array<string>
+}
+
+export type SessionBulkPreviewItem = {
+  id: string
+  messages: number
+  children: number
+  queued: number
+  shared: boolean
+  tool?: string
+}
+
+export type SessionBulkPreviewResult = {
+  items: Array<SessionBulkPreviewItem>
+  sync: boolean
 }
 
 export type NotFoundError = {
@@ -9446,6 +9461,10 @@ export type ExperimentalSessionBulkUnarchiveResponse =
 export type ExperimentalSessionBulkDeleteData = {
   body?: {
     sessionIDs: Array<string>
+    archivedOnly?: boolean
+    stop?: boolean
+    keepCloud?: boolean
+    origin?: "single" | "bulk"
   }
   path?: never
   query?: {
@@ -9467,13 +9486,45 @@ export type ExperimentalSessionBulkDeleteError =
 
 export type ExperimentalSessionBulkDeleteResponses = {
   /**
-   * Which archived sessions were deleted
+   * Which sessions were deleted, and why the others weren't
    */
   200: SessionBulkDeleteResult
 }
 
 export type ExperimentalSessionBulkDeleteResponse =
   ExperimentalSessionBulkDeleteResponses[keyof ExperimentalSessionBulkDeleteResponses]
+
+export type ExperimentalSessionBulkPreviewData = {
+  body?: {
+    sessionIDs: Array<string>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session-bulk/preview"
+}
+
+export type ExperimentalSessionBulkPreviewErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionBulkPreviewError =
+  ExperimentalSessionBulkPreviewErrors[keyof ExperimentalSessionBulkPreviewErrors]
+
+export type ExperimentalSessionBulkPreviewResponses = {
+  /**
+   * What deleting the sessions removes
+   */
+  200: SessionBulkPreviewResult
+}
+
+export type ExperimentalSessionBulkPreviewResponse =
+  ExperimentalSessionBulkPreviewResponses[keyof ExperimentalSessionBulkPreviewResponses]
 
 export type ExperimentalSessionGroupListData = {
   body?: never

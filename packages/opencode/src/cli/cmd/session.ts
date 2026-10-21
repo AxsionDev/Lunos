@@ -9,7 +9,6 @@ import { Locale } from "@/util/locale"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Filesystem } from "@/util/filesystem"
 import { Process } from "@/util/process"
-import { NotFoundError } from "@/storage/storage"
 import { EOL } from "os"
 import path from "path"
 import { which } from "@opencode-ai/core/util/which"
@@ -17,8 +16,7 @@ import * as prompts from "@clack/prompts"
 import { InstanceRef } from "@/effect/instance-ref"
 import { SessionBulk } from "@/session/bulk"
 import { SessionOverview } from "@/session/overview"
-import { SessionPromptQueue } from "@/session/prompt-queue"
-import { AuditLog } from "@/audit/log"
+import { SessionShare } from "@/share/session"
 
 function pagerCmd(): string[] {
   const lessOptions = ["-R", "-S"]
@@ -61,25 +59,102 @@ export const SessionCommand = cmd({
   async handler() {},
 })
 
+/**
+ * XCOD-284: which sessions `lunos session delete --archived` reaches: archived top-level sessions
+ * (and Claude Code / Codex rows), last active before `before`, in the project at `project` (a path).
+ */
+export function archivedTargets<
+  T extends Pick<SessionOverview.Item, "id" | "parentID" | "updated" | "directory"> & {
+    project?: { worktree: string }
+  },
+>(items: readonly T[], input: { before?: number; project?: string }) {
+  const inside = (dir: string | undefined, root: string) =>
+    !!dir && (dir === root || dir.startsWith(root.endsWith(path.sep) ? root : root + path.sep))
+  return items.filter(
+    (item) =>
+      !item.parentID &&
+      (input.before === undefined || item.updated < input.before) &&
+      (input.project === undefined ||
+        inside(item.project?.worktree, input.project) ||
+        inside(item.directory, input.project)),
+  )
+}
+
 export const SessionDeleteCommand = effectCmd({
-  command: "delete <sessionID>",
-  describe: "delete a session",
+  command: "delete [sessionIDs..]",
+  describe: "delete sessions for good: their history, subagent sessions and queued prompts",
   builder: (yargs) =>
-    yargs.positional("sessionID", {
-      describe: "session ID to delete",
-      type: "string",
-      demandOption: true,
-    }),
+    yargs
+      .positional("sessionIDs", { describe: "the sessions to delete", type: "string", array: true })
+      .option("archived", { describe: "delete every archived session (see lunos session archive)", type: "boolean" })
+      .option("older-than", {
+        describe: "with --archived: only those last active before this, e.g. 30d, 12h, 2w",
+        type: "string",
+      })
+      .option("project", { describe: "with --archived: only sessions of the project at this path", type: "string" })
+      .option("stop", {
+        describe: "stop running or waiting sessions first (otherwise they're skipped)",
+        type: "boolean",
+      })
+      .option("keep-cloud", { describe: "keep the synced copies on Lunos Cloud", type: "boolean" })
+      .option("yes", { alias: "y", describe: "don't ask for confirmation", type: "boolean" }),
   handler: Effect.fn("Cli.session.delete")(function* (args) {
+    const given = (args.sessionIDs ?? []).map(String).filter(Boolean)
+    if (given.length > 0 === !!args.archived) return yield* fail("Give session ids or --archived (not both).")
+    if (!args.archived && (args.olderThan !== undefined || args.project !== undefined))
+      return yield* fail("--older-than and --project go with --archived.")
+    const age = args.olderThan === undefined ? undefined : parseAge(args.olderThan)
+    if (args.olderThan !== undefined && age === undefined)
+      return yield* fail(`--older-than takes a number and a unit (m, h, d, w), e.g. 30d; not "${args.olderThan}".`)
+
     const svc = yield* Session.Service
-    const sessionID = SessionID.make(args.sessionID)
-    // XCOD-269: prompts queued for it and never sent go too (Session.remove); audited as a count.
-    const queued = SessionPromptQueue.held(sessionID)
-    yield* svc
-      .remove(sessionID)
-      .pipe(Effect.catchIf(NotFoundError.isInstance, () => fail(`Session not found: ${args.sessionID}`)))
-    AuditLog.emit("session.delete", { origin: "cli", count: 1, ids: [sessionID], queued_discarded: queued })
-    UI.println(UI.Style.TEXT_SUCCESS_BOLD + `Session ${args.sessionID} deleted` + UI.Style.TEXT_NORMAL)
+    const ids = args.archived
+      ? archivedTargets((yield* SessionOverview.build({ archived: true })).sessions, {
+          before: age === undefined ? undefined : Date.now() - age,
+          project: args.project === undefined ? undefined : path.resolve(args.project),
+        }).map((item) => item.id)
+      : given
+    if (ids.length === 0) {
+      UI.println(args.archived ? "No archived sessions match; nothing was deleted." : "Nothing to delete.")
+      return
+    }
+    // Titles, for the summary (a Claude Code / Codex row is named by its id).
+    const titles = new Map<string, string>()
+    for (const id of ids) {
+      if (id.startsWith(SessionBulk.EXTERNAL_PREFIX)) continue
+      const info = yield* svc.get(SessionID.make(id)).pipe(Effect.catch(() => Effect.succeed(undefined)))
+      if (info) titles.set(id, info.title)
+    }
+    const name = (id: string) => (titles.has(id) ? `${id}  ${Locale.truncate(titles.get(id)!, 50)}` : id)
+
+    const count = `${ids.length} ${ids.length === 1 ? "session" : "sessions"}`
+    const message = `Delete ${count} for good? Their history, subagent sessions and queued prompts go; files in your projects stay.${args.keepCloud ? "" : " Synced copies on Lunos Cloud are deleted too (--keep-cloud keeps them)."}`
+    // Ids given in a script (no terminal) delete as before, without asking; --archived needs --yes there.
+    const ask = args.archived || process.stdin.isTTY
+    if (ask && !(yield* confirmed(message, args.yes))) return
+
+    const share = yield* SessionShare.Service
+    const result = yield* SessionBulk.remove({
+      sessionIDs: ids,
+      archivedOnly: !!args.archived,
+      stop: !!args.stop,
+      keepCloud: !!args.keepCloud,
+      origin: "cli",
+      reason: "Stopped by lunos session delete",
+      unshare: share.unshare,
+    })
+    // One id that doesn't exist reads as it always has.
+    if (ids.length === 1 && result.skipped[0]?.reason === "no such session")
+      return yield* fail(`Session not found: ${ids[0]}`)
+    const stopped = result.stopped?.length ? ` (stopped ${result.stopped.length} first)` : ""
+    UI.println(
+      UI.Style.TEXT_SUCCESS_BOLD +
+        `Deleted ${result.deleted.length}${stopped}${result.skipped.length ? ` · ${result.skipped.length} skipped` : ""}` +
+        UI.Style.TEXT_NORMAL,
+    )
+    for (const id of result.deleted) UI.println(`  deleted ${name(id)}`)
+    for (const item of result.skipped) UI.println(`  skipped ${name(item.id)}: ${item.reason}`)
+    if (result.skipped.length) process.exitCode = 1
   }),
 })
 

@@ -337,3 +337,71 @@ export function queuedDeleteNote(count: number) {
   if (count <= 0) return undefined
   return `Also deletes ${count === 1 ? "1 queued prompt" : `${count} queued prompts`} that ${count === 1 ? "was" : "were"} never sent.`
 }
+
+/** XCOD-284: what the delete confirmation knows about each session (experimental.sessionBulk.preview). */
+export type DeletePreview = {
+  id: string
+  messages: number
+  children: number
+  queued: number
+  shared: boolean
+  tool?: string
+}
+
+/**
+ * XCOD-284: the delete confirmation's text: what goes, what is kept, and what happens to running
+ * sessions. `items` are the sessions asked about (top-level rows), `preview` what the server says.
+ */
+export function deleteQuestion(input: {
+  items: SessionOverviewItem[]
+  preview: DeletePreview[]
+  /** Show archived: "Clear list (archive)" isn't the way back from there. */
+  archivedView?: boolean
+}) {
+  const { items } = input
+  const byID = new Map(input.preview.map((item) => [item.id, item]))
+  const running = stopPlan(items)
+  const single = items.length === 1 ? items[0] : undefined
+  const messages = items.reduce((sum, item) => sum + (byID.get(item.id)?.messages ?? 0), 0)
+  const children = items.reduce((sum, item) => sum + (byID.get(item.id)?.children ?? 0), 0)
+  const queued = items.reduce((sum, item) => sum + (byID.get(item.id)?.queued ?? item.queued ?? 0), 0)
+  const shared = items.filter((item) => byID.get(item.id)?.shared).length
+  const tools = [
+    ...new Set(
+      items.filter((item) => item.kind === "external" || byID.get(item.id)?.tool).map((item) => kindLabel(item) ?? ""),
+    ),
+  ].filter(Boolean)
+
+  const title = single
+    ? `Delete "${single.title}" (project ${projectName(single)}${toolOnly(single) ? "" : `, ${plural(messages, "message")}`})? This can't be undone.`
+    : `Delete ${items.length} sessions? This can't be undone.`
+  const projects = new Map<string, number>()
+  for (const item of items) projects.set(projectName(item), (projects.get(projectName(item)) ?? 0) + 1)
+  const lines: string[] = []
+  if (!single) lines.push(`By project: ${[...projects].map(([name, count]) => `${name} ${count}`).join(", ")}.`)
+  const removed = [
+    single ? "its history and messages" : "their history and messages",
+    children ? plural(children, "subagent session") : undefined,
+    queued ? `${plural(queued, "queued prompt")} never sent` : undefined,
+  ].filter(Boolean)
+  lines.push(`Removed: ${removed.join(", ")}.`)
+  if (shared) lines.push(single ? "Its share link is removed first." : `${plural(shared, "share link")} removed first.`)
+  for (const tool of tools) lines.push(`${tool} keeps its own copy; only the Lunos record goes.`)
+  lines.push("Files the agent changed in your projects are never touched.")
+  if (running.targets.length) {
+    const elsewhere = running.targets.filter((item) => item.elsewhere).length
+    lines.push(
+      `${single ? "It's" : `${running.targets.length} ${running.targets.length === 1 ? "is" : "are"}`} running or waiting: Stop and delete stops ${running.targets.length === 1 ? "it" : "them"} first${elsewhere ? ` (${elsewhere} in another Lunos)` : ""}.`,
+    )
+  }
+  if (!input.archivedView) lines.push("Want it back later? Use Clear list (archive) instead.")
+  return { title, lines, running: running.targets }
+}
+
+/** XCOD-284: the toast after a delete: "Deleted 7 sessions", or what couldn't be deleted and why. */
+export function deleteSummary(result: { deleted: string[]; skipped: { id: string; reason: string }[] }) {
+  const done = result.deleted.length
+  if (!result.skipped.length) return `Deleted ${plural(done, "session")}`
+  const reasons = [...new Set(result.skipped.map((item) => item.reason))].join("; ")
+  return `Deleted ${done} · ${result.skipped.length} couldn't be deleted (${reasons})`
+}

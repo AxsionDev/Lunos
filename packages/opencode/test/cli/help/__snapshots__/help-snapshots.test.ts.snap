@@ -402,7 +402,8 @@ manage sessions
 
 Commands:
   lunos session list                   list sessions
-  lunos session delete <sessionID>     delete a session
+  lunos session delete [sessionIDs..]  delete sessions for good: their history, subagent sessions
+                                       and queued prompts
   lunos session stop                   stop every running or waiting session on this computer (as
                                        Stop all in /sessions)
   lunos session archive                clear finished sessions from the lists (archived: hidden, not
@@ -868,19 +869,25 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode session delete --help 1`] = `
-"lunos session delete <sessionID>
+"lunos session delete [sessionIDs..]
 
-delete a session
+delete sessions for good: their history, subagent sessions and queued prompts
 
 Positionals:
-  sessionID  session ID to delete                                                [string] [required]
+  sessionIDs  the sessions to delete                                           [array] [default: []]
 
 Options:
   -h, --help        show help                                                              [boolean]
   -v, --version     show version number                                                    [boolean]
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
-      --pure        run without external plugins                                           [boolean]"
+      --pure        run without external plugins                                           [boolean]
+      --archived    delete every archived session (see lunos session archive)              [boolean]
+      --older-than  with --archived: only those last active before this, e.g. 30d, 12h, 2w  [string]
+      --project     with --archived: only sessions of the project at this path              [string]
+      --stop        stop running or waiting sessions first (otherwise they're skipped)     [boolean]
+      --keep-cloud  keep the synced copies on Lunos Cloud                                  [boolean]
+  -y, --yes         don't ask for confirmation                                             [boolean]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode github install --help 1`] = `

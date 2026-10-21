@@ -373,3 +373,220 @@ describe("SessionBulk (XCOD-265)", () => {
     }),
   )
 })
+
+// XCOD-284: Delete in /sessions, the Agent Monitor and `lunos session delete`: any session, not only
+// archived ones, with what else goes (share link, synced copy) handled first.
+describe("SessionBulk.remove (XCOD-284)", () => {
+  const message = (sessionID: SessionNs.Info["id"]) =>
+    ({
+      id: MessageID.ascending(),
+      role: "user",
+      sessionID,
+      agent: "build",
+      model: { providerID: "test" as never, modelID: "test" as never },
+      time: { created: Date.now() },
+    }) as never
+  const noCloud = async () => ({ ok: true as const, deleted: false })
+
+  it.instance("deletes a listed session with its history and subagents; the project's files are untouched", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const parent = yield* sessions.create({ title: "refactor-auth" })
+      const child = yield* sessions.create({ title: "subagent", parentID: parent.id })
+      yield* sessions.updateMessage(message(parent.id))
+      yield* sessions.updateMessage(message(parent.id))
+      yield* sessions.updateMessage(message(child.id))
+      const file = path.join(parent.directory, "kept.txt")
+      yield* Effect.promise(() => Bun.write(file, "the agent's work"))
+
+      const preview = yield* SessionBulk.preview({ sessionIDs: [parent.id] })
+      expect(preview.items).toEqual([{ id: parent.id, messages: 2, children: 1, queued: 0, shared: false }])
+
+      // Delete archived still refuses it: it's listed.
+      expect((yield* SessionBulk.removeArchived({ sessionIDs: [parent.id], cloud: noCloud })).deleted).toEqual([])
+      const result = yield* SessionBulk.remove({ sessionIDs: [parent.id], archivedOnly: false, cloud: noCloud })
+      expect(result).toEqual({ deleted: [parent.id], skipped: [] })
+      for (const id of [parent.id, child.id]) expect(yield* sessions.get(id).pipe(Effect.flip)).toBeDefined()
+      expect(yield* listed()).not.toContain(parent.id)
+      expect(yield* Effect.promise(() => Bun.file(file).text())).toBe("the agent's work")
+    }),
+  )
+
+  it.instance("a running session is skipped unless stop: then it is stopped first and deleted", () =>
+    Effect.gen(function* () {
+      const tool = Bun.spawn(["sleep", "30"])
+      yield* Effect.promise(() =>
+        ExternalRegistry.save(external({ sessionID: "tool-run", status: "running", pid: tool.pid })),
+      )
+      const sessions = yield* SessionNs.Service
+      const done = yield* sessions.create({ title: "done" })
+
+      const skipped = yield* SessionBulk.remove({
+        sessionIDs: ["external:tool-run", done.id],
+        archivedOnly: false,
+        cloud: noCloud,
+      })
+      expect(skipped.deleted).toEqual([done.id])
+      expect(skipped.skipped).toEqual([{ id: "external:tool-run", reason: "it's running or waiting; stop it first" }])
+      expect(yield* Effect.promise(() => ExternalRegistry.get("tool-run"))).toBeDefined()
+
+      const stopped = yield* SessionBulk.remove({
+        sessionIDs: ["external:tool-run"],
+        archivedOnly: false,
+        stop: true,
+        cloud: noCloud,
+      })
+      expect(stopped).toEqual({ deleted: ["external:tool-run"], skipped: [], stopped: ["external:tool-run"] })
+      expect(yield* Effect.promise(() => tool.exited)).not.toBe(0)
+      expect(yield* Effect.promise(() => ExternalRegistry.get("tool-run"))).toBeUndefined()
+    }),
+  )
+
+  it.instance("a session another Lunos runs that doesn't answer stays, with the reason", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const elsewhere = yield* sessions.create({ title: "in another window" })
+      yield* Effect.promise(async () => {
+        await fs.mkdir(SessionPeers.dir(), { recursive: true, mode: 0o700 })
+        await Bun.write(
+          path.join(SessionPeers.dir(), "999999-deadbeef.json"),
+          JSON.stringify({
+            version: 1,
+            pid: 999999,
+            heartbeat: Date.now(),
+            sessions: { [elsewhere.id]: { status: "busy", permissions: 0, questions: 0, directory: "/work/b" } },
+            control: { port: 9, token: "a".repeat(64) },
+          }),
+        )
+      })
+      const result = yield* SessionBulk.remove({
+        sessionIDs: [elsewhere.id],
+        archivedOnly: false,
+        stop: true,
+        cloud: noCloud,
+      })
+      expect(result.deleted).toEqual([])
+      expect(result.skipped).toEqual([{ id: elsewhere.id, reason: "couldn't stop it: another Lunos didn't respond" }])
+      expect(yield* sessions.get(elsewhere.id)).toMatchObject({ id: elsewhere.id })
+    }),
+  )
+
+  it.instance("a Claude Code session: the Lunos record goes, the tool's own session file stays", () =>
+    Effect.gen(function* () {
+      const transcript = path.join(path.dirname(SessionPeers.dir()), "claude-home", "projects", "api", "cc-1.jsonl")
+      yield* Effect.promise(async () => {
+        await fs.mkdir(path.dirname(transcript), { recursive: true })
+        await Bun.write(transcript, '{"type":"user"}\n')
+      })
+      yield* Effect.promise(() => ExternalRegistry.save(external({ sessionID: "cc-1", transcript } as never)))
+      const preview = yield* SessionBulk.preview({ sessionIDs: ["external:cc-1"] })
+      expect(preview.items[0]).toMatchObject({ id: "external:cc-1", tool: "claude" })
+      const result = yield* SessionBulk.remove({ sessionIDs: ["external:cc-1"], archivedOnly: false, cloud: noCloud })
+      expect(result.deleted).toEqual(["external:cc-1"])
+      expect(yield* Effect.promise(() => ExternalRegistry.get("cc-1"))).toBeUndefined()
+      expect(yield* Effect.promise(() => Bun.file(transcript).text())).toBe('{"type":"user"}\n')
+      yield* Effect.promise(() => fs.rm(path.dirname(path.dirname(path.dirname(transcript))), { recursive: true }))
+    }),
+  )
+
+  it.instance("a Lunos session that ran Claude Code doesn't leave its tool row behind; the transcript stays", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const transcript = path.join(path.dirname(SessionPeers.dir()), "claude-linked", "cc-9.jsonl")
+      yield* Effect.promise(async () => {
+        await fs.mkdir(path.dirname(transcript), { recursive: true })
+        await Bun.write(transcript, "{}\n")
+      })
+      yield* Effect.promise(() => ExternalRegistry.save(external({ sessionID: "cc-9" })))
+      const session = yield* sessions.create({
+        title: "with Claude Code",
+        metadata: { external: { tool: "claude", session: "cc-9" } },
+      } as never)
+      expect(yield* listed()).toContain(session.id)
+      expect(yield* listed()).not.toContain("external:cc-9")
+      yield* SessionBulk.remove({ sessionIDs: [session.id], archivedOnly: false, cloud: noCloud })
+      expect(yield* listed()).not.toContain(session.id)
+      expect(yield* listed()).not.toContain("external:cc-9")
+      expect(yield* Effect.promise(() => Bun.file(transcript).text())).toBe("{}\n")
+      yield* Effect.promise(() => fs.rm(path.dirname(transcript), { recursive: true }))
+    }),
+  )
+
+  it.instance("a shared session is unshared first; if that fails it isn't deleted", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const shared = yield* sessions.create({ title: "shared" })
+      yield* sessions.setShare({ sessionID: shared.id, share: { url: "https://share.example/s/1" } })
+      expect((yield* SessionBulk.preview({ sessionIDs: [shared.id] })).items[0]?.shared).toBe(true)
+      const order: string[] = []
+
+      const refused = yield* SessionBulk.remove({
+        sessionIDs: [shared.id],
+        archivedOnly: false,
+        cloud: noCloud,
+        unshare: () => Effect.fail(new Error("share host unreachable")),
+      })
+      expect(refused.skipped).toEqual([
+        { id: shared.id, reason: "its share link couldn't be removed (share host unreachable)" },
+      ])
+      expect(yield* sessions.get(shared.id)).toMatchObject({ id: shared.id })
+
+      const result = yield* SessionBulk.remove({
+        sessionIDs: [shared.id],
+        archivedOnly: false,
+        cloud: async (id) => (order.push(`cloud ${id}`), { ok: true, deleted: true }),
+        unshare: (id) => Effect.sync(() => void order.push(`unshare ${id}`)),
+      })
+      expect(result.deleted).toEqual([shared.id])
+      expect(order).toEqual([`unshare ${shared.id}`, `cloud ${shared.id}`])
+    }),
+  )
+
+  it.instance("the synced copy (and its subagents') is deleted by default, kept with keepCloud", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const one = yield* sessions.create({ title: "synced" })
+      const child = yield* sessions.create({ title: "synced child", parentID: one.id })
+      const two = yield* sessions.create({ title: "kept in the cloud" })
+      const asked: string[] = []
+      const cloud = async (id: string) => (asked.push(id), { ok: true as const, deleted: true })
+
+      yield* SessionBulk.remove({ sessionIDs: [one.id], archivedOnly: false, cloud })
+      expect(asked).toEqual([one.id, child.id])
+      yield* SessionBulk.remove({ sessionIDs: [two.id], archivedOnly: false, keepCloud: true, cloud })
+      expect(asked).toEqual([one.id, child.id])
+      expect(yield* sessions.get(two.id).pipe(Effect.flip)).toBeDefined()
+
+      // Signed out: the synced copy can't be deleted, so the session stays (and says how to go on).
+      const three = yield* sessions.create({ title: "signed out" })
+      const result = yield* SessionBulk.remove({
+        sessionIDs: [three.id],
+        archivedOnly: false,
+        cloud: async () => ({ ok: false, status: 0, code: "signed_out", message: "signed out" }),
+      })
+      expect(result.skipped[0]?.reason).toContain("you're signed out")
+      expect(yield* sessions.get(three.id)).toMatchObject({ id: three.id })
+    }),
+  )
+
+  it.instance("audited as session.delete with origin, count and ids, never the title", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const file = path.join(path.dirname(SessionPeers.dir()), `audit-284-${Date.now()}.log`)
+      AuditLog.activate({ enabled: true, file, redact: [] })
+      const one = yield* sessions.create({ title: "TITLE-SECRET" })
+      yield* sessions.updateMessage(message(one.id))
+      yield* SessionBulk.remove({ sessionIDs: [one.id], archivedOnly: false, origin: "single", cloud: noCloud })
+      yield* Effect.promise(() => Audit.flush())
+      const log = yield* Effect.promise(() => fs.readFile(file, "utf8"))
+      AuditLog.activate({ enabled: false, file, redact: [] })
+      expect(log).not.toContain("TITLE-SECRET")
+      const entry = log
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .find((line) => line.event === "session.delete")
+      expect(entry).toMatchObject({ origin: "single", count: 1, ids: [one.id], queued_discarded: 0 })
+    }),
+  )
+})

@@ -1,7 +1,11 @@
 export * as SessionBulk from "./bulk"
 
+import { Database } from "@opencode-ai/core/database/database"
+import { MessageTable } from "@opencode-ai/core/session/sql"
+import { eq, sql } from "drizzle-orm"
 import { Effect } from "effect"
 import { AuditLog } from "@/audit/log"
+import { CloudSyncApi } from "@/cloud/sync-api"
 import { ExternalRegistry } from "@/external/registry"
 import { Session } from "./session"
 import { SessionLive } from "./live"
@@ -41,7 +45,7 @@ export function clearable(item: Row) {
 export type Failure = { id: string; reason: string }
 export type StopResult = { stopped: string[]; failed: Failure[] }
 export type ArchiveResult = { archived: string[]; skipped: Failure[] }
-export type DeleteResult = { deleted: string[]; skipped: Failure[] }
+export type DeleteResult = { deleted: string[]; skipped: Failure[]; stopped?: string[] }
 
 /** Sessions running or waiting anywhere on this machine: never archived. */
 export async function active(now = Date.now()) {
@@ -230,22 +234,77 @@ export const unarchive = Effect.fn("SessionBulk.unarchive")(function* (input: { 
   return result
 })
 
-/**
- * Deletes archived sessions and their history for good. Anything not archived is refused, so this
- * can never reach a session that is still listed. For an external row only Lunos's registry entry
- * goes; the tool's own transcript is left where it is.
- */
-export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* (input: {
+/** XCOD-284: where a delete came from, for the audit log. */
+export type Origin = "single" | "bulk" | "cli"
+
+/** XCOD-284: the synced copy on Lunos Cloud, deleted (`deleted: true`) or not there to delete. */
+export type CloudRemove = (session: string) => Promise<CloudSyncApi.RemoveResult>
+
+export type RemoveInput = {
   sessionIDs: readonly string[]
-}) {
+  /**
+   * Only sessions already archived (Delete archived). The default: a listed session is reached only
+   * when the caller asks for it (`false`), from /sessions' Delete or `lunos session delete`.
+   */
+  archivedOnly?: boolean
+  /** Stop the running and waiting ones first (as Stop all); otherwise they are skipped. */
+  stop?: boolean
+  /** Leave the synced copy on Lunos Cloud. By default it is deleted too. */
+  keepCloud?: boolean
+  origin?: Origin
+  reason?: string
+  /** Removes a session's share link; the server passes SessionShare.unshare. Without one, links stay. */
+  unshare?: (sessionID: SessionID) => Effect.Effect<void, unknown>
+  /** For tests; CloudSyncApi.removeSession otherwise. */
+  cloud?: CloudRemove
+}
+
+const cloudReason = (failure: CloudSyncApi.Failure) =>
+  failure.code === "signed_out"
+    ? "its synced copy couldn't be deleted: you're signed out (sign in, or keep the synced copy)"
+    : `its synced copy couldn't be deleted (${failure.message})`
+
+/**
+ * Deletes sessions and their history for good: messages, subagent sessions and prompts queued for
+ * them (Session.remove). In order, for each: a running one is stopped first (`stop`) or skipped; its
+ * share link is removed (`unshare`); its synced copy is deleted unless `keepCloud`; then the session.
+ * A step that fails leaves the session as it was and says why, so it can be tried again.
+ *
+ * For an external row (a Claude Code / Codex session with no Lunos session) only Lunos's registry
+ * entry goes; the tool's own transcript is left where it is. Files the agent changed are never touched.
+ */
+export const remove = Effect.fn("SessionBulk.remove")(function* (input: RemoveInput) {
   const sessions = yield* Session.Service
+  const archivedOnly = input.archivedOnly !== false
+  const ids = [...new Set(input.sessionIDs)]
   const result: DeleteResult = { deleted: [], skipped: [] }
+  const skip = new Map<string, string>()
+
+  // Running or waiting ones: stopped first, or left alone.
+  const busy = yield* Effect.promise(() => active())
+  const running = ids.filter((id) => busy.has(id))
+  if (running.length && input.stop) {
+    const stopped = yield* stop({ sessionIDs: running, reason: input.reason })
+    result.stopped = stopped.stopped
+    // The other Lunos's heartbeat lags a couple of seconds: what this request stopped isn't busy.
+    for (const id of stopped.stopped) busy.delete(id)
+    for (const failure of stopped.failed) skip.set(failure.id, `couldn't stop it: ${failure.reason}`)
+  }
+  for (const id of running) if (busy.has(id) && !skip.has(id)) skip.set(id, "it's running or waiting; stop it first")
+
+  const cloud: CloudRemove = input.cloud ?? ((session) => CloudSyncApi.removeSession(session))
   // XCOD-269: prompts queued for them and never sent go with them (Session.remove); counted here.
   let queued = 0
-  for (const id of new Set(input.sessionIDs)) {
+  let cloudDeleted = 0
+  for (const id of ids) {
+    const skipped = skip.get(id)
+    if (skipped) {
+      result.skipped.push({ id, reason: skipped })
+      continue
+    }
     if (toolOnly(id)) {
       const entry = yield* Effect.promise(() => ExternalRegistry.get(externalID(id)))
-      if (!entry?.archived) {
+      if (!entry || (archivedOnly && !entry.archived)) {
         result.skipped.push({ id, reason: entry ? "it isn't archived" : "no such session" })
         continue
       }
@@ -255,9 +314,45 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
     }
     const sessionID = SessionID.make(id)
     const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
-    if (!info?.time.archived) {
+    if (!info || (archivedOnly && !info.time.archived)) {
       result.skipped.push({ id, reason: info ? "it isn't archived" : "no such session" })
       continue
+    }
+    // The share link first: once the session is gone there is nothing left to unshare it by.
+    if (info.share && input.unshare) {
+      const reason = yield* input.unshare(sessionID).pipe(
+        Effect.as(undefined),
+        Effect.catch((error: unknown) =>
+          Effect.succeed(
+            `its share link couldn't be removed (${error instanceof Error ? error.message : String(error)})`,
+          ),
+        ),
+      )
+      if (reason) {
+        result.skipped.push({ id, reason })
+        continue
+      }
+    }
+    // Its subagents synced as sessions of their own.
+    const kids = yield* descendants(sessionID)
+    if (!input.keepCloud) {
+      let failed: string | undefined
+      for (const target of [sessionID, ...kids]) {
+        const outcome = yield* Effect.promise(() =>
+          cloud(target).catch(
+            (error): CloudSyncApi.Failure => ({ ok: false, status: 0, code: "network", message: String(error) }),
+          ),
+        )
+        if (!outcome.ok) {
+          failed = cloudReason(outcome)
+          break
+        }
+        if (outcome.deleted) cloudDeleted++
+      }
+      if (failed) {
+        result.skipped.push({ id, reason: failed })
+        continue
+      }
     }
     const held = SessionPromptQueue.held(id)
     const removed = yield* sessions.remove(sessionID).pipe(
@@ -267,16 +362,91 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
     if (removed) queued += held
     if (removed) result.deleted.push(id)
     else result.skipped.push({ id, reason: "no such session" })
+    // A Claude Code / Codex session Lunos ran (XCOD-218) would be listed on its own once its Lunos
+    // session is gone: its registry entry, Lunos's own file, goes too. The tool's transcript stays.
+    const linked = SessionOverview.externalOf(info)?.session
+    if (removed && linked) yield* Effect.promise(() => ExternalRegistry.remove(linked).catch(() => undefined))
   }
   if (result.deleted.length)
     AuditLog.emit("session.delete", {
-      origin: "bulk",
+      origin: input.origin ?? "bulk",
       count: result.deleted.length,
       ids: result.deleted,
       queued_discarded: queued,
+      ...(result.stopped?.length ? { stopped: result.stopped.length } : {}),
+      ...(cloudDeleted ? { cloud_deleted: cloudDeleted } : {}),
+      ...(input.keepCloud ? { cloud_kept: true } : {}),
     })
   return result
 })
+
+/**
+ * Deletes archived sessions and their history for good (Delete archived). Anything not archived is
+ * refused, so this can never reach a session that is still listed.
+ */
+export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* (input: {
+  sessionIDs: readonly string[]
+  keepCloud?: boolean
+  unshare?: RemoveInput["unshare"]
+  cloud?: CloudRemove
+}) {
+  // As before XCOD-284, synced copies are left unless the caller asks (keepCloud: false).
+  return yield* remove({ ...input, keepCloud: input.keepCloud ?? true, archivedOnly: true, origin: "bulk" })
+})
+
+/**
+ * XCOD-284: what deleting these sessions removes, for the confirmation: per session its messages,
+ * subagent sessions and queued prompts, whether it's shared, and whether it's a tool's session (whose
+ * own history stays). `sync`: this device syncs to Lunos Cloud, so a synced copy may exist.
+ */
+export const preview = Effect.fn("SessionBulk.preview")(function* (input: { sessionIDs: readonly string[] }) {
+  const sessions = yield* Session.Service
+  const items: PreviewItem[] = []
+  for (const id of new Set(input.sessionIDs)) {
+    if (toolOnly(id)) {
+      const entry = yield* Effect.promise(() => ExternalRegistry.get(externalID(id)))
+      if (entry) items.push({ id, messages: 0, children: 0, queued: 0, shared: false, tool: entry.tool })
+      continue
+    }
+    const sessionID = SessionID.make(id)
+    const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
+    if (!info) continue
+    const kids = yield* descendants(sessionID)
+    const messages = yield* messageCount(sessionID)
+    const tool = SessionOverview.externalOf(info)?.tool
+    items.push({
+      id,
+      messages,
+      children: kids.length,
+      queued: SessionPromptQueue.held(id),
+      shared: !!info.share,
+      ...(tool ? { tool } : {}),
+    })
+  }
+  const state = yield* Effect.promise(() => CloudSyncApi.load())
+  return { items, sync: !!state?.device.syncEnabled }
+})
+
+const messageCount = Effect.fn("SessionBulk.messageCount")(function* (sessionID: SessionID) {
+  const { db } = yield* Database.Service
+  const row = yield* db
+    .select({ count: sql<number>`count(*)` })
+    .from(MessageTable)
+    .where(eq(MessageTable.session_id, sessionID))
+    .get()
+    .pipe(Effect.orDie)
+  return Number(row?.count ?? 0)
+})
+
+export type PreviewItem = {
+  id: string
+  messages: number
+  children: number
+  queued: number
+  shared: boolean
+  /** A Claude Code / Codex session: that tool keeps its own history. */
+  tool?: string
+}
 
 /**
  * Sessions Clear would archive, however old, for `lunos session archive --finished`: top-level

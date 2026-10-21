@@ -337,6 +337,20 @@ describe("experimental HttpApi", () => {
           stopped: [],
           failed: [{ id: kept.id, reason: "it isn't running" }],
         })
+
+        // XCOD-284: Delete in /sessions reaches a listed session, after the preview the confirmation shows.
+        expect(yield* post(ExperimentalPaths.sessionBulkPreview, { sessionIDs: [kept.id] })).toEqual({
+          items: [{ id: kept.id, messages: 0, children: 0, queued: 0, shared: false }],
+          sync: false,
+        })
+        expect(
+          yield* post(ExperimentalPaths.sessionBulkDelete, {
+            sessionIDs: [kept.id],
+            archivedOnly: false,
+            origin: "single",
+          }),
+        ).toEqual({ deleted: [kept.id], skipped: [] })
+        expect(yield* overview(false)).not.toContain(kept.id)
       }),
     { git: true, config: { formatter: false, lsp: false } },
   )

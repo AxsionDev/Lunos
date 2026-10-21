@@ -17,6 +17,7 @@ import { useCommandShortcut } from "../keymap"
 import { errorMessage } from "../util/error"
 import { Locale } from "../util/locale"
 import { useStartExternal } from "./dialog-external"
+import { useSessionDelete } from "./session-delete"
 import { useTuiConfig } from "../config"
 import { externalAccent, type ExternalTool } from "../util/external"
 import {
@@ -71,6 +72,9 @@ const [ungroupedCollapsed, setUngroupedCollapsed] = createSignal(false)
 // the view, because every confirmation replaces the view and re-creates it.
 const [lastClear, setLastClear] = createSignal<{ ids: string[]; at: number }>()
 const [failedStops, setFailedStops] = createSignal<Record<string, string>>({})
+// XCOD-284: the rows marked with space for Delete, and the ones a Delete couldn't delete (with why).
+const [marked, setMarked] = createSignal<ReadonlySet<string>>(new Set())
+const [failedDeletes, setFailedDeletes] = createSignal<Record<string, string>>({})
 /** How long Undo stays offered after a Clear. */
 const UNDO_MS = 2 * 60 * 1000
 
@@ -91,7 +95,8 @@ export function DialogSessions(props: { select?: string }) {
           ? "claude"
           : undefined
   const startExternal = useStartExternal()
-  const deleteHint = useCommandShortcut("dialog.sessions.group.delete")
+  const deleteHint = useCommandShortcut("dialog.sessions.delete")
+  const removeSessions = useSessionDelete()
   const project = useProject()
   const archivedView = () => stateFilter() === "archived"
 
@@ -214,7 +219,7 @@ export function DialogSessions(props: { select?: string }) {
       }
       const item = entry.item
       const kind = kindLabel(item)
-      const title = `${entry.depth ? "  ↳ " : ""}${item.title}`
+      const title = `${marked().has(item.id) ? "[x] " : ""}${entry.depth ? "  ↳ " : ""}${item.title}`
       return [
         {
           value: entry.key,
@@ -237,6 +242,7 @@ export function DialogSessions(props: { select?: string }) {
           description: [projectName(item), kind].filter(Boolean).join(" · "),
           footer: [
             failedStops()[item.id] && stoppable(item) ? `couldn't stop: ${failedStops()[item.id]}` : undefined,
+            failedDeletes()[item.id] ? `couldn't delete: ${failedDeletes()[item.id]}` : undefined,
             item.archived ? `archived ${ago(item.archived, now())}` : stateLabel(item),
             item.agent,
             item.model ? Locale.truncateMiddle(item.model, 24) : undefined,
@@ -605,6 +611,46 @@ export function DialogSessions(props: { select?: string }) {
     reopen()
   }
 
+  /** XCOD-284: deletes for good, after one confirmation (and the typed count for more than one). */
+  async function deleteSessions(items: SessionOverviewItem[], select?: string) {
+    const result = await removeSessions(items, { archivedView: archivedView() })
+    if (result) {
+      setFailedDeletes(Object.fromEntries(result.skipped.map((item) => [item.id, item.reason])))
+      // What was deleted is no longer marked; what wasn't stays marked, to try again.
+      const gone = new Set(result.deleted)
+      setMarked((current) => new Set([...current].filter((id) => !gone.has(id))))
+    }
+    reopen(result?.deleted.includes(select ?? "") ? undefined : select)
+  }
+
+  /** ctrl+d: the marked sessions, else the highlighted one; on a group row, the group (pressed twice). */
+  function deleteSelected(option: DialogSelectOption<string> | undefined) {
+    const chosen = data.sessions.filter((item) => marked().has(item.id))
+    if (chosen.length) return void deleteSessions(chosen, option?.value)
+    if (groupOf(option)?.group) return void removeGroup(option!)
+    const item = sessionOf(option)
+    if (item) void deleteSessions([item], option!.value)
+  }
+
+  function toggleMark(option: DialogSelectOption<string> | undefined) {
+    const item = sessionOf(option)
+    if (!item) return
+    setMarked((current) => {
+      const next = new Set(current)
+      if (next.has(item.id)) next.delete(item.id)
+      else next.add(item.id)
+      return next
+    })
+  }
+
+  /** "Delete all shown…": every session in the view (state filter and search; collapsed groups count). */
+  function deleteShown() {
+    const items = viewItems()
+    if (items.length === 0) return toast.show({ variant: "info", message: "No sessions in this view." })
+    void deleteSessions(items)
+  }
+
+  const markedCount = createMemo(() => data.sessions.filter((item) => marked().has(item.id)).length)
   const waitingCount = createMemo(() => waiting(data.sessions))
   const titleView = (
     <text fg={theme.text} attributes={TextAttributes.BOLD}>
@@ -658,7 +704,10 @@ export function DialogSessions(props: { select?: string }) {
         if (entry.type === "group") return void toggle(entry)
         void open(entry.item)
       }}
-      footerHints={[{ title: "open", label: "enter" }]}
+      footerHints={[
+        { title: "open", label: "enter" },
+        ...(markedCount() ? [{ title: `${markedCount()} selected`, label: "" }] : []),
+      ]}
       actions={[
         {
           command: "dialog.sessions.move",
@@ -688,12 +737,28 @@ export function DialogSessions(props: { select?: string }) {
           },
           onTrigger: (option) => void rename(option),
         },
+        // XCOD-284: ctrl+d deletes the marked sessions, the highlighted session or (twice) a group.
+        {
+          command: "dialog.sessions.delete",
+          title: markedCount() ? `delete ${markedCount()}` : "delete",
+          disabled: (option) => !markedCount() && !sessionOf(option) && !groupOf(option)?.group,
+          onTrigger: (option) => deleteSelected(option),
+        },
+        // Still bindable on its own; unbound by default since dialog.sessions.delete covers groups too.
         {
           command: "dialog.sessions.group.delete",
           hidden: archivedView(),
-          title: "delete",
+          title: "delete group",
           disabled: (option) => !groupOf(option)?.group,
           onTrigger: (option) => void removeGroup(option),
+        },
+        // Space types into the search box while searching (multi-word search); marking is for the list.
+        {
+          command: "dialog.sessions.mark",
+          hidden: !!search(),
+          title: "select",
+          disabled: (option) => !sessionOf(option),
+          onTrigger: (option) => toggleMark(option),
         },
         {
           command: "dialog.sessions.stop",
@@ -757,6 +822,15 @@ export function DialogSessions(props: { select?: string }) {
             const item = sessionOf(option)
             if (item) void unarchive(item)
           },
+        },
+        {
+          command: "dialog.sessions.delete_all",
+          title: "delete all shown",
+          menu: true,
+          // In Show archived this is "delete archived", below.
+          hidden: archivedView(),
+          withoutSelection: true,
+          onTrigger: () => deleteShown(),
         },
         {
           command: "dialog.sessions.delete_archived",

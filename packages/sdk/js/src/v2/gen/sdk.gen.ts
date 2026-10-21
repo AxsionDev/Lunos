@@ -88,6 +88,8 @@ import type {
   ExperimentalSessionBulkArchiveResponses,
   ExperimentalSessionBulkDeleteErrors,
   ExperimentalSessionBulkDeleteResponses,
+  ExperimentalSessionBulkPreviewErrors,
+  ExperimentalSessionBulkPreviewResponses,
   ExperimentalSessionBulkStopErrors,
   ExperimentalSessionBulkStopResponses,
   ExperimentalSessionBulkUnarchiveErrors,
@@ -1431,11 +1433,60 @@ export class SessionBulk extends HeyApiClient {
   }
 
   /**
-   * Delete archived sessions
+   * Delete sessions
    *
-   * Delete archived sessions and their history for good. Sessions that aren't archived are skipped. Audited as session.delete.
+   * Delete sessions and their history for good: messages, subagent sessions and queued prompts. By default only archived sessions (others are skipped); archivedOnly false reaches listed ones too. Running ones are stopped first with stop, or skipped. A share link is removed first, and the synced copy on Lunos Cloud is deleted unless keepCloud. Audited as session.delete.
    */
   public delete<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      archivedOnly?: boolean
+      stop?: boolean
+      keepCloud?: boolean
+      origin?: "single" | "bulk"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "archivedOnly" },
+            { in: "body", key: "stop" },
+            { in: "body", key: "keepCloud" },
+            { in: "body", key: "origin" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkDeleteResponses,
+      ExperimentalSessionBulkDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/delete",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview deleting sessions
+   *
+   * For each session: its message, subagent and queued-prompt counts, whether it's shared, and the external tool that keeps its own history. Changes nothing.
+   */
+  public preview<ThrowOnError extends boolean = false>(
     parameters?: {
       directory?: string
       workspace?: string
@@ -1456,11 +1507,11 @@ export class SessionBulk extends HeyApiClient {
       ],
     )
     return (options?.client ?? this.client).post<
-      ExperimentalSessionBulkDeleteResponses,
-      ExperimentalSessionBulkDeleteErrors,
+      ExperimentalSessionBulkPreviewResponses,
+      ExperimentalSessionBulkPreviewErrors,
       ThrowOnError
     >({
-      url: "/experimental/session-bulk/delete",
+      url: "/experimental/session-bulk/preview",
       ...options,
       ...params,
       headers: {

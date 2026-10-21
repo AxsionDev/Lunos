@@ -867,3 +867,62 @@ test("XCOD-267: a session with nothing queued by a closed Lunos is sent to with 
     await ui.cleanup()
   }
 }, 20_000)
+
+// XCOD-284: the same Delete as /sessions, on the rail's selected row (x; d is deny there).
+test("XCOD-284: x on the rail deletes the selected session after the same confirmation; Cancel keeps it", async () => {
+  const sessions = [
+    row("w1", { state: "waiting", permissions: 1, updated: NOW - 1000 }),
+    row("f1", { updated: NOW - 7000 }),
+  ]
+  const deletes: Call[] = []
+  const server = fakeServer({
+    sessions,
+    extra: async (url, request) => {
+      if (url.pathname === "/experimental/session-bulk/preview") {
+        const body = await request.clone().json()
+        return json({
+          items: body.sessionIDs.map((id: string) => ({ id, messages: 5, children: 0, queued: 0, shared: false })),
+          sync: false,
+        })
+      }
+      if (url.pathname === "/experimental/session-bulk/delete") {
+        const body = await request.clone().json()
+        deletes.push({ path: url.pathname, body })
+        for (const id of body.sessionIDs)
+          sessions.splice(
+            sessions.findIndex((item) => item.id === id),
+            1,
+          )
+        return json({ deleted: body.sessionIDs, skipped: [] })
+      }
+      return undefined
+    },
+  })
+  const ui = await mount({ server, view: "monitor" })
+  // The confirmation wraps: read it with its lines joined (and the dialog's "esc" hint taken out).
+  const text = () => ui.frame().replace(/\s+/g, " ").replace(/ esc /g, " ")
+  try {
+    await ui.tab()
+    // (The rail's key hint is cut at this width; "x delete" is in it, after "s stop".)
+    await wait(() => ui.frame().includes("↑↓ move · enter open"))
+    await ui.arrow("down")
+    await ui.key("x")
+    await wait(() => text().includes(`Delete "title f1" (project alpha, 5 messages)? This can't be undone.`))
+    // Cancel is the default.
+    await ui.enter()
+    await Bun.sleep(100)
+    expect(deletes).toHaveLength(0)
+    expect(ui.frame()).toContain("title f1")
+
+    await ui.key("x")
+    await wait(() => text().includes(`Delete "title f1"`))
+    await ui.arrow("down")
+    await ui.enter()
+    await wait(() => deletes.length === 1)
+    expect(deletes[0]!.body).toMatchObject({ sessionIDs: ["f1"], archivedOnly: false, origin: "single" })
+    await wait(() => ui.toast() === "Deleted 1 session")
+    await wait(() => !ui.frame().includes("title f1"))
+  } finally {
+    await ui.cleanup()
+  }
+})

@@ -257,7 +257,34 @@ export const SessionBulkArchiveResult = Schema.Struct({
 export const SessionBulkDeleteResult = Schema.Struct({
   deleted: Schema.mutable(Schema.Array(Schema.String)),
   skipped: Schema.mutable(Schema.Array(SessionBulkFailure)),
+  /** XCOD-284: the running ones `stop` stopped before deleting them. */
+  stopped: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
 }).annotate({ identifier: "SessionBulkDeleteResult" })
+// XCOD-284: Delete in /sessions and the Agent Monitor (any session, not only archived ones).
+export const SessionBulkDeletePayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** false deletes sessions that are still listed too. Defaults to true: only archived sessions (Delete archived). */
+  archivedOnly: Schema.optional(Schema.Boolean),
+  /** Stop the running and waiting ones first; otherwise they are skipped. */
+  stop: Schema.optional(Schema.Boolean),
+  /** false deletes the synced copy on Lunos Cloud too. Defaults to true: synced copies are left. */
+  keepCloud: Schema.optional(Schema.Boolean),
+  /** For the audit log: one session, or many at once (the default). */
+  origin: Schema.optional(Schema.Literals(["single", "bulk"])),
+})
+export const SessionBulkPreviewItem = Schema.Struct({
+  id: Schema.String,
+  messages: Schema.Finite,
+  children: Schema.Finite,
+  queued: Schema.Finite,
+  shared: Schema.Boolean,
+  tool: Schema.optional(Schema.String),
+}).annotate({ identifier: "SessionBulkPreviewItem" })
+export const SessionBulkPreviewResult = Schema.Struct({
+  items: Schema.mutable(Schema.Array(SessionBulkPreviewItem)),
+  /** This device syncs sessions to Lunos Cloud, so a synced copy may exist. */
+  sync: Schema.Boolean,
+}).annotate({ identifier: "SessionBulkPreviewResult" })
 
 export const ExperimentalPaths = {
   capabilities: "/experimental/capabilities",
@@ -282,6 +309,7 @@ export const ExperimentalPaths = {
   sessionBulkArchive: "/experimental/session-bulk/archive",
   sessionBulkUnarchive: "/experimental/session-bulk/unarchive",
   sessionBulkDelete: "/experimental/session-bulk/delete",
+  sessionBulkPreview: "/experimental/session-bulk/preview",
   externalStop: "/experimental/external/:sessionID/stop",
   externalTools: "/experimental/external/tools",
   externalModels: "/experimental/external/:sessionID/models",
@@ -581,14 +609,26 @@ export const ExperimentalApi = HttpApi.make("experimental")
         ),
         HttpApiEndpoint.post("sessionBulkDelete", ExperimentalPaths.sessionBulkDelete, {
           query: WorkspaceRoutingQuery,
-          payload: SessionBulkPayload,
-          success: described(SessionBulkDeleteResult, "Which archived sessions were deleted"),
+          payload: SessionBulkDeletePayload,
+          success: described(SessionBulkDeleteResult, "Which sessions were deleted, and why the others weren't"),
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "experimental.sessionBulk.delete",
-            summary: "Delete archived sessions",
+            summary: "Delete sessions",
             description:
-              "Delete archived sessions and their history for good. Sessions that aren't archived are skipped. Audited as session.delete.",
+              "Delete sessions and their history for good: messages, subagent sessions and queued prompts. By default only archived sessions (others are skipped); archivedOnly false reaches listed ones too. Running ones are stopped first with stop, or skipped. A share link is removed first, and the synced copy on Lunos Cloud is deleted unless keepCloud. Audited as session.delete.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkPreview", ExperimentalPaths.sessionBulkPreview, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkPayload,
+          success: described(SessionBulkPreviewResult, "What deleting the sessions removes"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.preview",
+            summary: "Preview deleting sessions",
+            description:
+              "For each session: its message, subagent and queued-prompt counts, whether it's shared, and the external tool that keeps its own history. Changes nothing.",
           }),
         ),
         HttpApiEndpoint.get("sessionGroupList", ExperimentalPaths.sessionGroups, {
