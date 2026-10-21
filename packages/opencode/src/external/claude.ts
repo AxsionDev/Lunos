@@ -35,7 +35,13 @@ export type Event =
       commands: string[]
       /** XCOD-254: the MCP servers the tool reports at start, with their state ("connected", "failed", …). */
       mcp?: { name: string; status: string }[]
+      /** XCOD-285: the permission mode the tool says it runs in (`permissionMode` on its init line). */
+      permissionMode?: string
+      /** XCOD-285: its /commands with what it says about them (initialize's `commands`), when it lists them. */
+      commandInfo?: CommandInfo[]
     }
+  /** XCOD-285: the tool changed its permission mode mid-turn (its `status` line after `set_permission_mode`). */
+  | { type: "mode"; mode: string }
   | { type: "text"; text: string }
   | { type: "tool"; id: string; name: string; input: unknown }
   | { type: "tool_result"; id: string; isError: boolean; output: string }
@@ -59,9 +65,47 @@ export interface PermissionRequest {
   input: Record<string, unknown>
   description?: string
   toolUseID?: string
+  /**
+   * XCOD-285: what the tool offers to stop asking for this (Claude Code's `permission_suggestions`:
+   * `addRules`, `setMode`, `addDirectories`, …), as it sent them. Its "Yes, and don't ask again" choice.
+   */
+  suggestions?: Suggestion[]
+  /** XCOD-285: the decisions the tool accepts for this request (Codex's approval decisions), in its order. */
+  decisions?: string[]
 }
 
-export type PermissionDecision = { allow: true } | { allow: false; message: string; interrupt?: boolean }
+/** XCOD-285: one of Claude Code's `permission_suggestions` (the Agent SDK's `PermissionUpdate`). */
+export type Suggestion = { type: string; destination?: string; [key: string]: unknown }
+
+/** One of the tool's /commands, as initialize lists it. */
+export interface CommandInfo {
+  name: string
+  description?: string
+  hint?: string
+}
+
+/**
+ * `always`: the user chose the tool's "don't ask again" answer, so the tool is told to apply its own
+ * suggestions (Claude Code) or approve for the session (Codex). A refusal with `interrupt` also ends
+ * the tool's turn (Claude Code's `interrupt`, Codex's `cancel`); without, the tool carries on.
+ */
+export type PermissionDecision =
+  | { allow: true; always?: boolean }
+  | { allow: false; message: string; interrupt?: boolean }
+
+/**
+ * XCOD-285: Lunos policy on a call before the tool's own permission mode decides it, through the
+ * PreToolUse hook Lunos registers at initialize. A deny rule refuses the call even where the tool
+ * would allow it without asking (`acceptEdits`, `auto`); undefined leaves it to the tool.
+ */
+export type Policy = (call: {
+  tool: string
+  input: Record<string, unknown>
+  toolUseID?: string
+}) => Promise<{ deny: string } | undefined>
+
+/** The hook callback id Lunos registers for its policy check. */
+export const POLICY_HOOK = "lunos-policy"
 
 export interface Options {
   cwd: string
@@ -76,6 +120,8 @@ export interface Options {
   /** XCOD-254: a `--mcp-config` file carrying the Lunos bridge (only when `--help` lists the flag). */
   mcpConfig?: string
   ask: (request: PermissionRequest) => Promise<PermissionDecision>
+  /** XCOD-285: Lunos policy, checked on every call before the tool's own permission mode. */
+  policy?: Policy
   onEvent?: (event: Event) => void
 }
 
@@ -148,6 +194,7 @@ export function parse(line: string): { events: Event[]; permission?: PermissionR
       model: raw.model,
       tools: raw.tools ?? [],
       commands: raw.slash_commands ?? [],
+      ...(typeof raw.permissionMode === "string" ? { permissionMode: raw.permissionMode } : {}),
       ...(Array.isArray(raw.mcp_servers)
         ? {
             mcp: raw.mcp_servers.flatMap((item: any) =>
@@ -156,6 +203,8 @@ export function parse(line: string): { events: Event[]; permission?: PermissionR
           }
         : {}),
     })
+  if (raw.type === "system" && raw.subtype === "status" && typeof raw.permissionMode === "string")
+    events.push({ type: "mode", mode: raw.permissionMode })
   if (raw.type === "assistant")
     for (const block of raw.message?.content ?? []) {
       if (block.type === "text" && block.text) events.push({ type: "text", text: block.text })
@@ -191,16 +240,51 @@ export function parse(line: string): { events: Event[]; permission?: PermissionR
         input: raw.request.input ?? {},
         description: raw.request.description,
         toolUseID: raw.request.tool_use_id,
+        ...(Array.isArray(raw.request.permission_suggestions) && raw.request.permission_suggestions.length
+          ? {
+              suggestions: raw.request.permission_suggestions.filter(
+                (item: unknown): item is Suggestion =>
+                  !!item && typeof item === "object" && typeof (item as Suggestion).type === "string",
+              ),
+            }
+          : {}),
       },
     }
   return { events, raw }
 }
 
+/**
+ * XCOD-285: the suggestions to apply for "don't ask again", only for this session. Claude Code would
+ * write one aimed at `userSettings` / `projectSettings` / `localSettings` into that settings file; Lunos
+ * never has it change the user's files on its own, so every one is applied to the session instead.
+ */
+export function sessionOnly(suggestions: readonly Suggestion[] | undefined) {
+  return (suggestions ?? []).map((item) => ({ ...item, destination: "session" }))
+}
+
 export function reply(request: PermissionRequest, decision: PermissionDecision) {
+  const updates = decision.allow && decision.always ? sessionOnly(request.suggestions) : []
   const response = decision.allow
-    ? { behavior: "allow", updatedInput: request.input }
+    ? { behavior: "allow", updatedInput: request.input, ...(updates.length ? { updatedPermissions: updates } : {}) }
     : { behavior: "deny", message: decision.message, ...(decision.interrupt ? { interrupt: true } : {}) }
   return { type: "control_response", response: { subtype: "success", request_id: request.requestID, response } }
+}
+
+/**
+ * XCOD-285: the answer to the PreToolUse hook callback (`hook_callback`), as the Agent SDK's
+ * `SyncHookJSONOutput`: a deny with its reason, or nothing, which leaves the call to the tool.
+ */
+export function hookReply(requestID: string, verdict: { deny: string } | undefined) {
+  const response = verdict
+    ? {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: verdict.deny,
+        },
+      }
+    : {}
+  return { type: "control_response", response: { subtype: "success", request_id: requestID, response } }
 }
 
 export interface Running {
@@ -208,6 +292,11 @@ export interface Running {
   /** Resolves with the final result (or an error event if the tool exited without one). */
   done: Promise<Extract<Event, { type: "result" }> | Extract<Event, { type: "error" }>>
   stop: () => void
+  /**
+   * XCOD-285: change the permission mode of the running turn (Claude Code's `set_permission_mode`),
+   * as Shift+Tab does in the tool. Absent where the tool can't change it mid-turn.
+   */
+  setMode?: (mode: string) => void
 }
 
 /** One of the tool's models, as `/models` lists it in an external session (XCOD-254). */
@@ -255,12 +344,23 @@ export function parseModels(response: unknown): Model[] {
  * Its internal ones (`__…`) and ones it describes as "(removed)" aren't for users, so they're left out.
  */
 export function parseCommands(response: unknown): string[] {
+  return parseCommandInfo(response).map((item) => item.name)
+}
+
+/** XCOD-285: the same commands with the description and argument hint the tool gives them. */
+export function parseCommandInfo(response: unknown): CommandInfo[] {
   const list = (response as { commands?: unknown } | undefined)?.commands
   if (!Array.isArray(list)) return []
   return list.flatMap((item: any) => {
     if (typeof item?.name !== "string" || !item.name || item.name.startsWith("__")) return []
     if (typeof item.description === "string" && /^\s*\(removed\)/i.test(item.description)) return []
-    return [item.name]
+    return [
+      {
+        name: item.name,
+        ...(typeof item.description === "string" && item.description ? { description: item.description } : {}),
+        ...(typeof item.argumentHint === "string" && item.argumentHint ? { hint: item.argumentHint } : {}),
+      },
+    ]
   })
 }
 
@@ -304,6 +404,17 @@ export function models(options: { executable: string; cwd: string; timeoutMs?: n
   })
 }
 
+/**
+ * The host's `initialize`. With a Lunos policy it registers one PreToolUse hook for every tool, so
+ * Claude Code asks Lunos before its permission mode decides (2.1.304 answers `hooks_applied: true`).
+ */
+export function initialize(options: Pick<Options, "policy">) {
+  return {
+    subtype: "initialize",
+    hooks: options.policy ? { PreToolUse: [{ hookCallbackIds: [POLICY_HOOK] }] } : null,
+  }
+}
+
 /** Start one turn. Ends when Claude Code reports its result; stdin is then closed, ending the process. */
 export function start(options: Options): Running {
   const executable = options.executable ?? ExternalDetect.locate("claude")
@@ -331,13 +442,42 @@ export function start(options: Options): Running {
     }
     const lines = createInterface({ input: child.stdout! })
     // Its /commands from the answer to initialize, merged into the `init` event with any it lists there.
-    let commands: string[] = []
+    let commands: CommandInfo[] = []
+    let initMode: string | undefined
     lines.on("line", (line) => {
       const parsed = parse(line)
-      if (parsed.raw?.type === "control_response" && parsed.raw.response?.request_id === "lunos-init")
-        commands = parseCommands(parsed.raw.response.response)
+      if (parsed.raw?.type === "control_response" && parsed.raw.response?.request_id === "lunos-init") {
+        commands = parseCommandInfo(parsed.raw.response.response)
+        const mode = parsed.raw.response.response?.current_permission_mode
+        if (typeof mode === "string") initMode = mode
+      }
+      // XCOD-285: Lunos policy before the tool's own permission mode (the PreToolUse hook it registered).
+      if (
+        parsed.raw?.type === "control_request" &&
+        parsed.raw.request?.subtype === "hook_callback" &&
+        parsed.raw.request.callback_id === POLICY_HOOK
+      ) {
+        const requestID = parsed.raw.request_id
+        const hook = parsed.raw.request.input ?? {}
+        const call = {
+          tool: String(hook.tool_name ?? ""),
+          input: (hook.tool_input && typeof hook.tool_input === "object" ? hook.tool_input : {}) as Record<
+            string,
+            unknown
+          >,
+          toolUseID: hook.tool_use_id ?? parsed.raw.request.tool_use_id,
+        }
+        void (options.policy ? options.policy(call) : Promise.resolve(undefined))
+          // A check that fails refuses the call, as a Lunos rule would: never a silent allow.
+          .catch((error: unknown) => ({ deny: `Lunos couldn't check its policy: ${String(error)}` }))
+          .then((verdict) => write(hookReply(requestID, verdict)))
+      }
       for (const event of parsed.events) {
-        if (event.type === "init") event.commands = [...new Set([...commands, ...event.commands])]
+        if (event.type === "init") {
+          event.commands = [...new Set([...commands.map((item) => item.name), ...event.commands])]
+          if (commands.length) event.commandInfo = commands
+          if (!event.permissionMode && initMode) event.permissionMode = initMode
+        }
         if (event.type === "result") {
           options.onEvent?.(event)
           finish(event)
@@ -361,7 +501,20 @@ export function start(options: Options): Running {
       }),
     )
   })
-  write({ type: "control_request", request_id: "lunos-init", request: { subtype: "initialize", hooks: null } })
+  write({ type: "control_request", request_id: "lunos-init", request: initialize(options) })
   write({ type: "user", message: { role: "user", content: options.prompt }, parent_tool_use_id: null })
-  return { child, done, stop: () => child.kill("SIGINT") }
+  let modes = 0
+  return {
+    child,
+    done,
+    stop: () => child.kill("SIGINT"),
+    setMode: (mode: string) => {
+      if (!/^[A-Za-z]+$/.test(mode) || UNSAFE_MODES.has(mode)) return
+      write({
+        type: "control_request",
+        request_id: `lunos-mode-${++modes}`,
+        request: { subtype: "set_permission_mode", mode },
+      })
+    },
+  }
 }

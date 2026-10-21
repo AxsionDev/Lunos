@@ -9842,6 +9842,43 @@ export type ExperimentalExternalModelResponses = {
 export type ExperimentalExternalModelResponse =
   ExperimentalExternalModelResponses[keyof ExperimentalExternalModelResponses]
 
+export type ExperimentalExternalModeData = {
+  body?: {
+    mode?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/{sessionID}/mode"
+}
+
+export type ExperimentalExternalModeErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalExternalModeError = ExperimentalExternalModeErrors[keyof ExperimentalExternalModeErrors]
+
+export type ExperimentalExternalModeResponses = {
+  /**
+   * Mode saved
+   */
+  200: boolean
+}
+
+export type ExperimentalExternalModeResponse =
+  ExperimentalExternalModeResponses[keyof ExperimentalExternalModeResponses]
+
 export type ExperimentalExternalConsentData = {
   body?: {
     tool: "claude" | "codex"

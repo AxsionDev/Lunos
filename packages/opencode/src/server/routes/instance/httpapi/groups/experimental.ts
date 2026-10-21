@@ -172,6 +172,12 @@ export const ExternalModelPayload = Schema.Struct({
   model: Schema.optional(Schema.String),
 })
 
+// XCOD-285: Shift+Tab in a Claude Code session, as in the tool.
+export const ExternalModePayload = Schema.Struct({
+  /** Omitted goes back to external.claude.permission_mode. */
+  mode: Schema.optional(Schema.String),
+})
+
 // XCOD-205: one row of the Sessions window.
 export const SessionOverviewItem = Schema.Struct({
   id: Schema.String,
@@ -314,6 +320,7 @@ export const ExperimentalPaths = {
   externalTools: "/experimental/external/tools",
   externalModels: "/experimental/external/:sessionID/models",
   externalModel: "/experimental/external/:sessionID/model",
+  externalMode: "/experimental/external/:sessionID/mode",
   externalConsent: "/experimental/external/consent",
   peerStop: "/experimental/peer/:sessionID/stop",
   peerAsks: "/experimental/peer/:sessionID/asks",
@@ -740,6 +747,20 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Choose an external session's model",
             description:
               "Save the model Claude Code or Codex uses in an external session from its next turn on (resumes included). Omit it to go back to the tool's default.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalMode", ExperimentalPaths.externalMode, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ExternalModePayload,
+          success: described(Schema.Boolean, "Mode saved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.mode",
+            summary: "Switch an external session's permission mode",
+            description:
+              "Claude Code's permission mode for an external session, as Shift+Tab cycles it in the tool: the running turn switches now (set_permission_mode) and later turns start in it. Modes that skip approvals are refused. Omit it to go back to external.claude.permission_mode.",
           }),
         ),
         HttpApiEndpoint.post("externalConsent", ExperimentalPaths.externalConsent, {

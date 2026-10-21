@@ -55,7 +55,7 @@ After each session Lunos shows what the tool reports:
 `/external claude` (or `/external codex`) opens a Claude Code (or Codex CLI) session in its own session view, next to your Lunos sessions. It's in the command palette too, as "Start Claude Code or Codex session". The session is listed as `Claude Code · <session id>`, so `/sessions` finds it again after a restart.
 
 - What you type goes to the tool as typed, its own `/commands` included. The prompt suggests the commands the tool reported.
-- Each approval the tool asks for appears in that view, through Lunos's approval prompt (`external` → `claude:Write src/app.ts`). "Reject" refuses the request and ends the tool's turn. Rejecting with a message passes the message on, and the tool carries on.
+- Each approval the tool asks for appears in that view with the tool's own choices and wording (see [Approvals in a Claude Code or Codex session](#approvals-in-a-claude-code-or-codex-session)). It's still a Lunos approval (`external` → `claude:Write src/app.ts`): audited, and subject to your Lunos permission rules.
 - Each reply shows the cost the tool reported for that turn, and the session's total so far. For Codex, it shows tokens.
 - Press `esc` twice to stop the tool's turn, as in any session. A pending approval is refused.
 - `/external resume claude <session-id>` continues a session started elsewhere, for example with `lunos external run`.
@@ -85,9 +85,21 @@ A Claude Code or Codex session looks different from a Lunos one, so you don't se
 
 Claude Code is a product of Anthropic; Codex is a product of OpenAI. Lunos is not affiliated with either, and uses the products' plain names next to its own.
 
+### Keys and the status line, as in the tool
+
+In a Claude Code session the keys follow the tool's, as far as the installed release reports them:
+
+- **`shift+tab`** cycles Claude Code's permission mode through the modes your Claude Code's `--help` lists, in the tool's order: its default (`default`, or `manual` in newer releases), then `acceptEdits`, then `plan`. A mode that skips or auto-decides approvals (`bypassPermissions`, `dontAsk`, `auto`) is never in the cycle. A turn that's running switches at once, and the next turns start in the chosen mode. The key is Lunos's `mode_cycle_reverse` keybind, so rebinding that rebinds this; outside a Claude Code session it cycles Lunos agents as before.
+- **The status line** (bottom right) reads `Lunos · Claude Code · <model> · <mode>`, with the mode left out while it's the tool's default.
+- **Edits and todos:** Claude Code's `Edit` and `Write` calls show as a diff of the file, and its `TodoWrite` as a checklist, in Lunos's own diff and todo views and your theme.
+
+Codex has no permission mode to cycle: its sandbox and approval policy are set per thread (see [Choosing the settings for every run](#choosing-the-settings-for-every-run)), so `shift+tab` does nothing there.
+
+Not there yet: Claude Code's `!` (shell) and `#` (memory note) prefixes, because Claude Code in headless mode doesn't report them. In a Claude Code or Codex session, `!` doesn't switch to Lunos's shell mode. Like `#`, it's sent to the tool as typed, with the rest of the line.
+
 ### Your Lunos commands in a Claude Code or Codex session
 
-The prompt's `/` list shows the tool's own commands ("Claude Code command") and your Lunos custom commands and MCP prompts ("Lunos command"). A Lunos command is expanded by Lunos (its template, arguments and `@file` references) and the text it makes goes to the tool. When both have a command of the same name, the tool's keeps the bare name and Lunos's is `/<name>:lunos`, so `/review` in Codex is Codex's and `/review:lunos` is yours.
+The prompt's `/` list shows the tool's own commands first, with the description and arguments the tool gives them, then your Lunos custom commands and MCP prompts ("Lunos command"). A Lunos command is expanded by Lunos (its template, arguments and `@file` references) and the text it makes goes to the tool. When both have a command of the same name, the tool's keeps the bare name and Lunos's is `/<name>:lunos`, so `/review` in Codex is Codex's and `/review:lunos` is yours.
 
 Lunos commands that switch a Lunos agent, mode or model provider (`/agents`, `/modes`, `/providers`, `/variants`) are shown greyed out with "Not available in a Claude Code session" and never sent to the tool. Lunos's own screens (`/settings`, `/marketplace`, `/memory`, `/help`, …) work as usual.
 
@@ -115,6 +127,20 @@ It's off by default, and never offered in offline mode. When an agent uses it, y
 
 ## Approvals
 
+### Approvals in a Claude Code or Codex session
+
+An approval in a Claude Code or Codex session offers the tool's own choices, built from what the tool sent with the request:
+
+- **Claude Code:**
+  - **Yes:** allow this call.
+  - **Yes, and don't ask again for …:** shown only when Claude Code suggests something to stop asking for, and named from it. For example, `Bash(npm test:*)`, or edits in this session (accept edits mode). Claude Code applies it to this session only. Lunos never lets it write the rule into `~/.claude/settings.json` or the project's settings files. Lunos also stores it as an "Allow always" approval. Like any "Allow always", that applies to this project until Lunos restarts, so matching calls in your other Claude Code sessions here aren't asked either. A rule suggestion is stored as the same rule (`Bash(npm test:*)` → `claude:Bash npm test*`). For the accept-edits choice, the session's mode switches to accept edits, so its next turns start in it, and Lunos stores the call's own tool (`claude:Write *` for a Write).
+  - **No, and tell Claude what to do differently:** asks what to do instead. With text, Claude Code gets it and carries on. With none, the call is refused and the turn stops. `esc` refuses and stops.
+- **Codex:** the decisions its app server defines for the request. **Yes**; **Yes, for this session** (for file changes: "don't ask again for these files"); **No, carry on without it**; **No, and stop**. Codex's own options that change its exec-policy or network rules aren't offered, because they're saved into Codex's configuration.
+
+**Lunos's rules still win.** Lunos registers a check with Claude Code when it starts. Claude Code 2.1.304 reports that it applies it. With that check, every call Claude Code makes is checked against your Lunos `permission` rules before Claude Code's own permission mode decides. A Lunos `deny` rule (for example `"permission": { "external": { "claude:Bash rm *": "deny" } }`) refuses the call even in `acceptEdits` or `auto`, where Claude Code wouldn't ask. Claude Code is told "Blocked by Lunos policy" with the rule's name, and the refusal is written to the audit log. Codex has no such hook. There, a Lunos deny rule applies to what Codex asks about, which under the default approval policy (`untrusted`) is every edit and command.
+
+### The settings each tool starts in
+
 Both tools start in their safe settings:
 
 - **Claude Code:** permission mode `default`.
@@ -130,7 +156,7 @@ Each approval request a tool makes comes to Lunos:
 - **Claude Code:** reads, and anything allowed by rules in `~/.claude/settings.json`, the project's `.claude/settings.json`, or hooks.
 - **Codex CLI:** commands its own exec-policy rules mark as safe.
 
-Review those rules if you rely on Lunos to see every edit.
+Review those rules if you rely on Lunos to see every edit. In Claude Code (2.1.304 reports applying the check), your Lunos `deny` rules are still checked on those calls before its own rules and mode, but Lunos plugin hooks and approvals aren't (see [Approvals in a Claude Code or Codex session](#approvals-in-a-claude-code-or-codex-session)); nothing else about those calls comes to Lunos.
 
 Settings that skip approval or the sandbox are refused unless you ask for one explicitly for that run, for example `--permission-mode bypassPermissions --unsafe`. That covers Claude Code's `bypassPermissions`, and Codex's `danger-full-access` and `never`. They can't be saved to config, and one already in a config file is ignored (the safe default is used) and flagged in `/settings`. For Codex, `--permission-mode` takes either a sandbox (`read-only`, `workspace-write`) or an approval policy (`untrusted`, `on-request`).
 

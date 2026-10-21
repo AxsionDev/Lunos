@@ -59,3 +59,41 @@ export function choices(key: string, detected?: readonly string[], current?: unk
 export function perRun(value: string) {
   return `Only per run: lunos external run … --permission-mode ${value} --unsafe`
 }
+
+/**
+ * XCOD-285: one of the tool's own approval choices (Claude Code's "Yes" / "Yes, and don't ask again
+ * for …" / "No, and tell Claude what to do differently"; Codex's decisions), as the server builds them
+ * from the tool's request (ExternalNative.choices). `reply` is the Lunos reply it sends; `feedback`
+ * asks for the text first; `message` goes with the refusal.
+ */
+export type ExternalChoice = {
+  id: string
+  label: string
+  reply: "once" | "always" | "reject"
+  feedback?: boolean
+  message?: string
+}
+
+/** The choices on an `external` approval, or undefined to keep Lunos's own (an older server sends none). */
+export function externalChoices(metadata: Record<string, unknown> | undefined): ExternalChoice[] | undefined {
+  const raw = metadata?.["choices"]
+  if (!Array.isArray(raw)) return undefined
+  const valid = raw.flatMap((item): ExternalChoice[] => {
+    if (!item || typeof item !== "object") return []
+    const { id, label, reply, feedback, message } = item as Record<string, unknown>
+    if (typeof id !== "string" || typeof label !== "string") return []
+    if (reply !== "once" && reply !== "always" && reply !== "reject") return []
+    return [
+      {
+        id,
+        label,
+        reply,
+        ...(feedback === true ? { feedback: true } : {}),
+        ...(typeof message === "string" && message ? { message } : {}),
+      },
+    ]
+  })
+  // Something to allow with and something to refuse with, or it isn't a usable prompt.
+  if (!valid.some((item) => item.reply !== "reject") || !valid.some((item) => item.reply === "reject")) return undefined
+  return valid
+}

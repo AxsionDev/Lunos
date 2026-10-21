@@ -26,6 +26,9 @@ import { ExternalBridge } from "./bridge"
 import { ExternalBridgeTools } from "./bridge-tools"
 import { ExternalConsent } from "./consent"
 import { ExternalHooks } from "./hooks"
+import { ExternalNative } from "./native"
+import { Permission as PermissionRules } from "@/permission"
+import { AuditLog } from "@/audit/log"
 import type { MCP } from "@/mcp"
 import { McpEvent } from "@opencode-ai/schema/mcp-event"
 import type { Plugin } from "@/plugin"
@@ -58,7 +61,47 @@ export interface Marker {
   consent?: "later"
   /** XCOD-254: what the Lunos bridge offered on the last turn, for the header's status line. */
   bridge?: ExternalBridge.Status
+  /**
+   * XCOD-285: the Claude Code permission mode chosen in this session (Shift+Tab, or a "don't ask again"
+   * that switches mode), passed on every turn instead of external.claude.permission_mode. Never unsafe.
+   */
+  permissionMode?: string
+  /** XCOD-285: the permission mode the tool last said it runs in, for the status line. */
+  mode?: string
+  /** XCOD-285: the tool's /commands with their descriptions and argument hints, as it last listed them. */
+  commandInfo?: ExternalClaude.CommandInfo[]
 }
+
+/** XCOD-285: the turns running now, by Lunos session, so Shift+Tab can change a running turn's mode. */
+const live = new Map<string, ExternalClaude.Running>()
+
+/**
+ * XCOD-285: why `mode` can't be this session's Claude Code permission mode, if it can't: Codex has
+ * none (its sandbox and approval policy are per thread), a mode that skips approvals is only ever
+ * passed for one run, and a mode the install's `--help` doesn't list isn't accepted by it.
+ */
+export function invalidMode(tool: ExternalDetect.Tool, mode: string, reported: readonly string[] | undefined) {
+  if (tool !== "claude") return `${label(tool)} has no permission mode to switch; its approval policy is set per thread`
+  if (!/^[A-Za-z]+$/.test(mode)) return `"${mode}" isn't a Claude Code permission mode`
+  if (ConfigExternal.UNSAFE.has(mode) || ExternalClaude.UNSAFE_MODES.has(mode))
+    return `"${mode}" skips every approval; pass it for one run only (lunos external run … --permission-mode ${mode} --unsafe)`
+  if (reported && !reported.includes(mode) && !(mode === "default" && reported.includes("manual")))
+    return `This Claude Code doesn't list "${mode}" as a permission mode`
+  return undefined
+}
+
+/**
+ * XCOD-285: save the permission mode the next turns start in, and switch the running turn to it now
+ * (Claude Code's `set_permission_mode`), as Shift+Tab does in the tool. `undefined` goes back to config.
+ */
+export const setMode = Effect.fn("ExternalSession.setMode")(function* (
+  sessions: Session.Interface,
+  sessionID: SessionID,
+  mode: string | undefined,
+) {
+  yield* updateMarker(sessions, sessionID, { permissionMode: mode })
+  if (mode) live.get(sessionID)?.setMode?.(mode)
+})
 
 export function of(info: { metadata?: Record<string, any> }): Marker | undefined {
   const value = info.metadata?.external
@@ -86,8 +129,35 @@ export function patterns(tool: ExternalDetect.Tool, request: ExternalClaude.Perm
   const target = String(request.input.command ?? request.input.file_path ?? request.input.path ?? "*")
   return {
     patterns: [`${tool}:${request.tool} ${target}`],
-    always: [`${tool}:${request.tool} ${request.tool === "Bash" ? target : "*"}`],
+    // XCOD-285: what the tool's own "don't ask again" names, when it named something.
+    always: ExternalNative.always(tool, request.suggestions) ?? [
+      `${tool}:${request.tool} ${request.tool === "Bash" ? target : "*"}`,
+    ],
   }
+}
+
+/**
+ * XCOD-285: Lunos policy on one of the tool's calls before its own permission mode decides: a Lunos
+ * deny rule (or a locked one) for the call's pattern refuses it, says it's Lunos policy and names the
+ * rule, and is audited like a deny in `ask`. Undefined leaves the call to the tool.
+ */
+export function policyRefusal(
+  tool: ExternalDetect.Tool,
+  call: { tool: string; input: Record<string, unknown> },
+  ruleset: PermissionV1Type.Ruleset,
+  sessionID: string,
+) {
+  const request = { requestID: "", tool: call.tool, input: call.input }
+  const asked = patterns(tool, request).patterns
+  const rule = PermissionRules.denied("external", asked, ruleset)
+  if (!rule) return undefined
+  AuditLog.emit("permission.decision", {
+    session: sessionID,
+    permission: "external",
+    patterns: asked,
+    decision: "denied by rule",
+  })
+  return `Blocked by Lunos policy: the rule "${rule.permission}: ${rule.pattern} → deny" refuses ${call.tool} here, whatever ${label(tool)}'s permission mode allows.`
 }
 
 /** Starting an external session is gated like `lunos external run`; returns the refusal, if any. */
@@ -419,7 +489,7 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
   let current = marker.session
   let streamed = ""
 
-  const remember = (id: string, commands?: string[]) =>
+  const remember = (id: string, commands?: string[], extra?: Partial<Marker>) =>
     Effect.gen(function* () {
       const latest = yield* sessions.get(sessionID).pipe(Effect.orDie)
       const previous = of(latest) ?? marker
@@ -427,7 +497,7 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
         sessionID,
         metadata: {
           ...latest.metadata,
-          external: { ...previous, session: id, ...(commands ? { commands } : {}) },
+          external: { ...previous, session: id, ...(commands ? { commands } : {}), ...extra },
         },
       })
       if (latest.title === title(tool) || latest.title === title(tool, previous.session))
@@ -461,6 +531,18 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
         prompt,
         resume: marker.session,
         ...ConfigExternal.launch(tool, cfg.external),
+        // XCOD-285: the mode chosen in this session (Shift+Tab, "don't ask again") wins over config.
+        ...(tool === "claude" && marker.permissionMode && !invalidMode(tool, marker.permissionMode, undefined)
+          ? { permissionMode: marker.permissionMode }
+          : {}),
+        // XCOD-285: Lunos policy before the tool's permission mode, so a deny rule holds in acceptEdits
+        // or auto too. The Lunos bridge's own tools are judged by the bridge.
+        policy: async (call) => {
+          if (await lunos.owns(call.tool)) return undefined
+          const refusal = policyRefusal(tool, call, ruleset, sessionID)
+          if (call.toolUseID && refusal) refusedCalls.add(call.toolUseID)
+          return refusal ? { deny: refusal } : undefined
+        },
         // XCOD-254: each turn is a fresh start of the tool, so the model chosen with /models applies
         // from the next turn on (`--model` / Codex's thread `model`), resumes included.
         ...(marker.model ? { model: marker.model } : {}),
@@ -474,7 +556,10 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
             enqueue(
               Effect.gen(function* () {
                 yield* sessions.updateMessage(msg)
-                yield* remember(event.sessionID, event.commands.length ? event.commands : undefined)
+                yield* remember(event.sessionID, event.commands.length ? event.commands : undefined, {
+                  ...(event.permissionMode ? { mode: event.permissionMode } : {}),
+                  ...(event.commandInfo?.length ? { commandInfo: event.commandInfo } : {}),
+                })
                 yield* Effect.promise(() =>
                   ExternalRegistry.save({
                     sessionID: event.sessionID,
@@ -489,6 +574,7 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
               }),
             )
           }
+          if (event.type === "mode") enqueue(updateMarker(sessions, sessionID, { mode: event.mode }))
           if (event.type === "text") {
             streamed = event.text
             const now = Date.now()
@@ -515,6 +601,8 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                 status: "running",
                 input: (event.input ?? {}) as Record<string, unknown>,
                 title: event.name,
+                // XCOD-285: edits as diffs, todos as a checklist, as the tool shows them.
+                metadata: ExternalNative.render(tool, event.name, event.input),
                 time: { start: Date.now() },
               },
             }
@@ -533,7 +621,7 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                   input: part.state.input,
                   output: event.output,
                   title: part.state.title ?? "",
-                  metadata: {},
+                  metadata: part.state.metadata ?? {},
                   time: { start, end: Date.now() },
                 }
             enqueue(sessions.updatePart({ ...part }))
@@ -584,41 +672,65 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
           }
           const id = PermissionV1.ID.ascending()
           pending.add(id)
-          const exit = await bridge.promise(
-            Effect.exit(
-              permission.ask({
-                id,
-                sessionID,
-                permission: "external",
-                ...patterns(tool, request),
-                // Only JSON values: the request is sent to clients as is (an undefined field fails encoding).
-                metadata: {
-                  tool,
-                  label: spec.label,
-                  action: request.tool,
-                  ...(request.description ? { description: request.description } : {}),
-                  input: JSON.parse(JSON.stringify(request.input ?? {})),
-                },
-                ruleset,
-              }),
+          // XCOD-285: which answer the user gave (once / always), to tell the tool the matching decision.
+          let replied: string | undefined
+          const unlisten = await bridge.promise(
+            deps.events.listen((event) =>
+              event.type === PermissionV1.Event.Replied.type && (event.data as { requestID?: string })?.requestID === id
+                ? Effect.sync(() => {
+                    replied = (event.data as { reply?: string }).reply
+                  })
+                : Effect.void,
             ),
           )
+          const exit = await bridge
+            .promise(
+              Effect.exit(
+                permission.ask({
+                  id,
+                  sessionID,
+                  permission: "external",
+                  ...patterns(tool, request),
+                  // Only JSON values: the request is sent to clients as is (an undefined field fails encoding).
+                  metadata: {
+                    tool,
+                    label: spec.label,
+                    action: request.tool,
+                    ...(request.description ? { description: request.description } : {}),
+                    input: JSON.parse(JSON.stringify(request.input ?? {})),
+                    // XCOD-285: the tool's own choices for this request, in its wording.
+                    choices: JSON.parse(JSON.stringify(ExternalNative.choices(tool, request))),
+                  },
+                  ruleset,
+                }),
+              ),
+            )
+            .finally(() => bridge.promise(unlisten))
           pending.delete(id)
-          if (Exit.isSuccess(exit)) return { allow: true }
+          if (Exit.isSuccess(exit)) {
+            if (replied !== "always") return { allow: true }
+            // "Don't ask again" that switches Claude Code's mode: later turns start in it too.
+            const switched =
+              tool === "claude" ? ExternalNative.mode(request.suggestions, ConfigExternal.UNSAFE) : undefined
+            if (switched) enqueue(updateMarker(sessions, sessionID, { permissionMode: switched }))
+            return { allow: true, always: true }
+          }
           refusedCalls.add(callID)
           // As in a Lunos session: a refusal with feedback is passed on and the tool carries on; a
-          // plain refusal also ends the tool's turn (Claude Code's `interrupt`); a deny rule just refuses.
+          // plain refusal also ends the tool's turn (Claude Code's `interrupt`, Codex's `cancel`); a
+          // deny rule just refuses, and says it's Lunos policy.
           const error = Cause.squash(exit.cause)
           if (error instanceof PermissionV1.CorrectedError) return { allow: false, message: error.feedback }
           if (error instanceof PermissionV1.RejectedError)
             return { allow: false, message: "The user refused this in Lunos.", interrupt: true }
-          return { allow: false, message: "Refused by a Lunos permission rule." }
+          return { allow: false, message: "Blocked by Lunos policy: a Lunos permission rule refuses this." }
         },
       })
     } catch (error) {
       // An approval-skipping mode without --unsafe, a malformed id, or a Codex command it can't run headless.
       return yield* finish(error instanceof Error ? error.message : String(error))
     }
+    live.set(sessionID, running)
 
     const settle = Effect.promise(() => chain)
     const result = yield* Effect.promise(() => running.done).pipe(
@@ -724,5 +836,5 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
     )
     return yield* finish(result.ok ? undefined : `${spec.label} ended the turn: ${result.subtype}`)
   })
-  return yield* execute.pipe(Effect.ensuring(lunos.close))
+  return yield* execute.pipe(Effect.ensuring(Effect.sync(() => live.delete(sessionID))), Effect.ensuring(lunos.close))
 })

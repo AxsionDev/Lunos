@@ -29,6 +29,8 @@ export interface Options {
   config?: Record<string, unknown>
   onConfigRefused?: (message: string) => void
   ask: ExternalClaude.Options["ask"]
+  /** XCOD-285: Lunos policy before the tool's permission mode (Claude Code's PreToolUse hook). */
+  policy?: ExternalClaude.Options["policy"]
   onEvent?: ExternalClaude.Options["onEvent"]
 }
 

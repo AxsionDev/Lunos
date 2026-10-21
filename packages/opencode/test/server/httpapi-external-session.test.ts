@@ -71,7 +71,7 @@ function call(directory: string, route: string, body?: unknown) {
 const pause = Effect.promise(() => Bun.sleep(25))
 
 /** Waits for the session's next pending approval and answers it. */
-const answer = (directory: string, sessionID: string, reply: "once" | "reject", message?: string) =>
+const answer = (directory: string, sessionID: string, reply: "once" | "always" | "reject", message?: string) =>
   Effect.gen(function* () {
     for (let i = 0; i < 400; i++) {
       const all = (yield* call(directory, "/permission")).body as any[]
@@ -411,6 +411,84 @@ describe("external session (XCOD-218)", () => {
         ).toBe(400)
       }),
     { git: true, config: { formatter: false, lsp: false, external: { claude: { path: FAKE } } } as any },
+    30_000,
+  )
+
+  it.instance(
+    "XCOD-285: the tool's own approval choices, its don't-ask-again applied for the session, Shift+Tab's mode, and a Lunos deny rule over the tool's mode",
+    () =>
+      Effect.gen(function* () {
+        const { directory } = yield* TestInstance
+        const log = path.join(directory, "..", `fake-claude-${path.basename(directory)}.log`)
+        process.env.FAKE_CLAUDE_LOG = log
+        const created = yield* call(directory, SessionPaths.create, { metadata: { external: { tool: "claude" } } })
+        const sessionID = created.body.id as string
+        const promptRoute = pathFor(SessionPaths.prompt, { sessionID })
+        const get = () => call(directory, pathFor(SessionPaths.get, { sessionID })).pipe(Effect.map((r) => r.body))
+
+        // Turn 1: the recorded Write asks with Claude Code's suggestion (accept edits for the session).
+        const first = yield* call(directory, promptRoute, { parts: [{ type: "text", text: "Create hello.txt" }] }).pipe(
+          Effect.forkChild,
+        )
+        const asked = yield* answer(directory, sessionID, "always")
+        expect(asked.metadata.choices.map((item: any) => [item.label, item.reply])).toEqual([
+          ["Yes", "once"],
+          ["Yes, and don't ask again for edits in this session (accept edits mode)", "always"],
+          ["No, and tell Claude what to do differently", "reject"],
+        ])
+        // The recorded retry of the same Write: allowed by the "always" just given, not asked again.
+        expect((yield* Fiber.join(first)).status).toBe(200)
+        let marker = (yield* get()).metadata.external
+        // Its mode switch holds for the next turns; the mode it reported, and its commands with descriptions.
+        expect(marker).toMatchObject({ permissionMode: "acceptEdits", mode: "default" })
+        expect(marker.commandInfo).toContainEqual({ name: "review", description: "Review a pull request" })
+
+        // Shift+Tab: plan is saved; an approval-skipping mode is refused.
+        const modeRoute = pathFor(ExperimentalPaths.externalMode, { sessionID })
+        expect((yield* call(directory, modeRoute, { mode: "bypassPermissions" })).status).toBe(400)
+        expect((yield* call(directory, modeRoute, { mode: "plan" })).body).toBe(true)
+        expect((yield* get()).metadata.external.permissionMode).toBe("plan")
+
+        // Turn 2, where the tool's own mode would run the command without asking: Lunos's deny rule wins.
+        process.env.FAKE_CLAUDE_BASH = "rm -rf build"
+        process.env.FAKE_CLAUDE_AUTO_ALLOW = "1"
+        const second = yield* call(directory, promptRoute, { parts: [{ type: "text", text: "clean up" }] })
+        delete process.env.FAKE_CLAUDE_BASH
+        delete process.env.FAKE_CLAUDE_AUTO_ALLOW
+        expect(second.status).toBe(200)
+
+        const sent = yield* Effect.promise(() => hostLog(log))
+        const runs = sent.filter((line) => line.argv?.includes("-p")).map((line) => line.argv as string[])
+        expect(runs.map((argv) => argv[argv.indexOf("--permission-mode") + 1])).toEqual(["default", "plan"])
+        // Every turn registers the Lunos policy hook.
+        const inits = sent.filter((line) => line.request?.subtype === "initialize").map((line) => line.request.hooks)
+        expect(inits).toEqual([
+          { PreToolUse: [{ hookCallbackIds: ["lunos-policy"] }] },
+          { PreToolUse: [{ hookCallbackIds: ["lunos-policy"] }] },
+        ])
+        const allowed = sent.find((line) => line.response?.response?.behavior === "allow").response.response
+        expect(allowed.updatedPermissions).toEqual([{ type: "setMode", mode: "acceptEdits", destination: "session" }])
+        expect(sent.find((line) => line.ran !== undefined)).toEqual({ ran: false, hooked: true })
+        const hook = sent.find((line) => line.response?.request_id === "hook_toolu_bash").response.response
+        expect(hook.hookSpecificOutput.permissionDecisionReason).toMatch(/^Blocked by Lunos policy/)
+        const messages = (yield* call(directory, pathFor(SessionPaths.messages, { sessionID }))).body as any[]
+        // The recorded Write is shown as a diff of the file, as Claude Code shows it.
+        const write = messages.flatMap((m) => m.parts).findLast((part: any) => part.tool === "claude:Write")
+        expect(write.state.metadata).toMatchObject({ verb: "Write" })
+        expect(write.state.metadata.diff).toContain("+hi")
+        const bash = messages.flatMap((m) => m.parts).find((part: any) => part.tool === "claude:Bash")
+        expect(bash.state).toMatchObject({ status: "error" })
+        expect(bash.state.error).toMatch(/Lunos policy/)
+      }),
+    {
+      git: true,
+      config: {
+        formatter: false,
+        lsp: false,
+        permission: { external: { "claude:Bash rm *": "deny" } },
+        external: { claude: { path: FAKE } },
+      } as any,
+    },
     30_000,
   )
 })

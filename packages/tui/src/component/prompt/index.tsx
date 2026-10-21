@@ -95,6 +95,7 @@ import { useSandbox } from "../../context/sandbox"
 import { holds, SEND_QUESTION } from "../../util/sandbox"
 import { parseMarketplaceSlash, requestDiscover } from "../../util/marketplace"
 import { DialogExternal, useExternalCommand, useStartExternal } from "../dialog-external"
+import { externalModeLabel } from "../external-profile"
 
 registerOpencodeSpinner()
 
@@ -940,7 +941,10 @@ export function Prompt(props: PromptProps) {
           !props.disabled &&
           store.mode === "normal" &&
           !auto()?.visible &&
-          input?.visualCursor.offset === 0
+          input?.visualCursor.offset === 0 &&
+          // XCOD-285: in a Claude Code / Codex session `!` is typed as is and goes to the tool with the
+          // text; Lunos's shell mode would drop it and send the rest to the tool as a prompt.
+          !external()
         )
       })(),
       bindings: [
@@ -2314,7 +2318,7 @@ export function Prompt(props: PromptProps) {
               <Show when={external()}>
                 {(marker) => (
                   <text fg={accent() ?? theme.text} wrapMode="none" flexShrink={0}>
-                    {externalBadge(marker().tool, externalModel())}
+                    {externalBadge(marker().tool, externalModel(), externalModeLabel(marker()))}
                   </text>
                 )}
               </Show>
