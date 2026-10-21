@@ -231,6 +231,38 @@ describe("copy mode and the result handoff", () => {
     await using tmp = await tmpdir()
     await expect(SandboxGit.repo(tmp.path)).rejects.toThrow("isn't in one")
   })
+
+  test('a repository git refuses (safe.directory) says so and how to trust it, not "isn\'t in one"', () => {
+    const stderr = [
+      "fatal: detected dubious ownership in repository at 'D:/development/axsion-web'",
+      "'D:/development/axsion-web' is owned by:",
+      "\tBUILTIN/Administrators (S-1-5-32-544)",
+      "To add an exception for this directory, call:",
+      "\tgit config --global --add safe.directory D:/development/axsion-web",
+    ].join("\n")
+    const error = SandboxGit.notARepo("D:\\development\\axsion-web", { code: 128, stdout: "", stderr }, [
+      "git",
+      "rev-parse",
+      "--show-toplevel",
+    ])
+    expect(error.reason).toContain("belongs to another user")
+    expect(error.reason).not.toContain("isn't in one")
+    expect(error.fix).toBe(
+      "If you trust this repository, run `git config --global --add safe.directory D:/development/axsion-web`, then try again.",
+    )
+    expect(error.message).toContain("exit code: 128")
+    expect(error.message).toContain("| fatal: detected dubious ownership")
+  })
+
+  test("any other git failure shows git's own error instead of guessing", () => {
+    const error = SandboxGit.notARepo(
+      "/work",
+      { code: 128, stdout: "", stderr: "fatal: unsafe repository or permission denied" },
+      ["git", "rev-parse", "--show-toplevel"],
+    )
+    expect(error.reason).toBe("Git couldn't read the repository at /work")
+    expect(error.message).toContain("| fatal: unsafe repository or permission denied")
+  })
 })
 
 // XCOD-157: lifecycle policies, the runtime channel and the host-side config the container gets.

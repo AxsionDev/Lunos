@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { SandboxExec } from "./exec"
+import { SandboxError } from "./error"
 
 // XCOD-144: the git side of copy mode and of the result handoff. The host repository's working tree,
 // index and HEAD are never touched: trees are built with a throwaway index file, and the only write
@@ -22,13 +23,43 @@ export type Repo = {
   relative: string
 }
 
+/**
+ * Why `git rev-parse --show-toplevel` failed in `directory`, from what git printed. Git refusing a
+ * repository it doesn't trust (`safe.directory`, common for a repository on another Windows drive)
+ * fails exactly like a folder that isn't a repository, so the stderr decides which one it is.
+ */
+export function notARepo(directory: string, result: SandboxExec.Result, argv: string[]) {
+  const fields = { step: "detect" as const, command: argv, code: result.code, stderr: result.stderr }
+  const owned = /detected dubious ownership in repository at '([^']+)'/.exec(result.stderr)
+  if (owned)
+    return new SandboxError({
+      ...fields,
+      reason: `Git won't work in ${directory}: the folder belongs to another user, so git doesn't trust it`,
+      fix: `If you trust this repository, run \`git config --global --add safe.directory ${owned[1]}\`, then try again.`,
+    })
+  if (/not a git repository/i.test(result.stderr) || !result.stderr.trim())
+    return new SandboxError({
+      ...fields,
+      reason: `The sandbox copies a git repository into the container, and ${directory} isn't in one`,
+    })
+  return new SandboxError({ ...fields, reason: `Git couldn't read the repository at ${directory}` })
+}
+
 export async function repo(directory: string): Promise<Repo> {
-  const root = await SandboxExec.run(["git", "rev-parse", "--show-toplevel"], { cwd: directory })
-  if (root.code !== 0)
-    throw new Error(`The sandbox copies a git repository into the container, and ${directory} isn't in one`)
+  const show = ["git", "rev-parse", "--show-toplevel"]
+  const root = await SandboxExec.run(show, { cwd: directory })
+  if (root.code !== 0) throw notARepo(directory, root, show)
   const top = root.stdout.trim()
-  const base = await SandboxExec.run(["git", "rev-parse", "--verify", "HEAD^{commit}"], { cwd: top })
-  if (base.code !== 0) throw new Error("The sandbox starts from the current commit, and this repository has none yet")
+  const verify = ["git", "rev-parse", "--verify", "HEAD^{commit}"]
+  const base = await SandboxExec.run(verify, { cwd: top })
+  if (base.code !== 0)
+    throw new SandboxError({
+      step: "detect",
+      reason: "The sandbox starts from the current commit, and this repository has none yet",
+      command: verify,
+      code: base.code,
+      stderr: base.stderr,
+    })
   return {
     root: top,
     gitDir: (await git(["rev-parse", "--absolute-git-dir"], { cwd: top })).trim(),
