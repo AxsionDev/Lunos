@@ -1413,6 +1413,7 @@ export const SnapshotSchema = Schema.Struct({
           network: Schema.String,
           results: Schema.optional(Schema.String),
           workspace: Schema.optional(Schema.String),
+          source: Schema.optional(Schema.String),
           expires: Schema.optional(Schema.String),
           handedOff: Schema.optional(Schema.String),
         }),

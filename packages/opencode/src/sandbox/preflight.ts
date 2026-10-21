@@ -118,6 +118,31 @@ async function smoke(ref: string): Promise<Check> {
   return fail(name, SandboxFailure.wrap("start", SandboxExec.failure(command, result)))
 }
 
+const GIT_FIX =
+  "Install Git (https://git-scm.com/downloads; on Windows, Git for Windows), open a new terminal, and try again. " +
+  "The sandbox uses it to copy your files in and hand the results back."
+
+async function gitCheck(): Promise<Check> {
+  const name = "git installed"
+  const command = ["git", "--version"]
+  const result = await SandboxExec.run(command).catch((error: unknown) => SandboxFailure.wrap("detect", error))
+  if (!(result instanceof SandboxError) && result.code === 0) return pass(name, result.stdout.trim())
+  const error = result instanceof SandboxError ? result : SandboxExec.failure(command, result)
+  return fail(
+    name,
+    new SandboxError({ step: "detect", reason: error.reason, command: error.command, code: error.code, fix: GIT_FIX }),
+  )
+}
+
+/** What the sandbox would start from here, without writing anything. */
+async function workspaceCheck(directory: string) {
+  const found = await SandboxGit.locate(directory)
+  if (found.source === "git")
+    return { root: found.root, detail: `git repository (${found.root} at ${found.base.slice(0, 12)})` }
+  const survey = await SandboxGit.surveyFolder(found.root)
+  return { root: found.root, detail: `plain folder (${SandboxGit.describeSurvey(survey)})` }
+}
+
 /**
  * Every check, in order; later ones are skipped once one they depend on fails. `full` pulls the
  * image when it isn't here, so the test container always runs.
@@ -131,15 +156,24 @@ export async function run(input: {
   const runtime = await runtimeChecks(config)
   const checks = [...runtime.checks]
 
-  const repo = await SandboxGit.repo(input.directory).catch((error: unknown) => SandboxFailure.wrap("create", error))
-  if (repo instanceof SandboxError) checks.push(fail("git repository", repo))
-  else checks.push(pass("git repository", `${repo.root} at ${repo.base.slice(0, 12)}`))
+  // XCOD-282: git copies the workspace in and the results back, a repository or not.
+  const git = await gitCheck()
+  checks.push(git)
+  const gitOk = git.status === "pass"
 
+  const workspace = gitOk
+    ? await workspaceCheck(input.directory).catch((error: unknown) => SandboxFailure.wrap("detect", error))
+    : undefined
+  if (!workspace) checks.push(skip("workspace", "needs git"))
+  else if (workspace instanceof SandboxError) checks.push(fail("workspace", workspace))
+  else checks.push(pass("workspace", workspace.detail))
+
+  const located = workspace && !(workspace instanceof SandboxError) ? workspace : undefined
   if (config.workspace !== "mount") checks.push(pass("workspace mode", "copy"))
-  else if (repo instanceof SandboxError) checks.push(skip("workspace mode", "needs a git repository"))
+  else if (!located) checks.push(skip("workspace mode", "needs the workspace check to pass"))
   else if (!runtime.ok) checks.push(skip("workspace mode", "needs a working container runtime"))
   else {
-    const mount = await Promise.all([SandboxMount.workspace(repo.root), SandboxDocker.mountIdentity()]).catch(
+    const mount = await Promise.all([SandboxMount.workspace(located.root), SandboxDocker.mountIdentity()]).catch(
       (error: unknown) => SandboxFailure.wrap("create", error),
     )
     checks.push(mount instanceof SandboxError ? fail("workspace mode", mount) : pass("workspace mode", "mount"))

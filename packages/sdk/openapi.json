@@ -26953,6 +26953,9 @@
                     "workspace": {
                       "type": "string"
                     },
+                    "source": {
+                      "type": "string"
+                    },
                     "expires": {
                       "type": "string"
                     },

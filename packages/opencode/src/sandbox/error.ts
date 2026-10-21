@@ -89,8 +89,6 @@ export function diagnose(text: string, platform: NodeJS.Platform = process.platf
   )
     return "The container runtime couldn't reach the image registry: check your connection or proxy (Docker Desktop: Settings → Resources → Proxies), then try again."
   if (/sandbox\.workspace "mount"/.test(text)) return 'Use "sandbox": { "workspace": "copy" } in your global config.'
-  if (/isn't in one|has none yet/.test(text))
-    return "Run Lunos from a git repository with at least one commit, or start it without the sandbox (`lunos --no-sandbox`)."
   return undefined
 }
 

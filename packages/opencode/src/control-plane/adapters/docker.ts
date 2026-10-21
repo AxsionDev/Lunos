@@ -55,16 +55,24 @@ export const DockerAdapter: WorkspaceAdapter = {
     if (!project) return []
     // XCOD-158: a sandbox whose results have been handed back has ended. If on_finish kept it, it's
     // stopped, so it can't serve a warp; `lunos sandbox attach` reopens it.
-    return (await Sandbox.known())
-      .filter((meta) => meta.root === context?.instance?.worktree && !meta.handedOff)
-      .map((meta) => ({
-        type: "docker",
-        name: meta.id,
-        branch: meta.branch,
-        directory: meta.directory,
-        extra: { sandbox: meta.id },
-        projectID: project,
-      }))
+    return (
+      (await Sandbox.known())
+        // XCOD-282: a folder sandbox belongs to the directory ("global" project, worktree "/").
+        .filter(
+          (meta) =>
+            !!context?.instance &&
+            Sandbox.belongs(meta, context.instance.worktree, context.instance.directory) &&
+            !meta.handedOff,
+        )
+        .map((meta) => ({
+          type: "docker",
+          name: meta.id,
+          branch: meta.branch,
+          directory: meta.directory,
+          extra: { sandbox: meta.id },
+          projectID: project,
+        }))
+    )
   },
   // Nothing is destroyed until the results are back on the host: hand them back first (as
   // sandbox.results says, plus the transcript), then apply sandbox.on_finish, as `lunos run --sandbox`

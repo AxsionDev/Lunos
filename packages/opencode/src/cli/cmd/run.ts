@@ -307,7 +307,7 @@ export const RunCommand = effectCmd({
       .option("sandbox", {
         type: "boolean",
         describe:
-          "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>. If it can't start, the run warns and goes on without it; --sandbox=strict fails instead",
+          "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id> (outside a git repository: `lunos sandbox apply <id>` writes them back). If it can't start, the run warns and goes on without it; --sandbox=strict fails instead",
       })
       .option("unattended", {
         // XCOD-211: set by `lunos agent run`. Nobody can answer a permission prompt, so each one is

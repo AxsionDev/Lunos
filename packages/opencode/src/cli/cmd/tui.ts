@@ -234,7 +234,7 @@ export const TuiThreadCommand = cmd({
       .option("sandbox", {
         type: "boolean",
         describe:
-          "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id>. If it can't start, Lunos goes on without it; --sandbox=strict waits for it instead",
+          "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id> (outside a git repository: `lunos sandbox apply <id>` writes them back). If it can't start, Lunos goes on without it; --sandbox=strict waits for it instead",
       })
       .option("keep", {
         type: "boolean",
