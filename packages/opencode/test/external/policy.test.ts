@@ -66,6 +66,50 @@ describe("ExternalDetect (XCOD-204)", () => {
     )
   })
 
+  // XCOD-294: what the installed tool says about its sign-in (fakes replaying 2.1.304 / 0.160.1 in a fresh HOME).
+  test("signed out is what the tool's own status says, and the hint is its own login command", async () => {
+    const fixtures = path.join(import.meta.dir, "fixtures")
+    const dir = await tmp()
+    const before = { claude: process.env.FAKE_CLAUDE_AUTH, codex: process.env.FAKE_CODEX_AUTH }
+    process.env.FAKE_CLAUDE_AUTH = path.join(dir, "claude")
+    process.env.FAKE_CODEX_AUTH = path.join(dir, "codex")
+    try {
+      const claude = await ExternalDetect.detect("claude", path.join(fixtures, "fake-claude.ts"))
+      expect(claude).toMatchObject({ installed: true, loggedIn: false, authMethod: "none" })
+      expect(claude.hint).toContain("`claude auth login`")
+      const codex = await ExternalDetect.detect("codex", path.join(fixtures, "fake-codex.ts"))
+      expect(codex).toMatchObject({ installed: true, loggedIn: false })
+      expect(codex.hint).toContain("`codex login`")
+      // Signed in once the tool's own login has run (its file, which Lunos never reads).
+      await fs.writeFile(path.join(dir, "claude"), "x")
+      await fs.writeFile(path.join(dir, "codex"), "x")
+      expect((await ExternalDetect.detect("claude", path.join(fixtures, "fake-claude.ts"))).loggedIn).toBe(true)
+      expect((await ExternalDetect.detect("codex", path.join(fixtures, "fake-codex.ts"))).loggedIn).toBe(true)
+    } finally {
+      for (const [key, value] of [
+        ["FAKE_CLAUDE_AUTH", before.claude],
+        ["FAKE_CODEX_AUTH", before.codex],
+      ] as const)
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      await fs.rm(dir, { recursive: true, force: true })
+    }
+    expect(ExternalDetect.LOGIN).toEqual({ claude: ["auth", "login"], codex: ["login"] })
+  })
+
+  test("Codex failing to load its config isn't 'signed out': logging in wouldn't fix it", () => {
+    expect(ExternalDetect.codexLoggedIn({ code: 0, stdout: "Logged in using ChatGPT\n", stderr: "" })).toBe(true)
+    expect(ExternalDetect.codexLoggedIn({ code: 1, stdout: "", stderr: "Not logged in\n" })).toBe(false)
+    expect(
+      ExternalDetect.codexLoggedIn({
+        code: 1,
+        stdout: "",
+        stderr: 'Error loading configuration: CODEX_HOME points to "/x", but that path does not exist\n',
+      }),
+    ).toBeUndefined()
+    expect(ExternalDetect.codexLoggedIn({ code: null, stdout: "", stderr: "" })).toBeUndefined()
+  })
+
   test("scripts run with Bun, and a Windows .cmd shim through a shell", () => {
     expect(ExternalDetect.command("/x/fake.ts", ["--version"])).toEqual({
       file: process.execPath,

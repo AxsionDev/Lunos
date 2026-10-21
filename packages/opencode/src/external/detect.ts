@@ -134,8 +134,9 @@ export async function detect(tool: Tool, configured?: string): Promise<Status> {
     status.mcpConfig = help.stdout.includes("--mcp-config")
     const auth = await run(file, ["auth", "status"])
     try {
-      const parsed = JSON.parse(auth.stdout) as { loggedIn?: boolean; authMethod?: string }
-      status.loggedIn = parsed.loggedIn === true
+      // 2.1.304 prints this JSON either way and exits 1 when signed out: the field is the answer.
+      const parsed = JSON.parse(auth.stdout) as { loggedIn?: unknown; authMethod?: string }
+      status.loggedIn = typeof parsed.loggedIn === "boolean" ? parsed.loggedIn : undefined
       status.authMethod = parsed.authMethod
     } catch {
       status.loggedIn = undefined
@@ -143,9 +144,25 @@ export async function detect(tool: Tool, configured?: string): Promise<Status> {
   }
   if (tool === "codex") {
     const auth = await run(file, ["login", "status"])
-    status.loggedIn = auth.code === 0 ? true : auth.code === null ? undefined : false
+    status.loggedIn = codexLoggedIn(auth)
+    // Exit 1 is also how it fails to load its config: that isn't "signed out", and logging in wouldn't fix it.
+    if (status.loggedIn === undefined && auth.code !== null && !status.hint)
+      status.hint = `${spec.label}: ${(auth.stderr || auth.stdout).trim().split("\n").at(-1) || `login status exited ${auth.code}`}`
   }
   if (status.loggedIn === false && !status.hint)
-    status.hint = `Log in to ${spec.label} first: run \`${tool} ${tool === "claude" ? "auth login" : "login"}\` in a terminal`
+    status.hint = `Log in to ${spec.label} first: run \`${tool} ${LOGIN[tool].join(" ")}\` in a terminal`
   return status
+}
+
+/**
+ * XCOD-294: the tool's own sign-in, as its `--help` lists it (Claude Code 2.1.304 `auth login`, Codex 0.160.1
+ * `login`). Run on the user's terminal, never with the flags that read a key or token from stdin.
+ */
+export const LOGIN: Record<Tool, string[]> = { claude: ["auth", "login"], codex: ["login"] }
+
+/** `codex login status`: exit 0 is signed in; exit 1 with "Not logged in" (0.160.1, on stderr) is not. */
+export function codexLoggedIn(result: { code: number | null; stdout: string; stderr: string }) {
+  if (result.code === 0) return true
+  if (result.code !== null && /\bnot logged in\b/i.test(result.stderr + result.stdout)) return false
+  return undefined
 }

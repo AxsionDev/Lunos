@@ -4,7 +4,7 @@
 // approval request it waits for the host's answer, and on an accepted file change writes the file
 // the way Codex would. review/start and thread/compact/start replay codex-review.jsonl and
 // codex-compact.jsonl, recorded from 0.160.1. Everything the host sends is logged to FAKE_CODEX_LOG.
-import { appendFileSync, readFileSync, writeFileSync } from "fs"
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "fs"
 import path from "path"
 import { createInterface } from "readline"
 
@@ -61,6 +61,20 @@ const configView = JSON.parse(
     .replaceAll("<codex_home>", process.env.CODEX_HOME ?? "")
     .replaceAll("<project>", process.cwd()),
 ).replies
+// XCOD-294: FAKE_CODEX_AUTH=<file> is a Codex whose sign-in is that file. Without it, `login status` says
+// "Not logged in" on stderr and exits 1, as 0.160.1 does in a fresh HOME; `login` makes up a token, writes it
+// there and prints it on the terminal it was given.
+const auth = process.env.FAKE_CODEX_AUTH
+if (auth && process.argv[2] === "login" && process.argv.length === 3) {
+  const token = `sk-fake-${crypto.randomUUID()}`
+  writeFileSync(auth, token)
+  console.log(`Successfully logged in. Token ${token} saved by Codex.`)
+  process.exit(0)
+}
+if (auth && process.argv[2] === "login" && process.argv[3] === "status" && !existsSync(auth)) {
+  console.error("Not logged in")
+  process.exit(1)
+}
 if (process.argv[2] === "login" && process.argv[3] === "status") {
   console.log("Logged in using ChatGPT")
   process.exit(0)
