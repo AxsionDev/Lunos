@@ -166,7 +166,8 @@ export const Info = Schema.Struct({
     description: "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }",
   }),
   subagent: Schema.optional(ConfigSubagent.Info).annotate({
-    description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
+    description:
+      "Subagents: whether Build delegates to them, background runs, how many run at once, their model, and their names and animals in the TUI",
   }),
   subagent_depth: Schema.optional(NonNegativeInt).annotate({
     description: "Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents.",

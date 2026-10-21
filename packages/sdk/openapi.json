@@ -25514,6 +25514,19 @@
           "background": {
             "type": "boolean"
           },
+          "delegate": {
+            "type": "boolean"
+          },
+          "max_parallel": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "fun_names": {
+            "type": "boolean"
+          },
+          "mascots": {
+            "type": "boolean"
+          },
           "model": {
             "type": "string"
           },

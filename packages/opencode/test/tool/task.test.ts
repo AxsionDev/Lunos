@@ -653,66 +653,66 @@ describe("tool.task", () => {
     },
   )
 
-  // XCOD-82: the documented config key turns background subagents on without the env flag.
+  // XCOD-287: background subagents are on by default, without the env flag or any config.
+  it.instance("background execution is on by default", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const result = yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+          background: true,
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps: { ...stubOps(), prompt: () => Effect.never } satisfies TaskPromptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+      expect(result.metadata).toMatchObject({ background: true })
+    }),
+  )
+
   it.instance(
-    "subagent.background in config enables background execution without the env flag",
+    "rejects background execution when subagent.background is false",
     () =>
       Effect.gen(function* () {
         const { chat, assistant } = yield* seed()
         const tool = yield* TaskTool
         const def = yield* tool.init()
-        const result = yield* def.execute(
-          {
-            description: "inspect bug",
-            prompt: "look into the cache key path",
-            subagent_type: "general",
-            background: true,
-          },
-          {
-            sessionID: chat.id,
-            messageID: assistant.id,
-            agent: "build",
-            abort: new AbortController().signal,
-            extra: { promptOps: { ...stubOps(), prompt: () => Effect.never } satisfies TaskPromptOps },
-            messages: [],
-            metadata: () => Effect.void,
-            ask: () => Effect.void,
-          },
-        )
-        expect(result.metadata).toMatchObject({ background: true })
+
+        const exit = yield* def
+          .execute(
+            {
+              description: "inspect bug",
+              prompt: "look into the cache key path",
+              subagent_type: "general",
+              background: true,
+            },
+            {
+              sessionID: chat.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { promptOps: stubOps() },
+              messages: [],
+              metadata: () => Effect.void,
+              ask: () => Effect.void,
+            },
+          )
+          .pipe(Effect.exit)
+
+        expect(Exit.isFailure(exit)).toBe(true)
       }),
-    { config: { subagent: { background: true } } },
-  )
-
-  it.instance("rejects background execution when the experiment is disabled", () =>
-    Effect.gen(function* () {
-      const { chat, assistant } = yield* seed()
-      const tool = yield* TaskTool
-      const def = yield* tool.init()
-
-      const exit = yield* def
-        .execute(
-          {
-            description: "inspect bug",
-            prompt: "look into the cache key path",
-            subagent_type: "general",
-            background: true,
-          },
-          {
-            sessionID: chat.id,
-            messageID: assistant.id,
-            agent: "build",
-            abort: new AbortController().signal,
-            extra: { promptOps: stubOps() },
-            messages: [],
-            metadata: () => Effect.void,
-            ask: () => Effect.void,
-          },
-        )
-        .pipe(Effect.exit)
-
-      expect(Exit.isFailure(exit)).toBe(true)
-    }),
+    { config: { subagent: { background: false } } },
   )
 
   it.instance("promotes a running foreground task without restarting it", () =>
@@ -1171,5 +1171,58 @@ describe("tool.task", () => {
       expect((yield* jobs.get(child.id))?.status).toBe("cancelled")
       expect((yield* jobs.get(grandchild.id))?.status).toBe("cancelled")
     }),
+  )
+
+  // XCOD-287: at most subagent.max_parallel subagents of one session run at once; the rest are queued.
+  it.instance(
+    "queues subagents past subagent.max_parallel and marks them queued until a slot frees",
+    () =>
+      Effect.gen(function* () {
+        const jobs = yield* BackgroundJob.Service
+        const sessions = yield* Session.Service
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        const release = yield* Deferred.make<void>()
+        const started: string[] = []
+        const ops: TaskPromptOps = {
+          ...stubOps(),
+          prompt: (input) =>
+            Effect.gen(function* () {
+              if (input.sessionID === chat.id) return reply(input, "integrated")
+              started.push(input.sessionID)
+              yield* Deferred.await(release)
+              return reply(input, "done")
+            }),
+        }
+        const launch = (description: string) =>
+          def.execute(
+            { description, prompt: description, subagent_type: "general", background: true },
+            {
+              sessionID: chat.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { promptOps: ops },
+              messages: [],
+              metadata: () => Effect.void,
+              ask: () => Effect.void,
+            },
+          )
+
+        const first = yield* launch("first")
+        const second = yield* launch("second")
+        yield* Effect.sleep("20 millis")
+        expect(started).toEqual([first.metadata.sessionId])
+        expect((yield* sessions.get(SessionID.make(second.metadata.sessionId))).metadata).toMatchObject({
+          subagent: { queued: true },
+        })
+
+        yield* Deferred.succeed(release, undefined)
+        yield* jobs.wait({ id: second.metadata.sessionId })
+        expect(started).toEqual([first.metadata.sessionId, second.metadata.sessionId])
+        expect((yield* sessions.get(SessionID.make(second.metadata.sessionId))).metadata?.subagent).toBeUndefined()
+      }),
+    { config: { subagent: { max_parallel: 1 } } },
   )
 })

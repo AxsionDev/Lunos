@@ -210,8 +210,11 @@ const layer = Layer.effect(
               Permission.fromConfig({
                 question: "allow",
                 plan_exit: "allow",
+                // XCOD-287: no subagent that can write either: `general` edits, `qa` runs shell
+                // commands. explore, architect and planner are read-only.
                 task: {
                   general: "deny",
+                  qa: "deny",
                 },
                 // XCOD-204: read-only, so no delegating edits to an external tool either.
                 external: "deny",

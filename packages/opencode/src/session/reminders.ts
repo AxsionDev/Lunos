@@ -2,6 +2,7 @@ import path from "path"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Effect } from "effect"
 import { Agent } from "@/agent/agent"
+import { Permission } from "@/permission"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { InstanceState } from "@/effect/instance-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -13,12 +14,40 @@ import BUILD_SWITCH from "./prompt/build-switch.txt"
 import PLAN_MODE from "./prompt/plan-mode.txt"
 import RESEARCH_MODE from "./prompt/research-mode.txt"
 import DEV_CYCLE_MODE from "./prompt/dev-cycle-mode.txt"
+import DELEGATE from "./prompt/delegate.txt"
 import { DevCycle } from "./dev-cycle"
+
+/**
+ * XCOD-287: Build splits development work across subagents by default. Only for a top-level Build
+ * session that may launch a subagent; `subagent.delegate: false` turns it off.
+ */
+export function delegates(input: {
+  agent: Agent.Info
+  session: Pick<Session.Info, "parentID">
+  config: { subagent?: { delegate?: boolean } }
+  subagents: readonly Pick<Agent.Info, "name">[]
+}) {
+  if (input.agent.name !== "build" || input.session.parentID) return false
+  if (input.config.subagent?.delegate === false) return false
+  return input.subagents.some(
+    (subagent) => Permission.evaluate("task", subagent.name, input.agent.permission).action !== "deny",
+  )
+}
+
+export function delegateReminder(background: boolean) {
+  return DELEGATE.replace("${backgroundInfo}", () =>
+    background
+      ? "Launch them with background: true and carry on with your own part; you are notified as each one finishes, so never sleep, poll or ask for status."
+      : "Wait for their results before you build on them.",
+  )
+}
 
 export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   messages: SessionV1.WithParts[]
   agent: Agent.Info
   session: Session.Info
+  /** XCOD-287: the delegation reminder, when `delegates()` says so. Built per request, never saved. */
+  delegate?: string
 }) {
   const flags = yield* RuntimeFlags.Service
   const fsys = yield* FSUtil.Service
@@ -39,6 +68,8 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
       text,
       synthetic: true,
     })
+
+  if (input.delegate) inject(input.delegate)
 
   // Research mode is independent of the plan-mode flag: its reminder carries
   // the output path, so it always follows the path-bearing shape below.

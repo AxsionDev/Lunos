@@ -135,7 +135,8 @@ export class Info extends Schema.Class<Info>("Config.Info")({
     description: "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }",
   }),
   subagent: ConfigSubagent.Info.pipe(Schema.optional).annotate({
-    description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
+    description:
+      "Subagents: whether Build delegates to them, background runs, how many run at once, their model, and their names and animals in the TUI",
   }),
   memory: ConfigMemory.Info.pipe(Schema.optional).annotate({
     description: "Graph-based long-term memory, off by default",

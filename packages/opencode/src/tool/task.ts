@@ -11,7 +11,7 @@ import { Agent } from "../agent/agent"
 import { deriveSubagentSessionPermission } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
-import { Effect, Exit, Schema, Scope } from "effect"
+import { Effect, Exit, Option, Schema, Scope, Semaphore } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { backgroundEnabled } from "@/background/enabled"
@@ -30,6 +30,9 @@ export interface TaskPromptOps {
 }
 
 const id = "task"
+
+/** XCOD-287: subagents that run at once per session unless `subagent.max_parallel` says otherwise. */
+export const DEFAULT_MAX_PARALLEL = 3
 const BACKGROUND_DESCRIPTION = [
   "Background mode: background=true launches the subagent asynchronously and returns immediately.",
   "Foreground is the default; use it when you need the result before continuing.",
@@ -90,6 +93,21 @@ export function withModelParameter(schema: JSONSchema7, allowed: readonly string
   return { ...schema, properties }
 }
 
+/**
+ * XCOD-287: the task tool's description and JSON schema as the model sees them for one request:
+ * without the `background` parameter and its explanation when background subagents are off in the
+ * live config. Tool init can't always read config, so it can't decide this on its own.
+ */
+export function withBackground(input: { description: string; schema: JSONSchema7 }, enabled: boolean) {
+  if (enabled) return input
+  const properties = { ...(input.schema.properties ?? {}) } as Record<string, JSONSchema7Definition>
+  delete properties.background
+  return {
+    description: input.description.replace(`\n\n${BACKGROUND_DESCRIPTION}`, ""),
+    schema: { ...input.schema, properties },
+  }
+}
+
 function renderOutput(input: {
   sessionID: SessionID
   state: "running" | "completed" | "error"
@@ -117,6 +135,26 @@ export const TaskTool = Tool.define(
     const scope = yield* Scope.Scope
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
+
+    // XCOD-287: at most `subagent.max_parallel` subagents of one session run at once; the rest wait
+    // for a slot, marked `subagent.queued` on their session so the TUI can say so.
+    const slots = new Map<string, Semaphore.Semaphore>()
+    const slot = Effect.fn("TaskTool.slot")(function* (parentID: string, max: number) {
+      const hit = slots.get(parentID)
+      if (hit) {
+        // A changed setting applies to the next subagent; running ones keep their slot.
+        yield* hit.resize(max)
+        return hit
+      }
+      const next = Semaphore.makeUnsafe(max)
+      slots.set(parentID, next)
+      return next
+    })
+    const markQueued = Effect.fn("TaskTool.markQueued")(function* (sessionID: SessionID, queued: boolean) {
+      const latest = yield* sessions.get(sessionID)
+      const { subagent: _, ...rest } = (latest.metadata ?? {}) as Record<string, unknown>
+      yield* sessions.setMetadata({ sessionID, metadata: queued ? { ...rest, subagent: { queued: true } } : rest })
+    })
 
     const lastAssistant = Effect.fn("TaskTool.lastAssistant")(function* (sessionID: SessionID) {
       const messages = yield* sessions.messages({ sessionID }).pipe(Effect.orElseSucceed(() => []))
@@ -277,7 +315,18 @@ export const TaskTool = Tool.define(
       const ops = ctx.extra?.promptOps as TaskPromptOps
       if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
 
-      const runTask = Effect.fn("TaskTool.runTask")(function* () {
+      const gate = yield* slot(ctx.sessionID, cfg.subagent?.max_parallel ?? DEFAULT_MAX_PARALLEL)
+      const runTask = () =>
+        Effect.gen(function* () {
+          const now = yield* gate.withPermitsIfAvailable(1)(prompt())
+          if (Option.isSome(now)) return now.value
+          yield* markQueued(nextSession.id, true).pipe(Effect.ignore)
+          return yield* gate
+            .withPermits(1)(markQueued(nextSession.id, false).pipe(Effect.ignore, Effect.andThen(prompt())))
+            .pipe(Effect.onInterrupt(() => markQueued(nextSession.id, false).pipe(Effect.ignore)))
+        })
+
+      const prompt = Effect.fn("TaskTool.runTask")(function* () {
         const parts = yield* ops.resolvePromptParts(params.prompt)
         const result = yield* ops.prompt({
           messageID: MessageID.ascending(),
@@ -439,7 +488,8 @@ export const TaskTool = Tool.define(
     })
 
     // Tool init can run outside an instance (tests, tool listings), where config isn't
-    // reachable; fall back to the env flag there. Execution re-checks with live config.
+    // reachable; fall back to the default there. Execution re-checks with live config, and the
+    // registry drops the background parameter per request when it's off (withBackground).
     const initialConfig = yield* config.get().pipe(Effect.catchCause(() => Effect.succeed({})))
     const backgroundOn = backgroundEnabled(flags.experimentalBackgroundSubagents, initialConfig)
     return {

@@ -1,0 +1,5 @@
+<system-reminder>
+Subagents are on for development work. When the task has independent parts (for example exploring the codebase, writing tests, updating docs, fixing lint), delegate each part to a subagent with the task tool and run them in parallel: several task calls in one message. ${backgroundInfo}
+Give each subagent a complete, self-contained prompt, say whether it should write code or only research, and say what it must report back. Never give two subagents the same files. Integrate their results yourself and verify the combined change.
+Keep small, single-step work (a question, a one-file edit, a single command) in the main agent: don't spawn subagents for it.
+</system-reminder>

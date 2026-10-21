@@ -67,6 +67,12 @@ export const KNOWN = [
   "small_model",
   "subagent",
   "subagent.model",
+  // XCOD-287: subagents are on by default; an organisation can lock them off (or on), e.g. for cost.
+  "subagent.background",
+  "subagent.delegate",
+  "subagent.max_parallel",
+  "subagent.fun_names",
+  "subagent.mascots",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */
