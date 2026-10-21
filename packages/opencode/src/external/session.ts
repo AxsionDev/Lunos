@@ -71,6 +71,14 @@ export interface Marker {
   mode?: string
   /** XCOD-285: the tool's /commands with their descriptions and argument hints, as it last listed them. */
   commandInfo?: ExternalClaude.CommandInfo[]
+  /** XCOD-292: the context the conversation uses, for the status line, as far as the tool reports it. */
+  context?: Context
+}
+
+/** XCOD-292: tokens of context in use and, when the tool reports it, the model's window. */
+export interface Context {
+  used: number
+  window?: number
 }
 
 /** XCOD-285: the turns running now, by Lunos session, so Shift+Tab can change a running turn's mode. */
@@ -646,6 +654,21 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
             )
           }
           if (event.type === "mode") enqueue(updateMarker(sessions, sessionID, { mode: event.mode }))
+          // XCOD-292: the context in use for the status line, as the tool reports it; a part it doesn't
+          // report keeps what it last said (Claude Code gives the window only with its result).
+          if (event.type === "context")
+            enqueue(
+              Effect.gen(function* () {
+                const previous = of(yield* sessions.get(sessionID).pipe(Effect.orDie))?.context
+                const context = {
+                  ...previous,
+                  ...(event.used !== undefined ? { used: event.used } : {}),
+                  ...(event.window !== undefined ? { window: event.window } : {}),
+                }
+                if (context.used === undefined) return
+                yield* updateMarker(sessions, sessionID, { context: context as Context })
+              }),
+            )
           if (event.type === "text") {
             streamed = event.text
             const now = Date.now()
@@ -672,13 +695,15 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                 status: "running",
                 input: (event.input ?? {}) as Record<string, unknown>,
                 title: event.name,
-                // XCOD-285: edits as diffs, todos as a checklist, as the tool shows them.
-                metadata: ExternalNative.render(tool, event.name, event.input),
+                // XCOD-285: edits as diffs, todos as a checklist, as the tool shows them (XCOD-292: Codex's too).
+                metadata: ExternalNative.render(tool, event.name, event.input, ctx.directory),
                 time: { start: Date.now() },
               },
             }
             tools.set(event.id, part)
-            calls.set(event.id, { ...ExternalHooks.call(tool, event.name, event.input), name: event.name })
+            // XCOD-292: a plan update or a subagent's progress isn't a call: no hook sees it.
+            if (!event.progress)
+              calls.set(event.id, { ...ExternalHooks.call(tool, event.name, event.input), name: event.name })
             enqueue(sessions.updatePart(part))
           }
           if (event.type === "tool_result") {
@@ -692,7 +717,8 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                   input: part.state.input,
                   output: event.output,
                   title: part.state.title ?? "",
-                  metadata: part.state.metadata ?? {},
+                  // XCOD-292: what the tool only reports on completion (a subagent's final state) joins it.
+                  metadata: { ...part.state.metadata, ...event.metadata },
                   time: { start, end: Date.now() },
                 }
             enqueue(sessions.updatePart({ ...part }))

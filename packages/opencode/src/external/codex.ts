@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from "child_process"
 import { createInterface } from "readline"
 import { ExternalDetect } from "./detect"
 import type { ExternalClaude } from "./claude"
+import { ExternalNative } from "./native"
 
 /**
  * XCOD-204: drive the user's own Codex CLI through `codex app-server`, its JSON-RPC protocol
@@ -16,6 +17,11 @@ import type { ExternalClaude } from "./claude"
  *   host → turn/start { threadId, input: [{ type: "text", text }] }
  *   tool → item/started / item/completed / thread/tokenUsage/updated / turn/completed
  *   tool → item/…/requestApproval (a request, with an id)   host → { id, result: { decision } }
+ *
+ * XCOD-292: also read, for showing the turn as Codex does (schema excerpt in
+ * test/fixtures/external/codex-0.160.1/render-items.json): `turn/plan/updated` (its plan),
+ * `collabAgentToolCall` and `subAgentActivity` items (its subagents), and `thread/tokenUsage/updated`'s
+ * last call and window (the context in use).
  *
  * The app server is marked experimental by OpenAI; `lunos external list` reports the version.
  * Codex reports tokens, not money, so a session's cost is "not reported".
@@ -343,7 +349,24 @@ export function start(options: Options): Running {
   let turnID = ""
   let lastText = ""
   let tokens: number | undefined
+  /** XCOD-292: plan updates in this turn (each is its own checklist, as Codex shows each update). */
+  let plans = 0
+  /** XCOD-292: subagent activity items already shown (shown once, whichever of started/completed comes). */
+  const activity = new Set<string>()
   const denied: { tool: string; id: string }[] = []
+
+  const showActivity = (item: any) => {
+    const input = ExternalNative.codexAgentActivity(item)
+    if (!input || activity.has(item.id)) return
+    activity.add(item.id)
+    options.onEvent?.({ type: "tool", id: item.id, name: "Agent", input, progress: true })
+    options.onEvent?.({
+      type: "tool_result",
+      id: item.id,
+      isError: false,
+      output: `${input.agent ?? "agent"} ${input.activity}`,
+    })
+  }
 
   const done = new Promise<Extract<Event, { type: "result" }> | Extract<Event, { type: "error" }>>((resolve) => {
     let settled = false
@@ -431,6 +454,16 @@ export function start(options: Options): Running {
             options.onEvent?.({ type: "tool", id: item.id, name: "Bash", input: { command: item.command } })
           if (item.type === "fileChange")
             options.onEvent?.({ type: "tool", id: item.id, name: "FileChange", input: { changes: item.changes } })
+          // XCOD-292: one agent asking another (spawn, send input, wait, close, …), from the 0.160.1 schema.
+          if (item.type === "collabAgentToolCall")
+            options.onEvent?.({
+              type: "tool",
+              id: item.id,
+              name: "Agent",
+              input: ExternalNative.codexAgentCall(item),
+              progress: true,
+            })
+          if (item.type === "subAgentActivity") showActivity(item)
           // XCOD-254: an MCP server's tool, the Lunos bridge's included (v2 `mcpToolCall`; not recorded).
           if (item.type === "mcpToolCall")
             options.onEvent?.({
@@ -448,6 +481,19 @@ export function start(options: Options): Running {
             lastText = item.text
             options.onEvent?.({ type: "text", text: item.text })
           }
+          if (item.type === "collabAgentToolCall") {
+            const agents = ExternalNative.codexAgentStates(item)
+            options.onEvent?.({
+              type: "tool_result",
+              id: item.id,
+              isError: item.status === "failed",
+              output: agents
+                .map((agent) => `${agent.id}: ${agent.status}${agent.message ? ` (${agent.message})` : ""}`)
+                .join("\n"),
+              ...(agents.length ? { metadata: { agents } } : {}),
+            })
+          }
+          if (item.type === "subAgentActivity") showActivity(item)
           // Compaction says nothing itself, so the result would otherwise be empty.
           if (item.type === "contextCompaction" && !lastText) lastText = "Codex compacted the session."
           if (item.type === "mcpToolCall")
@@ -466,9 +512,33 @@ export function start(options: Options): Running {
             })
           return
         }
-        case "thread/tokenUsage/updated":
+        case "thread/tokenUsage/updated": {
           tokens = params.tokenUsage?.total?.totalTokens ?? tokens
+          // XCOD-292: the context in use is the last call's tokens, out of the model's window (when given).
+          const used = params.tokenUsage?.last?.totalTokens
+          const window = params.tokenUsage?.modelContextWindow
+          if (typeof used === "number" && used > 0)
+            options.onEvent?.({
+              type: "context",
+              used,
+              ...(typeof window === "number" && window > 0 ? { window } : {}),
+            })
           return
+        }
+        // XCOD-292: Codex's plan, as a checklist each time it updates it (schema: TurnPlanUpdatedNotification).
+        case "turn/plan/updated": {
+          const plan = ExternalNative.codexPlan(params)
+          if (!plan) return
+          const id = `plan-${params.turnId ?? turnID}-${++plans}`
+          options.onEvent?.({ type: "tool", id, name: "Plan", input: plan, progress: true })
+          options.onEvent?.({
+            type: "tool_result",
+            id,
+            isError: false,
+            output: plan.todos.map((todo) => `[${todo.status === "completed" ? "x" : " "}] ${todo.content}`).join("\n"),
+          })
+          return
+        }
         case "turn/completed": {
           const turn = params.turn ?? {}
           finish({

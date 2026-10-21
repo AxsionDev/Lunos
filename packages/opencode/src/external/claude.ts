@@ -43,8 +43,19 @@ export type Event =
   /** XCOD-285: the tool changed its permission mode mid-turn (its `status` line after `set_permission_mode`). */
   | { type: "mode"; mode: string }
   | { type: "text"; text: string }
-  | { type: "tool"; id: string; name: string; input: unknown }
-  | { type: "tool_result"; id: string; isError: boolean; output: string }
+  /**
+   * XCOD-292: `progress` marks something the tool shows that isn't one of its calls (Codex's plan
+   * updates and subagent activity): rendered like a call, but never seen by Lunos plugin hooks.
+   */
+  | { type: "tool"; id: string; name: string; input: unknown; progress?: true }
+  /** XCOD-292: `metadata` is what the tool reported only on completion (a subagent's final state). */
+  | { type: "tool_result"; id: string; isError: boolean; output: string; metadata?: Record<string, unknown> }
+  /**
+   * XCOD-292: how much of the model's context the conversation uses (tokens) and its window, as far
+   * as the tool reports them: either may come on its own (Claude Code reports the window only with its
+   * result). Never derived from a model table Lunos keeps.
+   */
+  | { type: "context"; used?: number; window?: number }
   | {
       type: "result"
       ok: boolean
@@ -184,6 +195,32 @@ function text(content: unknown): string {
   return ""
 }
 
+/**
+ * XCOD-292: the tokens of context one API call used, from the usage Claude Code puts on each assistant
+ * message (`input_tokens` + `cache_read_input_tokens` + `cache_creation_input_tokens`). Undefined
+ * when it reports none.
+ */
+export function contextUsed(usage: any) {
+  if (!usage || typeof usage !== "object") return undefined
+  const parts = [usage.input_tokens, usage.cache_read_input_tokens, usage.cache_creation_input_tokens]
+  if (!parts.some((value) => typeof value === "number")) return undefined
+  const total = parts.reduce((sum: number, value) => sum + (typeof value === "number" ? value : 0), 0)
+  return total > 0 ? total : undefined
+}
+
+/**
+ * XCOD-292: the context window of the session's model, from the result's `modelUsage` (keyed by
+ * model, each with `contextWindow`): the entry for `model`, or the only one. Undefined when the result
+ * doesn't say, or names several models none of which is the session's.
+ */
+export function contextWindow(modelUsage: any, model: string | undefined) {
+  if (!modelUsage || typeof modelUsage !== "object") return undefined
+  const entries = Object.entries(modelUsage as Record<string, any>)
+  const entry = (model ? modelUsage[model] : undefined) ?? (entries.length === 1 ? entries[0]![1] : undefined)
+  const value = entry?.contextWindow
+  return typeof value === "number" && value > 0 ? value : undefined
+}
+
 /** One stream-json line from Claude Code as Lunos events (several for a message with several blocks). */
 export function parse(line: string): { events: Event[]; permission?: PermissionRequest; raw?: any } {
   let raw: any
@@ -211,6 +248,11 @@ export function parse(line: string): { events: Event[]; permission?: PermissionR
     })
   if (raw.type === "system" && raw.subtype === "status" && typeof raw.permissionMode === "string")
     events.push({ type: "mode", mode: raw.permissionMode })
+  // XCOD-292: the context a main-thread call used is its input, cached or not (a subagent's isn't ours).
+  if (raw.type === "assistant" && !raw.parent_tool_use_id) {
+    const used = contextUsed(raw.message?.usage)
+    if (used !== undefined) events.push({ type: "context", used })
+  }
   if (raw.type === "assistant")
     for (const block of raw.message?.content ?? []) {
       if (block.type === "text" && block.text) events.push({ type: "text", text: block.text })
@@ -450,6 +492,8 @@ export function start(options: Options): Running {
     // Its /commands from the answer to initialize, merged into the `init` event with any it lists there.
     let commands: CommandInfo[] = []
     let initMode: string | undefined
+    /** XCOD-292: the model the session runs, whose context window the result reports. */
+    let model: string | undefined
     lines.on("line", (line) => {
       const parsed = parse(line)
       if (parsed.raw?.type === "control_response" && parsed.raw.response?.request_id === "lunos-init") {
@@ -484,8 +528,11 @@ export function start(options: Options): Running {
           event.commands = [...new Set([...commands.map((item) => item.name), ...event.commands])]
           if (commands.length) event.commandInfo = commands
           if (!event.permissionMode && initMode) event.permissionMode = initMode
+          model = event.model
         }
         if (event.type === "result") {
+          const window = contextWindow(parsed.raw?.modelUsage, model)
+          if (window !== undefined) options.onEvent?.({ type: "context", window })
           options.onEvent?.(event)
           finish(event)
           continue

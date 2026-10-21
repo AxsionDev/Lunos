@@ -38,5 +38,6 @@ test("Claude Code's Edit and Write render as diffs and its TodoWrite as a checkl
   expect(toolDisplay("claude:Write")).toBe("edit")
   expect(toolDisplay("claude:TodoWrite")).toBe("todowrite")
   expect(toolDisplay("claude:Bash")).toBe("generic")
-  expect(toolDisplay("codex:FileChange")).toBe("generic")
+  // XCOD-292: Codex's file changes have their own view now (external-codex-render.test.tsx).
+  expect(toolDisplay("codex:FileChange")).toBe("apply_patch")
 })
