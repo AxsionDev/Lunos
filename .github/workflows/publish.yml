@@ -304,9 +304,8 @@ jobs:
       - version
       - preflight
     runs-on: windows-2025
-    # Skips entirely without Azure Trusted Signing credentials. `publish` tolerates the skip:
-    # its `!failure()` gate treats a skipped job as non-failing, and it falls back to the
-    # unsigned `opencode-cli-windows` artifact from build-cli.
+    # Skips entirely without Azure Trusted Signing credentials. `release-gate` allows this one
+    # skip, and `publish` falls back to the unsigned `opencode-cli-windows` artifact from build-cli.
     if: github.repository == 'AxsionDev/Lunos' && needs.preflight.outputs.sign_windows == 'true'
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -596,20 +595,76 @@ jobs:
           name: latest-yml-${{ matrix.settings.target }}
           path: packages/desktop/dist/latest*.yml
 
-  publish:
+  # XCOD-283: the one place that decides whether the release may go out. `publish` used to gate on
+  # `always() && !failure() && !cancelled()`, but those only see the *run* being cancelled: when
+  # GitHub never found a macOS arm64 runner (1.18.52, 1.18.53) the cancelled job counted as neither,
+  # and publish started without the arm64 desktop build or the re-signed macOS CLI. Every required
+  # job must now be `success`; the only exception is a skipped sign-cli-windows (no Azure secrets,
+  # XCOD-49). On a block this job fails the run and names each job and why, and the draft release
+  # is left as it is, so `gh run rerun --failed` (or publish-retry.yml) picks it up again.
+  release-gate:
     needs:
       - version
+      - preflight
       - build-cli
       # XCOD-207: not skippable. A failed re-sign must stop the release, not ship unsigned.
       - sign-cli-macos
       - sign-cli-windows
       - build-electron
-      - preflight
       # XCOD-106: the SBOM must be on the release before SHA256SUMS is computed and signed.
       - sbom
-    # `always() && !failure()` deliberately tolerates a *skipped* sign-cli-windows (skipped is
-    # not a failure) while still refusing to publish if build-cli genuinely failed.
-    if: github.repository == 'AxsionDev/Lunos' && always() && !failure() && !cancelled()
+    if: github.repository == 'AxsionDev/Lunos' && !cancelled()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      checks: read
+    steps:
+      - name: Require every build job to have succeeded
+        timeout-minutes: 3
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          blocked=$(jq -r 'to_entries[]
+            | select(.value.result != "success")
+            | select(.key != "sign-cli-windows" or .value.result != "skipped")
+            | "\(.key): \(.value.result)"' <<<"$NEEDS")
+          if [ -z "$blocked" ]; then
+            echo "Every required job succeeded."
+            exit 0
+          fi
+          {
+            echo "### Release blocked: publish skipped, draft release left for a rerun"
+            echo
+            while IFS= read -r line; do echo "- $line"; done <<<"$blocked"
+            echo
+            echo "Jobs that did not succeed in attempt $GITHUB_RUN_ATTEMPT:"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Name the exact matrix leg and GitHub's reason (e.g. "The job was not acquired by Runner
+          # of type hosted even after multiple attempts"). Best effort: the gate decision above
+          # stands even if the API is unreachable.
+          jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '.jobs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped")
+              | "\(.id)\t\(.conclusion)\t\(.name)"') || jobs=""
+          while IFS=$'\t' read -r id conclusion name; do
+            [ -n "$id" ] || continue
+            reason=$(gh api "repos/$GITHUB_REPOSITORY/check-runs/$id/annotations" \
+              --jq '[.[] | select(.annotation_level == "failure") | .message | split("\n")[0]] | first // ""') || reason=""
+            echo "::error title=Release blocked::$name was $conclusion${reason:+: $reason}"
+            echo "- \`$name\`: $conclusion${reason:+ ($reason)}" >> "$GITHUB_STEP_SUMMARY"
+          done <<<"$jobs"
+          exit 1
+
+  publish:
+    needs:
+      - version
+      - preflight
+      - release-gate
+    # `!cancelled()` rather than the default `success()`: release-gate itself runs past a skipped
+    # sign-cli-windows, and a human cancelling the whole run must still stop publish.
+    if: github.repository == 'AxsionDev/Lunos' && !cancelled() && needs.release-gate.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
