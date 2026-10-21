@@ -124,11 +124,20 @@ async function listeners() {
 }
 async function serverProcs() {
   const r = await $`ps -axo pid,pgid,command`.nothrow().quiet()
-  return r.stdout
-    .toString()
-    .split("\n")
-    .filter((l) => l.includes("server.ts") || l.includes("__lunos_parent"))
-    .filter((l) => !l.includes("ps -axo"))
+  return (
+    r.stdout
+      .toString()
+      .split("\n")
+      // Only this script's: the fixture's server (`bun run server.ts`, started from under `root`) and
+      // the watchdog wrapping `PORT=4319 bun run dev`. Other work on the machine may run a server.ts.
+      .filter(
+        (l) =>
+          l.includes(root) ||
+          /bun run server\.ts/.test(l) ||
+          (l.includes("__lunos_parent") && l.includes(`PORT=${PORT} bun run dev`)),
+      )
+      .filter((l) => !l.includes("ps -axo") && !l.includes("background-e2e"))
+  )
 }
 
 async function project(name: string) {
