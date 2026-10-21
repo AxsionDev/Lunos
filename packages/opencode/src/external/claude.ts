@@ -122,6 +122,12 @@ export interface Options {
   ask: (request: PermissionRequest) => Promise<PermissionDecision>
   /** XCOD-285: Lunos policy, checked on every call before the tool's own permission mode. */
   policy?: Policy
+  /**
+   * Claude Code answered initialize with `hooks_applied: false`: it won't call the policy hook, so a
+   * call its permission mode allows without asking (acceptEdits, auto) reaches neither Lunos's deny
+   * rules nor its plugin hooks. Only called when a policy was registered.
+   */
+  onHooksNotApplied?: () => void
   onEvent?: (event: Event) => void
 }
 
@@ -450,6 +456,7 @@ export function start(options: Options): Running {
         commands = parseCommandInfo(parsed.raw.response.response)
         const mode = parsed.raw.response.response?.current_permission_mode
         if (typeof mode === "string") initMode = mode
+        if (options.policy && parsed.raw.response.response?.hooks_applied === false) options.onHooksNotApplied?.()
       }
       // XCOD-285: Lunos policy before the tool's own permission mode (the PreToolUse hook it registered).
       if (

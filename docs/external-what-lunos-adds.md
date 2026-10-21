@@ -64,7 +64,9 @@ Each of these is on by default once you agree. Set one to `false` to leave it ou
 
 Your Lunos plugins' `tool.execute.before` and `tool.execute.after` hooks, and the `hooks` in your config, also run on the calls Claude Code and Codex make with their own tools. They see the call as they would in a Lunos session: Claude Code's `Bash` is `bash` and `Edit` is `edit`, Codex's command is `bash` and its file change `apply_patch`, and arguments take Lunos's names (`filePath`, not `file_path`). A call with no Lunos counterpart, such as another MCP server's tool, keeps the tool's name. `input.external` says which tool made it.
 
-- **Before a call:** when the tool asks for approval, Lunos runs the hooks first. A hook that throws refuses the call, without asking you, and the tool is told why (`Refused by a Lunos hook: …`). It carries on with that, as a Lunos agent does. A hook that denies `rm -rf` in `bash` refuses it in both tools.
+- **Before a call:** Lunos runs the hooks before the call runs. A hook that throws refuses the call, without asking you, and the tool is told why (`Refused by a Lunos plugin hook: …`). It carries on with that, as a Lunos agent does. The refusal is written to the [audit log](audit-log.md) as a `permission.decision` with `denied by plugin hook`. A hook that denies `rm -rf` in `bash` refuses it in both tools.
+  - **Claude Code:** the hooks run in the check Lunos registers with Claude Code (its `PreToolUse` hook), after your Lunos `deny` rules and before Claude Code's own permission mode decides. So they also see calls Claude Code would allow without asking, in `acceptEdits` or `auto`, or through rules in your own Claude Code settings. Each call runs them once, even when Claude Code then asks for approval.
+  - **Codex:** the hooks run when Codex asks for approval. Codex has no hook a host can register, so a call Codex allows by itself isn't seen beforehand.
 - **After a call:** once the tool reports a call's result, the hooks run with its output. A call that was refused doesn't run them. A failing hook is logged and never fails the turn.
 - **Session hooks:** `session.created`, `session.idle`, `session.error` and `session.deleted` fire for an external session as for any Lunos session.
 
@@ -72,8 +74,9 @@ Hooks run in Lunos, on this machine, and send nothing to Anthropic or OpenAI. Th
 
 What they can't do yet:
 
-- **Only calls the tool asks about.** A call the tool allows by itself, through rules in your own Claude Code settings or because Codex knows a command is safe, never reaches Lunos before it runs, so the before hooks don't see it. The after hooks still do. Claude Code's host protocol can also hand hooks to the host (`hooks` on `initialize`, answered through `hook_callback`); using that would close the gap, and isn't done.
-- **Changes to the arguments aren't sent back.** A hook that rewrites `args` changes what Lunos records, but the tool runs its own arguments.
+- **Codex: only calls it asks about.** A call Codex allows by itself, for example because it knows a command is safe or its approval policy is `never`, never reaches Lunos before it runs, so the before hooks don't see it. The after hooks still do.
+- **Claude Code without the check.** If Claude Code answers that it won't apply the check (`hooks_applied: false` on `initialize`), Lunos shows a warning and logs it. Then only calls Claude Code asks about run the before hooks, as for Codex. Claude Code 2.1.304 applies it. A release that answers `false` hasn't been recorded.
+- **Block or allow only.** A hook that rewrites `args` is logged as a warning and not applied: the tool runs its own arguments. Claude Code takes changed arguments from its hook (`updatedInput`) only together with an allow, which would skip its own approval, or an ask, which would force one. Codex has no way to take them.
 - **No compaction hook.** `session.compacted` doesn't fire when the tool compacts its own session.
 
 ## The status line

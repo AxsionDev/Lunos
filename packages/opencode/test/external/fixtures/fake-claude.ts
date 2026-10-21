@@ -59,7 +59,11 @@ const nextLine = () =>
 // XCOD-254: initialize is answered at once, as Claude Code does, with its /commands and the models it
 // offers, shaped as 2.1.292 answers (test/fixtures/external/claude-2.1.292/start-models.1.jsonl).
 // FAKE_CLAUDE_MODELS=none answers without models, like a release that doesn't list them.
+// When the host registered hooks, `hooks_applied` says whether they're used: true as 2.1.304 answers
+// (test/fixtures/external/claude-2.1.304/policy-hook-mode.1.jsonl); false for FAKE_CLAUDE_OLD, which
+// ignores them. No real release has been recorded answering false.
 const init = JSON.parse(await nextLine())
+const hooksSent = !!init.request?.hooks
 console.log(
   JSON.stringify({
     type: "control_response",
@@ -67,6 +71,7 @@ console.log(
       subtype: "success",
       request_id: init.request_id,
       response: {
+        ...(hooksSent ? { hooks_applied: !old } : {}),
         commands:
           commands === "init"
             ? []
