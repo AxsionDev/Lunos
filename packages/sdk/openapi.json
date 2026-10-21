@@ -2504,7 +2504,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Which archived sessions were deleted",
+            "description": "Which sessions were deleted, and why the others weren't",
             "content": {
               "application/json": {
                 "schema": {
@@ -2524,8 +2524,94 @@
             }
           }
         },
-        "description": "Delete archived sessions and their history for good. Sessions that aren't archived are skipped. Audited as session.delete.",
-        "summary": "Delete archived sessions",
+        "description": "Delete sessions and their history for good: messages, subagent sessions and queued prompts. By default only archived sessions (others are skipped); archivedOnly false reaches listed ones too. Running ones are stopped first with stop, or skipped. A share link is removed first, and the synced copy on Lunos Cloud is deleted unless keepCloud. Audited as session.delete.",
+        "summary": "Delete sessions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionIDs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "archivedOnly": {
+                    "type": "boolean"
+                  },
+                  "stop": {
+                    "type": "boolean"
+                  },
+                  "keepCloud": {
+                    "type": "boolean"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": ["single", "bulk"]
+                  }
+                },
+                "required": ["sessionIDs"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.sessionBulk.delete({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/session-bulk/preview": {
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.sessionBulk.preview",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What deleting the sessions removes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBulkPreviewResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "For each session: its message, subagent and queued-prompt counts, whether it's shared, and the external tool that keeps its own history. Changes nothing.",
+        "summary": "Preview deleting sessions",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2548,7 +2634,7 @@
         "x-codeSamples": [
           {
             "lang": "js",
-            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.sessionBulk.delete({\n  ...\n})"
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.sessionBulk.preview({\n  ...\n})"
           }
         ]
       }
@@ -28251,9 +28337,56 @@
             "items": {
               "$ref": "#/components/schemas/SessionBulkFailure"
             }
+          },
+          "stopped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": ["deleted", "skipped"],
+        "additionalProperties": false
+      },
+      "SessionBulkPreviewItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "number"
+          },
+          "children": {
+            "type": "number"
+          },
+          "queued": {
+            "type": "number"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "messages", "children", "queued", "shared"],
+        "additionalProperties": false
+      },
+      "SessionBulkPreviewResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionBulkPreviewItem"
+            }
+          },
+          "sync": {
+            "type": "boolean"
+          }
+        },
+        "required": ["items", "sync"],
         "additionalProperties": false
       },
       "NotFoundError": {

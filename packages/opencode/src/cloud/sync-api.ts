@@ -8,6 +8,7 @@ import { Global } from "@opencode-ai/core/global"
 import { CloudAuth } from "./auth"
 import { CloudDefaults } from "./defaults"
 import { CloudStore } from "./store"
+import { CloudSyncQueue } from "./sync-queue"
 import { ConfigPolicy } from "@/config/policy"
 import { SandboxConfig } from "@/sandbox/config"
 
@@ -42,7 +43,10 @@ export type Options = {
  */
 export type Failure = { ok: false; status: number; code: string; message: string }
 export type UploadResult = { ok: true; lastSeq: number; duplicate: boolean } | Failure
-export type StatusResult = { ok: true; lastSeq: number; deleted?: boolean } | Failure
+/** `session` is the control plane's id for it (absent until its first chunk lands). */
+export type StatusResult = { ok: true; lastSeq: number; deleted?: boolean; session?: string } | Failure
+/** XCOD-284: whether a synced copy existed and was deleted (false: there was none to delete). */
+export type RemoveResult = { ok: true; deleted: boolean } | Failure
 
 export const file = () => path.join(Global.Path.data, "cloud", "sync", "device.json")
 
@@ -253,7 +257,43 @@ export async function status(state: State, session: string, opts: Options = {}):
     const p = `/v1/sync/devices/${encodeURIComponent(state.device.id)}/sessions/${encodeURIComponent(session)}`
     const res = await request(state.endpoint, token, "GET", p, undefined, opts)
     if (!res.ok) return failure(res)
-    const json = (await res.json()) as { lastSeq: number; deleted?: boolean }
-    return { ok: true as const, lastSeq: json.lastSeq, ...(json.deleted ? { deleted: true } : {}) }
+    const json = (await res.json()) as { lastSeq: number; deleted?: boolean; session?: string }
+    return {
+      ok: true as const,
+      lastSeq: json.lastSeq,
+      ...(json.deleted ? { deleted: true } : {}),
+      ...(json.session ? { session: json.session } : {}),
+    }
+  })
+}
+
+/**
+ * XCOD-284: deletes the synced copy of a Lunos session from the user's space (`DELETE
+ * /v1/sessions/{id}`; the control plane purges it 30 days later). Looked up by this device and the
+ * Lunos session id first. Nothing is sent when this device has no sync, or sync is off on it: then
+ * nothing of the session was uploaded from here since, and `ok` with `deleted: false` is returned.
+ */
+export async function removeSession(session: string, opts: Options & { state?: State } = {}): Promise<RemoveResult> {
+  const state = opts.state ?? (await load())
+  if (!state || !state.device.syncEnabled) return { ok: true, deleted: false }
+  // Nothing still queued for it is uploaded after this.
+  await CloudSyncQueue.drop(session, "deleted").catch(() => undefined)
+  const found = await status(state, session, opts)
+  if (!found.ok) return found
+  if (!found.session || found.deleted) return { ok: true, deleted: false }
+  return settle(async () => {
+    const { token } = await who(opts)
+    const res = await request(
+      state.endpoint,
+      token,
+      "DELETE",
+      `/v1/sessions/${encodeURIComponent(found.session!)}`,
+      undefined,
+      opts,
+    )
+    // Gone already (deleted on app.lunos.tech meanwhile): nothing left to delete.
+    if (res.status === 404 || res.status === 410) return { ok: true as const, deleted: false }
+    if (!res.ok) return failure(res)
+    return { ok: true as const, deleted: true }
   })
 }

@@ -40,6 +40,11 @@ beforeEach(async () => {
           { status: 409 },
         )
       if (req.method === "PUT") return Response.json({ session: "s", seq: 1, lastSeq: 1, duplicate: false })
+      // XCOD-284: where sync stands for a Lunos session, and deleting the synced copy.
+      if (req.method === "GET" && url.pathname.endsWith("/sessions/ses_synced"))
+        return Response.json({ session: "cs_1", lastSeq: 3 })
+      if (req.method === "GET" && url.pathname.endsWith("/sessions/ses_never")) return Response.json({ lastSeq: 0 })
+      if (req.method === "DELETE" && url.pathname === "/v1/sessions/cs_1") return Response.json({ ok: true })
       return new Response("no", { status: 404 })
     },
   })
@@ -104,7 +109,7 @@ test("global config sets the endpoint; a non-https remote is refused", async () 
   }
 })
 
-test("status reads lastSeq", async () => {
+test("status reads lastSeq (and, XCOD-284, the control plane's session id)", async () => {
   const s = await CloudSyncApi.register(opts())
   server.stop(true)
   server = Bun.serve({
@@ -116,6 +121,7 @@ test("status reads lastSeq", async () => {
     ok: true,
     lastSeq: 3,
     deleted: true,
+    session: "s",
   })
 })
 
@@ -174,4 +180,23 @@ test("sync may send the token only for Lunos's own issuer, or to an explicitly c
 test("setEnabled never registers a device", async () => {
   await expect(CloudSyncApi.setEnabled(false, opts())).rejects.toBeInstanceOf(CloudSyncApi.NotRegisteredError)
   expect(seen.filter((r) => r.method === "POST")).toEqual([])
+})
+
+test("XCOD-284: removeSession deletes the synced copy by its control-plane id, and only when one exists", async () => {
+  const state = await CloudSyncApi.register(opts())
+  expect(await CloudSyncApi.removeSession("ses_synced", { ...opts(), state })).toEqual({ ok: true, deleted: true })
+  expect(seen.filter((r) => r.method === "DELETE").map((r) => r.path)).toEqual(["/v1/sessions/cs_1"])
+  expect(await CloudSyncApi.removeSession("ses_never", { ...opts(), state })).toEqual({ ok: true, deleted: false })
+  expect(seen.filter((r) => r.method === "DELETE")).toHaveLength(1)
+  // Sync off on this device: nothing is asked of the server.
+  const before = seen.length
+  const off = { ...state, device: { ...state.device, syncEnabled: false } }
+  expect(await CloudSyncApi.removeSession("ses_synced", { ...opts(), state: off })).toEqual({
+    ok: true,
+    deleted: false,
+  })
+  expect(seen).toHaveLength(before)
+  // A server that refuses: a failure, not a throw.
+  const failed = await CloudSyncApi.removeSession("ses_other", { ...opts(), state })
+  expect(failed).toMatchObject({ ok: false, status: 404 })
 })

@@ -28,6 +28,7 @@ import {
   SessionGroupMovePayload,
   SessionGroupUpdatePayload,
   SessionBulkArchivePayload,
+  SessionBulkDeletePayload,
   SessionBulkPayload,
   SessionBulkStopPayload,
   SessionListQuery,
@@ -43,6 +44,7 @@ import { SessionPeerControl } from "@/session/peer-control"
 import { SessionOverview } from "@/session/overview"
 import { SessionPromptQueue } from "@/session/prompt-queue"
 import { SessionBulk } from "@/session/bulk"
+import { SessionShare } from "@/share/session"
 import { ExternalRegistry } from "@/external/registry"
 import { ExternalDetect } from "@/external/detect"
 import { ExternalPolicy } from "@/external/policy"
@@ -102,6 +104,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const registry = yield* ToolRegistry.Service
     const worktreeSvc = yield* Worktree.Service
     const sessions = yield* Session.Service
+    const shareSvc = yield* SessionShare.Service
     const background = yield* BackgroundJob.Service
     const runState = yield* SessionRunState.Service
     const flags = yield* RuntimeFlags.Service
@@ -297,9 +300,18 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return yield* SessionBulk.unarchive(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
     })
     const sessionBulkDelete = Effect.fn("ExperimentalHttpApi.sessionBulkDelete")(function* (ctx: {
+      payload: typeof SessionBulkDeletePayload.Type
+    }) {
+      return yield* SessionBulk.remove({
+        ...ctx.payload,
+        reason: ctx.payload.stop ? "Stopped to delete it" : undefined,
+        unshare: shareSvc.unshare,
+      }).pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkPreview = Effect.fn("ExperimentalHttpApi.sessionBulkPreview")(function* (ctx: {
       payload: typeof SessionBulkPayload.Type
     }) {
-      return yield* SessionBulk.removeArchived(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+      return yield* SessionBulk.preview(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
     })
 
     const sessionGroupList = Effect.fn("ExperimentalHttpApi.sessionGroupList")(function* () {
@@ -599,6 +611,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionBulkArchive", sessionBulkArchive)
       .handle("sessionBulkUnarchive", sessionBulkUnarchive)
       .handle("sessionBulkDelete", sessionBulkDelete)
+      .handle("sessionBulkPreview", sessionBulkPreview)
       .handle("sessionGroupList", sessionGroupList)
       .handle("sessionGroupCreate", sessionGroupCreate)
       .handle("sessionGroupUpdate", sessionGroupUpdate)

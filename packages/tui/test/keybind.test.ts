@@ -75,6 +75,11 @@ test("no default in the Sessions view collides with another of its keys or with 
   }
   expect(TuiKeybind.defaultValue("dialog.sessions.stop_all")).toBe("none")
   expect(TuiKeybind.defaultValue("dialog.sessions.clear")).toBe("none")
+  // XCOD-284: ctrl+d is Delete (as in the session list), for sessions and groups alike, so the
+  // group-only command ships unbound; space marks rows.
+  expect(TuiKeybind.defaultValue("dialog.sessions.delete")).toBe("ctrl+d")
+  expect(TuiKeybind.defaultValue("dialog.sessions.group.delete")).toBe("none")
+  expect(TuiKeybind.defaultValue("dialog.sessions.mark")).toBe("space")
 })
 
 // XCOD-262 + XCOD-265: the Agent Monitor's own keys are live together while its rail is focused, and
@@ -104,4 +109,6 @@ test("the Agent Monitor's keys collide with neither each other, the leader nor X
     expect(TuiKeybind.defaultValue(name)).toBe("none")
   // XCOD-268: Take over is a free single key, so the loop above checks it against every other one.
   expect(TuiKeybind.defaultValue("monitor.takeover")).toBe("t")
+  // XCOD-284: Delete on the rail: d is deny and ctrl+d exits the app outside a dialog.
+  expect(TuiKeybind.defaultValue("monitor.delete")).toBe("x,delete")
 })

@@ -21,6 +21,7 @@ import { useTheme } from "../context/theme"
 import { OPENCODE_BASE_MODE, useBindings } from "../keymap"
 import { useDialog } from "../ui/dialog"
 import { DialogConfirm } from "../ui/dialog-confirm"
+import { useSessionDelete } from "../component/session-delete"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogSelect } from "../ui/dialog-select"
 import { Toast, useToast } from "../ui/toast"
@@ -123,6 +124,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
   let interruptNext = false
 
   const fail = (cause: unknown) => toast.show({ variant: "error", message: errorMessage(cause) })
+  const removeSessions = useSessionDelete()
   const back = () => route.navigate(monitorReturn(props.params))
   const narrow = createMemo(() => dimensions().width < NARROW)
 
@@ -517,6 +519,14 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     refresh()
   }
 
+  /** XCOD-284: the same Delete as /sessions, for the selected row. */
+  async function remove(item: SessionOverviewItem) {
+    const result = await removeSessions([item])
+    dialog.clear()
+    if (result?.deleted.includes(item.id)) nextWaiting(item.id)
+    refresh()
+  }
+
   /**
    * XCOD-268: t on a row whose Lunos closed with prompts queued: send just those (in order, through the
    * same at-most-once take-over), or discard them, with no new prompt of its own.
@@ -694,6 +704,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       ...keys("monitor.approve", () => current() && void answer(current()!, true)),
       ...keys("monitor.deny", () => current() && void answer(current()!, false)),
       ...keys("monitor.stop", () => current() && void stop(current()!)),
+      ...keys("monitor.delete", () => current() && void remove(current()!)),
       ...keys("monitor.filter", () => void filter()),
       ...keys("monitor.older", () => setShowOlder((value) => !value)),
       ...keys("monitor.takeover", () => current() && void takeOver(current()!)),
@@ -875,7 +886,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       <box paddingLeft={1} flexShrink={0}>
         <text fg={theme.textMuted} wrapMode="none">
           {focus() === "rail"
-            ? `↑↓ move · enter open · ${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · / filter · ctrl+p stop all, clear · tab prompt`
+            ? `↑↓ move · enter open · ${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · x delete · / filter · ctrl+p stop all, clear · tab prompt`
             : "tab rail"}
         </text>
       </box>

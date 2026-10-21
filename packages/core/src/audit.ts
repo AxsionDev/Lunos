@@ -98,6 +98,8 @@ export const EVENTS = [
   // deleted for good, many at once (origin "bulk"): count and session ids. Never titles or content.
   // XCOD-269: a single delete too (origin "api" or "cli"), and every delete counts the prompts queued
   // for the sessions and never sent that went with them (`queued_discarded`), never their text.
+  // XCOD-284: Delete in /sessions and the Agent Monitor (origin "single" or "bulk"), with how many
+  // were stopped first and how many synced copies were deleted (`stopped`, `cloud_deleted`).
   "session.stop",
   "session.archive",
   "session.delete",

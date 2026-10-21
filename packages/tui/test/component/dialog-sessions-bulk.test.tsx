@@ -14,6 +14,7 @@ import { TestTuiContexts } from "../fixture/tui-environment"
 import { createEventSource, createFetch, directory, json } from "../fixture/tui-sdk"
 
 let lastFrame: (() => string) | undefined
+
 async function wait(fn: () => boolean, timeout = 3000) {
   const start = Date.now()
   while (!fn()) {
@@ -56,7 +57,13 @@ const fixture = () => [
 ]
 
 /** A fake server: the overview, and the four bulk endpoints acting on it. */
-function fakeServer(input: { sessions: SessionOverviewItem[]; unreachable?: string[] }) {
+function fakeServer(input: {
+  sessions: SessionOverviewItem[]
+  unreachable?: string[]
+  /** XCOD-284: what experimental.sessionBulk.preview says per session, and whether sync is on. */
+  preview?: Record<string, { messages?: number; children?: number; queued?: number; shared?: boolean; tool?: string }>
+  sync?: boolean
+}) {
   const sessions = input.sessions
   const calls: { path: string; body: any }[] = []
   const stoppable = (item: SessionOverviewItem) =>
@@ -116,6 +123,34 @@ function fakeServer(input: { sessions: SessionOverviewItem[]; unreachable?: stri
       for (const id of ids) delete sessions.find((each) => each.id === id)!.archived
       return json({ archived: ids, skipped: [] })
     }
+    if (url.pathname.endsWith("/preview"))
+      return json({
+        items: ids.map((id) => ({ id, messages: 0, children: 0, queued: 0, shared: false, ...input.preview?.[id] })),
+        sync: !!input.sync,
+      })
+    // XCOD-284: Delete in /sessions reaches listed sessions; running ones are stopped first or skipped.
+    if (url.pathname.endsWith("/delete") && body.archivedOnly === false) {
+      const result = { deleted: [] as string[], skipped: [] as { id: string; reason: string }[] }
+      const running = ids.filter((id) => {
+        const item = sessions.find((each) => each.id === id)
+        return item && stoppable(item)
+      })
+      const stopped = body.stop ? stop(running) : { stopped: [], failed: [] }
+      for (const id of ids) {
+        const failure = stopped.failed.find((item) => item.id === id)
+        if (failure) result.skipped.push({ id, reason: failure.reason })
+        else if (running.includes(id) && !body.stop)
+          result.skipped.push({ id, reason: "it's running or waiting; stop it first" })
+        else {
+          sessions.splice(
+            sessions.findIndex((each) => each.id === id),
+            1,
+          )
+          result.deleted.push(id)
+        }
+      }
+      return json({ ...result, ...(body.stop ? { stopped: stopped.stopped } : {}) })
+    }
     if (url.pathname.endsWith("/delete")) {
       const deleted = ids.filter((id) => sessions.find((each) => each.id === id)?.archived)
       for (const id of deleted)
@@ -138,6 +173,7 @@ const keys = {
   "dialog.sessions.archived": "alt+5",
   "dialog.sessions.unarchive": "alt+6",
   "dialog.sessions.delete_archived": "alt+7",
+  "dialog.sessions.delete_all": "alt+8",
 } as const
 
 async function mountSessions(server: ReturnType<typeof fakeServer>) {
@@ -225,7 +261,12 @@ async function mountSessions(server: ReturnType<typeof fakeServer>) {
   // Wrapped lines joined, and the dialog's "esc" hint taken out, so sentences read whole.
   const frame = () => app.captureCharFrame().replace(/ esc /g, " ").replace(/\s+/g, " ")
   lastFrame = frame
-  await wait(() => frame().includes("Sessions — all projects") && frame().includes("title "))
+  // (Or Show archived, which the view keeps from a previous test: mountList leaves it.)
+  await wait(
+    () =>
+      (frame().includes("Sessions — all projects") && frame().includes("title ")) ||
+      frame().includes("Archived sessions — all projects"),
+  )
   return {
     app,
     frame,
@@ -239,6 +280,11 @@ async function mountSessions(server: ReturnType<typeof fakeServer>) {
       app.mockInput.pressEnter()
       await Bun.sleep(80)
     },
+    async key(name: string, modifiers?: { ctrl?: boolean }) {
+      app.mockInput.pressKey(name, modifiers)
+      await Bun.sleep(80)
+    },
+
     cleanup() {
       app.renderer.destroy()
       void tmp[Symbol.asyncDispose]()
@@ -436,6 +482,269 @@ test("Show archived lists them; Unarchive restores one; Delete archived needs th
     expect(server.calls[1]!.body.sessionIDs).toHaveLength(2)
     expect(server.sessions.map((item) => item.id).toSorted()).toEqual([restored, "live"].toSorted())
     await wait(() => ui.frame().includes("No archived sessions"))
+  } finally {
+    ui.cleanup()
+  }
+})
+
+/** XCOD-284: mounted on the list (not Show archived, which a test above leaves open: the view keeps it). */
+async function mountList(server: ReturnType<typeof fakeServer>) {
+  const ui = await mountSessions(server)
+  if (ui.frame().includes("Archived sessions")) {
+    await ui.press("dialog.sessions.archived")
+    await wait(() => ui.frame().includes("Sessions — all projects") && ui.frame().includes("title "))
+  }
+  return ui
+}
+// XCOD-284: Delete in /sessions. Rows here are newest first under the Ungrouped heading: d1, d2, d3, d4.
+const finished = (extra: Partial<SessionOverviewItem>[] = []) =>
+  ["d1", "d2", "d3", "d4"].map((id, index) => row(id, { updated: Date.now() - index * 60_000, ...extra[index] }))
+
+test("XCOD-284: ctrl+d on one session asks once, Cancel first (Enter cancels), then deletes just it", async () => {
+  const server = fakeServer({ sessions: finished(), preview: { d1: { messages: 42 } } })
+  const ui = await mountList(server)
+  try {
+    // The cursor starts on the Ungrouped heading.
+    ui.app.mockInput.pressArrow("down")
+    await ui.key("d", { ctrl: true })
+    await wait(() => ui.frame().includes(`Delete "title d1" (project alpha, 42 messages)? This can't be undone.`))
+    expect(ui.frame()).toContain("Removed: its history and messages.")
+    expect(ui.frame()).toContain("Files the agent changed in your projects are never touched.")
+    expect(ui.frame()).toContain("Want it back later? Use Clear list (archive) instead.")
+    // Cancel is the default: Enter deletes nothing.
+    await ui.enter()
+    await Bun.sleep(100)
+    expect(server.calls.map((call) => call.path)).toEqual(["preview"])
+    await wait(() => ui.frame().includes("Sessions — all projects"))
+
+    await ui.key("d", { ctrl: true })
+    await wait(() => ui.frame().includes(`Delete "title d1"`))
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => server.calls.some((call) => call.path === "delete"))
+    expect(server.calls.find((call) => call.path === "delete")!.body).toEqual({
+      sessionIDs: ["d1"],
+      archivedOnly: false,
+      stop: false,
+      keepCloud: false,
+      origin: "single",
+    })
+    await wait(() => ui.toast() === "Deleted 1 session")
+    await wait(() => !ui.frame().includes("title d1"))
+    expect(ui.frame()).toContain("title d2")
+  } finally {
+    ui.cleanup()
+  }
+})
+
+test("XCOD-284: space marks rows (n selected), ctrl+d deletes exactly those after the typed count", async () => {
+  const server = fakeServer({ sessions: finished() })
+  const ui = await mountList(server)
+  try {
+    for (const step of ["down", "space", "down", "space", "down", "down", "space"]) {
+      if (step === "space") ui.app.mockInput.pressKey(" ")
+      else ui.app.mockInput.pressArrow("down")
+      await Bun.sleep(40)
+    }
+    await wait(() => ui.frame().includes("3 selected"))
+    expect(ui.frame()).toContain("[x] title d1")
+    expect(ui.frame()).toContain("[x] title d2")
+    expect(ui.frame()).not.toContain("[x] title d3")
+    expect(ui.frame()).toContain("[x] title d4")
+    // Unmark and mark again: a toggle.
+    ui.app.mockInput.pressKey(" ")
+    await wait(() => ui.frame().includes("2 selected"))
+    ui.app.mockInput.pressKey(" ")
+    await wait(() => ui.frame().includes("3 selected"))
+
+    await ui.key("d", { ctrl: true })
+    await wait(() => ui.frame().includes("Delete 3 sessions? This can't be undone."))
+    expect(ui.frame()).toContain("By project: alpha 3.")
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => ui.frame().includes("Type 3 to delete 3 sessions"))
+    // A wrong count deletes nothing, and the marks stay.
+    await ui.app.mockInput.typeText("4")
+    await ui.enter()
+    await wait(() => ui.toast() === "Nothing was deleted: the count didn't match.")
+    expect(server.calls.some((call) => call.path === "delete")).toBe(false)
+    await wait(() => ui.frame().includes("3 selected"))
+
+    await ui.key("d", { ctrl: true })
+    await wait(() => ui.frame().includes("Delete 3 sessions?"))
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => ui.frame().includes("Type 3 to delete 3 sessions"))
+    await ui.app.mockInput.typeText("3")
+    await ui.enter()
+    await wait(() => server.calls.some((call) => call.path === "delete"))
+    const call = server.calls.find((each) => each.path === "delete")!
+    expect(call.body.sessionIDs.toSorted()).toEqual(["d1", "d2", "d4"])
+    expect(call.body.origin).toBe("bulk")
+    await wait(() => ui.toast() === "Deleted 3 sessions")
+    await wait(() => !ui.frame().includes("title d1"))
+    expect(server.sessions.map((item) => item.id)).toEqual(["d3"])
+    expect(ui.frame()).not.toContain("selected")
+  } finally {
+    ui.cleanup()
+  }
+})
+
+test("XCOD-284: Delete all shown deletes only what the search shows; space still types while searching", async () => {
+  const server = fakeServer({
+    sessions: [
+      ...finished(),
+      row("b1", { title: "beta one", project: { id: "proj_b", name: "beta", worktree: "/work/beta" } }),
+      row("b2", { title: "beta two", project: { id: "proj_b", name: "beta", worktree: "/work/beta" } }),
+    ],
+  })
+  const ui = await mountList(server)
+  try {
+    // Typed key by key, as a person types (space included: it isn't "select" while searching).
+    await Bun.sleep(100)
+    for (const ch of "beta t") {
+      ui.app.mockInput.pressKey(ch)
+      await Bun.sleep(30)
+    }
+    await wait(() => ui.frame().includes("beta two") && !ui.frame().includes("title d1"))
+    expect(ui.frame()).toContain("Sessions — all projects · 6 sessions beta t ")
+    expect(ui.frame()).not.toContain("beta one")
+    // Backspace to "beta": both beta rows, nothing else.
+    ui.app.mockInput.pressBackspace()
+    ui.app.mockInput.pressBackspace()
+    await wait(() => ui.frame().includes("beta one") && ui.frame().includes("beta two"))
+    await ui.press("dialog.sessions.delete_all")
+    await wait(() => ui.frame().includes("Delete 2 sessions?"))
+    expect(ui.frame()).toContain("By project: beta 2.")
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => ui.frame().includes("Type 2 to delete 2 sessions"))
+    await ui.app.mockInput.typeText("2")
+    await ui.enter()
+    await wait(() => server.calls.some((call) => call.path === "delete"))
+    expect(server.calls.find((call) => call.path === "delete")!.body.sessionIDs.toSorted()).toEqual(["b1", "b2"])
+    expect(server.sessions.map((item) => item.id).toSorted()).toEqual(["d1", "d2", "d3", "d4"])
+  } finally {
+    ui.cleanup()
+  }
+})
+
+test("XCOD-284: a running session offers Stop and delete, which stops it first", async () => {
+  const server = fakeServer({
+    sessions: [row("r1", { state: "running", updated: Date.now() }), ...finished().slice(0, 2)],
+  })
+  const ui = await mountList(server)
+  try {
+    ui.app.mockInput.pressArrow("down")
+    await ui.key("d", { ctrl: true })
+    await wait(() => ui.frame().includes(`Delete "title r1"`))
+    expect(ui.frame()).toContain("It's running or waiting: Stop and delete stops it first.")
+    expect(ui.frame()).toContain("Stop and delete")
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => server.calls.some((call) => call.path === "delete"))
+    expect(server.calls.find((call) => call.path === "delete")!.body).toMatchObject({ sessionIDs: ["r1"], stop: true })
+    await wait(() => ui.toast() === "Deleted 1 session")
+  } finally {
+    ui.cleanup()
+  }
+})
+
+test("XCOD-284: several with some running also offer Skip running ones, and the count typed is what's deleted", async () => {
+  const server = fakeServer({
+    sessions: [row("r2", { state: "running", updated: Date.now() }), ...finished().slice(0, 2)],
+  })
+  const ui = await mountList(server)
+  try {
+    await ui.press("dialog.sessions.delete_all")
+    await wait(() => ui.frame().includes("Delete 3 sessions?"))
+    expect(ui.frame()).toContain("1 is running or waiting")
+    expect(ui.frame()).toContain("Stop 1 and delete 3")
+    expect(ui.frame()).toContain("Skip running ones (delete 2)")
+    ui.app.mockInput.pressArrow("down")
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => ui.frame().includes("Type 2 to delete 2 sessions"))
+    await ui.app.mockInput.typeText("2")
+    await ui.enter()
+    await wait(() => server.calls.some((call) => call.path === "delete"))
+    const body = server.calls.find((call) => call.path === "delete")!.body
+    expect(body.sessionIDs.toSorted()).toEqual(["d1", "d2"])
+    expect(body.stop).toBe(false)
+    expect(server.sessions.map((item) => item.id)).toEqual(["r2"])
+  } finally {
+    ui.cleanup()
+  }
+})
+
+test("XCOD-284: the confirmation says the share link goes first, Claude Code keeps its copy, and the synced copy box toggles", async () => {
+  const server = fakeServer({
+    sessions: [
+      row("s1", { updated: Date.now() }),
+      row("external:cc", { kind: "external", tool: "claude", title: "Claude Code · api", updated: Date.now() - 1000 }),
+    ],
+    preview: { s1: { shared: true, messages: 3, children: 2, queued: 1 } },
+    sync: true,
+  })
+  const ui = await mountList(server)
+  try {
+    ui.app.mockInput.pressArrow("down")
+    await ui.key("d", { ctrl: true })
+    await wait(() => ui.frame().includes(`Delete "title s1" (project alpha, 3 messages)?`))
+    expect(ui.frame()).toContain("Removed: its history and messages, 2 subagent sessions, 1 queued prompt never sent.")
+    expect(ui.frame()).toContain("Its share link is removed first.")
+    expect(ui.frame()).toContain("[x] Also delete the synced copy on Lunos Cloud")
+    // Untick it (Cancel, Delete, then the box), then Delete: the synced copy is kept.
+    ui.app.mockInput.pressArrow("down")
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => ui.frame().includes("[ ] Also delete the synced copy on Lunos Cloud"))
+    ui.app.mockInput.pressArrow("up")
+    await ui.enter()
+    await wait(() => server.calls.some((call) => call.path === "delete"))
+    expect(server.calls.find((call) => call.path === "delete")!.body).toMatchObject({
+      sessionIDs: ["s1"],
+      keepCloud: true,
+    })
+    await wait(() => !ui.frame().includes("title s1"))
+
+    // A Claude Code row: only the Lunos record goes; with the box left ticked the synced copy goes too.
+    server.calls.length = 0
+    ui.app.mockInput.pressArrow("down")
+    await ui.key("d", { ctrl: true })
+    await wait(() => ui.frame().includes(`Delete "Claude Code · api" (project alpha)?`))
+    expect(ui.frame()).toContain("Claude Code keeps its own copy; only the Lunos record goes.")
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => server.calls.some((call) => call.path === "delete"))
+    expect(server.calls.find((call) => call.path === "delete")!.body).toMatchObject({
+      sessionIDs: ["external:cc"],
+      keepCloud: false,
+    })
+  } finally {
+    ui.cleanup()
+  }
+})
+
+test("XCOD-284: a session that couldn't be deleted stays, marked with why, and the toast says so", async () => {
+  const server = fakeServer({
+    sessions: [row("e1", { state: "running", elsewhere: true, updated: Date.now() }), ...finished().slice(0, 1)],
+    unreachable: ["e1"],
+  })
+  const ui = await mountList(server)
+  try {
+    await ui.press("dialog.sessions.delete_all")
+    await wait(() => ui.frame().includes("Delete 2 sessions?"))
+    expect(ui.frame()).toContain("(1 in another Lunos)")
+    ui.app.mockInput.pressArrow("down")
+    await ui.enter()
+    await wait(() => ui.frame().includes("Type 2 to delete 2 sessions"))
+    await ui.app.mockInput.typeText("2")
+    await ui.enter()
+    await wait(() => ui.toast() === "Deleted 1 · 1 couldn't be deleted (another Lunos didn't respond)")
+    await wait(() => ui.frame().includes("couldn't delete: another Lunos didn't respond"))
+    expect(ui.frame()).toContain("title e1")
+    expect(ui.frame()).not.toContain("title d1")
   } finally {
     ui.cleanup()
   }

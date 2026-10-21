@@ -229,7 +229,10 @@ export const Definitions = {
   "dialog.sessions.group.new": keybind("ctrl+g", "New session group in the Sessions view"),
   "dialog.sessions.move": keybind("ctrl+o", "Move the selected session to a group in the Sessions view"),
   "dialog.sessions.rename": keybind("ctrl+r", "Rename the selected session or group in the Sessions view"),
-  "dialog.sessions.group.delete": keybind("ctrl+d", "Delete the selected group in the Sessions view"),
+  // XCOD-284: ctrl+d is Delete (the marked sessions, the highlighted one, or a group row's group).
+  "dialog.sessions.delete": keybind("ctrl+d", "Delete the selected sessions (or group) in the Sessions view"),
+  "dialog.sessions.group.delete": keybind("none", "Delete the selected group in the Sessions view"),
+  "dialog.sessions.mark": keybind("space", "Mark or unmark the selected session for Delete in the Sessions view"),
   "dialog.sessions.stop": keybind("ctrl+s", "Stop the selected session in the Sessions view"),
   "dialog.sessions.state": keybind("ctrl+f", "Cycle the Sessions view's state filter"),
   "monitor.back": keybind("escape,right", "Leave the Agent Monitor (right only from an empty prompt)"),
@@ -242,6 +245,7 @@ export const Definitions = {
   "monitor.approve": keybind("a", "Approve the shown request of the selected session in the Agent Monitor"),
   "monitor.deny": keybind("d", "Deny the shown request of the selected session in the Agent Monitor"),
   "monitor.stop": keybind("s", "Stop the selected session in the Agent Monitor"),
+  "monitor.delete": keybind("x,delete", "Delete the selected session for good in the Agent Monitor (after confirming)"),
   "monitor.filter": keybind("/", "Filter the Agent Monitor's rail"),
   "monitor.older": keybind("o", "Show or hide older completed sessions in the Agent Monitor"),
   "monitor.takeover": keybind(
@@ -259,6 +263,10 @@ export const Definitions = {
   "dialog.sessions.archived": keybind("none", "Show the archived sessions in the Sessions view, or go back"),
   "dialog.sessions.unarchive": keybind("none", "Put the selected archived session back in the Sessions view"),
   "dialog.sessions.delete_archived": keybind("none", "Delete the archived sessions for good, after typing their count"),
+  "dialog.sessions.delete_all": keybind(
+    "none",
+    "Delete every session shown in the Sessions view, after typing their count",
+  ),
   "prompt.autocomplete.prev": keybind("up,ctrl+p", "Move to previous autocomplete item"),
   "prompt.autocomplete.next": keybind("down,ctrl+n", "Move to next autocomplete item"),
   "prompt.autocomplete.hide": keybind("escape", "Hide autocomplete"),

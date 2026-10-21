@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionGroup, SessionOverviewItem } from "@opencode-ai/sdk/v2"
 import {
+  deleteQuestion,
+  deleteSummary,
   queuedDeleteNote,
   STATE_GLYPH,
   STATE_FILTERS,
@@ -302,5 +304,57 @@ describe("delete confirmations (XCOD-269)", () => {
     expect(queuedDeleteNote(0)).toBeUndefined()
     expect(queuedDeleteNote(1)).toBe("Also deletes 1 queued prompt that was never sent.")
     expect(queuedDeleteNote(2)).toBe("Also deletes 2 queued prompts that were never sent.")
+  })
+})
+
+// XCOD-284: the delete confirmation and its result.
+describe("deleteQuestion / deleteSummary", () => {
+  const preview = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    messages: 0,
+    children: 0,
+    queued: 0,
+    shared: false,
+    ...extra,
+  })
+  test("one session: its name, project and messages; what goes; Clear list as the way back", () => {
+    const q = deleteQuestion({
+      items: [item("a", { title: "refactor-auth" })],
+      preview: [preview("a", { messages: 42 })],
+    })
+    expect(q.title).toBe(
+      `Delete "refactor-auth" (project ${projectName(item("a"))}, 42 messages)? This can't be undone.`,
+    )
+    expect(q.lines).toContain("Removed: its history and messages.")
+    expect(q.lines).toContain("Want it back later? Use Clear list (archive) instead.")
+    expect(q.running).toEqual([])
+    // From Show archived, archiving isn't the way back.
+    expect(deleteQuestion({ items: [item("a")], preview: [], archivedView: true }).lines.join(" ")).not.toContain(
+      "Clear list",
+    )
+  })
+  test("several: counted by project; running ones, share links and tools' own copies are named", () => {
+    const q = deleteQuestion({
+      items: [
+        item("a", { state: "running", elsewhere: true }),
+        item("b", { project: { id: "p2", name: "beta", worktree: "/b" } }),
+        item("external:cc", { kind: "external", tool: "claude" }),
+      ],
+      preview: [preview("a", { shared: true, children: 1 }), preview("b", { queued: 2 })],
+    })
+    expect(q.title).toBe("Delete 3 sessions? This can't be undone.")
+    expect(q.lines[0]).toMatch(/^By project: .*beta 1/)
+    expect(q.lines).toContain("Removed: their history and messages, 1 subagent session, 2 queued prompts never sent.")
+    expect(q.lines).toContain("1 share link removed first.")
+    expect(q.lines).toContain("Claude Code keeps its own copy; only the Lunos record goes.")
+    expect(q.lines).toContain("1 is running or waiting: Stop and delete stops it first (1 in another Lunos).")
+    expect(q.running.map((x) => x.id)).toEqual(["a"])
+  })
+  test("the toast: all deleted, or how many couldn't be and why", () => {
+    expect(deleteSummary({ deleted: ["a"], skipped: [] })).toBe("Deleted 1 session")
+    expect(deleteSummary({ deleted: ["a", "b"], skipped: [] })).toBe("Deleted 2 sessions")
+    expect(deleteSummary({ deleted: ["a"], skipped: [{ id: "b", reason: "another Lunos didn't respond" }] })).toBe(
+      "Deleted 1 · 1 couldn't be deleted (another Lunos didn't respond)",
+    )
   })
 })

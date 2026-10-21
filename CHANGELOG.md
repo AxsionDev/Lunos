@@ -21,6 +21,23 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Delete sessions for good from `/sessions`.** `ctrl+d` deletes the highlighted session, or the
+  ones you marked with `space` (the footer counts them); "delete all shown" deletes everything the
+  current filter or search shows. One session asks once, with Cancel as the default; several ask you
+  to type their number. The confirmation says what goes (history, subagent sessions, queued
+  prompts) and what stays: your project's files, and a Claude Code or Codex session's own history.
+  Running sessions can be stopped and deleted, or skipped. A shared session's link is removed
+  first, and with session sync on, the synced copy is deleted too unless you untick it. The Agent
+  Monitor's rail has the same Delete on `x`. <!-- XCOD-284 -->
+- **`lunos session delete` takes several ids, or `--archived`** (with `--older-than 30d` and
+  `--project <path>`), plus `--stop` for running sessions, `--keep-cloud` to keep synced copies and
+  `--yes` for scripts. It prints what it deleted and what it skipped, and why. <!-- XCOD-284 -->
+- Deletes from `/sessions`, the Agent Monitor and `lunos session delete` are in the audit log as
+  `session.delete` with where they came from, the count and the ids (never titles or content), how
+  many were stopped first and how many synced copies were deleted. <!-- XCOD-284 --> <!-- internal -->
+
 ### Fixed
 
 - **A repository Git doesn't trust no longer looks like "not a git repository" to the sandbox.** On
