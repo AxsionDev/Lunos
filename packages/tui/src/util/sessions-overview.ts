@@ -346,6 +346,8 @@ export type DeletePreview = {
   queued: number
   shared: boolean
   tool?: string
+  /** Console shares made from it or its subagents (`lunos share`): revoked first. */
+  consoleShares?: { id: string; url?: string }[]
 }
 
 /**
@@ -357,6 +359,8 @@ export function deleteQuestion(input: {
   preview: DeletePreview[]
   /** Show archived: "Clear list (archive)" isn't the way back from there. */
   archivedView?: boolean
+  /** The organisation console configured here (its host), when there is one. */
+  console?: string
 }) {
   const { items } = input
   const byID = new Map(input.preview.map((item) => [item.id, item]))
@@ -386,6 +390,15 @@ export function deleteQuestion(input: {
   ].filter(Boolean)
   lines.push(`Removed: ${removed.join(", ")}.`)
   if (shared) lines.push(single ? "Its share link is removed first." : `${plural(shared, "share link")} removed first.`)
+  const consoleShares = items.flatMap((item) => byID.get(item.id)?.consoleShares ?? [])
+  if (consoleShares.length)
+    lines.push(
+      `${plural(consoleShares.length, "console share")} made from ${single ? "it" : "them"} on ${input.console ?? "your organisation's console"} ${consoleShares.length === 1 ? "is" : "are"} revoked first: ${consoleShares.map((share) => share.id).join(", ")}.`,
+    )
+  if (input.console)
+    lines.push(
+      "Console shares made before this version aren't linked to their session and stay live: lunos share list, then lunos share revoke <id>.",
+    )
   for (const tool of tools) lines.push(`${tool} keeps its own copy; only the Lunos record goes.`)
   lines.push("Files the agent changed in your projects are never touched.")
   if (running.targets.length) {
@@ -399,9 +412,16 @@ export function deleteQuestion(input: {
 }
 
 /** XCOD-284: the toast after a delete: "Deleted 7 sessions", or what couldn't be deleted and why. */
-export function deleteSummary(result: { deleted: string[]; skipped: { id: string; reason: string }[] }) {
+export function deleteSummary(result: {
+  deleted: string[]
+  skipped: { id: string; reason: string }[]
+  sharesRevoked?: string[]
+}) {
   const done = result.deleted.length
-  if (!result.skipped.length) return `Deleted ${plural(done, "session")}`
+  const revoked = result.sharesRevoked?.length
+    ? ` · ${plural(result.sharesRevoked.length, "console share")} revoked`
+    : ""
+  if (!result.skipped.length) return `Deleted ${plural(done, "session")}${revoked}`
   const reasons = [...new Set(result.skipped.map((item) => item.reason))].join("; ")
-  return `Deleted ${done} · ${result.skipped.length} couldn't be deleted (${reasons})`
+  return `Deleted ${done}${revoked} · ${result.skipped.length} couldn't be deleted (${reasons})`
 }

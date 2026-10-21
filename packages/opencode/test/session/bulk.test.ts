@@ -15,6 +15,8 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstanceStore } from "@/project/instance-store"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { AuditLog } from "@/audit/log"
+import { CloudOrg } from "@/cloud/org"
+import { CloudShareRecord } from "@/cloud/share-record"
 import { SessionBulk } from "../../src/session/bulk"
 import { SessionLive } from "../../src/session/live"
 import { SessionOverview } from "../../src/session/overview"
@@ -587,6 +589,129 @@ describe("SessionBulk.remove (XCOD-284)", () => {
         .map((line) => JSON.parse(line))
         .find((line) => line.event === "session.delete")
       expect(entry).toMatchObject({ origin: "single", count: 1, ids: [one.id], queued_discarded: 0 })
+    }),
+  )
+})
+
+// Console shares (`lunos share`, `/share` to the console) are separate uploads: deleting the session
+// they were made from revokes them first, and a session whose shares can't be revoked is kept.
+describe("SessionBulk.remove: console shares", () => {
+  const noCloud = async () => ({ ok: true as const, deleted: false })
+  const org = CloudOrg.parse("https://console.acme.eu/v1/orgs/acme/policy")!
+  afterEach(() => fs.rm(CloudShareRecord.file(), { force: true }))
+
+  it.instance("listed in the preview, revoked (its subagents' too) before the synced copy, then deleted", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const parent = yield* sessions.create({ title: "shared to the console" })
+      const child = yield* sessions.create({ title: "subagent", parentID: parent.id })
+      yield* Effect.promise(async () => {
+        await CloudShareRecord.record(parent.id, org, { id: "s1", url: "https://console.acme.eu/orgs/acme/shares/s1" })
+        await CloudShareRecord.record(child.id, org, { id: "s2" })
+      })
+
+      const preview = yield* SessionBulk.preview({ sessionIDs: [parent.id] })
+      expect(preview.items[0]?.consoleShares).toEqual([
+        { id: "s1", url: "https://console.acme.eu/orgs/acme/shares/s1" },
+        { id: "s2" },
+      ])
+
+      const order: string[] = []
+      const result = yield* SessionBulk.remove({
+        sessionIDs: [parent.id],
+        archivedOnly: false,
+        shares: async (ids) => (order.push(`shares ${ids.join(",")}`), { revoked: ["s1", "s2"] }),
+        cloud: async (id) => (order.push(`cloud ${id}`), { ok: true, deleted: false }),
+      })
+      expect(result).toEqual({ deleted: [parent.id], skipped: [], sharesRevoked: ["s1", "s2"] })
+      expect(order).toEqual([`shares ${parent.id},${child.id}`, `cloud ${parent.id}`, `cloud ${child.id}`])
+    }),
+  )
+
+  it.instance("if they can't be revoked the session is kept, says why and how to go on", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const one = yield* sessions.create({ title: "kept" })
+      let cloudAsked = false
+      const result = yield* SessionBulk.remove({
+        sessionIDs: [one.id],
+        archivedOnly: false,
+        shares: async () => ({
+          revoked: ["s1"],
+          error: "its console share s2 couldn't be revoked (you're signed out)",
+        }),
+        cloud: async () => ((cloudAsked = true), { ok: true, deleted: true }),
+      })
+      expect(result.deleted).toEqual([])
+      expect(result.sharesRevoked).toEqual(["s1"])
+      expect(result.skipped[0]?.reason).toBe(
+        `its console share s2 couldn't be revoked (you're signed out); ${SessionBulk.SHARES_WAY_OUT}`,
+      )
+      expect(cloudAsked).toBe(false)
+      expect(yield* sessions.get(one.id)).toMatchObject({ id: one.id })
+
+      // Thrown rather than reported: the same.
+      const thrown = yield* SessionBulk.remove({
+        sessionIDs: [one.id],
+        archivedOnly: false,
+        shares: async () => {
+          throw new Error("disk full")
+        },
+        cloud: noCloud,
+      })
+      expect(thrown.skipped[0]?.reason).toContain("its console shares couldn't be revoked (disk full)")
+    }),
+  )
+
+  it.instance("with nothing recorded nothing is asked: the real revoke is a no-op", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const one = yield* sessions.create({ title: "never shared" })
+      expect((yield* SessionBulk.preview({ sessionIDs: [one.id] })).items[0]?.consoleShares).toBeUndefined()
+      const result = yield* SessionBulk.remove({ sessionIDs: [one.id], archivedOnly: false, cloud: noCloud })
+      expect(result).toEqual({ deleted: [one.id], skipped: [] })
+    }),
+  )
+
+  it.instance("keepShares leaves them live and forgets the session they came from; audited as counts", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const file = path.join(path.dirname(SessionPeers.dir()), `audit-shares-${Date.now()}.log`)
+      AuditLog.activate({ enabled: true, file, redact: [] })
+      const kept = yield* sessions.create({ title: "kept live" })
+      const gone = yield* sessions.create({ title: "revoked" })
+      yield* Effect.promise(async () => {
+        await CloudShareRecord.record(kept.id, org, { id: "s1", url: "https://console.acme.eu/SECRET-URL" })
+        await CloudShareRecord.record(gone.id, org, { id: "s2", url: "https://console.acme.eu/SECRET-URL" })
+      })
+      let asked = false
+      yield* SessionBulk.remove({
+        sessionIDs: [kept.id],
+        archivedOnly: false,
+        keepShares: true,
+        cloud: noCloud,
+        shares: async () => ((asked = true), { revoked: [] }),
+      })
+      expect(asked).toBe(false)
+      expect((yield* Effect.promise(() => CloudShareRecord.forSessions([kept.id]))).size).toBe(0)
+      yield* SessionBulk.remove({
+        sessionIDs: [gone.id],
+        archivedOnly: false,
+        cloud: noCloud,
+        shares: async () => ({ revoked: ["s2"] }),
+      })
+      yield* Effect.promise(() => Audit.flush())
+      const log = yield* Effect.promise(() => fs.readFile(file, "utf8"))
+      AuditLog.activate({ enabled: false, file, redact: [] })
+      expect(log).not.toContain("SECRET-URL")
+      const entries = log
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .filter((line) => line.event === "session.delete")
+      expect(entries[0]).toMatchObject({ ids: [kept.id], console_shares_kept: 1 })
+      expect(entries[0].console_shares_revoked).toBeUndefined()
+      expect(entries[1]).toMatchObject({ ids: [gone.id], console_shares_revoked: 1 })
     }),
   )
 })

@@ -82,13 +82,18 @@ export function useSessionDelete() {
     if (items.length === 0) return undefined
     const preview = await sdk.client.experimental.sessionBulk
       .preview({ sessionIDs: items.map((item) => item.id) }, { throwOnError: true })
-      .then((response) => response.data as { items: DeletePreview[]; sync: boolean })
+      .then((response) => response.data as { items: DeletePreview[]; sync: boolean; console?: string })
       .catch((cause) => {
         toast.show({ variant: "error", message: errorMessage(cause) })
         return undefined
       })
     if (!preview) return undefined
-    const question = deleteQuestion({ items, preview: preview.items, archivedView: opts.archivedView })
+    const question = deleteQuestion({
+      items,
+      preview: preview.items,
+      archivedView: opts.archivedView,
+      console: preview.console,
+    })
     const running = question.running.length
     const single = items.length === 1
     const options: { value: Choice; title: string }[] = running

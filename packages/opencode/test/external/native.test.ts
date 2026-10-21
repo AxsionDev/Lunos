@@ -264,6 +264,31 @@ describe("a Lunos deny rule wins over the tool's permission mode (XCOD-285)", ()
   test("without a policy no hook is registered, as before", () => {
     expect(ExternalClaude.initialize({})).toEqual({ subtype: "initialize", hooks: null })
   })
+
+  test("a Claude Code that answers hooks_applied: false is reported, so the session can warn; one that applies it isn't", async () => {
+    for (const [env, expected] of [
+      [{ FAKE_CLAUDE_OLD: "1" }, 1],
+      [{}, 0],
+    ] as const) {
+      let reported = 0
+      const { running } = await fake(
+        { FAKE_CLAUDE_BASH: "ls", FAKE_CLAUDE_AUTO_ALLOW: "1", ...env },
+        { policy: lunosPolicy, onHooksNotApplied: () => reported++ },
+      )
+      await running.done
+      await new Promise((resolve) => running.child.once("close", resolve))
+      expect(reported).toBe(expected)
+    }
+    // Without a policy nothing was registered, so there's nothing to warn about.
+    let reported = 0
+    const { running } = await fake(
+      { FAKE_CLAUDE_BASH: "ls", FAKE_CLAUDE_OLD: "1" },
+      { onHooksNotApplied: () => reported++ },
+    )
+    await running.done
+    await new Promise((resolve) => running.child.once("close", resolve))
+    expect(reported).toBe(0)
+  })
 })
 
 describe("the tool's own 'don't ask again' and mode switch, end to end against the fake (XCOD-285)", () => {

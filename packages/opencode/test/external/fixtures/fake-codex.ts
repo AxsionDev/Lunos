@@ -15,10 +15,52 @@ if (process.argv.includes("--version")) {
   console.log("codex-cli 0.160.1")
   process.exit(0)
 }
-if (process.argv.includes("--help")) {
-  console.log("Commands:\n  exec\n  app-server")
+// XCOD-285 §4: `codex mcp add|remove`, as 0.160.1 does them: in $CODEX_HOME/config.toml, the only file they change.
+if (process.argv[2] === "mcp") {
+  const sub = process.argv[3]
+  if (process.argv.includes("--help")) {
+    console.log(
+      "Manage external MCP servers for Codex\n\nCommands:\n  list    \n  get     \n  add     \n  remove  \n  login   \n  logout  ",
+    )
+    process.exit(0)
+  }
+  const file = path.join(process.env.CODEX_HOME ?? "", "config.toml")
+  const { existsSync } = await import("fs")
+  const text = existsSync(file) ? readFileSync(file, "utf8") : ""
+  const name = process.argv[4]!
+  if (sub === "remove") {
+    const kept = text.replace(new RegExp(`\\n?\\[mcp_servers\\.${name}\\][^[]*`), "")
+    if (kept === text) console.log(`No MCP server named '${name}' found.`)
+    else {
+      writeFileSync(file, kept)
+      console.log(`Removed global MCP server '${name}'.`)
+    }
+    process.exit(0)
+  }
+  const rest = process.argv.slice(5)
+  const body =
+    rest[0] === "--url"
+      ? `url = ${JSON.stringify(rest[1])}`
+      : `command = ${JSON.stringify(rest[1])}\nargs = ${JSON.stringify(rest.slice(2))}`
+  writeFileSync(file, `${text}\n[mcp_servers.${name}]\n${body}\n`)
+  console.log(`Added global MCP server '${name}'.`)
   process.exit(0)
 }
+if (process.argv.includes("--help")) {
+  console.log("Commands:\n  exec\n  mcp\n  app-server")
+  process.exit(0)
+}
+// XCOD-285 §4: 0.160.1's recorded replies to config/read and an ephemeral thread/start
+// (test/fixtures/external/codex-0.160.1/config-view.json), <codex_home> and <project> being $CODEX_HOME
+// and the working directory. FAKE_CODEX_OLD=1 doesn't know config/read, as an older app server.
+const configView = JSON.parse(
+  readFileSync(
+    path.join(import.meta.dir, "..", "..", "fixtures", "external", "codex-0.160.1", "config-view.json"),
+    "utf8",
+  )
+    .replaceAll("<codex_home>", process.env.CODEX_HOME ?? "")
+    .replaceAll("<project>", process.cwd()),
+).replies
 if (process.argv[2] === "login" && process.argv[3] === "status") {
   console.log("Logged in using ChatGPT")
   process.exit(0)
@@ -44,6 +86,13 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   const m = JSON.parse(line)
   if (m.id !== undefined && !m.method) return answers.get(m.id)?.(m)
   if (m.method === "initialize") return send({ id: m.id, result: { userAgent: "codex/0.160.1" } })
+  if (m.method === "config/read")
+    return send(
+      process.env.FAKE_CODEX_OLD === "1"
+        ? { id: m.id, error: { code: -32601, message: "method not found" } }
+        : { id: m.id, result: configView["config/read"] },
+    )
+  if (m.method === "thread/start" && m.params.ephemeral) return send({ id: m.id, result: configView["thread/start"] })
   // XCOD-254: the thread runs the model the host asked for, as Codex's does.
   if (m.method === "thread/start" || m.method === "thread/resume") {
     // XCOD-254: not recorded. FAKE_CODEX_REFUSE_CONFIG=1 refuses config overrides, as a Codex

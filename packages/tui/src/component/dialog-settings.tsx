@@ -32,6 +32,7 @@ import { DialogLsp } from "./dialog-lsp"
 import * as Sections from "../util/settings-sections"
 import { DialogMemory } from "./dialog-memory"
 import { DialogMcp } from "./dialog-mcp"
+import { DialogExternalConfig } from "./dialog-external-config"
 import { DialogProviders } from "./dialog-provider"
 import { StatusServers } from "./dialog-status"
 import { DialogAccount } from "./dialog-account"
@@ -848,6 +849,12 @@ export function DialogSettings(props: {
           value: `+external.consent.${tool}`,
           footer: consentLabel(externalTools()?.find((item) => item.tool === tool)?.consent),
         })),
+        // XCOD-285 §4: each tool's own configuration, as the tool reports it.
+        ...(["claude", "codex"] as const).map((tool) => ({
+          title: `${EXTERNAL_LABEL[tool]}'s own configuration`,
+          value: `+external.config.${tool}`,
+          footer: "as the tool reports it",
+        })),
         ...list,
       ]
     // XCOD-281: Permissions › Sandbox starts with the last failure, while it holds the sandbox off.
@@ -897,6 +904,13 @@ export function DialogSettings(props: {
       return (
         <text fg={theme.textMuted} wrapMode="word">
           Memory at a glance: its status, a guided setup, and what's in it. Tab for every setting.
+        </text>
+      )
+    if (synthetic?.startsWith("+external.config."))
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          The tool's own model, permissions, instruction files, MCP servers and more, with where each comes from.
+          Changes run the tool's own command after you confirm it; Lunos never writes the tool's files.
         </text>
       )
     if (synthetic?.startsWith("+external.consent."))
@@ -1055,6 +1069,14 @@ export function DialogSettings(props: {
                   })
                 if (option.value === "+memory.analytics") return dialog.replace(() => <DialogMemory />)
                 if (option.value.startsWith("+sandbox.")) return sandboxAction(option.value.slice("+sandbox.".length))
+                if (option.value.startsWith("+external.config.")) {
+                  const tool = option.value.slice("+external.config.".length) as "claude" | "codex"
+                  return dialog.replace(
+                    () => <DialogExternalConfig tool={tool} nav={{ back: () => reopen(option.value), generation }} />,
+                    undefined,
+                    { back: () => reopen(option.value), generation },
+                  )
+                }
                 if (option.value.startsWith("+external.consent."))
                   return pickConsent(option.value.slice("+external.consent.".length) as "claude" | "codex")
                 // A search result from the home opens its section and sub-tab, on that row.

@@ -2795,6 +2795,7 @@ export type SessionBulkDeleteResult = {
   deleted: Array<string>
   skipped: Array<SessionBulkFailure>
   stopped?: Array<string>
+  sharesRevoked?: Array<string>
 }
 
 export type SessionBulkPreviewItem = {
@@ -2804,11 +2805,16 @@ export type SessionBulkPreviewItem = {
   queued: number
   shared: boolean
   tool?: string
+  consoleShares?: Array<{
+    id: string
+    url?: string
+  }>
 }
 
 export type SessionBulkPreviewResult = {
   items: Array<SessionBulkPreviewItem>
   sync: boolean
+  console?: string
 }
 
 export type NotFoundError = {
@@ -2846,6 +2852,53 @@ export type ExternalModels = {
   models: Array<ExternalModel>
   fallback: boolean
   error?: string
+}
+
+export type ExternalConfigSource = {
+  scope?: string
+  file?: string
+  label: string
+}
+
+export type ExternalConfigItem = {
+  id: string
+  name: string
+  value?: string
+  detail?: string
+  status?: string
+  source?: ExternalConfigSource
+  open?: string
+  remove?: {
+    scope?: string
+  }
+}
+
+export type ExternalConfigSection = {
+  id: string
+  title: string
+  items: Array<ExternalConfigItem>
+  note?: string
+  add?: {
+    scopes: Array<string>
+    url: boolean
+  }
+}
+
+export type ExternalConfigView = {
+  tool: "claude" | "codex"
+  label: string
+  version?: string
+  error?: string
+  sections: Array<ExternalConfigSection>
+  notes: Array<string>
+}
+
+export type ExternalConfigCommandResult = {
+  command: string
+  file?: string
+  ran: boolean
+  ok?: boolean
+  output?: string
 }
 
 export type PermissionRequest = {
@@ -9915,6 +9968,75 @@ export type ExperimentalExternalConsentResponses = {
 
 export type ExperimentalExternalConsentResponse =
   ExperimentalExternalConsentResponses[keyof ExperimentalExternalConsentResponses]
+
+export type ExperimentalExternalConfigData = {
+  body?: never
+  path: {
+    tool: "claude" | "codex"
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/config/{tool}"
+}
+
+export type ExperimentalExternalConfigErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalExternalConfigError = ExperimentalExternalConfigErrors[keyof ExperimentalExternalConfigErrors]
+
+export type ExperimentalExternalConfigResponses = {
+  /**
+   * The tool's configuration
+   */
+  200: ExternalConfigView
+}
+
+export type ExperimentalExternalConfigResponse =
+  ExperimentalExternalConfigResponses[keyof ExperimentalExternalConfigResponses]
+
+export type ExperimentalExternalConfigCommandData = {
+  body?: {
+    action: "mcp.add" | "mcp.remove"
+    name: string
+    scope?: string
+    target?: string
+    run: boolean
+  }
+  path: {
+    tool: "claude" | "codex"
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/config/{tool}/command"
+}
+
+export type ExperimentalExternalConfigCommandErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+}
+
+export type ExperimentalExternalConfigCommandError =
+  ExperimentalExternalConfigCommandErrors[keyof ExperimentalExternalConfigCommandErrors]
+
+export type ExperimentalExternalConfigCommandResponses = {
+  /**
+   * The tool's command
+   */
+  200: ExternalConfigCommandResult
+}
+
+export type ExperimentalExternalConfigCommandResponse =
+  ExperimentalExternalConfigCommandResponses[keyof ExperimentalExternalConfigCommandResponses]
 
 export type ExperimentalPeerStopData = {
   body?: never

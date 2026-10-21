@@ -6,6 +6,7 @@ import { Config } from "@/config/config"
 import { CloudAuth } from "@/cloud/auth"
 import { CloudOrg } from "@/cloud/org"
 import { CloudShare } from "@/cloud/share"
+import { CloudShareRecord } from "@/cloud/share-record"
 import { CloudStore } from "@/cloud/store"
 import { SessionID } from "../../session/schema"
 import { effectCmd, fail } from "../effect-cmd"
@@ -108,6 +109,7 @@ export const ShareRevokeCommand = effectCmd({
     yield* Effect.tryPromise({ try: () => CloudShare.revoke(org, id), catch: (e) => e }).pipe(
       Effect.catch(notDone("Not revoked")),
     )
+    yield* Effect.promise(() => CloudShareRecord.forgetShare(id).catch(() => undefined))
     out(`Revoked ${id} on ${org.host}, and its links: they stop working now.`)
   }),
 })
@@ -191,8 +193,21 @@ export const ShareCommand = effectCmd({
       try: () => CloudShare.upload(config, org, { ...input, linkHours: parsed.link }),
       catch: (error) => error,
     }).pipe(Effect.catch(notDone("Not shared")))
+    // Deleting the session revokes it too: the console doesn't know which session it came from.
+    const recorded =
+      input.kind === "session" &&
+      (yield* Effect.promise(() =>
+        CloudShareRecord.record(sessionID!, org, shared).then(
+          () => true,
+          () => false,
+        ),
+      ))
+    if (input.kind === "session" && !recorded)
+      process.stderr.write(
+        `Couldn't note which session this share came from, so deleting the session won't revoke it: revoke it yourself.${EOL}`,
+      )
     out(`Shared with ${org.org}: ${shared.url}`)
     if (shared.link) out(`Link (works without signing in until ${shared.link.expiresAt}): ${shared.link.url}`)
-    out(`Revoke it with: lunos share revoke ${shared.id}`)
+    out(`Revoke it with: lunos share revoke ${shared.id}${recorded ? " (deleting the session revokes it too)" : ""}`)
   }),
 })
