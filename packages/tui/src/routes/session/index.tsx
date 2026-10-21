@@ -65,6 +65,7 @@ import { usePromptRef } from "../../context/prompt"
 import { useEpilogue } from "../../context/epilogue"
 import { normalizePath } from "../../util/path"
 import { PermissionPrompt } from "./permission"
+import { useExternalKeyProfile } from "../../component/external-profile"
 import { QuestionPrompt } from "./question"
 import { createQuestionDismissal, type QuestionDismissal } from "./question-dismissal"
 import { isDismissedQuestion } from "../../util/dismiss"
@@ -200,6 +201,8 @@ export function Session() {
   const kv = useKV()
   const { theme } = useTheme()
   const promptRef = usePromptRef()
+  // XCOD-285: in a Claude Code session its keys do what they do in the tool (Shift+Tab: permission mode).
+  useExternalKeyProfile(() => route.sessionID)
   const dismissal = createQuestionDismissal({
     sessionID: () => route.sessionID,
     sdk: useSDK(),

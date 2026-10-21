@@ -502,10 +502,19 @@ export function Autocomplete(props: {
             }
           })
       : [...slashes()]
+    // XCOD-285: the tool's own commands come first, with what the tool says about them.
+    const info = new Map((external?.commandInfo ?? []).map((item) => [item.name, item]))
+    const first: AutocompleteOption[] = []
     for (const name of own)
-      results.push({
+      first.push({
         display: "/" + name,
-        description: `${tool} command`,
+        description: [
+          tool,
+          info.get(name)?.description ? `· ${info.get(name)!.description}` : "command",
+          info.get(name)?.hint ? `· ${info.get(name)!.hint}` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         onSelect: () => {
           const newText = "/" + name + " "
           const cursor = props.input().logicalCursor
@@ -545,10 +554,12 @@ export function Autocomplete(props: {
     }
 
     results.sort((a, b) => a.display.localeCompare(b.display))
+    first.sort((a, b) => a.display.localeCompare(b.display))
+    const listed = [...first, ...results]
 
-    const max = firstBy(results, [(x) => x.display.length, "desc"])?.display.length
-    if (!max) return results
-    return results.map((item) => ({
+    const max = firstBy(listed, [(x) => x.display.length, "desc"])?.display.length
+    if (!max) return listed
+    return listed.map((item) => ({
       ...item,
       display: item.display.padEnd(max + 2),
     }))

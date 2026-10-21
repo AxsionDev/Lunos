@@ -12,8 +12,9 @@ export const EXTERNAL_LABEL: Record<ExternalTool, string> = { claude: "Claude Co
  */
 export const EXTERNAL_BADGE: Record<ExternalTool, string> = { claude: "Claude Code", codex: "Codex" }
 
-export function externalBadge(tool: ExternalTool, model?: string) {
-  return ["Lunos", EXTERNAL_BADGE[tool], model].filter(Boolean).join(" · ")
+export function externalBadge(tool: ExternalTool, model?: string, mode?: string) {
+  // XCOD-285: the tool's permission mode when it isn't its default, as the tool names it.
+  return ["Lunos", EXTERNAL_BADGE[tool], model, mode].filter(Boolean).join(" · ")
 }
 
 /**
@@ -38,6 +39,12 @@ export type ExternalMarker = {
   model?: string
   /** XCOD-254: what the Lunos bridge offered on the last turn (server side: ExternalBridge.Status). */
   bridge?: ExternalBridgeStatus
+  /** XCOD-285: Claude Code's permission mode chosen in this session (Shift+Tab), used from now on. */
+  permissionMode?: string
+  /** XCOD-285: the permission mode the tool last reported. */
+  mode?: string
+  /** XCOD-285: the tool's /commands with what it says about them. */
+  commandInfo?: { name: string; description?: string; hint?: string }[]
 }
 
 export type ExternalBridgeStatus = {

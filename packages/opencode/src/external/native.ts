@@ -1,5 +1,6 @@
 export * as ExternalNative from "./native"
 
+import { ConfigExternal } from "@opencode-ai/core/config/external"
 import type { ExternalClaude } from "./claude"
 import type { ExternalDetect } from "./detect"
 
@@ -102,24 +103,6 @@ export function mode(suggestions: readonly ExternalClaude.Suggestion[] | undefin
   return value && /^[A-Za-z]+$/.test(value) && !unsafe.has(value) ? value : undefined
 }
 
-/**
- * XCOD-285: Claude Code's Shift+Tab cycle, as far as this install reports it: its default (named
- * `default`, or `manual` in newer releases), then accept edits, then plan, in that order, and only the
- * ones its `--help` lists. Modes that skip or auto-decide approvals (bypassPermissions, dontAsk, auto)
- * are never in the cycle. Without a readable `--help`, there's no cycle.
- */
-export const CYCLE = ["default", "acceptEdits", "plan"] as const
-
-export function cycle(reported: readonly string[] | undefined) {
-  if (!reported?.length) return []
-  const base = reported.includes("default") ? "default" : reported.includes("manual") ? "manual" : undefined
-  return [base, ...CYCLE.slice(1).filter((item) => reported.includes(item))].filter((x): x is string => !!x)
-}
-
-/** The mode after `current` in the cycle (wrapping); the first one when `current` isn't in it. */
-export function next(modes: readonly string[], current: string | undefined) {
-  if (!modes.length) return undefined
-  const normal = current === "manual" || current === "default" ? modes[0] : current
-  const index = normal ? modes.indexOf(normal) : -1
-  return modes[(index + 1) % modes.length]
-}
+/** XCOD-285: Shift+Tab's cycle lives with the config's modes (ConfigExternal.cycle / next), shared with the TUI. */
+export const cycle = ConfigExternal.cycle
+export const next = ConfigExternal.next

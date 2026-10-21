@@ -496,7 +496,15 @@ export function start(options: Options): Running {
             })
           : await open()
         threadID = started?.thread?.id ?? threadID
-        options.onEvent?.({ type: "init", sessionID: threadID, model: started?.model, tools: [], commands: [] })
+        // XCOD-285: the /commands this adapter can run through the app server (its review/start and
+        // thread/compact/start methods, recorded from 0.160.1); Codex's other TUI commands aren't offered.
+        options.onEvent?.({
+          type: "init",
+          sessionID: threadID,
+          model: started?.model,
+          tools: [],
+          commands: COMMANDS.map((item) => item.slice(1)),
+        })
         const turn = await request(first.method, { threadId: threadID, ...first.params })
         turnID = turn?.turn?.id ?? turnID
       } catch (error) {

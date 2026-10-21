@@ -2,7 +2,7 @@
 // XCOD-204: stands in for Claude Code in tests. Replays the recorded stream-json session in
 // claude-stream.jsonl, waiting at each can_use_tool request for the host's control_response and
 // recording what the host sent (to FAKE_CLAUDE_LOG) so the test can check it.
-import { appendFileSync, readFileSync } from "fs"
+import { appendFileSync, mkdirSync, readFileSync } from "fs"
 import path from "path"
 import { createInterface } from "readline"
 
@@ -187,6 +187,19 @@ if (bash) {
           return JSON.parse(await nextLine()).response?.response ?? {}
         })()
   record(JSON.stringify({ ran: answer.behavior === "allow", hooked: !!hooked }))
+  // XCOD-285: as Claude Code does, a "don't ask again" aimed at a settings file is written there
+  // ($HOME/.claude/settings.json, or the project's); one for the session changes no file.
+  const settings: Record<string, string> = {
+    userSettings: path.join(process.env.HOME ?? "", ".claude", "settings.json"),
+    projectSettings: path.join(process.cwd(), ".claude", "settings.json"),
+    localSettings: path.join(process.cwd(), ".claude", "settings.local.json"),
+  }
+  for (const update of (answer as { updatedPermissions?: any[] }).updatedPermissions ?? []) {
+    const file = settings[update.destination]
+    if (!file) continue
+    mkdirSync(path.dirname(file), { recursive: true })
+    appendFileSync(file, JSON.stringify(update) + "\n")
+  }
   const allowed = answer.behavior === "allow"
   console.log(
     JSON.stringify({

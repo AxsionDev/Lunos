@@ -30,6 +30,28 @@ export const CODEX_APPROVALS = ["untrusted", "on-request", "never"] as const
 /** Values that skip approval or the sandbox: refused in config, only ever passed for one run. */
 export const UNSAFE = new Set<string>(["bypassPermissions", "danger-full-access", "never"])
 
+/**
+ * XCOD-285: Claude Code's Shift+Tab cycle, as far as an install reports it: its default (named
+ * `default`, or `manual` in newer releases), then acceptEdits, then plan, in that order, and only the
+ * ones its `--help` lists. Modes that skip or auto-decide approvals (bypassPermissions, dontAsk, auto)
+ * are never in the cycle. Without a readable `--help` there's no cycle.
+ */
+export const CYCLE = ["default", "acceptEdits", "plan"] as const
+
+export function cycle(reported: readonly string[] | undefined) {
+  if (!reported?.length) return []
+  const base = reported.includes("default") ? "default" : reported.includes("manual") ? "manual" : undefined
+  return [base, ...CYCLE.slice(1).filter((item) => reported.includes(item))].filter((x): x is string => !!x)
+}
+
+/** The mode after `current` in the cycle (wrapping); the first one after the default when unset. */
+export function next(modes: readonly string[], current: string | undefined) {
+  if (!modes.length) return undefined
+  const normal = current === "manual" || current === "default" || current === undefined ? modes[0] : current
+  const index = modes.indexOf(normal!)
+  return modes[(index + 1) % modes.length]
+}
+
 /** What each value does, for /settings. */
 export const DESCRIPTIONS: Record<string, string> = {
   default: "Every edit and command asks in Lunos",
