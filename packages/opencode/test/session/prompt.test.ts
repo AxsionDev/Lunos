@@ -1493,7 +1493,8 @@ it.instance("concurrent loop callers all receive same error result", () =>
 
 it.instance("prompt submitted during an active run is included in the next LLM input", () =>
   Effect.gen(function* () {
-    const { llm } = yield* useServerConfig(providerCfg)
+    // XCOD-287: without Build's delegation reminder, so the last user message is the prompt alone.
+    const { llm } = yield* useServerConfig((url) => ({ ...providerCfg(url), subagent: { delegate: false } }))
     const gate = yield* Deferred.make<void>()
     const prompt = yield* SessionPrompt.Service
     const sessions = yield* Session.Service
