@@ -64,6 +64,9 @@ export const EVENTS = [
   "sandbox.retain",
   "sandbox.destroy",
   "sandbox.prune",
+  // XCOD-282: `lunos sandbox apply` wrote a folder sandbox's results into the folder: id, folder,
+  // and how many files were written and deleted. Never file contents.
+  "sandbox.apply",
   // XCOD-157: sandbox.required refused something on the host: a command, a tool call, --no-sandbox.
   "sandbox.refused",
   // XCOD-157: one decision of a sandbox's egress proxy (network "policy" or "none"): destination

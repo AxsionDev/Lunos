@@ -33,6 +33,8 @@ import { RunBudget } from "@/agent/run-budget"
 
 export type Meta = {
   id: string
+  /** XCOD-282: "folder" when `root` isn't a repository and `gitDir` is Lunos's shadow of it; absent: "git". */
+  source?: SandboxGit.Source
   root: string
   gitDir: string
   base: string
@@ -90,6 +92,10 @@ export type Handoff = {
   failed: boolean
   /** XCOD-158: "mount": nothing was handed back because the changes are already in your working tree. */
   workspace?: SandboxConfig.Resolved["workspace"]
+  /** XCOD-282: "folder": the results stay with Lunos until `lunos sandbox apply <id>` writes them into `root`. */
+  source?: SandboxGit.Source
+  id: string
+  root: string
 }
 
 export const branchName = (id: string) => `lunos/sandbox/${id}`
@@ -100,7 +106,14 @@ export const workdirOf = (relative: string) =>
 
 const metaDir = () => path.join(Global.Path.state, "sandbox")
 const metaFile = (id: string) => path.join(metaDir(), `${id}.json`)
-export const resultsDir = (root: string, id: string) => path.join(root, ".opencode", "sandbox", id)
+/**
+ * Where the transcript and summary go: the repository's .opencode/sandbox/<id>/, or for a folder
+ * (XCOD-282), which nothing is written into, Lunos's state.
+ */
+export const resultsDir = (info: Pick<Meta, "id" | "root" | "source">) =>
+  info.source === "folder"
+    ? path.join(metaDir(), "results", info.id)
+    : path.join(info.root, ".opencode", "sandbox", info.id)
 
 async function saveMeta(meta: Meta) {
   await fs.mkdir(metaDir(), { recursive: true, mode: 0o700 })
@@ -145,6 +158,7 @@ export type Status = {
     network: string
     results?: string
     workspace?: string
+    source?: string
     expires?: string
     handedOff?: string
   }[]
@@ -171,6 +185,7 @@ export async function status(root: string | undefined): Promise<Status> {
         network: info.network ?? "open",
         results: info.results ?? "branch",
         workspace: info.workspace ?? "copy",
+        source: info.source ?? "git",
         // Metadata from older sandboxes can hold null here; the snapshot's fields are optional strings.
         expires: info.expires ?? undefined,
         handedOff: info.handedOff ?? undefined,
@@ -190,6 +205,7 @@ function auditFields(info: Meta) {
     pids: info.resources.pids,
     tmp: info.resources.tmp,
     network: info.network ?? "open",
+    source: info.source ?? "git",
   }
 }
 
@@ -218,6 +234,8 @@ type CreateInput = {
   /** Provider ids the host holds credentials for: their API hosts go on the egress allow list. */
   providers?: readonly string[]
   log?: (line: string) => void
+  /** XCOD-282: how big a folder may be (tests); SandboxGit.LIMITS otherwise. */
+  limits?: SandboxGit.Limits
 }
 
 /** XCOD-279: any failure is a SandboxError naming its step: detect, image, or create for the rest. */
@@ -231,9 +249,9 @@ async function build(input: CreateInput): Promise<Meta> {
       reason: "Already running inside a sandbox; a sandbox can't start another",
     })
   await SandboxFailure.at("detect", () => SandboxDocker.available(input.config.runtime))
-  const repo = await SandboxGit.repo(input.directory)
   const id = input.id ?? randomBytes(4).toString("hex")
   if (!/^[a-z0-9-]{1,40}$/.test(id)) throw new Error(`Invalid sandbox id ${id}`)
+  const repo = await SandboxFailure.at("detect", () => SandboxGit.repo(input.directory, { id, limits: input.limits }))
   const branch = branchName(id)
 
   // The trusted image: Lunos's own, or a sandbox.image your global or managed config set. XCOD-158:
@@ -288,7 +306,11 @@ async function build(input: CreateInput): Promise<Meta> {
     const baseTree = await SandboxGit.treeOfCommit(repo.gitDir, repo.base)
     // In mount mode the volume holds only the sandbox's home: the workspace is your tree itself.
     if (!mount) {
-      log(`copying ${repo.root} at ${repo.base.slice(0, 12)} (with uncommitted changes)`)
+      log(
+        repo.survey
+          ? `copying the folder ${repo.root} (${SandboxGit.describeSurvey(repo.survey)}; it isn't a git repository)`
+          : `copying ${repo.root} at ${repo.base.slice(0, 12)} (with uncommitted changes)`,
+      )
       await SandboxGit.seed({ ...repo, into: seed, branch })
     }
     const seedTree = mount
@@ -299,6 +321,7 @@ async function build(input: CreateInput): Promise<Meta> {
     const workdir = workdirOf(repo.relative)
     const result: Meta = {
       id,
+      ...(repo.source === "folder" ? { source: "folder" as const } : {}),
       root: repo.root,
       gitDir: repo.gitDir,
       base: repo.base,
@@ -602,7 +625,8 @@ export function failed(sessions: { messages: { info: { role: string; error?: unk
  * transcript); stops the container before copying the workspace out, so the copy is consistent.
  */
 export async function handoff(info: Meta, conn: Connection, extra: Record<string, unknown> = {}): Promise<Handoff> {
-  const results = resultsDir(info.root, info.id)
+  const results = resultsDir(info)
+  const folder = info.source === "folder"
   const sessions = await transcript(conn)
   await SandboxDocker.stop(info.id)
 
@@ -610,7 +634,7 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
   try {
     const mode = info.results ?? "branch"
     await fs.mkdir(results, { recursive: true })
-    await fs.writeFile(path.join(path.dirname(results), ".gitignore"), "*\n")
+    if (!folder) await fs.writeFile(path.join(path.dirname(results), ".gitignore"), "*\n")
     await fs.writeFile(path.join(results, "transcript.json"), JSON.stringify(sessions, null, 2))
     await collectAudit(info, results)
     const summary = (fields: Record<string, unknown>) =>
@@ -626,6 +650,7 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
             base: info.base,
             results: mode,
             workspace: info.workspace ?? "copy",
+            source: info.source ?? "git",
             ...fields,
             sessions: sessions.map((item) => ({
               id: item.session.id,
@@ -640,9 +665,10 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
           2,
         ),
       )
+    const where = { id: info.id, root: info.root, ...(folder ? { source: "folder" as const } : {}) }
     if (mode === "none") {
       await summary({ files: [] })
-      return { mode, files: [], results, failed: failed(sessions), workspace: info.workspace }
+      return { mode, files: [], results, failed: failed(sessions), workspace: info.workspace, ...where }
     }
 
     await SandboxDocker.copyOut(info.id, out)
@@ -667,22 +693,51 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
       // Only the agent's changes: from the tree the sandbox started with, not from the base commit.
       const patch = path.join(results, "changes.patch")
       await fs.writeFile(patch, await SandboxGit.diff(info.gitDir, info.seedTree, tree))
+      // XCOD-282: a folder's results also go on the shadow's branch, for `lunos sandbox apply`.
+      if (folder) await SandboxGit.setBranch({ gitDir: info.gitDir, branch: info.branch, commit, expected: previous })
       info.handedOff = commit
       await saveMeta(info)
       const files = await SandboxGit.changedFiles(info.gitDir, info.seedTree, tree)
       await summary({ patch, commit, files })
-      return { mode, patch, commit, files, results, failed: failed(sessions) }
+      return { mode, patch, commit, files, results, failed: failed(sessions), ...where }
     }
     await SandboxGit.setBranch({ gitDir: info.gitDir, branch: info.branch, commit, expected: previous })
     info.handedOff = commit
     await saveMeta(info)
     // Last, so a summary only ever describes a branch that exists.
     const files = await SandboxGit.changedFiles(info.gitDir, info.base, commit)
-    await summary({ branch: info.branch, commit, files })
-    return { mode, branch: info.branch, commit, files, results, failed: failed(sessions) }
+    await summary({ ...(folder ? {} : { branch: info.branch }), commit, files })
+    return { mode, branch: info.branch, commit, files, results, failed: failed(sessions), ...where }
   } finally {
     await fs.rm(out, { recursive: true, force: true })
   }
+}
+
+/**
+ * XCOD-282: write a folder sandbox's results into the folder. Works after the sandbox is destroyed:
+ * the results and the base they started from are refs in the folder's shadow.
+ */
+export async function apply(id: string) {
+  const info = await meta(id).catch(() => undefined)
+  if (info && info.source !== "folder")
+    throw new Error(
+      `Sandbox ${id} ran in a git repository, so there's nothing to apply: its results are on branch ${info.branch} there (\`git merge ${info.branch}\`).`,
+    )
+  const found = await SandboxGit.folderResult(id, branchName(id))
+  if (!found)
+    throw new Error(
+      info
+        ? `Sandbox ${id} hasn't handed its results back yet: that happens when the session in it ends (\`lunos sandbox attach ${id}\`, then quit).`
+        : `No results for sandbox ${id}: it never handed any back, or it ran in a git repository. \`lunos sandbox list\` shows the sandboxes that exist.`,
+    )
+  const applied = await SandboxGit.applyFolder(found)
+  AuditLog.emit("sandbox.apply", {
+    id,
+    project: found.root,
+    written: applied.written.length,
+    deleted: applied.deleted.length,
+  })
+  return { ...applied, root: found.root }
 }
 
 /** Whether a policy destroys the sandbox, given how the task went. */

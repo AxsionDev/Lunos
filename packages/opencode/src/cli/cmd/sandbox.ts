@@ -97,12 +97,21 @@ const secrets = (all: Record<string, unknown>): Record<string, string> =>
   Object.keys(all).length ? { OPENCODE_AUTH_CONTENT: JSON.stringify(all) } : {}
 
 function reportHandoff(result: Sandbox.Handoff) {
-  if (result.mode === "branch")
+  // XCOD-282: nothing is written into a plain folder until you ask.
+  const folder = result.source === "folder" && result.mode !== "none"
+  if (folder)
+    say(
+      `results kept for ${result.root} (not a git repository): ` +
+        `${UI.Style.TEXT_HIGHLIGHT_BOLD}lunos sandbox apply ${result.id}${UI.Style.TEXT_NORMAL} writes them into it`,
+    )
+  else if (result.mode === "branch")
     say(
       `results on branch ${UI.Style.TEXT_HIGHLIGHT_BOLD}${result.branch}${UI.Style.TEXT_NORMAL} (${result.commit?.slice(0, 12)})`,
     )
   if (result.mode === "patch")
-    say(`the agent's changes are in ${UI.Style.TEXT_HIGHLIGHT_BOLD}${result.patch}${UI.Style.TEXT_NORMAL} (git apply)`)
+    say(
+      `${folder ? "also " : ""}the agent's changes are in ${UI.Style.TEXT_HIGHLIGHT_BOLD}${result.patch}${UI.Style.TEXT_NORMAL} (git apply)`,
+    )
   if (result.mode !== "none") {
     for (const file of result.files) say(`  ${file.status}\t${file.path}`)
     if (result.files.length === 0) say("  no changes")
@@ -379,8 +388,9 @@ export async function sandboxTui(
   } catch (error) {
     throw new SandboxError({ reason: SandboxFailure.describe(error) })
   }
-  const workdir = await SandboxGit.repo(directory)
-    .then((repo) => Sandbox.workdirOf(repo.relative))
+  // XCOD-282: located without writing anything; a plain folder's workspace is the top ("" relative).
+  const workdir = await SandboxGit.locate(directory)
+    .then((found) => Sandbox.workdirOf(found.relative))
     .catch(() => undefined)
   let info: Sandbox.Meta | undefined
   const background = SandboxBackground.start({
@@ -502,7 +512,7 @@ export const SandboxListCommand = effectCmd({
         row.state.padEnd(8),
         (row.meta?.created ?? row.created).slice(0, 19),
         row.meta?.expires ? `expires ${row.meta.expires.slice(0, 16)}` : "-",
-        row.meta?.branch ?? "-",
+        row.meta?.source === "folder" ? `folder (lunos sandbox apply ${row.id})` : (row.meta?.branch ?? "-"),
         row.project ?? "-",
       ].join("  "),
     )
@@ -542,6 +552,32 @@ export const SandboxDestroyCommand = effectCmd({
     yield* prepare
     yield* attempt(() => Sandbox.destroy(args.id))
     yield* writeStdoutEffect(`Destroyed sandbox ${args.id}.${EOL}`)
+  }),
+})
+
+export const SandboxApplyCommand = effectCmd({
+  command: "apply <id>",
+  describe:
+    "write a sandbox's results into the folder it ran in (folders that aren't a git repository); refuses files you changed since",
+  instance: false,
+  builder: (yargs) => yargs.positional("id", { type: "string", demandOption: true }),
+  handler: Effect.fn("Cli.sandbox.apply")(function* (args) {
+    yield* prepare
+    const applied = yield* attempt(() => Sandbox.apply(args.id))
+    const lines = [
+      ...applied.written.map((file) => `  wrote    ${file}`),
+      ...applied.deleted.map((file) => `  deleted  ${file}`),
+    ]
+    const count = applied.written.length + applied.deleted.length
+    yield* writeStdoutEffect(
+      [
+        count
+          ? `Applied sandbox ${args.id} to ${applied.root}: ${count} file${count === 1 ? "" : "s"}.`
+          : `Nothing to apply: ${applied.root} already has sandbox ${args.id}'s results.`,
+        ...lines,
+        ...(applied.unchanged.length && count ? [`  (${applied.unchanged.length} already up to date)`] : []),
+      ].join(EOL) + EOL,
+    )
   }),
 })
 
@@ -616,6 +652,7 @@ export const SandboxCommand = cmd({
     yargs
       .command(SandboxListCommand)
       .command(SandboxAttachCommand)
+      .command(SandboxApplyCommand)
       .command(SandboxLogsCommand)
       .command(SandboxStopCommand)
       .command(SandboxDestroyCommand)
