@@ -356,5 +356,20 @@ describe("deleteQuestion / deleteSummary", () => {
     expect(deleteSummary({ deleted: ["a"], skipped: [{ id: "b", reason: "another Lunos didn't respond" }] })).toBe(
       "Deleted 1 · 1 couldn't be deleted (another Lunos didn't respond)",
     )
+    expect(deleteSummary({ deleted: ["a"], skipped: [], sharesRevoked: ["s1", "s2"] })).toBe(
+      "Deleted 1 session · 2 console shares revoked",
+    )
+  })
+  test("console shares made from them are named; older ones are said to stay live, only with a console", () => {
+    const q = deleteQuestion({
+      items: [item("a")],
+      preview: [preview("a", { consoleShares: [{ id: "s1", url: "https://c/s1" }, { id: "s2" }] })],
+      console: "console.acme.eu",
+    })
+    expect(q.lines).toContain("2 console shares made from it on console.acme.eu are revoked first: s1, s2.")
+    expect(q.lines.join(" ")).toContain("Console shares made before this version aren't linked to their session")
+    const none = deleteQuestion({ items: [item("a")], preview: [preview("a")] }).lines.join(" ")
+    expect(none).not.toContain("console share")
+    expect(none).not.toContain("Console shares")
   })
 })

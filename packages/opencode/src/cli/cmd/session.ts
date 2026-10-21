@@ -97,6 +97,10 @@ export const SessionDeleteCommand = effectCmd({
         type: "boolean",
       })
       .option("keep-cloud", { describe: "keep the synced copies on Lunos Cloud", type: "boolean" })
+      .option("keep-shares", {
+        describe: "leave the console shares made from them (lunos share) live",
+        type: "boolean",
+      })
       .option("yes", { alias: "y", describe: "don't ask for confirmation", type: "boolean" }),
   handler: Effect.fn("Cli.session.delete")(function* (args) {
     const given = (args.sessionIDs ?? []).map(String).filter(Boolean)
@@ -131,7 +135,22 @@ export const SessionDeleteCommand = effectCmd({
     const message = `Delete ${count} for good? Their history, subagent sessions and queued prompts go; files in your projects stay.${args.keepCloud ? "" : " Synced copies on Lunos Cloud are deleted too (--keep-cloud keeps them)."}`
     // Ids given in a script (no terminal) delete as before, without asking; --archived needs --yes there.
     const ask = args.archived || process.stdin.isTTY
-    if (ask && !(yield* confirmed(message, args.yes))) return
+    if (ask) {
+      // The console shares made from them (lunos share): revoked first, unless --keep-shares.
+      const preview = yield* SessionBulk.preview({ sessionIDs: ids })
+      const shares = preview.items.flatMap((item) =>
+        (item.consoleShares ?? []).map((share) => ({ ...share, of: item.id })),
+      )
+      if (shares.length) {
+        UI.println(
+          `${args.keepShares ? "Left live (--keep-shares)" : "Revoked first"}: ${shares.length === 1 ? "1 console share" : `${shares.length} console shares`} made from them on ${preview.console ?? "your organisation's console"}:`,
+        )
+        for (const share of shares)
+          UI.println(`  ${share.id}${share.url ? `  ${share.url}` : ""}  (from ${name(share.of)})`)
+      }
+      if (preview.console) UI.println(SessionBulk.UNLINKED_SHARES_NOTE)
+      if (!(yield* confirmed(message, args.yes))) return
+    }
 
     const share = yield* SessionShare.Service
     const result = yield* SessionBulk.remove({
@@ -139,6 +158,7 @@ export const SessionDeleteCommand = effectCmd({
       archivedOnly: !!args.archived,
       stop: !!args.stop,
       keepCloud: !!args.keepCloud,
+      keepShares: !!args.keepShares,
       origin: "cli",
       reason: "Stopped by lunos session delete",
       unshare: share.unshare,
@@ -153,6 +173,7 @@ export const SessionDeleteCommand = effectCmd({
         UI.Style.TEXT_NORMAL,
     )
     for (const id of result.deleted) UI.println(`  deleted ${name(id)}`)
+    for (const id of result.sharesRevoked ?? []) UI.println(`  revoked console share ${id}`)
     for (const item of result.skipped) UI.println(`  skipped ${name(item.id)}: ${item.reason}`)
     if (result.skipped.length) process.exitCode = 1
   }),

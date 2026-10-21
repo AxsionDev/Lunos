@@ -9,6 +9,7 @@ import { ShareNext } from "@/share/share-next"
 import { CloudAuth } from "@/cloud/auth"
 import { CloudOrg } from "@/cloud/org"
 import { CloudShare } from "@/cloud/share"
+import { CloudShareRecord } from "@/cloud/share-record"
 import { Session } from "@/session/session"
 import { SessionPromptQueue } from "@/session/prompt-queue"
 import { AuditLog } from "@/audit/log"
@@ -334,6 +335,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         try: () => CloudShare.upload(config, org, { ...input, linkHours: link }),
         catch: refuse,
       })
+      // Deleting the session revokes it too (SessionBulk.remove). Not noted: it's shared all the
+      // same, and `lunos share revoke` still takes it back.
+      yield* Effect.promise(() => CloudShareRecord.record(ctx.params.sessionID, org, shared).catch(() => undefined))
       return {
         org: org.org,
         host: org.host,

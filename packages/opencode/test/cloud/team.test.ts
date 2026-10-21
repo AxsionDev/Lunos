@@ -13,6 +13,7 @@ import { Marketplace } from "@opencode-ai/core/marketplace"
 import { CloudAuth } from "../../src/cloud/auth"
 import { CloudOrg } from "../../src/cloud/org"
 import { CloudShare } from "../../src/cloud/share"
+import { CloudShareRecord } from "../../src/cloud/share-record"
 import {
   NOT_ALLOWED,
   orgMarketplace,
@@ -81,6 +82,11 @@ beforeAll(async () => {
         })
       if (url.pathname === "/v1/orgs/acme/shares/s1" && req.method === "DELETE")
         return new Response(null, { status: 204 })
+      if (url.pathname === "/v1/orgs/acme/shares/s2" && req.method === "DELETE")
+        return Response.json(
+          { error: { code: "admin_required", message: "Only whoever shared it, or an owner or admin, can do that." } },
+          { status: 403 },
+        )
       if (url.pathname === "/v1/orgs/acme/marketplace.json") return Response.json(manifest)
       if (url.pathname === "/v1/orgs/acme/plan")
         return Response.json(
@@ -435,5 +441,66 @@ describe("list and revoke", () => {
     expect(seen.at(-1)).toMatchObject({ url: "/v1/orgs/acme/shares/s1", method: "DELETE", auth: "Bearer fake-token" })
     const missing = await CloudShare.revoke(local(), "nope").catch((e) => e)
     expect(missing).toBeInstanceOf(CloudOrg.ConsoleError)
+  })
+})
+
+// Deleting a session revokes the console shares made from it: which ones is remembered on this
+// machine, since the console doesn't know the session a share came from.
+describe("console shares recorded by session", () => {
+  const local = () => CloudOrg.parse(`${base}/v1/orgs/acme/policy`)!
+  afterEach(() => fs.rm(CloudShareRecord.file(), { force: true }))
+
+  test("recorded per session (ids, URL and console only), forgotten when revoked by hand", async () => {
+    await CloudShareRecord.record("ses_a", local(), { id: "s1", url: `${base}/orgs/acme/shares/s1` })
+    await CloudShareRecord.record("ses_a", local(), { id: "s9" })
+    await CloudShareRecord.record("ses_b", local(), { id: "s3" })
+    const recorded = await CloudShareRecord.forSessions(["ses_a", "ses_b", "ses_none"])
+    expect([...recorded.keys()]).toEqual(["ses_a", "ses_b"])
+    expect(recorded.get("ses_a")).toMatchObject([
+      { id: "s1", url: `${base}/orgs/acme/shares/s1`, org: "acme", base: local().base },
+      { id: "s9", org: "acme" },
+    ])
+    expect(Object.keys(recorded.get("ses_a")![0]!).sort()).toEqual(["base", "created", "id", "org", "url"])
+    await CloudShareRecord.forgetShare("s9")
+    expect((await CloudShareRecord.forSessions(["ses_a"])).get("ses_a")?.map((e) => e.id)).toEqual(["s1"])
+    await CloudShareRecord.forget("ses_b")
+    expect((await CloudShareRecord.forSessions(["ses_b"])).size).toBe(0)
+  })
+
+  test("revoke: DELETE on the configured console; one it no longer has counts as revoked", async () => {
+    await signIn()
+    await managed({ cloud: { policy: `${base}/v1/orgs/acme/policy` } })
+    await CloudShareRecord.record("ses_a", local(), { id: "s1" })
+    await CloudShareRecord.record("ses_child", local(), { id: "gone" })
+    expect(await CloudShareRecord.revoke(["ses_a", "ses_child"])).toEqual({ revoked: ["s1", "gone"] })
+    expect(seen.filter((r) => r.method === "DELETE").map((r) => [r.url, r.auth])).toEqual([
+      ["/v1/orgs/acme/shares/s1", "Bearer fake-token"],
+      ["/v1/orgs/acme/shares/gone", "Bearer fake-token"],
+    ])
+    expect((await CloudShareRecord.forSessions(["ses_a", "ses_child"])).size).toBe(0)
+    // Nothing recorded: nothing is asked of anyone.
+    seen.length = 0
+    expect(await CloudShareRecord.revoke(["ses_a"])).toEqual({ revoked: [] })
+    expect(seen).toEqual([])
+  })
+
+  test("what can't be revoked stays recorded and says why; the token never goes to another console", async () => {
+    await signIn()
+    await managed({ cloud: { policy: `${base}/v1/orgs/acme/policy` } })
+    const other = CloudOrg.parse("https://console.other.eu/v1/orgs/other/policy")!
+    await CloudShareRecord.record("ses_a", local(), { id: "s1" })
+    await CloudShareRecord.record("ses_a", local(), { id: "s2" })
+    await CloudShareRecord.record("ses_a", other, { id: "s7" })
+    const outcome = await CloudShareRecord.revoke(["ses_a"])
+    expect(outcome.revoked).toEqual(["s1"])
+    expect(outcome.error).toContain("s2, s7 couldn't be revoked")
+    expect(outcome.error).toContain("Only whoever shared it")
+    expect(outcome.error).toContain("s7 is on console.other.eu")
+    expect(seen.some((r) => r.url.includes("s7"))).toBe(false)
+    // A retry only does what's left.
+    expect((await CloudShareRecord.forSessions(["ses_a"])).get("ses_a")?.map((e) => e.id)).toEqual(["s2", "s7"])
+
+    await signOut()
+    expect((await CloudShareRecord.revoke(["ses_a"])).error).toContain("you're signed out")
   })
 })

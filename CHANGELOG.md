@@ -37,6 +37,13 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Deletes from `/sessions`, the Agent Monitor and `lunos session delete` are in the audit log as
   `session.delete` with where they came from, the count and the ids (never titles or content), how
   many were stopped first and how many synced copies were deleted. <!-- XCOD-284 --> <!-- internal -->
+- **Deleting a session revokes what you shared from it on your organisation's console.** Console
+  shares made with `lunos share` or `/share` are now remembered with their session, listed in the
+  delete confirmation and revoked first; if one can't be (signed out, console unreachable), the
+  session is kept and you're told why. `lunos session delete --keep-shares` leaves them live. Shares
+  made before this release aren't linked to their session: revoke them with `lunos share list` and
+  `lunos share revoke <id>`. The audit log counts the shares revoked, never their content.
+  <!-- XCOD-290 -->
 - **The sandbox works in any folder, not only in a git repository.** Point it at a folder of
   documents or a project without Git, and it is copied in byte for byte (Word files, PDFs and
   images included), leaving out what the folder's `.gitignore` lists plus `node_modules`, build

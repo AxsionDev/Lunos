@@ -5,6 +5,8 @@ import { MessageTable } from "@opencode-ai/core/session/sql"
 import { eq, sql } from "drizzle-orm"
 import { Effect } from "effect"
 import { AuditLog } from "@/audit/log"
+import { CloudOrg } from "@/cloud/org"
+import { CloudShareRecord } from "@/cloud/share-record"
 import { CloudSyncApi } from "@/cloud/sync-api"
 import { ExternalRegistry } from "@/external/registry"
 import { Session } from "./session"
@@ -45,7 +47,13 @@ export function clearable(item: Row) {
 export type Failure = { id: string; reason: string }
 export type StopResult = { stopped: string[]; failed: Failure[] }
 export type ArchiveResult = { archived: string[]; skipped: Failure[] }
-export type DeleteResult = { deleted: string[]; skipped: Failure[]; stopped?: string[] }
+export type DeleteResult = {
+  deleted: string[]
+  skipped: Failure[]
+  stopped?: string[]
+  /** Console shares (`lunos share`) revoked because the session they were made from was deleted. */
+  sharesRevoked?: string[]
+}
 
 /** Sessions running or waiting anywhere on this machine: never archived. */
 export async function active(now = Date.now()) {
@@ -240,6 +248,9 @@ export type Origin = "single" | "bulk" | "cli"
 /** XCOD-284: the synced copy on Lunos Cloud, deleted (`deleted: true`) or not there to delete. */
 export type CloudRemove = (session: string) => Promise<CloudSyncApi.RemoveResult>
 
+/** Revokes the console shares recorded for these sessions (CloudShareRecord.revoke). */
+export type ShareRevoke = (sessionIDs: readonly string[]) => Promise<CloudShareRecord.RevokeOutcome>
+
 export type RemoveInput = {
   sessionIDs: readonly string[]
   /**
@@ -257,6 +268,13 @@ export type RemoveInput = {
   unshare?: (sessionID: SessionID) => Effect.Effect<void, unknown>
   /** For tests; CloudSyncApi.removeSession otherwise. */
   cloud?: CloudRemove
+  /**
+   * Leave the console shares made from these sessions (`lunos share`) live, and forget which session
+   * they came from. By default they are revoked first, and a session whose shares can't be is kept.
+   */
+  keepShares?: boolean
+  /** For tests; CloudShareRecord.revoke otherwise. */
+  shares?: ShareRevoke
 }
 
 const cloudReason = (failure: CloudSyncApi.Failure) =>
@@ -267,7 +285,8 @@ const cloudReason = (failure: CloudSyncApi.Failure) =>
 /**
  * Deletes sessions and their history for good: messages, subagent sessions and prompts queued for
  * them (Session.remove). In order, for each: a running one is stopped first (`stop`) or skipped; its
- * share link is removed (`unshare`); its synced copy is deleted unless `keepCloud`; then the session.
+ * share link is removed (`unshare`); the console shares recorded for it and its subagents are revoked
+ * unless `keepShares`; its synced copy is deleted unless `keepCloud`; then the session.
  * A step that fails leaves the session as it was and says why, so it can be tried again.
  *
  * For an external row (a Claude Code / Codex session with no Lunos session) only Lunos's registry
@@ -296,6 +315,9 @@ export const remove = Effect.fn("SessionBulk.remove")(function* (input: RemoveIn
   // XCOD-269: prompts queued for them and never sent go with them (Session.remove); counted here.
   let queued = 0
   let cloudDeleted = 0
+  const shares: ShareRevoke = input.shares ?? ((sessionIDs) => CloudShareRecord.revoke(sessionIDs))
+  const revoked: string[] = []
+  let sharesKept = 0
   for (const id of ids) {
     const skipped = skip.get(id)
     if (skipped) {
@@ -333,8 +355,24 @@ export const remove = Effect.fn("SessionBulk.remove")(function* (input: RemoveIn
         continue
       }
     }
-    // Its subagents synced as sessions of their own.
+    // Its subagents synced as sessions of their own, and can have been shared on their own.
     const kids = yield* descendants(sessionID)
+    // Console shares are separate uploads: revoked before anything goes, so a failure keeps it all.
+    if (!input.keepShares) {
+      const outcome = yield* Effect.promise(() =>
+        shares([sessionID, ...kids]).catch(
+          (error): CloudShareRecord.RevokeOutcome => ({
+            revoked: [],
+            error: `its console shares couldn't be revoked (${error instanceof Error ? error.message : String(error)})`,
+          }),
+        ),
+      )
+      revoked.push(...outcome.revoked)
+      if (outcome.error) {
+        result.skipped.push({ id, reason: `${outcome.error}; ${SHARES_WAY_OUT}` })
+        continue
+      }
+    }
     if (!input.keepCloud) {
       let failed: string | undefined
       for (const target of [sessionID, ...kids]) {
@@ -362,6 +400,16 @@ export const remove = Effect.fn("SessionBulk.remove")(function* (input: RemoveIn
     if (removed) queued += held
     if (removed) result.deleted.push(id)
     else result.skipped.push({ id, reason: "no such session" })
+    // Kept on purpose: which session they came from means nothing once it's gone.
+    if (removed && input.keepShares) {
+      const kept = yield* Effect.promise(() =>
+        CloudShareRecord.forSessions([sessionID, ...kids]).catch(() => new Map<string, CloudShareRecord.Entry[]>()),
+      )
+      for (const [target, entries] of kept) {
+        sharesKept += entries.length
+        yield* Effect.promise(() => CloudShareRecord.forget(target).catch(() => undefined))
+      }
+    }
     // A Claude Code / Codex session Lunos ran (XCOD-218) would be listed on its own once its Lunos
     // session is gone: its registry entry, Lunos's own file, goes too. The tool's transcript stays.
     const linked = SessionOverview.externalOf(info)?.session
@@ -376,9 +424,24 @@ export const remove = Effect.fn("SessionBulk.remove")(function* (input: RemoveIn
       ...(result.stopped?.length ? { stopped: result.stopped.length } : {}),
       ...(cloudDeleted ? { cloud_deleted: cloudDeleted } : {}),
       ...(input.keepCloud ? { cloud_kept: true } : {}),
+      // Counts only: never a share's id, URL or content.
+      ...(revoked.length ? { console_shares_revoked: revoked.length } : {}),
+      ...(sharesKept ? { console_shares_kept: sharesKept } : {}),
     })
+  if (revoked.length) result.sharesRevoked = revoked
   return result
 })
+
+/** What to do when console shares can't be revoked: said with every such failure. */
+export const SHARES_WAY_OUT =
+  "sign in and try again, revoke them on the console (lunos share revoke <id>), or delete with lunos session delete --keep-shares"
+
+/**
+ * Console shares made before Lunos recorded which session they came from aren't revoked with it:
+ * said wherever a delete is confirmed, and in the docs.
+ */
+export const UNLINKED_SHARES_NOTE =
+  "Console shares made before this version aren't linked to their session and stay live: find them with lunos share list and revoke them with lunos share revoke <id>."
 
 /**
  * Deletes archived sessions and their history for good (Delete archived). Anything not archived is
@@ -389,6 +452,7 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
   keepCloud?: boolean
   unshare?: RemoveInput["unshare"]
   cloud?: CloudRemove
+  shares?: ShareRevoke
 }) {
   // As before XCOD-284, synced copies are left unless the caller asks (keepCloud: false).
   return yield* remove({ ...input, keepCloud: input.keepCloud ?? true, archivedOnly: true, origin: "bulk" })
@@ -397,7 +461,10 @@ export const removeArchived = Effect.fn("SessionBulk.removeArchived")(function* 
 /**
  * XCOD-284: what deleting these sessions removes, for the confirmation: per session its messages,
  * subagent sessions and queued prompts, whether it's shared, and whether it's a tool's session (whose
- * own history stays). `sync`: this device syncs to Lunos Cloud, so a synced copy may exist.
+ * own history stays), and the console shares recorded for it and its subagents, which are revoked.
+ * `sync`: this device syncs to Lunos Cloud, so a synced copy may exist. `console`: the host of the
+ * organisation console configured here, if any (console shares made before they were recorded
+ * aren't linked to a session, which the confirmation says only then).
  */
 export const preview = Effect.fn("SessionBulk.preview")(function* (input: { sessionIDs: readonly string[] }) {
   const sessions = yield* Session.Service
@@ -414,6 +481,13 @@ export const preview = Effect.fn("SessionBulk.preview")(function* (input: { sess
     const kids = yield* descendants(sessionID)
     const messages = yield* messageCount(sessionID)
     const tool = SessionOverview.externalOf(info)?.tool
+    const recorded = yield* Effect.promise(() =>
+      CloudShareRecord.forSessions([sessionID, ...kids]).catch(() => new Map<string, CloudShareRecord.Entry[]>()),
+    )
+    const consoleShares = [...recorded.values()].flat().map((entry) => ({
+      id: entry.id,
+      ...(entry.url ? { url: entry.url } : {}),
+    }))
     items.push({
       id,
       messages,
@@ -421,10 +495,12 @@ export const preview = Effect.fn("SessionBulk.preview")(function* (input: { sess
       queued: SessionPromptQueue.held(id),
       shared: !!info.share,
       ...(tool ? { tool } : {}),
+      ...(consoleShares.length ? { consoleShares } : {}),
     })
   }
   const state = yield* Effect.promise(() => CloudSyncApi.load())
-  return { items, sync: !!state?.device.syncEnabled }
+  const org = yield* Effect.promise(() => CloudOrg.resolve().catch(() => undefined))
+  return { items, sync: !!state?.device.syncEnabled, ...(org ? { console: org.host } : {}) }
 })
 
 const messageCount = Effect.fn("SessionBulk.messageCount")(function* (sessionID: SessionID) {
@@ -446,6 +522,8 @@ export type PreviewItem = {
   shared: boolean
   /** A Claude Code / Codex session: that tool keeps its own history. */
   tool?: string
+  /** Console shares made from it or its subagents (`lunos share`), revoked when it's deleted. */
+  consoleShares?: { id: string; url?: string }[]
 }
 
 /**

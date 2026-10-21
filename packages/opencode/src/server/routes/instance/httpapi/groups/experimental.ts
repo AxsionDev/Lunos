@@ -265,6 +265,8 @@ export const SessionBulkDeleteResult = Schema.Struct({
   skipped: Schema.mutable(Schema.Array(SessionBulkFailure)),
   /** XCOD-284: the running ones `stop` stopped before deleting them. */
   stopped: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  /** Console shares (`lunos share`) made from the deleted sessions, revoked first. */
+  sharesRevoked: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
 }).annotate({ identifier: "SessionBulkDeleteResult" })
 // XCOD-284: Delete in /sessions and the Agent Monitor (any session, not only archived ones).
 export const SessionBulkDeletePayload = Schema.Struct({
@@ -285,11 +287,17 @@ export const SessionBulkPreviewItem = Schema.Struct({
   queued: Schema.Finite,
   shared: Schema.Boolean,
   tool: Schema.optional(Schema.String),
+  /** Console shares made from it or its subagents (`lunos share`): revoked when it's deleted. */
+  consoleShares: Schema.optional(
+    Schema.mutable(Schema.Array(Schema.Struct({ id: Schema.String, url: Schema.optional(Schema.String) }))),
+  ),
 }).annotate({ identifier: "SessionBulkPreviewItem" })
 export const SessionBulkPreviewResult = Schema.Struct({
   items: Schema.mutable(Schema.Array(SessionBulkPreviewItem)),
   /** This device syncs sessions to Lunos Cloud, so a synced copy may exist. */
   sync: Schema.Boolean,
+  /** The organisation console configured here (its host), where console shares go. */
+  console: Schema.optional(Schema.String),
 }).annotate({ identifier: "SessionBulkPreviewResult" })
 
 export const ExperimentalPaths = {
@@ -635,7 +643,7 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.sessionBulk.preview",
             summary: "Preview deleting sessions",
             description:
-              "For each session: its message, subagent and queued-prompt counts, whether it's shared, and the external tool that keeps its own history. Changes nothing.",
+              "For each session: its message, subagent and queued-prompt counts, whether it's shared, the console shares made from it (revoked when it's deleted), and the external tool that keeps its own history. Changes nothing.",
           }),
         ),
         HttpApiEndpoint.get("sessionGroupList", ExperimentalPaths.sessionGroups, {
