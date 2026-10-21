@@ -21,6 +21,8 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+## [1.18.53] - 2026-10-21
+
 ### Changed
 
 - **With the sandbox on, `lunos` opens straight away and the sandbox starts behind it.** The line at
