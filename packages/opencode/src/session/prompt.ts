@@ -88,6 +88,17 @@ IMPORTANT:
 - Complete all necessary research and tool calls BEFORE calling this tool
 - This tool provides your final answer - no further actions are taken after calling it`
 
+import BUILD_PROOF from "./prompt/build-proof.txt"
+
+/**
+ * XCOD-288: the build agent finishes with proof (it runs and checks what it changed) rather than
+ * asking the user to test. Only where it can: a session whose shell is denied gets no such advice.
+ */
+export function buildProof(agent: { name: string; permission: PermissionV1.Ruleset }, session?: PermissionV1.Ruleset) {
+  if (agent.name !== "build") return false
+  return !Permission.disabled([ShellID.ToolID], Permission.merge(agent.permission, session ?? [])).has(ShellID.ToolID)
+}
+
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
 function mcpResourceBase64Size(value: string) {
@@ -1353,6 +1364,7 @@ const layer = Layer.effect(
               ...instructions,
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...(skills ? [skills] : []),
+              ...(buildProof(agent, session.permission) ? [BUILD_PROOF] : []),
             ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)

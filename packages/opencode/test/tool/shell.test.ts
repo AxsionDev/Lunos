@@ -8,6 +8,7 @@ import path from "path"
 import { Config } from "@/config/config"
 import { Shell } from "@opencode-ai/core/shell"
 import { ShellTool } from "../../src/tool/shell"
+import { ProcessTool, type Parameters as ProcessParameters } from "../../src/tool/process"
 import { Filesystem } from "@/util/filesystem"
 import { provideInstance, testInstanceStoreLayer, tmpdirScoped } from "../fixture/fixture"
 import type { Permission } from "../../src/permission"
@@ -1193,6 +1194,111 @@ describe("tool.shell truncation", () => {
         expect(lines.length).toBe(lineCount)
         expect(lines[0]).toBe("1")
         expect(lines[lineCount - 1]).toBe(String(lineCount))
+      }),
+    ),
+  )
+})
+
+// XCOD-288: background commands through the tool, as the agent uses them.
+describe("tool.shell background", () => {
+  const server = (dir: string) => {
+    const file = path.join(dir, "server.ts")
+    return Effect.promise(async () => {
+      await Bun.write(
+        file,
+        `const s = Bun.serve({ port: Number(process.env.PORT), hostname: "127.0.0.1", fetch: () => new Response("hello") }); console.log("listening " + s.port)`,
+      )
+      return file
+    })
+  }
+  const freePort = () => {
+    const s = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("") })
+    const port = s.port
+    s.stop(true)
+    return port!
+  }
+  const processTool = Effect.fn("ShellToolTest.process")(function* (args: ProcessParameters) {
+    const info = yield* ProcessTool
+    const tool = yield* info.init()
+    return yield* tool.execute(args, ctx)
+  })
+
+  if (process.platform !== "win32") {
+    it.live("starts a server, returns once it answers, and the process tool stops it", () =>
+      Effect.gen(function* () {
+        const dir = yield* tmpdirScoped()
+        const file = yield* server(dir)
+        const port = freePort()
+        const result = yield* runIn(
+          dir,
+          run({
+            command: `PORT=${port} ${bin} ${quote(file)}`,
+            background: true,
+            ready_url: `http://localhost:${port}/`,
+            timeout: 20_000,
+          }),
+        )
+        expect(result.output).toContain(`answered HTTP 200`)
+        expect(result.output).toContain("keeps running after this call")
+        expect(result.metadata.exit).toBeNull()
+        const bg = result.metadata.background!
+        expect(bg.status).toBe("running")
+        expect(yield* Effect.promise(() => fetch(`http://127.0.0.1:${port}/`).then((r) => r.text()))).toBe("hello")
+
+        const listed = yield* runIn(dir, processTool({ action: "list" }))
+        expect(listed.output).toContain(bg.id)
+
+        const stopped = yield* runIn(dir, processTool({ action: "stop", id: bg.id }))
+        expect(stopped.output).toContain("stopped")
+        const after = yield* Effect.promise(() =>
+          fetch(`http://127.0.0.1:${port}/`).then(
+            () => "answered",
+            () => "refused",
+          ),
+        )
+        expect(after).toBe("refused")
+      }),
+    )
+
+    it.live("reports a background command that fails at once", () =>
+      runIn(
+        projectRoot,
+        Effect.gen(function* () {
+          const result = yield* run({ command: `echo cannot start; exit 7`, background: true })
+          expect(result.output).toContain("exited with code 7")
+          expect(result.output).toContain("cannot start")
+          expect(result.metadata.exit).toBe(7)
+        }),
+      ),
+    )
+  }
+
+  it.live("refuses a readiness URL that isn't this machine", () =>
+    runIn(
+      projectRoot,
+      Effect.gen(function* () {
+        const err = yield* fail({ command: "echo hi", background: true, ready_url: "http://example.com/" })
+        expect(err.message).toContain("must point at this machine")
+      }),
+    ),
+  )
+
+  it.live("refuses ready_url without background", () =>
+    runIn(
+      projectRoot,
+      Effect.gen(function* () {
+        const err = yield* fail({ command: "echo hi", ready_url: "http://127.0.0.1:3000/" })
+        expect(err.message).toContain("only applies with background")
+      }),
+    ),
+  )
+
+  it.live("the process tool only sees this session's processes", () =>
+    runIn(
+      projectRoot,
+      Effect.gen(function* () {
+        const exit = yield* processTool({ action: "stop", id: "bg_nope" }).pipe(Effect.exit)
+        expect(Exit.isFailure(exit)).toBe(true)
       }),
     ),
   )

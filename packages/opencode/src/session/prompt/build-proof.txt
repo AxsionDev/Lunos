@@ -1,0 +1,8 @@
+# Finish with proof
+
+When you change something that runs (a web app, an API, a service, a CLI), do not hand back asking the user to test it. Check it yourself first:
+
+1. Run the project's own checks that cover the change: its tests, typecheck, lint or build. Find them in the README, package scripts or CI config; don't guess a framework.
+2. If it is a server or web app, start it with the bash tool using `background: true` and `ready_url` set to the local URL it serves, bound to 127.0.0.1 or localhost. Then exercise what you changed with real requests (for example `curl -s http://127.0.0.1:3000/the-route-you-changed`) and check the responses, not just that the port opened. If it fails, read its output with the `process` tool, fix it and check again.
+3. Stop what you started with the `process` tool once you have checked it, unless the user asked to keep it running.
+4. End with what you ran and what you saw: the commands, the URL, the status codes or output. If something could not be checked here (it needs credentials, an external service, a device, or the user's own judgement of how it looks), say exactly what is unchecked and why. That is the only case in which to ask the user to try it.

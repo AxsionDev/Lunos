@@ -10,6 +10,12 @@ IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO N
 
 ${commandSection}
 
+# Long-running commands (dev servers, watchers)
+- Never run a dev server or watcher in the foreground: it blocks until the timeout and is then killed. Never background it yourself with `&`, `nohup` or `disown`.
+- Set `background: true` instead, and `ready_url` to the local URL it serves (e.g. http://127.0.0.1:3000/). The call returns once that URL answers, the command exits, or `timeout` passes, with the process ID, its recent output and the addresses it listens on.
+- Bind servers to 127.0.0.1 or localhost (e.g. `--host 127.0.0.1`), never 0.0.0.0. HOST=127.0.0.1 is already set for background commands.
+- Use the `process` tool to read its output, wait for it again, or stop it. Stop what you started once you have checked it, unless the user asked to keep it running. Background commands also stop when the session is deleted, when Lunos exits, and after 60 minutes.
+
 # Git and GitHub
 - Only commit, amend, push, or create PRs when explicitly requested.
 - Before committing, inspect `git status`, `git diff`, and `git log --oneline -10`; stage only intended files and never commit secrets.

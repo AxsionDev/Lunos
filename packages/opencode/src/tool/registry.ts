@@ -5,6 +5,7 @@ import { PlanExitTool } from "./plan"
 import { Session } from "@/session/session"
 import { QuestionTool } from "./question"
 import { ShellTool } from "./shell"
+import { ProcessTool } from "./process"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
@@ -114,6 +115,7 @@ const layer = Layer.effect(
     const websearch = yield* WebSearchTool
     const externalAgent = yield* ExternalAgentTool
     const shell = yield* ShellTool
+    const processTool = yield* ProcessTool
     const globtool = yield* GlobTool
     const writetool = yield* WriteTool
     const edit = yield* EditTool
@@ -215,6 +217,7 @@ const layer = Layer.effect(
         const tool = yield* Effect.all({
           invalid: Tool.init(invalid),
           shell: Tool.init(shell),
+          process: Tool.init(processTool),
           read: Tool.init(read),
           glob: Tool.init(globtool),
           grep: Tool.init(greptool),
@@ -239,6 +242,8 @@ const layer = Layer.effect(
             tool.invalid,
             ...(questionEnabled ? [tool.question] : []),
             tool.shell,
+            // XCOD-288: manages what the shell tool started with `background: true`.
+            tool.process,
             tool.read,
             tool.glob,
             tool.grep,

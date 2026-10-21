@@ -286,7 +286,10 @@ export function disabled(tools: string[], ruleset: PermissionV1.Ruleset): Set<st
           ? "read"
           : memory.includes(tool)
             ? "memory"
-            : tool
+            : // XCOD-288: the process tool only manages what bash started; no bash, no process tool.
+              tool === "process"
+              ? "bash"
+              : tool
       const rule = ruleset.findLast((rule) => Wildcard.match(permission, rule.permission))
       return rule?.pattern === "*" && rule.action === "deny"
     }),
