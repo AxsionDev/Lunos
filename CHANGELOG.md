@@ -28,6 +28,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   drive such as `D:`. The sandbox now says so, shows Git's own message, and gives the
   `git config --global --add safe.directory <path>` command that fixes it. Any other Git failure
   shows Git's error instead of a guess.
+## [1.18.53] - 2026-10-21
 
 ### Changed
 
