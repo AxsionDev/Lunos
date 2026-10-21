@@ -630,6 +630,18 @@ jobs:
             | select(.value.result != "success")
             | select(.key != "sign-cli-windows" or .value.result != "skipped")
             | "\(.key): \(.value.result)"' <<<"$NEEDS")
+          # Also ask the API for every finished job in this attempt, one row per matrix leg, rather
+          # than trusting how `needs.build-electron.result` aggregates a single cancelled leg. Only
+          # this job and publish are unfinished (null conclusion). If the API is unreachable, the
+          # `needs` check above still decides on its own.
+          if jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '.jobs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped")
+              | "\(.id)\t\(.conclusion)\t\(.name)"'); then
+            if [ -n "$jobs" ] && [ -z "$blocked" ]; then blocked="(see jobs below)"; fi
+          else
+            jobs=""
+            echo "::warning::Could not list this attempt's jobs; gating on needs results only."
+          fi
           if [ -z "$blocked" ]; then
             echo "Every required job succeeded."
             exit 0
@@ -642,12 +654,8 @@ jobs:
             echo "Jobs that did not succeed in attempt $GITHUB_RUN_ATTEMPT:"
             echo
           } >> "$GITHUB_STEP_SUMMARY"
-          # Name the exact matrix leg and GitHub's reason (e.g. "The job was not acquired by Runner
-          # of type hosted even after multiple attempts"). Best effort: the gate decision above
-          # stands even if the API is unreachable.
-          jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
-            --jq '.jobs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped")
-              | "\(.id)\t\(.conclusion)\t\(.name)"') || jobs=""
+          # Name the exact matrix leg and GitHub's reason, e.g. "The job was not acquired by Runner
+          # of type hosted even after multiple attempts".
           while IFS=$'\t' read -r id conclusion name; do
             [ -n "$id" ] || continue
             reason=$(gh api "repos/$GITHUB_REPOSITORY/check-runs/$id/annotations" \
