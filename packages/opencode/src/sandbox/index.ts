@@ -1,4 +1,5 @@
 import fs from "node:fs/promises"
+import { realpathSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { randomBytes } from "node:crypto"
@@ -165,10 +166,26 @@ export type Status = {
 }
 
 /**
+ * Whether a sandbox belongs to the project at `worktree`. XCOD-282: a folder that isn't a repository
+ * is the "global" project, whose worktree is "/": its sandboxes are matched by `directory` instead.
+ */
+export function belongs(info: Pick<Meta, "root" | "source">, worktree: string, directory?: string) {
+  const real = (item: string) => {
+    try {
+      return realpathSync(item)
+    } catch {
+      return item
+    }
+  }
+  const places = info.source === "folder" && directory ? [worktree, directory] : [worktree]
+  return places.some((place) => info.root === place || info.root === real(place))
+}
+
+/**
  * For the Status tab. Inside a sandbox, the marker (only when it matches LUNOS_SANDBOX, see
  * SandboxConfig.inside); on the host, the project's sandboxes from their metadata.
  */
-export async function status(root: string | undefined): Promise<Status> {
+export async function status(root: string | undefined, directory?: string): Promise<Status> {
   if (SandboxConfig.inside()) {
     const marker = JSON.parse(
       await fs.readFile(path.join(SandboxDocker.POLICY_DIR, SandboxDocker.MARKER), "utf8"),
@@ -177,7 +194,7 @@ export async function status(root: string | undefined): Promise<Status> {
   }
   return {
     known: (await known())
-      .filter((info) => !root || info.root === root)
+      .filter((info) => !root || belongs(info, root, directory))
       .map((info) => ({
         id: info.id,
         created: info.created,
@@ -728,7 +745,7 @@ export async function apply(id: string) {
     throw new Error(
       info
         ? `Sandbox ${id} hasn't handed its results back yet: that happens when the session in it ends (\`lunos sandbox attach ${id}\`, then quit).`
-        : `No results for sandbox ${id}: it never handed any back, or it ran in a git repository. \`lunos sandbox list\` shows the sandboxes that exist.`,
+        : `No results for sandbox ${id}: it never handed any back, or it ran in a git repository. Its id is in the run's last lines ("lunos sandbox apply <id>").`,
     )
   const applied = await SandboxGit.applyFolder(found)
   AuditLog.emit("sandbox.apply", {

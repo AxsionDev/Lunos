@@ -264,7 +264,45 @@ describe("lunos sandbox apply", () => {
     const again = await Sandbox.apply("apply1")
     expect(again.written).toEqual([])
     expect(again.deleted).toEqual([])
-    expect(again.unchanged.sort()).toEqual(["new/chart.png", "notes.docx", "sub/a.md"])
+    expect(again.unchanged).toEqual([])
+  })
+
+  test("reopened and handed back again, the next apply starts from what the last one wrote", async () => {
+    await using tmp = await tmpdir()
+    await Bun.write(path.join(tmp.path, "a.txt"), "a\n")
+    await Bun.write(path.join(tmp.path, "b.txt"), "b\n")
+    await Bun.write(path.join(tmp.path, "c.txt"), "c\n")
+    const repo = await handedOff(tmp.path, "apply3", async (ws) => {
+      await Bun.write(path.join(ws, "a.txt"), "agent a 1\n")
+      await Bun.write(path.join(ws, "c.txt"), "agent c\n")
+    })
+    // You already copied c.txt across by hand: it's left alone.
+    await Bun.write(path.join(tmp.path, "c.txt"), "agent c\n")
+    const first = await Sandbox.apply("apply3")
+    expect(first.written).toEqual(["a.txt"])
+    expect(first.unchanged).toEqual(["c.txt"])
+
+    // `lunos sandbox attach`: the agent changes a.txt again (and b.txt), and the branch advances.
+    const branch = Sandbox.branchName("apply3")
+    const previous = (await SandboxGit.branchHead(repo.gitDir, branch))!
+    // The workspace as the reopened sandbox has it: the first result.
+    await using seed = await tmpdir()
+    await $`git --git-dir ${repo.gitDir} archive ${previous} | tar -x -f - -C ${seed.path}`.quiet()
+    await Bun.write(path.join(seed.path, "a.txt"), "agent a 2\n")
+    await Bun.write(path.join(seed.path, "b.txt"), "agent b\n")
+    const tree = await SandboxGit.tree({
+      gitDir: repo.gitDir,
+      workTree: seed.path,
+      startTree: await SandboxGit.treeOfCommit(repo.gitDir, previous),
+    })
+    const commit = await SandboxGit.commit({ gitDir: repo.gitDir, tree, parent: previous, message: "agent again" })
+    await SandboxGit.setBranch({ gitDir: repo.gitDir, branch, commit, expected: previous })
+
+    // a.txt holds what the first apply wrote: that's not a change of yours.
+    const second = await Sandbox.apply("apply3")
+    expect(second.written.sort()).toEqual(["a.txt", "b.txt"])
+    expect(await Bun.file(path.join(tmp.path, "a.txt")).text()).toBe("agent a 2\n")
+    expect(await Bun.file(path.join(tmp.path, "b.txt")).text()).toBe("agent b\n")
   })
 
   test("refuses, writing nothing, when you changed a file the agent changed since the sandbox started", async () => {
@@ -281,6 +319,14 @@ describe("lunos sandbox apply", () => {
       "Nothing was written: since the sandbox started you changed a file the agent also changed (b.txt)",
     )
     expect(await listing(tmp.path)).toEqual(before)
+  })
+
+  test('a folder sandbox belongs to its folder, which the project layer sees as worktree "/"', () => {
+    expect(Sandbox.belongs({ root: "/docs", source: "folder" }, "/", "/docs")).toBe(true)
+    expect(Sandbox.belongs({ root: "/docs", source: "folder" }, "/", "/other")).toBe(false)
+    expect(Sandbox.belongs({ root: "/repo" }, "/repo", "/repo/src")).toBe(true)
+    // A git sandbox is never matched by directory alone.
+    expect(Sandbox.belongs({ root: "/repo" }, "/", "/repo")).toBe(false)
   })
 
   test("a sandbox with no results, or one from a git repository, says so", async () => {

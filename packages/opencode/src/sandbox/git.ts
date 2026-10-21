@@ -246,6 +246,21 @@ async function snapshot(found: Location, options: { id?: string; limits?: Limits
 }
 
 export const baseRef = (id: string) => `refs/lunos/base/${id}`
+/** The result `lunos sandbox apply` last wrote into the folder: the next apply starts from it. */
+export const appliedRef = (id: string) => `refs/lunos/applied/${id}`
+
+const commitAt = async (gitDir: string, ref: string) => {
+  const result = await SandboxExec.run([
+    "git",
+    "--git-dir",
+    gitDir,
+    "rev-parse",
+    "--verify",
+    "--quiet",
+    `${ref}^{commit}`,
+  ])
+  return result.code === 0 ? result.stdout.trim() : undefined
+}
 
 /**
  * A folder sandbox's results, from its shadow: found by id after the sandbox's own metadata is gone
@@ -257,9 +272,10 @@ export async function folderResult(id: string, branch: string) {
     const gitDir = path.join(dir, name)
     const result = await branchHead(gitDir, branch)
     if (!result) continue
-    const base = await SandboxExec.run(["git", "--git-dir", gitDir, "rev-parse", "--verify", `${baseRef(id)}^{commit}`])
+    const base = await commitAt(gitDir, baseRef(id))
+    if (!base) continue
     const { root } = JSON.parse(await fs.readFile(path.join(gitDir, FOLDER_FILE), "utf8")) as { root: string }
-    if (base.code === 0) return { gitDir, root, base: base.stdout.trim(), result }
+    return { id, gitDir, root, base, result, applied: await commitAt(gitDir, appliedRef(id)) }
   }
   return undefined
 }
@@ -278,20 +294,24 @@ async function differing(gitDir: string, from: string, to: string) {
 /**
  * Write a folder sandbox's results into the folder: every file the agent changed, taken from the
  * result tree (byte for byte), and its deletions. Refuses, writing nothing, when the user changed
- * any of those files on this machine since the sandbox started; a file that already holds the
- * agent's version is left alone, so applying twice is harmless.
+ * any of those files on this machine since the sandbox started (or since the last apply, when it
+ * was reopened and handed back again); a file that already holds the agent's version is left
+ * alone, so applying twice is harmless.
  */
 export async function applyFolder(input: {
+  id: string
   gitDir: string
   root: string
   base: string
   result: string
+  applied?: string
 }): Promise<Applied> {
   if (!existsSync(input.root))
     throw new Error(`${input.root} doesn't exist any more, so there's nowhere to write the results`)
-  const agent = await differing(input.gitDir, input.base, input.result)
+  const from = input.applied ?? input.base
+  const agent = await differing(input.gitDir, from, input.result)
   const host = await tree({ gitDir: input.gitDir, workTree: input.root })
-  const user = await differing(input.gitDir, input.base, host)
+  const user = await differing(input.gitDir, from, host)
   const done = await differing(input.gitDir, host, input.result)
   const unchanged = [...agent.keys()].filter((file) => !done.has(file))
   const conflicts = [...agent.keys()].filter((file) => user.has(file) && done.has(file))
@@ -327,6 +347,7 @@ export async function applyFolder(input: {
     }
   }
   for (const file of remove) await fs.rm(path.join(input.root, file), { force: true })
+  await git(["--git-dir", input.gitDir, "update-ref", appliedRef(input.id), input.result])
   return { written: write, deleted: remove, unchanged }
 }
 
