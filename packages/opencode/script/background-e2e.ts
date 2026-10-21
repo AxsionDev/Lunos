@@ -309,6 +309,110 @@ check("port is free before the scenarios (lsof exit 1 = nothing)", pre.exit === 
   )
 }
 
+// D: against a long-running `lunos serve`, so the end of a turn can be told apart from Lunos
+// exiting: a server not kept stops with the turn; a kept one survives it and stops when the session
+// is deleted.
+{
+  console.log("\n# D: turn end vs keep, on a long-running server")
+  const { proj, env } = await project("d")
+  const password = "e2e-" + Math.random().toString(36).slice(2)
+  const serverEnv = { ...env, OPENCODE_SERVER_PASSWORD: password }
+  const lunosPort = 40000 + Math.floor(Math.random() * 10000)
+  const serve = Bun.spawn(
+    ["bun", "run", path.join(opencode, "src", "index.ts"), "serve", "--port", String(lunosPort)],
+    {
+      cwd: proj,
+      env: serverEnv,
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  )
+  const base = `http://127.0.0.1:${lunosPort}`
+  const auth = { authorization: "Basic " + btoa(`opencode:${password}`) }
+  const upBy = Date.now() + 60_000
+  while (Date.now() < upBy) {
+    const ok = await fetch(`${base}/session`, { headers: auth }).then(
+      (r) => r.ok,
+      () => false,
+    )
+    if (ok) break
+    await Bun.sleep(300)
+  }
+  const attach = () =>
+    Bun.spawn(
+      [
+        "bun",
+        "run",
+        path.join(opencode, "src", "index.ts"),
+        "run",
+        "--attach",
+        base,
+        "--dir",
+        proj,
+        "--format",
+        "json",
+        "do it",
+      ],
+      { cwd: proj, env: serverEnv, stdout: "pipe", stderr: "pipe", timeout: 240_000 },
+    )
+  const finish = async (proc: ReturnType<typeof attach>) => {
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ])
+    return { stdout, stderr, code }
+  }
+
+  // D1: started, checked, not kept: gone once the turn ends, with Lunos still running.
+  script = [() => start(), () => curl(), () => ({ text: "checked" })]
+  const one = await finish(attach())
+  check("turn 1 finished", one.code === 0, one.code === 0 ? "" : one.stderr.slice(-1500))
+  check("server was up during turn 1", /fixture app HTTP=200/.test(toolOutputs(one.stdout)[1]?.output ?? ""))
+  let after = await listeners()
+  const turnEnd = Date.now()
+  while (after.exit === 0 && Date.now() - turnEnd < 6000) {
+    await Bun.sleep(250)
+    after = await listeners()
+  }
+  check(
+    "not kept: port free after the turn, while lunos serve still runs",
+    after.exit === 1 && serve.exitCode === null,
+    `lsof exit=${after.exit} ${after.text}`,
+  )
+
+  // D2: started and kept: still up after the turn; deleting the session stops it.
+  script = [
+    () => start(),
+    (req) => ({ tool: "process", args: { action: "keep", id: bgId(req) } }),
+    () => ({ text: "left it running at http://127.0.0.1:4319" }),
+  ]
+  const two = await finish(attach())
+  check("turn 2 finished", two.code === 0, two.code === 0 ? "" : two.stderr.slice(-1500))
+  check("process tool kept it", /Kept:/.test(toolOutputs(two.stdout)[1]?.output ?? ""))
+  await Bun.sleep(1000)
+  const kept = await listeners()
+  check("kept: still listening after the turn", kept.exit === 0, kept.text)
+  const sessionID = two.stdout.match(/"sessionID":"(ses_[^"]+)"/)?.[1]
+  const del = sessionID
+    ? await fetch(`${base}/session/${sessionID}?directory=${encodeURIComponent(proj)}`, {
+        method: "DELETE",
+        headers: auth,
+      }).then((r) => r.status)
+    : 0
+  check("session deleted through the API", del >= 200 && del < 300, `session=${sessionID} status=${del}`)
+  let gone = await listeners()
+  const deletedAt = Date.now()
+  while (gone.exit === 0 && Date.now() - deletedAt < 8000) {
+    await Bun.sleep(250)
+    gone = await listeners()
+  }
+  check("kept server stopped when its session was deleted", gone.exit === 1, `lsof exit=${gone.exit} ${gone.text}`)
+
+  serve.kill("SIGTERM")
+  await serve.exited
+}
+
 model.stop(true)
 console.log(`\n${failures.length ? `FAILED: ${failures.join(", ")}` : "all checks passed"}`)
 process.exit(failures.length ? 1 : 0)
