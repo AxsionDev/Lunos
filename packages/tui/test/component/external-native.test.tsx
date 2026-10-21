@@ -107,6 +107,7 @@ async function mount(input: { tool?: Tool; modes?: string[]; choices?: unknown[]
     ...(marker ? { metadata: { external: marker } } : {}),
   }
   const calls: Call[] = []
+  const agentCycles: number[] = []
   const tmp = await tmpdir()
   const state = path.join(tmp.path, "state")
   await mkdir(state, { recursive: true })
@@ -153,7 +154,7 @@ async function mount(input: { tool?: Tool; modes?: string[]; choices?: unknown[]
     { KVProvider },
     { ToastProvider },
     { RouteProvider, useRoute },
-    { TuiConfigProvider },
+    { TuiConfigProvider, useTuiConfig },
     { SDKProvider },
     { PermissionProvider },
     { ProjectProvider },
@@ -170,7 +171,7 @@ async function mount(input: { tool?: Tool; modes?: string[]; choices?: unknown[]
     { LocationProvider },
     { ExitProvider },
     { ClipboardProvider },
-    { OpencodeKeymapProvider, registerOpencodeKeymap },
+    { OpencodeKeymapProvider, registerOpencodeKeymap, useBindings, OPENCODE_BASE_MODE },
     { Prompt },
     { PermissionPrompt },
     { useExternalKeyProfile },
@@ -207,6 +208,15 @@ async function mount(input: { tool?: Tool; modes?: string[]; choices?: unknown[]
     const route = useRoute()
     const promptRef = usePromptRef()
     const [ready, setReady] = createSignal(false)
+    const tuiConfig = useTuiConfig()
+    // Lunos's own agent cycle on the same key, as app.tsx registers it: it must not also fire.
+    useBindings(() => ({
+      commands: [{ name: "mode.cycle.reverse", title: "Mode cycle reverse", run: () => void agentCycles.push(1) }],
+    }))
+    useBindings(() => ({
+      mode: OPENCODE_BASE_MODE,
+      bindings: tuiConfig.keybinds.gather("app", ["mode.cycle.reverse"]),
+    }))
     // As the session route mounts it.
     useExternalKeyProfile(() => (ready() ? "ses_ext" : undefined))
     onMount(() => {
@@ -290,6 +300,7 @@ async function mount(input: { tool?: Tool; modes?: string[]; choices?: unknown[]
   return {
     frame,
     calls,
+    agentCycles,
     /** The server saved a new marker (as session.updated after the mode POST). */
     update(next: Record<string, unknown>) {
       Object.assign(session, { metadata: { external: { ...marker, ...next } } })
@@ -459,6 +470,8 @@ describe("Shift+Tab cycles Claude Code's permission mode, as in the tool", () =>
       await wait(() => modes(ui).length === 3)
       // Never into a mode that skips or auto-decides approvals.
       expect(modes(ui)).toEqual(["acceptEdits", "plan", "manual"])
+      // The tool's key wins inside its session: Lunos's agent cycle on the same key never ran.
+      expect(ui.agentCycles).toEqual([])
     } finally {
       await ui.cleanup()
     }
@@ -485,8 +498,25 @@ describe("Shift+Tab cycles Claude Code's permission mode, as in the tool", () =>
       await ui.key("TAB", { shift: true })
       await Bun.sleep(200)
       expect(modes(ui)).toEqual([])
+      // Outside a Claude Code session the key is Lunos's own again.
+      expect(ui.agentCycles).toEqual([1])
     } finally {
       await ui.cleanup()
     }
   })
+})
+
+test("`!` in a Claude Code session is typed as is and goes to the tool, not to Lunos's shell", async () => {
+  const ui = await mount({ tool: "claude", modes: MODES.current })
+  try {
+    await ui.type("!ls")
+    await ui.enter()
+    await wait(() => ui.calls.some((call) => call.path === "/session/ses_ext/message"))
+    expect(ui.calls.find((call) => call.path === "/session/ses_ext/message")!.body.parts).toEqual([
+      { type: "text", text: "!ls" },
+    ])
+    expect(ui.calls.filter((call) => call.path.endsWith("/shell"))).toEqual([])
+  } finally {
+    await ui.cleanup()
+  }
 })

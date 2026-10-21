@@ -941,7 +941,10 @@ export function Prompt(props: PromptProps) {
           !props.disabled &&
           store.mode === "normal" &&
           !auto()?.visible &&
-          input?.visualCursor.offset === 0
+          input?.visualCursor.offset === 0 &&
+          // XCOD-285: in a Claude Code / Codex session `!` is typed as is and goes to the tool with the
+          // text; Lunos's shell mode would drop it and send the rest to the tool as a prompt.
+          !external()
         )
       })(),
       bindings: [
