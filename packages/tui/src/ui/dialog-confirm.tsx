@@ -13,6 +13,8 @@ export type DialogConfirmProps = {
   onConfirm?: () => void
   onCancel?: () => void
   label?: string
+  /** XCOD-286: the confirm button's text ("Stop and close"), shown as written, as `label` then is. */
+  confirmLabel?: string
 }
 
 export type DialogConfirmResult = boolean | undefined
@@ -85,7 +87,11 @@ export function DialogConfirm(props: DialogConfirmProps) {
               <text fg={key === store.active ? theme.selectedListItemText : theme.textMuted}>
                 {/* XCOD-141: a marker as well as the highlight, so the choice doesn't rely on colour alone. */}
                 {selectionMarker(key === store.active)}
-                {Locale.titlecase(key === "cancel" ? (props.label ?? key) : key)}
+                {props.confirmLabel
+                  ? key === "cancel"
+                    ? (props.label ?? "Cancel")
+                    : props.confirmLabel
+                  : Locale.titlecase(key === "cancel" ? (props.label ?? key) : key)}
               </text>
             </box>
           )}

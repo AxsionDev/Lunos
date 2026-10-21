@@ -3,6 +3,7 @@ import { animationsEnabled } from "./util/motion"
 import { DialogArtifacts } from "./component/dialog-artifacts"
 import { DialogBackground } from "./component/dialog-background"
 import { DialogExternal, useExternalCommand } from "./component/dialog-external"
+import { useExternalExit } from "./component/external-exit"
 import { EXTERNAL_LABEL, externalOf, toolUnavailable, toolsWanted } from "./util/external"
 import type { ExternalToolStatus } from "@opencode-ai/sdk/v2"
 import { registerOpencodeSpinner } from "./component/register-spinner"
@@ -457,6 +458,7 @@ function App(props: {
   const sync = useSync()
   const project = useProject()
   const exit = useExit()
+  const externalExit = useExternalExit()
   const promptRef = usePromptRef()
   const pluginRuntime = usePluginRuntime()
   const attention = createTuiAttention({ renderer, config: tuiConfig, kv })
@@ -1479,14 +1481,8 @@ function App(props: {
             },
           ]
         : []),
-      {
-        name: "app.exit",
-        title: "Exit the app",
-        slashName: "exit",
-        slashAliases: ["quit", "q"],
-        run: () => exit(),
-        category: "System",
-      },
+      // XCOD-286: app.exit and app.quit (Quit Lunos, /exit:lunos), external-session aware.
+      ...externalExit.commands(),
       {
         name: "app.debug",
         title: "Toggle debug panel",
@@ -1635,11 +1631,9 @@ function App(props: {
 
   useBindings(() => ({
     mode: OPENCODE_BASE_MODE,
-    enabled: () => {
-      const current = promptRef.current
-      if (!current?.focused) return true
-      return current.current.input === ""
-    },
+    // XCOD-286: a focused prompt in a Claude Code / Codex session takes these keys itself (ctrl+c
+    // interrupts a working tool first), so this binding doesn't race it.
+    enabled: () => externalExit.globalKeys(promptRef.current),
     bindings: tuiConfig.keybinds.gather("app_exit", ["app.exit"]),
   }))
 
