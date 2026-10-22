@@ -138,7 +138,8 @@ export function toolUnavailable(tool: ExternalTool, state: ExternalToolState | u
   if (!state) return undefined
   if (state.refused) return state.refused.reason === "residency" ? "blocked by policy" : state.refused.message
   if (!state.installed) return `${EXTERNAL_LABEL[tool]} isn't installed — see lunos external list`
-  if (state.loggedIn === false) return `${EXTERNAL_LABEL[tool]} isn't signed in — see lunos external list`
+  // XCOD-294: still chosen: the command offers the tool's own sign-in.
+  if (state.loggedIn === false) return `${EXTERNAL_LABEL[tool]} isn't signed in — choose it to sign in`
   return undefined
 }
 

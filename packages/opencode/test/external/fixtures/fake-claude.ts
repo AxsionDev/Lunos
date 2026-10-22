@@ -2,7 +2,7 @@
 // XCOD-204: stands in for Claude Code in tests. Replays the recorded stream-json session in
 // claude-stream.jsonl, waiting at each can_use_tool request for the host's control_response and
 // recording what the host sent (to FAKE_CLAUDE_LOG) so the test can check it.
-import { appendFileSync, mkdirSync, readFileSync } from "fs"
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import path from "path"
 import { createInterface } from "readline"
 
@@ -75,6 +75,29 @@ if (process.argv.includes("--help")) {
       (old ? "" : "\n--no-session-persistence\n--settings <file-or-json>"),
   )
   process.exit(0)
+}
+// XCOD-294: FAKE_CLAUDE_AUTH=<file> is a Claude Code whose sign-in is that file. Without it, `auth status`
+// answers as 2.1.304 does in a fresh HOME (JSON, exit 1); `auth login` makes up a token, writes it there
+// and prints it on the terminal it was given, so a test can tell if Lunos ever got hold of it.
+const auth = process.env.FAKE_CLAUDE_AUTH
+if (auth && process.argv[2] === "auth" && process.argv[3] === "login") {
+  const token = `sk-fake-${crypto.randomUUID()}`
+  writeFileSync(auth, token)
+  console.log(`Logged in. Token ${token} saved by Claude Code.`)
+  process.exit(0)
+}
+if (auth && process.argv[2] === "auth" && process.argv[3] === "status") {
+  const signedIn = existsSync(auth)
+  console.log(
+    JSON.stringify(
+      signedIn
+        ? { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty" }
+        : { loggedIn: false, authMethod: "none", apiProvider: "firstParty" },
+      null,
+      2,
+    ),
+  )
+  process.exit(signedIn ? 0 : 1)
 }
 if (process.argv[2] === "auth" && process.argv[3] === "status") {
   console.log(JSON.stringify({ loggedIn: true, authMethod: "claude.ai" }))

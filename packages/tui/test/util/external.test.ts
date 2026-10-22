@@ -61,7 +61,7 @@ describe("/claude and /codex (XCOD-250)", () => {
       "Claude Code isn't installed — see lunos external list",
     )
     expect(toolUnavailable("codex", { installed: true, loggedIn: false })).toBe(
-      "Codex CLI isn't signed in — see lunos external list",
+      "Codex CLI isn't signed in — choose it to sign in",
     )
     expect(
       toolUnavailable("claude", { installed: true, refused: { reason: "residency", message: "sends your code to…" } }),
