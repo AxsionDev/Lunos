@@ -26,6 +26,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@opencode-ai/core/database/database"
 import { Usage, type LLMEvent } from "@opencode-ai/llm"
 import { RunBudget } from "@/agent/run-budget"
+import { Budget } from "@/budget"
 
 const DOOM_LOOP_THRESHOLD = 3
 export type Result = "compact" | "stop" | "continue"
@@ -458,6 +459,8 @@ const layer = Layer.effect(
             ctx.assistantMessage.finish = value.reason
             ctx.assistantMessage.cost += usage.cost
             RunBudget.spend(usage.cost)
+            // XCOD-298: counted against the project's budget at the next step, before the database is re-read.
+            Budget.spent(ctx.assistantMessage.sessionID, usage.cost)
             ctx.assistantMessage.tokens = usage.tokens
             yield* session.updatePart({
               id: PartID.ascending(),

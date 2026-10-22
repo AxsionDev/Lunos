@@ -2530,3 +2530,70 @@ noLLMServer.instance(
     }),
   30_000,
 )
+
+// XCOD-298: on_limit "ask" in an interactive session: the turn waits for the answer. "Run anyway"
+// runs it; "Stop" doesn't start it.
+for (const answer of ["Run anyway", "Stop"] as const) {
+  it.instance(`a turn estimated past the budget asks first; ${answer}`, () =>
+    Effect.gen(function* () {
+      const { llm, dir } = yield* useServerConfig((url) => {
+        const value = providerCfg(url)
+        value.provider.test.models["test-model"].cost = { input: 1000, output: 1000 }
+        return value
+      })
+      const { ProjectGroup } = yield* Effect.promise(() => import("../../src/project/group"))
+      const { Budget } = yield* Effect.promise(() => import("../../src/budget"))
+      Budget.reset()
+      const group = yield* Effect.promise(() => ProjectGroup.create({ name: `Budgeted ${answer}`, folders: [dir] }))
+      // €50 a month, €49.90 already spent (at the default 0.9 €/$), so any turn may go over.
+      yield* Effect.promise(() => ProjectGroup.setBudget(group.id, { amount: 50 }))
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const question = yield* Question.Service
+      const session = yield* sessions.create({
+        title: "Budget",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      yield* sessions.updateMessage({
+        id: MessageID.ascending(),
+        role: "assistant",
+        sessionID: session.id,
+        parentID: MessageID.ascending(),
+        mode: "build",
+        agent: "build",
+        path: { cwd: dir, root: dir },
+        cost: 49.9 / 0.9,
+        tokens: { input: 1000, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: "test-model",
+        providerID: "test",
+        time: { created: Date.now() - 1000, completed: Date.now() - 1000 },
+      } as never)
+      yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [{ type: "text", text: "go" }],
+      })
+      yield* llm.text("done", { usage: { input: 10, output: 10 } })
+
+      const loop = yield* prompt.loop({ sessionID: session.id }).pipe(Effect.forkScoped)
+      const pending = yield* Effect.gen(function* () {
+        for (;;) {
+          const [item] = yield* question.list()
+          if (item) return item
+          yield* Effect.sleep("20 millis")
+        }
+      }).pipe(Effect.timeout("10 seconds"))
+      expect(pending.questions[0]?.question).toContain("may take Budgeted")
+      expect(pending.questions[0]?.options.map((option) => option.label)).toEqual([
+        "Run anyway",
+        "Use a cheaper model…",
+        "Stop",
+      ])
+      yield* question.reply({ requestID: pending.id, answers: [[answer]] })
+      yield* Fiber.join(loop)
+      expect(yield* llm.calls).toBe(answer === "Run anyway" ? 1 : 0)
+      yield* Effect.promise(() => ProjectGroup.archive(group.id))
+    }),
+  )
+}

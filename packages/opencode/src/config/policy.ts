@@ -75,6 +75,10 @@ export const KNOWN = [
   "subagent.mascots",
   // XCOD-288: the commands the Build agent verifies its work with (plus `agent.<name>.verify`).
   "verify",
+  // XCOD-298: the organisation's budget (enforced only while locked), and what happens at a limit.
+  "budget",
+  "budget.organisation",
+  "budget.on_limit",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */

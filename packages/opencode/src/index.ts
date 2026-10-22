@@ -19,6 +19,7 @@ import { LoginCommand, LogoutCommand, WhoamiCommand } from "./cli/cmd/cloud"
 import { CloudCommand } from "./cli/cmd/cloud-git-token"
 import { OrgCommand } from "./cli/cmd/org"
 import { ProjectCommand } from "./cli/cmd/project"
+import { BudgetCommand } from "./cli/cmd/budget"
 import { ExternalCommand } from "./cli/cmd/external"
 import { LspCommand } from "./cli/cmd/lsp"
 import { UI } from "./cli/ui"
@@ -196,6 +197,7 @@ const cli = yargs(args)
   .command(CloudCommand)
   .command(OrgCommand)
   .command(ProjectCommand)
+  .command(BudgetCommand)
   .command(ExternalCommand)
   .command(LspCommand)
   .command(StatsCommand)

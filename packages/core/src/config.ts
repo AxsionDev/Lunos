@@ -31,6 +31,7 @@ import { ConfigSync } from "./config/sync"
 import { ConfigExternal } from "./config/external"
 import { ConfigMemory } from "./config/memory"
 import { ConfigSandbox } from "./config/sandbox"
+import { ConfigBudget } from "./config/budget"
 import { ConfigLog } from "./config/log"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
@@ -145,6 +146,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   memory: ConfigMemory.Info.pipe(Schema.optional).annotate({
     description: "Graph-based long-term memory, off by default",
+  }),
+  budget: ConfigBudget.Info.pipe(Schema.optional).annotate({
+    description:
+      "Project budgets: what happens at the limit, alert thresholds, the currency, and the organisation's budget (managed config)",
   }),
   sandbox: ConfigSandbox.Info.pipe(Schema.optional).annotate({
     description: "Sandboxed runs: the Lunos server and everything it spawns run in a Docker container",

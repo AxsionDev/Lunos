@@ -64,6 +64,7 @@ import { Question } from "@/question"
 import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
+import { Budget } from "@/budget"
 import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
@@ -1174,6 +1175,95 @@ const layer = Layer.effect(
       throw new Error("Impossible")
     })
 
+    /** XCOD-298: the budget guard's decision, acted on: a toast, a question, or the turn stopped. */
+    const budgetCheck = Effect.fn("SessionPrompt.budget")(function* (input: {
+      sessionID: SessionID
+      session: Session.Info
+      step: number
+      model: Provider.Model
+      msgs: SessionV1.WithParts[]
+      lastUser: SessionV1.User
+    }) {
+      const ctx = yield* InstanceState.context
+      const cfg = yield* config.get()
+      const decision = yield* Budget.guard({
+        session: { id: input.sessionID, ...(input.session.parentID ? { parentID: input.session.parentID } : {}) },
+        directory: input.session.directory ?? ctx.directory,
+        project: { id: ctx.project.id, worktree: ctx.project.worktree, name: ctx.project.name },
+        config: cfg as Budget.Config,
+        start: input.step === 1,
+        price: input.model.cost,
+        turn: Budget.turnsOf(input.msgs),
+      }).pipe(
+        Effect.provideService(Database.Service, database),
+        // A budget that can't be read never stops work; it's logged.
+        Effect.catchCause((cause) =>
+          Effect.logWarning("budget check failed", { "session.id": input.sessionID, cause }).pipe(
+            Effect.as({ action: "run", toasts: [] } as Budget.Decision),
+          ),
+        ),
+      )
+      const toast = (message: string, variant: "warning" | "error" = "warning") =>
+        events.publish(TuiEvent.ToastShow, { title: "Budget", message, variant, duration: 10000 }).pipe(Effect.ignore)
+      for (const message of decision.toasts) yield* toast(message)
+      if (decision.action === "run") return "run" as const
+      if (decision.action === "warn") {
+        yield* toast(decision.message)
+        return "run" as const
+      }
+      if (decision.action === "ask") {
+        const RUN = "Run anyway"
+        const CHEAPER = "Use a cheaper model…"
+        const answers = yield* question
+          .ask({
+            sessionID: input.sessionID,
+            questions: [
+              {
+                header: "Budget",
+                question: decision.message,
+                custom: false,
+                options: [
+                  { label: RUN, description: "Run this turn; the overspend is shown" },
+                  { label: CHEAPER, description: "Stop, and pick another model for the next turn" },
+                  { label: "Stop", description: "Don't start it" },
+                ],
+              },
+            ],
+          })
+          .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<ReadonlyArray<string>>)))
+        const answer = answers[0]?.[0]
+        if (answer === RUN) {
+          Budget.approve(decision.root)
+          return "run" as const
+        }
+        if (answer === CHEAPER)
+          yield* events.publish(TuiEvent.CommandExecute, { command: "model.list" }).pipe(Effect.ignore)
+        yield* Effect.logInfo("budget: turn not started", { "session.id": input.sessionID, answer })
+        return "stop" as const
+      }
+      // stop: the reason, on the session and as its error (`lunos run` exits with code 3 on it).
+      const error = new NamedError.Unknown({ message: decision.message, ref: "budget" }).toObject()
+      const msg: SessionV1.Assistant = {
+        id: MessageID.ascending(),
+        parentID: input.lastUser.id,
+        role: "assistant",
+        mode: input.lastUser.agent,
+        agent: input.lastUser.agent,
+        path: { cwd: ctx.directory, root: ctx.worktree },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: input.model.id,
+        providerID: input.model.providerID,
+        time: { created: Date.now(), completed: Date.now() },
+        sessionID: input.sessionID,
+        finish: "stop",
+        error: error as SessionV1.Assistant["error"],
+      }
+      yield* sessions.updateMessage(msg)
+      yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: msg.error })
+      return "stop" as const
+    })
+
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
         const ctx = yield* InstanceState.context
@@ -1277,6 +1367,10 @@ const layer = Layer.effect(
             yield* Effect.logInfo("unattended run limit reached", { "session.id": sessionID })
             break
           }
+          // XCOD-298: project and organisation budgets, before every step (subagents' included). A step
+          // already running always finishes; this decides whether the next one starts.
+          const budget = yield* budgetCheck({ sessionID, session, step, model, msgs, lastUser })
+          if (budget === "stop") break
           const maxSteps = agent.steps ?? Infinity
           const isLastStep = step >= maxSteps
           // XCOD-287: Build's nudge to split development work across subagents.

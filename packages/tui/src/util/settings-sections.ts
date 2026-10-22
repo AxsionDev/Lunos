@@ -20,7 +20,7 @@ export const SECTIONS = [
 
 export const SUBTABS: Record<string, readonly string[]> = {
   "Models & agents": ["Models", "Agents", "Subagents", "Providers", "External sessions"],
-  Projects: ["Projects"],
+  Projects: ["Projects", "Budgets"],
   Permissions: ["Rules", "Tools", "Sandbox"],
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
   Memory: ["Overview", "Settings", "Advanced"],
@@ -87,7 +87,11 @@ export function summary(category: string, rows: readonly Pick<SettingRow, "key" 
     category === "Models & agents"
       ? [set("model") ?? "no model chosen", set("default_agent") ? `starts with ${set("default_agent")}` : undefined]
       : category === "Projects"
-        ? ["repositories, and named projects of several folders"]
+        ? [
+            "repositories, and named projects of several folders",
+            set("budget.on_limit") ? `at a limit: ${set("budget.on_limit")}` : undefined,
+            set("budget.organisation") ? "organisation budget" : undefined,
+          ]
         : category === "Permissions"
           ? [
               value("sandbox.enabled") === "true" ? "sandbox on" : "sandbox off",

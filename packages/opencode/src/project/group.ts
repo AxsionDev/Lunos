@@ -5,6 +5,7 @@ import fsp from "node:fs/promises"
 import path from "node:path"
 import { Global } from "@opencode-ai/core/global"
 import { Flock } from "@opencode-ai/core/util/flock"
+import type { ConfigBudget } from "@opencode-ai/core/config/budget"
 
 /**
  * XCOD-298: named projects. A project is either the repository Lunos already knows
@@ -52,6 +53,11 @@ interface State {
   groups: Info[]
   /** Session id to the project id it was moved to (a named project's, or a repository's). */
   sessions: Record<string, string>
+  /**
+   * XCOD-298: each project's budget, by project id (a named project's or a repository's, which has
+   * no record here otherwise). Kept with the projects, on this computer only.
+   */
+  budgets: Record<string, ConfigBudget.Budget>
 }
 
 export class NotFoundError extends Error {
@@ -75,7 +81,7 @@ const GLOBAL = "global"
 
 export const file = () => path.join(Global.Path.data, "project-groups.json")
 
-const empty = (): State => ({ version: 1, groups: [], sessions: {} })
+const empty = (): State => ({ version: 1, groups: [], sessions: {}, budgets: {} })
 
 const clean = (folder: string) => {
   const value = path.resolve(folder)
@@ -118,7 +124,12 @@ function parse(text: string): State {
     if (value.sessions && typeof value.sessions === "object")
       for (const [session, project] of Object.entries(value.sessions))
         if (typeof project === "string") sessions[session] = project
-    return { version: 1, groups, sessions }
+    const budgets: Record<string, ConfigBudget.Budget> = {}
+    if (value.budgets && typeof value.budgets === "object")
+      for (const [project, budget] of Object.entries(value.budgets))
+        if (budget && typeof budget === "object" && Number((budget as ConfigBudget.Budget).amount) > 0)
+          budgets[project] = budget as ConfigBudget.Budget
+    return { version: 1, groups, sessions, budgets }
   } catch {
     return empty()
   }
@@ -213,6 +224,8 @@ export interface Snapshot {
   groups: Info[]
   /** Session id to the project id it was moved to. */
   sessions: Record<string, string>
+  /** Project id to its budget. */
+  budgets: Record<string, ConfigBudget.Budget>
   resolve(directory: string, project?: Repository): Info | undefined
   forSession(session: SessionRef, parent?: (id: string) => SessionRef | undefined): Info | undefined
 }
@@ -226,6 +239,7 @@ function snapshotOf(state: State): Snapshot {
   return {
     groups: state.groups.map(copy),
     sessions: { ...state.sessions },
+    budgets: structuredClone(state.budgets),
     resolve: resolveIn,
     forSession(session, parent) {
       const seen = new Set<string>()
@@ -385,5 +399,35 @@ export async function move(sessionIDs: string[], projectID: string | null) {
       else state.sessions[session] = projectID
     }
     return true
+  })
+}
+
+const PERIODS = ["monthly", "weekly", "total"]
+const ACTIONS = ["warn", "ask", "stop"]
+
+/** XCOD-298: a project's budget (a named project's id or a repository's), or undefined. */
+export async function budget(projectID: string): Promise<ConfigBudget.Budget | undefined> {
+  const found = (await read()).budgets[projectID]
+  return found ? { ...found } : undefined
+}
+
+/** Sets a project's budget, or removes it with null. */
+export async function setBudget(projectID: string, budget: ConfigBudget.Budget | null) {
+  if (budget) {
+    if (!(budget.amount > 0)) throw new InvalidError("A budget needs an amount above 0")
+    if (budget.period && !PERIODS.includes(budget.period)) throw new InvalidError(`A period is ${PERIODS.join(", ")}`)
+    if (
+      budget.reset_day !== undefined &&
+      !(Number.isInteger(budget.reset_day) && budget.reset_day >= 1 && budget.reset_day <= 28)
+    )
+      throw new InvalidError("reset_day is a day of the month, 1 to 28")
+    if (budget.on_limit && !ACTIONS.includes(budget.on_limit))
+      throw new InvalidError(`on_limit is ${ACTIONS.join(", ")}`)
+  }
+  return update((state) => {
+    if (projectID.startsWith(PREFIX)) find(state, projectID)
+    if (budget) state.budgets[projectID] = { ...budget }
+    else delete state.budgets[projectID]
+    return budget ? { ...budget } : null
   })
 }
