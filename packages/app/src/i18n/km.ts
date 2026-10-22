@@ -1281,7 +1281,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "កំពុងរង់ចាំអ្នក ({{count}})",
   "sessions.monitor.section.running": "កំពុងដំណើរការ ({{count}})",
   "sessions.monitor.section.completed": "បានបញ្ចប់ ({{count}})",
-  "sessions.monitor.section.failed": "បរាជ័យ ({{count}})",
   "sessions.monitor.showOlder": "បង្ហាញចាស់ៗ ({{count}})",
   "sessions.monitor.hideOlder": "លាក់ចាស់ៗ",
   "sessions.monitor.view.label": "រៀបចំបញ្ជី",

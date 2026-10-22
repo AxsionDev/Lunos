@@ -1368,7 +1368,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "รอคุณอยู่ ({{count}})",
   "sessions.monitor.section.running": "กำลังทำงาน ({{count}})",
   "sessions.monitor.section.completed": "เสร็จสิ้น ({{count}})",
-  "sessions.monitor.section.failed": "ล้มเหลว ({{count}})",
   "sessions.monitor.showOlder": "แสดงรายการเก่า ({{count}})",
   "sessions.monitor.hideOlder": "ซ่อนรายการเก่า",
   "sessions.monitor.view.label": "จัดเรียงรายการ",

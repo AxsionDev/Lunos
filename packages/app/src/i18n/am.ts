@@ -1254,7 +1254,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "እርስዎን በመጠበቅ ላይ ({{count}})",
   "sessions.monitor.section.running": "በመሄድ ላይ ({{count}})",
   "sessions.monitor.section.completed": "የተጠናቀቁ ({{count}})",
-  "sessions.monitor.section.failed": "ያልተሳኩ ({{count}})",
   "sessions.monitor.showOlder": "የቆዩትን አሳይ ({{count}})",
   "sessions.monitor.hideOlder": "የቆዩትን ደብቅ",
   "sessions.monitor.view.label": "ዝርዝሩን አደራጅ",

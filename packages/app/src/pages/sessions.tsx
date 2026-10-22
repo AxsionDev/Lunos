@@ -36,16 +36,19 @@ import { useBulkConfirm } from "./sessions/bulk-confirm"
 import { MonitorComposer } from "./sessions/monitor-composer"
 import {
   ask as askOf,
-  MONITOR_SECTIONS,
+  forgetWaiting,
   number,
   orphanedQueue,
   canTakeOver,
   rail as monitorRail,
   route as deliveryRoute,
+  sections as railSections,
   tags,
+  toggleSection,
   type Asks,
-  type MonitorSection,
   type RailRow,
+  type SectionOverrides,
+  type SectionView,
 } from "./sessions/monitor-model"
 import { useOpenSession } from "./sessions/open-session"
 
@@ -111,7 +114,8 @@ export function SessionsPage() {
   // XCOD-262: the rail by status (the Agent Monitor's sections) or by the user's groups, remembered.
   const [railPrefs, setRailPrefs] = persisted(
     Persist.global("sessions.rail"),
-    createStore({ view: "status" as RailView }),
+    // XCOD-299: and which of its sections are collapsed.
+    createStore({ view: "status" as RailView, sections: {} as SectionOverrides }),
   )
   const railView = (): RailView => (RAIL_VIEWS.includes(railPrefs.view) ? railPrefs.view : "status")
   const [error, setError] = createSignal<string>()
@@ -516,6 +520,22 @@ export function SessionsPage() {
   const statusRail = createMemo(() =>
     monitorRail({ sessions: viewItems(), now: now(), search: filter.search, showOlder: ui.showOlder }),
   )
+  const sectionViews = createMemo(() => railSections(statusRail(), railPrefs.sections ?? {}))
+  // XCOD-299: a new ask opens a collapsed Waiting for action again, and the collapse is forgotten.
+  createEffect(() => {
+    if (sectionViews().reopened) setRailPrefs("sections", forgetWaiting(railPrefs.sections ?? {}))
+  })
+  const flipSection = (view: SectionView) =>
+    setRailPrefs(
+      "sections",
+      toggleSection(
+        railPrefs.sections ?? {},
+        view,
+        statusRail()
+          .rows.filter((row) => row.section === "waiting")
+          .map((row) => row.item.id),
+      ),
+    )
   const [numbers, setNumbers] = createSignal<ReadonlyMap<string, number>>(new Map())
   createEffect(
     on(statusRail, (value) =>
@@ -1227,33 +1247,67 @@ export function SessionsPage() {
     )
   }
 
-  /** XCOD-262: a section of the rail by status, with its count. */
-  const StatusSection = (props: { section: MonitorSection }) => {
-    const rows = createMemo(() => statusRail().rows.filter((row) => row.section === props.section))
-    const heading = () => t(`sessions.monitor.section.${props.section}`, { count: statusRail().counts[props.section] })
+  /**
+   * XCOD-262: a section of the rail by status, with its count. XCOD-299: Working, Waiting for action
+   * and Completed are always there; an empty one is "(0)", dimmed and collapsed, and a collapsed one
+   * says what it holds ("✕ 1 Failed · ✓ 2 Finished").
+   */
+  const StatusSection = (props: { view: SectionView }) => {
+    const section = () => props.view.section
+    const rows = createMemo(() => statusRail().rows.filter((row) => row.section === section()))
+    const heading = () => t(`sessions.monitor.section.${section()}`, { count: props.view.count })
+    const glyph = { running: "◐", waiting: "!", failed: "✕", finished: "✓" } as const
+    const summaryID = () => `monitor-section-${section()}-summary`
+    const summary = () =>
+      props.view.states
+        .map((entry) => `${glyph[entry.state]} ${entry.count} ${t(`sessions.state.${entry.state}`)}`)
+        .join(" · ")
     return (
-      <Show when={rows().length > 0}>
-        <section
-          class="rounded-lg border border-v2-border-border-base"
-          data-monitor-section={props.section}
-          aria-label={heading()}
+      <section
+        class="rounded-lg border border-v2-border-border-base"
+        classList={{ "opacity-60": props.view.empty }}
+        data-monitor-section={section()}
+        aria-label={heading()}
+      >
+        {/* The accordion pattern: the heading holds the button, so it stays a heading for screen readers. */}
+        <header
+          class="flex items-center gap-2 px-3 py-2"
+          classList={{ "border-b border-v2-border-border-base": props.view.open }}
         >
-          <header class="border-b border-v2-border-border-base px-3 py-2">
-            <h2
-              class="text-14-medium"
-              classList={{
-                "text-v2-state-fg-warning": props.section === "waiting",
-                "text-v2-text-text-strong": props.section !== "waiting",
-              }}
+          <span aria-hidden="true" class="text-12-regular text-v2-text-text-weak">
+            {props.view.open ? "▼" : "▶"}
+          </span>
+          <h2
+            class="text-14-medium"
+            classList={{
+              "text-v2-state-fg-warning underline": section() === "waiting" && !props.view.empty,
+              "text-v2-text-text-strong": section() !== "waiting" && !props.view.empty,
+              "text-v2-text-text-weak": props.view.empty,
+            }}
+          >
+            <button
+              type="button"
+              class="text-left"
+              aria-expanded={props.view.open}
+              aria-describedby={!props.view.open && !props.view.empty ? summaryID() : undefined}
+              disabled={props.view.empty}
+              onClick={() => flipSection(props.view)}
             >
               {heading()}
-            </h2>
-          </header>
+            </button>
+          </h2>
+          <Show when={!props.view.open && !props.view.empty}>
+            <span id={summaryID()} class="text-12-regular text-v2-text-text-weak">
+              {summary()}
+            </span>
+          </Show>
+        </header>
+        <Show when={props.view.open}>
           <ul class="flex flex-col">
             <For each={rows()}>{(row: RailRow) => <SessionRow item={row.item} child={row.depth === 1} />}</For>
           </ul>
-        </section>
-      </Show>
+        </Show>
+      </section>
     )
   }
 
@@ -1431,7 +1485,9 @@ export function SessionsPage() {
           when={byGroups()}
           fallback={
             <>
-              <For each={MONITOR_SECTIONS}>{(section) => <StatusSection section={section} />}</For>
+              <Show when={statusRail().rows.length > 0}>
+                <For each={sectionViews().views}>{(view) => <StatusSection view={view} />}</For>
+              </Show>
               <Show when={data.loaded && statusRail().rows.length === 0}>
                 <p class="text-14-regular text-v2-text-text-weak">{language.t("sessions.empty")}</p>
               </Show>
@@ -1439,7 +1495,12 @@ export function SessionsPage() {
                 <button
                   type="button"
                   class="self-start rounded px-2 py-1 text-12-medium text-v2-text-text-weak"
-                  onClick={() => setUi("showOlder", (value) => !value)}
+                  onClick={() => {
+                    setUi("showOlder", (value) => !value)
+                    // XCOD-299: what Show older adds isn't left hidden in a collapsed Completed.
+                    if (ui.showOlder && railPrefs.sections?.completed === false)
+                      setRailPrefs("sections", { ...railPrefs.sections, completed: true })
+                  }}
                 >
                   {ui.showOlder
                     ? t("sessions.monitor.hideOlder")

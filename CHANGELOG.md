@@ -21,6 +21,18 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- **Subagents are grouped by what they need from you.** The sidebar's Subagents section now holds
+  three sub-sections, always in the same place: Working (running ones, the longest-running first,
+  then queued ones), Waiting for action (each row shows its ask, with approve and deny), and
+  Completed (failed ones first, with why, then done ones). Each has its own count and toggle, and a
+  collapsed one says what it holds, as in `✕ 1 failed · ✓ 1 done`. The header counts how many need
+  you, and Waiting for action opens itself when a new ask arrives, even if you collapsed it. What
+  you open or collapse is remembered per session, across restarts. Subagents of subagents sit under
+  the one that started them. States and headers are words and symbols, not colour alone. The Agent
+  Monitor and the desktop and web Sessions window use the same three sections, and in the monitor
+  ↑/↓ also reach the section headers, where Enter collapses or expands one. <!-- XCOD-299 -->
 ### Added
 
 - **Projects that span several repositories.** Group the repositories and folders that belong

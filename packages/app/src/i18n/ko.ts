@@ -1297,7 +1297,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "응답 대기 중 ({{count}})",
   "sessions.monitor.section.running": "실행 중 ({{count}})",
   "sessions.monitor.section.completed": "완료됨 ({{count}})",
-  "sessions.monitor.section.failed": "실패함 ({{count}})",
   "sessions.monitor.showOlder": "이전 항목 보기 ({{count}})",
   "sessions.monitor.hideOlder": "이전 항목 숨기기",
   "sessions.monitor.view.label": "목록 정렬",

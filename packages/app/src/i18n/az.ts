@@ -1298,7 +1298,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Sizi gözləyir ({{count}})",
   "sessions.monitor.section.running": "İşləyir ({{count}})",
   "sessions.monitor.section.completed": "Tamamlanıb ({{count}})",
-  "sessions.monitor.section.failed": "Uğursuz ({{count}})",
   "sessions.monitor.showOlder": "Köhnələri göstər ({{count}})",
   "sessions.monitor.hideOlder": "Köhnələri gizlət",
   "sessions.monitor.view.label": "Siyahını düzənlə",

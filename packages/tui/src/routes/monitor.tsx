@@ -12,6 +12,7 @@ import { Prompt, type PromptRef } from "../component/prompt"
 import type { AutocompleteOption } from "../component/prompt/autocomplete"
 import { useTuiConfig } from "../config"
 import { useEvent } from "../context/event"
+import { useKV } from "../context/kv"
 import { useLocal } from "../context/local"
 import { useAnimationsEnabled } from "../context/motion"
 import { useRoute, type Route } from "../context/route"
@@ -26,8 +27,7 @@ import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogSelect } from "../ui/dialog-select"
 import { Toast, useToast } from "../ui/toast"
 import {
-  SECTION_TITLE,
-  SECTIONS,
+  MONITOR_GROUPS_KEY,
   askText,
   build,
   elapsed,
@@ -40,7 +40,9 @@ import {
   takeoverOnlyChoices,
   canTakeOver,
   type Row,
+  type Section,
 } from "../util/agent-monitor"
+import { forgetWaiting, toggle, type Overrides } from "../util/subagent-groups"
 import { errorMessage } from "../util/error"
 import { externalAccent, type ExternalTool } from "../util/external"
 import { Locale } from "../util/locale"
@@ -107,6 +109,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
   const dimensions = useTerminalDimensions()
   const animations = useAnimationsEnabled()
   const { theme } = useTheme()
+  const kv = useKV()
 
   const [data, setData] = createStore({ sessions: [] as SessionOverviewItem[], loaded: false })
   const [asks, setAsks] = createStore<Record<string, Asks>>({})
@@ -216,8 +219,30 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     if (timer) clearTimeout(timer)
   })
 
+  // XCOD-299: what was opened or collapsed is kept (kv.json); a new ask opens Waiting for action again.
+  const overrides = () => kv.get(MONITOR_GROUPS_KEY, {}) as Overrides
   const rail = createMemo(() =>
-    build({ sessions: data.sessions, now: now(), search: search(), showOlder: showOlder() }),
+    build({ sessions: data.sessions, now: now(), search: search(), showOlder: showOlder(), overrides: overrides() }),
+  )
+  createEffect(() => {
+    if (rail().reopened && kv.ready) kv.set(MONITOR_GROUPS_KEY, forgetWaiting(overrides()))
+  })
+  const flip = (section: Section) => {
+    const view = rail().groups.find((group) => group.group === section)
+    if (view) kv.set(MONITOR_GROUPS_KEY, toggle(overrides(), view))
+  }
+  /** Show older opens Completed too, so what it shows isn't hidden behind a collapse. */
+  const toggleOlder = () => {
+    const showing = !showOlder()
+    setShowOlder(showing)
+    if (showing && overrides().completed === false) kv.set(MONITOR_GROUPS_KEY, { ...overrides(), completed: true })
+  }
+  /** What ↑/↓ walk through: each sub-section's header, then its rows while it's open. */
+  const headerKey = (section: Section) => `group:${section}`
+  const sectionOfKey = (key: string | undefined) =>
+    key?.startsWith("group:") ? (key.slice("group:".length) as Section) : undefined
+  const stops = createMemo(() =>
+    rail().groups.flatMap((view) => [headerKey(view.group), ...(view.open ? view.rows.map((row) => row.item.id) : [])]),
   )
   const byID = createMemo(() => new Map(data.sessions.map((item) => [item.id, item])))
   // Numbers stick to their session while the monitor is open (see `number`).
@@ -235,7 +260,9 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
   createEffect(() => {
     const rows = rail().rows
     if (rows.length === 0) return setSelected(undefined)
-    if (!selected() || !rows.some((row) => row.item.id === selected())) setSelected(rows[0]!.item.id)
+    if (selected() && stops().includes(selected()!)) return
+    // The first row that's shown, else the first header.
+    setSelected(stops().find((key) => !sectionOfKey(key)) ?? stops()[0])
   })
   const current = createMemo(() => (selected() ? byID().get(selected()!) : undefined))
 
@@ -655,12 +682,27 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
   }
 
   function move(direction: 1 | -1) {
-    const rows = rail().rows
-    if (rows.length === 0) return
-    const index = rows.findIndex((row) => row.item.id === selected())
-    const next = rows[Math.max(0, Math.min(rows.length - 1, index + direction))]!
-    setSelected(next.item.id)
-    scroll?.scrollChildIntoView?.(`monitor-row-${next.item.id}`)
+    const list = stops()
+    if (rail().rows.length === 0 || list.length === 0) return
+    const index = list.indexOf(selected() ?? "")
+    const next = list[Math.max(0, Math.min(list.length - 1, index + direction))]!
+    setSelected(next)
+    const section = sectionOfKey(next)
+    scroll?.scrollChildIntoView?.(section ? `monitor-group-${section}` : `monitor-row-${next}`)
+  }
+
+  /** What Enter does on the selected line, for the key hint. */
+  const enterHint = () => {
+    const section = sectionOfKey(selected())
+    if (!section) return "open"
+    return rail().groups.find((view) => view.group === section)?.open ? "collapse" : "expand"
+  }
+
+  /** Enter: on a sub-section's header it opens or collapses it; on a row it opens the session. */
+  function enter() {
+    const section = sectionOfKey(selected())
+    if (section) return flip(section)
+    if (current()) open(current()!)
   }
 
   // Keys. The prompt keeps everything it does today; these are the monitor's own, and none of them
@@ -700,13 +742,13 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       // ↑/↓ only: dialog.select.prev's ctrl+p is the palette here.
       ...keys("dialog.select.prev", () => move(-1)).flatMap((binding) => arrowsOnly(binding) ?? []),
       ...keys("dialog.select.next", () => move(1)).flatMap((binding) => arrowsOnly(binding) ?? []),
-      ...keys("dialog.select.submit", () => current() && open(current()!)),
+      ...keys("dialog.select.submit", enter),
       ...keys("monitor.approve", () => current() && void answer(current()!, true)),
       ...keys("monitor.deny", () => current() && void answer(current()!, false)),
       ...keys("monitor.stop", () => current() && void stop(current()!)),
       ...keys("monitor.delete", () => current() && void remove(current()!)),
       ...keys("monitor.filter", () => void filter()),
-      ...keys("monitor.older", () => setShowOlder((value) => !value)),
+      ...keys("monitor.older", toggleOlder),
       ...keys("monitor.takeover", () => current() && void takeOver(current()!)),
       ...keys("monitor.stop_all", () => void stopAll()),
       ...keys("monitor.clear", () => void clearList()),
@@ -864,21 +906,57 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
             </box>
           }
         >
-          <For each={SECTIONS.filter((section) => rail().counts[section] > 0)}>
-            {(section) => (
-              <box flexDirection="column" flexShrink={0}>
-                <box paddingLeft={1} paddingTop={1} flexShrink={0}>
-                  <text fg={section === "waiting" ? theme.warning : theme.textMuted} attributes={TextAttributes.BOLD}>
-                    {SECTION_TITLE[section]} ({rail().counts[section]})
-                  </text>
+          {/* XCOD-299: all three, always in this order; an empty one is "(0)", dimmed and collapsed. */}
+          <For each={rail().groups}>
+            {(view) => {
+              const active = () => focus() === "rail" && selected() === headerKey(view.group)
+              const urgent = () => view.group === "waiting" && view.count > 0
+              return (
+                <box flexDirection="column" flexShrink={0}>
+                  <box
+                    id={`monitor-group-${view.group}`}
+                    flexDirection="row"
+                    gap={1}
+                    paddingLeft={1}
+                    paddingTop={1}
+                    flexShrink={0}
+                    backgroundColor={active() ? theme.backgroundElement : undefined}
+                    onMouseUp={() => {
+                      setSelected(headerKey(view.group))
+                      setFocus("rail")
+                      flip(view.group)
+                    }}
+                  >
+                    <text fg={view.empty ? theme.textMuted : theme.text} flexShrink={0}>
+                      {view.open ? "▼" : "▶"}
+                    </text>
+                    <text
+                      fg={urgent() ? theme.warning : theme.textMuted}
+                      attributes={
+                        view.empty ? undefined : TextAttributes.BOLD | (urgent() ? TextAttributes.UNDERLINE : 0)
+                      }
+                      wrapMode="none"
+                    >
+                      {view.title} ({view.count})
+                    </text>
+                    <Show when={!view.open && !view.empty}>
+                      <text fg={theme.textMuted} wrapMode="none" flexShrink={1}>
+                        {view.summary}
+                      </text>
+                    </Show>
+                  </box>
+                  <Show when={view.open}>
+                    <For each={rail().rows.filter((row) => row.section === view.group)}>
+                      {(row) => <RailRow row={row} />}
+                    </For>
+                  </Show>
                 </box>
-                <For each={rail().rows.filter((row) => row.section === section)}>{(row) => <RailRow row={row} />}</For>
-              </box>
-            )}
+              )
+            }}
           </For>
         </Show>
         <Show when={rail().older > 0 || showOlder()}>
-          <box paddingLeft={1} paddingTop={1} flexShrink={0} onMouseUp={() => setShowOlder((value) => !value)}>
+          <box paddingLeft={1} paddingTop={1} flexShrink={0} onMouseUp={toggleOlder}>
             <text fg={theme.textMuted}>{showOlder() ? "Hide older" : `Show older (${rail().older})`} · o</text>
           </box>
         </Show>
@@ -886,7 +964,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       <box paddingLeft={1} flexShrink={0}>
         <text fg={theme.textMuted} wrapMode="none">
           {focus() === "rail"
-            ? `↑↓ move · enter open · ${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · x delete · / filter · ctrl+p stop all, clear · tab prompt`
+            ? `↑↓ move · enter ${enterHint()} · ${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · x delete · / filter · ctrl+p stop all, clear · tab prompt`
             : "tab rail"}
         </text>
       </box>
@@ -911,7 +989,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
           <text fg={theme.textMuted}>
             {"  "}
             {rail().counts.waiting > 0 ? `${STATE_GLYPH.waiting} ${rail().counts.waiting} waiting · ` : ""}
-            {rail().counts.running} running · esc back
+            {rail().counts.working} working · esc back
           </text>
         </box>
         <box flexGrow={1} minHeight={0} paddingTop={1}>

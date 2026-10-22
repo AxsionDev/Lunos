@@ -7,9 +7,13 @@ import { projectName, toolName, toolOnly } from "./sessions-model"
  * are tested without a DOM. The same rules as the TUI's monitor (packages/tui/src/util/agent-monitor.ts).
  */
 
-export type MonitorSection = "waiting" | "running" | "completed" | "failed"
+/**
+ * XCOD-299: the TUI's three sub-sections (packages/tui/src/util/subagent-groups.ts): Working
+ * ("running", for its i18n key), Waiting for action, Completed. Always in this order, empty ones too.
+ */
+export type MonitorSection = "running" | "waiting" | "completed"
 
-export const MONITOR_SECTIONS: MonitorSection[] = ["waiting", "running", "completed", "failed"]
+export const MONITOR_SECTIONS: MonitorSection[] = ["running", "waiting", "completed"]
 
 /** Completed sessions older than this are behind "Show older". */
 export const RECENT_MS = 24 * 60 * 60 * 1000
@@ -25,20 +29,30 @@ export type RailRow = {
 }
 
 export type Rail = {
+  /** Every row, collapsed sections' too, in rail order (numbers and tags use it). */
   rows: RailRow[]
   counts: Record<MonitorSection, number>
   /** Completed sessions hidden behind "Show older". */
   older: number
 }
 
-function sectionOf(item: SessionOverviewItem): MonitorSection {
+type Effective = "waiting" | "running" | "failed" | "done"
+
+function effectiveOf(item: SessionOverviewItem): Effective {
   if (item.state === "waiting") return "waiting"
   if (item.state === "running") return "running"
   if (item.state === "failed") return "failed"
-  return "completed"
+  return "done"
 }
 
-const URGENCY: Record<MonitorSection, number> = { waiting: 0, running: 1, failed: 2, completed: 3 }
+const SECTION_OF: Record<Effective, MonitorSection> = {
+  waiting: "waiting",
+  running: "running",
+  failed: "completed",
+  done: "completed",
+}
+
+const URGENCY: Record<Effective, number> = { waiting: 0, running: 1, failed: 2, done: 3 }
 
 function matches(item: SessionOverviewItem, search: string) {
   if (!search) return true
@@ -48,9 +62,9 @@ function matches(item: SessionOverviewItem, search: string) {
 }
 
 /**
- * Sections in the ticket's order (Waiting, Running, Completed, Failed), newest first inside each.
- * A subagent sits under its parent, and a parent moves to its most urgent child's section, so a
- * background subagent asking for approval surfaces under Waiting with its parent. Archived sessions
+ * Working, Waiting for action, Completed (failed ones first), newest first inside each. A subagent
+ * sits under its parent, and a parent moves to its most urgent child's section, so a background
+ * subagent asking for approval surfaces under Waiting for action with its parent. Archived sessions
  * (cleared from the list) aren't in the rail.
  */
 export function rail(input: {
@@ -69,12 +83,8 @@ export function rail(input: {
   }
   const newest = (a: SessionOverviewItem, b: SessionOverviewItem) => b.updated - a.updated
 
-  const groups: Record<MonitorSection, { item: SessionOverviewItem; kids: SessionOverviewItem[] }[]> = {
-    waiting: [],
-    running: [],
-    completed: [],
-    failed: [],
-  }
+  const groups: Record<MonitorSection, { item: SessionOverviewItem; kids: SessionOverviewItem[]; state: Effective }[]> =
+    { running: [], waiting: [], completed: [] }
   let older = 0
   for (const item of sessions) {
     if (item.parentID && ids.has(item.parentID)) continue
@@ -82,25 +92,85 @@ export function rail(input: {
     const own = matches(item, search)
     const kids = own ? all : all.filter((kid) => matches(kid, search))
     if (!own && kids.length === 0) continue
-    const section = [item, ...all].map(sectionOf).reduce((best, next) => (URGENCY[next] < URGENCY[best] ? next : best))
+    const state = [item, ...all].map(effectiveOf).reduce((best, next) => (URGENCY[next] < URGENCY[best] ? next : best))
     // A search reaches older ones too: it never hides a hit.
-    if (section === "completed" && !search && !input.showOlder && input.now - item.updated > RECENT_MS) {
+    if (state === "done" && !search && !input.showOlder && input.now - item.updated > RECENT_MS) {
       older++
       continue
     }
-    groups[section].push({ item, kids })
+    groups[SECTION_OF[state]].push({ item, kids, state })
   }
 
   const rows: RailRow[] = []
-  const counts = { waiting: 0, running: 0, completed: 0, failed: 0 }
+  const counts = { running: 0, waiting: 0, completed: 0 }
   for (const section of MONITOR_SECTIONS) {
-    for (const entry of groups[section].toSorted((a, b) => newest(a.item, b.item))) {
+    // Failed before done in Completed; newest first otherwise.
+    const sorted = groups[section].toSorted((a, b) => URGENCY[a.state] - URGENCY[b.state] || newest(a.item, b.item))
+    for (const entry of sorted) {
       rows.push({ item: entry.item, section, depth: 0 })
-      counts[section]++
       for (const kid of entry.kids) rows.push({ item: kid, section, depth: 1 })
     }
+    counts[section] = rows.filter((row) => row.section === section).length
   }
   return { rows, counts, older }
+}
+
+/**
+ * What the user opened or collapsed: true open, false collapsed, absent the default. A collapse of
+ * Waiting for action remembers the asks it hid (`waitingSeen`), so a new one opens it again.
+ */
+export type SectionOverrides = Partial<Record<MonitorSection, boolean>> & { waitingSeen?: string[] }
+
+export type SectionView = {
+  section: MonitorSection
+  count: number
+  open: boolean
+  /** Shown "(0)", dimmed and collapsed. */
+  empty: boolean
+  /** For the collapsed header: how many are in each state. */
+  states: { state: "running" | "waiting" | "failed" | "finished"; count: number }[]
+}
+
+/** Each section's header: open or not, empty, and what it holds; `reopened` when a new ask opened Waiting again. */
+export function sections(value: Rail, overrides: SectionOverrides = {}) {
+  const waiting = value.rows.filter((row) => row.section === "waiting").map((row) => row.item.id)
+  const seen = new Set(overrides.waitingSeen ?? [])
+  const reopened = overrides.waiting === false && waiting.some((id) => !seen.has(id))
+  const views = MONITOR_SECTIONS.map((section): SectionView => {
+    const rows = value.rows.filter((row) => row.section === section)
+    const count = rows.length
+    const chosen = section === "waiting" && reopened ? undefined : overrides[section]
+    const states = (
+      section === "running"
+        ? (["running"] as const)
+        : section === "waiting"
+          ? (["waiting"] as const)
+          : (["failed", "finished"] as const)
+    )
+      .map((state) => ({
+        state,
+        count: rows.filter((row) =>
+          state === "finished" ? row.item.state !== "failed" : state === "failed" ? row.item.state === "failed" : true,
+        ).length,
+      }))
+      .filter((entry) => entry.count > 0)
+    // Open unless the user collapsed it: unlike the TUI sidebar, Completed doesn't start collapsed here.
+    return { section, count, open: count > 0 && (chosen ?? true), empty: count === 0, states }
+  })
+  return { views, reopened }
+}
+
+/** The overrides after a click on a section's header. Cleared keys are undefined, so a merged store drops them. */
+export function toggleSection(overrides: SectionOverrides, view: SectionView, waitingIDs: readonly string[]) {
+  if (view.empty) return overrides
+  const next: SectionOverrides = { ...overrides, [view.section]: !view.open }
+  if (view.section === "waiting") next.waitingSeen = view.open ? [...waitingIDs] : undefined
+  return next
+}
+
+/** The overrides once a new ask reopened Waiting for action: its collapse is forgotten. */
+export function forgetWaiting(overrides: SectionOverrides): SectionOverrides {
+  return { ...overrides, waiting: undefined, waitingSeen: undefined }
 }
 
 /**

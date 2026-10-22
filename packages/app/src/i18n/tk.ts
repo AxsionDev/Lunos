@@ -1288,7 +1288,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Size garaşýar ({{count}})",
   "sessions.monitor.section.running": "Işleýär ({{count}})",
   "sessions.monitor.section.completed": "Tamamlandy ({{count}})",
-  "sessions.monitor.section.failed": "Şowsuz ({{count}})",
   "sessions.monitor.showOlder": "Köne sessiýalary görkez ({{count}})",
   "sessions.monitor.hideOlder": "Köne sessiýalary gizle",
   "sessions.monitor.view.label": "Sanawy tertiple",

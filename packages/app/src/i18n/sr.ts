@@ -1298,7 +1298,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Чекају вас ({{count}})",
   "sessions.monitor.section.running": "Покренуте ({{count}})",
   "sessions.monitor.section.completed": "Завршене ({{count}})",
-  "sessions.monitor.section.failed": "Неуспеле ({{count}})",
   "sessions.monitor.showOlder": "Прикажи старије ({{count}})",
   "sessions.monitor.hideOlder": "Сакриј старије",
   "sessions.monitor.view.label": "Поређај листу",

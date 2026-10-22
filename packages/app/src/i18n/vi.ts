@@ -1299,7 +1299,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Đang chờ bạn ({{count}})",
   "sessions.monitor.section.running": "Đang chạy ({{count}})",
   "sessions.monitor.section.completed": "Đã hoàn tất ({{count}})",
-  "sessions.monitor.section.failed": "Thất bại ({{count}})",
   "sessions.monitor.showOlder": "Hiện mục cũ hơn ({{count}})",
   "sessions.monitor.hideOlder": "Ẩn mục cũ hơn",
   "sessions.monitor.view.label": "Sắp xếp danh sách",

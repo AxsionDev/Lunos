@@ -35,7 +35,7 @@ function item(id: string, input: Partial<SessionOverviewItem> = {}): SessionOver
 const ids = (rail: ReturnType<typeof build>) => rail.rows.map((row) => `${row.section}:${row.depth}:${row.item.id}`)
 
 describe("Agent Monitor rail (XCOD-262)", () => {
-  test("sections in order (Waiting, Running, Completed, Failed), newest first, each with its count", () => {
+  test("XCOD-299: Working, Waiting for action, Completed (failed first), newest first, each with its count", () => {
     const rail = build({
       now: NOW,
       sessions: [
@@ -48,14 +48,23 @@ describe("Agent Monitor rail (XCOD-262)", () => {
       ],
     })
     expect(ids(rail)).toEqual([
+      "working:0:busy-new",
+      "working:0:busy-old",
       "waiting:0:ask",
-      "running:0:busy-new",
-      "running:0:busy-old",
+      "completed:0:broke",
       "completed:0:idle",
       "completed:0:done",
-      "failed:0:broke",
     ])
-    expect(rail.counts).toEqual({ waiting: 1, running: 2, completed: 2, failed: 1 })
+    expect(rail.counts).toEqual({ working: 2, waiting: 1, completed: 3 })
+    expect(rail.groups.map((view) => [view.title, view.open, view.summary])).toEqual([
+      ["Working", true, "◐ 2 running"],
+      ["Waiting for action", true, "! 1 waiting"],
+      ["Completed", true, "✕ 1 failed · ✓ 2 done"],
+    ])
+    // Collapsed, Completed keeps its rows (numbers and tags still reach them) and says what it holds.
+    const collapsed = build({ now: NOW, sessions: rail.rows.map((row) => row.item), overrides: { completed: false } })
+    expect(collapsed.groups[2]!.open).toBe(false)
+    expect(collapsed.rows).toHaveLength(6)
   })
 
   test("Completed is the last 24 h; older ones are behind Show older, and a search still finds them", () => {
@@ -70,7 +79,7 @@ describe("Agent Monitor rail (XCOD-262)", () => {
     // Running and waiting sessions are listed however old.
     expect(
       ids(build({ now: NOW, sessions: [item("long", { state: "running", updated: NOW - 3 * RECENT_MS })] })),
-    ).toEqual(["running:0:long"])
+    ).toEqual(["working:0:long"])
   })
 
   test("a background subagent sits under its parent, and a waiting one brings its parent to Waiting", () => {
@@ -82,8 +91,8 @@ describe("Agent Monitor rail (XCOD-262)", () => {
         item("orphan", { kind: "subagent", parentID: "gone", state: "running" }),
       ],
     })
-    expect(ids(rail)).toEqual(["waiting:0:parent", "waiting:1:child", "running:0:orphan"])
-    expect(rail.counts.waiting).toBe(1)
+    expect(ids(rail)).toEqual(["working:0:orphan", "waiting:0:parent", "waiting:1:child"])
+    expect(rail.counts.waiting).toBe(2)
   })
 
   test("sessions cleared from the list (archived) aren't in the rail", () => {

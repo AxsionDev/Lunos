@@ -1406,7 +1406,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Ждут вас ({{count}})",
   "sessions.monitor.section.running": "Выполняются ({{count}})",
   "sessions.monitor.section.completed": "Завершены ({{count}})",
-  "sessions.monitor.section.failed": "С ошибкой ({{count}})",
   "sessions.monitor.showOlder": "Показать старые ({{count}})",
   "sessions.monitor.hideOlder": "Скрыть старые",
   "sessions.monitor.view.label": "Упорядочить список",

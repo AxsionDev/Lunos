@@ -1380,7 +1380,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Menunggu Anda ({{count}})",
   "sessions.monitor.section.running": "Berjalan ({{count}})",
   "sessions.monitor.section.completed": "Selesai ({{count}})",
-  "sessions.monitor.section.failed": "Gagal ({{count}})",
   "sessions.monitor.showOlder": "Tampilkan yang lebih lama ({{count}})",
   "sessions.monitor.hideOlder": "Sembunyikan yang lebih lama",
   "sessions.monitor.view.label": "Atur daftar",

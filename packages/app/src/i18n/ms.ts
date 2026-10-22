@@ -1288,7 +1288,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Menunggu anda ({{count}})",
   "sessions.monitor.section.running": "Sedang berjalan ({{count}})",
   "sessions.monitor.section.completed": "Selesai ({{count}})",
-  "sessions.monitor.section.failed": "Gagal ({{count}})",
   "sessions.monitor.showOlder": "Tunjukkan yang lebih lama ({{count}})",
   "sessions.monitor.hideOlder": "Sembunyikan yang lebih lama",
   "sessions.monitor.view.label": "Susun senarai",

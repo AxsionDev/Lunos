@@ -1299,7 +1299,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Odottavat sinua ({{count}})",
   "sessions.monitor.section.running": "Käynnissä ({{count}})",
   "sessions.monitor.section.completed": "Valmiit ({{count}})",
-  "sessions.monitor.section.failed": "Epäonnistuneet ({{count}})",
   "sessions.monitor.showOlder": "Näytä vanhemmat ({{count}})",
   "sessions.monitor.hideOlder": "Piilota vanhemmat",
   "sessions.monitor.view.label": "Järjestä luettelo",

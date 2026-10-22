@@ -1377,7 +1377,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Venter på dig ({{count}})",
   "sessions.monitor.section.running": "Kører ({{count}})",
   "sessions.monitor.section.completed": "Fuldført ({{count}})",
-  "sessions.monitor.section.failed": "Mislykkedes ({{count}})",
   "sessions.monitor.showOlder": "Vis ældre ({{count}})",
   "sessions.monitor.hideOlder": "Skjul ældre",
   "sessions.monitor.view.label": "Ordn listen",

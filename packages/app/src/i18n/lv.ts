@@ -1297,7 +1297,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Gaida jūs ({{count}})",
   "sessions.monitor.section.running": "Darbojas ({{count}})",
   "sessions.monitor.section.completed": "Pabeigtas ({{count}})",
-  "sessions.monitor.section.failed": "Neizdevās ({{count}})",
   "sessions.monitor.showOlder": "Rādīt vecākas ({{count}})",
   "sessions.monitor.hideOlder": "Slēpt vecākas",
   "sessions.monitor.view.label": "Kārtot sarakstu",
