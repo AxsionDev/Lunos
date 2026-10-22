@@ -153,6 +153,11 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
     send({ method: "item/completed", params: { item: { id: "msg-1", type: "agentMessage", text: "Done." } } })
     send({ method: "turn/completed", params: { turn: { id: "turn-1", status: "completed" } } })
   }
+  // XCOD-292: FAKE_CODEX_PROGRESS=1 first sends a plan update, a subagent call and its activity, then
+  // the recorded turn. Not recorded: shaped on 0.160.1's app-server schema
+  // (test/fixtures/external/codex-0.160.1/render-items.json), which the tests check them against.
+  if (process.env.FAKE_CODEX_PROGRESS === "1")
+    for (const message of load("codex-progress.schema-shaped.jsonl")) send(message)
   // XCOD-254: FAKE_CODEX_BASH=<command> asks to run that command, as the recorded commandExecution
   // approval of 0.160.1's v2 protocol is shaped (not recorded here); the command isn't run either way.
   const bash = process.env.FAKE_CODEX_BASH

@@ -1853,6 +1853,16 @@ export type SubagentConfig = {
   }
 }
 
+export type VerifyConfig = {
+  build?: string
+  test?: string
+  start?: string
+  ready?: string
+  check?: Array<string>
+  max_attempts?: number
+  timeout?: number
+}
+
 export type PermissionActionConfig = "ask" | "allow" | "deny"
 
 export type PermissionObjectConfig = {
@@ -1905,6 +1915,7 @@ export type AgentConfig = {
   steps?: number
   maxSteps?: number
   permission?: PermissionConfig
+  verify?: boolean
   [key: string]:
     | unknown
     | string
@@ -2214,6 +2225,7 @@ export type Config = {
   auth?: AuthConfig
   sync?: SyncConfig
   subagent?: SubagentConfig
+  verify?: VerifyConfig
   subagent_depth?: number
   username?: string
   mode?: {

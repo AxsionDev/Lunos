@@ -19,6 +19,14 @@ export function parameterSchema() {
     workdir: Schema.optional(Schema.String).annotate({
       description: `The working directory to run the command in. Defaults to the current directory. Use this instead of 'cd' commands.`,
     }),
+    background: Schema.optional(Schema.Boolean).annotate({
+      description:
+        "Start a long-running command (dev server, watcher) in the background and return once it is up, instead of waiting for it to finish. Do not add '&' or nohup. With background, `timeout` is how long to wait for `ready_url` (default 60000, at most 300000).",
+    }),
+    ready_url: Schema.optional(Schema.String).annotate({
+      description:
+        "Only with background: a local URL (localhost, 127.0.0.1 or [::1]) to wait for. The call returns when it answers with any HTTP response, when the command exits, or when `timeout` passes.",
+    }),
   })
 }
 

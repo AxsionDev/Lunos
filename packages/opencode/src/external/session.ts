@@ -71,6 +71,14 @@ export interface Marker {
   mode?: string
   /** XCOD-285: the tool's /commands with their descriptions and argument hints, as it last listed them. */
   commandInfo?: ExternalClaude.CommandInfo[]
+  /** XCOD-292: the context the conversation uses, for the status line, as far as the tool reports it. */
+  context?: Context
+}
+
+/** XCOD-292: tokens of context in use and, when the tool reports it, the model's window. */
+export interface Context {
+  used: number
+  window?: number
 }
 
 /** XCOD-285: the turns running now, by Lunos session, so Shift+Tab can change a running turn's mode. */
@@ -159,6 +167,139 @@ export function policyRefusal(
     decision: "denied by rule",
   })
   return `Blocked by Lunos policy: the rule "${rule.permission}: ${rule.pattern} → deny" refuses ${call.tool} here, whatever ${label(tool)}'s permission mode allows.`
+}
+
+/** The warning when Claude Code answers initialize with `hooks_applied: false`. */
+export function hooksNotApplied(tool: ExternalDetect.Tool) {
+  return `${label(tool)} didn't apply Lunos's pre-tool check (hooks_applied: false). Calls it allows without asking (acceptEdits, auto, its own allow rules) skip Lunos deny rules and plugin hooks; calls it asks about still go through them.`
+}
+
+/**
+ * XCOD-254: Lunos's pre-tool hooks (`tool.execute.before`, v1 and v2 plugins and config `hooks`) on
+ * one of the tool's calls, as in a Lunos session, where a hook that throws refuses the call. Returns
+ * the call as hooks saw it, that refusal (audited), and whether a hook rewrote the arguments (for the
+ * caller to log; not applied, the tool runs its own arguments).
+ */
+export async function beforeHooks(input: {
+  plugin: Plugin.Interface
+  run: EffectBridgeType.Shape
+  tool: ExternalDetect.Tool
+  sessionID: string
+  agent: string
+  callID: string
+  name: string
+  input: Record<string, unknown>
+}) {
+  const call = { ...ExternalHooks.call(input.tool, input.name, input.input), name: input.name }
+  const sent = JSON.stringify(call.args)
+  const output = { args: call.args }
+  const hooked = await input.run.promise(
+    Effect.exit(
+      input.plugin.trigger(
+        "tool.execute.before",
+        {
+          tool: call.tool,
+          sessionID: input.sessionID,
+          agent: input.agent,
+          callID: input.callID,
+          external: input.tool,
+        },
+        output,
+      ),
+    ),
+  )
+  if (Exit.isFailure(hooked)) {
+    AuditLog.emit("permission.decision", {
+      session: input.sessionID,
+      permission: "external",
+      patterns: patterns(input.tool, { requestID: "", tool: input.name, input: input.input }).patterns,
+      decision: "denied by plugin hook",
+    })
+    return { call, refusal: ExternalHooks.refusal(Cause.squash(hooked.cause)), changed: false }
+  }
+  return { call, refusal: undefined, changed: JSON.stringify(output.args) !== sent }
+}
+
+/**
+ * XCOD-285: the `policy` Claude Code's PreToolUse hook asks: a Lunos deny rule refuses the call
+ * (`policyRefusal`), then Lunos's plugin pre-tool hooks (`before`, when `hooks` is on) may. Calls the
+ * Lunos bridge `owns` are judged by the bridge. `onRefused` / `onHooked` get the call's id.
+ */
+export function policyCheck(input: {
+  tool: ExternalDetect.Tool
+  ruleset: PermissionV1Type.Ruleset
+  sessionID: () => string
+  hooks: boolean
+  before: (callID: string, name: string, input: Record<string, unknown>) => Promise<string | undefined>
+  owns?: (tool: string) => Promise<boolean>
+  onRefused?: (callID: string) => void
+  onHooked?: (callID: string) => void
+}): ExternalClaude.Policy {
+  return async (call) => {
+    if (input.owns && (await input.owns(call.tool))) return undefined
+    const refusal = policyRefusal(input.tool, call, input.ruleset, input.sessionID())
+    if (call.toolUseID && refusal) input.onRefused?.(call.toolUseID)
+    if (refusal) return { deny: refusal }
+    if (!input.hooks) return undefined
+    // Without the tool's call id the approval runs the hooks again rather than guess which call it is.
+    if (call.toolUseID) input.onHooked?.(call.toolUseID)
+    const hooked = await input.before(call.toolUseID ?? `policy-${call.tool}`, call.tool, call.input)
+    return hooked ? { deny: hooked } : undefined
+  }
+}
+
+/**
+ * XCOD-293: the same Lunos policy for a run outside a Lunos session (`lunos external run`, the
+ * external_agent tool). Claude Code's PreToolUse hook gets `policyCheck`, so a deny rule or a plugin
+ * hook refuses a call its permission mode would allow without asking. Where the tool doesn't call
+ * that hook (Codex, or a Claude Code answering `hooks_applied: false`, which `warn` reports), the
+ * same check runs on the calls it asks about, before `ask`.
+ */
+export function standalonePolicy(input: {
+  tool: ExternalDetect.Tool
+  config: { external?: Parameters<typeof ConfigExternal.share>[0] }
+  ruleset: PermissionV1Type.Ruleset
+  agent: string
+  plugin: Plugin.Interface
+  run: EffectBridgeType.Shape
+  sessionID: () => string
+  ask: ExternalClaude.Options["ask"]
+  warn: (message: string) => void
+}): Pick<ExternalRun.Options, "policy" | "onHooksNotApplied" | "ask"> {
+  let hookApplied = input.tool === "claude"
+  const policy = policyCheck({
+    tool: input.tool,
+    ruleset: input.ruleset,
+    sessionID: input.sessionID,
+    hooks: ConfigExternal.share(input.config.external).hooks,
+    before: async (callID, name, args) =>
+      (
+        await beforeHooks({
+          plugin: input.plugin,
+          run: input.run,
+          tool: input.tool,
+          sessionID: input.sessionID(),
+          agent: input.agent,
+          callID,
+          name,
+          input: args,
+        })
+      ).refusal,
+  })
+  return {
+    policy,
+    onHooksNotApplied: () => {
+      hookApplied = false
+      input.warn(hooksNotApplied(input.tool))
+    },
+    ask: async (request) => {
+      if (!hookApplied) {
+        const refused = await policy({ tool: request.tool, input: request.input, toolUseID: request.toolUseID })
+        if (refused) return { allow: false, message: refused.deny }
+      }
+      return input.ask(request)
+    },
+  }
 }
 
 /** Starting an external session is gated like `lunos external run`; returns the refusal, if any. */
@@ -537,30 +678,22 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
    * approval, or `ask`, which forces one; Codex has no way to take changed arguments).
    */
   const before = async (callID: string, name: string, input: Record<string, unknown>) => {
-    const call = { ...ExternalHooks.call(tool, name, input), name }
-    calls.set(callID, call)
-    const sent = JSON.stringify(call.args)
-    const output = { args: call.args }
-    const hooked = await bridge.promise(
-      Effect.exit(
-        deps.plugin.trigger(
-          "tool.execute.before",
-          { tool: call.tool, sessionID, agent: lastUser.info.agent, callID, external: tool },
-          output,
-        ),
-      ),
-    )
-    if (Exit.isFailure(hooked)) {
+    const hooked = await beforeHooks({
+      plugin: deps.plugin,
+      run: bridge,
+      tool,
+      sessionID,
+      agent: lastUser.info.agent,
+      callID,
+      name,
+      input,
+    })
+    calls.set(callID, hooked.call)
+    if (hooked.refusal) {
       refusedCalls.add(callID)
-      AuditLog.emit("permission.decision", {
-        session: sessionID,
-        permission: "external",
-        patterns: patterns(tool, { requestID: "", tool: name, input }).patterns,
-        decision: "denied by plugin hook",
-      })
-      return ExternalHooks.refusal(Cause.squash(hooked.cause))
+      return hooked.refusal
     }
-    if (JSON.stringify(output.args) !== sent)
+    if (hooked.changed)
       enqueue(
         Effect.logWarning(
           `A Lunos plugin hook changed the arguments of ${spec.label}'s ${name} call; ${spec.label} runs its own arguments.`,
@@ -586,20 +719,19 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
         // XCOD-285: Lunos policy before the tool's permission mode, so a deny rule holds in acceptEdits
         // or auto too. The Lunos bridge's own tools are judged by the bridge.
         // Then Lunos's plugin pre-tool hooks, so a plugin that refuses a call is honoured there too.
-        policy: async (call) => {
-          if (await lunos.owns(call.tool)) return undefined
-          const refusal = policyRefusal(tool, call, ruleset, sessionID)
-          if (call.toolUseID && refusal) refusedCalls.add(call.toolUseID)
-          if (refusal) return { deny: refusal }
-          if (!hooks) return undefined
-          // Without the tool's call id the approval runs the hooks again rather than guess which call it is.
-          if (call.toolUseID) hookedCalls.add(call.toolUseID)
-          const hooked = await before(call.toolUseID ?? `policy-${call.tool}`, call.tool, call.input)
-          return hooked ? { deny: hooked } : undefined
-        },
+        policy: policyCheck({
+          tool,
+          ruleset,
+          sessionID: () => sessionID,
+          hooks,
+          before,
+          owns: lunos.owns,
+          onRefused: (callID) => refusedCalls.add(callID),
+          onHooked: (callID) => hookedCalls.add(callID),
+        }),
         // The PreToolUse hook isn't applied: calls the tool allows by itself skip Lunos's rules and hooks.
         onHooksNotApplied: () => {
-          const message = `${spec.label} didn't apply Lunos's pre-tool check (hooks_applied: false). Calls it allows without asking (acceptEdits, auto, its own allow rules) skip Lunos deny rules and plugin hooks; calls it asks about still go through them.`
+          const message = hooksNotApplied(tool)
           enqueue(
             Effect.gen(function* () {
               yield* Effect.logWarning(message)
@@ -646,6 +778,21 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
             )
           }
           if (event.type === "mode") enqueue(updateMarker(sessions, sessionID, { mode: event.mode }))
+          // XCOD-292: the context in use for the status line, as the tool reports it; a part it doesn't
+          // report keeps what it last said (Claude Code gives the window only with its result).
+          if (event.type === "context")
+            enqueue(
+              Effect.gen(function* () {
+                const previous = of(yield* sessions.get(sessionID).pipe(Effect.orDie))?.context
+                const context = {
+                  ...previous,
+                  ...(event.used !== undefined ? { used: event.used } : {}),
+                  ...(event.window !== undefined ? { window: event.window } : {}),
+                }
+                if (context.used === undefined) return
+                yield* updateMarker(sessions, sessionID, { context: context as Context })
+              }),
+            )
           if (event.type === "text") {
             streamed = event.text
             const now = Date.now()
@@ -672,13 +819,15 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                 status: "running",
                 input: (event.input ?? {}) as Record<string, unknown>,
                 title: event.name,
-                // XCOD-285: edits as diffs, todos as a checklist, as the tool shows them.
-                metadata: ExternalNative.render(tool, event.name, event.input),
+                // XCOD-285: edits as diffs, todos as a checklist, as the tool shows them (XCOD-292: Codex's too).
+                metadata: ExternalNative.render(tool, event.name, event.input, ctx.directory),
                 time: { start: Date.now() },
               },
             }
             tools.set(event.id, part)
-            calls.set(event.id, { ...ExternalHooks.call(tool, event.name, event.input), name: event.name })
+            // XCOD-292: a plan update or a subagent's progress isn't a call: no hook sees it.
+            if (!event.progress)
+              calls.set(event.id, { ...ExternalHooks.call(tool, event.name, event.input), name: event.name })
             enqueue(sessions.updatePart(part))
           }
           if (event.type === "tool_result") {
@@ -692,7 +841,8 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
                   input: part.state.input,
                   output: event.output,
                   title: part.state.title ?? "",
-                  metadata: part.state.metadata ?? {},
+                  // XCOD-292: what the tool only reports on completion (a subagent's final state) joins it.
+                  metadata: { ...part.state.metadata, ...event.metadata },
                   time: { start, end: Date.now() },
                 }
             enqueue(sessions.updatePart({ ...part }))

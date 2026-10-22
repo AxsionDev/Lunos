@@ -35,6 +35,10 @@ const AgentFields = Schema.Struct({
   }),
   maxSteps: Schema.optional(PositiveInt).annotate({ description: "@deprecated Use 'steps' field instead." }),
   permission: Schema.optional(ConfigPermissionV1.Info),
+  verify: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Build agent: check the work (build, tests, start the app and try it) before handing back (default true). false restores handing back without checking (XCOD-288)",
+  }),
 })
 
 const AgentSchema = Schema.StructWithRest(AgentFields, [Schema.Record(Schema.String, Schema.Any)])

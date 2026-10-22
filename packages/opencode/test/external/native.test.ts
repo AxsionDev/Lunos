@@ -383,3 +383,231 @@ describe("the tool's edits and todos shown as it shows them (XCOD-285)", () => {
     expect(ExternalNative.render("codex", "FileChange", { changes: [] })).toEqual({})
   })
 })
+
+// XCOD-292: Codex's file changes, plan updates and subagent progress shown the way it shows them, and
+// the context both tools report. File changes and token usage come from the recorded 0.160.1 turn
+// (codex-app-server.jsonl, replayed by fake-codex.ts); the plan and subagent items aren't in any
+// recording, so they are checked against 0.160.1's generated schema (codex-0.160.1/render-items.json)
+// and sent by the fake in that shape (codex-progress.schema-shaped.jsonl).
+describe("Codex's diffs, plan and subagent progress (XCOD-292)", () => {
+  const RECORDED = path.join(import.meta.dir, "fixtures", "codex-app-server.jsonl")
+  const SCHEMA = JSON.parse(readFileSync(path.join(FIXTURES, "codex-0.160.1", "render-items.json"), "utf8"))
+  const FAKE_CODEX = path.join(import.meta.dir, "fixtures", "fake-codex.ts")
+
+  async function codexTurn(env: Record<string, string> = {}) {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-codex-render-"))
+    process.env.FAKE_CODEX_LOG = path.join(dir, "host.log")
+    Object.assign(process.env, env)
+    const events: ExternalCodex.Event[] = []
+    try {
+      const result = await ExternalCodex.start({
+        cwd: dir,
+        prompt: "Create note.txt",
+        executable: FAKE_CODEX,
+        ask: async () => ({ allow: true }),
+        onEvent: (event) => events.push(event),
+      }).done
+      return { result, events }
+    } finally {
+      delete process.env.FAKE_CODEX_LOG
+      for (const key of Object.keys(env)) delete process.env[key]
+    }
+  }
+
+  test("the recorded file change (a new file) is a diff from nothing, its path relative to the session", () => {
+    const item = lines(RECORDED).find((m) => m.method === "item/started" && m.params.item.type === "fileChange")
+    const metadata = ExternalNative.render("codex", "FileChange", { changes: item.params.item.changes }, "/work")
+    const files = metadata.files as ExternalNative.PatchFile[]
+    expect(files).toHaveLength(1)
+    expect(files[0]).toMatchObject({ type: "add", filePath: "/work/note.txt", relativePath: "note.txt", deletions: 0 })
+    expect(files[0]!.patch).toContain("+from codex")
+    // Outside the session's directory the path is shown whole.
+    expect(
+      (
+        ExternalNative.render("codex", "FileChange", { changes: item.params.item.changes }, "/elsewhere").files as any
+      )[0].relativePath,
+    ).toBe("/work/note.txt")
+  })
+
+  test("every change kind the schema lists is shown; one it doesn't list, or without a path, is left out", () => {
+    const kinds = SCHEMA.fileChange.PatchChangeKind.oneOf.map((kind: any) => kind.properties.type.enum[0])
+    expect(kinds).toEqual(["add", "delete", "update"])
+    expect(SCHEMA.fileChange.FileUpdateChange.required).toEqual(["diff", "kind", "path"])
+    const files = ExternalNative.codexFiles(
+      [
+        { path: "/w/a.ts", kind: { type: "add" }, diff: "a\n" },
+        { path: "/w/b.ts", kind: { type: "delete" }, diff: "one\ntwo\n" },
+        { path: "/w/c.ts", kind: { type: "update", move_path: null }, diff: "@@ -1 +1 @@\n-old\n+new\n" },
+        { path: "/w/d.ts", kind: { type: "update", move_path: "/w/e.ts" }, diff: "@@ -1 +1 @@\n-x\n+y\n" },
+        { path: "/w/f.ts", kind: { type: "rename" }, diff: "" },
+        { kind: { type: "add" }, diff: "no path" },
+      ],
+      "/w",
+    )
+    expect(files.map((file) => [file.type, file.relativePath, file.deletions])).toEqual([
+      ["add", "a.ts", 0],
+      ["delete", "b.ts", 2],
+      ["update", "c.ts", 1],
+      ["move", "e.ts", 1],
+    ])
+    // A hunk without file headers gets them, so the diff view can read it.
+    expect(files[2]!.patch.startsWith("--- c.ts\n+++ c.ts\n@@")).toBe(true)
+    expect(files[3]).toMatchObject({ filePath: "/w/d.ts", movePath: "/w/e.ts" })
+  })
+
+  test("a plan update is a checklist in Lunos's statuses, for each status the schema lists", () => {
+    const plan = SCHEMA.plan.notification
+    expect(SCHEMA.notifications).toContain("turn/plan/updated")
+    expect(plan.required).toEqual(["plan", "threadId", "turnId"])
+    expect(Object.keys(ExternalNative.PLAN_STATUS)).toEqual(plan.definitions.TurnPlanStepStatus.enum)
+    expect(
+      ExternalNative.codexPlan({
+        explanation: null,
+        plan: [
+          { step: "Read", status: "completed" },
+          { step: "Fix", status: "inProgress" },
+          { step: "Test", status: "pending" },
+          { step: "Unknown", status: "blocked" },
+        ],
+      }),
+    ).toEqual({
+      todos: [
+        { content: "Read", status: "completed" },
+        { content: "Fix", status: "in_progress" },
+        { content: "Test", status: "pending" },
+      ],
+    })
+    expect(ExternalNative.codexPlan({ explanation: "Why", plan: [{ step: "A", status: "pending" }] })).toMatchObject({
+      explanation: "Why",
+    })
+    expect(ExternalNative.codexPlan({ plan: [] })).toBeUndefined()
+  })
+
+  test("a subagent call shows what Codex reported, null fields left out; its final state arrives on completion", () => {
+    const item = SCHEMA.collabAgentToolCall.item
+    expect(item.required).toEqual([
+      "agentsStates",
+      "id",
+      "receiverThreadIds",
+      "senderThreadId",
+      "status",
+      "tool",
+      "type",
+    ])
+    expect(
+      ExternalNative.codexAgentCall({ tool: "wait", prompt: null, model: null, receiverThreadIds: ["t1", "t2"] }),
+    ).toEqual({ kind: "call", tool: "wait", receivers: ["t1", "t2"] })
+    expect(
+      ExternalNative.codexAgentStates({
+        agentsStates: {
+          t1: { status: "completed", message: "done" },
+          t2: { status: "running", message: null },
+          t3: {},
+        },
+      }),
+    ).toEqual([
+      { id: "t1", status: "completed", message: "done" },
+      { id: "t2", status: "running" },
+    ])
+    expect(SCHEMA.subAgentActivity.SubAgentActivityKind.enum).toEqual([
+      "started",
+      "interacted",
+      "interrupted",
+      "completed",
+    ])
+    expect(ExternalNative.codexAgentActivity({ kind: "started", agentPath: "checker", agentThreadId: "t1" })).toEqual({
+      kind: "activity",
+      activity: "started",
+      agent: "checker",
+      thread: "t1",
+    })
+  })
+
+  test("the fake's plan and subagent lines match the schema's required fields", () => {
+    const sent = lines(path.join(import.meta.dir, "fixtures", "codex-progress.schema-shaped.jsonl"))
+    for (const message of sent) {
+      if (message.method === "turn/plan/updated")
+        for (const key of SCHEMA.plan.notification.required) expect(message.params).toHaveProperty(key)
+      else {
+        const item = message.params.item
+        const schema = item.type === "collabAgentToolCall" ? SCHEMA.collabAgentToolCall : SCHEMA.subAgentActivity
+        for (const key of schema.item.required) expect(item).toHaveProperty(key)
+        if (item.type === "collabAgentToolCall") expect(schema.CollabAgentTool.enum).toContain(item.tool)
+      }
+    }
+  })
+
+  test("end to end: the adapter turns them into calls Lunos renders, and none is seen as one of Codex's calls", async () => {
+    const { events, result } = await codexTurn({ FAKE_CODEX_PROGRESS: "1" })
+    expect(result).toMatchObject({ type: "result", ok: true })
+    const tools = events.filter((event) => event.type === "tool") as Extract<ExternalCodex.Event, { type: "tool" }>[]
+    const plans = tools.filter((event) => event.name === "Plan")
+    expect(plans.map((event) => (event.input as any).todos.map((todo: any) => todo.status))).toEqual([
+      ["in_progress", "pending"],
+      ["completed", "completed"],
+    ])
+    expect((plans[0]!.input as any).explanation).toBe("Write the note, then check it.")
+    expect(plans[1]!.input).not.toHaveProperty("explanation")
+    const agents = tools.filter((event) => event.name === "Agent")
+    // The activity item is shown once, though it came as started and completed.
+    expect(agents.map((event) => (event.input as any).kind)).toEqual(["call", "activity"])
+    for (const event of [...plans, ...agents]) expect(event.progress).toBe(true)
+    const done = events.find((event) => event.type === "tool_result" && event.id === "call_agent_1") as any
+    expect(done.metadata.agents).toEqual([
+      { id: "01a11700-aaaa-7bbb-8ccc-000000000001", status: "completed", message: "note.txt says from codex" },
+    ])
+    // The recorded file changes are still Codex's own calls.
+    expect(tools.filter((event) => event.name === "FileChange").every((event) => !event.progress)).toBe(true)
+  })
+
+  test("context: the recorded turn's last token use, out of the window Codex reports", async () => {
+    const recorded = lines(RECORDED).filter((m) => m.method === "thread/tokenUsage/updated")
+    const last = recorded.at(-1).params.tokenUsage
+    const { events } = await codexTurn()
+    const context = events.filter((event) => event.type === "context")
+    expect(context.length).toBe(recorded.length)
+    expect(context.at(-1)).toEqual({ type: "context", used: last.last.totalTokens, window: last.modelContextWindow })
+  })
+})
+
+describe("Claude Code's context (XCOD-292)", () => {
+  test("the recorded turn: the last main-thread call's input, out of the window its result reports", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-claude-context-"))
+    process.env.FAKE_CLAUDE_LOG = path.join(dir, "host.log")
+    const events: ExternalClaude.Event[] = []
+    try {
+      await ExternalClaude.start({
+        cwd: dir,
+        prompt: "Create hello.txt containing hi",
+        executable: FAKE,
+        ask: async () => ({ allow: true }),
+        onEvent: (event) => events.push(event),
+      }).done
+    } finally {
+      delete process.env.FAKE_CLAUDE_LOG
+    }
+    const stream = lines(path.join(import.meta.dir, "fixtures", "claude-stream.jsonl"))
+    const usage = stream.findLast((m) => m.type === "assistant" && !m.parent_tool_use_id).message.usage
+    const used = usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens
+    const context = events.filter((event) => event.type === "context")
+    expect(context.findLast((event: any) => event.used !== undefined)).toEqual({ type: "context", used })
+    expect(context.at(-1)).toEqual({ type: "context", window: 1_000_000 })
+  })
+
+  test("nothing when it reports nothing: no usage, a subagent's call, or a result naming no window", () => {
+    const context = (line: unknown) =>
+      ExternalClaude.parse(JSON.stringify(line)).events.filter((event) => event.type === "context")
+    expect(context({ type: "assistant", message: { content: [] } })).toEqual([])
+    expect(
+      context({
+        type: "assistant",
+        parent_tool_use_id: "toolu_1",
+        message: { content: [], usage: { input_tokens: 9 } },
+      }),
+    ).toEqual([])
+    expect(ExternalClaude.contextWindow(undefined, "m")).toBeUndefined()
+    expect(ExternalClaude.contextWindow({ a: { contextWindow: 1 }, b: { contextWindow: 2 } }, "c")).toBeUndefined()
+    expect(ExternalClaude.contextWindow({ a: { contextWindow: 1 }, b: { contextWindow: 2 } }, "b")).toBe(2)
+    expect(ExternalClaude.contextWindow({ only: {} }, "m")).toBeUndefined()
+  })
+})

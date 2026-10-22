@@ -24,6 +24,7 @@ import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
 import { ConfigResidency } from "./config/residency"
 import { ConfigSubagent } from "./config/subagent"
+import { ConfigVerify } from "./config/verify"
 import { ConfigCloud } from "./config/cloud"
 import { ConfigAuth } from "./config/auth"
 import { ConfigSync } from "./config/sync"
@@ -137,6 +138,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   subagent: ConfigSubagent.Info.pipe(Schema.optional).annotate({
     description:
       "Subagents: whether Build delegates to them, background runs, how many run at once, their model, and their names and animals in the TUI",
+  }),
+  verify: ConfigVerify.Info.pipe(Schema.optional).annotate({
+    description:
+      "How the Build agent checks its work before handing back: build, test and start commands, the ready URL and checks (XCOD-288)",
   }),
   memory: ConfigMemory.Info.pipe(Schema.optional).annotate({
     description: "Graph-based long-term memory, off by default",
