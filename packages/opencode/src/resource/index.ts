@@ -12,6 +12,7 @@ import type { ConfigResource } from "@opencode-ai/core/config/resource"
 import { Watcher } from "@opencode-ai/core/filesystem/watcher"
 import type { EventV2 } from "@opencode-ai/core/event"
 import { Cause, Context, Duration, Effect, Layer } from "effect"
+import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
 import { ConfigManaged } from "@/config/managed"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -124,6 +125,7 @@ const layer = Layer.effect(
     const events = yield* EventV2Bridge.Service
     const locations = yield* LocationServiceMap.Service
     const repositories = yield* RepositoryCache.Service
+    const agents = yield* Agent.Service
 
     const inLocation = <A, E, R>(directory: string, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(directory) }))))
@@ -501,6 +503,9 @@ const layer = Layer.effect(
         return yield* Effect.fail(
           new ResourceError(`the name "${input.name}" can only use letters, digits, ".", "_" and "-"`),
         )
+      // `@build` already means a subagent: a resource can't take an agent's name.
+      if ((yield* agents.list()).some((agent) => agent.name === input.name))
+        return yield* Effect.fail(new ResourceError(`@${input.name} already names an agent; pick another name`))
       const existing = list.find((item) => item.name === input.name)
       if (existing)
         return yield* Effect.fail(
@@ -650,7 +655,7 @@ const locationServiceMapNode = LayerNode.make({
 export const node = LayerNode.make({
   service: Service,
   layer,
-  deps: [Config.node, MCP.node, EventV2Bridge.node, RepositoryCache.node, locationServiceMapNode],
+  deps: [Config.node, MCP.node, EventV2Bridge.node, RepositoryCache.node, Agent.node, locationServiceMapNode],
 })
 
 export * as Resource from "."

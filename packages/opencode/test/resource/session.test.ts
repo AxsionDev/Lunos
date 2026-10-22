@@ -442,6 +442,10 @@ it.instance(
         ["small", "shared"],
       ])
       expect(yield* resources.remove("mine")).toBe("personal")
+      const clash = yield* resources
+        .add({ name: "build", entry: { path: "small.md" }, scope: "shared" })
+        .pipe(Effect.flip)
+      expect(clash.message).toContain("@build already names an agent")
     }),
   30_000,
 )
