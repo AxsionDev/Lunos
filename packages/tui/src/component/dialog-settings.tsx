@@ -198,7 +198,7 @@ export function DialogSettings(props: {
                 display: host.display,
                 source: host.layer ?? "default",
                 from: host.file,
-                locked: !!host.fixed,
+                locked: host.fixedBy === "managed",
                 override: host.fixed ?? host.detail,
               }
             : row,
@@ -484,6 +484,21 @@ export function DialogSettings(props: {
   async function save(row: SettingRow, value: string, options: { reopen?: boolean; unset?: boolean } = {}) {
     const input = { key: row.key, value, scope: scope(), ...(options.unset ? { unset: true } : {}) }
     const host = savedOnHost(row.key) ? hostSettings() : undefined
+    // XCOD-297: the rows come from the server in the sandbox, which runs the project's plugins, so
+    // what's about to change on this computer is said here, in this process's own words.
+    if (host) {
+      const sure = await DialogConfirm.show(
+        dialog,
+        "Save on this computer?",
+        hostQuestion(row.key, value, options.unset),
+        undefined,
+        backTo(row.key),
+      )
+      if (sure !== true) {
+        reopen(row.key)
+        return false
+      }
+    }
     const result = await (
       host ? host.set(input).then((data) => ({ data })) : sdk.client.config.settingsSet({ settingsSetInput: input })
     ).catch((cause: unknown) => ({ data: undefined, error: cause }))
@@ -543,6 +558,20 @@ export function DialogSettings(props: {
     return true
   }
 
+  /** XCOD-297: what a save from inside the sandbox changes on this computer, written by this TUI. */
+  function hostQuestion(key: string, value: string, unset?: boolean) {
+    if (key === "sandbox.enabled" && value === "false") {
+      const detail = hostSandbox()?.detail
+      const where = detail?.startsWith("on · ") ? detail.slice("on · ".length) : undefined
+      return (
+        `This turns the sandbox off on this computer: sandbox.enabled becomes false${where ? ` (${where})` : ""}. ` +
+        "Lunos then restarts and runs this project on this computer, with its plugins, without the sandbox."
+      )
+    }
+    if (unset) return `This removes ${key} from your ${scope()} config on this computer, not the sandbox's.`
+    return `This saves ${key} = ${value} in your ${scope()} config on this computer, not the sandbox's. It applies from the next start.`
+  }
+
   function refuse(row: SettingRow) {
     // XCOD-297: sandbox.enabled is fixed by sandbox.required or the organisation; the row says which.
     if (row.locked && row.key === "sandbox.enabled" && row.override) {
@@ -590,6 +619,14 @@ export function DialogSettings(props: {
    */
   async function switchSandbox(row: SettingRow) {
     if (refuse(row)) return
+    // sandbox.required in a config file: the row says where; nothing to try.
+    const fixed = hostSettings()
+      ? hostSandbox()?.fixed
+      : row.value === true && !!row.override && !row.override.startsWith("on · ")
+    if (fixed) {
+      toast.show({ variant: "warning", message: hostSandbox()?.fixed ?? row.override ?? "", duration: 8000 })
+      return
+    }
     if (sandbox.state()?.status === "off")
       return dialog.replace(
         () => (
@@ -612,12 +649,13 @@ export function DialogSettings(props: {
         backTo(row.key),
       )
     if (row.value !== true) return void save(row, "true")
-    if (row.source === "project" && row.from) {
+    // Inside a sandbox the host's own question covers it.
+    if (row.source === "project" && row.from && !hostSettings()) {
       const sure = await DialogConfirm.show(
         dialog,
         "Turn the sandbox off?",
         `This sets sandbox.enabled to false in ${home(row.from)}, this project's config, which may be shared in the repository.`,
-        "turn off",
+        undefined,
         backTo(row.key),
       )
       if (sure !== true) return reopen(row.key)

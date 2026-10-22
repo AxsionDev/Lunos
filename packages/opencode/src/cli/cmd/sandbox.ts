@@ -382,9 +382,24 @@ export function hostSettings(directory: string): NonNullable<SandboxHost["settin
   return {
     sandbox: () => SandboxEffective.view(SandboxEffective.resolve(directory)),
     async set(input): Promise<SandboxSaved> {
-      if (input.key !== "sandbox" && !input.key.startsWith("sandbox."))
+      if (!input.key.startsWith("sandbox."))
         return { ok: false, error: `${input.key} isn't saved on this computer from inside the sandbox` }
       const { ConfigSettings } = await import("@/config/settings")
+      // The rows come from the server inside, which runs the project's plugins: nothing from there
+      // may loosen the sandbox on this computer. What a repository can't choose (an open network, a
+      // mount, the image) is refused here too; only turning it off is allowed, and the TUI asks first.
+      const value = input.unset ? undefined : ConfigSettings.coerceKey(input.key, input.value)
+      const weakens =
+        input.key === "sandbox.image" ||
+        (input.key === "sandbox.required" && value !== true) ||
+        (!input.unset && ConfigSettings.projectRefusal(input.key, value))
+      if (weakens)
+        return {
+          ok: false,
+          error:
+            `${input.key} can't be changed from inside a sandbox, since that would loosen it. ` +
+            "Change it with `lunos settings set` on this computer, or in /settings when Lunos runs without the sandbox.",
+        }
       const where = { ctx: { directory, worktree: SandboxConfig.worktreeOf(directory) }, via: "settings screen" }
       try {
         const result = input.unset

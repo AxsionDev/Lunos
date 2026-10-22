@@ -12,6 +12,8 @@ In terminals that support links (Windows Terminal, iTerm2, GNOME Terminal and ot
 
 This applies when Lunos fails to start, when `/restart` fails, when a sandbox can't be created, started or connected to, when Lunos's background worker stops, when an unexpected error stops Lunos, when the TUI crashes (the crash screen shows the log's path too, and the link is printed after the terminal is put back), and when `lunos run` fails.
 
+If the sandbox keeps Lunos from starting, `lunos sandbox off` turns it off from the command line (PowerShell included), without Docker or the TUI, and `lunos sandbox status` says which config file turns it on. See [turning it off](sandboxed-runs.md#turning-it-off).
+
 ## Where the logs are
 
 | System  | Directory                                  |

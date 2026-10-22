@@ -46,6 +46,8 @@ export type SandboxSetting = {
   file?: string
   /** Why it can't be turned off here (an organisation lock, sandbox.required), and who set it. */
   fixed?: string
+  /** Who fixed it: the organisation (shown locked), or sandbox.required in a config file. */
+  fixedBy?: "managed" | "config"
   /** Off only because it failed to start here (XCOD-281); the config still turns it on. */
   disabled?: boolean
 }

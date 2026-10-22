@@ -28,6 +28,8 @@ export type State = {
   sources: Source[]
   /** Why it can't be turned off here, and who set it. */
   fixed?: string
+  /** Your organisation (managed config, a lock), or a config file (sandbox.required). */
+  fixedBy?: "managed" | "config"
   /** XCOD-281: turned off here after it failed to start; the config still turns it on. */
   disabled?: SandboxDisabled.Entry
 }
@@ -87,11 +89,16 @@ export function resolve(directory: string): State {
   const locked = ConfigPolicy.isLocked(ConfigPolicy.lockList(managed), "sandbox.enabled")
   // As `wanted` decides: required always runs sandboxed; otherwise enabled, unless it failed here.
   const disabled = !config.required && config.enabled ? SandboxDisabled.get(directory, config) : undefined
+  const reason = config.enabled ? fixed(found, locked) : locked ? ConfigPolicy.message("sandbox.enabled") : undefined
+  const required = found.find((source) => source.key === "required")
   return {
     config,
     on: config.required || (config.enabled && !disabled),
     sources: found,
-    fixed: config.enabled ? fixed(found, locked) : locked ? ConfigPolicy.message("sandbox.enabled") : undefined,
+    fixed: reason,
+    ...(reason
+      ? { fixedBy: required && required.layer !== "managed" ? ("config" as const) : ("managed" as const) }
+      : {}),
     ...(disabled ? { disabled } : {}),
   }
 }
@@ -127,7 +134,7 @@ export function view(state: State): SandboxSetting {
     ...base,
     display: state.config.required ? "on (required)" : "on",
     detail: `on · ${from ?? "set by --sandbox"}`,
-    ...(state.fixed ? { fixed: state.fixed } : {}),
+    ...(state.fixed ? { fixed: state.fixed, fixedBy: state.fixedBy } : {}),
   }
 }
 

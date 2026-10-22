@@ -123,14 +123,22 @@ describe("fixed: an organisation lock or sandbox.required", () => {
     const state = SandboxEffective.resolve(project)
     expect(state.on).toBe(true)
     expect(state.fixed).toContain("sandbox.required is set by your organisation's managed config")
-    expect(SandboxEffective.view(state)).toMatchObject({ display: "on (required)", fixed: state.fixed })
+    expect(SandboxEffective.view(state)).toMatchObject({
+      display: "on (required)",
+      fixed: state.fixed,
+      fixedBy: "managed",
+    })
     expect(SandboxEffective.turnOff(project)).toMatchObject({ ok: false, reason: state.fixed })
     await expect(off()).rejects.toThrow(state.fixed!)
   })
 
-  test("sandbox.required in a project file names the file", async () => {
+  test("sandbox.required in a project file names the file, and isn't shown as the organisation's", async () => {
     const file = path.join(project, ".opencode", "opencode.json")
     await write(file, { sandbox: { required: true } })
+    expect(SandboxEffective.view(SandboxEffective.resolve(project))).toMatchObject({
+      fixedBy: "config",
+      layer: "project",
+    })
     const turned = SandboxEffective.turnOff(project)
     expect(turned).toMatchObject({ ok: false })
     expect(!turned.ok && turned.reason).toBe(
@@ -278,10 +286,27 @@ describe("from inside a sandbox", () => {
     const host = hostSettings(project)
     expect(await host.set({ key: "sandbox.network", value: "none", scope: "user" })).toMatchObject({ ok: true })
     expect(read(path.join(user, "opencode.json")).sandbox.network).toBe("none")
-    // A repository can't open the network: refused, as on the host.
-    const refused = await host.set({ key: "sandbox.network", value: "open", scope: "project" })
-    expect(refused.ok).toBe(false)
     expect(await host.set({ key: "model", value: "x/y", scope: "user" })).toMatchObject({ ok: false })
+  })
+
+  test("nothing from inside loosens the sandbox on this computer, even at user scope", async () => {
+    // The rows come from the server inside, which runs the project's plugins.
+    const host = hostSettings(project)
+    for (const [key, value] of [
+      ["sandbox.network", "open"],
+      ["sandbox.workspace", "mount"],
+      ["sandbox.devcontainer", "build"],
+      ["sandbox.image", "evil/image:latest"],
+      ["sandbox.allow", "evil.example:443"],
+      ["sandbox.required", "false"],
+    ]) {
+      const saved = await host.set({ key: key!, value: value!, scope: "user" })
+      expect(saved.ok).toBe(false)
+      expect(!saved.ok && saved.error).toContain("can't be changed from inside a sandbox")
+    }
+    expect(await Bun.file(path.join(user, "opencode.json")).exists()).toBe(false)
+    // Stricter is fine.
+    expect(await host.set({ key: "sandbox.network", value: "none", scope: "user" })).toMatchObject({ ok: true })
   })
 })
 
@@ -334,6 +359,48 @@ describe("lunos sandbox status | off", () => {
         expect(run(["sandbox", "status"]).stdout.toString()).toContain("Sandbox: off")
       } finally {
         await fs.rm(status.home, { recursive: true, force: true })
+      }
+    },
+    TIMEOUT,
+  )
+
+  test(
+    "--project leaves your own file and says where it's still on; --project with --user is refused",
+    async () => {
+      let mine = ""
+      let theirs = ""
+      const result = await lunos(["sandbox", "off", "--project"], async (dirs) => {
+        mine = path.join(dirs.config, "opencode.json")
+        theirs = path.join(dirs.project, "opencode.json")
+        await write(mine, { sandbox: { enabled: true } })
+        await write(theirs, { sandbox: { enabled: true } })
+      })
+      try {
+        expect(result.code).not.toBe(0)
+        expect(result.stdout).toContain(`sandbox.enabled is now false in ${theirs}`)
+        expect(result.stderr).toContain(`still on: set in ${mine} (user)`)
+        expect(read(theirs).sandbox.enabled).toBe(false)
+        expect(read(mine).sandbox.enabled).toBe(true)
+        const env = { ...(await Pty.prepare({ home: result.home })).env, PWD: result.project }
+        const both = Bun.spawnSync(
+          [
+            process.execPath,
+            "run",
+            "--cwd",
+            path.resolve(import.meta.dir, "../.."),
+            "src/index.ts",
+            "sandbox",
+            "off",
+            "--project",
+            "--user",
+          ],
+          { cwd: result.project, env },
+        )
+        expect(both.exitCode).not.toBe(0)
+        expect(both.stderr.toString()).toContain("--project and --user contradict each other")
+        expect(read(mine).sandbox.enabled).toBe(true)
+      } finally {
+        await fs.rm(result.home, { recursive: true, force: true })
       }
     },
     TIMEOUT,

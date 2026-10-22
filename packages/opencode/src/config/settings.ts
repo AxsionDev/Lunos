@@ -731,7 +731,8 @@ async function sandboxRow(rows: Row[], ctx: Context) {
             display: view.display,
             source: view.layer ?? "default",
             from: view.file,
-            locked: !!view.fixed,
+            // A file's sandbox.required isn't the organisation's: it shows where it's set, not 🔒 managed.
+            locked: view.fixedBy === "managed",
             override: view.fixed ?? view.detail,
           }
         : row,
@@ -812,6 +813,17 @@ export class SettingError extends Error {
 
 function allowed(item: Entry) {
   return (item.values ?? []).map(String).join(", ")
+}
+
+/** XCOD-297: `coerce` by key, undefined for an unknown key or a value it refuses. */
+export function coerceKey(key: string, input: unknown) {
+  const item = find(key)
+  if (!item) return undefined
+  try {
+    return coerce(item, input)
+  } catch {
+    return undefined
+  }
 }
 
 /** Turns what a user typed into the value to store, or explains why it can't be. */
