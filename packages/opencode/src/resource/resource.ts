@@ -135,6 +135,12 @@ export interface ResolveInput {
   directory: string
   /** Names the project's own config files declare. */
   shared: ReadonlySet<string>
+  /**
+   * Names your own config files declare (global config, `~/.opencode`, OPENCODE_CONFIG_DIR). Only
+   * these may point outside the project: an entry from anywhere else (a config file in a folder
+   * between here and the repository root, OPENCODE_CONFIG_CONTENT) counts as the repository's.
+   */
+  user?: ReadonlySet<string>
   personal: Record<string, ConfigResource.Entry>
   /** Managed config documents, for which entries are the organisation's. */
   managed: readonly unknown[]
@@ -164,8 +170,11 @@ export function resolve(input: ResolveInput): Resource[] {
   for (const [name, entry] of Object.entries(input.config?.entries ?? {}))
     merged[name] = {
       entry,
-      scope: name in organisation ? "organisation" : input.shared.has(name) ? "shared" : "user",
+      scope: input.shared.has(name) || !input.user?.has(name) ? "shared" : "user",
     }
+  // An organisation's resource is always managed config's definition: a repository's config can't
+  // redefine it under the organisation's name (and read-only label).
+  for (const [name, entry] of Object.entries(organisation)) merged[name] = { entry, scope: "organisation" }
   // XCOD-102: a locked `resources` takes managed config only, so personal resources are off too.
   if (!locked)
     for (const [name, entry] of Object.entries(input.personal))
@@ -461,6 +470,19 @@ export async function sharedEntries(directories: readonly string[]) {
       if (!text) continue
       const entries = ConfigPolicy.get(parseJsonc(text, [], { allowTrailingComma: true }), "resources.entries")
       if (isRecord(entries)) Object.assign(out, entries)
+    }
+  return out
+}
+
+/** Names under `resources.entries` in your own config files: global config and `~/.opencode`. */
+export async function userNames(directories: readonly string[]) {
+  const out = new Set<string>()
+  for (const dir of directories)
+    for (const name of ["config.json", "opencode.json", "opencode.jsonc"]) {
+      const text = await fs.readFile(path.join(dir, name), "utf8").catch(() => undefined)
+      if (!text) continue
+      const entries = ConfigPolicy.get(parseJsonc(text, [], { allowTrailingComma: true }), "resources.entries")
+      if (isRecord(entries)) for (const key of Object.keys(entries)) out.add(key)
     }
   return out
 }

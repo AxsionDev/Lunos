@@ -29,8 +29,8 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   new `project_resources_search` tool, or included when you mention it as `@name`. Shared resources
   go in the project's config for the whole team; personal ones stay on this computer. Everything is
   indexed on this computer, secrets are skipped and masked, web and MCP content is labelled as
-  untrusted reference material, and web pages are fetched only where `permission.webfetch` and
-  offline mode allow. The sidebar's Context section lists them, with a per-session exclude, and
+  untrusted reference material, and web pages are fetched only when offline mode, `resources.web`
+  and `permission.webfetch` allow it. The sidebar's Context section lists them, with a per-session exclude, and
   `/context` shows what the last turn's context was made of, in tokens. See
   [Project resources](docs/project-resources.md). <!-- XCOD-300 -->
 

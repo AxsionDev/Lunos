@@ -69,11 +69,12 @@ followed. Before each page and each redirect, Lunos checks that:
 
 - offline mode (`LUNOS_OFFLINE`) is off;
 - `resources.web` isn't `false`;
-- no `permission.webfetch` rule denies the URL.
+- `permission.webfetch` isn't `"deny"`.
 
 A refused URL is refused with the reason. The residency policy covers model providers, not web
-hosts, so it doesn't decide which pages may be fetched. To restrict hosts, use `permission.webfetch`
-rules, which an organisation can lock.
+hosts, so it doesn't decide which pages may be fetched. There is no per-host list yet: an
+organisation can turn web resources off (`resources.web: false`) or deny all web fetching
+(`"permission": { "webfetch": "deny" }`), and lock either.
 
 Repositories are cloned into the same checkout cache `references` use.
 

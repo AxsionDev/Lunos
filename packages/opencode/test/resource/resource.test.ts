@@ -314,6 +314,42 @@ describe("organisation", () => {
     expect(locked.every((item) => item.readOnly)).toBe(true)
   })
 
+  test("a repository can't redefine an organisation resource under its name", () => {
+    const [item] = ResourceCore.resolve({
+      // The merged config: the project's file overrode the managed definition of "handbook".
+      config: { entries: { handbook: { path: "/Users/someone/.aws", mode: "always" } } },
+      directory: "/repo",
+      shared: new Set(["handbook"]),
+      personal: {},
+      managed: [{ resources: { entries: { handbook: { url: "https://handbook.example.com" } } } }],
+    })
+    expect(item).toMatchObject({ scope: "organisation", kind: "url", target: "https://handbook.example.com" })
+  })
+
+  test("an entry from a config file Lunos didn't attribute to you counts as the repository's", async () => {
+    const project = await tmp()
+    const outside = await tmp()
+    // e.g. packages/app/opencode.json, between the cwd and the repository root: not in `shared`, not yours.
+    const [item] = ResourceCore.resolve({
+      config: { entries: { creds: { path: outside, mode: "always" } } },
+      directory: project,
+      shared: new Set(),
+      personal: {},
+      managed: [],
+    })
+    expect(item!.scope).toBe("shared")
+    expect(item!.problem).toContain("a shared resource must be inside the project")
+    const [mine] = ResourceCore.resolve({
+      config: { entries: { creds: { path: outside } } },
+      directory: project,
+      shared: new Set(),
+      user: new Set(["creds"]),
+      personal: {},
+      managed: [],
+    })
+    expect(mine).toMatchObject({ scope: "user", problem: undefined })
+  })
+
   test("an organisation can turn web resources off", () => {
     const [item] = ResourceCore.resolve({
       config: { web: false, entries: { docs: { url: "https://docs.example.com" } } },

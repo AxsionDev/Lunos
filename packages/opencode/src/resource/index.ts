@@ -1,6 +1,7 @@
 import path from "node:path"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Global } from "@opencode-ai/core/global"
+import { Flag } from "@opencode-ai/core/flag/flag"
 import { Location } from "@opencode-ai/core/location"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
 import { Offline } from "@opencode-ai/core/offline"
@@ -32,7 +33,7 @@ import { ResourceSearch } from "./search"
  * it leaves only inside a prompt to the model the user chose.
  *
  * - Web pages and repositories are fetched only if offline mode is off, `resources.web` allows web
- *   pages, and no `permission.webfetch` rule denies the URL (checked for every page and redirect).
+ *   pages, and `permission.webfetch` isn't "deny" (checked for every page and redirect).
  *   The residency policy governs model providers, not web hosts, so it isn't consulted here.
  * - Local resources are re-indexed when the file watcher reports a change under them, and checked
  *   for changes (sizes and times) at most every 30 seconds otherwise, for folders the watcher
@@ -191,11 +192,19 @@ const layer = Layer.effect(
           return yield* (yield* Reference.Service).list()
         }),
       ).pipe(Effect.orElseSucceed(() => [] as Reference.Info[]))
+      const user = yield* Effect.promise(() =>
+        ResourceCore.userNames([
+          Global.Path.config,
+          path.join(Global.Path.home, ".opencode"),
+          ...(Flag.OPENCODE_CONFIG_DIR ? [Flag.OPENCODE_CONFIG_DIR] : []),
+        ]),
+      )
       const list = ResourceCore.resolve({
         config: ConfigPolicyLocked(cfg) ? cfg.resources : { ...cfg.resources, entries },
         locked: cfg.$locked,
         directory: data.scope.directory,
         shared,
+        user,
         personal,
         managed,
         references: references.map((item) => ({
@@ -516,10 +525,10 @@ const layer = Layer.effect(
           ),
         )
       const candidate = ResourceCore.resolve({
-        config: { ...cfg.resources, entries: { [input.name]: input.entry } },
+        config: { ...cfg.resources, entries: input.scope === "shared" ? { [input.name]: input.entry } : {} },
         directory: data.scope.directory,
         shared: new Set(input.scope === "shared" ? [input.name] : []),
-        personal: {},
+        personal: input.scope === "personal" ? { [input.name]: input.entry } : {},
         managed: [],
       })[0]!
       if (candidate.problem) return yield* Effect.fail(new ResourceError(candidate.problem))
