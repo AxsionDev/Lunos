@@ -44,6 +44,7 @@ import { NonNegativeInt, optional } from "@opencode-ai/core/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { BackgroundShell } from "@/tool/shell/background"
 import { SessionMessage } from "@opencode-ai/schema/session-message"
 
 const parentTitlePrefix = "New session - "
@@ -638,6 +639,8 @@ const layer: Layer.Layer<
         )
 
         if (hasInstance) yield* cancelBackgroundJobs(background, sessionID)
+        // XCOD-288: dev servers and watchers the agent started in this session stop with it.
+        yield* Effect.promise(() => BackgroundShell.stopSession(sessionID))
         const kids = yield* children(sessionID)
         for (const child of kids) {
           yield* remove(child.id)

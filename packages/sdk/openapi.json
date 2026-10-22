@@ -25700,6 +25700,38 @@
         },
         "additionalProperties": false
       },
+      "VerifyConfig": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "type": "string"
+          },
+          "test": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "string"
+          },
+          "check": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_attempts": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "timeout": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "PermissionActionConfig": {
         "type": "string",
         "enum": ["ask", "allow", "deny"]
@@ -25843,6 +25875,9 @@
           },
           "permission": {
             "$ref": "#/components/schemas/PermissionConfig"
+          },
+          "verify": {
+            "type": "boolean"
           }
         },
         "additionalProperties": {}
@@ -26715,6 +26750,9 @@
           },
           "subagent": {
             "$ref": "#/components/schemas/SubagentConfig"
+          },
+          "verify": {
+            "$ref": "#/components/schemas/VerifyConfig"
           },
           "subagent_depth": {
             "type": "integer",

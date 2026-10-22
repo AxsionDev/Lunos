@@ -23,6 +23,21 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Build checks its work before handing back.** The Build agent now builds, runs the relevant
+  tests, starts your app on this machine and tries what it changed, and ends with a Verification
+  block saying what it ran and what it saw, instead of asking you to test. When it can't check
+  something (a missing `.env` value, a service it can't start), it says exactly what and why. Pin the
+  commands in a `verify` block (`build`, `test`, `start`, `ready`, `check`, `max_attempts`,
+  `timeout`), or set `agent.build.verify: false` to turn it off; an organisation can lock both.
+  <!-- XCOD-288 -->
+- **Dev servers in the background.** The bash tool can start a long-running command with
+  `background: true` and return once its `ready_url` answers, and the new `process` tool reads its
+  output, waits for it, stops it, or keeps it running for you. They only ever check addresses on this
+  machine and warn when a server can be reached from other machines. They stop at the end of the
+  turn unless kept, and in any case when the session is deleted, when Lunos exits (on macOS and
+  Linux even if it is killed), and after 60 minutes. <!-- XCOD-288 -->
+- Background commands are in the audit log as `process.start` and `process.stop` (with the reason),
+  with the command line, never the output. <!-- XCOD-288 --> <!-- internal -->
 - **Delete sessions for good from `/sessions`.** `ctrl+d` deletes the highlighted session, or the
   ones you marked with `space` (the footer counts them); "delete all shown" deletes everything the
   current filter or search shows. One session asks once, with Cancel as the default; several ask you

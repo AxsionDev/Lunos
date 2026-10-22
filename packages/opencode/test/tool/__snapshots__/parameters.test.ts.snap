@@ -20,8 +20,16 @@ exports[`tool parameters JSON Schema (wire shape) bash 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {
+    "background": {
+      "description": "Start a long-running command (dev server, watcher) in the background and return once it is up, instead of waiting for it to finish. Do not add '&' or nohup. With background, \`timeout\` is how long to wait for \`ready_url\` (default 60000, at most 300000).",
+      "type": "boolean",
+    },
     "command": {
       "description": "The command to execute",
+      "type": "string",
+    },
+    "ready_url": {
+      "description": "Only with background: a local URL (localhost, 127.0.0.1 or [::1]) to wait for. The call returns when it answers with any HTTP response, when the command exits, or when \`timeout\` passes.",
       "type": "string",
     },
     "timeout": {

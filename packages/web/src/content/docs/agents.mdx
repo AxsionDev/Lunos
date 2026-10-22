@@ -52,6 +52,30 @@ _Mode_: `primary`
 
 Build is the **default** primary agent with all tools enabled. This is the standard agent for development work where you need full access to file operations and system commands.
 
+#### Build checks its work
+
+Before it hands back, Build verifies what it changed on your machine: it builds, runs the relevant tests, starts the app in the background and tries the change (a health URL, the changed endpoint, the page), then ends with a **Verification** block listing what it ran and what it saw. If something can't be checked here, such as a missing `.env` value or a service it can't start, it says exactly what and why instead of asking you to test.
+
+It finds the commands in the project (package scripts, `*.csproj`, `Makefile`, `AGENTS.md`). To pin them:
+
+```json title="opencode.json"
+{
+  "verify": {
+    "build": "npm run build",
+    "test": "npm test",
+    "start": "npm run dev",
+    "ready": "http://localhost:4200",
+    "check": ["GET /api/health -> 200"],
+    "max_attempts": 3,
+    "timeout": 10
+  }
+}
+```
+
+`max_attempts` is how many times it fixes a failed check and tries again (default 3), and `timeout` its time budget in minutes (default 10). Both are guidance to the agent, not hard limits. Set `"agent": { "build": { "verify": false } }` to have Build hand back without verifying. An organisation can lock `verify` and `agent.build.verify` in managed config.
+
+Dev servers run through the bash tool's `background: true`, which returns once `ready_url` answers. The `process` tool lists them, reads their output, waits for them, stops them, or keeps one running for you. Readiness checks only reach addresses on this machine, and a server that other machines can reach is flagged. Background commands stop at the end of the turn unless kept, and always when the session is deleted, when Lunos exits (on macOS and Linux even if it is killed), and after 60 minutes.
+
 ---
 
 ### Use plan

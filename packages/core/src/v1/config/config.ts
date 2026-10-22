@@ -19,6 +19,7 @@ import { ConfigSkillsV1 } from "./skills"
 import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
 import { ConfigSubagent } from "../../config/subagent"
+import { ConfigVerify } from "../../config/verify"
 import { ConfigCloud } from "../../config/cloud"
 import { ConfigAuth } from "../../config/auth"
 import { ConfigSync } from "../../config/sync"
@@ -167,6 +168,10 @@ export const Info = Schema.Struct({
   }),
   subagent: Schema.optional(ConfigSubagent.Info).annotate({
     description: "How subagents choose their model: inherit, small_model, a fixed model, or per task",
+  }),
+  verify: Schema.optional(ConfigVerify.Info).annotate({
+    description:
+      "How the Build agent checks its work before handing back: build, test and start commands, the ready URL and checks (XCOD-288)",
   }),
   subagent_depth: Schema.optional(NonNegativeInt).annotate({
     description: "Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents.",
