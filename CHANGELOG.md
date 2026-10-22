@@ -33,6 +33,15 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   the one that started them. States and headers are words and symbols, not colour alone. The Agent
   Monitor and the desktop and web Sessions window use the same three sections, and in the monitor
   ↑/↓ also reach the section headers, where Enter collapses or expands one. <!-- XCOD-299 -->
+### Added
+
+- **Projects that span several repositories.** Group the repositories and folders that belong
+  together, say `axsion-web`, `axsion-api` and `infra`, into one named project, with `/projects` in
+  the TUI, Settings › Projects, or `lunos project create|list|rename|add|remove|archive` (with
+  `--json`) from the shell. A repository is still a project of its own with no setup. Sessions count
+  in the project of their folder, subagents in their parent's, and `/sessions` can move one to
+  another project. Named projects are kept on this computer only.
+  <!-- XCOD-298 -->
 
 ### Fixed
 

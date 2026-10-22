@@ -75,6 +75,7 @@ import { DialogMode } from "./component/dialog-mode"
 import { DialogAgentList } from "./component/dialog-agent-settings"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogSessions } from "./component/dialog-sessions"
+import { DialogProjects } from "./component/dialog-projects"
 import { AgentMonitor, MONITOR_ROUTE } from "./routes/monitor"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
@@ -977,6 +978,16 @@ function App(props: {
         slashName: "sessions",
         run: () => {
           dialog.replace(() => <DialogSessions />)
+        },
+      },
+      {
+        // XCOD-298: repositories and named projects (several folders counted as one).
+        name: "project.list",
+        title: "Projects",
+        category: "Session",
+        slashName: "projects",
+        run: () => {
+          dialog.replace(() => <DialogProjects />)
         },
       },
       {

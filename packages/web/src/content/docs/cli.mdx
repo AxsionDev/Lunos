@@ -407,6 +407,37 @@ This starts an HTTP server that provides API access to opencode functionality wi
 
 ---
 
+### project
+
+Named projects: several repositories or directories counted as one, for example "Axsion web" for
+`axsion-web`, `axsion-api` and `infra`. A repository is a project of its own without any of this.
+Named projects are kept on this computer only. A session counts in the project of its working
+directory (the deepest folder wins), a subagent's in its parent's; `/sessions` can move one.
+
+```bash
+lunos project create "Axsion web" ../axsion-web ../axsion-api
+lunos project list
+lunos project add "Axsion web" ../infra
+lunos project remove "Axsion web" ../axsion-api
+lunos project rename "Axsion web" "Axsion"
+lunos project archive "Axsion"
+```
+
+A project is named by its name or its id (`pgrp_…`). Folders are paths, relative to where you run
+the command; leaving them out means the current folder. A folder can be in one live project at a
+time. Archiving keeps the project and its history, but its folders count in their repositories'
+projects again; `lunos project archive <project> --undo` brings it back.
+
+#### Flags
+
+| Flag                                     | Description                                                   |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| <nobr><code>{"--json"}</code></nobr>     | Print the project (or the list) as JSON; a refusal as `error` |
+| <nobr><code>{"--archived"}</code></nobr> | With `list`: include archived projects                        |
+| <nobr><code>{"--empty"}</code></nobr>    | With `create`: create it without any folder                   |
+
+---
+
 ### session
 
 Manage Lunos sessions.
