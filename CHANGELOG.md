@@ -33,20 +33,6 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   and `permission.webfetch` allow it. The sidebar's Context section lists them, with a per-session exclude, and
   `/context` shows what the last turn's context was made of, in tokens. See
   [Project resources](docs/project-resources.md). <!-- XCOD-300 -->
-### Changed
-
-- **Subagents are grouped by what they need from you.** The sidebar's Subagents section now holds
-  three sub-sections, always in the same place: Working (running ones, the longest-running first,
-  then queued ones), Waiting for action (each row shows its ask, with approve and deny), and
-  Completed (failed ones first, with why, then done ones). Each has its own count and toggle, and a
-  collapsed one says what it holds, as in `✕ 1 failed · ✓ 1 done`. The header counts how many need
-  you, and Waiting for action opens itself when a new ask arrives, even if you collapsed it. What
-  you open or collapse is remembered per session, across restarts. Subagents of subagents sit under
-  the one that started them. States and headers are words and symbols, not colour alone. The Agent
-  Monitor and the desktop and web Sessions window use the same three sections, and in the monitor
-  ↑/↓ also reach the section headers, where Enter collapses or expands one. <!-- XCOD-299 -->
-### Added
-
 - **Projects that span several repositories.** Group the repositories and folders that belong
   together, say `axsion-web`, `axsion-api` and `infra`, into one named project, with `/projects` in
   the TUI, Settings › Projects, or `lunos project create|list|rename|add|remove|archive` (with
@@ -65,6 +51,19 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   `lunos budget export` (CSV) and `lunos stats --project <name> --json` report it. An organisation
   can set a budget in managed config that members can't raise.
   <!-- XCOD-298 -->
+
+### Changed
+
+- **Subagents are grouped by what they need from you.** The sidebar's Subagents section now holds
+  three sub-sections, always in the same place: Working (running ones, the longest-running first,
+  then queued ones), Waiting for action (each row shows its ask, with approve and deny), and
+  Completed (failed ones first, with why, then done ones). Each has its own count and toggle, and a
+  collapsed one says what it holds, as in `✕ 1 failed · ✓ 1 done`. The header counts how many need
+  you, and Waiting for action opens itself when a new ask arrives, even if you collapsed it. What
+  you open or collapse is remembered per session, across restarts. Subagents of subagents sit under
+  the one that started them. States and headers are words and symbols, not colour alone. The Agent
+  Monitor and the desktop and web Sessions window use the same three sections, and in the monitor
+  ↑/↓ also reach the section headers, where Enter collapses or expands one. <!-- XCOD-299 -->
 
 ### Fixed
 
