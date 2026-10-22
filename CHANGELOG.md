@@ -33,6 +33,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   and `permission.webfetch` allow it. The sidebar's Context section lists them, with a per-session exclude, and
   `/context` shows what the last turn's context was made of, in tokens. See
   [Project resources](docs/project-resources.md). <!-- XCOD-300 -->
+
 ### Changed
 
 - **Subagents are grouped by what they need from you.** The sidebar's Subagents section now holds
@@ -45,6 +46,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   the one that started them. States and headers are words and symbols, not colour alone. The Agent
   Monitor and the desktop and web Sessions window use the same three sections, and in the monitor
   ↑/↓ also reach the section headers, where Enter collapses or expands one. <!-- XCOD-299 -->
+
 ### Added
 
 - **Projects that span several repositories.** Group the repositories and folders that belong
