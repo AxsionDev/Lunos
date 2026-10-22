@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js"
 import { prefersReducedMotion } from "./motion"
+import { Locale } from "./locale"
 // XCOD-218: external sessions (Claude Code / Codex driven from Lunos) in the TUI.
 
 export type ExternalTool = "claude" | "codex"
@@ -12,9 +13,23 @@ export const EXTERNAL_LABEL: Record<ExternalTool, string> = { claude: "Claude Co
  */
 export const EXTERNAL_BADGE: Record<ExternalTool, string> = { claude: "Claude Code", codex: "Codex" }
 
-export function externalBadge(tool: ExternalTool, model?: string, mode?: string) {
+export function externalBadge(tool: ExternalTool, model?: string, mode?: string, context?: string) {
   // XCOD-285: the tool's permission mode when it isn't its default, as the tool names it.
-  return ["Lunos", EXTERNAL_BADGE[tool], model, mode].filter(Boolean).join(" · ")
+  // XCOD-292: then the context in use, when the tool reports it (externalContext).
+  return ["Lunos", EXTERNAL_BADGE[tool], model, mode, context].filter(Boolean).join(" · ")
+}
+
+/**
+ * XCOD-292: "49.0K (5%)": the context the tool says the conversation uses, as Lunos's own status line
+ * shows a session's (Locale.number, then the share of the window), the share only when the tool
+ * reports the window. Undefined (nothing shown) when it reports no usage.
+ */
+export function externalContext(context: ExternalMarker["context"]) {
+  const used = context?.used
+  if (typeof used !== "number" || !Number.isFinite(used) || used <= 0) return undefined
+  const window = context?.window
+  const pct = typeof window === "number" && window > 0 ? ` (${Math.round((used / window) * 100)}%)` : ""
+  return `${Locale.number(used)}${pct}`
 }
 
 /**
@@ -45,6 +60,8 @@ export type ExternalMarker = {
   mode?: string
   /** XCOD-285: the tool's /commands with what it says about them. */
   commandInfo?: { name: string; description?: string; hint?: string }[]
+  /** XCOD-292: the context in use (tokens) and the model's window, as far as the tool reports them. */
+  context?: { used?: number; window?: number }
 }
 
 export type ExternalBridgeStatus = {

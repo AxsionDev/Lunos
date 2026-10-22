@@ -85,6 +85,47 @@ const answer = (directory: string, sessionID: string, reply: "once" | "always" |
     throw new Error("no approval was asked")
   })
 
+/**
+ * XCOD-292: a stored session and its messages with what changes from run to run made stable, for the
+ * TUI's fixture: ids numbered in order (so they sort as before), times, slug and project fixed, the
+ * test's directory as the TUI fixture's.
+ */
+function normalise(value: unknown, directory: string) {
+  const ids = new Map<string, string>()
+  const id = (raw: string) => {
+    if (!ids.has(raw)) ids.set(raw, `${raw.slice(0, 4)}${String(ids.size + 1).padStart(4, "0")}`)
+    return ids.get(raw)!
+  }
+  const walk = (item: unknown, key?: string): unknown => {
+    if (Array.isArray(item)) return item.map((entry) => walk(entry))
+    if (item && typeof item === "object")
+      return Object.fromEntries(Object.entries(item).map(([name, entry]) => [name, walk(entry, name)]))
+    if (key === "slug") return "external-session"
+    if (key === "projectID") return "proj_test"
+    if (typeof item === "string" && /^(ses|msg|prt)_/.test(item)) return id(item)
+    if (typeof item === "number" && key && /^(start|end|created|updated|completed|compacting)$/.test(key)) return 1
+    if (typeof item === "string") return item.replaceAll(directory, "/tmp/opencode/packages/tui")
+    return item
+  }
+  return walk(value)
+}
+
+/** XCOD-292: what the TUI's rendering test shows of a stored session: its context, and its parts. */
+function rendered(value: any) {
+  return {
+    context: value.session.metadata.external.context,
+    parts: value.messages.flatMap((message: any) =>
+      message.parts.flatMap((part: any) =>
+        part.type === "tool"
+          ? [{ tool: part.tool, status: part.state.status, input: part.state.input, metadata: part.state.metadata }]
+          : part.type === "text"
+            ? [{ text: part.text }]
+            : [],
+      ),
+    ),
+  }
+}
+
 const hostLog = async (file: string) =>
   (await fs.readFile(file, "utf8"))
     .trim()
@@ -222,6 +263,13 @@ describe("external session (XCOD-218)", () => {
         const session = (yield* call(directory, pathFor(SessionPaths.get, { sessionID }))).body
         expect(session.title).toBe("Codex CLI · 01a116f2")
         expect(session.metadata.external.session).toBe("01a116f2-5e88-79d3-afb9-db1da07c9fcd")
+        // XCOD-292: the recorded file change renders as a patch, and the status line gets the context
+        // the recorded turn's last token update reports (last call's tokens, model window).
+        const messages = (yield* call(directory, pathFor(SessionPaths.messages, { sessionID }))).body as any[]
+        const change = messages.flatMap((m) => m.parts).findLast((part: any) => part.tool === "codex:FileChange")
+        expect(change.state.metadata.files[0]).toMatchObject({ type: "add", filePath: "/work/note.txt" })
+        expect(change.state.metadata.files[0].patch).toContain("+from codex")
+        expect(session.metadata.external.context).toEqual({ used: 15273, window: 258400 })
 
         const unsupported = yield* call(directory, promptRoute, {
           agent: "build",
@@ -237,6 +285,74 @@ describe("external session (XCOD-218)", () => {
         formatter: false,
         lsp: false,
         // XCOD-254: nothing shared, so no consent question: the tool runs as it did before the bridge.
+        external: {
+          codex: { path: path.join(import.meta.dir, "..", "external", "fixtures", "fake-codex.ts") },
+          share: { mcp: false, skills: false, memory: false },
+        },
+      } as any,
+    },
+    30_000,
+  )
+
+  // XCOD-292: what the TUI's rendering test shows is what the server stores for a Codex turn: the
+  // recorded 0.160.1 turn (its file changes and token use) with a plan update and a subagent call in
+  // the 0.160.1 schema's shape before it. The TUI's fixture is this, normalised; UPDATE_TUI_FIXTURES=1
+  // rewrites it.
+  it.instance(
+    "a Codex turn's file changes, plan and subagent progress are stored as the TUI renders them",
+    () =>
+      Effect.gen(function* () {
+        const { directory } = yield* TestInstance
+        process.env.FAKE_CODEX_LOG = path.join(directory, "..", `fake-codex-${path.basename(directory)}.log`)
+        process.env.FAKE_CODEX_PROGRESS = "1"
+        try {
+          const created = yield* call(directory, SessionPaths.create, { metadata: { external: { tool: "codex" } } })
+          const sessionID = created.body.id as string
+          const turn = yield* call(directory, pathFor(SessionPaths.prompt, { sessionID }), {
+            agent: "build",
+            parts: [{ type: "text", text: "Create note.txt" }],
+          }).pipe(Effect.forkChild)
+          yield* answer(directory, sessionID, "reject")
+          yield* answer(directory, sessionID, "once")
+          yield* Fiber.join(turn)
+          const messages = (yield* call(directory, pathFor(SessionPaths.messages, { sessionID }))).body as any[]
+          const parts = messages.flatMap((m) => m.parts).filter((part: any) => part.type === "tool")
+          expect(parts.map((part: any) => part.tool)).toEqual([
+            "codex:Plan",
+            "codex:Agent",
+            "codex:Agent",
+            "codex:Plan",
+            "codex:FileChange",
+            "codex:FileChange",
+          ])
+          const session = (yield* call(directory, pathFor(SessionPaths.get, { sessionID }))).body
+          const fixture = normalise({ session, messages }, directory)
+          const file = path.join(
+            import.meta.dir,
+            "..",
+            "..",
+            "..",
+            "tui",
+            "test",
+            "fixture",
+            "external",
+            "codex-0.160.1-turn.json",
+          )
+          if (process.env.UPDATE_TUI_FIXTURES === "1")
+            yield* Effect.promise(() => fs.writeFile(file, JSON.stringify(fixture, null, 2) + "\n"))
+          const kept = JSON.parse(yield* Effect.promise(() => fs.readFile(file, "utf8")))
+          // Only what the TUI renders is held equal, so a new field elsewhere doesn't break this.
+          expect(rendered(fixture)).toEqual(rendered(kept))
+        } finally {
+          delete process.env.FAKE_CODEX_LOG
+          delete process.env.FAKE_CODEX_PROGRESS
+        }
+      }),
+    {
+      git: true,
+      config: {
+        formatter: false,
+        lsp: false,
         external: {
           codex: { path: path.join(import.meta.dir, "..", "external", "fixtures", "fake-codex.ts") },
           share: { mcp: false, skills: false, memory: false },
@@ -476,6 +592,8 @@ describe("external session (XCOD-218)", () => {
         const write = messages.flatMap((m) => m.parts).findLast((part: any) => part.tool === "claude:Write")
         expect(write.state.metadata).toMatchObject({ verb: "Write" })
         expect(write.state.metadata.diff).toContain("+hi")
+        // XCOD-292: the context the recorded turn used, out of the window its result reports.
+        expect((yield* get()).metadata.external.context).toEqual({ used: 48986, window: 1_000_000 })
         const bash = messages.flatMap((m) => m.parts).find((part: any) => part.tool === "claude:Bash")
         expect(bash.state).toMatchObject({ status: "error" })
         expect(bash.state.error).toMatch(/Lunos policy/)

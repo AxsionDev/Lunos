@@ -1949,6 +1949,9 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={display() === "todowrite"}>
           <TodoWrite {...toolprops} />
         </Match>
+        <Match when={display() === "external_agent"}>
+          <ExternalAgent {...toolprops} />
+        </Match>
         <Match when={display() === "question"}>
           <Question {...toolprops} />
         </Match>
@@ -2041,7 +2044,9 @@ function InlineTool(props: {
       error()?.includes("QuestionRejectedError") ||
       error()?.includes("rejected permission") ||
       error()?.includes("specified a rule") ||
-      error()?.includes("user dismissed"),
+      error()?.includes("user dismissed") ||
+      // XCOD-292: a Codex change the user declined ends with its PatchApplyStatus, "declined".
+      error() === "declined",
   )
 
   const failed = createMemo(() => Boolean(error() && !denied()))
@@ -2485,6 +2490,84 @@ function Task(props: ToolProps) {
   )
 }
 
+/**
+ * XCOD-292: what a Codex subagent call says, from the schema's `CollabAgentTool` names. A name this
+ * table doesn't know (a newer Codex) is shown as Codex sent it.
+ */
+const AGENT_CALLS: Record<string, string> = {
+  spawnAgent: "Spawned agent",
+  sendInput: "Sent input to agent",
+  resumeAgent: "Resumed agent",
+  wait: "Waited for agents",
+  closeAgent: "Closed agent",
+  sendMessage: "Sent message to agent",
+  followupTask: "Sent follow-up task to agent",
+  interruptAgent: "Interrupted agent",
+  listAgents: "Listed agents",
+}
+
+/** XCOD-292: a subagent's progress (`SubAgentActivityKind`) in words. */
+const AGENT_ACTIVITY: Record<string, string> = {
+  started: "started",
+  interacted: "replied",
+  interrupted: "was interrupted",
+  completed: "finished",
+}
+
+const shortThread = (id: string) => (id.length > 8 ? id.slice(0, 8) : id)
+
+/**
+ * XCOD-292: the lines of a Codex subagent call or activity (input from ExternalNative.codexAgentCall /
+ * codexAgentActivity, final states in `metadata.agents`). Only what Codex reported is shown.
+ */
+export function formatExternalAgent(input: Record<string, unknown>, metadata: Record<string, unknown>) {
+  if (input.kind === "activity") {
+    const who =
+      stringValue(input.agent) ??
+      (stringValue(input.thread) ? `Agent ${shortThread(stringValue(input.thread)!)}` : "Agent")
+    const activity = stringValue(input.activity) ?? ""
+    return [`${who} ${AGENT_ACTIVITY[activity] ?? activity}`]
+  }
+  const tool = stringValue(input.tool) ?? ""
+  const receivers = Array.isArray(input.receivers)
+    ? input.receivers.filter((id): id is string => typeof id === "string")
+    : []
+  const head = [AGENT_CALLS[tool] ?? tool, receivers.map(shortThread).join(", "), stringValue(input.model)]
+    .filter(Boolean)
+    .join(" · ")
+  const lines = [head]
+  const prompt = stringValue(input.prompt)
+  if (prompt) lines.push(`↳ ${Locale.truncate(prompt.replace(/\s+/g, " "), 100)}`)
+  const agents = Array.isArray(metadata.agents) ? metadata.agents : []
+  for (const agent of agents) {
+    const item = recordValue(agent)
+    const id = stringValue(item?.id)
+    const status = stringValue(item?.status)
+    if (!id || !status) continue
+    const message = stringValue(item?.message)
+    lines.push(
+      `↳ ${shortThread(id)}: ${status}${message ? ` — ${Locale.truncate(message.replace(/\s+/g, " "), 80)}` : ""}`,
+    )
+  }
+  return lines
+}
+
+function ExternalAgent(props: ToolProps) {
+  const running = createMemo(() => props.part.state.status === "running")
+  return (
+    <InlineTool
+      icon={props.part.state.status === "completed" ? "✓" : "│"}
+      separate={true}
+      spinner={running()}
+      complete={true}
+      pending="Delegating…"
+      part={props.part}
+    >
+      {formatExternalAgent(props.input, props.metadata).join("\n")}
+    </InlineTool>
+  )
+}
+
 export function formatSubagentToolcalls(count: number) {
   return `${count} toolcall${count === 1 ? "" : "s"}`
 }
@@ -2624,6 +2707,8 @@ function ApplyPatch(props: ToolProps) {
   const pathFormatter = usePathFormatter()
 
   const files = createMemo(() => parseApplyPatchFiles(props.metadata.files))
+  // XCOD-292: Codex reports a change the user declined as "declined": shown as refused, not failed.
+  const declined = createMemo(() => props.part.state.status === "error" && props.part.state.error === "declined")
 
   const view = createMemo(() => {
     const diffStyle = ctx.tui.diff_style
@@ -2686,8 +2771,8 @@ function ApplyPatch(props: ToolProps) {
         </For>
       </Match>
       <Match when={true}>
-        <InlineTool icon="%" pending="Preparing patch…" failure="Patch failed" complete={false} part={props.part}>
-          Patch
+        <InlineTool icon="%" pending="Preparing patch…" failure="Patch failed" complete={declined()} part={props.part}>
+          {declined() ? "Patch declined" : "Patch"}
         </InlineTool>
       </Match>
     </Switch>
@@ -2695,11 +2780,17 @@ function ApplyPatch(props: ToolProps) {
 }
 
 function TodoWrite(props: ToolProps) {
+  const { theme } = useTheme()
   const todos = createMemo(() => parseTodos(props.input.todos))
+  // XCOD-292: Codex's plan updates use the same checklist, with its explanation when it gives one.
+  const plan = createMemo(() => props.tool === "codex:Plan")
   return (
     <Switch>
       <Match when={parseTodos(props.metadata.todos).length}>
-        <BlockTool title="# Todos" part={props.part}>
+        <BlockTool title={plan() ? "# Plan" : "# Todos"} part={props.part}>
+          <Show when={plan() && stringValue(props.input.explanation)}>
+            {(text) => <text fg={theme.textMuted}>{text()}</text>}
+          </Show>
           <box>
             <For each={todos()}>{(todo) => <TodoItem status={todo.status} content={todo.content} />}</For>
           </box>
@@ -2861,6 +2952,10 @@ const externalDisplays: Record<string, string> = {
   "claude:Edit": "edit",
   "claude:Write": "edit",
   "claude:TodoWrite": "todowrite",
+  // XCOD-292: Codex's file changes in the patch view, its plan as the checklist, its subagents' progress.
+  "codex:FileChange": "apply_patch",
+  "codex:Plan": "todowrite",
+  "codex:Agent": "external_agent",
 }
 
 export function toolDisplay(tool: string) {

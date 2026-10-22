@@ -1,0 +1,365 @@
+{
+  "session": {
+    "id": "ses_0001",
+    "slug": "external-session",
+    "projectID": "proj_test",
+    "directory": "/tmp/opencode/packages/tui",
+    "path": "",
+    "cost": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cache": {
+        "read": 0,
+        "write": 0
+      }
+    },
+    "title": "Codex CLI · 01a116f2",
+    "agent": "build",
+    "model": {
+      "id": "codex",
+      "providerID": "external",
+      "variant": "default"
+    },
+    "version": "local",
+    "metadata": {
+      "external": {
+        "tool": "codex",
+        "bridge": {
+          "servers": 0,
+          "skills": 0,
+          "memory": false,
+          "off": "turned off in external.share"
+        },
+        "session": "01a116f2-5e88-79d3-afb9-db1da07c9fcd",
+        "commands": ["review", "compact"],
+        "context": {
+          "used": 15273,
+          "window": 258400
+        }
+      }
+    },
+    "time": {
+      "created": 1,
+      "updated": 1
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "id": "msg_0002",
+        "sessionID": "ses_0001",
+        "role": "user",
+        "time": {
+          "created": 1
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "external",
+          "modelID": "codex"
+        }
+      },
+      "parts": [
+        {
+          "id": "prt_0003",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0002",
+          "type": "text",
+          "text": "Create note.txt"
+        }
+      ]
+    },
+    {
+      "info": {
+        "id": "msg_0004",
+        "sessionID": "ses_0001",
+        "role": "assistant",
+        "time": {
+          "created": 1,
+          "completed": 1
+        },
+        "parentID": "msg_0002",
+        "modelID": "gpt-5.5",
+        "providerID": "external",
+        "mode": "Codex CLI",
+        "agent": "build",
+        "path": {
+          "cwd": "/tmp/opencode/packages/tui",
+          "root": "/tmp/opencode/packages/tui"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 45617,
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "finish": "stop"
+      },
+      "parts": [
+        {
+          "id": "prt_0005",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "tool",
+          "callID": "plan-turn-1-1",
+          "tool": "codex:Plan",
+          "state": {
+            "status": "completed",
+            "input": {
+              "todos": [
+                {
+                  "content": "Create note.txt",
+                  "status": "in_progress"
+                },
+                {
+                  "content": "Check its contents",
+                  "status": "pending"
+                }
+              ],
+              "explanation": "Write the note, then check it."
+            },
+            "output": "[ ] Create note.txt\n[ ] Check its contents",
+            "title": "Plan",
+            "metadata": {
+              "todos": [
+                {
+                  "content": "Create note.txt",
+                  "status": "in_progress"
+                },
+                {
+                  "content": "Check its contents",
+                  "status": "pending"
+                }
+              ]
+            },
+            "time": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        },
+        {
+          "id": "prt_0006",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "tool",
+          "callID": "call_agent_1",
+          "tool": "codex:Agent",
+          "state": {
+            "status": "completed",
+            "input": {
+              "kind": "call",
+              "tool": "spawnAgent",
+              "prompt": "Check note.txt says from codex",
+              "model": "gpt-5.5-mini",
+              "receivers": ["01a11700-aaaa-7bbb-8ccc-000000000001"]
+            },
+            "output": "01a11700-aaaa-7bbb-8ccc-000000000001: completed (note.txt says from codex)",
+            "title": "Agent",
+            "metadata": {
+              "agents": [
+                {
+                  "id": "01a11700-aaaa-7bbb-8ccc-000000000001",
+                  "status": "completed",
+                  "message": "note.txt says from codex"
+                }
+              ]
+            },
+            "time": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        },
+        {
+          "id": "prt_0007",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "tool",
+          "callID": "activity_1",
+          "tool": "codex:Agent",
+          "state": {
+            "status": "completed",
+            "input": {
+              "kind": "activity",
+              "activity": "started",
+              "agent": "checker",
+              "thread": "01a11700-aaaa-7bbb-8ccc-000000000001"
+            },
+            "output": "checker started",
+            "title": "Agent",
+            "metadata": {},
+            "time": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        },
+        {
+          "id": "prt_0008",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "tool",
+          "callID": "plan-turn-1-2",
+          "tool": "codex:Plan",
+          "state": {
+            "status": "completed",
+            "input": {
+              "todos": [
+                {
+                  "content": "Create note.txt",
+                  "status": "completed"
+                },
+                {
+                  "content": "Check its contents",
+                  "status": "completed"
+                }
+              ]
+            },
+            "output": "[x] Create note.txt\n[x] Check its contents",
+            "title": "Plan",
+            "metadata": {
+              "todos": [
+                {
+                  "content": "Create note.txt",
+                  "status": "completed"
+                },
+                {
+                  "content": "Check its contents",
+                  "status": "completed"
+                }
+              ]
+            },
+            "time": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        },
+        {
+          "id": "prt_0009",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "text",
+          "text": "I’ll create `note.txt` with exactly the requested text. The workspace is read-only from my side, so this may require approval; if the first write is declined, I’ll make one more attempt as requested.",
+          "time": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "id": "prt_0010",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "tool",
+          "callID": "call_1fDgtmBtfRvSCKF6JYW2DXXT",
+          "tool": "codex:FileChange",
+          "state": {
+            "status": "error",
+            "input": {
+              "changes": [
+                {
+                  "path": "/work/note.txt",
+                  "kind": {
+                    "type": "add"
+                  },
+                  "diff": "from codex\n"
+                }
+              ]
+            },
+            "error": "declined",
+            "time": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        },
+        {
+          "id": "prt_0011",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "text",
+          "text": "The first write was declined. I’m trying once more now, matching your instruction exactly.",
+          "time": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "id": "prt_0012",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "tool",
+          "callID": "call_qtpvwbZrFoYUtKCqsTTRIOk9",
+          "tool": "codex:FileChange",
+          "state": {
+            "status": "completed",
+            "input": {
+              "changes": [
+                {
+                  "path": "/work/note.txt",
+                  "kind": {
+                    "type": "add"
+                  },
+                  "diff": "from codex\n"
+                }
+              ]
+            },
+            "output": "completed",
+            "title": "FileChange",
+            "metadata": {
+              "files": [
+                {
+                  "type": "add",
+                  "filePath": "/work/note.txt",
+                  "relativePath": "/work/note.txt",
+                  "patch": "Index: /work/note.txt\n===================================================================\n--- /work/note.txt\n+++ /work/note.txt\n@@ -0,0 +1,1 @@\n+from codex\n",
+                  "deletions": 0
+                }
+              ]
+            },
+            "time": {
+              "start": 1,
+              "end": 1
+            }
+          }
+        },
+        {
+          "id": "prt_0013",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "text",
+          "text": "Created `note.txt` containing exactly:\n\n```text\nfrom codex\n```",
+          "time": {
+            "start": 1,
+            "end": 1
+          }
+        },
+        {
+          "id": "prt_0014",
+          "sessionID": "ses_0001",
+          "messageID": "msg_0004",
+          "type": "step-finish",
+          "reason": "stop",
+          "cost": 0,
+          "tokens": {
+            "total": 45617,
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

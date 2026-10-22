@@ -83,6 +83,7 @@ import {
   EXTERNAL_LABEL,
   externalAccent,
   externalBadge,
+  externalContext,
   bridgeLine,
   externalOf,
   parseExternalSlash,
@@ -2318,7 +2319,12 @@ export function Prompt(props: PromptProps) {
               <Show when={external()}>
                 {(marker) => (
                   <text fg={accent() ?? theme.text} wrapMode="none" flexShrink={0}>
-                    {externalBadge(marker().tool, externalModel(), externalModeLabel(marker()))}
+                    {externalBadge(
+                      marker().tool,
+                      externalModel(),
+                      externalModeLabel(marker()),
+                      externalContext(marker().context),
+                    )}
                   </text>
                 )}
               </Show>
