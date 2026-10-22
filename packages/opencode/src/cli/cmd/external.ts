@@ -15,6 +15,11 @@ import { ExternalRun } from "@/external/run"
 import { ExternalBridge } from "@/external/bridge"
 import { ExternalBridgeTools } from "@/external/bridge-tools"
 import { ExternalConsent } from "@/external/consent"
+import { ExternalSession } from "@/external/session"
+import { EffectBridge } from "@/effect/bridge"
+import { Agent } from "@/agent/agent"
+import { Plugin } from "@/plugin"
+import { Audit } from "@opencode-ai/core/audit"
 import { InstanceState } from "@/effect/instance-state"
 import { Skill } from "@/skill"
 import { Memory } from "@/memory"
@@ -157,6 +162,28 @@ function runHandler(resume: boolean) {
     const cwd = previous?.cwd ?? process.cwd()
     const started = new Date().toISOString()
     let lastText = ""
+    // XCOD-293: the tool's session id, once it reports one: what plugin hooks and the audit log see.
+    let sessionID: string = resume ? args.session : ""
+    // XCOD-293: Lunos policy before the tool's permission mode, as in a /claude session: the default
+    // agent's rules (with config's `permission`) and plugin pre-tool hooks.
+    const agentName = yield* Agent.Service.use((agents) => agents.defaultAgent())
+    const agent = yield* Agent.Service.use((agents) => agents.get(agentName))
+    const plugin = yield* Plugin.Service
+    const bridge = yield* EffectBridge.make()
+    const guarded = ExternalSession.standalonePolicy({
+      tool,
+      config,
+      ruleset: agent.permission ?? [],
+      agent: agentName,
+      plugin,
+      run: bridge,
+      sessionID: () => sessionID,
+      ask: asker(args.auto),
+      warn: (message) =>
+        process.stderr.write(
+          UI.Style.TEXT_WARNING + `Lunos rules not applied: ${message}` + UI.Style.TEXT_NORMAL + EOL,
+        ),
+    })
     const running = yield* Effect.try({
       try: () =>
         ExternalRun.start({
@@ -172,8 +199,9 @@ function runHandler(resume: boolean) {
           allowUnsafe: args.unsafe,
           maxBudgetUSD: args.maxBudgetUsd,
           executable: status.path,
-          ask: asker(args.auto),
+          ...guarded,
           onEvent: (event) => {
+            if (event.type === "init") sessionID = event.sessionID
             if (args.json) return out(JSON.stringify(event))
             if (event.type === "init") {
               out(
@@ -203,6 +231,8 @@ function runHandler(resume: boolean) {
       catch: (error) => error,
     }).pipe(Effect.catch((error) => fail(error instanceof Error ? error.message : String(error))))
     const result = yield* Effect.promise(() => running.done)
+    // The policy's audit entries (a call refused by a rule or a hook) are written before the CLI exits.
+    yield* Effect.promise(() => Audit.flush())
     if (result.type === "error") {
       ExternalPolicy.record(config, "external.session", {
         tool,

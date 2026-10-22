@@ -11,6 +11,11 @@ import { ExternalClaude } from "@/external/claude"
 import { ExternalRegistry } from "@/external/registry"
 import { ExternalRun } from "@/external/run"
 import { EffectBridge } from "@/effect/bridge"
+import { ExternalSession } from "@/external/session"
+import { Agent } from "@/agent/agent"
+import { Session } from "@/session/session"
+import { Plugin } from "@/plugin"
+import { Permission } from "@/permission"
 
 // XCOD-204: delegation to the user's own Claude Code or Codex CLI. Registered only with `external.delegate`.
 // Each approval the tool asks for becomes a Lunos permission request ("external", pattern
@@ -44,6 +49,9 @@ export const ExternalAgentTool = Tool.define(
   "external_agent",
   Effect.gen(function* () {
     const config = yield* Config.Service
+    const agents = yield* Agent.Service
+    const sessions = yield* Session.Service
+    const plugin = yield* Plugin.Service
     return {
       description: DESCRIPTION,
       parameters: Parameters,
@@ -70,6 +78,11 @@ export const ExternalAgentTool = Tool.define(
           const before = changed(cwd)
           const title = `${ExternalDetect.TOOLS[params.tool].label}: ${params.task.slice(0, 60)}`
           let last = ""
+          // XCOD-293: Lunos policy before the tool's permission mode, as in a /claude session: the rules
+          // this session's tool calls are judged by, then plugin pre-tool hooks.
+          const agent = yield* agents.get(ctx.agent)
+          const session = yield* sessions.get(ctx.sessionID).pipe(Effect.orDie)
+          let notApplied: string | undefined
           const running = ExternalRun.start({
             tool: params.tool,
             cwd,
@@ -88,29 +101,42 @@ export const ExternalAgentTool = Tool.define(
               last = step
               bridge.fork(ctx.metadata({ title, metadata: { progress: last } }))
             },
-            ask: async (request) => {
-              // The target goes in the pattern, so "always" on claude:Bash covers one command, not all.
-              const target = String(request.input.command ?? request.input.file_path ?? request.input.path ?? "*")
-              const exit = await bridge.promise(
-                Effect.exit(
-                  ctx.ask({
-                    permission: "external",
-                    patterns: [`${params.tool}:${request.tool} ${target}`],
-                    always: [`${params.tool}:${request.tool} ${request.tool === "Bash" ? target : "*"}`],
-                    metadata: {
-                      tool: params.tool,
-                      action: request.tool,
-                      // XCOD-218: no undefined fields (Codex sends no description); clients get it as JSON.
-                      ...(request.description ? { description: request.description } : {}),
-                      input: request.input,
-                    },
-                  }),
-                ),
-              )
-              return Exit.isSuccess(exit)
-                ? { allow: true }
-                : { allow: false, message: "The user refused this in Lunos." }
-            },
+            ...ExternalSession.standalonePolicy({
+              tool: params.tool,
+              config: cfg,
+              ruleset: Permission.merge(agent.permission, session.permission ?? []),
+              agent: ctx.agent,
+              plugin,
+              run: bridge,
+              sessionID: () => ctx.sessionID,
+              warn: (message) => {
+                notApplied = message
+                bridge.fork(ctx.metadata({ title, metadata: { hooksApplied: false, warning: message } }))
+              },
+              ask: async (request) => {
+                // The target goes in the pattern, so "always" on claude:Bash covers one command, not all.
+                const target = String(request.input.command ?? request.input.file_path ?? request.input.path ?? "*")
+                const exit = await bridge.promise(
+                  Effect.exit(
+                    ctx.ask({
+                      permission: "external",
+                      patterns: [`${params.tool}:${request.tool} ${target}`],
+                      always: [`${params.tool}:${request.tool} ${request.tool === "Bash" ? target : "*"}`],
+                      metadata: {
+                        tool: params.tool,
+                        action: request.tool,
+                        // XCOD-218: no undefined fields (Codex sends no description); clients get it as JSON.
+                        ...(request.description ? { description: request.description } : {}),
+                        input: request.input,
+                      },
+                    }),
+                  ),
+                )
+                return Exit.isSuccess(exit)
+                  ? { allow: true }
+                  : { allow: false, message: "The user refused this in Lunos." }
+              },
+            }),
           })
           const abort = () => running.stop()
           ctx.abort.addEventListener("abort", abort, { once: true })
@@ -160,8 +186,15 @@ export const ExternalAgentTool = Tool.define(
               ...(result.denied.length
                 ? [`Refused by the user: ${result.denied.map((item) => item.tool).join(", ")}`]
                 : []),
+              ...(notApplied ? [`Warning: Lunos rules not applied. ${notApplied}`] : []),
             ].join("\n"),
-            metadata: { session: result.sessionID, files, costUSD: result.costUSD, ok: result.ok },
+            metadata: {
+              session: result.sessionID,
+              files,
+              costUSD: result.costUSD,
+              ok: result.ok,
+              ...(notApplied ? { hooksApplied: false } : {}),
+            },
           }
         }),
     }
