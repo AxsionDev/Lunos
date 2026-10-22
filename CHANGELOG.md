@@ -21,6 +21,8 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+## [1.18.54] - 2026-10-22
+
 ### Added
 
 - **Build checks its work before handing back.** The Build agent now builds, runs the relevant
