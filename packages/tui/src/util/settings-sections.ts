@@ -6,6 +6,8 @@ import type { SettingRow } from "@opencode-ai/sdk/v2"
 
 export const SECTIONS = [
   { category: "Models & agents", slug: "models", aliases: ["agents", "model"] },
+  // XCOD-298: named projects are kept on this computer, not in config: the section lists them.
+  { category: "Projects", slug: "projects", aliases: ["project"] },
   { category: "Permissions", slug: "permissions", aliases: ["permission", "sandbox"] },
   { category: "Residency & privacy", slug: "residency", aliases: ["privacy", "audit"] },
   { category: "Memory", slug: "memory", aliases: [] },
@@ -18,6 +20,7 @@ export const SECTIONS = [
 
 export const SUBTABS: Record<string, readonly string[]> = {
   "Models & agents": ["Models", "Agents", "Subagents", "Providers", "External sessions"],
+  Projects: ["Projects"],
   Permissions: ["Rules", "Tools", "Sandbox"],
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
   Memory: ["Overview", "Settings", "Advanced"],
@@ -83,34 +86,36 @@ export function summary(category: string, rows: readonly Pick<SettingRow, "key" 
   const parts: (string | undefined)[] =
     category === "Models & agents"
       ? [set("model") ?? "no model chosen", set("default_agent") ? `starts with ${set("default_agent")}` : undefined]
-      : category === "Permissions"
-        ? [
-            value("sandbox.enabled") === "true" ? "sandbox on" : "sandbox off",
-            set("permission") ? "custom rules" : undefined,
-          ]
-        : category === "Residency & privacy"
+      : category === "Projects"
+        ? ["repositories, and named projects of several folders"]
+        : category === "Permissions"
           ? [
-              set("residency.allow") ? `residency ${set("residency.allow")}` : "no residency policy",
-              value("share") ? `share ${value("share")}` : undefined,
+              value("sandbox.enabled") === "true" ? "sandbox on" : "sandbox off",
+              set("permission") ? "custom rules" : undefined,
             ]
-          : category === "Memory"
+          : category === "Residency & privacy"
             ? [
-                value("memory.enabled") === "true" ? "on" : "off",
-                // XCOD-264: plain words, never the config value "embedded".
-                set("memory.backend.type") ? MemoryStorage.short({ type: set("memory.backend.type") }) : undefined,
+                set("residency.allow") ? `residency ${set("residency.allow")}` : "no residency policy",
+                value("share") ? `share ${value("share")}` : undefined,
               ]
-            : category === "Marketplace & plugins"
+            : category === "Memory"
               ? [
-                  set("marketplace") ? "marketplaces added" : "built-in marketplace",
-                  set("plugin") ? "plugins set" : undefined,
+                  value("memory.enabled") === "true" ? "on" : "off",
+                  // XCOD-264: plain words, never the config value "embedded".
+                  set("memory.backend.type") ? MemoryStorage.short({ type: set("memory.backend.type") }) : undefined,
                 ]
-              : category === "Appearance"
-                ? [value("tui.theme")]
-                : category === "Updates"
-                  ? [`auto-update ${value("autoupdate") ?? "on"}`]
-                  : category === "Tools"
-                    ? [value("lsp") === "false" ? "LSP off" : "LSP on", set("mcp") ? "MCP servers set" : undefined]
-                    : ["for troubleshooting and early features"]
+              : category === "Marketplace & plugins"
+                ? [
+                    set("marketplace") ? "marketplaces added" : "built-in marketplace",
+                    set("plugin") ? "plugins set" : undefined,
+                  ]
+                : category === "Appearance"
+                  ? [value("tui.theme")]
+                  : category === "Updates"
+                    ? [`auto-update ${value("autoupdate") ?? "on"}`]
+                    : category === "Tools"
+                      ? [value("lsp") === "false" ? "LSP off" : "LSP on", set("mcp") ? "MCP servers set" : undefined]
+                      : ["for troubleshooting and early features"]
   return parts.filter(Boolean).join(" · ")
 }
 

@@ -86,6 +86,18 @@ import type {
   ExperimentalPeerStopResponses,
   ExperimentalProjectCopyGenerateNameErrors,
   ExperimentalProjectCopyGenerateNameResponses,
+  ExperimentalProjectGroupAddErrors,
+  ExperimentalProjectGroupAddResponses,
+  ExperimentalProjectGroupCreateErrors,
+  ExperimentalProjectGroupCreateResponses,
+  ExperimentalProjectGroupListErrors,
+  ExperimentalProjectGroupListResponses,
+  ExperimentalProjectGroupMoveErrors,
+  ExperimentalProjectGroupMoveResponses,
+  ExperimentalProjectGroupRemoveErrors,
+  ExperimentalProjectGroupRemoveResponses,
+  ExperimentalProjectGroupUpdateErrors,
+  ExperimentalProjectGroupUpdateResponses,
   ExperimentalResourceListErrors,
   ExperimentalResourceListResponses,
   ExperimentalSessionBackgroundErrors,
@@ -1734,6 +1746,259 @@ export class SessionGroup extends HeyApiClient {
   }
 }
 
+export class ProjectGroup extends HeyApiClient {
+  /**
+   * List projects
+   *
+   * The named projects on this computer (archived ones marked), and the project this directory belongs to: a named project, or its repository project.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalProjectGroupListResponses,
+      ExperimentalProjectGroupListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create project
+   *
+   * Create a named project grouping folders (absolute paths), kept on this computer only.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      name?: string
+      folders?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "folders" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalProjectGroupCreateResponses,
+      ExperimentalProjectGroupCreateErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Move sessions to a project
+   *
+   * Count sessions in another project. Without a projectID they go back to the project of their directory.
+   */
+  public move<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      projectID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "projectID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalProjectGroupMoveResponses,
+      ExperimentalProjectGroupMoveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group/move",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Update project
+   *
+   * Rename a named project, or archive it (archived: true) or bring it back (archived: false).
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+      name?: string
+      archived?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "archived" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<
+      ExperimentalProjectGroupUpdateResponses,
+      ExperimentalProjectGroupUpdateErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group/{groupID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Add folders to a project
+   *
+   * Add folders (absolute paths) to a named project. A folder another live project has is refused.
+   */
+  public add<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+      folders?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "folders" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalProjectGroupAddResponses,
+      ExperimentalProjectGroupAddErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group/{groupID}/folders",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Remove folders from a project
+   *
+   * Remove folders from a named project. Its sessions there go back to their repository's project.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+      folders?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "folders" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalProjectGroupRemoveResponses,
+      ExperimentalProjectGroupRemoveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group/{groupID}/folders/remove",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class External extends HeyApiClient {
   /**
    * External tools
@@ -2700,6 +2965,11 @@ export class Experimental extends HeyApiClient {
   private _sessionGroup?: SessionGroup
   get sessionGroup(): SessionGroup {
     return (this._sessionGroup ??= new SessionGroup({ client: this.client }))
+  }
+
+  private _projectGroup?: ProjectGroup
+  get projectGroup(): ProjectGroup {
+    return (this._projectGroup ??= new ProjectGroup({ client: this.client }))
   }
 
   private _external?: External

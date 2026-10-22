@@ -25,6 +25,10 @@ import {
   ExternalConfigCommandPayload,
   SessionEnqueuePayload,
   SessionTakeoverPayload,
+  ProjectGroupCreatePayload,
+  ProjectGroupFoldersPayload,
+  ProjectGroupMovePayload,
+  ProjectGroupUpdatePayload,
   SessionGroupCreatePayload,
   SessionGroupMovePayload,
   SessionGroupUpdatePayload,
@@ -39,6 +43,7 @@ import {
 } from "../groups/experimental"
 import { InvalidRequestError, notFound } from "../errors"
 import { SessionGroups } from "@/session/groups"
+import { ProjectGroup } from "@/project/group"
 import { SessionLive } from "@/session/live"
 import { SessionPeers } from "@/session/peers"
 import { SessionPeerControl } from "@/session/peer-control"
@@ -56,6 +61,18 @@ import { ExternalConfig } from "@/external/config"
 import { ConfigExternal } from "@opencode-ai/core/config/external"
 import { GlobalBus } from "@/bus/global"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
+
+// XCOD-298: project store errors become the endpoint's declared errors.
+function projectErrors<A>(run: () => Promise<A>) {
+  return Effect.tryPromise({
+    try: run,
+    catch: (error) => {
+      if (error instanceof ProjectGroup.NotFoundError) return notFound(error.message)
+      if (error instanceof ProjectGroup.InvalidError) return new InvalidRequestError({ message: error.message })
+      throw error
+    },
+  })
+}
 
 // XCOD-205: group store errors become the endpoint's declared errors.
 function groupErrors<A>(run: () => Promise<A>) {
@@ -318,6 +335,56 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       payload: typeof SessionBulkPayload.Type
     }) {
       return yield* SessionBulk.preview(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+
+    const projectGroupList = Effect.fn("ExperimentalHttpApi.projectGroupList")(function* () {
+      const ctx = yield* InstanceState.context
+      const snap = yield* Effect.promise(() => ProjectGroup.snapshot())
+      return {
+        groups: snap.groups,
+        current: snap.resolve(ctx.directory, ctx.project) ?? ProjectGroup.implicit(ctx.directory, ctx.project),
+      }
+    })
+
+    const projectGroupCreate = Effect.fn("ExperimentalHttpApi.projectGroupCreate")(function* (ctx: {
+      payload: typeof ProjectGroupCreatePayload.Type
+    }) {
+      return yield* projectErrors(() => ProjectGroup.create({ name: ctx.payload.name, folders: ctx.payload.folders }))
+    })
+
+    const projectGroupUpdate = Effect.fn("ExperimentalHttpApi.projectGroupUpdate")(function* (ctx: {
+      params: { groupID: string }
+      payload: typeof ProjectGroupUpdatePayload.Type
+    }) {
+      const { groupID } = ctx.params
+      return yield* projectErrors(async () => {
+        let group = ctx.payload.name !== undefined ? await ProjectGroup.rename(groupID, ctx.payload.name) : undefined
+        if (ctx.payload.archived !== undefined) group = await ProjectGroup.archive(groupID, ctx.payload.archived)
+        if (group) return group
+        const found = await ProjectGroup.get(groupID)
+        if (!found) throw new ProjectGroup.NotFoundError(groupID)
+        return found
+      })
+    })
+
+    const projectGroupAdd = Effect.fn("ExperimentalHttpApi.projectGroupAdd")(function* (ctx: {
+      params: { groupID: string }
+      payload: typeof ProjectGroupFoldersPayload.Type
+    }) {
+      return yield* projectErrors(() => ProjectGroup.add(ctx.params.groupID, ctx.payload.folders))
+    })
+
+    const projectGroupRemove = Effect.fn("ExperimentalHttpApi.projectGroupRemove")(function* (ctx: {
+      params: { groupID: string }
+      payload: typeof ProjectGroupFoldersPayload.Type
+    }) {
+      return yield* projectErrors(() => ProjectGroup.remove(ctx.params.groupID, ctx.payload.folders))
+    })
+
+    const projectGroupMove = Effect.fn("ExperimentalHttpApi.projectGroupMove")(function* (ctx: {
+      payload: typeof ProjectGroupMovePayload.Type
+    }) {
+      return yield* projectErrors(() => ProjectGroup.move(ctx.payload.sessionIDs, ctx.payload.projectID ?? null))
     })
 
     const sessionGroupList = Effect.fn("ExperimentalHttpApi.sessionGroupList")(function* () {
@@ -713,6 +780,12 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionBulkUnarchive", sessionBulkUnarchive)
       .handle("sessionBulkDelete", sessionBulkDelete)
       .handle("sessionBulkPreview", sessionBulkPreview)
+      .handle("projectGroupList", projectGroupList)
+      .handle("projectGroupCreate", projectGroupCreate)
+      .handle("projectGroupUpdate", projectGroupUpdate)
+      .handle("projectGroupAdd", projectGroupAdd)
+      .handle("projectGroupRemove", projectGroupRemove)
+      .handle("projectGroupMove", projectGroupMove)
       .handle("sessionGroupList", sessionGroupList)
       .handle("sessionGroupCreate", sessionGroupCreate)
       .handle("sessionGroupUpdate", sessionGroupUpdate)
