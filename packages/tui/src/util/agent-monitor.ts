@@ -1,5 +1,15 @@
 import type { SessionOverviewItem } from "@opencode-ai/sdk/v2"
 import { kindLabel, projectName, stateLabel, toolOnly } from "./sessions-overview"
+import type { SubagentState } from "./subagent-avatar"
+import {
+  GROUP_TITLE,
+  GROUPS,
+  groupSubagents,
+  type Group,
+  type GroupItem,
+  type GroupView,
+  type Overrides,
+} from "./subagent-groups"
 
 /**
  * XCOD-262: the model behind the Agent Monitor (← on an empty prompt, /monitor). Pure, so the rail's
@@ -7,16 +17,15 @@ import { kindLabel, projectName, stateLabel, toolOnly } from "./sessions-overvie
  * The rows come from the same `session.overview` as /sessions.
  */
 
-export type Section = "waiting" | "running" | "completed" | "failed"
+// XCOD-299: the rail has the sidebar's three sub-sections, from the same function.
+export type Section = Group
 
-export const SECTIONS: Section[] = ["waiting", "running", "completed", "failed"]
+export const SECTIONS: readonly Section[] = GROUPS
 
-export const SECTION_TITLE: Record<Section, string> = {
-  waiting: "Waiting for you",
-  running: "Running",
-  completed: "Completed",
-  failed: "Failed",
-}
+export const SECTION_TITLE: Record<Section, string> = GROUP_TITLE
+
+/** Where the rail's expand/collapse choices are kept (kv.json). */
+export const MONITOR_GROUPS_KEY = "agent_monitor_groups"
 
 /** Completed sessions older than this are behind "Show older". */
 export const RECENT_MS = 24 * 60 * 60 * 1000
@@ -32,11 +41,18 @@ export type Row = {
 }
 
 export type Rail = {
+  /** Every row, collapsed sub-sections too, in rail order (numbers and tags use it). */
   rows: Row[]
   counts: Record<Section, number>
+  /** The three sub-sections, in order: open or not, empty, the collapsed summary. */
+  groups: GroupView<RailItem>[]
+  /** Waiting for action was collapsed and a new ask arrived: it is open again. */
+  reopened: boolean
   /** Completed sessions hidden behind "Show older". */
   older: number
 }
+
+type RailItem = GroupItem & { item: SessionOverviewItem }
 
 /**
  * The sessions the rail lists: none that were cleared from the list (archived, XCOD-265). The
@@ -46,14 +62,22 @@ export function railItems(sessions: readonly SessionOverviewItem[]) {
   return sessions.filter((item) => !item.archived)
 }
 
-function sectionOf(item: SessionOverviewItem): Section {
-  if (item.state === "waiting") return "waiting"
-  if (item.state === "running") return "running"
-  if (item.state === "failed") return "failed"
-  return "completed"
+/** A session's state, as a subagent's: finished and idle ones are done. */
+const STATE: Record<SessionOverviewItem["state"], SubagentState> = {
+  running: "running",
+  waiting: "waiting",
+  failed: "failed",
+  finished: "done",
+  idle: "done",
 }
 
-const URGENCY: Record<Section, number> = { waiting: 0, running: 1, failed: 2, completed: 3 }
+const URGENCY: Record<SessionOverviewItem["state"], number> = {
+  waiting: 0,
+  running: 1,
+  failed: 2,
+  finished: 3,
+  idle: 3,
+}
 
 function matches(item: SessionOverviewItem, search: string) {
   if (!search) return true
@@ -63,15 +87,16 @@ function matches(item: SessionOverviewItem, search: string) {
 }
 
 /**
- * Sections in the ticket's order (Waiting, Running, Completed, Failed), newest first inside each.
- * A subagent sits under its parent, and a parent moves to its most urgent child's section, so a
- * background subagent asking for approval surfaces under Waiting with its parent.
+ * Working, Waiting for action and Completed (failed ones first), newest first inside each. A
+ * subagent sits under its parent, and a parent moves to its most urgent child's sub-section, so a
+ * background subagent asking for approval surfaces under Waiting for action with its parent.
  */
 export function build(input: {
   sessions: readonly SessionOverviewItem[]
   now: number
   search?: string
   showOlder?: boolean
+  overrides?: Overrides
 }): Rail {
   const search = (input.search ?? "").trim().toLowerCase()
   const sessions = railItems(input.sessions)
@@ -83,38 +108,33 @@ export function build(input: {
   }
   const newest = (a: SessionOverviewItem, b: SessionOverviewItem) => b.updated - a.updated
 
-  const groups: Record<Section, { item: SessionOverviewItem; kids: SessionOverviewItem[] }[]> = {
-    waiting: [],
-    running: [],
-    completed: [],
-    failed: [],
-  }
+  const items: RailItem[] = []
   let older = 0
-  for (const item of sessions) {
+  for (const item of sessions.toSorted(newest)) {
     if (item.parentID && ids.has(item.parentID)) continue
     const all = (children.get(item.id) ?? []).toSorted(newest)
     const own = matches(item, search)
     const kids = own ? all : all.filter((kid) => matches(kid, search))
     if (!own && kids.length === 0) continue
-    const section = [item, ...all].map(sectionOf).reduce((best, next) => (URGENCY[next] < URGENCY[best] ? next : best))
+    const state = [item, ...all]
+      .map((each) => each.state)
+      .reduce((best, next) => (URGENCY[next] < URGENCY[best] ? next : best))
     // A search reaches older ones too: it never hides a hit.
-    if (section === "completed" && !search && !input.showOlder && input.now - item.updated > RECENT_MS) {
+    if (STATE[state] === "done" && !search && !input.showOlder && input.now - item.updated > RECENT_MS) {
       older++
       continue
     }
-    groups[section].push({ item, kids })
+    items.push({ id: item.id, state: STATE[state], item })
+    for (const kid of kids) items.push({ id: kid.id, state: STATE[kid.state], parent: item.id, item: kid })
   }
 
-  const rows: Row[] = []
-  const counts = { waiting: 0, running: 0, completed: 0, failed: 0 }
-  for (const section of SECTIONS) {
-    for (const entry of groups[section].toSorted((a, b) => newest(a.item, b.item))) {
-      rows.push({ item: entry.item, section, depth: 0 })
-      counts[section]++
-      for (const kid of entry.kids) rows.push({ item: kid, section, depth: 1 })
-    }
-  }
-  return { rows, counts, older }
+  // Completed stays open however many it holds: the rail is how they're reached (and numbered).
+  const grouped = groupSubagents(items, { overrides: input.overrides, nest: "parent", completedOpenMax: Infinity })
+  const rows = grouped.groups.flatMap((view) =>
+    view.rows.map((row): Row => ({ item: row.item.item, section: view.group, depth: row.depth ? 1 : 0 })),
+  )
+  const counts = Object.fromEntries(grouped.groups.map((view) => [view.group, view.count])) as Record<Section, number>
+  return { rows, counts, groups: grouped.groups, reopened: grouped.reopened, older }
 }
 
 /**

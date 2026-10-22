@@ -1297,7 +1297,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Шуморо интизоранд ({{count}})",
   "sessions.monitor.section.running": "Иҷро мешаванд ({{count}})",
   "sessions.monitor.section.completed": "Анҷомёфта ({{count}})",
-  "sessions.monitor.section.failed": "Ноком ({{count}})",
   "sessions.monitor.showOlder": "Нишон додани кӯҳнаҳо ({{count}})",
   "sessions.monitor.hideOlder": "Пинҳон кардани кӯҳнаҳо",
   "sessions.monitor.view.label": "Тартиб додани рӯйхат",

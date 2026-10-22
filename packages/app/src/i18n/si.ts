@@ -1282,7 +1282,6 @@ export const dict: Record<string, string> = {
   "sessions.monitor.section.waiting": "ඔබ එනතුරු ({{count}})",
   "sessions.monitor.section.running": "ක්‍රියාත්මක ({{count}})",
   "sessions.monitor.section.completed": "සම්පූර්ණයි ({{count}})",
-  "sessions.monitor.section.failed": "අසාර්ථකයි ({{count}})",
   "sessions.monitor.showOlder": "පැරණි ඒවා පෙන්වන්න ({{count}})",
   "sessions.monitor.hideOlder": "පැරණි ඒවා සඟවන්න",
   "sessions.monitor.view.label": "ලැයිස්තුව සකසන්න",

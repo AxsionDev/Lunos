@@ -1286,7 +1286,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "გელოდებათ ({{count}})",
   "sessions.monitor.section.running": "მიმდინარეობს ({{count}})",
   "sessions.monitor.section.completed": "დასრულებული ({{count}})",
-  "sessions.monitor.section.failed": "ვერ შესრულდა ({{count}})",
   "sessions.monitor.showOlder": "ძველების ჩვენება ({{count}})",
   "sessions.monitor.hideOlder": "ძველების დამალვა",
   "sessions.monitor.view.label": "სიის დალაგება",

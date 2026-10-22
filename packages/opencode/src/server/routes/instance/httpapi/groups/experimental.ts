@@ -124,6 +124,42 @@ export const SessionGroupInfo = Schema.Struct({
   updated: Schema.Finite,
 }).annotate({ identifier: "SessionGroup" })
 
+// XCOD-298: a named project (several folders), or a repository project shown as one (implicit).
+export const ProjectGroupInfo = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  folders: Schema.mutable(Schema.Array(Schema.String)),
+  archived: Schema.optional(Schema.Boolean),
+  implicit: Schema.optional(Schema.Boolean),
+  time: Schema.Struct({ created: Schema.Finite, updated: Schema.Finite }),
+}).annotate({ identifier: "ProjectGroup" })
+
+export const ProjectGroupListResponse = Schema.Struct({
+  groups: Schema.mutable(Schema.Array(ProjectGroupInfo)),
+  /** The project this instance's directory belongs to. */
+  current: ProjectGroupInfo,
+}).annotate({ identifier: "ProjectGroupList" })
+
+export const ProjectGroupCreatePayload = Schema.Struct({
+  name: Schema.String,
+  folders: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+})
+
+export const ProjectGroupUpdatePayload = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  archived: Schema.optional(Schema.Boolean),
+})
+
+export const ProjectGroupFoldersPayload = Schema.Struct({
+  folders: Schema.mutable(Schema.Array(Schema.String)),
+})
+
+export const ProjectGroupMovePayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** A named project's id or a repository project's. Omitted puts them back in their directory's project. */
+  projectID: Schema.optional(Schema.String),
+})
+
 // XCOD-250: what /claude and /codex show before anything starts.
 export const ExternalToolStatus = Schema.Struct({
   tool: Schema.Literals(["claude", "codex"]),
@@ -255,6 +291,8 @@ export const SessionOverviewItem = Schema.Struct({
   queued: Schema.optional(NonNegativeInt),
   ownerClosed: Schema.optional(Schema.Boolean),
   groupID: Schema.optional(Schema.String),
+  /** XCOD-298: the project it counts in (named, or its repository's). */
+  projectGroupID: Schema.optional(Schema.String),
   archived: Schema.optional(Schema.Finite),
 }).annotate({ identifier: "SessionOverviewItem" })
 
@@ -374,6 +412,11 @@ export const ExperimentalPaths = {
   sessionGroups: "/experimental/session-group",
   sessionGroup: "/experimental/session-group/:groupID",
   sessionGroupMove: "/experimental/session-group/move",
+  projectGroups: "/experimental/project-group",
+  projectGroup: "/experimental/project-group/:groupID",
+  projectGroupFolders: "/experimental/project-group/:groupID/folders",
+  projectGroupFoldersRemove: "/experimental/project-group/:groupID/folders/remove",
+  projectGroupMove: "/experimental/project-group/move",
   sessionBulkStop: "/experimental/session-bulk/stop",
   sessionBulkArchive: "/experimental/session-bulk/archive",
   sessionBulkUnarchive: "/experimental/session-bulk/unarchive",
@@ -761,6 +804,83 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.sessionGroup.delete",
             summary: "Delete session group",
             description: "Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.",
+          }),
+        ),
+        HttpApiEndpoint.get("projectGroupList", ExperimentalPaths.projectGroups, {
+          query: WorkspaceRoutingQuery,
+          success: described(ProjectGroupListResponse, "Projects"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.list",
+            summary: "List projects",
+            description:
+              "The named projects on this computer (archived ones marked), and the project this directory belongs to: a named project, or its repository project.",
+          }),
+        ),
+        HttpApiEndpoint.post("projectGroupCreate", ExperimentalPaths.projectGroups, {
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupCreatePayload,
+          success: described(ProjectGroupInfo, "Created project"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.create",
+            summary: "Create project",
+            description: "Create a named project grouping folders (absolute paths), kept on this computer only.",
+          }),
+        ),
+        HttpApiEndpoint.post("projectGroupMove", ExperimentalPaths.projectGroupMove, {
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupMovePayload,
+          success: described(Schema.Boolean, "Sessions moved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.move",
+            summary: "Move sessions to a project",
+            description:
+              "Count sessions in another project. Without a projectID they go back to the project of their directory.",
+          }),
+        ),
+        HttpApiEndpoint.patch("projectGroupUpdate", ExperimentalPaths.projectGroup, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupUpdatePayload,
+          success: described(ProjectGroupInfo, "Updated project"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.update",
+            summary: "Update project",
+            description: "Rename a named project, or archive it (archived: true) or bring it back (archived: false).",
+          }),
+        ),
+        HttpApiEndpoint.post("projectGroupAdd", ExperimentalPaths.projectGroupFolders, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupFoldersPayload,
+          success: described(ProjectGroupInfo, "Updated project"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.add",
+            summary: "Add folders to a project",
+            description:
+              "Add folders (absolute paths) to a named project. A folder another live project has is refused.",
+          }),
+        ),
+        HttpApiEndpoint.post("projectGroupRemove", ExperimentalPaths.projectGroupFoldersRemove, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupFoldersPayload,
+          success: described(ProjectGroupInfo, "Updated project"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.remove",
+            summary: "Remove folders from a project",
+            description:
+              "Remove folders from a named project. Its sessions there go back to their repository's project.",
           }),
         ),
         HttpApiEndpoint.get("externalTools", ExperimentalPaths.externalTools, {

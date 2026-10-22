@@ -12,6 +12,8 @@ describe("settings sections", () => {
     expect(Sections.target("lsp")).toEqual({ category: "Tools", sub: "LSP" })
     expect(Sections.target("Residency")).toEqual({ category: "Residency & privacy", sub: "Residency" })
     expect(Sections.target("nonsense")).toBeUndefined()
+    // XCOD-298: named projects aren't config keys; the section lists them on its one tab.
+    expect(Sections.target("projects")).toEqual({ category: "Projects", sub: "Projects" })
   })
 
   test("a search result says where it lives", () => {

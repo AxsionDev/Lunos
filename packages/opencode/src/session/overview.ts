@@ -6,6 +6,7 @@ import { inArray, sql } from "drizzle-orm"
 import { Effect } from "effect"
 import { ExternalRegistry } from "@/external/registry"
 import { Session } from "./session"
+import { ProjectGroup } from "@/project/group"
 import { SessionGroups } from "./groups"
 import { SessionLive } from "./live"
 import { SessionPeers } from "./peers"
@@ -52,6 +53,8 @@ export interface Item {
    */
   ownerClosed?: boolean
   groupID?: string
+  /** XCOD-298: the project it counts in (named, or its repository's). */
+  projectGroupID?: string
   /** XCOD-265: when it was cleared from the list. Only archived listings (`archived: true`) have these. */
   archived?: number
 }
@@ -152,6 +155,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
   const archived = input?.archived === true
   const sessions = yield* Session.Service
   const groups = yield* Effect.promise(() => SessionGroups.read())
+  const projects = yield* Effect.promise(() => ProjectGroup.snapshot())
 
   const recent = yield* sessions.listGlobal(
     archived ? { archived: "only", limit: LIMIT } : { start: now - WINDOW, limit: LIMIT },
@@ -177,6 +181,13 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
 
   // Tool sessions that already have a Lunos session (XCOD-218), so the registry doesn't list them twice.
   const linked = new Set<string>()
+  const byID = new Map(all.map((session) => [session.id as string, session]))
+  const ref = (session: Session.GlobalInfo): ProjectGroup.SessionRef => ({
+    id: session.id,
+    directory: session.directory,
+    ...(session.parentID ? { parentID: session.parentID } : {}),
+    ...(session.project ? { project: session.project } : {}),
+  })
   const items: Item[] = all.map((session) => {
     const external = externalOf(session)
     if (external?.session) linked.add(external.session)
@@ -193,6 +204,10 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
         : undefined
     const agent = session.agent ?? message?.agent
     const group = groups.assignments[session.id]
+    const project = projects.forSession(ref(session), (id) => {
+      const found = byID.get(id)
+      return found ? ref(found) : undefined
+    })
     return {
       id: session.id,
       kind: kind(session),
@@ -214,6 +229,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       ...(activity.queued ? { queued: activity.queued } : {}),
       ...(orphaned ? { queued: orphaned, ownerClosed: true } : {}),
       ...(group ? { groupID: group } : {}),
+      ...(project ? { projectGroupID: project.id } : {}),
       ...(session.time.archived ? { archived: session.time.archived } : {}),
     }
   })
@@ -227,6 +243,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
     if (linked.has(entry.sessionID)) continue
     const id = `external:${entry.sessionID}`
     const group = groups.assignments[id]
+    const project = projects.forSession({ id, directory: entry.cwd })
     items.push({
       id,
       kind: "external",
@@ -247,6 +264,7 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
       permissions: 0,
       questions: 0,
       ...(group ? { groupID: group } : {}),
+      ...(project ? { projectGroupID: project.id } : {}),
       ...(entry.archived ? { archived: Date.parse(entry.archived) || updated } : {}),
     })
   }

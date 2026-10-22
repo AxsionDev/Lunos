@@ -1303,7 +1303,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Sizni kutmoqda ({{count}})",
   "sessions.monitor.section.running": "Ishlamoqda ({{count}})",
   "sessions.monitor.section.completed": "Yakunlangan ({{count}})",
-  "sessions.monitor.section.failed": "Muvaffaqiyatsiz ({{count}})",
   "sessions.monitor.showOlder": "Eskilarini ko'rsatish ({{count}})",
   "sessions.monitor.hideOlder": "Eskilarini yashirish",
   "sessions.monitor.view.label": "Ro'yxatni tartiblash",

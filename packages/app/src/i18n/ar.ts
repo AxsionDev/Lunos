@@ -1327,7 +1327,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "بانتظارك ({{count}})",
   "sessions.monitor.section.running": "قيد التشغيل ({{count}})",
   "sessions.monitor.section.completed": "مكتملة ({{count}})",
-  "sessions.monitor.section.failed": "فشلت ({{count}})",
   "sessions.monitor.showOlder": "إظهار الأقدم ({{count}})",
   "sessions.monitor.hideOlder": "إخفاء الأقدم",
   "sessions.monitor.view.label": "ترتيب القائمة",

@@ -2851,6 +2851,7 @@ export type SessionOverviewItem = {
   queued?: number
   ownerClosed?: boolean
   groupID?: string
+  projectGroupID?: string
   archived?: number
 }
 
@@ -2907,6 +2908,23 @@ export type NotFoundError = {
   data: {
     message: string
   }
+}
+
+export type ProjectGroup = {
+  id: string
+  name: string
+  folders: Array<string>
+  archived?: boolean
+  implicit?: boolean
+  time: {
+    created: number
+    updated: number
+  }
+}
+
+export type ProjectGroupList = {
+  groups: Array<ProjectGroup>
+  current: ProjectGroup
 }
 
 export type ExternalToolStatus = {
@@ -9888,6 +9906,225 @@ export type ExperimentalSessionGroupUpdateResponses = {
 
 export type ExperimentalSessionGroupUpdateResponse =
   ExperimentalSessionGroupUpdateResponses[keyof ExperimentalSessionGroupUpdateResponses]
+
+export type ExperimentalProjectGroupListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/project-group"
+}
+
+export type ExperimentalProjectGroupListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalProjectGroupListError =
+  ExperimentalProjectGroupListErrors[keyof ExperimentalProjectGroupListErrors]
+
+export type ExperimentalProjectGroupListResponses = {
+  /**
+   * Projects
+   */
+  200: ProjectGroupList
+}
+
+export type ExperimentalProjectGroupListResponse =
+  ExperimentalProjectGroupListResponses[keyof ExperimentalProjectGroupListResponses]
+
+export type ExperimentalProjectGroupCreateData = {
+  body?: {
+    name: string
+    folders?: Array<string>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/project-group"
+}
+
+export type ExperimentalProjectGroupCreateErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalProjectGroupCreateError =
+  ExperimentalProjectGroupCreateErrors[keyof ExperimentalProjectGroupCreateErrors]
+
+export type ExperimentalProjectGroupCreateResponses = {
+  /**
+   * Created project
+   */
+  200: ProjectGroup
+}
+
+export type ExperimentalProjectGroupCreateResponse =
+  ExperimentalProjectGroupCreateResponses[keyof ExperimentalProjectGroupCreateResponses]
+
+export type ExperimentalProjectGroupMoveData = {
+  body?: {
+    sessionIDs: Array<string>
+    projectID?: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/project-group/move"
+}
+
+export type ExperimentalProjectGroupMoveErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalProjectGroupMoveError =
+  ExperimentalProjectGroupMoveErrors[keyof ExperimentalProjectGroupMoveErrors]
+
+export type ExperimentalProjectGroupMoveResponses = {
+  /**
+   * Sessions moved
+   */
+  200: boolean
+}
+
+export type ExperimentalProjectGroupMoveResponse =
+  ExperimentalProjectGroupMoveResponses[keyof ExperimentalProjectGroupMoveResponses]
+
+export type ExperimentalProjectGroupUpdateData = {
+  body?: {
+    name?: string
+    archived?: boolean
+  }
+  path: {
+    groupID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/project-group/{groupID}"
+}
+
+export type ExperimentalProjectGroupUpdateErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalProjectGroupUpdateError =
+  ExperimentalProjectGroupUpdateErrors[keyof ExperimentalProjectGroupUpdateErrors]
+
+export type ExperimentalProjectGroupUpdateResponses = {
+  /**
+   * Updated project
+   */
+  200: ProjectGroup
+}
+
+export type ExperimentalProjectGroupUpdateResponse =
+  ExperimentalProjectGroupUpdateResponses[keyof ExperimentalProjectGroupUpdateResponses]
+
+export type ExperimentalProjectGroupAddData = {
+  body?: {
+    folders: Array<string>
+  }
+  path: {
+    groupID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/project-group/{groupID}/folders"
+}
+
+export type ExperimentalProjectGroupAddErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalProjectGroupAddError =
+  ExperimentalProjectGroupAddErrors[keyof ExperimentalProjectGroupAddErrors]
+
+export type ExperimentalProjectGroupAddResponses = {
+  /**
+   * Updated project
+   */
+  200: ProjectGroup
+}
+
+export type ExperimentalProjectGroupAddResponse =
+  ExperimentalProjectGroupAddResponses[keyof ExperimentalProjectGroupAddResponses]
+
+export type ExperimentalProjectGroupRemoveData = {
+  body?: {
+    folders: Array<string>
+  }
+  path: {
+    groupID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/project-group/{groupID}/folders/remove"
+}
+
+export type ExperimentalProjectGroupRemoveErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalProjectGroupRemoveError =
+  ExperimentalProjectGroupRemoveErrors[keyof ExperimentalProjectGroupRemoveErrors]
+
+export type ExperimentalProjectGroupRemoveResponses = {
+  /**
+   * Updated project
+   */
+  200: ProjectGroup
+}
+
+export type ExperimentalProjectGroupRemoveResponse =
+  ExperimentalProjectGroupRemoveResponses[keyof ExperimentalProjectGroupRemoveResponses]
 
 export type ExperimentalExternalToolsData = {
   body?: never

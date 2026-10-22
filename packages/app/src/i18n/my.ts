@@ -1307,7 +1307,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "သင့်ကို စောင့်နေသည် ({{count}})",
   "sessions.monitor.section.running": "လုပ်ဆောင်နေသည် ({{count}})",
   "sessions.monitor.section.completed": "ပြီးဆုံးပြီ ({{count}})",
-  "sessions.monitor.section.failed": "မအောင်မြင်ပါ ({{count}})",
   "sessions.monitor.showOlder": "အဟောင်းများကို ပြပါ ({{count}})",
   "sessions.monitor.hideOlder": "အဟောင်းများကို ဖျောက်ပါ",
   "sessions.monitor.view.label": "စာရင်းကို စီပါ",

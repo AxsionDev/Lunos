@@ -1318,7 +1318,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Aguardando você ({{count}})",
   "sessions.monitor.section.running": "Em execução ({{count}})",
   "sessions.monitor.section.completed": "Concluídas ({{count}})",
-  "sessions.monitor.section.failed": "Com falha ({{count}})",
   "sessions.monitor.showOlder": "Mostrar mais antigas ({{count}})",
   "sessions.monitor.hideOlder": "Ocultar mais antigas",
   "sessions.monitor.view.label": "Organizar a lista",

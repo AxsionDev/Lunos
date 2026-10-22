@@ -217,6 +217,12 @@ describe("subagentsOf", () => {
     expect(subagentsOf(parts, () => ({ status: "busy" }))[0]).toMatchObject({ state: "running", background: true })
     expect(subagentsOf(parts, () => ({ queued: true }))[0]!.state).toBe("queued")
     expect(subagentsOf(parts, () => ({ status: "busy", waiting: true }))[0]!.state).toBe("waiting")
+    // XCOD-299: its call never errors, so a failed last turn is what says it failed, and why.
+    expect(subagentsOf(parts, () => ({ status: "idle", error: "rate limited" }))[0]).toMatchObject({
+      state: "failed",
+      error: "rate limited",
+    })
+    expect(subagentsOf(parts, () => ({ status: "busy", error: "earlier turn" }))[0]!.state).toBe("running")
     expect(subagentsOf(parts, () => ({ status: "idle" }))[0]!.state).toBe("done")
     // A foreground one is done when its call is, whatever its session says.
     expect(subagentsOf([task("completed", { sessionId: "ses_fg" })], () => ({ status: "busy" }))[0]!.state).toBe("done")

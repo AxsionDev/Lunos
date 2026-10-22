@@ -1310,7 +1310,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "ތިބާއަށް މަޑުކުރަނީ ({{count}})",
   "sessions.monitor.section.running": "ދުވަނީ ({{count}})",
   "sessions.monitor.section.completed": "ނިމިފައި ({{count}})",
-  "sessions.monitor.section.failed": "ނާކާމިޔާބު ({{count}})",
   "sessions.monitor.showOlder": "ބޮޑާ ސެޝަންތައް ދައްކާ ({{count}})",
   "sessions.monitor.hideOlder": "ބޮޑާ ސެޝަންތައް ފޮރުވާ",
   "sessions.monitor.view.label": "ލިސްޓު ތަރުތީބުކުރޭ",

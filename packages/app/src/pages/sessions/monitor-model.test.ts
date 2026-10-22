@@ -8,6 +8,9 @@ import {
   number,
   rail,
   RECENT_MS,
+  sections,
+  toggleSection,
+  forgetWaiting,
   orphanedQueue,
   canTakeOver,
   route,
@@ -37,7 +40,7 @@ function item(id: string, input: Partial<SessionOverviewItem> = {}): SessionOver
 const ids = (value: ReturnType<typeof rail>) => value.rows.map((row) => `${row.section}:${row.depth}:${row.item.id}`)
 
 describe("Sessions window monitor rail (XCOD-262)", () => {
-  test("sections in order (Waiting, Running, Completed, Failed), newest first, each with its count", () => {
+  test("XCOD-299: Working, Waiting for action, Completed (failed first), newest first, each with its count", () => {
     const value = rail({
       now: NOW,
       sessions: [
@@ -50,14 +53,48 @@ describe("Sessions window monitor rail (XCOD-262)", () => {
       ],
     })
     expect(ids(value)).toEqual([
-      "waiting:0:ask",
       "running:0:busy-new",
       "running:0:busy-old",
+      "waiting:0:ask",
+      "completed:0:broke",
       "completed:0:idle",
       "completed:0:done",
-      "failed:0:broke",
     ])
-    expect(value.counts).toEqual({ waiting: 1, running: 2, completed: 2, failed: 1 })
+    expect(value.counts).toEqual({ running: 2, waiting: 1, completed: 3 })
+    expect(sections(value).views.map((view) => [view.section, view.open, view.states])).toEqual([
+      ["running", true, [{ state: "running", count: 2 }]],
+      ["waiting", true, [{ state: "waiting", count: 1 }]],
+      [
+        "completed",
+        true,
+        [
+          { state: "failed", count: 1 },
+          { state: "finished", count: 2 },
+        ],
+      ],
+    ])
+  })
+
+  test("XCOD-299: empty sections are listed collapsed; a long Completed stays open; a new ask reopens Waiting", () => {
+    const one = rail({ now: NOW, sessions: [item("done", { state: "finished" })] })
+    expect(sections(one).views.map((view) => [view.section, view.count, view.empty, view.open])).toEqual([
+      ["running", 0, true, false],
+      ["waiting", 0, true, false],
+      ["completed", 1, false, true],
+    ])
+    const many = rail({ now: NOW, sessions: ["a", "b", "c", "d"].map((id) => item(id, { state: "finished" })) })
+    expect(sections(many).views[2]!.open).toBe(true)
+
+    const asking = rail({ now: NOW, sessions: [item("w1", { state: "waiting", permissions: 1 })] })
+    const collapsed = toggleSection({}, sections(asking).views[1]!, ["w1"])
+    expect(collapsed).toEqual({ waiting: false, waitingSeen: ["w1"] })
+    expect(sections(asking, collapsed)).toMatchObject({ reopened: false, views: [{}, { open: false }, {}] })
+    const more = rail({
+      now: NOW,
+      sessions: [item("w1", { state: "waiting", permissions: 1 }), item("w2", { state: "waiting", questions: 1 })],
+    })
+    expect(sections(more, collapsed)).toMatchObject({ reopened: true, views: [{}, { open: true }, {}] })
+    expect(forgetWaiting(collapsed)).toEqual({})
   })
 
   test("Completed is the last 24 h; older ones are behind Show older, and a search still finds them", () => {
@@ -83,8 +120,8 @@ describe("Sessions window monitor rail (XCOD-262)", () => {
         item("orphan", { kind: "subagent", parentID: "gone", state: "running" }),
       ],
     })
-    expect(ids(value)).toEqual(["waiting:0:parent", "waiting:1:child", "running:0:orphan"])
-    expect(value.counts.waiting).toBe(1)
+    expect(ids(value)).toEqual(["running:0:orphan", "waiting:0:parent", "waiting:1:child"])
+    expect(value.counts.waiting).toBe(2)
   })
 
   test("archived sessions aren't in the rail; the search reaches title, project and tool", () => {
@@ -167,7 +204,8 @@ describe("the sessions autocomplete (XCOD-262)", () => {
     expect(mentionOptions(rows, numbers, "dep").map((option) => option.item.id)).toEqual(["ses_b"])
     expect(mentionOptions(rows, numbers, "beta").map((option) => option.item.id)).toEqual(["ses_c"])
     expect(mentionOptions(rows, numbers, "1").map((option) => option.number)).toEqual([1])
-    expect(mentionOptions(rows, numbers, "").map((option) => option.item.id)).toEqual(["ses_b", "ses_a", "ses_c"])
+    // Rail order (XCOD-299): Working, then Waiting for action, then Completed.
+    expect(mentionOptions(rows, numbers, "").map((option) => option.item.id)).toEqual(["ses_a", "ses_b", "ses_c"])
   })
 
   test("the pick replaces what was typed with its number", () => {

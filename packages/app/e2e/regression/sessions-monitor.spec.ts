@@ -28,7 +28,7 @@ function setup(
     questions: 0,
     ...extra,
   })
-  // Rail order and numbers: Waiting 1, Running 2-4, Completed 5 (its Lunos stopped) and 6, Failed 7.
+  // Rail order and numbers (XCOD-299): Working 1-3, Waiting for action 4, Completed 5 (failed first), 6 (its Lunos stopped) and 7.
   const listed = [
     row("ses_w1", "Deploy script", "waiting", { updated: now - 1000 }),
     row("ses_r1", "Refactor parser", "running", { updated: now - 2000 }),
@@ -120,6 +120,7 @@ async function open(page: Page, extra: Parameters<typeof setup>[1] = () => []) {
 }
 
 const rail = (page: Page) => page.getByRole("complementary", { name: "Sessions on this computer" })
+const completed = (page: Page) => rail(page).getByRole("button", { name: /^Completed \(\d+\)/ })
 const prompt = (page: Page) => page.getByRole("combobox", { name: "Prompt" })
 const sent = (state: { calls: { path: string }[] }, pattern: RegExp) =>
   state.calls.filter((call) => pattern.test(call.path))
@@ -129,16 +130,16 @@ async function send(page: Page, text: string) {
   await prompt(page).press("Enter")
 }
 
-test("the rail: Waiting first with its ask, then Running, Completed and Failed, counted and numbered", async ({
+test("the rail: Working, Waiting for action with its ask, then Completed (failed first), counted and numbered", async ({
   page,
 }) => {
   await open(page)
   const headings = rail(page).getByRole("heading", { level: 2 })
-  await expect(headings).toHaveText(["Waiting for you (1)", "Running (3)", "Completed (2)", "Failed (1)"])
+  await expect(headings).toHaveText(["Working (3)", "Waiting for action (1)", "Completed (3)"])
   const waiting = page.locator('[data-session-id="ses_w1"]')
   await expect(waiting.getByText("Approve: bash git push origin main")).toBeVisible()
-  await expect(waiting.getByRole("button", { name: "Tag @1 Deploy script in the prompt" })).toHaveText("1")
-  await expect(page.locator('[data-session-id="ses_x1"]').getByRole("button", { name: /^Tag @7 / })).toBeVisible()
+  await expect(waiting.getByRole("button", { name: "Tag @4 Deploy script in the prompt" })).toHaveText("4")
+  await expect(page.locator('[data-session-id="ses_x1"]').getByRole("button", { name: /^Tag @5 / })).toBeVisible()
   // Completed in the last 24 h only; older ones are behind Show older.
   await expect(page.getByText("Last week's spike", { exact: true })).toHaveCount(0)
   await rail(page).getByRole("button", { name: "Show older (1)" }).click()
@@ -163,9 +164,9 @@ test("an untagged prompt starts a session in the chosen project and the window s
 
 test("@n sends to that session with a chip; a running one queues it, Ctrl+Enter interrupts", async ({ page }) => {
   const state = await open(page)
-  await prompt(page).fill("@2 run the tests")
-  await expect(page.getByText("@2 Refactor parser", { exact: true }).first()).toBeVisible()
-  await expect(page.getByText("To: @2 Refactor parser")).toBeVisible()
+  await prompt(page).fill("@1 run the tests")
+  await expect(page.getByText("@1 Refactor parser", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText("To: @1 Refactor parser")).toBeVisible()
   await prompt(page).press("Enter")
   await expect(page.getByText('Queued for "Refactor parser"')).toBeVisible()
   expect(state.calls).toEqual([
@@ -173,7 +174,7 @@ test("@n sends to that session with a chip; a running one queues it, Ctrl+Enter 
   ])
   await expect(prompt(page)).toHaveValue("")
 
-  await prompt(page).fill("@2 stop and fix the build")
+  await prompt(page).fill("@1 stop and fix the build")
   await prompt(page).press("Control+Enter")
   await expect.poll(() => state.calls.length).toBe(2)
   expect(state.calls[1]!.body).toEqual({ text: "stop and fix the build", interrupt: true })
@@ -182,10 +183,10 @@ test("@n sends to that session with a chip; a running one queues it, Ctrl+Enter 
   // A row's number puts its tag in the prompt; the chip's × takes it out.
   await page
     .locator('[data-session-id="ses_f1"]')
-    .getByRole("button", { name: /^Tag @6 / })
+    .getByRole("button", { name: /^Tag @7 / })
     .click()
-  await expect(prompt(page)).toHaveValue("@6 ")
-  await page.getByRole("button", { name: "Remove @6 Fix typo" }).click()
+  await expect(prompt(page)).toHaveValue("@7 ")
+  await page.getByRole("button", { name: "Remove @7 Fix typo" }).click()
   await expect(prompt(page)).toHaveValue("")
 
   await send(page, "@42 hello")
@@ -196,7 +197,7 @@ test("@n sends to that session with a chip; a running one queues it, Ctrl+Enter 
 test("@ and part of a name lists the sessions; the pick becomes its number", async ({ page }) => {
   const state = await open(page)
   await prompt(page).pressSequentially("@fix")
-  const option = page.getByRole("option", { name: /@6 Fix typo/ })
+  const option = page.getByRole("option", { name: /@7 Fix typo/ })
   await expect(option).toBeVisible()
   // Claude Code rows with no Lunos session aren't offered.
   await prompt(page).fill("@claude")
@@ -205,7 +206,7 @@ test("@ and part of a name lists the sessions; the pick becomes its number", asy
   await prompt(page).fill("")
   await prompt(page).pressSequentially("@fix")
   await prompt(page).press("Enter")
-  await expect(prompt(page)).toHaveValue("@6 ")
+  await expect(prompt(page)).toHaveValue("@7 ")
   await prompt(page).pressSequentially("summarise it")
   await prompt(page).press("Enter")
   await expect.poll(() => state.calls.length).toBe(1)
@@ -217,14 +218,14 @@ test("@ and part of a name lists the sessions; the pick becomes its number", asy
 
 test("tagging three sessions asks first; cancelling sends nothing, confirming sends to each", async ({ page }) => {
   const state = await open(page)
-  await send(page, "@2 @6 @7 rebase on dev")
+  await send(page, "@1 @7 @5 rebase on dev")
   const dialog = page.locator('[data-component="sessions-bulk-confirm"]')
   await expect(page.getByRole("heading", { name: "Send to 3 sessions?" })).toBeVisible()
-  await expect(dialog).toContainText("@2 Refactor parser, @6 Fix typo, @7 Flaky test")
+  await expect(dialog).toContainText("@1 Refactor parser, @7 Fix typo, @5 Flaky test")
   await page.keyboard.press("Escape")
   await expect(dialog).toHaveCount(0)
   expect(state.calls).toHaveLength(0)
-  await expect(prompt(page)).toHaveValue("@2 @6 @7 rebase on dev")
+  await expect(prompt(page)).toHaveValue("@1 @7 @5 rebase on dev")
 
   await prompt(page).press("Enter")
   await dialog.getByRole("button", { name: "Send" }).click()
@@ -236,7 +237,7 @@ test("tagging three sessions asks first; cancelling sends nothing, confirming se
 
 test("another Lunos's session gets it through peer.prompt; a stopped one asks to take it over", async ({ page }) => {
   const state = await open(page)
-  await send(page, "@3 check the logs")
+  await send(page, "@2 check the logs")
   await expect.poll(() => state.calls.length).toBe(1)
   expect(state.calls[0]).toEqual({
     path: "/experimental/peer/ses_p1/prompt",
@@ -244,7 +245,7 @@ test("another Lunos's session gets it through peer.prompt; a stopped one asks to
   })
   await expect(prompt(page)).toHaveValue("")
 
-  await send(page, "@5 carry on")
+  await send(page, "@6 carry on")
   await expect(page.getByRole("heading", { name: "Take over this session here?" })).toBeVisible()
   await page.getByRole("button", { name: "Take over" }).click()
   await expect.poll(() => state.calls.length).toBe(2)
@@ -252,6 +253,20 @@ test("another Lunos's session gets it through peer.prompt; a stopped one asks to
     path: "/experimental/session/ses_s1/takeover",
     body: { queued: "send", text: "carry on" },
   })
+})
+
+test("XCOD-299: a section collapses to what it holds, and stays collapsed across a reload", async ({ page }) => {
+  await open(page)
+  await expect(completed(page)).toHaveAttribute("aria-expanded", "true")
+  await completed(page).click()
+  await expect(completed(page)).toHaveAttribute("aria-expanded", "false")
+  await expect(page.locator('[data-monitor-section="completed"]')).toContainText("✕ 1 Failed · ✓ 2 Finished")
+  // Still a heading, with the button inside it.
+  await expect(rail(page).getByRole("heading", { level: 2, name: "Completed (3)" })).toBeVisible()
+  await expect(page.locator('[data-session-id="ses_x1"]')).toHaveCount(0)
+  await page.reload()
+  await expectAppVisible(page.getByText("Refactor parser", { exact: true }))
+  await expect(completed(page)).toHaveAttribute("aria-expanded", "false")
 })
 
 test("the rail remembers By status / By group across a reload", async ({ page }) => {
@@ -269,24 +284,23 @@ test("the rail remembers By status / By group across a reload", async ({ page })
   await expectAppVisible(page.getByText("Refactor parser", { exact: true }))
   await expect(view("By status")).toHaveAttribute("aria-pressed", "true")
   await expect(rail(page).getByRole("heading", { level: 2 })).toHaveText([
-    "Waiting for you (1)",
-    "Running (3)",
-    "Completed (2)",
-    "Failed (1)",
+    "Working (3)",
+    "Waiting for action (1)",
+    "Completed (3)",
   ])
 })
 
 test("prompts a closed Lunos queued show on the row; the take-over says how many and can discard them", async ({
   page,
 }) => {
-  // Completed: 5 Crashed run, 6 Fix typo, 7 this one; Failed: 8.
+  // Completed: 5 Flaky test (failed first), 6 Crashed run, 7 Fix typo, 8 this one.
   const state = await open(page, (row, now) => [
     row("ses_q1", "Queued work", "idle", { queued: 2, ownerClosed: true, updated: now - 6500 }),
   ])
   await expect(page.locator('[data-session-id="ses_q1"]').getByText("2 queued (owner closed)")).toBeVisible()
 
   // Cancelling sends nothing and takes nothing over.
-  await send(page, "@7 carry on")
+  await send(page, "@8 carry on")
   const dialog = page.locator('[data-component="sessions-bulk-confirm"]')
   await expect(page.getByRole("heading", { name: "Take over this session here?" })).toBeVisible()
   await expect(dialog).toContainText("Queued: 2.")
@@ -304,7 +318,7 @@ test("prompts a closed Lunos queued show on the row; the take-over says how many
     body: { queued: "send", text: "carry on" },
   })
 
-  await send(page, "@7 start over")
+  await send(page, "@8 start over")
   await dialog.getByRole("combobox", { name: "Queued prompts" }).selectOption({ label: "Discard them (2)" })
   await dialog.getByRole("button", { name: "Take over" }).click()
   await expect.poll(() => state.calls.length).toBe(2)
@@ -352,7 +366,7 @@ test("Take over on a row with a closed Lunos's queued prompts sends or discards 
 
 test("a prompt never approves a tool call; Approve on the row does, once", async ({ page }) => {
   const state = await open(page)
-  await send(page, "@1 yes, go ahead")
+  await send(page, "@4 yes, go ahead")
   await expect.poll(() => state.calls.length).toBe(1)
   expect(state.calls[0]!.path).toBe("/experimental/session/ses_w1/enqueue")
   await expect(prompt(page)).toHaveValue("")
@@ -363,7 +377,7 @@ test("a prompt never approves a tool call; Approve on the row does, once", async
   expect(sent(state, /permission/)).toEqual([{ path: "/permission/per_1/reply", body: { reply: "once" } }])
 
   // A Claude Code session with no Lunos session isn't sent anything from here.
-  await send(page, "@4 hi")
+  await send(page, "@3 hi")
   await expect(
     page.getByText('"Claude Code · alpha" runs in Claude Code: open it there to send it a prompt'),
   ).toBeVisible()
@@ -376,5 +390,5 @@ test("at a narrow desktop window's width the list still sits to the right of the
   const list = (await rail(page).boundingBox())!
   const input = (await prompt(page).boundingBox())!
   expect(list.x).toBeGreaterThanOrEqual(input.x + input.width)
-  await expect(rail(page).getByRole("heading", { name: "Running (3)" })).toBeVisible()
+  await expect(rail(page).getByRole("heading", { name: "Working (3)" })).toBeVisible()
 })

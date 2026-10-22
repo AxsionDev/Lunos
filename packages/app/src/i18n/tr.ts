@@ -1392,7 +1392,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Sizi bekliyor ({{count}})",
   "sessions.monitor.section.running": "Çalışıyor ({{count}})",
   "sessions.monitor.section.completed": "Tamamlandı ({{count}})",
-  "sessions.monitor.section.failed": "Başarısız ({{count}})",
   "sessions.monitor.showOlder": "Eskileri göster ({{count}})",
   "sessions.monitor.hideOlder": "Eskileri gizle",
   "sessions.monitor.view.label": "Listeyi düzenle",

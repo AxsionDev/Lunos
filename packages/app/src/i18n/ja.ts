@@ -1300,7 +1300,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "あなたの対応待ち ({{count}})",
   "sessions.monitor.section.running": "実行中 ({{count}})",
   "sessions.monitor.section.completed": "完了 ({{count}})",
-  "sessions.monitor.section.failed": "失敗 ({{count}})",
   "sessions.monitor.showOlder": "古いものを表示 ({{count}})",
   "sessions.monitor.hideOlder": "古いものを隠す",
   "sessions.monitor.view.label": "一覧の並べ方",

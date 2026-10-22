@@ -1278,7 +1278,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "ກຳລັງລໍຖ້າທ່ານ ({{count}})",
   "sessions.monitor.section.running": "ກຳລັງເຮັດວຽກ ({{count}})",
   "sessions.monitor.section.completed": "ສຳເລັດແລ້ວ ({{count}})",
-  "sessions.monitor.section.failed": "ລົ້ມເຫຼວ ({{count}})",
   "sessions.monitor.showOlder": "ສະແດງອັນເກົ່າ ({{count}})",
   "sessions.monitor.hideOlder": "ເຊື່ອງອັນເກົ່າ",
   "sessions.monitor.view.label": "ຈັດລຽງລາຍການ",

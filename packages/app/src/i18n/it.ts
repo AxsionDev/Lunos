@@ -1313,7 +1313,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "In attesa di te ({{count}})",
   "sessions.monitor.section.running": "In esecuzione ({{count}})",
   "sessions.monitor.section.completed": "Completate ({{count}})",
-  "sessions.monitor.section.failed": "Non riuscite ({{count}})",
   "sessions.monitor.showOlder": "Mostra meno recenti ({{count}})",
   "sessions.monitor.hideOlder": "Nascondi meno recenti",
   "sessions.monitor.view.label": "Organizza l'elenco",

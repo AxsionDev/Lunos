@@ -45,9 +45,9 @@ function row(id: string, extra: Partial<SessionOverviewItem> = {}): SessionOverv
 }
 
 /**
- * Every kind of row, numbered in rail order: Waiting (1 here, 2 in another Lunos), Running (3 with
- * its subagent 4, 5 in another Lunos, 6 Claude Code), Completed (7 whose Lunos stopped mid-turn, 8),
- * Failed (9), and one completed two days ago behind "Show older".
+ * Every kind of row, numbered in rail order (XCOD-299): Working (1 with its subagent 2, 3 in another
+ * Lunos, 4 Claude Code), Waiting for action (5 here, 6 in another Lunos), Completed (7 failed first,
+ * then 8 whose Lunos stopped mid-turn, 9), and one completed two days ago behind "Show older".
  */
 const fixture = () => [
   row("w1", { state: "waiting", permissions: 1, updated: NOW - 1000 }),
@@ -335,6 +335,13 @@ async function mount(input: {
     app,
     frame,
     calls: input.server.calls,
+    /** Tells the monitor something changed, as the server's events do. */
+    poke: () =>
+      events.emit({
+        directory,
+        payload: { type: "session.status", properties: { sessionID: "w1", status: { type: "busy" } } },
+      } as never),
+    kv: () => Bun.file(path.join(state, "kv.json")).json(),
     toast: () => toast.currentToast?.message,
     async type(text: string) {
       await app.mockInput.typeText(text)
@@ -384,33 +391,36 @@ async function mount(input: {
 const monitor = (sessions = fixture()) => mount({ server: fakeServer({ sessions }), view: "monitor" })
 const posts = (ui: { calls: Call[] }, pattern: RegExp) => ui.calls.filter((call) => pattern.test(call.path))
 
-test("the rail: Waiting first with the ask, then Running, Completed and Failed, each counted and numbered", async () => {
+test("the rail: Working, Waiting for action with the ask, then Completed (failed first), each counted and numbered", async () => {
   const ui = await monitor()
   try {
     await wait(() => ui.frame().includes("approve: bash git push origin main"))
     const screen = ui.frame()
-    const order = ["Waiting for you (2)", "Running (3)", "Completed (2)", "Failed (1)", "Show older (1)"].map((text) =>
+    const order = ["▼ Working (4)", "▼ Waiting for action (2)", "▼ Completed (3)", "Show older (1)"].map((text) =>
       screen.indexOf(text),
     )
     expect(order.every((index) => index >= 0)).toBe(true)
     expect(order).toEqual(order.toSorted((a, b) => a - b))
-    // Numbered in rail order; the subagent sits under its parent, Running because it runs.
+    // Numbered in rail order; the subagent sits under its parent, in Working because it runs.
     for (const [n, id] of [
-      [1, "w1"],
-      [2, "p2"],
-      [3, "r1"],
-      [5, "e1"],
-      [7, "s1"],
-      [8, "f1"],
-      [9, "x1"],
+      [1, "r1"],
+      [3, "e1"],
+      [5, "w1"],
+      [6, "p2"],
+      [7, "x1"],
+      [8, "s1"],
+      [9, "f1"],
     ] as const)
       expect(screen).toMatch(new RegExp(`\\b${n} . title ${id}\\b`))
-    expect(screen).toMatch(/↳ 4 . title sub1/)
+    expect(screen).toMatch(/↳ 2 . title sub1/)
+    // Completed: the failed one first.
+    expect(screen.indexOf("title x1")).toBeLessThan(screen.indexOf("title s1"))
     // Another Lunos's ask comes from that Lunos.
     expect(screen).toContain("approve: edit src/a.ts")
     expect(screen).not.toContain("title old1")
     // NO_COLOR: the state glyph carries the meaning, not colour alone.
-    expect(screen).toMatch(/1 ! title w1/)
+    expect(screen).toMatch(/5 ! title w1/)
+    expect(screen).toMatch(/7 ✕ title x1/)
   } finally {
     await ui.cleanup()
   }
@@ -422,6 +432,8 @@ test("a / d answer the shown ask inline: here through the permission route, in a
     await wait(() => ui.frame().includes("approve: edit src/a.ts"))
     await ui.tab()
     await wait(() => ui.frame().includes("a approve · d deny"))
+    // From the first row (title r1) down across Working's rows and Waiting for action's header.
+    for (let i = 0; i < 5; i++) await ui.arrow("down")
     await ui.key("a")
     await wait(() => ui.calls.length === 1)
     expect(ui.calls[0]).toEqual({ path: "/permission/per_1/reply", body: { reply: "once" } })
@@ -449,7 +461,7 @@ test("an untagged prompt starts a session in the project, with the default agent
     })
     await wait(() => ui.frame().includes("New session"))
     expect(ui.frame()).toContain("Agent Monitor")
-    expect(ui.frame()).toContain("Running (4)")
+    expect(ui.frame()).toContain("Working (5)")
   } finally {
     await ui.cleanup()
   }
@@ -458,7 +470,7 @@ test("an untagged prompt starts a session in the project, with the default agent
 test("@n sends to session n; a running one queues it, and ctrl+enter interrupts and sends now", async () => {
   const ui = await monitor()
   try {
-    await ui.send("@3 run the tests")
+    await ui.send("@1 run the tests")
     await wait(() => ui.calls.length === 1)
     expect(ui.calls[0]).toEqual({
       path: "/experimental/session/r1/enqueue",
@@ -466,13 +478,13 @@ test("@n sends to session n; a running one queues it, and ctrl+enter interrupts 
     })
     await wait(() => ui.toast() === 'Queued for "title r1"')
 
-    await ui.type("@3 stop and fix the build")
+    await ui.type("@1 stop and fix the build")
     await ui.enter({ ctrl: true })
     await wait(() => ui.calls.length === 2)
     expect(ui.calls[1]!.body).toEqual({ text: "stop and fix the build", interrupt: true })
 
     // An idle session runs it now; an unknown number sends nothing.
-    await ui.send("@8 one more thing")
+    await ui.send("@9 one more thing")
     await wait(() => ui.calls.length === 3)
     expect(ui.calls[2]!.path).toBe("/experimental/session/f1/enqueue")
     await ui.send("@42 hello")
@@ -488,9 +500,9 @@ test("@ and a name autocompletes sessions; the pick becomes its number", async (
   try {
     // A space ends a mention, so a name is typed as one word: "@f1" for "title f1".
     await ui.type("@f1")
-    await wait(() => ui.frame().includes("@8 title f1"))
+    await wait(() => ui.frame().includes("@9 title f1"))
     await ui.enter()
-    await wait(() => ui.frame().includes("To: @8 title f1"))
+    await wait(() => ui.frame().includes("To: @9 title f1"))
     await ui.send("summarise it")
     await wait(() => ui.calls.length === 1)
     expect(ui.calls[0]).toEqual({
@@ -505,7 +517,7 @@ test("@ and a name autocompletes sessions; the pick becomes its number", async (
 test("tagging three sessions asks first; Esc sends nothing, confirming sends to each", async () => {
   const ui = await monitor()
   try {
-    await ui.send("@3 @8 @9 rebase on dev")
+    await ui.send("@1 @9 @7 rebase on dev")
     await wait(() => ui.frame().includes("Send to 3 sessions?"))
     await ui.escape()
     await Bun.sleep(100)
@@ -529,7 +541,7 @@ test("tagging three sessions asks first; Esc sends nothing, confirming sends to 
 test("a session another Lunos runs gets the prompt through peer.prompt, never enqueued here", async () => {
   const ui = await monitor()
   try {
-    await ui.send("@5 check the logs")
+    await ui.send("@3 check the logs")
     await wait(() => ui.calls.length === 1)
     expect(ui.calls[0]).toEqual({
       path: "/experimental/peer/e1/prompt",
@@ -545,7 +557,7 @@ test("a session another Lunos runs gets the prompt through peer.prompt, never en
 test("a session whose Lunos stopped asks to take it over first", async () => {
   const ui = await monitor()
   try {
-    await ui.send("@7 carry on")
+    await ui.send("@8 carry on")
     await wait(() => ui.frame().includes("Take over this session here?"))
     await ui.escape()
     await Bun.sleep(100)
@@ -624,6 +636,8 @@ test("XCOD-268: t takes over a closed Lunos's queued prompts with no new prompt;
       await ui.key("t")
       await Bun.sleep(100)
       expect(ui.frame()).not.toContain("Take over this session here?")
+      // Past Completed's header to its row.
+      await ui.arrow("down")
       await ui.arrow("down")
       await wait(() => ui.frame().includes("t take over"))
       await ui.key("t")
@@ -647,6 +661,7 @@ test("XCOD-268: t takes over a closed Lunos's queued prompts with no new prompt;
     await wait(() => ui.frame().includes("2 queued (owner closed)"))
     await ui.tab()
     await ui.arrow("down")
+    await ui.arrow("down")
     await wait(() => ui.frame().includes("t take over"))
     await ui.key("t")
     await wait(() => ui.frame().includes("closed with 2 prompts queued"))
@@ -661,18 +676,111 @@ test("XCOD-268: t takes over a closed Lunos's queued prompts with no new prompt;
 test("a prompt never approves a tool call: tagged to a session waiting on one, only the prompt is sent", async () => {
   const ui = await monitor()
   try {
-    await ui.send("@1 yes, go ahead")
+    await ui.send("@5 yes, go ahead")
     await wait(() => ui.calls.length === 1)
     expect(ui.calls[0]!.path).toBe("/experimental/session/w1/enqueue")
-    await ui.send("@2 yes, go ahead")
+    await ui.send("@6 yes, go ahead")
     await wait(() => ui.calls.length === 2)
     expect(ui.calls[1]!.path).toBe("/experimental/peer/p2/prompt")
     await Bun.sleep(100)
     expect(posts(ui, /permission/)).toHaveLength(0)
     // A Claude Code session with no Lunos session isn't sent anything from here.
-    await ui.send("@6 hi")
+    await ui.send("@4 hi")
     await wait(() => ui.toast()?.includes("open it to send it a prompt") === true)
     expect(ui.calls).toHaveLength(2)
+  } finally {
+    await ui.cleanup()
+  }
+})
+
+// XCOD-299: the three sub-sections, by keyboard.
+test("XCOD-299: ↑/↓ cross the sub-sections and their headers; Enter collapses one, kept in kv.json; s still stops", async () => {
+  const ui = await monitor()
+  try {
+    await wait(() => ui.frame().includes("approve: bash git push origin main"))
+    await ui.tab()
+    await wait(() => ui.frame().includes("↑↓ move · enter open"))
+    // Up from the first row is Working's header.
+    await ui.arrow("up")
+    await wait(() => ui.frame().includes("↑↓ move · enter collapse"))
+    await ui.enter()
+    await wait(() => ui.frame().includes("▶ Working (4) ◐ 4 running"))
+    expect(ui.frame()).not.toContain("title r1")
+    expect(ui.frame()).not.toContain("Highlighted: @1")
+    // Down from the collapsed header goes straight to Waiting for action.
+    await ui.arrow("down")
+    await ui.arrow("down")
+    await wait(() => ui.frame().includes("Highlighted: @5 title w1"))
+    // Down past Waiting for action's rows and Completed's header to its first row, then s stops it.
+    for (let i = 0; i < 3; i++) await ui.arrow("down")
+    await wait(() => ui.frame().includes("Highlighted: @7 title x1"))
+    await ui.arrow("up")
+    await ui.arrow("up")
+    await ui.arrow("up")
+    await ui.arrow("up")
+    await wait(() => ui.frame().includes("↑↓ move · enter collapse"))
+    await ui.arrow("down")
+    await wait(() => ui.frame().includes("Highlighted: @5 title w1"))
+    await ui.key("s")
+    await wait(() => ui.frame().includes("Stop this session?"))
+    await ui.enter()
+    await wait(() => posts(ui, /abort$/).length === 1)
+    expect(posts(ui, /abort$/)[0]!.path).toBe("/session/w1/abort")
+    await Bun.sleep(100)
+    expect((await ui.kv()).agent_monitor_groups).toEqual({ working: false })
+  } finally {
+    await ui.cleanup()
+  }
+})
+
+test("XCOD-299: a collapsed Waiting for action opens again when a new ask arrives", async () => {
+  const sessions = fixture()
+  const ui = await monitor(sessions)
+  try {
+    await wait(() => ui.frame().includes("approve: bash git push origin main"))
+    await ui.tab()
+    // r1, sub1, e1, cc, then Waiting for action's header.
+    for (let i = 0; i < 4; i++) await ui.arrow("down")
+    await wait(() => ui.frame().includes("↑↓ move · enter collapse"))
+    await ui.enter()
+    await wait(() => ui.frame().includes("▶ Waiting for action (2) ! 2 waiting"))
+    expect(ui.frame()).not.toContain("approve: bash git push origin main")
+    // An answered one doesn't open it.
+    sessions.splice(
+      sessions.findIndex((item) => item.id === "p2"),
+      1,
+    )
+    ui.poke()
+    await wait(() => ui.frame().includes("▶ Waiting for action (1)"))
+    // A new one does.
+    sessions.push(row("n1", { state: "waiting", questions: 1, updated: NOW }))
+    ui.poke()
+    await wait(() => ui.frame().includes("▼ Waiting for action (2)"))
+    expect(ui.frame()).toContain("approve: bash git push origin main")
+    await Bun.sleep(100)
+    expect((await ui.kv()).agent_monitor_groups ?? {}).toEqual({})
+  } finally {
+    await ui.cleanup()
+  }
+})
+
+test("XCOD-299: empty sub-sections show (0), collapsed, in their place", async () => {
+  const ui = await mount({
+    server: fakeServer({ sessions: [row("f1", { updated: NOW - 7000 })] }),
+    view: "monitor",
+    ready: (frame) => frame.includes("title f1"),
+  })
+  try {
+    const screen = ui.frame()
+    const order = ["▶ Working (0)", "▶ Waiting for action (0)", "▼ Completed (1)"].map((text) => screen.indexOf(text))
+    expect(order.every((index) => index >= 0)).toBe(true)
+    expect(order).toEqual(order.toSorted((a, b) => a - b))
+    // Enter on an empty header does nothing.
+    await ui.tab()
+    await ui.arrow("up")
+    await ui.arrow("up")
+    await ui.enter()
+    expect(ui.frame()).toContain("▶ Working (0)")
   } finally {
     await ui.cleanup()
   }
@@ -905,6 +1013,8 @@ test("XCOD-284: x on the rail deletes the selected session after the same confir
     await ui.tab()
     // (The rail's key hint is cut at this width; "x delete" is in it, after "s stop".)
     await wait(() => ui.frame().includes("↑↓ move · enter open"))
+    // Past Completed's header to its row.
+    await ui.arrow("down")
     await ui.arrow("down")
     await ui.key("x")
     await wait(() => text().includes(`Delete "title f1" (project alpha, 5 messages)? This can't be undone.`))

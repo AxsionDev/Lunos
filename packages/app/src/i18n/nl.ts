@@ -1301,7 +1301,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Wacht op jou ({{count}})",
   "sessions.monitor.section.running": "Actief ({{count}})",
   "sessions.monitor.section.completed": "Voltooid ({{count}})",
-  "sessions.monitor.section.failed": "Mislukt ({{count}})",
   "sessions.monitor.showOlder": "Oudere tonen ({{count}})",
   "sessions.monitor.hideOlder": "Oudere verbergen",
   "sessions.monitor.view.label": "Lijst ordenen",

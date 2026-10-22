@@ -325,9 +325,27 @@ groups are the same ones the desktop app's Sessions window and the web UI's `/se
 
 Type to search by name, project, state or group. **Enter** opens the selected session (a session
 waiting for approval opens at its prompt) or collapses and expands a group. `ctrl+o` moves a session
-to a group, `ctrl+g` creates a group, `ctrl+r` renames a session or group, `ctrl+d` (twice) deletes
-a group without touching its sessions, `ctrl+s` stops a running session and `ctrl+f` cycles the
-state filter.
+to a group or to another [project](#projects), `ctrl+g` creates a group, `ctrl+r` renames a session
+or group, `ctrl+d` (twice) deletes a group without touching its sessions, `ctrl+s` stops a running
+session and `ctrl+f` cycles the state filter.
+
+---
+
+### projects
+
+The project this folder counts in, and your named projects. A repository is a project with no setup;
+a named project counts several repositories or directories as one, for example "Axsion web" for
+`axsion-web`, `axsion-api` and `infra`. Named projects are kept on this computer only.
+
+```bash frame="none"
+/projects
+```
+
+**New project…** creates one, starting with this folder when it isn't in one yet. Enter on a project
+opens it: **Add a folder…** takes a path (`~/…`, `/…` or relative to this folder), Enter on a folder
+removes it after asking, and **Archive…** puts the project away (its folders count in their
+repositories' projects again; **Bring it back** undoes it). The same commands are in the shell as
+[`lunos project`](/docs/cli#project), and the named projects are listed in Settings › Projects.
 
 ---
 
@@ -481,6 +499,7 @@ they're sub-tabs (Tab / Shift+Tab or a click switches):
 | Section               | Sub-tabs                                                                |
 | --------------------- | ----------------------------------------------------------------------- |
 | Models & agents       | Models · Agents · Providers · External sessions                         |
+| Projects              | your named projects (they're kept on this computer, not in config)      |
 | Permissions           | Rules · Tools · Sandbox                                                 |
 | Residency & privacy   | Residency · Audit · Sharing                                             |
 | Memory                | Overview (status, guided setup, analytics) · Settings · Advanced        |

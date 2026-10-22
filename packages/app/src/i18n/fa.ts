@@ -1285,7 +1285,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "منتظر شما ({{count}})",
   "sessions.monitor.section.running": "در حال اجرا ({{count}})",
   "sessions.monitor.section.completed": "تکمیل‌شده ({{count}})",
-  "sessions.monitor.section.failed": "ناموفق ({{count}})",
   "sessions.monitor.showOlder": "نمایش قدیمی‌ترها ({{count}})",
   "sessions.monitor.hideOlder": "پنهان کردن قدیمی‌ترها",
   "sessions.monitor.view.label": "مرتب کردن فهرست",

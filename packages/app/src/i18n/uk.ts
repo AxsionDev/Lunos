@@ -1410,7 +1410,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Чекають на вас ({{count}})",
   "sessions.monitor.section.running": "Виконуються ({{count}})",
   "sessions.monitor.section.completed": "Завершені ({{count}})",
-  "sessions.monitor.section.failed": "Зі збоєм ({{count}})",
   "sessions.monitor.showOlder": "Показати старіші ({{count}})",
   "sessions.monitor.hideOlder": "Сховати старіші",
   "sessions.monitor.view.label": "Упорядкувати список",
