@@ -142,6 +142,33 @@ describe("Budget (XCOD-298)", () => {
   )
 })
 
+describe("accuracy record", () => {
+  it.instance("each root turn's estimate is recorded against what the turn cost", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionNs.Service
+      const session = yield* sessions.create({ title: "estimates" })
+      const group = yield* Effect.promise(() => ProjectGroup.create({ name: "Est", folders: [session.directory] }))
+      yield* Effect.promise(() => ProjectGroup.setBudget(group.id, { amount: 1000 }))
+      const guard = (recent: number[]) =>
+        Budget.guard({
+          session: { id: session.id },
+          directory: session.directory,
+          config: {},
+          start: true,
+          price: { input: 3, output: 15 },
+          model: "local/m",
+          turn: { recent, context: 10_000, cached: 0 },
+        })
+      yield* guard([0.1, 0.2, 0.3])
+      // The next turn starts: the last one cost 0.25.
+      yield* guard([0.1, 0.2, 0.3, 0.25])
+      const [entry] = yield* Effect.promise(() => BudgetState.accuracy())
+      expect(entry).toMatchObject({ session: session.id, model: "local/m", actual: 0.25 })
+      expect(entry!.low).toBeLessThanOrEqual(entry!.high)
+    }),
+  )
+})
+
 describe("BudgetPeriod", () => {
   test("monthly from a reset day, weekly from Monday, and total", () => {
     const at = new Date(2026, 9, 22, 12).getTime()

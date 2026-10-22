@@ -324,8 +324,10 @@ const layer = Layer.effect(
       // XCOD-241: tell the organisation's console this client started (once per process; the
       // switch is read from managed and global config, never a project's).
       if (CloudClientStart.wanted()) CloudClientStart.send({ managed: doc, locked, global: yield* cachedGlobal })
-      // XCOD-298: whether each step's cost goes to the console, from the same layers.
-      CloudCostReport.configure({ managed: doc, locked, global: yield* cachedGlobal })
+      // XCOD-298: whether each step's cost goes to the console, from the same layers. Only for a start
+      // bound to an organisation: nothing is ever sent without one.
+      if (ConfigOrgPolicy.startInfo()?.result.url)
+        CloudCostReport.configure({ managed: doc, locked, global: yield* cachedGlobal })
       return { layers, doc, locked }
     })
 

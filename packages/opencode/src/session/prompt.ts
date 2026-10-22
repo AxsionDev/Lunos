@@ -1193,6 +1193,7 @@ const layer = Layer.effect(
         config: cfg as Budget.Config,
         start: input.step === 1,
         price: input.model.cost,
+        model: `${input.model.providerID}/${input.model.id}`,
         turn: Budget.turnsOf(input.msgs),
       }).pipe(
         Effect.provideService(Database.Service, database),

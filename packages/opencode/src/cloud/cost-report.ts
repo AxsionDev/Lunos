@@ -1,5 +1,6 @@
 export * as CloudCostReport from "./cost-report"
 
+import { createHash } from "crypto"
 import { Offline } from "@opencode-ai/core/offline"
 import { ConfigOrgPolicy } from "@/config/org-policy"
 import { ConfigPolicy } from "@/config/policy"
@@ -14,8 +15,9 @@ import { CloudOrg } from "./org"
  *   Authorization: Bearer <the lunos login access token>
  *   { install_id, time, amount_usd, unknown_cost, model, project_id }
  *
- * `project_id` is the project's opaque id (a named project's `pgrp_…`, or the repository project's
- * id); `model` is `provider/model`. Nothing else: no prompt, code, output, file, path, title or user
+ * `project_id` is opaque: a named project's random `pgrp_…` id as it is, any other project's id
+ * (a repository's, or a plain folder's, which holds its path) as a SHA-256, so no path or commit
+ * leaves the computer and members' copies of one repository still add up. `model` is `provider/model`. Nothing else: no prompt, code, output, file, path, title or user
  * name. **Off by default.** It's on only when `cloud.cost_report` is true in managed or user config
  * (never a project's), this start is bound to an organisation (`cloud.policy`; never for a personal
  * account), the console answered the policy fetch, and Lunos isn't offline. Fire and forget, like
@@ -49,6 +51,17 @@ export function endpoint(policyURL: string | undefined) {
 
 export type Turn = { cost: number; model: string; project: string }
 
+/** The project id as reported: a `pgrp_…` id as it is, anything else hashed. */
+export function projectID(id: string) {
+  if (/^pgrp_[0-9a-f]+$/.test(id)) return id
+  return "sha256:" + createHash("sha256").update(id).digest("hex").slice(0, 32)
+}
+
+/** Whether reports go out at all in this process (so the budget guard can skip its lookups). */
+export function active() {
+  return !!settings && enabled(settings)
+}
+
 export type Payload = {
   install_id: string
   time: string
@@ -65,7 +78,7 @@ export function payload(turn: Turn, installID: string, now = Date.now()): Payloa
     amount_usd: Math.max(0, turn.cost),
     unknown_cost: !(turn.cost > 0),
     model: turn.model,
-    project_id: turn.project,
+    project_id: projectID(turn.project),
   }
 }
 

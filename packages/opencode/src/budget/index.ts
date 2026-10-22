@@ -11,6 +11,7 @@ import { BudgetSpend } from "./spend"
 import { BudgetEstimate } from "./estimate"
 import { BudgetState } from "./state"
 import { BudgetNotify } from "./notify"
+import { CloudCostReport } from "@/cloud/cost-report"
 
 // XCOD-298: project budgets. A project's budget is kept on this computer with the project
 // (`ProjectGroup.setBudget`); the organisation's comes from managed config, and counts only while
@@ -101,6 +102,7 @@ export function reset() {
   pending.length = 0
   approved.clear()
   warned.clear()
+  estimates.clear()
 }
 
 const load = Effect.fn("Budget.load")(function* (since: number, now: number, fresh: boolean) {
@@ -168,7 +170,9 @@ export const applicable = Effect.fn("Budget.applicable")(function* (where: Where
   const snapshot = yield* Effect.promise(() => ProjectGroup.snapshot())
   const org = organisation(config)
   let group: ProjectGroup.Info | undefined
-  if (where.session) {
+  // No budget anywhere and no cost report: nothing to look up.
+  const idle = !org && !Object.keys(snapshot.budgets).length && !CloudCostReport.active()
+  if (where.session && !idle) {
     const chain = yield* parents(where.session.id)
     const own = chain.get(where.session.id) ?? {
       id: where.session.id,
@@ -340,6 +344,8 @@ export type Decision =
 const approved = new Set<string>()
 /** Root sessions already warned this turn. */
 const warned = new Set<string>()
+/** The estimate shown before each root session's current turn (USD). */
+const estimates = new Map<string, { low: number; high: number; model?: string }>()
 
 export function approve(root: string) {
   approved.add(root)
@@ -373,6 +379,8 @@ export const guard = Effect.fn("Budget.guard")(function* (input: {
   config: Config | undefined
   start: boolean
   price?: BudgetEstimate.Price
+  /** "provider/model", for the accuracy record. */
+  model?: string
   turn: Turn
   now?: number
 }) {
@@ -407,6 +415,23 @@ export const guard = Effect.fn("Budget.guard")(function* (input: {
         `${item.project.name} has used ${Math.max(...fresh)}% of its ${item.period.label} budget (${money(item.spent, item.currency)} of ${money(item.amount, item.currency)})`,
       )
   }
+  // The accuracy record: the estimate shown before the root's last turn, against what it cost.
+  if (input.start && !input.session.parentID) {
+    const shown = estimates.get(root)
+    const actual = input.turn.recent.at(-1)
+    if (shown && actual !== undefined)
+      yield* Effect.promise(() =>
+        recordAccuracy({
+          time: Date.now(),
+          session: root,
+          model: shown.model,
+          low: shown.low,
+          high: shown.high,
+          actual,
+        }),
+      )
+    estimates.delete(root)
+  }
   const estimate = input.start
     ? BudgetEstimate.estimate({
         context: input.turn.context,
@@ -415,6 +440,8 @@ export const guard = Effect.fn("Budget.guard")(function* (input: {
         recent: input.turn.recent,
       })
     : undefined
+  if (estimate && input.start && !input.session.parentID)
+    estimates.set(root, { low: estimate.low, high: estimate.high, ...(input.model ? { model: input.model } : {}) })
   const reasons: { item: Status; message: string }[] = []
   for (const item of list) {
     const high = (estimate?.high ?? 0) * set.rate

@@ -91,6 +91,19 @@ describe("cloud.cost_report", () => {
       expect(reports()[0]!.body!).not.toContain(secret)
   })
 
+  test("a project id that holds a path or a commit is sent hashed, never as it is", async () => {
+    await ConfigOrgPolicy.resolve([{ cloud: { policy: url() } }], { token })
+    CloudCostReport.configure({ managed: { cloud: { policy: url(), cost_report: true } }, locked: [], global: {} })
+    const id = "global:" + path.join(os.homedir(), "x")
+    CloudCostReport.send({ ...turn, project: id }, { token })
+    await CloudCostReport.flush(5000)
+    const body = reports()[0]!.body!
+    expect(body).not.toContain(os.homedir())
+    expect(body).not.toContain(id)
+    expect(JSON.parse(body).project_id).toMatch(/^sha256:[0-9a-f]{32}$/)
+    expect(CloudCostReport.projectID("pgrp_0123abcd")).toBe("pgrp_0123abcd")
+  })
+
   test("nothing is sent by default, for a personal account (no organisation), or offline", async () => {
     // Default: off.
     await ConfigOrgPolicy.resolve([{ cloud: { policy: url() } }], { token })
