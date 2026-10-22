@@ -21,6 +21,18 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Turning the sandbox off now stays off.** Switching it off in `/settings` used to leave it on at
+  the next start whenever another config file still turned it on, and from inside a sandbox the
+  change only reached the sandbox's own copy of the config. It is now saved on this computer, in
+  every file that turns the sandbox on, and Lunos restarts without it; a restart that can't start
+  the sandbox no longer turns it back on. The setting shows what the next start will do and which
+  file decides it, and says why when your organisation or `sandbox.required` keeps it on. New
+  `lunos sandbox status` and `lunos sandbox off [--project|--user]` do the same from the command
+  line, without Docker or the TUI, so you can switch it off when Lunos can't start.
+  <!-- XCOD-297 -->
+
 ## [1.18.54] - 2026-10-22
 
 ### Added

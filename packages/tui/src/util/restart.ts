@@ -18,9 +18,9 @@ export type RestartRequest = {
   upgraded?: string
   /**
    * XCOD-281: "failed": the sandbox couldn't start, so start again without it. "retry": start again
-   * with it (Retry after a failure).
+   * with it (Retry after a failure). XCOD-297: "off": it was just turned off, so start without it.
    */
-  sandbox?: "failed" | "retry"
+  sandbox?: "failed" | "retry" | "off"
   /** XCOD-281: the draft was sent while the sandbox was starting, and waits to be sent. */
   queued?: boolean
 }
@@ -34,8 +34,11 @@ export type Restarted = {
   cancelled: string[]
   /** Set in attach mode: the server this client was attached to, which kept running. */
   attach?: string
-  /** XCOD-281: this start is without the sandbox because it just failed, or a Retry of it. */
-  sandbox?: { failed?: SandboxFailure; retry?: boolean }
+  /**
+   * XCOD-281: this start is without the sandbox because it just failed, or a Retry of it. XCOD-297:
+   * `off`: without it because it was just turned off.
+   */
+  sandbox?: { failed?: SandboxFailure; retry?: boolean; off?: boolean }
   /** XCOD-281: the draft was a prompt waiting for the sandbox: ask before sending it to the host. */
   queued?: boolean
 }

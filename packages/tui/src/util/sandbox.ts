@@ -30,6 +30,41 @@ export type SandboxState =
    */
   | { status: "off"; failure: SandboxFailure; announce?: boolean; queued?: boolean }
 
+/**
+ * XCOD-297: the sandbox setting as it really is on this computer: what the next start does, and
+ * the config layers that decide it. One answer for /settings, the badge and startup.
+ */
+export type SandboxSetting = {
+  /** Whether the next plain `lunos` start here uses the sandbox. */
+  on: boolean
+  /** Short, for the list: "on", "off", "off (after a failure)", "on (required)". */
+  display: string
+  /** One line saying why: "on · set in ~/repo/opencode.json (project)". */
+  detail: string
+  /** The highest layer that turns it on, and its file. */
+  layer?: "user" | "project" | "env" | "managed"
+  file?: string
+  /** Why it can't be turned off here (an organisation lock, sandbox.required), and who set it. */
+  fixed?: string
+  /** Who fixed it: the organisation (shown locked), or sandbox.required in a config file. */
+  fixedBy?: "managed" | "config"
+  /** Off only because it failed to start here (XCOD-281); the config still turns it on. */
+  disabled?: boolean
+}
+
+/** XCOD-297: a setting saved on this computer by the host, as PATCH /config/settings answers. */
+export type SandboxSaved =
+  | {
+      ok: true
+      key: string
+      value?: unknown
+      file: string
+      scope: "user" | "project"
+      restart: boolean
+      changed: boolean
+    }
+  | { ok: false; error: string }
+
 /** What the command that started the TUI offers for its sandbox. */
 export type SandboxHost = {
   state: () => SandboxState
@@ -40,6 +75,15 @@ export type SandboxHost = {
   reenable: () => void
   /** `lunos sandbox doctor`'s checks, as it prints them. */
   doctor: () => Promise<string>
+  /**
+   * XCOD-297: set while the TUI is attached to a sandboxed server. The server's /settings writes
+   * land in the container's copy of the config, which this computer never reads; `sandbox.*` is
+   * read here, at start-up, so it's read and written here, by this process.
+   */
+  settings?: {
+    sandbox: () => SandboxSetting
+    set: (input: { key: string; value: string; scope: "user" | "project"; unset?: boolean }) => Promise<SandboxSaved>
+  }
 }
 
 /** Whether prompts wait: the sandbox is still starting, or required and not running. */

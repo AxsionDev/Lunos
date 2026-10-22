@@ -64,7 +64,10 @@ const FLAG_OPTIONS = new Set(["--continue", "-c", "--fork", "--no-continue", "--
  * in any spelling (`--x v`, `--x=v`, `-s v`), then add `--session <id>` unless `--fresh`.
  * `--prompt` goes because the TUI would send it again.
  */
-export function relaunchArgs(args: readonly string[], input: { sessionID?: string; fresh: boolean }) {
+export function relaunchArgs(
+  args: readonly string[],
+  input: { sessionID?: string; fresh: boolean; sandboxOff?: boolean },
+) {
   const out: string[] = []
   // XCOD-128: `lunos settings` is the TUI opened on the settings screen; a restart from there
   // comes back to the session, not to the screen.
@@ -81,6 +84,8 @@ export function relaunchArgs(args: readonly string[], input: { sessionID?: strin
       continue
     }
     if (FLAG_OPTIONS.has(name)) continue
+    // XCOD-297: turned off in /settings; a `--sandbox` it was started with mustn't bring it back.
+    if (input.sandboxOff && name === "--sandbox") continue
     out.push(arg)
   }
   if (!input.fresh && input.sessionID) {
@@ -294,7 +299,7 @@ export async function relaunch(
     execPath: input.execPath ?? process.execPath,
     argv,
     execArgv: input.execArgv ?? process.execArgv,
-    args: relaunchArgs(argv.slice(2), request),
+    args: relaunchArgs(argv.slice(2), { ...request, sandboxOff: input.sandbox?.off }),
     upgraded: Boolean(request.upgraded),
     platform: deps.platform,
     which: (name) =>
