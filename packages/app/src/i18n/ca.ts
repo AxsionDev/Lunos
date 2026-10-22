@@ -1309,7 +1309,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Esperant-te ({{count}})",
   "sessions.monitor.section.running": "En execució ({{count}})",
   "sessions.monitor.section.completed": "Completades ({{count}})",
-  "sessions.monitor.section.failed": "Fallides ({{count}})",
   "sessions.monitor.showOlder": "Mostra les anteriors ({{count}})",
   "sessions.monitor.hideOlder": "Amaga les anteriors",
   "sessions.monitor.view.label": "Organitza la llista",

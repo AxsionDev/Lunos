@@ -1293,7 +1293,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "आपका इंतज़ार ({{count}})",
   "sessions.monitor.section.running": "चल रहे हैं ({{count}})",
   "sessions.monitor.section.completed": "पूरे हुए ({{count}})",
-  "sessions.monitor.section.failed": "विफल ({{count}})",
   "sessions.monitor.showOlder": "पुराने दिखाएँ ({{count}})",
   "sessions.monitor.hideOlder": "पुराने छिपाएँ",
   "sessions.monitor.view.label": "सूची व्यवस्थित करें",

@@ -1291,7 +1291,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "تہاڈی اڈیک وچ ({{count}})",
   "sessions.monitor.section.running": "چل رہے نیں ({{count}})",
   "sessions.monitor.section.completed": "مکمل ({{count}})",
-  "sessions.monitor.section.failed": "ناکام ({{count}})",
   "sessions.monitor.showOlder": "پرانے وکھاؤ ({{count}})",
   "sessions.monitor.hideOlder": "پرانے لکاؤ",
   "sessions.monitor.view.label": "لسٹ ترتیب دیو",

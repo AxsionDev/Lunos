@@ -1302,7 +1302,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Rád várnak ({{count}})",
   "sessions.monitor.section.running": "Futnak ({{count}})",
   "sessions.monitor.section.completed": "Befejezett ({{count}})",
-  "sessions.monitor.section.failed": "Sikertelen ({{count}})",
   "sessions.monitor.showOlder": "Régebbiek megjelenítése ({{count}})",
   "sessions.monitor.hideOlder": "Régebbiek elrejtése",
   "sessions.monitor.view.label": "Lista rendezése",

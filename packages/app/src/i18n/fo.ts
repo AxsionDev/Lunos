@@ -1284,7 +1284,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Bíða eftir tær ({{count}})",
   "sessions.monitor.section.running": "Koyra ({{count}})",
   "sessions.monitor.section.completed": "Lidnar ({{count}})",
-  "sessions.monitor.section.failed": "Miseydnaðust ({{count}})",
   "sessions.monitor.showOlder": "Vís eldri ({{count}})",
   "sessions.monitor.hideOlder": "Fjal eldri",
   "sessions.monitor.view.label": "Skipa listan",

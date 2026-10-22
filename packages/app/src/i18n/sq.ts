@@ -1292,7 +1292,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Ju presin ({{count}})",
   "sessions.monitor.section.running": "Në ekzekutim ({{count}})",
   "sessions.monitor.section.completed": "Të përfunduara ({{count}})",
-  "sessions.monitor.section.failed": "Të dështuara ({{count}})",
   "sessions.monitor.showOlder": "Shfaq më të vjetrat ({{count}})",
   "sessions.monitor.hideOlder": "Fshih më të vjetrat",
   "sessions.monitor.view.label": "Rendit listën",

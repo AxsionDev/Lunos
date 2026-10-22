@@ -1298,7 +1298,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Таныг хүлээж байна ({{count}})",
   "sessions.monitor.section.running": "Ажиллаж байна ({{count}})",
   "sessions.monitor.section.completed": "Дууссан ({{count}})",
-  "sessions.monitor.section.failed": "Амжилтгүй ({{count}})",
   "sessions.monitor.showOlder": "Хуучнуудыг харуулах ({{count}})",
   "sessions.monitor.hideOlder": "Хуучнуудыг нуух",
   "sessions.monitor.view.label": "Жагсаалтыг эрэмбэлэх",

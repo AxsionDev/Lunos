@@ -1302,7 +1302,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Чакат вас ({{count}})",
   "sessions.monitor.section.running": "Изпълняват се ({{count}})",
   "sessions.monitor.section.completed": "Завършени ({{count}})",
-  "sessions.monitor.section.failed": "Неуспешни ({{count}})",
   "sessions.monitor.showOlder": "Покажи по-старите ({{count}})",
   "sessions.monitor.hideOlder": "Скрий по-старите",
   "sessions.monitor.view.label": "Подреди списъка",

@@ -1335,7 +1335,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "En attente de vous ({{count}})",
   "sessions.monitor.section.running": "En cours ({{count}})",
   "sessions.monitor.section.completed": "Terminées ({{count}})",
-  "sessions.monitor.section.failed": "Échouées ({{count}})",
   "sessions.monitor.showOlder": "Afficher les plus anciennes ({{count}})",
   "sessions.monitor.hideOlder": "Masquer les plus anciennes",
   "sessions.monitor.view.label": "Organiser la liste",

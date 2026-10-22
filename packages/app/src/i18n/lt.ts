@@ -1316,7 +1316,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Laukia jūsų ({{count}})",
   "sessions.monitor.section.running": "Vykdomi ({{count}})",
   "sessions.monitor.section.completed": "Baigti ({{count}})",
-  "sessions.monitor.section.failed": "Nepavykę ({{count}})",
   "sessions.monitor.showOlder": "Rodyti senesnius ({{count}})",
   "sessions.monitor.hideOlder": "Slėpti senesnius",
   "sessions.monitor.view.label": "Tvarkyti sąrašą",

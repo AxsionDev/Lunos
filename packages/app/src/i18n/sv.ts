@@ -1290,7 +1290,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Väntar på dig ({{count}})",
   "sessions.monitor.section.running": "Körs ({{count}})",
   "sessions.monitor.section.completed": "Slutförda ({{count}})",
-  "sessions.monitor.section.failed": "Misslyckades ({{count}})",
   "sessions.monitor.showOlder": "Visa äldre ({{count}})",
   "sessions.monitor.hideOlder": "Dölj äldre",
   "sessions.monitor.view.label": "Ordna listan",

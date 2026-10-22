@@ -1302,7 +1302,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Čakajú na vás ({{count}})",
   "sessions.monitor.section.running": "Bežia ({{count}})",
   "sessions.monitor.section.completed": "Dokončené ({{count}})",
-  "sessions.monitor.section.failed": "Zlyhali ({{count}})",
   "sessions.monitor.showOlder": "Zobraziť staršie ({{count}})",
   "sessions.monitor.hideOlder": "Skryť staršie",
   "sessions.monitor.view.label": "Usporiadať zoznam",

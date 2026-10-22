@@ -1312,7 +1312,6 @@ export const dict: Record<string, string> = {
   "sessions.monitor.section.waiting": "ཁྱོད་ལུ་བསྒུག་དོ ({{count}})",
   "sessions.monitor.section.running": "གཡོག་བཀོལ་དོ ({{count}})",
   "sessions.monitor.section.completed": "མཇུག་བསྡུ་ཡོད ({{count}})",
-  "sessions.monitor.section.failed": "འཐུས་ཤོར ({{count}})",
   "sessions.monitor.showOlder": "རྙིངམ་ཚུ་སྟོན ({{count}})",
   "sessions.monitor.hideOlder": "རྙིངམ་ཚུ་སྦ",
   "sessions.monitor.view.label": "ཐོ་བཀོད་རིམ་སྒྲིག",

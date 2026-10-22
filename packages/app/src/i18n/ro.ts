@@ -1299,7 +1299,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Te așteaptă ({{count}})",
   "sessions.monitor.section.running": "În execuție ({{count}})",
   "sessions.monitor.section.completed": "Finalizate ({{count}})",
-  "sessions.monitor.section.failed": "Eșuate ({{count}})",
   "sessions.monitor.showOlder": "Arată mai vechi ({{count}})",
   "sessions.monitor.hideOlder": "Ascunde mai vechi",
   "sessions.monitor.view.label": "Aranjează lista",

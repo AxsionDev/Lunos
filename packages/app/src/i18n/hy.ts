@@ -1297,7 +1297,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Սպասում են ձեզ ({{count}})",
   "sessions.monitor.section.running": "Աշխատում են ({{count}})",
   "sessions.monitor.section.completed": "Ավարտված ({{count}})",
-  "sessions.monitor.section.failed": "Ձախողված ({{count}})",
   "sessions.monitor.showOlder": "Ցույց տալ ավելի հները ({{count}})",
   "sessions.monitor.hideOlder": "Թաքցնել ավելի հները",
   "sessions.monitor.view.label": "Դասավորել ցանկը",

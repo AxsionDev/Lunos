@@ -1281,7 +1281,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Ootavad sind ({{count}})",
   "sessions.monitor.section.running": "Töötavad ({{count}})",
   "sessions.monitor.section.completed": "Lõpetatud ({{count}})",
-  "sessions.monitor.section.failed": "Ebaõnnestunud ({{count}})",
   "sessions.monitor.showOlder": "Näita vanemaid ({{count}})",
   "sessions.monitor.hideOlder": "Peida vanemad",
   "sessions.monitor.view.label": "Korralda loendit",

@@ -1288,7 +1288,6 @@ export const dict: Record<string, string> = {
   "sessions.monitor.section.waiting": "तपाईंको प्रतीक्षामा ({{count}})",
   "sessions.monitor.section.running": "चलिरहेका ({{count}})",
   "sessions.monitor.section.completed": "पूरा भएका ({{count}})",
-  "sessions.monitor.section.failed": "असफल ({{count}})",
   "sessions.monitor.showOlder": "पुराना देखाउनुहोस् ({{count}})",
   "sessions.monitor.hideOlder": "पुराना लुकाउनुहोस्",
   "sessions.monitor.view.label": "सूची मिलाउनुहोस्",

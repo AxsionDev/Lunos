@@ -19,12 +19,13 @@ To stop ← opening it, set `"left_opens_monitor": false` in `tui.json`. `/monit
 
 ## The list of sessions
 
-The list shows the same sessions as [`/sessions`](/docs/tui#sessions): every project, every Lunos running on this computer, Claude Code and Codex sessions, and background subagents under the session that started them. It's in four sections, each with its count:
+The list shows the same sessions as [`/sessions`](/docs/tui#sessions): every project, every Lunos running on this computer, Claude Code and Codex sessions, and background subagents under the session that started them. It's in three sections, always in this order and each with its count, the same as the sidebar's Subagents section:
 
-1. **Waiting for you**: a session asking for approval or with a question. The row shows what it asks, for example `approve: bash git push origin main`.
-2. **Running**.
-3. **Completed**: finished or idle in the last 24 hours. Older ones are behind **Show older**.
-4. **Failed**.
+1. **Working**: running sessions.
+2. **Waiting for action**: a session asking for approval or with a question. The row shows what it asks, for example `approve: bash git push origin main`.
+3. **Completed**: failed ones first, then those finished or idle in the last 24 hours. Older ones are behind **Show older**.
+
+Click a section's header, or select it and press Enter, to collapse or expand it. A collapsed section says what it holds, for example `✕ 1 failed · ✓ 2 done`, and an empty one shows `(0)`, dimmed. Completed starts collapsed when it holds more than three. What you choose is remembered across restarts. Waiting for action opens itself again whenever a new ask arrives, so a waiting session is never hidden. A collapsed section's sessions keep their numbers, so `@n` still reaches them.
 
 Each row has a number, the title, the project, the agent (or Claude Code / Codex), a state symbol, the time since its last activity and its cost. The symbols are `!` waiting, `»` running, `○` idle, `✓` finished and `✕` failed, so the state is readable without colour (`NO_COLOR`). A row that starts waiting moves to the top and is highlighted for a moment. With reduced motion it isn't highlighted.
 
@@ -32,8 +33,8 @@ Press **Tab** to move between the prompt and the list. In the list:
 
 | Key   | Does                                                                         |
 | ----- | ---------------------------------------------------------------------------- |
-| ↑ ↓   | Move                                                                         |
-| Enter | Open the session                                                             |
+| ↑ ↓   | Move, across the sections and their headers                                  |
+| Enter | Open the session, or collapse or expand the selected section                 |
 | `a`   | Approve what the session asks (once)                                         |
 | `d`   | Deny it, or dismiss its question                                             |
 | `s`   | Stop the session, after you confirm                                          |
@@ -52,7 +53,7 @@ In a terminal narrower than 100 columns, the list takes the whole screen. Tab sw
 
 ## Starting a session
 
-Type a prompt with no tag and press Enter. A new session starts in this project with the current agent and model, and appears under Running. You stay in the monitor, ready for the next one. **Ctrl+P** picks another project from the ones in the list.
+Type a prompt with no tag and press Enter. A new session starts in this project with the current agent and model, and appears under Working. You stay in the monitor, ready for the next one. **Ctrl+P** picks another project from the ones in the list.
 
 ---
 
@@ -65,7 +66,7 @@ Numbers stay with their session while the monitor is open, even when the rows mo
 What happens to the prompt depends on the session:
 
 - **Idle or finished**: it runs as the session's next turn.
-- **Running**: it's queued, and sent when the current turn ends. The row shows how many prompts are queued. **Ctrl+Enter** stops the turn and sends it now, ahead of the queue. Ctrl+Enter needs a terminal that reports it separately from Enter (kitty, WezTerm, Ghostty, iTerm2 with CSI u). In others it is just Enter, and the prompt is queued.
+- **Working**: it's queued, and sent when the current turn ends. The row shows how many prompts are queued. **Ctrl+Enter** stops the turn and sends it now, ahead of the queue. Ctrl+Enter needs a terminal that reports it separately from Enter (kitty, WezTerm, Ghostty, iTerm2 with CSI u). In others it is just Enter, and the prompt is queued.
 - **Waiting for an answer to a question**: the prompt is the answer, when the question takes a typed answer.
 - **Waiting for an approval**: the prompt is queued. A prompt never approves or denies a tool call: press `a` or `d`.
 - **Run by another Lunos on this computer**: that Lunos receives it and runs it, with its own agent, permissions and organisation policy. A session is never run by two Lunos processes at once.

@@ -1303,7 +1303,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "Σας περιμένουν ({{count}})",
   "sessions.monitor.section.running": "Εκτελούνται ({{count}})",
   "sessions.monitor.section.completed": "Ολοκληρώθηκαν ({{count}})",
-  "sessions.monitor.section.failed": "Απέτυχαν ({{count}})",
   "sessions.monitor.showOlder": "Εμφάνιση παλαιότερων ({{count}})",
   "sessions.monitor.hideOlder": "Απόκρυψη παλαιότερων",
   "sessions.monitor.view.label": "Οργάνωση λίστας",

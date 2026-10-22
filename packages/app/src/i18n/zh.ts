@@ -1377,7 +1377,6 @@ export const dict = {
   "sessions.monitor.section.waiting": "等待你处理 ({{count}})",
   "sessions.monitor.section.running": "运行中 ({{count}})",
   "sessions.monitor.section.completed": "已完成 ({{count}})",
-  "sessions.monitor.section.failed": "失败 ({{count}})",
   "sessions.monitor.showOlder": "显示更早的 ({{count}})",
   "sessions.monitor.hideOlder": "隐藏更早的",
   "sessions.monitor.view.label": "排列列表",

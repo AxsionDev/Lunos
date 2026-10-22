@@ -1280,7 +1280,6 @@ export const dict: Record<string, string> = {
   "sessions.monitor.section.waiting": "আপনার অপেক্ষায় ({{count}})",
   "sessions.monitor.section.running": "চলছে ({{count}})",
   "sessions.monitor.section.completed": "সম্পন্ন ({{count}})",
-  "sessions.monitor.section.failed": "ব্যর্থ ({{count}})",
   "sessions.monitor.showOlder": "পুরনোগুলো দেখান ({{count}})",
   "sessions.monitor.hideOlder": "পুরনোগুলো লুকান",
   "sessions.monitor.view.label": "তালিকা সাজান",

@@ -354,6 +354,8 @@ export type SubagentEntry = {
   started?: number
   /** When it ended (ms), for a foreground call. */
   ended?: number
+  /** Why it failed, for a failed one (XCOD-299). */
+  error?: string
 }
 
 /** What the TUI knows about a subagent's own session. */
@@ -374,6 +376,7 @@ type TaskLikePart = {
     input?: Record<string, unknown>
     metadata?: Record<string, unknown>
     time?: { start?: number; end?: number }
+    error?: unknown
   }
 }
 
@@ -421,6 +424,7 @@ export function subagentsOf(parts: readonly TaskLikePart[], child: (sessionID: s
       model: modelOf(part.state.metadata?.model),
       started: part.state.time?.start,
       ended: background ? undefined : part.state.time?.end,
+      error: state === "failed" ? text(part.state.error) : undefined,
     }
     // Resuming a subagent (task_id) calls the tool again on the same session: keep its place, take
     // the newest call's state.
