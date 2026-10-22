@@ -10,6 +10,7 @@ import { usePluginRuntime } from "../../plugin/runtime"
 import { getScrollAcceleration } from "../../util/scroll"
 import { WorkspaceLabel } from "../../component/workspace-label"
 import { bridgeLine, EXTERNAL_BADGE, externalAccent, externalOf } from "../../util/external"
+import { BudgetMeter } from "../../component/budget-meter"
 
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const pluginRuntime = usePluginRuntime()
@@ -126,6 +127,8 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                 </Show>
               </box>
             </pluginRuntime.Slot>
+            {/* XCOD-298: the project's budget, live. */}
+            <BudgetMeter sessionID={props.sessionID} />
             <pluginRuntime.Slot name="sidebar_content" session_id={props.sessionID} />
           </box>
         </scrollbox>

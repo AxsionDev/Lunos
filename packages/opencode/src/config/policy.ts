@@ -54,6 +54,8 @@ export const KNOWN = [
   "cloud.endpoint",
   "cloud.policy",
   "cloud.client_start",
+  // XCOD-298: per-step cost reports to the console (off by default).
+  "cloud.cost_report",
   // XCOD-273: whether the TUI needs a Lunos account. Only managed config sets it, so a lock only
   // makes that explicit.
   "auth",

@@ -47,6 +47,8 @@ import type {
   ExperimentalBackgroundCancelResponses,
   ExperimentalBackgroundListErrors,
   ExperimentalBackgroundListResponses,
+  ExperimentalBudgetStatusErrors,
+  ExperimentalBudgetStatusResponses,
   ExperimentalCapabilitiesGetErrors,
   ExperimentalCapabilitiesGetResponses,
   ExperimentalConsoleGetErrors,
@@ -1746,6 +1748,44 @@ export class SessionGroup extends HeyApiClient {
   }
 }
 
+export class Budget extends HeyApiClient {
+  /**
+   * Budget status
+   *
+   * Where the budgets of this directory's (or the session's) project stand, and, for a session, the estimate of its next turn as the prompt shows it.
+   */
+  public status<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalBudgetStatusResponses,
+      ExperimentalBudgetStatusErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/budget",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class ProjectGroup extends HeyApiClient {
   /**
    * List projects
@@ -2965,6 +3005,11 @@ export class Experimental extends HeyApiClient {
   private _sessionGroup?: SessionGroup
   get sessionGroup(): SessionGroup {
     return (this._sessionGroup ??= new SessionGroup({ client: this.client }))
+  }
+
+  private _budget?: Budget
+  get budget(): Budget {
+    return (this._budget ??= new Budget({ client: this.client }))
   }
 
   private _projectGroup?: ProjectGroup

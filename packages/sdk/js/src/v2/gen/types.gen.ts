@@ -1767,6 +1767,32 @@ export type MemoryConfig = {
   templates?: MemoryTemplatesConfig
 }
 
+export type BudgetLimit = {
+  amount: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  period?: "monthly" | "weekly" | "total"
+  reset_day?: number
+  /**
+   * Most one session may spend, its subagents included, in budget.currency
+   */
+  per_session?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  /**
+   * Most the project may spend in one day, in budget.currency
+   */
+  per_day?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  on_limit?: "warn" | "ask" | "stop"
+}
+
+export type BudgetConfig = {
+  on_limit?: "warn" | "ask" | "stop"
+  thresholds?: Array<number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN">
+  currency?: "EUR" | "USD"
+  /**
+   * With budget.currency "EUR": what 1 USD is in EUR, for model prices (which are in USD). A fixed rate you set; Lunos never fetches one. Default 0.9
+   */
+  usd_rate?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  organisation?: BudgetLimit
+}
+
 export type LogConfig = {
   /**
    * Days a failed run's log is kept, beyond the newest 10 runs. Default 14
@@ -1825,6 +1851,7 @@ export type CloudConfig = {
   endpoint?: string
   policy?: string
   client_start?: boolean
+  cost_report?: boolean
   auto_team?: boolean
 }
 
@@ -2156,6 +2183,7 @@ export type Config = {
     }
   }
   memory?: MemoryConfig
+  budget?: BudgetConfig
   sandbox?: {
     enabled?: boolean
     required?: boolean
@@ -2835,6 +2863,34 @@ export type NotFoundError = {
   data: {
     message: string
   }
+}
+
+export type BudgetStatusItem = {
+  id: string
+  scope: "project" | "organisation"
+  name: string
+  locked: boolean
+  currency: "EUR" | "USD"
+  amount: number
+  spent: number
+  remaining: number
+  percent: number
+  unknown: number
+  forecast?: number
+  on_limit: "warn" | "ask" | "stop"
+  period: {
+    key: string
+    label: string
+  }
+}
+
+export type BudgetStatus = {
+  project: {
+    id: string
+    name: string
+  }
+  budgets: Array<BudgetStatusItem>
+  line: string
 }
 
 export type ProjectGroup = {
@@ -9792,6 +9848,36 @@ export type ExperimentalSessionGroupUpdateResponses = {
 
 export type ExperimentalSessionGroupUpdateResponse =
   ExperimentalSessionGroupUpdateResponses[keyof ExperimentalSessionGroupUpdateResponses]
+
+export type ExperimentalBudgetStatusData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    sessionID?: string
+  }
+  url: "/experimental/budget"
+}
+
+export type ExperimentalBudgetStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalBudgetStatusError = ExperimentalBudgetStatusErrors[keyof ExperimentalBudgetStatusErrors]
+
+export type ExperimentalBudgetStatusResponses = {
+  /**
+   * Budget status
+   */
+  200: BudgetStatus
+}
+
+export type ExperimentalBudgetStatusResponse =
+  ExperimentalBudgetStatusResponses[keyof ExperimentalBudgetStatusResponses]
 
 export type ExperimentalProjectGroupListData = {
   body?: never

@@ -10,6 +10,7 @@ import { BudgetPeriod } from "./period"
 import { BudgetSpend } from "./spend"
 import { BudgetEstimate } from "./estimate"
 import { BudgetState } from "./state"
+import { BudgetNotify } from "./notify"
 
 // XCOD-298: project budgets. A project's budget is kept on this computer with the project
 // (`ProjectGroup.setBudget`); the organisation's comes from managed config, and counts only while
@@ -156,6 +157,12 @@ const parents = Effect.fn("Budget.parents")(function* (sessionID: string) {
   return chain
 })
 
+/** The project each session counted in at its last check, for the console's cost report. */
+const sessionProjects = new Map<string, string>()
+export function projectOf(sessionID: string) {
+  return sessionProjects.get(sessionID)
+}
+
 /** The project a directory (or session) counts in, and the budgets that apply to it. */
 export const applicable = Effect.fn("Budget.applicable")(function* (where: Where, config: Config | undefined) {
   const snapshot = yield* Effect.promise(() => ProjectGroup.snapshot())
@@ -174,6 +181,10 @@ export const applicable = Effect.fn("Budget.applicable")(function* (where: Where
     })
   } else group = snapshot.resolve(where.directory, where.project)
   group ??= ProjectGroup.implicit(where.directory, where.project ?? { id: "global", worktree: "/" })
+  if (where.session) {
+    sessionProjects.set(where.session.id, group.id)
+    if (sessionProjects.size > 5000) sessionProjects.delete(sessionProjects.keys().next().value!)
+  }
   const list: { id: string; scope: Status["scope"]; budget: ConfigBudget.Budget; locked: boolean }[] = []
   const own = snapshot.budgets[group.id]
   if (own) list.push({ id: `project:${group.id}`, scope: "project", budget: own, locked: false })
@@ -381,6 +392,16 @@ export const guard = Effect.fn("Budget.guard")(function* (input: {
   for (const item of list) {
     const crossed = set.thresholds.filter((value) => item.percent >= value)
     const fresh = yield* Effect.promise(() => BudgetState.claim(item.id, item.period.key, crossed))
+    for (const threshold of fresh)
+      BudgetNotify.notify({
+        budget: item.id,
+        project: item.project.name,
+        threshold,
+        period: item.period.label,
+        spent: item.spent,
+        amount: item.amount,
+        currency: item.currency,
+      })
     if (fresh.length)
       toasts.push(
         `${item.project.name} has used ${Math.max(...fresh)}% of its ${item.period.label} budget (${money(item.spent, item.currency)} of ${money(item.amount, item.currency)})`,

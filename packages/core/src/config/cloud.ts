@@ -33,6 +33,11 @@ export const Info = Schema.Struct({
     description:
       "Tell your organisation's Lunos console (cloud.policy) when Lunos starts: version, OS, architecture, surface, a random install id and the policy in effect (default true). Read from managed and user config only; your organisation can lock it on",
   }),
+  // XCOD-298: off by default; read from managed and global (user) config, not a project's.
+  cost_report: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      "Report each model step's cost to your organisation's Lunos console (cloud.policy), so it can add up organisation project budgets: the amount, the model and the project's id, never content (default false). Read from managed and user config only; never sent for a personal account",
+  }),
   // XCOD-242: read from managed config only. Without managed cloud.policy, a sign-in to Lunos's own
   // identity provider turns on team features for the account's hosted organisation.
   auto_team: Schema.Boolean.pipe(Schema.optional).annotate({

@@ -30,6 +30,17 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   in the project of their folder, subagents in their parent's, and `/sessions` can move one to
   another project. Named projects are kept on this computer only.
   <!-- XCOD-298 -->
+- **Project budgets.** Give a project a budget (`lunos budget set "Axsion web" 50`): monthly from a
+  day you choose, weekly or one total, with optional per-session and per-day caps, in EUR by default.
+  Every model step counts, subagents, `lunos run` and scheduled agents included; a model without a
+  price shows as "unknown cost", never €0. Before each turn the prompt shows its estimate against
+  what's left ("est. €0.08–0.30 · €12.40 left of €50.00 (Oct)") and the sidebar shows the meter. At
+  the limit Lunos warns, asks (the default: run anyway, use a cheaper model, or stop) or stops, as
+  `budget.on_limit` says; a running step always finishes. Thresholds alert once per period. In CI and
+  unattended runs, a budget stops the run with exit code 3. `lunos budget status --json`,
+  `lunos budget export` (CSV) and `lunos stats --project <name> --json` report it. An organisation
+  can set a budget in managed config that members can't raise.
+  <!-- XCOD-298 -->
 
 ### Fixed
 

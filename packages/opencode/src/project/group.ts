@@ -1,6 +1,7 @@
 export * as ProjectGroup from "./group"
 
 import crypto from "node:crypto"
+import fs from "node:fs"
 import fsp from "node:fs/promises"
 import path from "node:path"
 import { Global } from "@opencode-ai/core/global"
@@ -82,6 +83,16 @@ const GLOBAL = "global"
 export const file = () => path.join(Global.Path.data, "project-groups.json")
 
 const empty = (): State => ({ version: 1, groups: [], sessions: {}, budgets: {} })
+
+/** A folder as stored: absolute, and its real path when it exists (the server sees real paths). */
+const stored = (folder: string) => {
+  const value = clean(folder)
+  try {
+    return clean(fs.realpathSync(value))
+  } catch {
+    return value
+  }
+}
 
 const clean = (folder: string) => {
   const value = path.resolve(folder)
@@ -305,7 +316,7 @@ export async function moves(): Promise<Record<string, string>> {
 
 export async function create(input: { name: string; folders?: string[] }): Promise<Info> {
   const name = cleanName(input.name)
-  const folders = [...new Set((input.folders ?? []).map(clean))]
+  const folders = [...new Set((input.folders ?? []).map(stored))]
   return update((state) => {
     if (state.groups.some((group) => !group.archived && group.name.toLowerCase() === name.toLowerCase()))
       throw new InvalidError(`There is already a project named "${name}"`)
@@ -338,7 +349,7 @@ export async function rename(id: string, name: string): Promise<Info> {
 
 /** Adds folders (absolute or relative to the working directory). Ones already in it are skipped. */
 export async function add(id: string, folders: string[]): Promise<Info> {
-  const wanted = [...new Set(folders.map(clean))]
+  const wanted = [...new Set(folders.map(stored))]
   if (!wanted.length) throw new InvalidError("Name a folder to add")
   return update((state) => {
     const group = find(state, id)
@@ -351,13 +362,14 @@ export async function add(id: string, folders: string[]): Promise<Info> {
 }
 
 export async function remove(id: string, folders: string[]): Promise<Info> {
-  const unwanted = new Set(folders.map(clean))
-  if (!unwanted.size) throw new InvalidError("Name a folder to remove")
+  // As typed, or as stored (its real path).
+  const wanted = folders.map((folder) => new Set([clean(folder), stored(folder)]))
+  if (!wanted.length) throw new InvalidError("Name a folder to remove")
   return update((state) => {
     const group = find(state, id)
-    const missing = [...unwanted].filter((folder) => !group.folders.some((item) => clean(item) === folder))
+    const missing = folders.filter((_, index) => !group.folders.some((item) => wanted[index]!.has(clean(item))))
     if (missing.length) throw new InvalidError(`${missing.join(", ")} isn't in the project "${group.name}"`)
-    group.folders = group.folders.filter((item) => !unwanted.has(clean(item)))
+    group.folders = group.folders.filter((item) => !wanted.some((set) => set.has(clean(item))))
     group.time.updated = Date.now()
     return copy(group)
   })

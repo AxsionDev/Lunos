@@ -162,6 +162,46 @@ describe("project budgets (lunos run)", () => {
       }),
     180_000,
   )
-})
 
-void STEP_USD
+  cliIt.live(
+    "an earlier run's spend counts, from the database: the next run starts no step and says why",
+    ({ opencode, home, llm }) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => fs.writeFile(path.join(home, "notes.txt"), "hello\n"))
+        yield* Effect.promise(() => project(home, { amount: 3, on_limit: "warn" }))
+        // One database for both runs, as on a real computer.
+        const env = {
+          OPENCODE_CONFIG_CONTENT: JSON.stringify(config(llm.url)),
+          OPENCODE_DB: path.join(home, "budget.db"),
+        }
+        for (const item of steps(home, 2)) yield* llm.push(item)
+        yield* llm.text("done", { usage: { input: 10, output: 10 } })
+        const first = yield* opencode.spawn(run, { env })
+        expect(first.exitCode, first.stderr.slice(-2000)).toBe(0)
+
+        yield* Effect.promise(() => project(home, { amount: 3, on_limit: "stop" }))
+        const before = yield* llm.calls
+        for (const item of steps(home, 2)) yield* llm.push(item)
+        const second = yield* opencode.spawn(run, { env })
+        expect(second.exitCode, second.stderr.slice(-2000)).toBe(3)
+        expect(second.stderr).toContain("Axsion web has used its")
+        // At most the title: no step of this run started.
+        expect((yield* llm.calls) - before).toBeLessThanOrEqual(1)
+
+        // `lunos budget status --json` agrees, and the CSV has the first run's turns.
+        const status = yield* opencode.spawn(["budget", "status", "--json"], { env })
+        expect(status.exitCode, status.stderr.slice(-2000)).toBe(0)
+        const parsed = JSON.parse(status.stdout)
+        expect(parsed.project).toEqual({ id: "pgrp_budgettest", name: "Axsion web" })
+        expect(parsed.budgets[0]).toMatchObject({ amount: 3, currency: "EUR", on_limit: "stop" })
+        expect(parsed.budgets[0].spent).toBeGreaterThanOrEqual(3.6)
+        const exported = yield* opencode.spawn(["budget", "export"], { env })
+        expect(exported.exitCode, exported.stderr.slice(-2000)).toBe(0)
+        const rows = exported.stdout.trim().split("\n")
+        expect(rows[0]).toBe("time,project,session,title,subagent,model,agent,cost_eur,cost_usd,unknown_cost")
+        expect(rows.filter((row) => row.includes(",test/test-model,")).length).toBeGreaterThanOrEqual(2)
+        expect(rows.some((row) => row.endsWith(",1.800000,2.000000,false"))).toBe(true)
+      }),
+    180_000,
+  )
+})

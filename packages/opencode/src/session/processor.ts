@@ -27,6 +27,7 @@ import { Database } from "@opencode-ai/core/database/database"
 import { Usage, type LLMEvent } from "@opencode-ai/llm"
 import { RunBudget } from "@/agent/run-budget"
 import { Budget } from "@/budget"
+import { CloudCostReport } from "@/cloud/cost-report"
 
 const DOOM_LOOP_THRESHOLD = 3
 export type Result = "compact" | "stop" | "continue"
@@ -461,6 +462,12 @@ const layer = Layer.effect(
             RunBudget.spend(usage.cost)
             // XCOD-298: counted against the project's budget at the next step, before the database is re-read.
             Budget.spent(ctx.assistantMessage.sessionID, usage.cost)
+            // XCOD-298: to the organisation's console, only when cloud.cost_report is on (off by default).
+            CloudCostReport.send({
+              cost: usage.cost,
+              model: `${ctx.model.providerID}/${ctx.model.id}`,
+              project: Budget.projectOf(ctx.assistantMessage.sessionID) ?? "unknown",
+            })
             ctx.assistantMessage.tokens = usage.tokens
             yield* session.updatePart({
               id: PartID.ascending(),

@@ -38,6 +38,7 @@ import { useRoute } from "../../context/route"
 import { useProject } from "../../context/project"
 import { useSync } from "../../context/sync"
 import { useEvent } from "../../context/event"
+import { useBudget } from "../budget-meter"
 import { editorSelectionKey, useEditorContext, type EditorSelection } from "../../context/editor"
 import { normalizePromptContent, openEditor } from "../../editor"
 import { EXIT_WORDS, exitIntent, useExternalExit } from "../external-exit"
@@ -334,6 +335,8 @@ export function Prompt(props: PromptProps) {
     return messages.findLast((m): m is UserMessage => m.role === "user")
   })
 
+  // XCOD-298: the next turn's estimate against what's left of the project's budget.
+  const budget = useBudget(() => props.sessionID)
   const usage = createMemo(() => {
     if (!props.sessionID) return
     const session = sync.session.get(props.sessionID)
@@ -2339,7 +2342,7 @@ export function Prompt(props: PromptProps) {
                     <Match when={usage()}>
                       {(item) => (
                         <text fg={theme.textMuted} wrapMode="none">
-                          {[item().context, item().cost].filter(Boolean).join(" · ")}
+                          {[item().context, item().cost, budget()?.line].filter(Boolean).join(" · ")}
                         </text>
                       )}
                     </Match>
