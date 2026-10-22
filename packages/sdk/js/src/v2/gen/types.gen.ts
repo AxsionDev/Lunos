@@ -2190,6 +2190,79 @@ export type Config = {
   references?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal
   }
+  resources?: {
+    entries?: {
+      [key: string]:
+        | {
+            /**
+             * A file or folder on this computer. In a project's config it must be inside the project: anything else is a personal resource
+             */
+            path: string
+            include?: Array<string>
+            exclude?: Array<string>
+            description?: string
+            /**
+             * "always": in every session's context, within resources.always_tokens. "search" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. "on_demand": only when a prompt mentions @name
+             */
+            mode?: "always" | "search" | "on_demand"
+          }
+        | {
+            /**
+             * A web page or docs site (http or https)
+             */
+            url: string
+            depth?: 0 | 1 | 2
+            description?: string
+            /**
+             * "always": in every session's context, within resources.always_tokens. "search" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. "on_demand": only when a prompt mentions @name
+             */
+            mode?: "always" | "search" | "on_demand"
+          }
+        | {
+            /**
+             * A git repository URL, cloned on this computer
+             */
+            repository: string
+            branch?: string
+            include?: Array<string>
+            exclude?: Array<string>
+            description?: string
+            /**
+             * "always": in every session's context, within resources.always_tokens. "search" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. "on_demand": only when a prompt mentions @name
+             */
+            mode?: "always" | "search" | "on_demand"
+          }
+        | {
+            /**
+             * A connected MCP server's name
+             */
+            server: string
+            /**
+             * The resource's URI on that server
+             */
+            uri: string
+            description?: string
+            /**
+             * "always": in every session's context, within resources.always_tokens. "search" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. "on_demand": only when a prompt mentions @name
+             */
+            mode?: "always" | "search" | "on_demand"
+          }
+    }
+    always_tokens?: number
+    /**
+     * Largest a single resource may be. Default 50
+     */
+    max_resource_mb?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    /**
+     * Largest the project's resource index may grow. Default 1024
+     */
+    max_index_mb?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    /**
+     * How often web, git and MCP resources are fetched again. Default 24
+     */
+    refresh_hours?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    web?: boolean
+  }
   reference?: {
     [key: string]: string | ConfigV2ReferenceGit | ConfigV2ReferenceLocal
   }
@@ -3650,6 +3723,47 @@ export type MemorySetupCheckResult = {
   model?: string
   log?: string
   diagnostics?: string
+}
+
+export type ResourceItem = {
+  name: string
+  kind: "path" | "url" | "git" | "mcp" | "reference"
+  mode: "always" | "search" | "on_demand"
+  scope: "shared" | "personal" | "user" | "organisation"
+  description?: string
+  target: string
+  readOnly: boolean
+  trusted: boolean
+  excluded: boolean
+  problem?: string
+  /**
+   * e.g. "indexed 2 h ago · 143 chunks"
+   */
+  state: string
+  tokens?: number
+  chunks?: number
+  indexedAt?: number
+  error?: string
+}
+
+export type ResourceContext = {
+  time: number
+  system: number
+  instructions: number
+  always: number
+  memory: number
+  attachments: number
+  searched: number
+  mentioned: number
+  resources: Array<{
+    name: string
+    tokens: number
+  }>
+  dropped: Array<{
+    name: string
+    tokens: number
+    reason: string
+  }>
 }
 
 export type PermissionNotFoundError = {
@@ -12696,6 +12810,96 @@ export type MemoryForgetResponses = {
 }
 
 export type MemoryForgetResponse = MemoryForgetResponses[keyof MemoryForgetResponses]
+
+export type ResourceListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    sessionID?: string
+  }
+  url: "/resource"
+}
+
+export type ResourceListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ResourceListError = ResourceListErrors[keyof ResourceListErrors]
+
+export type ResourceListResponses = {
+  /**
+   * The project's resources
+   */
+  200: Array<ResourceItem>
+}
+
+export type ResourceListResponse = ResourceListResponses[keyof ResourceListResponses]
+
+export type ResourceExcludeData = {
+  body?: {
+    sessionID: string
+    name: string
+    excluded: boolean
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/resource/exclude"
+}
+
+export type ResourceExcludeErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ResourceExcludeError = ResourceExcludeErrors[keyof ResourceExcludeErrors]
+
+export type ResourceExcludeResponses = {
+  /**
+   * Whether the resource is now excluded
+   */
+  200: boolean
+}
+
+export type ResourceExcludeResponse = ResourceExcludeResponses[keyof ResourceExcludeResponses]
+
+export type ResourceContextData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    workspace?: string
+    sessionID: string
+  }
+  url: "/resource/context"
+}
+
+export type ResourceContextErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ResourceContextError = ResourceContextErrors[keyof ResourceContextErrors]
+
+export type ResourceContextResponses = {
+  /**
+   * The last turn's context, in tokens
+   */
+  200: ResourceContext
+}
+
+export type ResourceContextResponse = ResourceContextResponses[keyof ResourceContextResponses]
 
 export type PermissionListData = {
   body?: never

@@ -98,6 +98,8 @@ import { providerHandlers } from "./handlers/provider"
 import { ptyConnectHandlers, ptyHandlers } from "./handlers/pty"
 import { questionHandlers } from "./handlers/question"
 import { memoryHandlers } from "./handlers/memory"
+import { resourceHandlers } from "./handlers/resource"
+import { Resource } from "@/resource"
 import { sessionHandlers } from "./handlers/session"
 import { syncHandlers } from "./handlers/sync"
 import { tuiHandlers } from "./handlers/tui"
@@ -165,6 +167,7 @@ const instanceApiRoutes = HttpApiBuilder.layer(InstanceHttpApi).pipe(
     ptyHandlers,
     questionHandlers,
     memoryHandlers,
+    resourceHandlers,
     permissionHandlers,
     providerHandlers,
     sessionHandlers,
@@ -233,6 +236,7 @@ const app = LayerNode.group([
   Discovery.node,
   Question.node,
   Memory.node,
+  Resource.node,
   Permission.node,
   PermissionSaved.node,
   Todo.node,

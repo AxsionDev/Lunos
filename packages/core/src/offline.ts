@@ -132,6 +132,14 @@ export const CALLS: Call[] = [
     offline: "tool",
   },
   {
+    id: "resources",
+    what: "Project resources: web pages and git repositories (XCOD-300)",
+    hosts: "the URLs and repositories in `resources.entries`",
+    when: "when one is added or used, then every `resources.refresh_hours` (default 24)",
+    offline: "blocked",
+    alsoOffBy: "`resources.web: false` (web pages), or a `permission.webfetch` rule that denies the URL",
+  },
+  {
     id: "websearch",
     what: "`websearch` tool",
     hosts: "mcp.exa.ai, search.parallel.ai",

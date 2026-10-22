@@ -59,6 +59,9 @@ import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { Memory } from "@/memory"
 import { MemorySources } from "@/memory/sources"
+import { Resource } from "@/resource"
+import type { ResourceCore } from "@/resource/resource"
+import { Token } from "@/util/token"
 import { Skill } from "@/skill"
 import { Question } from "@/question"
 import { SessionTools } from "./tools"
@@ -193,6 +196,7 @@ const layer = Layer.effect(
     const events = yield* EventV2Bridge.Service
     const memory = yield* Memory.Service
     const memorySources = yield* MemorySources.Service
+    const resources = yield* Resource.Service
     const skill = yield* Skill.Service
     const question = yield* Question.Service
     const flags = yield* RuntimeFlags.Service
@@ -1320,6 +1324,46 @@ const layer = Layer.effect(
                 synthetic: true,
               })
           }
+          // XCOD-300: project resources the user mentioned as @name, added to their message for this
+          // turn only (never saved), like recalled memory. Images and PDFs only for models that take them.
+          let mentionedTokens = 0
+          if (memoryUser) {
+            const typed = memoryUser.parts
+              .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+              .join("\n")
+            const mentioned = typed.includes("@")
+              ? yield* resources
+                  .mention({
+                    sessionID,
+                    text: typed,
+                    image: model.capabilities.input.image,
+                    pdf: model.capabilities.input.pdf,
+                  })
+                  .pipe(Effect.orElseSucceed(() => ({ parts: [], tokens: 0, names: [] })))
+              : undefined
+            mentionedTokens = mentioned?.tokens ?? 0
+            for (const part of mentioned?.parts ?? [])
+              memoryUser.parts.push(
+                part.type === "text"
+                  ? {
+                      id: PartID.ascending(),
+                      messageID: memoryUser.info.id,
+                      sessionID,
+                      type: "text",
+                      text: part.text,
+                      synthetic: true,
+                    }
+                  : {
+                      id: PartID.ascending(),
+                      messageID: memoryUser.info.id,
+                      sessionID,
+                      type: "file",
+                      mime: part.mime,
+                      url: part.url,
+                      filename: part.filename,
+                    },
+              )
+          }
 
           const msg: SessionV1.Assistant = {
             id: MessageID.ascending(),
@@ -1403,13 +1447,39 @@ const layer = Layer.effect(
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
             const proof = buildProof(agent, session.permission, yield* config.get())
+            // XCOD-300: the project's resources: the list (with how to reach each) and the Always ones in full.
+            const projectResources = yield* resources.system(sessionID).pipe(
+              Effect.orElseSucceed(() => ({
+                catalog: undefined as string | undefined,
+                always: { included: [], dropped: [], tokens: 0 } as ResourceCore.Always,
+              })),
+            )
             const system = [
               ...env,
               ...instructions,
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...(skills ? [skills] : []),
               ...(proof ? [proof] : []),
+              ...(projectResources.catalog ? [projectResources.catalog] : []),
+              ...(projectResources.always.text ? [projectResources.always.text] : []),
             ]
+            yield* resources.record(
+              sessionID,
+              contextBreakdown({
+                model,
+                system: [
+                  ...env,
+                  ...(mcpInstructions ? [mcpInstructions] : []),
+                  ...(skills ? [skills] : []),
+                  ...(proof ? [proof] : []),
+                  projectResources.catalog ?? "",
+                ],
+                instructions,
+                always: projectResources.always,
+                messages: msgs,
+                mentioned: mentionedTokens,
+              }),
+            )
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
@@ -1800,6 +1870,49 @@ export function createStructuredOutputTool(input: {
     },
   })
 }
+/**
+ * XCOD-300: what this turn's context is made of, in tokens (estimated as Lunos does elsewhere), for
+ * /context: the system prompt, instructions, Always resources, recalled memory, attachments, and
+ * what project_resources_search and @mentions pulled in since the last user message.
+ */
+function contextBreakdown(input: {
+  model: Provider.Model
+  system: string[]
+  instructions: string[]
+  always: {
+    included: { name: string; tokens: number }[]
+    dropped: { name: string; tokens: number; reason: string }[]
+    tokens: number
+  }
+  messages: SessionV1.WithParts[]
+  mentioned: number
+}) {
+  const lastUser = input.messages.findLastIndex((message) => message.info.role === "user")
+  const user = input.messages[lastUser]
+  let memory = 0
+  let attachments = 0
+  for (const part of user?.parts ?? []) {
+    if (part.type === "text" && part.synthetic && part.text.startsWith("<memory>")) memory += Token.estimate(part.text)
+    if (part.type === "file") attachments += part.url.startsWith("data:") ? Math.round(part.url.length / 4) : 0
+  }
+  let searched = 0
+  for (const message of input.messages.slice(lastUser + 1))
+    for (const part of message.parts)
+      if (part.type === "tool" && part.tool === "project_resources_search" && part.state.status === "completed")
+        searched += Token.estimate(part.state.output)
+  return {
+    system: Token.estimate([...SystemPrompt.provider(input.model), ...input.system].join("\n")),
+    instructions: Token.estimate(input.instructions.join("\n")),
+    always: input.always.tokens,
+    memory,
+    attachments,
+    searched,
+    mentioned: input.mentioned,
+    resources: input.always.included,
+    dropped: input.always.dropped,
+  }
+}
+
 const bashRegex = /!`([^`]+)`/g
 // Match [Image N] as single token, quoted strings, or non-space sequences
 const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
@@ -1838,6 +1951,7 @@ export const node = LayerNode.make({
     Database.node,
     Memory.node,
     MemorySources.node,
+    Resource.node,
     Skill.node,
     Question.node,
   ],

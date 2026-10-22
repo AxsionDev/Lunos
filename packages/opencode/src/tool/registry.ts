@@ -21,6 +21,8 @@ import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
 import { SkillTool } from "./skill"
+import { ProjectResourcesSearchTool } from "./project-resources-search"
+import { Resource } from "@/resource"
 import * as Tool from "./tool"
 import { Config } from "@/config/config"
 import { type ToolContext as PluginToolContext, type ToolDefinition } from "@opencode-ai/plugin"
@@ -90,6 +92,8 @@ export interface Interface {
     modelID: ModelV2.ID
     agent: Agent.Info
     permission?: PermissionV1.Ruleset
+    /** XCOD-300: so a resource excluded for this session doesn't count as searchable. */
+    sessionID?: string
   }) => Effect.Effect<Tool.Def[]>
 }
 
@@ -123,6 +127,8 @@ const layer = Layer.effect(
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
+    const resourceSearch = yield* ProjectResourcesSearchTool
+    const resources = yield* Resource.Service
     const agent = yield* Agent.Service
     const codeMode = flags.experimentalCodeMode ? yield* Effect.promise(() => import("./code-mode")) : undefined
     const codeModeTool = codeMode ? yield* codeMode.CodeModeTool : undefined
@@ -229,6 +235,7 @@ const layer = Layer.effect(
           todo: Tool.init(todo),
           search: Tool.init(websearch),
           skill: Tool.init(skilltool),
+          resources: Tool.init(resourceSearch),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
@@ -256,6 +263,8 @@ const layer = Layer.effect(
             tool.todo,
             ...(Offline.enabled() ? [] : [tool.search]),
             tool.skill,
+            // XCOD-300: offered only while the project has searchable resources (tools() below).
+            tool.resources,
             tool.patch,
             ...(tool.execute ? [tool.execute] : []),
             // XCOD-204: opt-in, and never offline (it sends the task to the tool's vendor).
@@ -307,7 +316,10 @@ const layer = Layer.effect(
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
+      const searchable = yield* resources.searchable(input.sessionID ?? "").pipe(Effect.orElseSucceed(() => false))
       const filtered = (yield* all()).filter((tool) => {
+        if (tool.id === ProjectResourcesSearchTool.id) return searchable
+
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
         }
@@ -485,6 +497,7 @@ export const node = LayerNode.make({
     MCP.node,
     Database.node,
     Ripgrep.node,
+    Resource.node,
   ],
 })
 

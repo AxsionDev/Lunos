@@ -1455,7 +1455,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, log, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)"
+          "description": "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, log, resources, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)"
         },
         "shell": {
           "type": "string",
@@ -1777,6 +1777,215 @@
             ]
           },
           "description": "Named git or local directory references"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "entries": {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "A file or folder on this computer. In a project's config it must be inside the project: anything else is a personal resource"
+                      },
+                      "include": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Globs of files to include, relative to the folder. Default [\"**/*\"]"
+                      },
+                      "exclude": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Globs of files to leave out, relative to the folder"
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "What the resource is for, shown to the agent"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": ["always", "search", "on_demand"],
+                        "description": "\"always\": in every session's context, within resources.always_tokens. \"search\" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. \"on_demand\": only when a prompt mentions @name"
+                      }
+                    },
+                    "required": ["path"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "description": "A web page or docs site (http or https)"
+                      },
+                      "depth": {
+                        "type": "number",
+                        "enum": [0, 1, 2],
+                        "description": "How many links deep to follow on the same site. Default 0 (the page only)"
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "What the resource is for, shown to the agent"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": ["always", "search", "on_demand"],
+                        "description": "\"always\": in every session's context, within resources.always_tokens. \"search\" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. \"on_demand\": only when a prompt mentions @name"
+                      }
+                    },
+                    "required": ["url"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "repository": {
+                        "type": "string",
+                        "description": "A git repository URL, cloned on this computer"
+                      },
+                      "branch": {
+                        "type": "string",
+                        "description": "Branch or tag. Default: the remote default"
+                      },
+                      "include": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Globs of files to include. Default [\"**/*\"]"
+                      },
+                      "exclude": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Globs of files to leave out"
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "What the resource is for, shown to the agent"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": ["always", "search", "on_demand"],
+                        "description": "\"always\": in every session's context, within resources.always_tokens. \"search\" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. \"on_demand\": only when a prompt mentions @name"
+                      }
+                    },
+                    "required": ["repository"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "server": {
+                        "type": "string",
+                        "description": "A connected MCP server's name"
+                      },
+                      "uri": {
+                        "type": "string",
+                        "description": "The resource's URI on that server"
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "What the resource is for, shown to the agent"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": ["always", "search", "on_demand"],
+                        "description": "\"always\": in every session's context, within resources.always_tokens. \"search\" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. \"on_demand\": only when a prompt mentions @name"
+                      }
+                    },
+                    "required": ["server", "uri"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "description": "Resources by name. The name is also the resource's @alias in prompts"
+            },
+            "always_tokens": {
+              "exclusiveMinimum": 0,
+              "type": "integer",
+              "maximum": 9007199254740991,
+              "description": "Most tokens \"always\" resources may add to every session's context. Default 8000"
+            },
+            "max_resource_mb": {
+              "exclusiveMinimum": 0,
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "enum": ["NaN"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["Infinity"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["-Infinity"]
+                }
+              ],
+              "description": "Largest a single resource may be. Default 50"
+            },
+            "max_index_mb": {
+              "exclusiveMinimum": 0,
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "enum": ["NaN"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["Infinity"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["-Infinity"]
+                }
+              ],
+              "description": "Largest the project's resource index may grow. Default 1024"
+            },
+            "refresh_hours": {
+              "exclusiveMinimum": 0,
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "enum": ["NaN"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["Infinity"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["-Infinity"]
+                }
+              ],
+              "description": "How often web, git and MCP resources are fetched again. Default 24"
+            },
+            "web": {
+              "type": "boolean",
+              "description": "Allow web page resources. Default true; an organisation can turn them off in managed config"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Project resources (XCOD-300): files, folders, repositories, web pages and MCP resources given to the agent as context, always or searched when relevant"
         },
         "reference": {
           "type": "object",

@@ -89,6 +89,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   skills: "Tools",
   hooks: "Tools",
   references: "Tools",
+  resources: "Tools",
   reference: "Tools",
   shell: "Tools",
   instructions: "Advanced / experimental",
@@ -151,6 +152,7 @@ const SUBTAB: Record<string, string> = {
   shell: "Shell",
   reference: "References",
   references: "References",
+  resources: "References",
 }
 
 /** Memory's everyday settings; the rest of `memory.*` is Advanced. */

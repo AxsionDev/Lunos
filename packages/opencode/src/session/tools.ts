@@ -115,6 +115,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     providerID: input.model.providerID,
     agent: input.agent,
     permission: input.session.permission,
+    sessionID: input.session.id,
   })) {
     if (item.id === "question") questionTool = item
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))

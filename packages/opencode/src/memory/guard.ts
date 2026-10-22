@@ -29,7 +29,8 @@ export class RefusedError extends Error {
   override name = "MemoryRefused"
 }
 
-export const TAINTING = ["webfetch", "websearch", "read_mcp_resource"] as const
+// XCOD-300: a project resource can be a web page or an MCP resource.
+export const TAINTING = ["webfetch", "websearch", "read_mcp_resource", "project_resources_search"] as const
 
 export function taint(messages: readonly SessionV1.WithParts[], worktree: string): string | undefined {
   const lastUser = messages.findLastIndex((message) => message.info.role === "user")
