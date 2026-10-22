@@ -361,16 +361,32 @@ export function DialogSessions(props: { select?: string }) {
   async function move(item: SessionOverviewItem) {
     const NEW = "new"
     const UNGROUPED = "ungrouped"
+    // XCOD-298: the same picker moves a session to another project (what its cost counts against).
+    const PROJECT = "project:"
+    const projects = (await sdk.client.experimental.projectGroup.list().catch(() => undefined))?.data
+    const named = (projects?.groups ?? []).filter((group) => !group.archived)
     const choice = await new Promise<string | undefined>((resolve) =>
       dialog.replace(
         () => (
           <DialogSelect<string>
-            title={`Move "${Locale.truncate(item.title, 40)}" to group`}
+            title={`Move "${Locale.truncate(item.title, 40)}" to group or project`}
             current={item.groupID ?? UNGROUPED}
             options={[
-              ...data.groups.map((group) => ({ value: group.id, title: group.name })),
-              { value: UNGROUPED, title: "Ungrouped" },
-              { value: NEW, title: "New group…" },
+              ...data.groups.map((group) => ({ value: group.id, title: group.name, category: "Group" })),
+              { value: UNGROUPED, title: "Ungrouped", category: "Group" },
+              { value: NEW, title: "New group…", category: "Group" },
+              ...named.map((group) => ({
+                value: PROJECT + group.id,
+                title: group.name,
+                category: "Project",
+                footer: item.projectGroupID === group.id ? "now" : undefined,
+              })),
+              {
+                value: PROJECT,
+                title: "Its folder's project",
+                category: "Project",
+                description: "undo a move: count it where its folder belongs",
+              },
             ]}
             onSelect={(option) => resolve(option.value)}
           />
@@ -379,6 +395,13 @@ export function DialogSessions(props: { select?: string }) {
       ),
     )
     if (choice === undefined) return reopen(item.id)
+    if (choice.startsWith(PROJECT)) {
+      const projectID = choice.slice(PROJECT.length)
+      await sdk.client.experimental.projectGroup
+        .move({ sessionIDs: [item.id], ...(projectID ? { projectID } : {}) }, { throwOnError: true })
+        .catch(fail)
+      return reopen(item.id)
+    }
     let groupID: string | undefined = choice === UNGROUPED ? undefined : choice
     if (choice === NEW) {
       const name = await DialogPrompt.show(dialog, "New group", { placeholder: "Group name" })

@@ -36,6 +36,7 @@ import { DialogExternalConfig } from "./dialog-external-config"
 import { DialogProviders } from "./dialog-provider"
 import { StatusServers } from "./dialog-status"
 import { DialogAccount } from "./dialog-account"
+import { DialogProject, DialogProjects, folderCount } from "./dialog-projects"
 import { AccountContext } from "../context/account"
 import {
   AGENT_NAME,
@@ -77,6 +78,8 @@ let memoryAdvancedOpen = false
 const pendingRestart = new Set<string>()
 const MEMORY = "Memory"
 const EXTERNAL_AREA = "Models & agents"
+/** XCOD-298: named projects aren't config keys; the Projects section lists them. */
+const PROJECTS = "Projects"
 const EXTERNAL_SUB = "External sessions"
 
 /** XCOD-254: the footer of a tool's sharing row. */
@@ -282,6 +285,12 @@ export function DialogSettings(props: {
       { back: () => reopen(`+external.consent.${tool}`), generation },
     )
   }
+
+  // XCOD-298: the named projects, for the Projects section and its line on the home.
+  const [projects] = createResource(
+    () => atHome() || props.area === PROJECTS,
+    async () => (await sdk.client.experimental.projectGroup.list().catch(() => undefined))?.data,
+  )
 
   /** XCOD-259: a section window, on a sub-tab and row; ← goes back to the home on its row. */
   function openArea(area: string, tab?: string, focus?: string) {
@@ -936,11 +945,16 @@ export function DialogSettings(props: {
         Sections.SECTIONS.map((item) => {
           const mine = all.filter((row) => row.category === item.category)
           const marks = Sections.badges(mine, pendingRestart)
+          const named = item.category === PROJECTS ? projects()?.groups.filter((group) => !group.archived) : undefined
           return {
             title: item.category,
             value: `+area:${item.category}`,
             description: Sections.summary(item.category, mine),
-            footer: marks || `${mine.length} settings`,
+            footer:
+              marks ||
+              (named
+                ? `${named.length} named ${named.length === 1 ? "project" : "projects"}`
+                : `${mine.length} settings`),
           }
         }),
       )
@@ -980,6 +994,15 @@ export function DialogSettings(props: {
           value: `+external.config.${tool}`,
           footer: "as the tool reports it",
         })),
+        ...list,
+      ]
+    // XCOD-298: Projects › Projects lists the named projects; each opens its own view.
+    if (props.area === PROJECTS && sub() === "Projects" && !query())
+      return [
+        ...(projects()?.groups ?? [])
+          .filter((group) => !group.archived)
+          .map((group) => ({ title: group.name, value: `+project:${group.id}`, footer: folderCount(group) })),
+        { title: "All projects…", value: "+projects", footer: "/projects" },
         ...list,
       ]
     // XCOD-281: Permissions › Sandbox starts with the last failure, while it holds the sandbox off.
@@ -1029,6 +1052,13 @@ export function DialogSettings(props: {
       return (
         <text fg={theme.textMuted} wrapMode="word">
           Memory at a glance: its status, a guided setup, and what's in it. Tab for every setting.
+        </text>
+      )
+    if (synthetic === "+projects" || synthetic?.startsWith("+project:"))
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          A repository is a project with no setup. A named project counts several repositories or folders as one; it's
+          kept on this computer only. Sessions count in the project of their folder.
         </text>
       )
     if (synthetic?.startsWith("+external.config."))
@@ -1193,6 +1223,20 @@ export function DialogSettings(props: {
                     generation,
                   })
                 if (option.value === "+memory.analytics") return dialog.replace(() => <DialogMemory />)
+                if (option.value === "+projects")
+                  return dialog.replace(
+                    () => <DialogProjects nav={backTo("+projects")} />,
+                    undefined,
+                    backTo("+projects"),
+                  )
+                if (option.value.startsWith("+project:"))
+                  return dialog.replace(
+                    () => (
+                      <DialogProject id={option.value.slice("+project:".length)} onBack={() => reopen(option.value)} />
+                    ),
+                    undefined,
+                    backTo(option.value),
+                  )
                 if (option.value.startsWith("+sandbox.")) return sandboxAction(option.value.slice("+sandbox.".length))
                 if (option.value.startsWith("+external.config.")) {
                   const tool = option.value.slice("+external.config.".length) as "claude" | "codex"
