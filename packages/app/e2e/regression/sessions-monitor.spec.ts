@@ -260,7 +260,9 @@ test("XCOD-299: a section collapses to what it holds, and stays collapsed across
   await expect(completed(page)).toHaveAttribute("aria-expanded", "true")
   await completed(page).click()
   await expect(completed(page)).toHaveAttribute("aria-expanded", "false")
-  await expect(completed(page)).toContainText("✕ 1 Failed · ✓ 2 Finished")
+  await expect(page.locator('[data-monitor-section="completed"]')).toContainText("✕ 1 Failed · ✓ 2 Finished")
+  // Still a heading, with the button inside it.
+  await expect(rail(page).getByRole("heading", { level: 2, name: "Completed (3)" })).toBeVisible()
   await expect(page.locator('[data-session-id="ses_x1"]')).toHaveCount(0)
   await page.reload()
   await expectAppVisible(page.getByText("Refactor parser", { exact: true }))

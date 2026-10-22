@@ -1257,6 +1257,7 @@ export function SessionsPage() {
     const rows = createMemo(() => statusRail().rows.filter((row) => row.section === section()))
     const heading = () => t(`sessions.monitor.section.${section()}`, { count: props.view.count })
     const glyph = { running: "◐", waiting: "!", failed: "✕", finished: "✓" } as const
+    const summaryID = () => `monitor-section-${section()}-summary`
     const summary = () =>
       props.view.states
         .map((entry) => `${glyph[entry.state]} ${entry.count} ${t(`sessions.state.${entry.state}`)}`)
@@ -1268,31 +1269,38 @@ export function SessionsPage() {
         data-monitor-section={section()}
         aria-label={heading()}
       >
-        <header classList={{ "border-b border-v2-border-border-base": props.view.open }}>
-          <button
-            type="button"
-            class="flex w-full items-center gap-2 px-3 py-2 text-left"
-            aria-expanded={props.view.open}
-            disabled={props.view.empty}
-            onClick={() => flipSection(props.view)}
+        {/* The accordion pattern: the heading holds the button, so it stays a heading for screen readers. */}
+        <header
+          class="flex items-center gap-2 px-3 py-2"
+          classList={{ "border-b border-v2-border-border-base": props.view.open }}
+        >
+          <span aria-hidden="true" class="text-12-regular text-v2-text-text-weak">
+            {props.view.open ? "▼" : "▶"}
+          </span>
+          <h2
+            class="text-14-medium"
+            classList={{
+              "text-v2-state-fg-warning underline": section() === "waiting" && !props.view.empty,
+              "text-v2-text-text-strong": section() !== "waiting" && !props.view.empty,
+              "text-v2-text-text-weak": props.view.empty,
+            }}
           >
-            <span aria-hidden="true" class="text-12-regular text-v2-text-text-weak">
-              {props.view.open ? "▼" : "▶"}
-            </span>
-            <h2
-              class="text-14-medium"
-              classList={{
-                "text-v2-state-fg-warning underline": section() === "waiting" && !props.view.empty,
-                "text-v2-text-text-strong": section() !== "waiting" && !props.view.empty,
-                "text-v2-text-text-weak": props.view.empty,
-              }}
+            <button
+              type="button"
+              class="text-left"
+              aria-expanded={props.view.open}
+              aria-describedby={!props.view.open && !props.view.empty ? summaryID() : undefined}
+              disabled={props.view.empty}
+              onClick={() => flipSection(props.view)}
             >
               {heading()}
-            </h2>
-            <Show when={!props.view.open && !props.view.empty}>
-              <span class="text-12-regular text-v2-text-text-weak">{summary()}</span>
-            </Show>
-          </button>
+            </button>
+          </h2>
+          <Show when={!props.view.open && !props.view.empty}>
+            <span id={summaryID()} class="text-12-regular text-v2-text-text-weak">
+              {summary()}
+            </span>
+          </Show>
         </header>
         <Show when={props.view.open}>
           <ul class="flex flex-col">

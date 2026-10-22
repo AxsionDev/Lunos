@@ -366,6 +366,8 @@ export type ChildInfo = {
   waiting?: boolean
   /** It is waiting for a slot (`subagent.max_parallel`), from its session metadata. */
   queued?: boolean
+  /** Why its last turn failed, when it did (XCOD-299: a background one's tool call never errors). */
+  error?: string
 }
 
 type TaskLikePart = {
@@ -406,7 +408,7 @@ export function subagentsOf(parts: readonly TaskLikePart[], child: (sessionID: s
     const busy = info.status !== undefined && info.status !== "idle"
     const live = part.state.status === "running" || (background && (busy || info.queued === true))
     const state: SubagentState =
-      part.state.status === "error"
+      part.state.status === "error" || (background && !live && info.error)
         ? "failed"
         : !live
           ? "done"
@@ -424,7 +426,7 @@ export function subagentsOf(parts: readonly TaskLikePart[], child: (sessionID: s
       model: modelOf(part.state.metadata?.model),
       started: part.state.time?.start,
       ended: background ? undefined : part.state.time?.end,
-      error: state === "failed" ? text(part.state.error) : undefined,
+      error: state === "failed" ? (text(part.state.error) ?? info.error) : undefined,
     }
     // Resuming a subagent (task_id) calls the tool again on the same session: keep its place, take
     // the newest call's state.

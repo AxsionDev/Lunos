@@ -95,7 +95,16 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
     status: api.state.session.status(sessionID)?.type,
     waiting: api.state.session.permission(sessionID).length > 0 || api.state.session.question(sessionID).length > 0,
     queued: (api.state.session.get(sessionID)?.metadata?.subagent as { queued?: unknown } | undefined)?.queued === true,
+    error: lastError(sessionID),
   })
+  /** Why a subagent's last turn failed, from its last reply. */
+  const lastError = (sessionID: string) => {
+    const last = api.state.session.messages(sessionID).findLast((message) => message.role === "assistant")
+    const error = last?.role === "assistant" ? last.error : undefined
+    if (!error) return undefined
+    const message = (error.data as { message?: unknown } | undefined)?.message
+    return typeof message === "string" && message ? message : error.name
+  }
   const partsOf = (sessionID: string) =>
     api.state.session.messages(sessionID).flatMap((message) => api.state.part(message.id))
   // This session's subagents, and theirs (XCOD-299: nested ones, `subagent_depth` > 1), each after
