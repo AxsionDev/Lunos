@@ -152,7 +152,7 @@ const SUBTAB: Record<string, string> = {
   shell: "Shell",
   reference: "References",
   references: "References",
-  resources: "Project resources",
+  resources: "References",
 }
 
 /** Memory's everyday settings; the rest of `memory.*` is Advanced. */
