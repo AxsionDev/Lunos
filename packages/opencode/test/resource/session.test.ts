@@ -59,6 +59,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
 
 import { Resource } from "@/resource"
+import { Watcher } from "@opencode-ai/core/filesystem/watcher"
 
 const summary = Layer.succeed(
   SessionSummary.Service,
@@ -406,6 +407,98 @@ it.instance(
       expect(body).not.toContain(ALWAYS)
       // No searchable resources, so no search tool.
       expect(body).not.toContain('project_resources_search\\"')
+    }),
+  30_000,
+)
+
+it.instance(
+  "adding an Always resource over the budget is refused with the Search suggestion; shared ones go to project config, personal ones don't",
+  () =>
+    Effect.gen(function* () {
+      const { directory: dir } = yield* TestInstance
+      yield* writeText(path.join(dir, "big.md"), "word ".repeat(10_000))
+      yield* writeText(path.join(dir, "small.md"), "Release on Tuesdays.")
+      yield* writeConfig(dir, { resources: { always_tokens: 2000 } } as Partial<ConfigV1.Info>)
+      const resources = yield* Resource.Service
+      const refused = yield* resources
+        .add({ name: "big", entry: { path: "big.md", mode: "always" }, scope: "shared" })
+        .pipe(Effect.flip)
+      expect(refused.message).toContain("over the project's budget of 2000 (resources.always_tokens)")
+      expect(refused.message).toContain("--mode search")
+      const added = yield* resources.add({
+        name: "small",
+        entry: { path: "small.md", mode: "always" },
+        scope: "shared",
+      })
+      expect(added.state).toContain("indexed just now · 1 chunk")
+      const config = yield* Effect.promise(() => Bun.file(path.join(dir, "opencode.json")).text())
+      expect(config).toContain('"small"')
+      expect(config).not.toContain('"big"')
+      yield* resources.add({ name: "mine", entry: { path: "big.md" }, scope: "personal" })
+      expect(yield* Effect.promise(() => Bun.file(path.join(dir, "opencode.json")).text())).not.toContain('"mine"')
+      const list = yield* resources.list()
+      expect(list.map((item) => [item.name, item.scope])).toEqual([
+        ["mine", "personal"],
+        ["small", "shared"],
+      ])
+      expect(yield* resources.remove("mine")).toBe("personal")
+    }),
+  30_000,
+)
+
+it.instance(
+  "a changed local file is re-indexed, and web resources refresh when due",
+  () =>
+    Effect.gen(function* () {
+      const { directory: dir } = yield* TestInstance
+      let version = "first"
+      const server = Bun.serve({
+        port: 0,
+        fetch: () => new Response(`<p>Docs ${version}</p>`, { headers: { "content-type": "text/html" } }),
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(() => server.stop(true)))
+      yield* writeText(path.join(dir, "notes", "a.md"), "alpha")
+      yield* writeConfig(dir, {
+        resources: {
+          entries: {
+            notes: { path: "notes", mode: "always" },
+            docs: { url: `http://127.0.0.1:${server.port}/`, mode: "always" },
+          },
+        },
+      } as Partial<ConfigV1.Info>)
+      const resources = yield* Resource.Service
+      expect((yield* resources.system("s")).always.text).toContain("Docs first")
+
+      // Local: the file watcher's event marks it changed, and the next turn has the new text.
+      yield* writeText(path.join(dir, "notes", "a.md"), "alpha, then beta")
+      const events = yield* EventV2Bridge.Service
+      yield* events.publish(Watcher.Event.Updated, { file: path.join(dir, "notes", "a.md"), event: "change" })
+      yield* Effect.sleep("50 millis")
+      expect((yield* resources.system("s")).always.text).toContain("alpha, then beta")
+
+      // Web: not before it is due, then on the schedule.
+      version = "second"
+      expect(yield* resources.tick(Date.now() + 3_600_000)).toEqual([])
+      expect(yield* resources.tick(Date.now() + 25 * 3_600_000)).toEqual(["docs"])
+      expect((yield* resources.system("s")).always.text).toContain("Docs second")
+    }),
+  30_000,
+)
+
+it.instance(
+  "a web resource the webfetch permission denies is refused with the reason",
+  () =>
+    Effect.gen(function* () {
+      const { directory: dir } = yield* TestInstance
+      yield* writeConfig(dir, {
+        permission: { webfetch: "deny" },
+      } as Partial<ConfigV1.Info>)
+      const resources = yield* Resource.Service
+      const refused = yield* resources
+        .add({ name: "blocked", entry: { url: "https://blocked.example.com/docs" }, scope: "shared" })
+        .pipe(Effect.flip)
+      expect(refused.message).toContain("permission.webfetch denies https://blocked.example.com/docs")
+      expect(refused.message).toContain("couldn't read blocked")
     }),
   30_000,
 )

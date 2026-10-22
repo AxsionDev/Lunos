@@ -105,6 +105,8 @@ interface State {
   turns: Map<string, Breakdown>
   /** Local resources the watcher saw change. */
   dirty: Set<string>
+  /** Shared resources removed since the instance loaded its config. */
+  removed: Set<string>
   checked: Map<string, number>
   /** Loaded index entries, by name. */
   cache: Map<string, ResourceCore.Stored>
@@ -136,6 +138,7 @@ const layer = Layer.effect(
           excluded: new Map(),
           turns: new Map(),
           dirty: new Set(),
+          removed: new Set(),
           checked: new Map(),
           cache: new Map(),
         }
@@ -170,8 +173,15 @@ const layer = Layer.effect(
       const managed = yield* Effect.promise(
         () => (data.managed ??= ConfigManaged.readManagedDocs().catch(() => [] as unknown[])),
       )
-      const shared = yield* Effect.promise(() =>
-        ResourceCore.sharedNames([...new Set([data.scope.directory, data.directory])]),
+      const sharedNow = yield* Effect.promise(() =>
+        ResourceCore.sharedEntries([...new Set([data.scope.directory, data.directory])]),
+      )
+      const shared = new Set(Object.keys(sharedNow))
+      // Config loaded with the instance may predate an add or remove: the files say what is shared now.
+      const entries = Object.fromEntries(
+        Object.entries({ ...cfg.resources?.entries, ...sharedNow }).filter(
+          ([name]) => !data.removed.has(name) || shared.has(name),
+        ),
       )
       const references = yield* inLocation(
         data.directory,
@@ -180,7 +190,7 @@ const layer = Layer.effect(
         }),
       ).pipe(Effect.orElseSucceed(() => [] as Reference.Info[]))
       const list = ResourceCore.resolve({
-        config: cfg.resources,
+        config: ConfigPolicyLocked(cfg) ? cfg.resources : { ...cfg.resources, entries },
         locked: cfg.$locked,
         directory: data.scope.directory,
         shared,
@@ -567,7 +577,10 @@ const layer = Layer.effect(
           new ResourceError(`${name} is in your global config (resources.entries.${name}): remove it there`),
         )
       if (resource.scope === "personal") yield* Effect.promise(() => data.store.setPersonal(name, undefined))
-      else yield* Effect.promise(() => ResourceCore.writeShared(data.scope.directory, name, undefined))
+      else {
+        yield* Effect.promise(() => ResourceCore.writeShared(data.scope.directory, name, undefined))
+        data.removed.add(name)
+      }
       yield* Effect.promise(() => data.store.remove(name))
       data.cache.delete(name)
       data.search = undefined

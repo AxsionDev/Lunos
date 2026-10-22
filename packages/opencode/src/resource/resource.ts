@@ -449,17 +449,24 @@ export function sharedConfigFile(directory: string) {
   return path.join(directory, "opencode.json")
 }
 
-/** Names under `resources.entries` in the project's own config files. */
-export async function sharedNames(directories: readonly string[]) {
-  const out = new Set<string>()
+/**
+ * `resources.entries` in the project's own config files, read as they are now: a resource just added
+ * or removed counts at once, before the instance reloads its config.
+ */
+export async function sharedEntries(directories: readonly string[]) {
+  const out: Record<string, ConfigResource.Entry> = {}
   for (const dir of directories)
-    for (const name of ["opencode.jsonc", "opencode.json", ".opencode/opencode.jsonc", ".opencode/opencode.json"]) {
+    for (const name of [".opencode/opencode.json", ".opencode/opencode.jsonc", "opencode.json", "opencode.jsonc"]) {
       const text = await fs.readFile(path.join(dir, name), "utf8").catch(() => undefined)
       if (!text) continue
       const entries = ConfigPolicy.get(parseJsonc(text, [], { allowTrailingComma: true }), "resources.entries")
-      if (isRecord(entries)) for (const key of Object.keys(entries)) out.add(key)
+      if (isRecord(entries)) Object.assign(out, entries)
     }
   return out
+}
+
+export async function sharedNames(directories: readonly string[]) {
+  return new Set(Object.keys(await sharedEntries(directories)))
 }
 
 /** Adds or removes one shared resource in the project's config, keeping its comments and layout. */
