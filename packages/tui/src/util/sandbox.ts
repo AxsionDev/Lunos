@@ -80,7 +80,7 @@ export type SandboxHost = {
    */
   settings?: {
     sandbox: () => SandboxSetting
-    set: (input: { key: string; value: string; scope: "user" | "project" }) => Promise<SandboxSaved>
+    set: (input: { key: string; value: string; scope: "user" | "project"; unset?: boolean }) => Promise<SandboxSaved>
   }
 }
 

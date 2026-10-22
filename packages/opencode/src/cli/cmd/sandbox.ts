@@ -385,12 +385,11 @@ export function hostSettings(directory: string): NonNullable<SandboxHost["settin
       if (input.key !== "sandbox" && !input.key.startsWith("sandbox."))
         return { ok: false, error: `${input.key} isn't saved on this computer from inside the sandbox` }
       const { ConfigSettings } = await import("@/config/settings")
+      const where = { ctx: { directory, worktree: SandboxConfig.worktreeOf(directory) }, via: "settings screen" }
       try {
-        const result = await ConfigSettings.set({
-          ...input,
-          ctx: { directory, worktree: SandboxConfig.worktreeOf(directory) },
-          via: "settings screen",
-        })
+        const result = input.unset
+          ? await ConfigSettings.unset({ key: input.key, scope: input.scope, ...where })
+          : await ConfigSettings.set({ key: input.key, value: input.value, scope: input.scope, ...where })
         return { ok: true, ...result }
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) }

@@ -142,6 +142,14 @@ export function DialogSettings(props: {
   }
   /** The Settings home: a list of sections, unless something is typed. */
   const atHome = () => !props.section && !props.area
+  /**
+   * XCOD-297: set while this TUI is attached to a sandboxed server. The server's writes land in the
+   * container's copy of the config; `sandbox.*` is decided on this computer, so it's read and saved
+   * here instead, by the process that runs this TUI.
+   */
+  const hostSettings = () => sandbox.host?.settings
+  const [hostSandbox, setHostSandbox] = createSignal(hostSettings()?.sandbox())
+  const savedOnHost = (key: string) => !!hostSettings() && (key === "sandbox" || key.startsWith("sandbox."))
 
   let list: DialogSelectRef<string> | undefined
   // XCOD-233: a save still running when Esc closed the window must not reopen it.
@@ -154,6 +162,7 @@ export function DialogSettings(props: {
       return
     }
     setError(undefined)
+    setHostSandbox(hostSettings()?.sandbox())
     setSnapshot(result.data)
     // Back on the row that was being edited, scrolled into view.
     const focus = highlighted()
@@ -176,10 +185,23 @@ export function DialogSettings(props: {
         ? all.filter((row) => row.category === props.area)
         : all
     // tui.json is read by this process: show the theme actually in use.
-    return list.map((row) =>
-      row.key === "tui.theme" && row.source === "default"
-        ? { ...row, value: themeState.selected, display: themeState.selected }
-        : row,
+    const host = hostSandbox()
+    return list.map(
+      (row): SettingRow =>
+        row.key === "tui.theme" && row.source === "default"
+          ? { ...row, value: themeState.selected, display: themeState.selected }
+          : // XCOD-297: inside a sandbox, whether it's on is this computer's answer, not the container's.
+            host && row.key === "sandbox.enabled"
+            ? {
+                ...row,
+                value: host.on,
+                display: host.display,
+                source: host.layer ?? "default",
+                from: host.file,
+                locked: !!host.fixed,
+                override: host.fixed ?? host.detail,
+              }
+            : row,
     )
   })
   const visible = createMemo(() => filterRows(rows(), query()))
@@ -460,11 +482,11 @@ export function DialogSettings(props: {
 
   /** `unset` (XCOD-232's Clear) removes the key from the scope's file instead of setting it. */
   async function save(row: SettingRow, value: string, options: { reopen?: boolean; unset?: boolean } = {}) {
-    const result = await sdk.client.config
-      .settingsSet({
-        settingsSetInput: { key: row.key, value, scope: scope(), ...(options.unset ? { unset: true } : {}) },
-      })
-      .catch((cause: unknown) => ({ data: undefined, error: cause }))
+    const input = { key: row.key, value, scope: scope(), ...(options.unset ? { unset: true } : {}) }
+    const host = savedOnHost(row.key) ? hostSettings() : undefined
+    const result = await (
+      host ? host.set(input).then((data) => ({ data })) : sdk.client.config.settingsSet({ settingsSetInput: input })
+    ).catch((cause: unknown) => ({ data: undefined, error: cause }))
     const data = result.data
     if (!data || !data.ok) {
       toast.show({
@@ -477,12 +499,28 @@ export function DialogSettings(props: {
       return false
     }
     if (row.key === "tui.theme" && typeof data.value === "string") themeState.set(data.value)
+    // XCOD-297: turned off. Saved on this computer (by the host when this is a sandbox), and the
+    // restart starts without it; it isn't asked about, since the toast says it happens.
+    if (row.key === "sandbox.enabled" && data.value === false && !options.unset && data.changed) {
+      toast.show({ variant: "success", message: "Saved on this computer. Lunos will restart without the sandbox." })
+      pendingRestart.add(row.key)
+      dialog.clear()
+      keymap.dispatchCommand("sandbox.off")
+      return true
+    }
+    // Where it was saved, plainly: on this computer, or only in the sandbox's own copy.
+    const inside = !host && (!!hostSettings() || !!snapshot()?.sandbox?.inside)
+    const where = host
+      ? `saved on this computer: ${home(data.file)}`
+      : inside
+        ? `saved inside the sandbox only (${home(data.file)}); this computer's config is unchanged`
+        : `saved to ${data.scope} config: ${home(data.file)}`
     toast.show({
       variant: "success",
       message: options.unset
-        ? `${row.label} ${data.changed ? "removed" : "wasn't set"} (${data.scope} config: ${home(data.file)})`
-        : `${row.label} = ${typeof data.value === "string" ? data.value : JSON.stringify(data.value)} (saved to ${data.scope} config: ${home(data.file)})`,
-      duration: 5000,
+        ? `${row.label} ${data.changed ? "removed" : "wasn't set"} (${host ? "on this computer: " : `${data.scope} config: `}${home(data.file)})`
+        : `${row.label} = ${typeof data.value === "string" ? data.value : JSON.stringify(data.value)} (${where})`,
+      duration: inside ? 8000 : 5000,
     })
     if (options.reopen) reopen(row.key)
     else await load()
@@ -506,6 +544,11 @@ export function DialogSettings(props: {
   }
 
   function refuse(row: SettingRow) {
+    // XCOD-297: sandbox.enabled is fixed by sandbox.required or the organisation; the row says which.
+    if (row.locked && row.key === "sandbox.enabled" && row.override) {
+      toast.show({ variant: "warning", message: row.override, duration: 8000 })
+      return true
+    }
     if (row.locked) {
       toast.show({
         variant: "warning",
@@ -540,7 +583,50 @@ export function DialogSettings(props: {
     else toast.show({ variant: "info", message: "Saved edits apply after /restart" })
   }
 
+  /**
+   * XCOD-297: the sandbox switch acts on what startup does, not on one file. On: off, everywhere it's
+   * turned on (asking first when that's a project file, which may be shared). Off after a failure
+   * (XCOD-281): keep it off, or Re-enable. Off: on, with XCOD-279's check first.
+   */
+  async function switchSandbox(row: SettingRow) {
+    if (refuse(row)) return
+    if (sandbox.state()?.status === "off")
+      return dialog.replace(
+        () => (
+          <DialogSelect<string>
+            title="Sandbox"
+            placeholder={row.override ?? "off after a failure"}
+            skipFilter
+            options={[
+              { title: "Keep the sandbox off", value: "off", footer: "sets sandbox.enabled to false" },
+              { title: "Re-enable the sandbox", value: "reenable", footer: "from the next start" },
+            ]}
+            onSelect={(option) => {
+              if (option.value === "off") return void save(row, "false")
+              sandboxAction("reenable")
+              reopen(row.key)
+            }}
+          />
+        ),
+        undefined,
+        backTo(row.key),
+      )
+    if (row.value !== true) return void save(row, "true")
+    if (row.source === "project" && row.from) {
+      const sure = await DialogConfirm.show(
+        dialog,
+        "Turn the sandbox off?",
+        `This sets sandbox.enabled to false in ${home(row.from)}, this project's config, which may be shared in the repository.`,
+        "turn off",
+        backTo(row.key),
+      )
+      if (sure !== true) return reopen(row.key)
+    }
+    await save(row, "false")
+  }
+
   async function edit(row: SettingRow) {
+    if (row.key === "sandbox.enabled") return switchSandbox(row)
     // Before refuse(): a parent reads as locked when any one field is, and the others can still change.
     if (row.kind === "object" && hasSection(row, rows())) return openSection(row)
     // XCOD-229: its own screen; a locked list can still be looked at, every change is refused there.
@@ -726,6 +812,7 @@ export function DialogSettings(props: {
   }
 
   function toggle(row: SettingRow | undefined) {
+    if (row?.key === "sandbox.enabled") return void switchSandbox(row)
     if (!row || refuse(row)) return
     // XCOD-256: cycling would step onto values refused in config; the list explains each one.
     const next = EXTERNAL_KEYS.includes(row.key) ? undefined : cycle(row)

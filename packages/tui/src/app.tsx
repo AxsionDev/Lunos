@@ -614,10 +614,13 @@ function App(props: {
     // XCOD-128: `lunos settings` starts on the settings screen.
     if (args.settings) dialog.replace(() => <DialogSettings tab={args.settings} />)
     // XCOD-281: a start without the sandbox right after it failed isn't a restart the user asked for.
-    if (props.restarted && !props.restarted.sandbox)
+    if (props.restarted && (!props.restarted.sandbox || props.restarted.sandbox.off))
       toast.show({
         variant: "success",
-        message: restartBanner(props.restarted, InstallationVersion),
+        // XCOD-297: after turning it off in /settings.
+        message:
+          restartBanner(props.restarted, InstallationVersion) +
+          (props.restarted.sandbox?.off ? "\nThe sandbox is off: Lunos runs on this computer." : ""),
         duration: 8000,
       })
     announceSandbox()
@@ -821,7 +824,7 @@ function App(props: {
     dialog.replace(() => <DialogAlert title="Sandbox doctor" message={report} />)
   }
 
-  async function restart(fresh: boolean, sandboxRestart?: "retry") {
+  async function restart(fresh: boolean, sandboxRestart?: "retry" | "off") {
     const host = props.restart
     if (!host) {
       toast.show({ variant: "warning", message: "Restart isn't available in this client." })
@@ -1459,6 +1462,14 @@ function App(props: {
             },
           ]
         : []),
+      // XCOD-297: /settings turned the sandbox off: restart without it (asked first if work is running).
+      {
+        name: "sandbox.off",
+        title: "Restart without the sandbox",
+        hidden: true,
+        run: () => void restart(false, "off"),
+        category: "System",
+      },
       // XCOD-281: the sandbox's Retry, its doctor and the last failure's log, from the keyboard.
       ...(sandbox.host
         ? [
