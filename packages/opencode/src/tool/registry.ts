@@ -10,7 +10,8 @@ import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
-import { TaskTool, withModelParameter } from "./task"
+import { TaskTool, withBackground, withModelParameter } from "./task"
+import { backgroundEnabled } from "@/background/enabled"
 import { ToolJsonSchema } from "./json-schema"
 import { Residency } from "@opencode-ai/core/residency"
 import { SubagentModel } from "../agent/subagent-model"
@@ -322,6 +323,7 @@ const layer = Layer.effect(
       // XCOD-82: allowed per-task models, minus any the residency policy would deny.
       const cfg = yield* config.get()
       const subagentModels = SubagentModel.allowed(cfg, Residency.resolve(cfg.residency))
+      const background = backgroundEnabled(flags.experimentalBackgroundSubagents, cfg)
 
       const codeModeDescription = filtered.some((tool) => tool.id === "execute")
         ? yield* describeCodeMode(input)
@@ -341,14 +343,23 @@ const layer = Layer.effect(
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
               ? output.jsonSchema
               : undefined
-          const jsonSchema =
+          const modelSchema =
             tool.id === TaskTool.id && subagentModels.length
               ? withModelParameter(pluginSchema ?? ToolJsonSchema.fromTool(tool), subagentModels)
               : pluginSchema
+          // XCOD-287: no background parameter when background subagents are off in the live config.
+          const task =
+            tool.id === TaskTool.id
+              ? withBackground(
+                  { description: output.description, schema: modelSchema ?? ToolJsonSchema.fromTool(tool) },
+                  background,
+                )
+              : undefined
+          const jsonSchema = task && !background ? task.schema : modelSchema
           return {
             id: tool.id,
             description: [
-              output.description,
+              task?.description ?? output.description,
               tool.id === TaskTool.id ? yield* describeTask(input.agent) : undefined,
               tool.id === "execute" ? codeModeDescription : undefined,
             ]

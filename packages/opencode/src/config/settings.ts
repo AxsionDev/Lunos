@@ -111,7 +111,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
  * none. Memory's Overview holds the wizard and status, so it lists no keys of its own.
  */
 export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
-  "Models & agents": ["Models", "Agents", "Providers", "External sessions"],
+  "Models & agents": ["Models", "Agents", "Subagents", "Providers", "External sessions"],
   Permissions: ["Rules", "Tools", "Sandbox"],
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
   Memory: ["Overview", "Settings", "Advanced"],
@@ -127,7 +127,9 @@ const SUBTAB: Record<string, string> = {
   verify: "Agents",
   default_agent: "Agents",
   mode: "Agents",
-  subagent_depth: "Agents",
+  // XCOD-287: Settings › Models & agents › Subagents.
+  subagent: "Subagents",
+  subagent_depth: "Subagents",
   provider: "Providers",
   disabled_providers: "Providers",
   enabled_providers: "Providers",
@@ -201,6 +203,12 @@ const DEFAULTS: Record<string, unknown> = {
   autoupdate: true,
   snapshot: true,
   subagent_depth: 1,
+  // XCOD-287: subagents on by default.
+  "subagent.background": true,
+  "subagent.delegate": true,
+  "subagent.max_parallel": 3,
+  "subagent.fun_names": true,
+  "subagent.mascots": true,
   marketplace_default: true,
   "memory.enabled": false,
   "sandbox.enabled": false,

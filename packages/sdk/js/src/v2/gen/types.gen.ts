@@ -1841,6 +1841,10 @@ export type SyncConfig = false | SyncOptions
 
 export type SubagentConfig = {
   background?: boolean
+  delegate?: boolean
+  max_parallel?: number
+  fun_names?: boolean
+  mascots?: boolean
   model?: string
   variant?: string
   dynamic?: {

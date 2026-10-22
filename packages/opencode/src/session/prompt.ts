@@ -34,6 +34,7 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
+import { backgroundEnabled } from "@/background/enabled"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { Shell } from "@opencode-ai/core/shell"
@@ -1278,7 +1279,17 @@ const layer = Layer.effect(
           }
           const maxSteps = agent.steps ?? Infinity
           const isLastStep = step >= maxSteps
-          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session }).pipe(
+          // XCOD-287: Build's nudge to split development work across subagents.
+          const stepConfig = yield* config.get()
+          const delegate = SessionReminders.delegates({
+            agent,
+            session,
+            config: stepConfig,
+            subagents: (yield* agents.list()).filter((item) => item.mode !== "primary"),
+          })
+            ? SessionReminders.delegateReminder(backgroundEnabled(flags.experimentalBackgroundSubagents, stepConfig))
+            : undefined
+          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session, delegate }).pipe(
             Effect.provideService(RuntimeFlags.Service, flags),
             Effect.provideService(FSUtil.Service, fsys),
             Effect.provideService(Session.Service, sessions),

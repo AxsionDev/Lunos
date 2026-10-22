@@ -30,6 +30,7 @@ import { Failure } from "../failure"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
 import { RunBudget } from "@/agent/run-budget"
 import { RunEnding } from "./run/ending"
+import { RunSettle } from "./run/settle"
 import { ShareNotice } from "@/share/notice"
 
 const isAbort = (error: unknown) =>
@@ -888,10 +889,17 @@ export const RunCommand = effectCmd({
         // to stdout/UI. `client` is passed explicitly because attach mode may
         // rebind the SDK to the session's directory after the subscription is
         // created, and replies issued from inside the loop must use that client.
+        // XCOD-287: this session's subagents still running, queued ones included.
+        async function runningSubagents(client: OpencodeClient) {
+          const result = await client.experimental.background.list({ sessionID }).catch(() => undefined)
+          return (result?.data ?? []).filter((job) => job.status === "running").length
+        }
+
         async function loop(client: OpencodeClient, events: Awaited<ReturnType<typeof sdk.event.subscribe>>) {
           const toggles = new Map<string, boolean>()
           const sessions = new Set([sessionID])
           let error: string | undefined
+          let settle = RunSettle.create()
 
           for await (const event of events.stream) {
             if (event.type === "session.created" && event.properties.info.parentID) {
@@ -1002,12 +1010,27 @@ export const RunCommand = effectCmd({
               UI.error(err)
             }
 
-            if (
-              event.type === "session.status" &&
-              event.properties.sessionID === sessionID &&
-              event.properties.status.type === "idle"
-            ) {
-              break
+            // XCOD-287: the session going idle ends the run only once its background subagents have
+            // finished and their results have been integrated (run/settle.ts).
+            if (event.type === "session.status" && event.properties.sessionID === sessionID) {
+              if (event.properties.status.type !== "idle") settle = RunSettle.busy()
+              else {
+                const next = RunSettle.check(settle, {
+                  running: await runningSubagents(client),
+                  now: Date.now(),
+                  idleEvent: true,
+                })
+                settle = next.state
+                if (next.end) break
+              }
+            } else if (settle.idle && (event as { type: string }).type === "server.heartbeat") {
+              const next = RunSettle.check(settle, {
+                running: await runningSubagents(client),
+                now: Date.now(),
+                idleEvent: false,
+              })
+              settle = next.state
+              if (next.end) break
             }
 
             if (event.type === "permission.asked") {

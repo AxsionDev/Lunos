@@ -675,7 +675,25 @@
       "properties": {
         "background": {
           "type": "boolean",
-          "description": "Allow subagents to run in the background while the main agent keeps working (off by default). Replaces OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS, which still works"
+          "description": "Allow subagents to run in the background while the main agent keeps working (on by default; false turns it off). OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS still turns it on"
+        },
+        "delegate": {
+          "type": "boolean",
+          "description": "Have the Build agent split development work across subagents running in parallel (on by default; false leaves delegation to the model)"
+        },
+        "max_parallel": {
+          "exclusiveMinimum": 0,
+          "type": "integer",
+          "maximum": 9007199254740991,
+          "description": "At most this many subagents run at once per session; more wait their turn (default 3)"
+        },
+        "fun_names": {
+          "type": "boolean",
+          "description": "Give subagents funny names in the TUI, such as \"Turbo Pickle\" (on by default; false shows \"Subagent 1\")"
+        },
+        "mascots": {
+          "type": "boolean",
+          "description": "Show each subagent's pixel-art animal in the TUI sidebar (on by default)"
         },
         "model": {
           "type": "string",
@@ -1890,7 +1908,7 @@
         },
         "subagent": {
           "$ref": "#/$defs/SubagentConfig",
-          "description": "How subagents choose their model: inherit, small_model, a fixed model, or per task"
+          "description": "Subagents: whether Build delegates to them, background runs, how many run at once, their model, and their names and animals in the TUI"
         },
         "verify": {
           "$ref": "#/$defs/VerifyConfig",
