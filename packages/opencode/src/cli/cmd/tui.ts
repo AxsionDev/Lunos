@@ -150,6 +150,9 @@ export function relaunchFor(
   if (request.sandbox === "failed" && sandbox?.status === "failed")
     return [fresh, undefined, { sandbox: { failed: sandbox.failure } }]
   if (request.sandbox === "retry") return [fresh, undefined, { sandbox: { retry: true } }]
+  // XCOD-297: turned off. A session that ran in the sandbox stays there; one on this computer goes on.
+  if (request.sandbox === "off")
+    return [sandbox && sandbox.status !== "off" ? fresh : request, undefined, { sandbox: { off: true } }]
   if (sandbox && sandbox.status !== "off") return [fresh]
   return [request]
 }

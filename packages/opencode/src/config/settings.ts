@@ -708,6 +708,37 @@ export async function list(input: {
   ctx: Context
   env?: Record<string, string | undefined>
 }): Promise<Row[]> {
+  const rows = await listRows(input)
+  return sandboxRow(rows, input.ctx)
+}
+
+/**
+ * XCOD-297: sandbox.enabled as startup decides it, not as the merged config says: any file that
+ * sets it to true turns it on, and XCOD-281 can have turned it off here after a failure. Inside a
+ * sandbox these are the container's files, so the TUI shows its host's answer instead.
+ */
+async function sandboxRow(rows: Row[], ctx: Context) {
+  const { SandboxConfig } = await import("@/sandbox/config")
+  if (SandboxConfig.inside()) return rows
+  const { SandboxEffective } = await import("@/sandbox/effective")
+  const view = SandboxEffective.view(SandboxEffective.resolve(ctx.directory))
+  return rows.map(
+    (row): Row =>
+      row.key === "sandbox.enabled"
+        ? {
+            ...row,
+            value: view.on,
+            display: view.display,
+            source: view.layer ?? "default",
+            from: view.file,
+            locked: !!view.fixed,
+            override: view.fixed ?? view.detail,
+          }
+        : row,
+  )
+}
+
+async function listRows(input: Parameters<typeof list>[0]): Promise<Row[]> {
   const env = input.env ?? process.env
   return Promise.all(
     entries().map(async (item): Promise<Row> => {
@@ -1100,6 +1131,20 @@ export const sandboxPreflight = {
     const { SandboxRollback } = await import("@/sandbox/rollback")
     SandboxRollback.record(change)
   },
+  /**
+   * XCOD-297: turning the sandbox off, when some file turns it on: false in each of them. Undefined
+   * when none does (an ordinary write then). Refused under sandbox.required or a lock.
+   */
+  async turnOff(directory: string): Promise<{ file: string; changed: boolean } | undefined> {
+    const { SandboxEffective } = await import("@/sandbox/effective")
+    const state = SandboxEffective.resolve(directory)
+    if (state.fixed) throw new SettingError(state.fixed, "locked")
+    if (!state.sources.some((source) => source.key === "enabled")) return undefined
+    const turned = SandboxEffective.turnOff(directory)
+    if (!turned.ok) throw new SettingError(turned.reason, "locked")
+    if (turned.still) throw new SettingError(`sandbox.enabled was set to false, but ${turned.still}`, "invalid")
+    return { file: turned.files.join(", "), changed: turned.files.length > 0 }
+  },
 }
 
 export async function set(input: {
@@ -1120,6 +1165,11 @@ export async function set(input: {
 }): Promise<SetResult> {
   const item = await writable(input)
   const value = coerce(item, input.value)
+  // XCOD-297: off is off in every file that turns it on, since any one of them does.
+  if (item.key === "sandbox.enabled" && value === false) {
+    const turned = await sandboxPreflight.turnOff(input.ctx.directory)
+    if (turned) return { ...turned, key: item.key, value, scope: input.scope, restart: item.restart }
+  }
   const file = targetFile(item.target, input.scope, input.ctx)
   const before = await readText(file)
   const problem = input.models

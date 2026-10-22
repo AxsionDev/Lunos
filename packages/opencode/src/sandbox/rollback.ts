@@ -57,6 +57,16 @@ const at = (doc: unknown, keys: string[]) =>
   )
 
 /**
+ * XCOD-297: whether a change may be undone when the sandbox then can't start. Turning the sandbox
+ * off never is: it isn't what made the start fail, and undoing it turned the sandbox back on.
+ */
+export function undoable(change: Change) {
+  if (change.path[0] !== "sandbox") return false
+  const value = change.path.length === 1 ? (change.value as { enabled?: unknown } | undefined)?.enabled : change.value
+  return !((change.path.length === 1 || ["enabled", "required"].includes(change.path[1]!)) && value === false)
+}
+
+/**
  * Put each change back, where the file still holds the value it saved (a later edit by hand wins).
  * Returns the keys undone.
  */

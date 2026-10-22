@@ -10,9 +10,15 @@ import { SandboxError, SandboxFailure } from "@/sandbox/error"
 import { SandboxPreflight } from "@/sandbox/preflight"
 import { SandboxRollback } from "@/sandbox/rollback"
 import { SandboxDisabled } from "@/sandbox/disabled"
+import { SandboxEffective } from "@/sandbox/effective"
 import { SandboxBackground } from "@/sandbox/background"
 import { SandboxGit } from "@/sandbox/git"
-import type { SandboxFailure as SandboxFailureInfo, SandboxHost, SandboxState } from "@opencode-ai/tui/util/sandbox"
+import type {
+  SandboxFailure as SandboxFailureInfo,
+  SandboxHost,
+  SandboxSaved,
+  SandboxState,
+} from "@opencode-ai/tui/util/sandbox"
 import { AuditLog } from "@/audit/log"
 import { RunEnding } from "./run/ending"
 import { Failure } from "../failure"
@@ -35,13 +41,14 @@ const say = (text: string) => UI.println(UI.Style.TEXT_DIM + "sandbox " + UI.Sty
  * sandbox.required it always does (--attach excepted: that client runs nothing here); --no-sandbox
  * is then refused by `refuseHost`, before anything starts. XCOD-281: sandbox.enabled doesn't count
  * while the sandbox is turned off after a failure here (`SandboxDisabled`); --sandbox tries again.
+ * XCOD-297: the same answer /settings and `lunos sandbox status` give (`SandboxEffective`).
  */
 export function wanted(args: { sandbox?: boolean; attach?: string }, directory = process.env.PWD ?? process.cwd()) {
   if (args.attach) return args.sandbox === true
-  const config = SandboxConfig.load(directory)
-  if (config.required) return true
+  const state = SandboxEffective.resolve(directory)
+  if (state.config.required) return true
   if (args.sandbox !== undefined) return args.sandbox
-  return config.enabled && !SandboxDisabled.get(directory, config)
+  return state.on
 }
 
 /** XCOD-281: `--sandbox=strict`: a sandbox that can't start fails the run instead of running without it. */
@@ -319,7 +326,8 @@ export function failed(
   // `--sandbox=strict` asks for no fallback, as a requirement does.
   if (strict && !failure.requiredBy) failure.requiredBy = "flag"
   if (failure.requiredBy) return { status: "blocked", failure }
-  const undone = SandboxRollback.revert(changes.filter((change) => change.path[0] === "sandbox"))
+  // XCOD-297: a change that turned the sandbox off isn't undone; that would turn it back on.
+  const undone = SandboxRollback.revert(changes.filter(SandboxRollback.undoable))
   if (undone.length) {
     RunLog.note("the sandbox couldn't start; the change was undone", undone.join(", "))
     failure.reason += ` (your change to ${undone.map((key) => `\`${key}\``).join(", ")} was undone)`
@@ -330,15 +338,15 @@ export function failed(
 
 /**
  * XCOD-281: whether the TUI starts with the sandbox. A relaunch after it failed doesn't (unless it's
- * required); a Retry does; otherwise `wanted`.
+ * required); a Retry does; otherwise `wanted`. XCOD-297: nor does the restart after turning it off.
  */
 export function startsSandboxed(
   args: { sandbox?: boolean },
   directory: string,
-  handoff?: { failed?: SandboxFailureInfo; retry?: boolean },
+  handoff?: { failed?: SandboxFailureInfo; retry?: boolean; off?: boolean },
 ) {
   if (SandboxConfig.load(directory).required) return true
-  if (handoff?.failed) return false
+  if (handoff?.failed || handoff?.off) return false
   if (handoff?.retry) return true
   return wanted(args, directory)
 }
@@ -353,7 +361,7 @@ export function sandboxOff(
   handoff?: { failed?: SandboxFailureInfo },
   queued?: boolean,
 ): SandboxHost | undefined {
-  const failure = handoff?.failed ?? SandboxDisabled.get(directory)
+  const failure = handoff?.failed ?? SandboxEffective.resolve(directory).disabled
   if (!failure) return undefined
   const state: SandboxState = { status: "off", failure, announce: Boolean(handoff?.failed), queued }
   return {
@@ -362,6 +370,32 @@ export function sandboxOff(
     retry: () => {},
     reenable: () => SandboxDisabled.clear(directory),
     doctor: () => doctor(directory),
+  }
+}
+
+/**
+ * XCOD-297: /settings' sandbox settings, read and written on this computer by this process while the
+ * TUI is attached to a sandboxed server: the server's own writes land in the container's copy of the
+ * config, and the sandbox is decided here, from these files, at the next start. Only `sandbox.*`.
+ */
+export function hostSettings(directory: string): NonNullable<SandboxHost["settings"]> {
+  return {
+    sandbox: () => SandboxEffective.view(SandboxEffective.resolve(directory)),
+    async set(input): Promise<SandboxSaved> {
+      if (input.key !== "sandbox" && !input.key.startsWith("sandbox."))
+        return { ok: false, error: `${input.key} isn't saved on this computer from inside the sandbox` }
+      const { ConfigSettings } = await import("@/config/settings")
+      try {
+        const result = await ConfigSettings.set({
+          ...input,
+          ctx: { directory, worktree: SandboxConfig.worktreeOf(directory) },
+          via: "settings screen",
+        })
+        return { ok: true, ...result }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    },
   }
 }
 
@@ -428,7 +462,7 @@ export async function sandboxTui(
 
   return {
     fetch: background.fetch,
-    host: background.host,
+    host: { ...background.host, settings: hostSettings(directory) } satisfies SandboxHost,
     directory: workdir ?? directory,
     /** Once the TUI has exited: hand the results back, or keep a sandbox that was still starting. */
     async finish() {
@@ -625,6 +659,54 @@ export const SandboxStopCommand = effectCmd({
   }),
 })
 
+/**
+ * XCOD-297: `lunos sandbox status`: whether the next start here uses the sandbox, and which files
+ * decide it. Files only: no Docker, no project instance, so it works when nothing else starts.
+ */
+export const SandboxStatusCommand = effectCmd({
+  command: "status",
+  describe: "whether the sandbox is on here, and which config file turns it on",
+  instance: false,
+  handler: Effect.fn("Cli.sandbox.status")(function* () {
+    const directory = process.env.PWD ?? process.cwd()
+    const state = SandboxEffective.resolve(directory)
+    const view = SandboxEffective.view(state)
+    const lines = [`Sandbox: ${view.display}`, `  ${view.detail}`]
+    if (view.fixed && view.on) lines.push(`  ${view.fixed}`)
+    else if (view.disabled) lines.push("  `lunos sandbox off` keeps it off; `lunos --sandbox` tries it again.")
+    else if (view.on) lines.push("  `lunos sandbox off` turns it off.")
+    yield* writeStdoutEffect(lines.join(EOL) + EOL)
+  }),
+})
+
+/**
+ * XCOD-297: `lunos sandbox off`: sandbox.enabled is set to false in each of your config files that
+ * turns it on (any one of them does), or only the user's or the project's. Refused, with the reason,
+ * under sandbox.required or an organisation lock. Files only, as `status`.
+ */
+export const SandboxOffCommand = effectCmd({
+  command: "off",
+  describe: "turn the sandbox off here: sets sandbox.enabled to false in the config files that turn it on",
+  instance: false,
+  builder: (yargs) =>
+    yargs
+      .option("project", { type: "boolean", describe: "only this project's config files" })
+      .option("user", { type: "boolean", describe: "only your own (global) config files" }),
+  handler: Effect.fn("Cli.sandbox.off")(function* (args) {
+    if (args.project && args.user)
+      return yield* fail("--project and --user contradict each other; pass one, or neither")
+    const directory = process.env.PWD ?? process.cwd()
+    const turned = SandboxEffective.turnOff(directory, args.project ? "project" : args.user ? "user" : undefined)
+    if (!turned.ok) return yield* fail(turned.reason)
+    const lines = turned.files.length
+      ? turned.files.map((file) => `sandbox.enabled is now false in ${file}`)
+      : [turned.still ? "Nothing to change in those files." : "The sandbox is already off here."]
+    yield* writeStdoutEffect(lines.join(EOL) + EOL)
+    if (turned.still) return yield* fail(turned.still.charAt(0).toUpperCase() + turned.still.slice(1))
+    if (turned.files.length) yield* writeStdoutEffect(`The sandbox is off: Lunos starts without it from now on.${EOL}`)
+  }),
+})
+
 /** Run by the egress container (see src/sandbox/egress.ts); not for people. */
 export const SandboxEgressCommand = cmd({
   command: "egress",
@@ -658,6 +740,8 @@ export const SandboxCommand = cmd({
       .command(SandboxDestroyCommand)
       .command(SandboxPruneCommand)
       .command(SandboxDoctorCommand)
+      .command(SandboxStatusCommand)
+      .command(SandboxOffCommand)
       .command(SandboxEgressCommand)
       .demandCommand(),
   async handler() {},
