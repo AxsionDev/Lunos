@@ -28,6 +28,19 @@ With `OPENCODE_EXPERIMENTAL_WORKSPACES=1`, `/sandbox` in the TUI moves the sessi
 - File changes are never copied across a warp into or out of a sandbox, whoever asks (the TUI, the SDK or the desktop app): its changes come back only through the hand-back. The server refuses such a warp.
 - A sandbox kept by `on_finish` isn't offered for warping again; `lunos sandbox attach <id>` reopens it.
 
+### Turning it off
+
+```sh
+lunos sandbox status            # on or off here, and which config file turns it on
+lunos sandbox off               # off: sandbox.enabled set to false in each file that turns it on
+lunos sandbox off --project     # only this project's config files
+lunos sandbox off --user        # only your own (global) config files
+```
+
+Any file that sets `sandbox.enabled` to `true` turns the sandbox on, so turning it off sets it to `false` in each of them, in place (comments kept; no file is created). Both commands only read and write files: they need neither Docker nor the TUI, so they work when the sandbox keeps Lunos from starting (in PowerShell too). If the sandbox is still on afterwards (another scope's file, or `OPENCODE_CONFIG_CONTENT`), `off` says where and exits with an error. Under `sandbox.required` or an organisation's lock, it refuses and says why and who set it.
+
+In `/settings` (Permissions › Sandbox), the **Sandbox on** row shows what the next start does and where that comes from (`on · set in ~/repo/opencode.json (project)`). Turning it off there does the same as `lunos sandbox off`, asking first when that edits a project's file (it may be shared in the repository), and Lunos restarts without the sandbox. In a sandboxed session the change is saved on this computer, not in the sandbox's copy of the config ("Saved on this computer. Lunos will restart without the sandbox."); the other `sandbox.*` settings are saved on this computer too, and any other setting changed inside the sandbox says that it was saved there only. A restart after a sandbox change is undone if the sandbox then can't start; turning it off never is. After a failure turned the sandbox off here, the row says so and offers **Keep the sandbox off** (sets `sandbox.enabled` to `false`) or **Re-enable the sandbox**.
+
 `--no-sandbox` overrides `sandbox.enabled` for one run. If any config layer (global, project, `OPENCODE_CONFIG_CONTENT`) turns it on, it is on: a repository's own config can't switch off a sandbox you asked for. `sandbox.enabled` applies to `lunos` and `lunos run` only; `lunos serve`, `lunos web`, `lunos acp` and the other commands still run on the host. Sandboxing needs Docker (Docker Desktop, or Docker Engine on Linux) or Podman, rootless included. Lunos uses Docker if it's available, else Podman; `sandbox.runtime` (`"docker"` or `"podman"`) picks one. If neither is available, Lunos says what it tried and stops rather than running on the host.
 
 ## What happens
