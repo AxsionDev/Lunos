@@ -4,6 +4,7 @@ import { Schema } from "effect"
 import { NonNegativeInt, PositiveInt, type DeepMutable } from "../../schema"
 import { ConfigExperimental } from "../../config/experimental"
 import { ConfigReference } from "../../config/reference"
+import { ConfigResource } from "../../config/resource"
 import { ConfigAgentV1 } from "./agent"
 import { ConfigAttachmentV1 } from "./attachment"
 import { ConfigCommandV1 } from "./command"
@@ -46,7 +47,7 @@ export const Info = Schema.Struct({
   }),
   $locked: Schema.optional(Schema.Array(Schema.String)).annotate({
     description:
-      "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, log, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)",
+      "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, log, resources, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)",
   }),
   shell: Schema.optional(Schema.String).annotate({ description: "Default shell to use for terminal and bash tool" }),
   logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
@@ -113,6 +114,10 @@ export const Info = Schema.Struct({
   }),
   references: Schema.optional(ConfigReference.Info).annotate({
     description: "Named git or local directory references",
+  }),
+  resources: Schema.optional(ConfigResource.Info).annotate({
+    description:
+      "Project resources (XCOD-300): files, folders, repositories, web pages and MCP resources given to the agent as context, always or searched when relevant",
   }),
   reference: Schema.optional(ConfigReference.Info).annotate({
     description: "@deprecated Use 'references' field instead. Named git or local directory references",

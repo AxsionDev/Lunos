@@ -22,6 +22,7 @@ import { ConfigMCP } from "./config/mcp"
 import { ConfigPlugin } from "./config/plugin"
 import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
+import { ConfigResource } from "./config/resource"
 import { ConfigResidency } from "./config/residency"
 import { ConfigSubagent } from "./config/subagent"
 import { ConfigVerify } from "./config/verify"
@@ -110,6 +111,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   references: ConfigReference.Info.pipe(Schema.optional).annotate({
     description: "Named local directories or Git repositories available as external context",
+  }),
+  resources: ConfigResource.Info.pipe(Schema.optional).annotate({
+    description:
+      "Project resources (XCOD-300): files, folders, repositories, web pages and MCP resources given to the agent as context, always or searched when relevant",
   }),
   plugins: ConfigPlugin.Plugins.pipe(Schema.optional).annotate({
     description: "Ordered external plugin packages to load",

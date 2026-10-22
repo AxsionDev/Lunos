@@ -33,6 +33,8 @@ export const KNOWN = [
   "sandbox.required",
   // How long run logs are kept (log.retention_days, log.max_mb).
   "log",
+  // XCOD-300: an organisation's project resources, read-only for members, and whether web ones are allowed.
+  "resources",
   // XCOD-213: an organisation's curated Recommended model list.
   "recommended",
   // XCOD-204: an organisation can turn off driving Claude Code / Codex CLI.
