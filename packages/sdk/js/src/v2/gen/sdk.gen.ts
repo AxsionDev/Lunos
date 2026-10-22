@@ -301,6 +301,12 @@ import type {
   QuestionReplyErrors,
   QuestionReplyResponses,
   QuestionV2Reply,
+  ResourceContextErrors,
+  ResourceContextResponses,
+  ResourceExcludeErrors,
+  ResourceExcludeResponses,
+  ResourceListErrors,
+  ResourceListResponses,
   SessionAbortErrors,
   SessionAbortResponses,
   SessionChildrenErrors,
@@ -5500,6 +5506,113 @@ export class Memory extends HeyApiClient {
   }
 }
 
+export class Resource2 extends HeyApiClient {
+  /**
+   * List project resources
+   *
+   * The project's resources with mode, scope, size and index status. Doesn't index anything.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResourceListResponses, ResourceListErrors, ThrowOnError>({
+      url: "/resource",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Exclude a resource for a session
+   *
+   * Leave a resource out of one session's context, or put it back.
+   */
+  public exclude<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+      name?: string
+      excluded?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionID" },
+            { in: "body", key: "name" },
+            { in: "body", key: "excluded" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResourceExcludeResponses, ResourceExcludeErrors, ThrowOnError>({
+      url: "/resource/exclude",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Context breakdown
+   *
+   * What the session's last turn sent as context, in estimated tokens: system prompt, instructions, Always resources, memory, attachments and searched resources.
+   */
+  public context<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      workspace?: string
+      sessionID: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResourceContextResponses, ResourceContextErrors, ThrowOnError>({
+      url: "/resource/context",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Permission extends HeyApiClient {
   /**
    * List pending permissions
@@ -9674,6 +9787,11 @@ export class OpencodeClient extends HeyApiClient {
   private _memory?: Memory
   get memory(): Memory {
     return (this._memory ??= new Memory({ client: this.client }))
+  }
+
+  private _resource?: Resource2
+  get resource(): Resource2 {
+    return (this._resource ??= new Resource2({ client: this.client }))
   }
 
   private _permission?: Permission

@@ -479,6 +479,32 @@ export function Autocomplete(props: {
       ),
   )
 
+  // XCOD-300: project resources by @name, inserted as plain text: the server adds the resource to the turn.
+  const [projectResources] = createResource(
+    () => (store.visible === "@" ? true : undefined),
+    async () => (await sdk.client.resource.list({}).catch(() => undefined))?.data ?? [],
+  )
+  const resourceAliases = createMemo(() =>
+    (projectResources() ?? [])
+      .filter((item) => item.kind !== "reference" && !item.problem)
+      .map(
+        (item): AutocompleteOption => ({
+          display: "@" + item.name,
+          description: ` resource · ${item.mode === "on_demand" ? "@name" : item.mode}${item.description ? ` · ${item.description}` : ""}`,
+          onSelect: () => {
+            const input = props.input()
+            const end = input.cursorOffset
+            input.cursorOffset = store.index
+            const start = input.logicalCursor
+            input.cursorOffset = end
+            const stop = input.logicalCursor
+            input.deleteRange(start.row, start.col, stop.row, stop.col)
+            input.insertText(`@${item.name}${displayCharAt(props.value, end) === " " ? "" : " "}`)
+          },
+        }),
+      ),
+  )
+
   const commands = createMemo((): AutocompleteOption[] => {
     // XCOD-218: in an external session, the tool's own /commands replace Lunos's prompt commands
     // (they're sent to Claude Code / Codex as typed); Lunos's app commands stay unless a name clashes.
@@ -582,7 +608,7 @@ export function Autocomplete(props: {
     const fileOptions: AutocompleteOption[] = store.visible === "@" ? filesValue || [] : []
     const nonFileOptions: AutocompleteOption[] =
       store.visible === "@"
-        ? [...mentions(), ...referenceAliasesValue, ...agentsValue, ...mcpResources()]
+        ? [...mentions(), ...referenceAliasesValue, ...resourceAliases(), ...agentsValue, ...mcpResources()]
         : [...commandsValue]
 
     if (!searchValue) {

@@ -9246,6 +9246,211 @@
         ]
       }
     },
+    "/resource": {
+      "get": {
+        "tags": ["resource"],
+        "operationId": "resource.list",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "sessionID",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project's resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResourceItem"
+                  },
+                  "description": "The project's resources"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The project's resources with mode, scope, size and index status. Doesn't index anything.",
+        "summary": "List project resources",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.resource.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/resource/exclude": {
+      "post": {
+        "tags": ["resource"],
+        "operationId": "resource.exclude",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the resource is now excluded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "description": "Whether the resource is now excluded"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Leave a resource out of one session's context, or put it back.",
+        "summary": "Exclude a resource for a session",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionID": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "excluded": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["sessionID", "name", "excluded"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.resource.exclude({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/resource/context": {
+      "get": {
+        "tags": ["resource"],
+        "operationId": "resource.context",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "sessionID",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The last turn's context, in tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceContext"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "What the session's last turn sent as context, in estimated tokens: system prompt, instructions, Always resources, memory, attachments and searched resources.",
+        "summary": "Context breakdown",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.resource.context({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/permission": {
       "get": {
         "tags": ["permission"],
@@ -26649,6 +26854,209 @@
               ]
             }
           },
+          "resources": {
+            "type": "object",
+            "properties": {
+              "entries": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string",
+                          "description": "A file or folder on this computer. In a project's config it must be inside the project: anything else is a personal resource"
+                        },
+                        "include": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "exclude": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["always", "search", "on_demand"],
+                          "description": "\"always\": in every session's context, within resources.always_tokens. \"search\" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. \"on_demand\": only when a prompt mentions @name"
+                        }
+                      },
+                      "required": ["path"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "description": "A web page or docs site (http or https)"
+                        },
+                        "depth": {
+                          "type": "number",
+                          "enum": [0, 1, 2]
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["always", "search", "on_demand"],
+                          "description": "\"always\": in every session's context, within resources.always_tokens. \"search\" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. \"on_demand\": only when a prompt mentions @name"
+                        }
+                      },
+                      "required": ["url"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "repository": {
+                          "type": "string",
+                          "description": "A git repository URL, cloned on this computer"
+                        },
+                        "branch": {
+                          "type": "string"
+                        },
+                        "include": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "exclude": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["always", "search", "on_demand"],
+                          "description": "\"always\": in every session's context, within resources.always_tokens. \"search\" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. \"on_demand\": only when a prompt mentions @name"
+                        }
+                      },
+                      "required": ["repository"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "server": {
+                          "type": "string",
+                          "description": "A connected MCP server's name"
+                        },
+                        "uri": {
+                          "type": "string",
+                          "description": "The resource's URI on that server"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["always", "search", "on_demand"],
+                          "description": "\"always\": in every session's context, within resources.always_tokens. \"search\" (default): indexed on this computer, and the agent pulls in the relevant parts with project_resources_search. \"on_demand\": only when a prompt mentions @name"
+                        }
+                      },
+                      "required": ["server", "uri"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "always_tokens": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "max_resource_mb": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ],
+                "description": "Largest a single resource may be. Default 50"
+              },
+              "max_index_mb": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ],
+                "description": "Largest the project's resource index may grow. Default 1024"
+              },
+              "refresh_hours": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["NaN"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["-Infinity"]
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ],
+                "description": "How often web, git and MCP resources are fetched again. Default 24"
+              },
+              "web": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "reference": {
             "type": "object",
             "additionalProperties": {
@@ -31584,6 +31992,139 @@
           }
         },
         "required": ["ok"],
+        "additionalProperties": false
+      },
+      "ResourceItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["path", "url", "git", "mcp", "reference"]
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["always", "search", "on_demand"]
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["shared", "personal", "user", "organisation"]
+          },
+          "description": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "trusted": {
+            "type": "boolean"
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "description": "e.g. \"indexed 2 h ago · 143 chunks\""
+          },
+          "tokens": {
+            "type": "number"
+          },
+          "chunks": {
+            "type": "number"
+          },
+          "indexedAt": {
+            "type": "number"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "kind", "mode", "scope", "target", "readOnly", "trusted", "excluded", "state"],
+        "additionalProperties": false
+      },
+      "ResourceContext": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "number"
+          },
+          "system": {
+            "type": "number"
+          },
+          "instructions": {
+            "type": "number"
+          },
+          "always": {
+            "type": "number"
+          },
+          "memory": {
+            "type": "number"
+          },
+          "attachments": {
+            "type": "number"
+          },
+          "searched": {
+            "type": "number"
+          },
+          "mentioned": {
+            "type": "number"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "tokens": {
+                  "type": "number"
+                }
+              },
+              "required": ["name", "tokens"],
+              "additionalProperties": false
+            }
+          },
+          "dropped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "tokens": {
+                  "type": "number"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": ["name", "tokens", "reason"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "time",
+          "system",
+          "instructions",
+          "always",
+          "memory",
+          "attachments",
+          "searched",
+          "mentioned",
+          "resources",
+          "dropped"
+        ],
         "additionalProperties": false
       },
       "PermissionNotFoundError": {
@@ -45975,6 +46516,10 @@
     {
       "name": "memory",
       "description": "Long-term memory routes."
+    },
+    {
+      "name": "resource",
+      "description": "Project resources (XCOD-300)."
     },
     {
       "name": "permission",
