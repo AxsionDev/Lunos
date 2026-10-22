@@ -162,6 +162,9 @@ export function cloudSecretNames(value: string | string[] | undefined): string[]
     .filter(Boolean)
 }
 
+/** XCOD-298: the exit code of a run a budget stopped. */
+export const BUDGET_EXIT = 3
+
 export const RunCommand = effectCmd({
   command: "run [message..]",
   describe: "run opencode with a message",
@@ -876,6 +879,8 @@ export const RunCommand = effectCmd({
         // error event, whichever arrives first; --format json gets exactly one error record. Returns
         // whether JSON mode handled it (as emit does), so text mode is unchanged.
         let errorRecorded = false
+        // XCOD-298: a budget stopped the run (nobody here can answer "run anyway?"): exit code 3.
+        let budgetExceeded = false
         function emitError(error: unknown) {
           // XCOD-211: aborting at the deadline is how an unattended run ends on time, not an error.
           if (timeUp && isAbort(error)) return true
@@ -1004,6 +1009,16 @@ export const RunCommand = effectCmd({
               if ("data" in props.error && props.error.data && "message" in props.error.data) {
                 err = String(props.error.data.message)
               }
+              if (
+                "data" in props.error &&
+                props.error.data &&
+                "ref" in props.error.data &&
+                props.error.data.ref === "budget"
+              ) {
+                budgetExceeded = true
+                err = `budget exceeded: ${err}`
+                if (args.format === "json") process.stderr.write(err + EOL)
+              }
               error = error ? error + EOL + err : err
               RunLog.failure("lunos run: the session", props.error)
               if (emitError(props.error)) continue
@@ -1109,7 +1124,7 @@ export const RunCommand = effectCmd({
             if (RunEnding.interrupted) return
             console.error(e)
             RunLog.failure("lunos run: the event stream", e)
-            process.exitCode = 1
+            process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
           })
           // XCOD-236: an attached run (--attach, --cloud, --sandbox) ends in error as a local one
           // does: non-zero. The session's error event normally arrives with the idle that ends the
@@ -1123,13 +1138,13 @@ export const RunCommand = effectCmd({
                 : []),
             ])
             if (error) {
-              process.exitCode = 1
+              process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
               return
             }
             const failed = args.attach ? messageError(info) : undefined
             if (!failed || (timeUp && isAbort(failed))) return
             if (!emitError(failed)) UI.error(formatRunError(failed))
-            process.exitCode = 1
+            process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
           }
 
           if (args.command) {
@@ -1146,7 +1161,7 @@ export const RunCommand = effectCmd({
             if (RunEnding.interrupted) return
             if (result.error && !(timeUp && isAbort(result.error))) {
               if (!emitError(result.error)) UI.error(formatRunError(result.error))
-              process.exitCode = 1
+              process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
               return
             }
             await finish(result.data)
@@ -1166,7 +1181,7 @@ export const RunCommand = effectCmd({
           if (RunEnding.interrupted) return
           if (result.error && !(timeUp && isAbort(result.error))) {
             if (!emitError(result.error)) UI.error(formatRunError(result.error))
-            process.exitCode = 1
+            process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
             return
           }
           await finish(result.data)

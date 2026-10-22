@@ -369,6 +369,158 @@
       },
       "additionalProperties": false
     },
+    "BudgetLimit": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "exclusiveMinimum": 0,
+          "description": "The budget for each period, in budget.currency",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "enum": ["NaN"]
+            },
+            {
+              "type": "string",
+              "enum": ["Infinity"]
+            },
+            {
+              "type": "string",
+              "enum": ["-Infinity"]
+            }
+          ]
+        },
+        "period": {
+          "type": "string",
+          "enum": ["monthly", "weekly", "total"],
+          "description": "\"monthly\" (default): resets on reset_day each month. \"weekly\": resets every Monday. \"total\": one amount for the project, never reset"
+        },
+        "reset_day": {
+          "minimum": 1,
+          "maximum": 28,
+          "type": "integer",
+          "description": "With a monthly period: the day of the month it resets on, 1 to 28. Default 1"
+        },
+        "per_session": {
+          "exclusiveMinimum": 0,
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "enum": ["NaN"]
+            },
+            {
+              "type": "string",
+              "enum": ["Infinity"]
+            },
+            {
+              "type": "string",
+              "enum": ["-Infinity"]
+            }
+          ],
+          "description": "Most one session may spend, its subagents included, in budget.currency"
+        },
+        "per_day": {
+          "exclusiveMinimum": 0,
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "enum": ["NaN"]
+            },
+            {
+              "type": "string",
+              "enum": ["Infinity"]
+            },
+            {
+              "type": "string",
+              "enum": ["-Infinity"]
+            }
+          ],
+          "description": "Most the project may spend in one day, in budget.currency"
+        },
+        "on_limit": {
+          "type": "string",
+          "enum": ["warn", "ask", "stop"],
+          "description": "What happens at the limit for this budget; default budget.on_limit"
+        }
+      },
+      "required": ["amount"],
+      "additionalProperties": false
+    },
+    "BudgetConfig": {
+      "type": "object",
+      "properties": {
+        "on_limit": {
+          "type": "string",
+          "enum": ["warn", "ask", "stop"],
+          "description": "When a turn may take a project over its budget. \"warn\": a warning, and the turn runs. \"ask\" (default): you choose to run it anyway, pick a cheaper model or stop. \"stop\": no new turn or step starts until the period resets or the budget is raised; a step already running finishes. In `lunos run`, CI and unattended runs nobody can answer, so \"ask\" stops, and the run exits with code 3"
+        },
+        "thresholds": {
+          "type": "array",
+          "items": {
+            "minimum": 1,
+            "maximum": 1000,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              }
+            ]
+          },
+          "description": "Percentages of a budget at which you're alerted, once each per period. Default [50, 80, 100]"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["EUR", "USD"],
+          "description": "The currency budgets are in: \"EUR\" (default) or \"USD\""
+        },
+        "usd_rate": {
+          "exclusiveMinimum": 0,
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "enum": ["NaN"]
+            },
+            {
+              "type": "string",
+              "enum": ["Infinity"]
+            },
+            {
+              "type": "string",
+              "enum": ["-Infinity"]
+            }
+          ],
+          "description": "With budget.currency \"EUR\": what 1 USD is in EUR, for model prices (which are in USD). A fixed rate you set; Lunos never fetches one. Default 0.9"
+        },
+        "organisation": {
+          "$ref": "#/$defs/BudgetLimit",
+          "description": "Your organisation's budget for everything Lunos spends on this computer. Enforced only from managed config locked with \"$locked\": [\"budget.organisation\"], so members see it but can't raise it. Where a project budget applies too, whichever is reached first stops"
+        }
+      },
+      "additionalProperties": false
+    },
     "LogConfig": {
       "type": "object",
       "properties": {
@@ -624,6 +776,10 @@
         "client_start": {
           "type": "boolean",
           "description": "Tell your organisation's Lunos console (cloud.policy) when Lunos starts: version, OS, architecture, surface, a random install id and the policy in effect (default true). Read from managed and user config only; your organisation can lock it on"
+        },
+        "cost_report": {
+          "type": "boolean",
+          "description": "Report each model step's cost to your organisation's Lunos console (cloud.policy), so it can add up organisation project budgets: the amount, the model and the project's id, never content (default false). Read from managed and user config only; never sent for a personal account"
         },
         "auto_team": {
           "type": "boolean",
@@ -1630,6 +1786,10 @@
         "memory": {
           "$ref": "#/$defs/MemoryConfig",
           "description": "Graph-based long-term memory, off by default"
+        },
+        "budget": {
+          "$ref": "#/$defs/BudgetConfig",
+          "description": "Project budgets: what happens at the limit, alert thresholds, the currency, and the organisation's budget (managed config)"
         },
         "sandbox": {
           "type": "object",

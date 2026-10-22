@@ -32,6 +32,7 @@ import { ConfigExternal } from "@opencode-ai/core/config/external"
 
 export const CATEGORIES = [
   "Models & agents",
+  "Projects",
   "Permissions",
   "Residency & privacy",
   "Memory",
@@ -52,6 +53,8 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   subagent: "Models & agents",
   // XCOD-288: how the Build agent checks its work before handing back.
   verify: "Models & agents",
+  // XCOD-298: Settings › Projects › Budgets (the named projects themselves aren't config).
+  budget: "Projects",
   cloud: "Advanced / experimental",
   auth: "Advanced / experimental",
   sync: "Advanced / experimental",
@@ -113,6 +116,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
  */
 export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
   "Models & agents": ["Models", "Agents", "Subagents", "Providers", "External sessions"],
+  Projects: ["Projects", "Budgets"],
   Permissions: ["Rules", "Tools", "Sandbox"],
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
   Memory: ["Overview", "Settings", "Advanced"],
@@ -123,6 +127,7 @@ export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
 
 /** Top-level keys (or `tui.` keys) whose sub-tab isn't their section's first. */
 const SUBTAB: Record<string, string> = {
+  budget: "Budgets",
   agent: "Agents",
   agent_import: "Agents",
   verify: "Agents",

@@ -3057,6 +3057,68 @@
         ]
       }
     },
+    "/experimental/budget": {
+      "get": {
+        "tags": ["experimental"],
+        "operationId": "experimental.budget.status",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "sessionID",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Budget status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Where the budgets of this directory's (or the session's) project stand, and, for a session, the estimate of its next turn as the prompt shows it.",
+        "summary": "Budget status",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.budget.status({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/experimental/project-group": {
       "get": {
         "tags": ["experimental"],
@@ -26200,6 +26262,164 @@
         },
         "additionalProperties": false
       },
+      "BudgetLimit": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          },
+          "period": {
+            "type": "string",
+            "enum": ["monthly", "weekly", "total"]
+          },
+          "reset_day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 28
+          },
+          "per_session": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "Most one session may spend, its subagents included, in budget.currency"
+          },
+          "per_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "Most the project may spend in one day, in budget.currency"
+          },
+          "on_limit": {
+            "type": "string",
+            "enum": ["warn", "ask", "stop"]
+          }
+        },
+        "required": ["amount"],
+        "additionalProperties": false
+      },
+      "BudgetConfig": {
+        "type": "object",
+        "properties": {
+          "on_limit": {
+            "type": "string",
+            "enum": ["warn", "ask", "stop"]
+          },
+          "thresholds": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "enum": ["NaN"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["Infinity"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["-Infinity"]
+                },
+                {
+                  "type": "string",
+                  "enum": ["Infinity", "-Infinity", "NaN"]
+                }
+              ]
+            }
+          },
+          "currency": {
+            "type": "string",
+            "enum": ["EUR", "USD"]
+          },
+          "usd_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["NaN"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["-Infinity"]
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ],
+            "description": "With budget.currency \"EUR\": what 1 USD is in EUR, for model prices (which are in USD). A fixed rate you set; Lunos never fetches one. Default 0.9"
+          },
+          "organisation": {
+            "$ref": "#/components/schemas/BudgetLimit"
+          }
+        },
+        "additionalProperties": false
+      },
       "LogConfig": {
         "type": "object",
         "properties": {
@@ -26364,6 +26584,9 @@
             "type": "string"
           },
           "client_start": {
+            "type": "boolean"
+          },
+          "cost_report": {
             "type": "boolean"
           },
           "auto_team": {
@@ -27257,6 +27480,9 @@
           },
           "memory": {
             "$ref": "#/components/schemas/MemoryConfig"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/BudgetConfig"
           },
           "sandbox": {
             "type": "object",
@@ -29686,6 +29912,107 @@
             }
           }
         }
+      },
+      "BudgetStatusItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["project", "organisation"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string",
+            "enum": ["EUR", "USD"]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "spent": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "number"
+          },
+          "percent": {
+            "type": "number"
+          },
+          "unknown": {
+            "type": "number"
+          },
+          "forecast": {
+            "type": "number"
+          },
+          "on_limit": {
+            "type": "string",
+            "enum": ["warn", "ask", "stop"]
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": ["key", "label"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "name",
+          "locked",
+          "currency",
+          "amount",
+          "spent",
+          "remaining",
+          "percent",
+          "unknown",
+          "on_limit",
+          "period"
+        ],
+        "additionalProperties": false
+      },
+      "BudgetStatus": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name"],
+            "additionalProperties": false
+          },
+          "budgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetStatusItem"
+            }
+          },
+          "line": {
+            "type": "string"
+          }
+        },
+        "required": ["project", "budgets", "line"],
+        "additionalProperties": false
       },
       "ProjectGroup": {
         "type": "object",

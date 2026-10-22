@@ -19,7 +19,10 @@ import { RunBudget } from "./run-budget"
  *   by itself: they can't wind a run down on Windows, where kill() ends the process outright.
  */
 
-export type Reason = "completed" | "failed" | "time" | "cost" | "steps"
+export type Reason = "completed" | "failed" | "time" | "cost" | "steps" | "budget"
+
+/** XCOD-298: `lunos run`'s exit code when a project or organisation budget stopped it. */
+export const BUDGET_EXIT = 3
 
 export interface Report {
   agent: string
@@ -173,7 +176,9 @@ export async function run(input: {
   // A limit reached is a success if the child then ended cleanly (results handed back); the reason
   // still says which limit. A child that had to be killed, or failed to hand back, failed.
   const ok = exitCode === 0 && !stuck && (reason !== undefined || !error)
-  const final: Reason = reason ?? (ok ? "completed" : "failed")
+  // XCOD-298: a budget stopped it. Like a limit, the work done until then is handed back, but the
+  // budget isn't the run's own limit, so it's reported as not ok, with its own reason.
+  const final: Reason = reason ?? (exitCode === BUDGET_EXIT && !stuck ? "budget" : ok ? "completed" : "failed")
   if (!ok && !error) error = stderr.trim().split("\n").slice(-5).join("\n") || `exit code ${exitCode}`
   const results = handedBack(stderr)
   const end = now()

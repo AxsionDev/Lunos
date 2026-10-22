@@ -160,6 +160,35 @@ export const ProjectGroupMovePayload = Schema.Struct({
   projectID: Schema.optional(Schema.String),
 })
 
+// XCOD-298: where a project's budgets stand, and the line the prompt shows before a turn.
+export const BudgetStatusItem = Schema.Struct({
+  id: Schema.String,
+  scope: Schema.Literals(["project", "organisation"]),
+  name: Schema.String,
+  locked: Schema.Boolean,
+  currency: Schema.Literals(["EUR", "USD"]),
+  amount: Schema.Finite,
+  spent: Schema.Finite,
+  remaining: Schema.Finite,
+  percent: Schema.Finite,
+  unknown: Schema.Finite,
+  forecast: Schema.optional(Schema.Finite),
+  on_limit: Schema.Literals(["warn", "ask", "stop"]),
+  period: Schema.Struct({ key: Schema.String, label: Schema.String }),
+}).annotate({ identifier: "BudgetStatusItem" })
+
+export const BudgetStatusResponse = Schema.Struct({
+  project: Schema.Struct({ id: Schema.String, name: Schema.String }),
+  budgets: Schema.mutable(Schema.Array(BudgetStatusItem)),
+  /** "est. €0.08–0.30 · €12.40 left of €50 (Oct)"; empty when there's nothing to show. */
+  line: Schema.String,
+}).annotate({ identifier: "BudgetStatus" })
+
+export const BudgetStatusQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  sessionID: Schema.optional(Schema.String),
+})
+
 // XCOD-250: what /claude and /codex show before anything starts.
 export const ExternalToolStatus = Schema.Struct({
   tool: Schema.Literals(["claude", "codex"]),
@@ -413,6 +442,7 @@ export const ExperimentalPaths = {
   sessionGroup: "/experimental/session-group/:groupID",
   sessionGroupMove: "/experimental/session-group/move",
   projectGroups: "/experimental/project-group",
+  budgetStatus: "/experimental/budget",
   projectGroup: "/experimental/project-group/:groupID",
   projectGroupFolders: "/experimental/project-group/:groupID/folders",
   projectGroupFoldersRemove: "/experimental/project-group/:groupID/folders/remove",
@@ -804,6 +834,17 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.sessionGroup.delete",
             summary: "Delete session group",
             description: "Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.",
+          }),
+        ),
+        HttpApiEndpoint.get("budgetStatus", ExperimentalPaths.budgetStatus, {
+          query: BudgetStatusQuery,
+          success: described(BudgetStatusResponse, "Budget status"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.budget.status",
+            summary: "Budget status",
+            description:
+              "Where the budgets of this directory's (or the session's) project stand, and, for a session, the estimate of its next turn as the prompt shows it.",
           }),
         ),
         HttpApiEndpoint.get("projectGroupList", ExperimentalPaths.projectGroups, {

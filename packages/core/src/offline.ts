@@ -187,6 +187,16 @@ export const CALLS: Call[] = [
     alsoOffBy: '`"cloud": { "client_start": false }` in user config, unless your organisation locks it',
   },
   {
+    // XCOD-298: amount, model and project id per model step; off by default, never for a personal account.
+    id: "cost-report",
+    what: "Cost reports to your Lunos console: each model step's amount, model and project id (no content)",
+    hosts:
+      "the console in `cloud.policy`, or cloud.lunos.tech for your hosted organisation (`/v1/orgs/<org>/usage/turns`)",
+    when: 'after each model step, only with `"cloud": { "cost_report": true }` in managed or user config (off by default)',
+    offline: "blocked",
+    alsoOffBy: "leaving `cloud.cost_report` unset (the default)",
+  },
+  {
     // XCOD-191: the console managed config names; on even offline, like org-policy.
     id: "console-share",
     what: 'Sharing with your organisation (`"share": "cloud"`): `/share`, `lunos share`, `lunos memory share`, and the region check before each (`GET <console>/v1`)',

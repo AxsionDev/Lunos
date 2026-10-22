@@ -438,6 +438,52 @@ projects again; `lunos project archive <project> --undo` brings it back.
 
 ---
 
+### budget
+
+Project budgets. A project's budget is kept on this computer with the project, never in a config
+file a repository could change. Every model step in the project counts against it, subagents',
+`lunos run`'s and scheduled agents' included, and Claude Code turns at the cost Claude Code reports.
+Prices come from the model catalogue, in USD, converted at `budget.usd_rate` (a fixed rate you set;
+default 0.9). A model without a price counts as "unknown cost", never as 0: set one with
+`provider.<id>.models.<id>.cost`.
+
+```bash
+lunos budget set "Axsion web" 50                     # €50 a month, from the 1st
+lunos budget set . 200 --period total --per-day 20   # this folder's project
+lunos budget status --json
+lunos budget export --period 2026-10 -o october.csv
+lunos budget set "Axsion web" --clear
+```
+
+Before every step, Lunos checks what's left. At the start of a turn it also checks the turn's
+estimate (from the context size, the model's price and the session's recent turns). What happens at
+the limit is `budget.on_limit`, or `--on-limit` for one project:
+
+- `warn`: a warning, and the turn runs.
+- `ask` (the default): you choose **Run anyway**, **Use a cheaper model…** or **Stop**.
+- `stop`: no new turn or step starts until the period resets or the budget is raised. A step
+  already running always finishes.
+
+In `lunos run`, CI and unattended agents nobody can answer, so `ask` stops, and the run exits with
+code 3 and "budget exceeded". Each of `budget.thresholds` (default 50, 80 and 100%) alerts once per
+period. An organisation's budget comes from managed config, `budget.organisation` locked with
+`"$locked": ["budget.organisation"]`; members see it and can't raise it.
+
+#### Flags
+
+| Flag                                        | Description                                                          |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| <nobr><code>{"--project"}</code></nobr>     | With `status` and `export`: a named project; default: this folder's  |
+| <nobr><code>{"--json"}</code></nobr>        | With `status` and `set`: print JSON                                  |
+| <nobr><code>{"--period"}</code></nobr>      | With `set`: `monthly`, `weekly` or `total`; with `export`: `2026-10` |
+| <nobr><code>{"--reset-day"}</code></nobr>   | With `set --period monthly`: the day it resets on, 1 to 28           |
+| <nobr><code>{"--per-session"}</code></nobr> | With `set`: the most one session may spend, subagents included       |
+| <nobr><code>{"--per-day"}</code></nobr>     | With `set`: the most the project may spend in a day                  |
+| <nobr><code>{"--on-limit"}</code></nobr>    | With `set`: `warn`, `ask` or `stop` for this project                 |
+| <nobr><code>{"--output"}</code></nobr>      | With `export`: write the CSV to this file                            |
+
+---
+
 ### session
 
 Manage Lunos sessions.
@@ -506,12 +552,13 @@ opencode stats
 
 #### Flags
 
-| Flag                                    | Description                                                                 |
-| --------------------------------------- | --------------------------------------------------------------------------- |
-| <nobr><code>{"--days"}</code></nobr>    | Show stats for the last N days (all time)                                   |
-| <nobr><code>{"--tools"}</code></nobr>   | Number of tools to show (all)                                               |
-| <nobr><code>{"--models"}</code></nobr>  | Show model usage breakdown (hidden by default). Pass a number to show top N |
-| <nobr><code>{"--project"}</code></nobr> | Filter by project (all projects, empty string: current project)             |
+| Flag                                    | Description                                                                                                                 |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| <nobr><code>{"--days"}</code></nobr>    | Show stats for the last N days (all time)                                                                                   |
+| <nobr><code>{"--tools"}</code></nobr>   | Number of tools to show (all)                                                                                               |
+| <nobr><code>{"--models"}</code></nobr>  | Show model usage breakdown (hidden by default). Pass a number to show top N                                                 |
+| <nobr><code>{"--project"}</code></nobr> | Filter by project: a named project's name or id, or a repository project's id (all projects, empty string: current project) |
+| <nobr><code>{"--json"}</code></nobr>    | Print the statistics as JSON                                                                                                |
 
 ---
 

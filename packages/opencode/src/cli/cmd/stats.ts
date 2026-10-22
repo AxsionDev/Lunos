@@ -6,6 +6,7 @@ import { Database } from "@opencode-ai/core/database/database"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { Project } from "@/project/project"
 import { InstanceRef } from "@/effect/instance-ref"
+import { ProjectGroup } from "@/project/group"
 
 interface SessionStats {
   totalSessions: number
@@ -63,13 +64,19 @@ export const StatsCommand = effectCmd({
         describe: "show model statistics (default: hidden). Pass a number to show top N, otherwise shows all",
       })
       .option("project", {
-        describe: "filter by project (default: all projects, empty string: current project)",
+        describe:
+          "filter by project: a named project (name or id) or a repository project's id (default: all projects, empty string: current project)",
         type: "string",
-      }),
+      })
+      .option("json", { describe: "print the statistics as JSON", type: "boolean", default: false }),
   handler: Effect.fn("Cli.stats")(function* (args) {
     const ctx = yield* InstanceRef
     if (!ctx) return
     const stats = yield* aggregateSessionStats(args.days, args.project, ctx.project)
+    if (args.json) {
+      process.stdout.write(JSON.stringify(stats, null, 2) + "\n")
+      return
+    }
     let modelLimit: number | undefined
     if (args.models === true) {
       modelLimit = Infinity
@@ -117,7 +124,25 @@ const aggregateSessionStats = Effect.fn("Cli.stats.aggregate")(function* (
       if (!currentProject) throw new Error("currentProject required when projectFilter is empty string")
       filteredSessions = filteredSessions.filter((session) => session.projectID === currentProject.id)
     } else {
-      filteredSessions = filteredSessions.filter((session) => session.projectID === projectFilter)
+      // XCOD-298: a named project (by name or id) counts the sessions of all its folders.
+      const group = yield* Effect.promise(() => ProjectGroup.get(projectFilter))
+      if (group) {
+        const snapshot = yield* Effect.promise(() => ProjectGroup.snapshot())
+        const byID = new Map(sessions.map((session) => [session.id as string, session]))
+        const ref = (id: string): ProjectGroup.SessionRef | undefined => {
+          const session = byID.get(id)
+          return session
+            ? {
+                id: session.id,
+                directory: session.directory,
+                ...(session.parentID ? { parentID: session.parentID } : {}),
+              }
+            : undefined
+        }
+        filteredSessions = filteredSessions.filter(
+          (session) => snapshot.forSession(ref(session.id)!, ref)?.id === group.id,
+        )
+      } else filteredSessions = filteredSessions.filter((session) => session.projectID === projectFilter)
     }
   }
 

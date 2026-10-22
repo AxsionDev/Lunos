@@ -25,6 +25,7 @@ import {
   ExternalConfigCommandPayload,
   SessionEnqueuePayload,
   SessionTakeoverPayload,
+  BudgetStatusQuery,
   ProjectGroupCreatePayload,
   ProjectGroupFoldersPayload,
   ProjectGroupMovePayload,
@@ -44,6 +45,10 @@ import {
 import { InvalidRequestError, notFound } from "../errors"
 import { SessionGroups } from "@/session/groups"
 import { ProjectGroup } from "@/project/group"
+import { Budget } from "@/budget"
+import { BudgetEstimate } from "@/budget/estimate"
+import { Database } from "@opencode-ai/core/database/database"
+import { Provider } from "@/provider/provider"
 import { SessionLive } from "@/session/live"
 import { SessionPeers } from "@/session/peers"
 import { SessionPeerControl } from "@/session/peer-control"
@@ -128,6 +133,8 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const background = yield* BackgroundJob.Service
     const runState = yield* SessionRunState.Service
     const flags = yield* RuntimeFlags.Service
+    const database = yield* Database.Service
+    const provider = yield* Provider.Service
     SessionLive.start()
     SessionLive.withControl(SessionPeerControl.start)
     publishGroupChanges()
@@ -335,6 +342,68 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       payload: typeof SessionBulkPayload.Type
     }) {
       return yield* SessionBulk.preview(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+
+    const budgetStatus = Effect.fn("ExperimentalHttpApi.budgetStatus")(function* (ctx: {
+      query: typeof BudgetStatusQuery.Type
+    }) {
+      const instance = yield* InstanceState.context
+      const cfg = (yield* config.get()) as Budget.Config
+      const repo = { id: instance.project.id, worktree: instance.project.worktree, name: instance.project.name }
+      const session = ctx.query.sessionID
+        ? yield* sessions.get(ctx.query.sessionID as SessionID).pipe(Effect.option)
+        : Option.none()
+      const info = Option.getOrUndefined(session)
+      const where = {
+        directory: info?.directory ?? instance.directory,
+        project: repo,
+        ...(info ? { session: { id: info.id, ...(info.parentID ? { parentID: info.parentID } : {}) } } : {}),
+      }
+      const { group } = yield* Budget.applicable(where, cfg).pipe(Effect.provideService(Database.Service, database))
+      const list = yield* Budget.status(where, cfg).pipe(Effect.provideService(Database.Service, database))
+      // The next turn's estimate, from the session's recent turns and its model's price.
+      let estimate: BudgetEstimate.Range | undefined
+      let unpriced = false
+      if (info) {
+        const messages = yield* sessions
+          .messages({ sessionID: info.id, limit: 200 })
+          .pipe(Effect.orElseSucceed(() => []))
+        const last = messages.findLast((message) => message.info.role === "assistant")?.info as
+          | { providerID?: string; modelID?: string }
+          | undefined
+        const model =
+          last?.providerID && last.modelID
+            ? yield* provider.getModel(last.providerID as never, last.modelID as never).pipe(Effect.option)
+            : Option.none()
+        const price = Option.getOrUndefined(model)?.cost
+        if (Option.isSome(model)) {
+          estimate = BudgetEstimate.estimate({ ...Budget.turnsOf(messages), price })
+          unpriced = !estimate
+        }
+      }
+      const tightest = Budget.tightest(list)
+      return {
+        project: { id: group.id, name: group.name },
+        budgets: list.map((item) => ({
+          id: item.id,
+          scope: item.scope,
+          name: item.project.name,
+          locked: item.locked,
+          currency: item.currency,
+          amount: item.amount,
+          spent: item.spent,
+          remaining: item.remaining,
+          percent: item.percent,
+          unknown: item.unknown,
+          ...(item.forecast !== undefined ? { forecast: item.forecast } : {}),
+          on_limit: item.on_limit,
+          period: { key: item.period.key, label: item.period.label },
+        })),
+        line:
+          list.length || unpriced
+            ? Budget.line({ estimate, unpriced, status: tightest, settings: Budget.settings(cfg) })
+            : "",
+      }
     })
 
     const projectGroupList = Effect.fn("ExperimentalHttpApi.projectGroupList")(function* () {
@@ -780,6 +849,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionBulkUnarchive", sessionBulkUnarchive)
       .handle("sessionBulkDelete", sessionBulkDelete)
       .handle("sessionBulkPreview", sessionBulkPreview)
+      .handle("budgetStatus", budgetStatus)
       .handle("projectGroupList", projectGroupList)
       .handle("projectGroupCreate", projectGroupCreate)
       .handle("projectGroupUpdate", projectGroupUpdate)
