@@ -3,6 +3,7 @@ import { onCleanup } from "solid-js"
 import { stepVolume } from "@opencode-ai/ui/sounds"
 import type { TuiAttentionSoundName } from "@opencode-ai/plugin/tui"
 import { currentAttention } from "../attention"
+import type { TuiConfig } from "../config"
 import * as TuiAudio from "../audio"
 import { useTheme } from "../context/theme"
 import { useDialog, type DialogNav } from "../ui/dialog"
@@ -21,6 +22,16 @@ type Save = (row: SettingRow, value: string, options?: { reopen?: boolean; unset
 /** The sound an event plays when nothing is chosen for it, by the active pack. */
 export function packSound(event: string) {
   return currentAttention()?.packSound(event as TuiAttentionSoundName)
+}
+
+/**
+ * After a save: the running config, and for the pack the soundboard too, since a pack activated
+ * before (and remembered) wins over the config's `sound_pack`.
+ */
+export function applySaved(attention: TuiConfig.Resolved["attention"], key: string, value: unknown) {
+  SoundSettings.apply(attention, key, value)
+  if (key === SoundSettings.PREFIX + "sound_pack")
+    currentAttention()?.soundboard.activate(attention.sound_pack, { persist: true })
 }
 
 /** A sound pack's name, for the row and the picker. */
@@ -42,16 +53,14 @@ function usePreview(player: (sound: string) => Promise<(() => void) | undefined>
 const play = async (sound: string, volume?: number) => (await currentAttention()?.preview(sound, volume)) ?? undefined
 
 /**
- * The first highlight a picker reports is its current value on opening, not a move: that one
- * doesn't play, so opening a picker is silent.
+ * A picker reports its current value as a highlight when it opens (when it has one), which isn't a
+ * move: that report doesn't play, so opening a picker is silent. Every later highlight does.
  */
-function afterFirst<T>(fn: (value: T) => void) {
-  let first = true
+function skipOpening<T>(opening: T | undefined, fn: (value: T) => void) {
+  let moved = false
   return (value: T) => {
-    if (first) {
-      first = false
-      return
-    }
+    if (!moved && value === opening) return
+    moved = true
     fn(value)
   }
 }
@@ -59,7 +68,9 @@ function afterFirst<T>(fn: (value: T) => void) {
 function VolumePicker(props: { row: SettingRow; current: number; onPick: (volume: number) => void }) {
   // At each level, the finished sound. What's previewed is the level, so moving through levels debounces.
   const preview = usePreview((volume) => play(packSound("done") ?? "bip-bop-01", Number(volume)))
-  const move = afterFirst((volume: number) => preview.play(volume > 0 ? String(volume) : undefined))
+  const move = skipOpening(stepVolume(props.current), (volume: number) =>
+    preview.play(volume > 0 ? String(volume) : undefined),
+  )
   return (
     <DialogSelect<number>
       title={props.row.label}
@@ -87,7 +98,7 @@ function EventSoundPicker(props: {
 }) {
   const preview = usePreview((sound) => play(sound))
   const isSound = (value: string) => value !== SoundSettings.CUSTOM_FILE && value !== SoundSettings.PACK_DEFAULT
-  const move = afterFirst((value: string) =>
+  const move = skipOpening(props.current ?? props.packDefault, (value: string) =>
     preview.play(
       value === SoundSettings.PACK_DEFAULT ? props.packDefault : isSound(value) && value !== "none" ? value : undefined,
     ),

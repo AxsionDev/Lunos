@@ -39,7 +39,7 @@ import { DialogAccount } from "./dialog-account"
 import { DialogProject, DialogProjects, folderCount } from "./dialog-projects"
 import { AccountContext } from "../context/account"
 import { useTuiConfig } from "../config"
-import { packName, packSound, useSoundSettingsEditor } from "./dialog-sound-settings"
+import { applySaved, packName, packSound, useSoundSettingsEditor } from "./dialog-sound-settings"
 import * as SoundSettings from "../util/sound-settings"
 import {
   AGENT_NAME,
@@ -533,7 +533,7 @@ export function DialogSettings(props: {
     if (row.key === "tui.theme" && typeof data.value === "string") themeState.set(data.value)
     // XCOD-311: alerts read their config on every alert; this makes the change heard at once.
     if (row.key.startsWith(SoundSettings.PREFIX))
-      SoundSettings.apply(tuiConfig.attention, row.key, options.unset ? undefined : data.value)
+      applySaved(tuiConfig.attention, row.key, options.unset ? undefined : data.value)
     // XCOD-297: turned off. Saved on this computer (by the host when this is a sandbox), and the
     // restart starts without it; it isn't asked about, since the toast says it happens.
     if (row.key === "sandbox.enabled" && data.value === false && !options.unset && data.changed) {
