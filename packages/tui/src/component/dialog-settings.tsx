@@ -34,6 +34,8 @@ import * as ProjectSection from "../util/project-section"
 import * as ProjectTheme from "../util/project-theme"
 import type { ProjectRef } from "../util/project-theme"
 import { projectSettingsChanged } from "./project-section"
+import * as RightPane from "../util/right-pane"
+import { useKV } from "../context/kv"
 import { DialogMemory } from "./dialog-memory"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogExternalConfig } from "./dialog-external-config"
@@ -85,6 +87,8 @@ const EXTERNAL_AREA = "Models & agents"
 /** XCOD-298: named projects aren't config keys; the Projects section lists them. */
 const PROJECTS = "Projects"
 const EXTERNAL_SUB = "External sessions"
+const APPEARANCE = "Appearance"
+const PANE_VIEWS: readonly RightPane.PaneView[] = ["session", "external", "monitor"]
 
 /** XCOD-254: the footer of a tool's sharing row. */
 export function consentLabel(consent: "share" | "never" | undefined) {
@@ -115,6 +119,34 @@ export function DialogSettings(props: {
   const keymap = useOpencodeKeymap()
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
+  const kv = useKV()
+
+  /** XCOD-307: the right pane, per view; the pane's keybind and » / « write the same value. */
+  function pickPane(view: RightPane.PaneView) {
+    const key = RightPane.PANE_KEY[view]
+    // The Agent Monitor's list is shown whenever the terminal is wide enough, so it's on or hidden.
+    const choices = view === "monitor" ? (["auto", "hide"] as const) : RightPane.PANES
+    dialog.replace(
+      () => (
+        <DialogSelect<RightPane.Pane>
+          title={RightPane.PANE_VIEW_LABEL[view]}
+          skipFilter
+          current={RightPane.pane(kv.get(key))}
+          options={choices.map((value) => ({
+            title: view === "monitor" && value === "auto" ? "Shown" : RightPane.PANE_LABEL[value],
+            value,
+            description: view === "monitor" && value === "auto" ? "beside the prompt" : RightPane.PANE_HELP[value],
+          }))}
+          onSelect={(option) => {
+            kv.set(key, option.value)
+            reopen(`+pane.${view}`)
+          }}
+        />
+      ),
+      undefined,
+      backTo(`+pane.${view}`),
+    )
+  }
 
   const [tab, setTab] = createSignal<Tab>(props.tab ?? "settings")
   // XCOD-306: a project's settings save to its own config (Shared) unless switched with ctrl+s.
@@ -1140,6 +1172,17 @@ export function DialogSettings(props: {
         { title: "All projects…", value: "+projects", footer: "/projects" },
         ...list,
       ]
+    // XCOD-307: Appearance › Layout starts with the right pane, per view. It's kept on this computer
+    // (kv.json, as the pane keybind keeps it), not in config, so it isn't a setting row.
+    if (props.area === APPEARANCE && sub() === "Layout" && !query())
+      return [
+        ...PANE_VIEWS.map((view) => ({
+          title: RightPane.PANE_VIEW_LABEL[view],
+          value: `+pane.${view}`,
+          footer: RightPane.PANE_LABEL[RightPane.pane(kv.get(RightPane.PANE_KEY[view]))],
+        })),
+        ...list,
+      ]
     // XCOD-281: Permissions › Sandbox starts with the last failure, while it holds the sandbox off.
     const failure = sandboxFailure()
     if (props.area === "Permissions" && sub() === "Sandbox" && !query() && failure)
@@ -1187,6 +1230,13 @@ export function DialogSettings(props: {
       return (
         <text fg={theme.textMuted} wrapMode="word">
           Memory at a glance: its status, a guided setup, and what's in it. Tab for every setting.
+        </text>
+      )
+    if (synthetic?.startsWith("+pane."))
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          The pane on the right of a session: Auto shows it on a wide terminal and opens it over the conversation below
+          that. Its keybind and the » and « buttons change the same choice. Kept on this computer.
         </text>
       )
     if (synthetic === "+project.theme")
@@ -1437,6 +1487,8 @@ export function DialogSettings(props: {
                     undefined,
                     backTo(option.value),
                   )
+                if (option.value.startsWith("+pane."))
+                  return pickPane(option.value.slice("+pane.".length) as RightPane.PaneView)
                 if (option.value.startsWith("+sandbox.")) return sandboxAction(option.value.slice("+sandbox.".length))
                 if (option.value.startsWith("+external.config.")) {
                   const tool = option.value.slice("+external.config.".length) as "claude" | "codex"

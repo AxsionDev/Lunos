@@ -45,6 +45,8 @@ import {
 import { forgetWaiting, toggle, type Overrides } from "../util/subagent-groups"
 import { errorMessage } from "../util/error"
 import { useProjectTheme } from "../component/project-section"
+import { PANE_KEY, pane } from "../util/right-pane"
+import { PaneChip, PaneHide } from "../component/right-pane"
 import { externalAccent, type ExternalTool } from "../util/external"
 import { Locale } from "../util/locale"
 import {
@@ -131,6 +133,16 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
   const removeSessions = useSessionDelete()
   const back = () => route.navigate(monitorReturn(props.params))
   const narrow = createMemo(() => dimensions().width < NARROW)
+  // XCOD-307: the rail can be hidden on a wide terminal, and is remembered apart from the session
+  // pane. Narrow, it stays the Tab overlay it was.
+  const railHidden = createMemo(() => !narrow() && pane(kv.get(PANE_KEY.monitor)) === "hide")
+  const toggleRail = () => {
+    if (narrow()) return setFocus((value) => (value === "prompt" ? "rail" : "prompt"))
+    kv.set(PANE_KEY.monitor, railHidden() ? "auto" : "hide")
+  }
+  createEffect(() => {
+    if (railHidden()) setFocus("prompt")
+  })
 
   // Loading, as /sessions does: one request at a time, events coalesced.
   let inflight = false
@@ -728,7 +740,8 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       .join(",")
     return key ? { ...binding, key } : undefined
   }
-  const toggleFocus = () => setFocus((value) => (value === "prompt" ? "rail" : "prompt"))
+  // A hidden rail can't take focus; « or the pane keybind brings it back.
+  const toggleFocus = () => !railHidden() && setFocus((value) => (value === "prompt" ? "rail" : "prompt"))
   const promptBindings = createMemo(() => ({
     always: [
       ...keys("monitor.focus", toggleFocus),
@@ -781,7 +794,23 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
         category: "Session",
         run: () => void clearList(),
       },
+      // XCOD-307: the session pane's keybind hides and shows the rail here.
+      {
+        namespace: "palette",
+        name: "session.sidebar.toggle",
+        title: railHidden() ? "Show the session list" : "Hide the session list",
+        category: "Session",
+        run: () => {
+          toggleRail()
+          dialog.clear()
+        },
+      },
     ],
+  }))
+
+  useBindings(() => ({
+    mode: OPENCODE_BASE_MODE,
+    bindings: tuiConfig.keybinds.gather("monitor.pane", ["session.sidebar.toggle"]),
   }))
 
   let scroll: ScrollBoxRenderable | undefined
@@ -875,6 +904,12 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       borderColor={focus() === "rail" ? theme.borderActive : theme.border}
       backgroundColor={theme.background}
     >
+      {/* XCOD-307: » hides the list on a wide terminal; narrow, Tab already takes it away. */}
+      <Show when={!narrow()}>
+        <box paddingRight={1}>
+          <PaneHide onHide={toggleRail} label="hide list" />
+        </box>
+      </Show>
       <box flexDirection="row" gap={1} paddingLeft={1} paddingRight={1} flexShrink={0}>
         <text fg={theme.text} attributes={TextAttributes.BOLD} flexGrow={1} flexShrink={1} wrapMode="none">
           Sessions on this computer
@@ -1047,7 +1082,15 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
         </box>
         <Toast />
       </box>
-      <Show when={!narrow() || focus() === "rail"}>
+      <Show when={railHidden()}>
+        <PaneChip
+          title="show sessions"
+          count={rail().counts.waiting}
+          label={rail().counts.waiting ? `${rail().counts.waiting} waiting for action` : ""}
+          onOpen={toggleRail}
+        />
+      </Show>
+      <Show when={!railHidden() && (!narrow() || focus() === "rail")}>
         <Rail />
       </Show>
     </box>

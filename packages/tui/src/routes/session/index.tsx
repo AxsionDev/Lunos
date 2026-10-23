@@ -56,6 +56,9 @@ import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar } from "./sidebar"
 import { useProjectTheme } from "../../component/project-section"
 import { useProjectDetail } from "../../component/project-detail"
+import { PaneChip, useRightPane } from "../../component/right-pane"
+import * as RightPane from "../../util/right-pane"
+import { useBudget } from "../../component/budget-meter"
 import { SubagentFooter } from "./subagent-footer.tsx"
 import { filetype } from "../../util/filetype"
 import parsers from "../../parsers-config"
@@ -286,8 +289,8 @@ export function Session() {
   const sessionProject = useProjectTheme(() => route.sessionID)
   const openProjectDetail = useProjectDetail()
   const dimensions = useTerminalDimensions()
-  const [sidebar, setSidebar] = kv.signal<"auto" | "hide">("sidebar", "auto")
-  const [sidebarOpen, setSidebarOpen] = createSignal(false)
+  // XCOD-307: Claude Code and Codex sessions remember their own choice, apart from Lunos's.
+  const paneKey = createMemo(() => RightPane.PANE_KEY[externalOf(session()) ? "external" : "session"])
   const [conceal, setConceal] = createSignal(true)
   const thinking = useThinkingMode()
   const thinkingMode = thinking.mode
@@ -300,15 +303,31 @@ export function Session() {
   const [_animationsEnabled, _setAnimationsEnabled] = kv.signal("animations_enabled", true)
   const [showGenericToolOutput, setShowGenericToolOutput] = kv.signal("generic_tool_output_visibility", false)
 
-  const wide = createMemo(() => dimensions().width > 120)
-  const sidebarVisible = createMemo(() => {
-    if (session()?.parentID) return false
-    if (sidebarOpen()) return true
-    if (sidebar() === "auto" && wide()) return true
-    return false
-  })
+  const wide = createMemo(() => dimensions().width > RightPane.WIDE)
+  // A subagent's session has no pane of its own.
+  const pane = useRightPane({ key: paneKey, wide, none: () => !!session()?.parentID })
+  const placement = pane.placement
+  const sidebarVisible = createMemo(() => pane.visible())
+  /** XCOD-307: one toggle for the keybind, the command palette, » and «. */
+  const toggleSidebar = () => pane.toggle()
+  // XCOD-307: what the hidden pane holds that needs you, on the « chip.
+  // Only while the pane (and its own budget meter) is hidden.
+  const paneBudget = useBudget(() => (sidebarVisible() ? undefined : route.sessionID))
+  const attention = createMemo(() =>
+    RightPane.attention({
+      waiting: RightPane.waitingSubagents(
+        route.sessionID,
+        sync.data.session,
+        (id) => (sync.data.permission[id]?.length ?? 0) > 0 || (sync.data.question[id]?.length ?? 0) > 0,
+      ),
+      budgets: paneBudget()?.budgets ?? [],
+      lsp: sync.data.lsp,
+      mcp: Object.values(sync.data.mcp),
+    }),
+  )
   const showTimestamps = createMemo(() => timestamps() === "show")
-  const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 42 : 0) - 4)
+  // Only a docked pane takes columns from the conversation; an overlay sits over it.
+  const contentWidth = createMemo(() => dimensions().width - pane.taken() - 4)
   const providers = createMemo(() => Model.index(sync.data.provider))
 
   const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
@@ -810,11 +829,7 @@ export function Session() {
       value: "session.sidebar.toggle",
       category: "Session",
       run: () => {
-        batch(() => {
-          const isVisible = sidebarVisible()
-          setSidebar(() => (isVisible ? "hide" : "auto"))
-          setSidebarOpen(!isVisible)
-        })
+        toggleSidebar()
         dialog.clear()
       },
     },
@@ -1496,12 +1511,18 @@ export function Session() {
             </Show>
             <Toast />
           </box>
+          {/* XCOD-307: with the pane hidden, « brings it back and shows what in it needs you. It sits
+              outside the prompt, which gives way to a permission or question: hiding the pane never
+              hides those. */}
+          <Show when={!session()?.parentID && !sidebarVisible()}>
+            <PaneChip count={attention().count} label={attention().label} onOpen={toggleSidebar} />
+          </Show>
           <Show when={sidebarVisible()}>
             <Switch>
-              <Match when={wide()}>
-                <Sidebar sessionID={route.sessionID} />
+              <Match when={placement() === "docked"}>
+                <Sidebar sessionID={route.sessionID} onHide={toggleSidebar} />
               </Match>
-              <Match when={!wide()}>
+              <Match when={placement() === "overlay"}>
                 <box
                   position="absolute"
                   top={0}
@@ -1511,7 +1532,7 @@ export function Session() {
                   alignItems="flex-end"
                   backgroundColor={RGBA.fromInts(0, 0, 0, 70)}
                 >
-                  <Sidebar sessionID={route.sessionID} />
+                  <Sidebar sessionID={route.sessionID} onHide={toggleSidebar} />
                 </box>
               </Match>
             </Switch>
