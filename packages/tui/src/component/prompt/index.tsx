@@ -1306,6 +1306,15 @@ export function Prompt(props: PromptProps) {
       keymap.dispatchCommand(restartSlash.fresh ? "app.restart.fresh" : "app.restart")
       return false
     }
+    // XCOD-306: `/project settings` opens Settings scoped to the session's project.
+    if (/^\/project\s+settings\s*$/.test(store.prompt.input.trim())) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      if (!props.sessionID)
+        toast.show({ variant: "info", message: "Open a session in the project first; /projects lists them all" })
+      else keymap.dispatchCommand("project.settings")
+      return false
+    }
     // XCOD-128: `/settings key=value` (or `/config key=value`) changes one setting in the user
     // config, with the same validation and organisation locks as the settings screen.
     const settingsSlash = parseSettingsSlash(store.prompt.input)

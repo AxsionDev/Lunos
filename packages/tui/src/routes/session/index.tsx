@@ -54,6 +54,8 @@ import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar, startRename } from "./sidebar"
+import { useProjectTheme } from "../../component/project-section"
+import { useProjectDetail } from "../../component/project-detail"
 import { PaneChip, useRightPane } from "../../component/right-pane"
 import * as RightPane from "../../util/right-pane"
 import { useBudget } from "../../component/budget-meter"
@@ -283,6 +285,9 @@ export function Session() {
     return messages().findLast((x) => x.role === "assistant")
   })
 
+  // XCOD-306: while this session is open, the TUI shows its project's theme.
+  const sessionProject = useProjectTheme(() => route.sessionID)
+  const openProjectDetail = useProjectDetail()
   const dimensions = useTerminalDimensions()
   // XCOD-307: Claude Code and Codex sessions remember their own choice, apart from Lunos's.
   const paneKey = createMemo(() => RightPane.PANE_KEY[externalOf(session()) ? "external" : "session"])
@@ -833,6 +838,14 @@ export function Session() {
         toggleSidebar()
         dialog.clear()
       },
+    },
+    {
+      // XCOD-306: Settings scoped to the session's project (also the sidebar's Settings button).
+      title: sessionProject.ref() ? `Project settings: ${sessionProject.ref()!.name}` : "Project settings",
+      value: "project.settings",
+      category: "Session",
+      hidden: !sessionProject.ref(),
+      run: () => openProjectDetail("settings", sessionProject),
     },
     {
       title: conceal() ? "Disable code concealment" : "Enable code concealment",
