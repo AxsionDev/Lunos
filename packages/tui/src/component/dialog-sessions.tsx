@@ -45,7 +45,18 @@ import {
   type Line,
   type StateFilter,
   queuedDeleteNote,
+  SESSIONS_PROJECTS_KEY,
+  SESSIONS_VIEW_KEY,
+  budgetLine,
+  buildProjects,
+  projectCounts,
+  projectSections,
+  sectionItems,
+  sessionsView,
+  type NamedProject,
 } from "../util/sessions-overview"
+import { useKV } from "../context/kv"
+import { DialogProject, DialogProjects } from "./dialog-projects"
 
 // Events after which the overview is re-read. The same list the desktop/web window uses.
 const REFRESH_ON = new Set([
@@ -78,6 +89,10 @@ const [marked, setMarked] = createSignal<ReadonlySet<string>>(new Set())
 const [failedDeletes, setFailedDeletes] = createSignal<Record<string, string>>({})
 /** How long Undo stays offered after a Clear. */
 const UNDO_MS = 2 * 60 * 1000
+// XCOD-309: each project's budget line ("€12.40 of €50 (Oct)"), by project id, when it has one; kept
+// across re-opening the view, and read at most once a minute.
+const [budgets, setBudgets] = createStore<Record<string, string>>({})
+let budgetsRead = 0
 
 export function DialogSessions(props: { select?: string }) {
   const dialog = useDialog()
@@ -97,14 +112,19 @@ export function DialogSessions(props: { select?: string }) {
           : undefined
   const startExternal = useStartExternal()
   const deleteHint = useCommandShortcut("dialog.sessions.delete")
+  const viewHint = useCommandShortcut("dialog.sessions.view")
   const removeSessions = useSessionDelete()
   const project = useProject()
   const archivedView = () => stateFilter() === "archived"
 
+  const kv = useKV()
   const [data, setData] = createStore({
     groups: [] as SessionGroup[],
     sessions: [] as SessionOverviewItem[],
     loaded: false,
+    // XCOD-309: the named projects, and the project this folder is in.
+    named: [] as NamedProject[],
+    current: undefined as string | undefined,
   })
   const [search, setSearch] = createSignal("")
   const [now, setNow] = createSignal(Date.now())
@@ -125,13 +145,25 @@ export function DialogSessions(props: { select?: string }) {
       const result = await sdk.client.experimental.session.overview(archivedView() ? { archived: true } : undefined, {
         throwOnError: true,
       })
+      const projects = await sdk.client.experimental.projectGroup.list().catch(() => undefined)
       batch(() => {
         setData("groups", reconcile(result.data.groups, { key: "id" }))
         setData("sessions", reconcile(result.data.sessions, { key: "id" }))
+        if (projects?.data) {
+          setData(
+            "named",
+            reconcile(
+              projects.data.groups.filter((group) => !group.archived),
+              { key: "id" },
+            ),
+          )
+          setData("current", projects.data.current.id)
+        }
         setData("loaded", true)
       })
       setNow(Date.now())
       setError(undefined)
+      if (byProject()) void loadBudgets()
     } catch (cause) {
       setError(errorMessage(cause))
     } finally {
@@ -141,6 +173,29 @@ export function DialogSessions(props: { select?: string }) {
         void load()
       }
     }
+  }
+
+  /**
+   * XCOD-309: the budget each project section shows. There is one status per project (asked in one of
+   * its folders), so it is read when the Projects view is shown and then at most once a minute.
+   */
+  async function loadBudgets() {
+    if (Date.now() - budgetsRead < 60_000) return
+    budgetsRead = Date.now()
+    const sections = projectSections({ sessions: data.sessions, named: data.named, search: "", state: "all" })
+    const lines = await Promise.all(
+      sections
+        .filter((section) => section.directory)
+        .map(async (section) => {
+          const status = await sdk.client.experimental.budget
+            .status({ directory: section.directory })
+            .then((result) => result.data)
+            .catch(() => undefined)
+          const budget = status?.budgets.find((item) => item.scope === "project")
+          return [section.id, budget ? budgetLine(budget) : ""] as const
+        }),
+    )
+    setBudgets(reconcile(Object.fromEntries(lines.filter(([, value]) => value))))
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -167,14 +222,35 @@ export function DialogSessions(props: { select?: string }) {
     if (timer) clearTimeout(timer)
   })
 
+  // XCOD-309: Groups (the default) or Projects, remembered across restarts (kv.json).
+  const view = () => sessionsView(kv.get(SESSIONS_VIEW_KEY, "groups"))
+  const byProject = () => view() === "projects"
+  const switchView = () => kv.set(SESSIONS_VIEW_KEY, byProject() ? "groups" : "projects")
+  createEffect(on(byProject, (projects) => projects && data.loaded && void loadBudgets(), { defer: true }))
+  const projectCollapsed = () => kv.get(SESSIONS_PROJECTS_KEY, {}) as Record<string, boolean>
+  // The project of the session open behind the view, else this folder's.
+  const here = createMemo(() => {
+    const id = route.data.type === "session" ? route.data.sessionID : undefined
+    const open = id ? data.sessions.find((item) => item.id === id) : undefined
+    return open?.projectGroupID ?? data.current
+  })
   const lines = createMemo(() =>
-    build({
-      groups: data.groups,
-      sessions: data.sessions,
-      search: search(),
-      state: stateFilter(),
-      ungroupedCollapsed: ungroupedCollapsed(),
-    }),
+    byProject()
+      ? buildProjects({
+          sessions: data.sessions,
+          named: data.named,
+          search: search(),
+          state: stateFilter(),
+          here: here(),
+          collapsed: projectCollapsed(),
+        })
+      : build({
+          groups: data.groups,
+          sessions: data.sessions,
+          search: search(),
+          state: stateFilter(),
+          ungroupedCollapsed: ungroupedCollapsed(),
+        }),
   )
   const byKey = createMemo(() => new Map(lines().map((line) => [line.key, line])))
   const line = (option: DialogSelectOption<string> | undefined) => (option ? byKey().get(option.value) : undefined)
@@ -185,6 +261,16 @@ export function DialogSessions(props: { select?: string }) {
   const groupOf = (option: DialogSelectOption<string> | undefined) => {
     const found = line(option)
     return found?.type === "group" ? found : undefined
+  }
+  const projectOf = (option: DialogSelectOption<string> | undefined) => {
+    const found = line(option)
+    return found?.type === "project" ? found : undefined
+  }
+  // XCOD-309: the highlighted row, so a project header's own keys (n, p) exist only on it.
+  const [highlighted, setHighlighted] = createSignal<string>()
+  const onHeader = () => {
+    const found = highlighted() ? byKey().get(highlighted()!) : undefined
+    return !search() && found?.type === "project" ? found : undefined
   }
 
   function stateColor(item: SessionOverviewItem) {
@@ -200,6 +286,21 @@ export function DialogSessions(props: { select?: string }) {
   const options = createMemo((): DialogSelectOption<string>[] => {
     let heading: string | undefined
     return lines().flatMap((entry): DialogSelectOption<string>[] => {
+      // XCOD-309: a project's header, as a group's: a row of its own, or a plain heading while filtering.
+      if (entry.type === "project") {
+        const section = entry.section
+        heading = `${section.name} (${entry.count})`
+        if (filtering()) return []
+        return [
+          {
+            value: entry.key,
+            title: `${entry.collapsed ? "▸" : "▾"} ${section.name}${section.here ? " · here" : ""}`,
+            description: [projectCounts(section.counts), budgets[section.id]].filter(Boolean).join(" · "),
+            footer: entry.collapsed ? "collapsed" : undefined,
+            titleWidth: 100,
+          },
+        ]
+      }
       if (entry.type === "group") {
         const name = entry.group?.name ?? "Ungrouped"
         heading = `${name} (${entry.count})`
@@ -337,6 +438,34 @@ export function DialogSessions(props: { select?: string }) {
     reopen(item.id)
   }
 
+  /** XCOD-309: Enter on a project's header collapses or expands it (the one marked "here" stays open). */
+  function toggleProject(entry: Extract<Line, { type: "project" }>) {
+    if (entry.section.here) return
+    kv.set(SESSIONS_PROJECTS_KEY, { ...projectCollapsed(), [entry.key]: !entry.collapsed })
+  }
+
+  /** XCOD-309: n on a project's header: a new session in that project's folder, opened at once. */
+  async function newInProject(entry: Extract<Line, { type: "project" }>) {
+    const directory = entry.section.directory
+    if (!directory) return
+    const created = await sdk.client.session
+      .create({ directory }, { throwOnError: true })
+      .then((result) => result.data)
+      .catch((cause) => (fail(cause), undefined))
+    if (!created) return
+    dialog.clear()
+    route.navigate({ type: "session", sessionID: created.id })
+  }
+
+  /** XCOD-309: p on a project's header: the project's settings (a named project's, or the projects list). */
+  function projectSettings(entry: Extract<Line, { type: "project" }>) {
+    const section = entry.section
+    if (section.kind === "none") return
+    if (section.kind === "named")
+      return dialog.replace(() => <DialogProject id={section.id} onBack={() => reopen(entry.key)} />)
+    dialog.replace(() => <DialogProjects select={section.id} />)
+  }
+
   async function toggle(entry: Extract<Line, { type: "group" }>) {
     if (!entry.group) {
       setUngroupedCollapsed((value) => !value)
@@ -366,16 +495,20 @@ export function DialogSessions(props: { select?: string }) {
     const PROJECT = "project:"
     const projects = (await sdk.client.experimental.projectGroup.list().catch(() => undefined))?.data
     const named = (projects?.groups ?? []).filter((group) => !group.archived)
+    const groupOptions = [
+      ...data.groups.map((group) => ({ value: group.id, title: group.name, category: "Group" })),
+      { value: UNGROUPED, title: "Ungrouped", category: "Group" },
+      { value: NEW, title: "New group…", category: "Group" },
+    ]
     const choice = await new Promise<string | undefined>((resolve) =>
       dialog.replace(
         () => (
           <DialogSelect<string>
-            title={`Move "${Locale.truncate(item.title, 40)}" to group or project`}
-            current={item.groupID ?? UNGROUPED}
+            title={`Move "${Locale.truncate(item.title, 40)}" to ${byProject() ? "project or group" : "group or project"}`}
+            // XCOD-309: in the Projects view the projects come first.
+            current={byProject() ? PROJECT + (item.projectGroupID ?? "") : (item.groupID ?? UNGROUPED)}
             options={[
-              ...data.groups.map((group) => ({ value: group.id, title: group.name, category: "Group" })),
-              { value: UNGROUPED, title: "Ungrouped", category: "Group" },
-              { value: NEW, title: "New group…", category: "Group" },
+              ...(byProject() ? [] : groupOptions),
               ...named.map((group) => ({
                 value: PROJECT + group.id,
                 title: group.name,
@@ -388,6 +521,7 @@ export function DialogSessions(props: { select?: string }) {
                 category: "Project",
                 description: "undo a move: count it where its folder belongs",
               },
+              ...(byProject() ? groupOptions : []),
             ]}
             onSelect={(option) => resolve(option.value)}
           />
@@ -473,8 +607,19 @@ export function DialogSessions(props: { select?: string }) {
   }
 
   /** XCOD-265: the rows Stop all and Clear list act on (state filter and search; collapsed groups count). */
-  const viewItems = () =>
-    inView({ groups: data.groups, sessions: data.sessions, search: search(), state: stateFilter() })
+  const viewItems = () => {
+    // XCOD-309: on a project's header (Projects view) they act on that project alone.
+    const scope = scoped()
+    if (scope) return sectionItems(scope.section)
+    return inView({ groups: data.groups, sessions: data.sessions, search: search(), state: stateFilter() })
+  }
+  const scoped = () => {
+    const found = highlighted() ? byKey().get(highlighted()!) : undefined
+    return found?.type === "project" ? found : undefined
+  }
+  /** " in <project>" when Stop all and Clear act on one project, which their confirmation names. */
+  const scopeName = () => (scoped() ? ` in ${scoped()!.section.name}` : "")
+  const scopedQuestion = (question: string) => (scoped() ? `${scoped()!.section.name}: ${question}` : question)
 
   /** Asks once; the first option is the default and Esc cancels. */
   function confirm<T extends string>(message: string, options: { value: T; title: string }[]) {
@@ -506,7 +651,7 @@ export function DialogSessions(props: { select?: string }) {
       return toast.show({ variant: "info", message: "Nothing in this view is running or waiting." })
     const here = (item: SessionOverviewItem) => !!item.project && item.project.id === project.project()
     const local = plan.targets.filter(here)
-    const choice = await confirm(stopQuestion(plan), [
+    const choice = await confirm(scopedQuestion(stopQuestion(plan)), [
       { value: "all", title: `Stop ${plan.targets.length}` },
       // XCOD-265: the view spans several projects; this Lunos's project alone is offered too.
       ...(plan.projects.length > 1 && local.length > 0
@@ -543,8 +688,8 @@ export function DialogSessions(props: { select?: string }) {
       return toast.show({ variant: "info", message: "Nothing in this view to clear." })
     const choice =
       plan.targets.length === 0
-        ? await confirm(clearQuestion(plan), [{ value: "stop" as const, title: "Stop all & clear" }])
-        : await confirm(clearQuestion(plan), [
+        ? await confirm(scopedQuestion(clearQuestion(plan)), [{ value: "stop" as const, title: "Stop all & clear" }])
+        : await confirm(scopedQuestion(clearQuestion(plan)), [
             { value: "clear" as const, title: `Clear ${plan.targets.length}` },
             ...(running ? [{ value: "stop" as const, title: "Stop all & clear" }] : []),
           ])
@@ -565,7 +710,7 @@ export function DialogSessions(props: { select?: string }) {
     if (stop.length + clear.length === 0)
       return toast.show({ variant: "info", message: "Nothing in this view to stop or clear." })
     if (!confirmed) {
-      const choice = await confirm(stopAndClearQuestion(items), [
+      const choice = await confirm(scopedQuestion(stopAndClearQuestion(items)), [
         { value: "go" as const, title: `Stop ${stop.length} and clear ${stop.length + clear.length}` },
       ])
       if (!choice) return reopen()
@@ -684,20 +829,29 @@ export function DialogSessions(props: { select?: string }) {
   const markedCount = createMemo(() => data.sessions.filter((item) => marked().has(item.id)).length)
   const waitingCount = createMemo(() => waiting(data.sessions))
   const titleView = (
-    <text fg={theme.text} attributes={TextAttributes.BOLD}>
-      {archivedView() ? "Archived sessions — all projects" : "Sessions — all projects"}
-      <span style={{ fg: theme.textMuted }}>
-        {" · "}
-        {data.sessions.length} {data.sessions.length === 1 ? "session" : "sessions"}
-      </span>
-      {waitingCount() > 0 ? (
-        <span style={{ fg: theme.warning }}>
+    <box flexDirection="row" gap={2} flexShrink={1}>
+      <text fg={theme.text} attributes={TextAttributes.BOLD}>
+        {archivedView() ? "Archived sessions — all projects" : "Sessions — all projects"}
+        <span style={{ fg: theme.textMuted }}>
           {" · "}
-          {STATE_GLYPH.waiting} {waitingCount()} waiting
+          {data.sessions.length} {data.sessions.length === 1 ? "session" : "sessions"}
         </span>
-      ) : null}
-      {stateFilter() !== "all" ? <span style={{ fg: theme.accent }}> · state: {stateFilter()}</span> : null}
-    </text>
+        {waitingCount() > 0 ? (
+          <span style={{ fg: theme.warning }}>
+            {" · "}
+            {STATE_GLYPH.waiting} {waitingCount()} waiting
+          </span>
+        ) : null}
+        {stateFilter() !== "all" ? <span style={{ fg: theme.accent }}> · state: {stateFilter()}</span> : null}
+      </text>
+      {/* XCOD-309: the view switch; click it, or press its key (dialog.sessions.view). */}
+      <text fg={theme.textMuted} onMouseUp={switchView}>
+        View: <span style={{ fg: byProject() ? theme.textMuted : theme.text, bold: !byProject() }}>Groups</span>
+        {" | "}
+        <span style={{ fg: byProject() ? theme.text : theme.textMuted, bold: byProject() }}>Projects</span>
+        {viewHint() ? ` · ${viewHint()}` : ""}
+      </text>
+    </box>
   )
 
   return (
@@ -713,7 +867,10 @@ export function DialogSessions(props: { select?: string }) {
       // The session open behind the view is marked, as in the switcher.
       current={props.select ? undefined : currentSessionID()}
       onFilter={setSearch}
-      onMove={() => setToDelete(undefined)}
+      onMove={(option) => {
+        setToDelete(undefined)
+        setHighlighted(option.value)
+      }}
       emptyView={
         <box paddingLeft={4} paddingRight={4} paddingTop={1}>
           <text fg={theme.textMuted}>
@@ -733,6 +890,7 @@ export function DialogSessions(props: { select?: string }) {
         const entry = line(option)
         if (!entry) return
         if (entry.type === "group") return void toggle(entry)
+        if (entry.type === "project") return toggleProject(entry)
         void open(entry.item)
       }}
       footerHints={[
@@ -752,7 +910,8 @@ export function DialogSessions(props: { select?: string }) {
         },
         {
           command: "dialog.sessions.group.new",
-          hidden: archivedView(),
+          // XCOD-309: groups are made in the Groups view.
+          hidden: archivedView() || byProject(),
           title: "new group",
           withoutSelection: true,
           onTrigger: (option) => void createGroup(option?.value),
@@ -763,7 +922,7 @@ export function DialogSessions(props: { select?: string }) {
           title: "rename",
           disabled: (option) => {
             const entry = line(option)
-            if (!entry) return true
+            if (!entry || entry.type === "project") return true
             return entry.type === "group" ? !entry.group : toolOnly(entry.item)
           },
           onTrigger: (option) => void rename(option),
@@ -804,6 +963,32 @@ export function DialogSessions(props: { select?: string }) {
             if (item && stoppable(item)) void stop(item)
           },
         },
+        // XCOD-309: Groups or Projects; the project header's own keys exist only on a header.
+        {
+          command: "dialog.sessions.view",
+          title: byProject() ? "groups view" : "projects view",
+          withoutSelection: true,
+          onTrigger: () => switchView(),
+        },
+        {
+          command: "dialog.sessions.project.new",
+          // Hidden, not disabled, elsewhere: a disabled action still takes the key, and n is typed.
+          hidden: !onHeader()?.section.directory,
+          title: "new session here",
+          onTrigger: () => {
+            const entry = onHeader()
+            if (entry) void newInProject(entry)
+          },
+        },
+        {
+          command: "dialog.sessions.project.settings",
+          hidden: !onHeader() || onHeader()!.section.kind === "none",
+          title: "project settings",
+          onTrigger: () => {
+            const entry = onHeader()
+            if (entry) projectSettings(entry)
+          },
+        },
         {
           command: "dialog.sessions.state",
           title: "state",
@@ -813,7 +998,7 @@ export function DialogSessions(props: { select?: string }) {
         // XCOD-265: unbound by default, so `menu` keeps them in the footer and the Tab menu.
         {
           command: "dialog.sessions.stop_all",
-          title: "stop all",
+          title: `stop all${scopeName()}`,
           menu: true,
           hidden: archivedView(),
           withoutSelection: true,
@@ -821,7 +1006,7 @@ export function DialogSessions(props: { select?: string }) {
         },
         {
           command: "dialog.sessions.clear",
-          title: "clear list",
+          title: `clear list${scopeName()}`,
           menu: true,
           hidden: archivedView(),
           withoutSelection: true,
@@ -829,7 +1014,7 @@ export function DialogSessions(props: { select?: string }) {
         },
         {
           command: "dialog.sessions.stop_all_clear",
-          title: "stop all & clear",
+          title: `stop all & clear${scopeName()}`,
           menu: true,
           hidden: archivedView(),
           withoutSelection: true,
@@ -856,7 +1041,7 @@ export function DialogSessions(props: { select?: string }) {
         },
         {
           command: "dialog.sessions.delete_all",
-          title: "delete all shown",
+          title: `delete all shown${scopeName()}`,
           menu: true,
           // In Show archived this is "delete archived", below.
           hidden: archivedView(),

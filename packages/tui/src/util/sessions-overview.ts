@@ -370,6 +370,18 @@ export function buildProjects(input: {
   return lines
 }
 
+/** XCOD-309: a project budget in a section header: "€12.40 of €50 (Oct)". */
+export function budgetLine(budget: {
+  currency: "EUR" | "USD"
+  amount: number
+  spent: number
+  period: { label: string }
+}) {
+  const sign = budget.currency === "USD" ? "$" : "€"
+  const value = (amount: number) => `${sign}${Number.isInteger(amount) ? amount : amount.toFixed(2)}`
+  return `${value(Math.round(budget.spent * 100) / 100)} of ${value(budget.amount)}${budget.period.label ? ` (${budget.period.label})` : ""}`
+}
+
 /** XCOD-309: the sessions of one project section (its subagents too), for Stop all and Clear on it. */
 export function sectionItems(section: ProjectSection) {
   return section.rows.flatMap((row) => [row.item, ...row.kids])

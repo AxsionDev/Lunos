@@ -113,9 +113,7 @@ describe("sessions view: projects", () => {
       projectGroupID: undefined,
     })
     const sections = projectSections({ sessions: [...sessions, tool], named: [web], search: "", state: "all" })
-    expect(sections.find((section) => section.id === "prj_a")!.rows.map((row) => row.item.id)).toContain(
-      "external:abc",
-    )
+    expect(sections.find((section) => section.id === "prj_a")!.rows.map((row) => row.item.id)).toContain("external:abc")
   })
 
   test("the list: headers, newest first, subagents under their parent; here is open and marked", () => {
