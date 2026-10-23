@@ -1,6 +1,7 @@
 export * as CloudAccountApi from "./account-api"
 
 import { Offline } from "@opencode-ai/core/offline"
+import { CloudDisabled } from "./disabled"
 import { CloudSyncApi } from "./sync-api"
 
 /**
@@ -219,9 +220,14 @@ export async function call(token: string, method: string, path: string, body: un
     const retryAfter = Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined
     // A 429 without a code is still a rate limit.
     const code = found.code ?? (response.status === 429 ? "rate_limited" : undefined)
+    // XCOD-312: the account itself is disabled: recorded here, whichever call found it (several
+    // callers swallow their errors), so the TUI shows the screen and the session loop refuses prompts.
+    const disabled = CloudDisabled.suspension(response.status, found)
+    if (disabled) await CloudDisabled.record(disabled).catch(() => undefined)
     throw new RefusedError(
       response.status,
-      explain(code, found.details, retryAfter, found.message) ??
+      (disabled && CloudDisabled.text(disabled)) ??
+        explain(code, found.details, retryAfter, found.message) ??
         found.message ??
         `Lunos Cloud answered ${response.status}`,
       found.code,

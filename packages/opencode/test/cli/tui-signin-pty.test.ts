@@ -284,6 +284,48 @@ describe("Welcome screen (XCOD-273)", () => {
     TIMEOUT,
   )
 
+  test(
+    "a disabled account (XCOD-312): the notice with its reason and end date, read-only past sessions, kept across a restart",
+    async () => {
+      await start({
+        env: OFFICIAL,
+        fake: { suspended: { scope: "account", category: "payment", until: "2026-12-01T00:00:00Z" } },
+      })
+      await tui!.waitFor("Welcome to Lunos")
+      await acceptAnd("Sign in")
+      const notice = await tui!.waitFor("Your Lunos account is disabled")
+      expect(notice).toContain("Reason: A payment issue")
+      expect(notice).toContain("Until 2026-12-01")
+      expect(notice).toContain("Contact support: support@lunos.tech")
+      // Lunos Cloud's free-text reason is never shown.
+      expect(notice).not.toContain("chargeback")
+      expect(notice).not.toContain("Signed in as pat@lunos.test ·")
+      await choose("View past sessions (read-only)")
+      await tui!.waitFor("new prompts can't be sent")
+      await tui!.type("hello")
+      await Bun.sleep(200)
+      tui!.press(KEY.enter)
+      // Not sent: the draft stays, the notice says why, and nothing is asked of a model.
+      const refused = await tui!.waitFor("Your Lunos account is disabled: new prompts")
+      expect(refused).toContain("hello")
+      expect(refused).toContain("support@lunos.tech")
+      expect(idp!.requests.some((request) => request.path.includes("chat"))).toBe(false)
+      await tui!.stop()
+
+      // The next start (same HOME): the notice again, from this machine's record.
+      tui = await Pty.launch({
+        home: tui!.home,
+        config: { cloud: { issuer: idp!.origin, endpoint: idp!.origin } },
+        env: { ...proxied, ...OFFICIAL },
+      })
+      const again = await tui.waitFor("Your Lunos account is disabled")
+      expect(again).toContain("Reason: A payment issue")
+      await choose("Sign in again")
+      await tui.waitFor("Welcome to Lunos")
+    },
+    TIMEOUT,
+  )
+
   /** Signs in through the Welcome screen and opens /account. */
   async function openAccount(fake: FakeIdp.Options = {}) {
     await start({ env: OFFICIAL, fake })

@@ -21,6 +21,17 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **A clear screen when your Lunos account is disabled.** If Lunos Cloud disables your account, at
+  sign-in or when your session is next refreshed, the TUI says so in full screen: "Your Lunos account
+  is disabled", the kind of reason (a payment issue, a security concern, and so on), the date it ends
+  if it has one, and how to reach support (support@lunos.tech). New prompts are blocked, including in
+  the session loop itself, so `lunos run` and other clients refuse them too. A turn already running
+  finishes, and your past sessions on this computer stay readable. The notice comes back after a
+  restart until a sign-in or refresh succeeds. Self-hosted use, an organisation's own sign-in,
+  offline mode and CI are not affected. <!-- XCOD-312 -->
+
 ## [1.18.55] - 2026-10-22
 
 ### Added
