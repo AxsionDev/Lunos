@@ -19,7 +19,8 @@ import {
   upsertTheme,
   type ThemeJson,
 } from "../theme"
-import { createEffect, createMemo, onCleanup, onMount } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import * as ProjectTheme from "../util/project-theme"
 import { createStore, produce } from "solid-js/store"
 import { createSimpleContext } from "./helper"
 import { useKV } from "./kv"
@@ -260,8 +261,28 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       themeRefreshTimeouts.length = 0
     })
 
+    // XCOD-306: the project the active session counts in, and its theme. Never saved here: the
+    // global choice (`active`, kv `theme`, tui.json) stays what /settings and /theme show for all
+    // projects, and the project's own theme sits on top of it while one of its sessions is open.
+    const [project, setProject] = createSignal<{ ref: ProjectTheme.ProjectRef; shared?: string; locked?: boolean }>()
+    // A theme shown while it's picked (/theme moving through the list), over everything else.
+    const [preview, setPreview] = createSignal<string>()
+    const projectTheme = createMemo(() => {
+      const current = project()
+      if (!current) return undefined
+      const personal = kv.get(ProjectTheme.personalKey(current.ref.key))
+      return ProjectTheme.resolveProjectTheme({
+        personal: typeof personal === "string" ? personal : undefined,
+        shared: current.shared,
+        global: store.active,
+        locked: current.locked,
+        has: (name) => !!store.themes[name],
+      })
+    })
+    const shown = createMemo(() => preview() ?? projectTheme()?.theme ?? store.active)
+
     const values = createMemo(() => {
-      const active = store.themes[store.active]
+      const active = store.themes[shown()]
       if (active) return resolveTheme(active, store.mode)
 
       const saved = kv.get("theme")
@@ -302,6 +323,29 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         setStore("active", theme)
         kv.set("theme", theme)
         return true
+      },
+      /** XCOD-306: shows a theme without choosing it (undefined: back to the chosen one). */
+      preview(theme: string | undefined) {
+        setPreview(theme && hasTheme(theme) ? theme : undefined)
+      },
+      /** The theme on screen: a preview, the project's, or the global one. */
+      get shown() {
+        return shown()
+      },
+      /** XCOD-306: the active session's project; undefined outside a project's session. */
+      project: () => project()?.ref,
+      setProject(input: { ref: ProjectTheme.ProjectRef; shared?: string; locked?: boolean } | undefined) {
+        setProject(input)
+      },
+      /** Which theme the project uses and why, while one is active. */
+      projectTheme: () => projectTheme(),
+      /** "Just me": this project's theme on this computer (undefined clears it). */
+      setPersonal(projectKey: string, theme: string | undefined) {
+        kv.set(ProjectTheme.personalKey(projectKey), theme)
+      },
+      personal(projectKey: string) {
+        const value = kv.get(ProjectTheme.personalKey(projectKey))
+        return typeof value === "string" ? value : undefined
       },
       get ready() {
         return store.ready

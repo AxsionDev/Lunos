@@ -21,6 +21,23 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **See your project at a glance, and give each project its own theme.** When a session belongs to a
+  project, the right sidebar shows a Project section. Collapsed, it's one line: the budget used
+  ("€38 of €50 · Oct"), with ⚠ if a budget is past its warning line or a resource failed to index.
+  Expanded, it lists everything defined for the project: folders, budget, resources, agent defaults,
+  memory, sandbox, settings your organisation locked, and the theme. Each row opens its detail. A
+  repository with no named project shows as "Repository: name". **Settings** in the section (or
+  `/project settings`) opens Settings for that project alone. It lists only what a project can set,
+  with each value and where it comes from, and names the file a shared change goes to before you
+  save. Settings a repository can't choose, such as extra sandbox hosts, are saved to your own
+  config, and it says why. Pick a theme for the project just for you (kept on this computer) or
+  shared with the team (the project's `tui.json`). The TUI switches to it as soon as you open one of
+  the project's sessions, or select one in the Agent Monitor, and switches back when you leave. Your
+  own choice wins over the shared one, and an organisation that locks the theme wins over both. In a
+  project's session, `/theme` asks whether the pick is for this project only or for all projects.
+
 ## [1.18.55] - 2026-10-22
 
 ### Added

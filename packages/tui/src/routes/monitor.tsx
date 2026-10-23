@@ -44,6 +44,7 @@ import {
 } from "../util/agent-monitor"
 import { forgetWaiting, toggle, type Overrides } from "../util/subagent-groups"
 import { errorMessage } from "../util/error"
+import { useProjectTheme } from "../component/project-section"
 import { externalAccent, type ExternalTool } from "../util/external"
 import { Locale } from "../util/locale"
 import {
@@ -274,6 +275,14 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       .filter((item) => !!item)
   })
   const previewTarget = createMemo(() => tagged()[0] ?? (focus() === "rail" ? current() : undefined))
+  // XCOD-306: the selected session's project theme, as in its own session view.
+  useProjectTheme(
+    () => {
+      const item = previewTarget()
+      return item && item.kind !== "external" && !item.elsewhere ? item.id : undefined
+    },
+    () => previewTarget()?.directory,
+  )
 
   // The last message of the tagged or highlighted session, so its context is seen before sending.
   createEffect(

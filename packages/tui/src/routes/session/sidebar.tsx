@@ -10,7 +10,8 @@ import { usePluginRuntime } from "../../plugin/runtime"
 import { getScrollAcceleration } from "../../util/scroll"
 import { WorkspaceLabel } from "../../component/workspace-label"
 import { bridgeLine, EXTERNAL_BADGE, externalAccent, externalOf } from "../../util/external"
-import { BudgetMeter } from "../../component/budget-meter"
+import { ProjectSection } from "../../component/project-section"
+import { useProjectDetail } from "../../component/project-detail"
 
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const pluginRuntime = usePluginRuntime()
@@ -38,6 +39,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
       return result?.data?.sandbox?.inside
     },
   )
+  const openProjectDetail = useProjectDetail()
   const short = (digest: string) => digest.replace(/^.*@/, "").replace(/^(sha256:[0-9a-f]{12})[0-9a-f]+$/, "$1")
 
   return (
@@ -127,8 +129,8 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                 </Show>
               </box>
             </pluginRuntime.Slot>
-            {/* XCOD-298: the project's budget, live. */}
-            <BudgetMeter sessionID={props.sessionID} />
+            {/* XCOD-306: the session's project, with its budget (live) and everything defined for it. */}
+            <ProjectSection sessionID={props.sessionID} onOpen={openProjectDetail} />
             <pluginRuntime.Slot name="sidebar_content" session_id={props.sessionID} />
           </box>
         </scrollbox>

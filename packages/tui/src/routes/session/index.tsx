@@ -54,6 +54,8 @@ import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar } from "./sidebar"
+import { useProjectTheme } from "../../component/project-section"
+import { useProjectDetail } from "../../component/project-detail"
 import { SubagentFooter } from "./subagent-footer.tsx"
 import { filetype } from "../../util/filetype"
 import parsers from "../../parsers-config"
@@ -280,6 +282,9 @@ export function Session() {
     return messages().findLast((x) => x.role === "assistant")
   })
 
+  // XCOD-306: while this session is open, the TUI shows its project's theme.
+  const sessionProject = useProjectTheme(() => route.sessionID)
+  const openProjectDetail = useProjectDetail()
   const dimensions = useTerminalDimensions()
   const [sidebar, setSidebar] = kv.signal<"auto" | "hide">("sidebar", "auto")
   const [sidebarOpen, setSidebarOpen] = createSignal(false)
@@ -812,6 +817,14 @@ export function Session() {
         })
         dialog.clear()
       },
+    },
+    {
+      // XCOD-306: Settings scoped to the session's project (also the sidebar's Settings button).
+      title: sessionProject.ref() ? `Project settings: ${sessionProject.ref()!.name}` : "Project settings",
+      value: "project.settings",
+      category: "Session",
+      hidden: !sessionProject.ref(),
+      run: () => openProjectDetail("settings", sessionProject),
     },
     {
       title: conceal() ? "Disable code concealment" : "Enable code concealment",

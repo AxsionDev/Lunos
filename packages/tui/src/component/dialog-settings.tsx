@@ -30,6 +30,10 @@ import { DialogThemeList } from "./dialog-theme-list"
 import { choices as externalChoices, KEYS as EXTERNAL_KEYS, perRun } from "../util/external-permission"
 import { DialogLsp } from "./dialog-lsp"
 import * as Sections from "../util/settings-sections"
+import * as ProjectSection from "../util/project-section"
+import * as ProjectTheme from "../util/project-theme"
+import type { ProjectRef } from "../util/project-theme"
+import { projectSettingsChanged } from "./project-section"
 import { DialogMemory } from "./dialog-memory"
 import { DialogMcp } from "./dialog-mcp"
 import { DialogExternalConfig } from "./dialog-external-config"
@@ -99,6 +103,8 @@ export function DialogSettings(props: {
   /** XCOD-259: a section window (a category), and its sub-tab. */
   area?: string
   sub?: string
+  /** XCOD-306: Settings scoped to a project: only the keys a project can set, saved to its config. */
+  project?: { ref: ProjectRef; directory?: string }
 }) {
   const sdk = useSDK()
   const dialog = useDialog()
@@ -111,7 +117,8 @@ export function DialogSettings(props: {
   const dimensions = useTerminalDimensions()
 
   const [tab, setTab] = createSignal<Tab>(props.tab ?? "settings")
-  const [scope, setScope] = createSignal<Scope>(props.scope ?? "user")
+  // XCOD-306: a project's settings save to its own config (Shared) unless switched with ctrl+s.
+  const [scope, setScope] = createSignal<Scope>(props.scope ?? (props.project ? "project" : "user"))
   const [snapshot, setSnapshot] = createSignal<SettingsSnapshot>()
   const [error, setError] = createSignal<string>()
   const [query, setQuery] = createSignal("")
@@ -144,7 +151,9 @@ export function DialogSettings(props: {
     }
   }
   /** The Settings home: a list of sections, unless something is typed. */
-  const atHome = () => !props.section && !props.area
+  const atHome = () => !props.section && !props.area && !props.project
+  /** XCOD-306: reads and writes for a project go to its folder's config. */
+  const scopedTo = () => (props.project?.directory ? { directory: props.project.directory } : {})
   /**
    * XCOD-297: set while this TUI is attached to a sandboxed server. The server's writes land in the
    * container's copy of the config; `sandbox.*` is decided on this computer, so it's read and saved
@@ -159,7 +168,9 @@ export function DialogSettings(props: {
   const generation = dialog.generation
 
   async function load() {
-    const result = await sdk.client.config.settings().catch((cause: unknown) => ({ error: cause, data: undefined }))
+    const result = await sdk.client.config
+      .settings(scopedTo())
+      .catch((cause: unknown) => ({ error: cause, data: undefined }))
     if (!result.data) {
       setError("Couldn't load settings from the server")
       return
@@ -186,7 +197,10 @@ export function DialogSettings(props: {
       ? all.filter((row) => row.key.startsWith(`${props.section}.`))
       : props.area
         ? all.filter((row) => row.category === props.area)
-        : all
+        : props.project
+          ? // XCOD-306: only what a project can set; its theme has its own row (Just me or Shared).
+            all.filter((row) => ProjectSection.projectScoped(row.key) && row.key !== "tui.theme")
+          : all
     // tui.json is read by this process: show the theme actually in use.
     const host = hostSandbox()
     return list.map(
@@ -229,6 +243,7 @@ export function DialogSettings(props: {
   function reopen(key?: string) {
     const section = props.section
     const area = props.area
+    const project = props.project
     dialog.replace(
       () => (
         <DialogSettings
@@ -238,6 +253,7 @@ export function DialogSettings(props: {
           section={section}
           area={area}
           sub={sub()}
+          project={project}
         />
       ),
       undefined,
@@ -489,9 +505,98 @@ export function DialogSettings(props: {
   /** XCOD-233: a screen opened from row `key`; ← comes back to the list with that row highlighted. */
   const backTo = (key: string) => ({ back: () => reopen(key), generation })
 
+  /** XCOD-306: the project's theme, for just you (this computer) or shared (the project's tui.json). */
+  function pickProjectTheme() {
+    const ref = props.project!.ref
+    const row = snapshot()?.rows.find((item) => item.key === "tui.theme")
+    if (row?.locked)
+      return toast.show({
+        variant: "info",
+        message: `Your organisation sets the theme (${row.display}) for every project, so it can't be changed here`,
+        duration: 6000,
+      })
+    const mine = themeState.personal(ref.key)
+    const shared = row?.source === "project" ? row.display : undefined
+    const sharedFile = home(snapshot()?.files.project.tui ?? "the project's tui.json")
+    const choose = (target: "me" | "shared") =>
+      dialog.replace(
+        () => (
+          <DialogThemeList
+            forProject
+            title={target === "me" ? `${ref.name}: theme for just you` : `${ref.name}: shared theme`}
+            current={(target === "me" ? mine : shared) ?? themeState.shown}
+            onPick={(name) => void writeProjectTheme(target, name)}
+          />
+        ),
+        undefined,
+        backTo("+project.theme"),
+      )
+    dialog.replace(
+      () => (
+        <DialogSelect<string>
+          title={`Theme for ${ref.name}`}
+          skipFilter
+          options={[
+            {
+              title: "Just me…",
+              value: "me",
+              description: "kept on this computer, never in the repository",
+              footer: mine,
+            },
+            { title: "Shared…", value: "shared", description: `written to ${sharedFile} for the team`, footer: shared },
+            ...(mine ? [{ title: "Clear my theme for this project", value: "clear-me" }] : []),
+            ...(shared ? [{ title: "Clear the shared theme", value: "clear-shared", description: sharedFile }] : []),
+          ]}
+          onSelect={(option) => {
+            if (option.value === "me" || option.value === "shared") return choose(option.value)
+            void writeProjectTheme(option.value === "clear-me" ? "me" : "shared", undefined)
+          }}
+        />
+      ),
+      undefined,
+      backTo("+project.theme"),
+    )
+  }
+
+  async function writeProjectTheme(target: "me" | "shared", name: string | undefined) {
+    const ref = props.project!.ref
+    const write = ProjectTheme.themeWrite(target, ref.key, name)
+    if ("kv" in write) {
+      themeState.setPersonal(ref.key, name)
+      toast.show({
+        variant: "success",
+        message: name ? `${ref.name} uses ${name}, for you on this computer` : `Your theme for ${ref.name} is cleared`,
+      })
+      return reopen("+project.theme")
+    }
+    const result = await sdk.client.config
+      .settingsSet({ ...scopedTo(), settingsSetInput: write.settings })
+      .catch(() => undefined)
+    const data = result?.data
+    if (!data?.ok) {
+      toast.show({
+        variant: "error",
+        title: "Theme not saved",
+        message: data && !data.ok ? data.error : "The server didn't answer",
+        duration: 8000,
+      })
+      return reopen("+project.theme")
+    }
+    projectSettingsChanged()
+    toast.show({
+      variant: "success",
+      message: name
+        ? `${ref.name}'s shared theme is ${name} (${home(data.file)})`
+        : `${ref.name}'s shared theme is removed (${home(data.file)})`,
+    })
+    reopen("+project.theme")
+  }
+
   /** `unset` (XCOD-232's Clear) removes the key from the scope's file instead of setting it. */
   async function save(row: SettingRow, value: string, options: { reopen?: boolean; unset?: boolean } = {}) {
-    const input = { key: row.key, value, scope: scope(), ...(options.unset ? { unset: true } : {}) }
+    // XCOD-306: a key a repository can't set goes to your own config, even from a project's settings.
+    const target: Scope = props.project && ProjectSection.personalOnly(row.key) ? "user" : scope()
+    const input = { key: row.key, value, scope: target, ...(options.unset ? { unset: true } : {}) }
     const host = savedOnHost(row.key) ? hostSettings() : undefined
     // XCOD-297: the rows come from the server in the sandbox, which runs the project's plugins, so
     // what's about to change on this computer is said here, in this process's own words.
@@ -509,9 +614,12 @@ export function DialogSettings(props: {
       }
     }
     const result = await (
-      host ? host.set(input).then((data) => ({ data })) : sdk.client.config.settingsSet({ settingsSetInput: input })
+      host
+        ? host.set(input).then((data) => ({ data }))
+        : sdk.client.config.settingsSet({ ...scopedTo(), settingsSetInput: input })
     ).catch((cause: unknown) => ({ data: undefined, error: cause }))
     const data = result.data
+    if (props.project && data?.ok) projectSettingsChanged()
     if (!data || !data.ok) {
       toast.show({
         variant: "error",
@@ -979,6 +1087,33 @@ export function DialogSettings(props: {
         footer: right,
       }
     })
+    // XCOD-306: a project's settings start with its theme and what's kept with the project itself
+    // (name and folders, budget, resources), then every key a project can set.
+    if (props.project && !query()) {
+      const ref = props.project.ref
+      const current = themeState.project()?.key === ref.key ? themeState.projectTheme() : undefined
+      const mine = themeState.personal(ref.key)
+      const themeRow = snapshot()?.rows.find((row) => row.key === "tui.theme")
+      const themeValue = themeRow?.locked
+        ? `${themeRow.display} 🔒`
+        : (mine ?? (themeRow?.source === "project" ? themeRow.display : undefined) ?? "not set")
+      return [
+        {
+          title: "Theme for this project",
+          value: "+project.theme",
+          footer: `${themeValue}  ${mine ? "just me" : themeRow?.source === "project" ? "shared" : current?.source === "locked" ? "🔒 managed" : "default"}`,
+          category: "Appearance",
+        },
+        {
+          title: ref.kind === "named" ? "Name and folders…" : "Make it a named project…",
+          value: "+project.folders",
+          footer: ref.kind === "named" ? "/projects" : "group several folders",
+          category: "Project",
+        },
+        { title: "Budget…", value: "+project.budget", footer: "Settings › Projects › Budgets", category: "Project" },
+        ...list.map((item) => ({ ...item, category: "Settings" })),
+      ]
+    }
     // XCOD-254: Models & agents › External sessions starts with the answer to sharing Lunos with each
     // tool in this project; it's kept on this machine, not in config, so it isn't a setting row.
     if (props.area === EXTERNAL_AREA && sub() === EXTERNAL_SUB && !query())
@@ -1052,6 +1187,20 @@ export function DialogSettings(props: {
       return (
         <text fg={theme.textMuted} wrapMode="word">
           Memory at a glance: its status, a guided setup, and what's in it. Tab for every setting.
+        </text>
+      )
+    if (synthetic === "+project.theme")
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          A theme for this project's sessions, so you can tell projects apart. Just me keeps it on this computer; Shared
+          writes it to the project's tui.json for the team. Yours wins over the shared one, and both over your theme for
+          all projects. An organisation can fix the theme for everyone.
+        </text>
+      )
+    if (synthetic === "+project.folders" || synthetic === "+project.budget")
+      return (
+        <text fg={theme.textMuted} wrapMode="word">
+          Kept with the project on this computer, not in config: a repository's config can't raise its budget.
         </text>
       )
     if (synthetic === "+projects" || synthetic?.startsWith("+project:"))
@@ -1131,6 +1280,20 @@ export function DialogSettings(props: {
       lines.push({ text: "Enter lists its settings", color: theme.textMuted })
     else if (row.kind === "object" && !row.dialog)
       lines.push({ text: "Enter opens the config file in your editor", color: theme.textMuted })
+    if (props.project) {
+      // XCOD-306: where this key's change goes, and why when it can't go to the repository.
+      const why = ProjectSection.personalOnly(row.key)
+      if (why) lines.push({ text: `Yours only, saved to your own config: ${why}`, color: theme.warning })
+      else if (!row.locked)
+        lines.push({
+          text:
+            scope() === "project"
+              ? `Shared: saved to ${home(snapshot()?.files.project.config ?? "the project's config")}, so teammates get it`
+              : "Saved to your own config, for every project",
+          color: theme.textMuted,
+        })
+      lines.push({ text: `now ${row.display} (${badge(row)})`, color: theme.textMuted })
+    }
     if (row.from) lines.push({ text: `from ${home(row.from)}`, color: theme.textMuted })
     if (row.restart) lines.push({ text: "↻ restart required after a change", color: theme.textMuted })
     return (
@@ -1156,22 +1319,39 @@ export function DialogSettings(props: {
               titleView={
                 <box flexDirection="column" flexShrink={1}>
                   <box flexDirection="row" gap={2}>
-                    <Show when={props.section || props.area} fallback={tabs()}>
+                    <Show when={props.section || props.area || props.project} fallback={tabs()}>
                       {/* XCOD-259: where you are; "Settings" goes back to the home. */}
                       <box flexDirection="row">
                         <text fg={theme.textMuted} onMouseUp={() => openHome(props.area ?? "")}>
                           {"Settings › "}
                         </text>
                         <text fg={theme.text} attributes={TextAttributes.BOLD}>
-                          {props.area ?? sectionRow()?.label ?? props.section}
+                          {props.project
+                            ? `${props.project.ref.kind === "named" ? "Project" : "Repository"}: ${props.project.ref.name}`
+                            : (props.area ?? sectionRow()?.label ?? props.section)}
                           {props.area && sub() ? " › " + sub() : ""}
                         </text>
                       </box>
                     </Show>
-                    <text fg={theme.textMuted}>
-                      saving to <span style={{ fg: theme.text }}>{scope()}</span> config (ctrl+s)
-                    </text>
+                    <Show when={!props.project}>
+                      <text fg={theme.textMuted}>
+                        saving to <span style={{ fg: theme.text }}>{scope()}</span> config (ctrl+s)
+                      </text>
+                    </Show>
                   </box>
+                  <Show when={props.project}>
+                    {/* XCOD-306: the file a change goes to, before it's saved. */}
+                    <text fg={theme.textMuted} wrapMode="char">
+                      {scope() === "project" ? "Shared, saved to " : "Saved to your own config, "}
+                      <span style={{ fg: theme.text }}>
+                        {home(
+                          (scope() === "project" ? snapshot()?.files.project.config : snapshot()?.files.user.config) ??
+                            "",
+                        )}
+                      </span>{" "}
+                      (ctrl+s switches)
+                    </text>
+                  </Show>
                   <Show when={tabsOf().length}>
                     <box flexDirection="row" gap={2} flexWrap="wrap">
                       <For each={tabsOf()}>
@@ -1222,6 +1402,26 @@ export function DialogSettings(props: {
                       ),
                     generation,
                   })
+                if (option.value === "+project.theme") return pickProjectTheme()
+                if (option.value === "+project.folders" && props.project) {
+                  const ref = props.project.ref
+                  return dialog.replace(
+                    () =>
+                      ref.kind === "named" ? (
+                        <DialogProject id={ref.key} onBack={() => reopen("+project.folders")} />
+                      ) : (
+                        <DialogProjects nav={backTo("+project.folders")} />
+                      ),
+                    undefined,
+                    backTo("+project.folders"),
+                  )
+                }
+                if (option.value === "+project.budget")
+                  return dialog.replace(
+                    () => <DialogSettings tab="settings" area={PROJECTS} sub="Budgets" />,
+                    undefined,
+                    backTo("+project.budget"),
+                  )
                 if (option.value === "+memory.analytics") return dialog.replace(() => <DialogMemory />)
                 if (option.value === "+projects")
                   return dialog.replace(
