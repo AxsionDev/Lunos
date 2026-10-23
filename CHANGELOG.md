@@ -30,6 +30,13 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   is still being generated. Names are one line of up to 80 characters; save an empty name to get the
   automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
   Lunos name. <!-- XCOD-308 -->
+### Fixed
+
+- **Esc Esc while the agent is working clears what you've typed first** instead of stopping the
+  run, in the terminal app, `/claude` and `/codex` sessions and the Agent Monitor. Once the prompt is
+  empty, Esc Esc stops the run as before, and the line under the prompt shows which it will do
+  (`esc esc clear` or `esc esc stop`). The undo key brings the cleared text back while the agent
+  keeps working. `"double_escape_clear": false` keeps the old behaviour. <!-- XCOD-313 -->
 
 ## [1.18.55] - 2026-10-22
 

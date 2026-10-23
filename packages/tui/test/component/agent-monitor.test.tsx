@@ -514,6 +514,26 @@ test("@ and a name autocompletes sessions; the pick becomes its number", async (
   }
 })
 
+test("XCOD-313: with sessions working, Esc Esc clears the typed prompt and stops nothing; undo restores it", async () => {
+  const ui = await monitor()
+  try {
+    await wait(() => ui.frame().includes("Working (4)"))
+    await ui.type("@5 half a thought")
+    await ui.escape()
+    await ui.escape()
+    await wait(() => !ui.frame().includes("half a thought"))
+    expect(ui.toast()).toContain("Prompt cleared")
+    // input.undo's default (ctrl+z is the terminal's suspend here).
+    await ui.key("-", { ctrl: true })
+    await wait(() => ui.frame().includes("half a thought"))
+    await Bun.sleep(100)
+    expect(posts(ui, /abort$/)).toEqual([])
+    expect(posts(ui, /(prompt|enqueue)$/)).toEqual([])
+  } finally {
+    await ui.cleanup()
+  }
+})
+
 test("tagging three sessions asks first; Esc sends nothing, confirming sends to each", async () => {
   const ui = await monitor()
   try {

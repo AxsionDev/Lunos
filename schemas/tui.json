@@ -41947,7 +41947,7 @@
     },
     "double_escape_clear": {
       "type": "boolean",
-      "description": "Esc twice in the prompt clears it while the session is idle; the cleared prompt can be undone and is kept in history (default: true)"
+      "description": "Esc twice in the prompt clears it, idle or busy (with the prompt empty, Esc twice stops a busy session); the cleared prompt can be undone and is kept in history (default: true)"
     },
     "left_opens_monitor": {
       "type": "boolean",
