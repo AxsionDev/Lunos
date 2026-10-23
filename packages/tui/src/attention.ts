@@ -14,12 +14,8 @@ import { AttentionSoundName, type TuiConfig } from "./config"
 import { Schema } from "effect"
 import stripAnsi from "strip-ansi"
 import * as TuiAudio from "./audio"
-import defaultSoundPath from "@opencode-ai/ui/audio/bip-bop-01.mp3" with { type: "file" }
-import questionSoundPath from "@opencode-ai/ui/audio/bip-bop-03.mp3" with { type: "file" }
-import permissionSoundPath from "@opencode-ai/ui/audio/staplebops-06.mp3" with { type: "file" }
-import errorSoundPath from "@opencode-ai/ui/audio/nope-03.mp3" with { type: "file" }
-import doneSoundPath from "@opencode-ai/ui/audio/bip-bop-01.mp3" with { type: "file" }
-import subagentDoneSoundPath from "@opencode-ai/ui/audio/yup-01.mp3" with { type: "file" }
+import { DEFAULT_SOUNDS, NO_SOUND, clampVolume, isSoundID } from "@opencode-ai/ui/sounds"
+import { SOUND_FILES } from "./sounds"
 
 type FocusState = "unknown" | "focused" | "blurred"
 
@@ -35,7 +31,21 @@ type RegisteredSoundPack = TuiAttentionSoundPack & {
 }
 
 type TuiAttentionHost = TuiAttention & {
+  /**
+   * XCOD-311: plays one sound for the settings' preview, at the configured volume (or `volume`),
+   * whether or not alerts are on. `sound` is a bundled ID or a file. Resolves to a stop function.
+   */
+  preview(sound: string, volume?: number): Promise<(() => void) | undefined>
+  /** What an event plays when nothing is chosen for it: the active pack's sound, else the built-in. */
+  packSound(name: TuiAttentionSoundName): string
   dispose(): void
+}
+
+let active: TuiAttentionHost | undefined
+
+/** XCOD-311: the running app's attention, for /settings (preview, packs) and the mute command. */
+export function currentAttention() {
+  return active
 }
 
 const DEFAULT_TITLE = "Lunos"
@@ -49,14 +59,21 @@ const BUILTIN_PACK: RegisteredSoundPack = {
   id: DEFAULT_PACK_ID,
   name: "Lunos Default",
   builtin: true,
-  sounds: {
-    default: defaultSoundPath,
-    question: questionSoundPath,
-    permission: permissionSoundPath,
-    error: errorSoundPath,
-    done: doneSoundPath,
-    subagent_done: subagentDoneSoundPath,
-  },
+  // XCOD-311: by bundled sound ID (@opencode-ai/ui/sounds), so the settings can name each default.
+  sounds: DEFAULT_SOUNDS,
+}
+
+/**
+ * XCOD-311: what a configured sound plays. A bundled ID ("alert-04") is its embedded file, `none`
+ * is silence (null), anything else is a path. Undefined when nothing is set.
+ */
+export function soundFile(value: string | undefined): string | null | undefined {
+  if (value === undefined) return undefined
+  const text = value.trim()
+  if (!text) return undefined
+  if (text === NO_SOUND) return null
+  if (isSoundID(text)) return SOUND_FILES[text]
+  return text
 }
 
 function skipped(reason: TuiAttentionNotifySkipReason): TuiAttentionNotifyResult {
@@ -77,17 +94,14 @@ function normalizeText(input: string | undefined, fallback: string, limit: numbe
   return Array.from(normalized).slice(0, limit).join("")
 }
 
-function clampVolume(volume: number) {
-  if (!Number.isFinite(volume)) return 0
-  return Math.min(1, Math.max(0, volume))
-}
-
 function soundVolume(input: TuiAttentionNotifyInput, config: Pick<TuiConfig.Resolved, "attention">) {
   if (!config.attention.sound) return
   if (input.sound === false) return
-  if (input.sound === undefined) return clampVolume(config.attention.volume)
-  if (input.sound === true) return clampVolume(config.attention.volume)
-  return clampVolume(input.sound.volume ?? config.attention.volume)
+  const volume = clampVolume(
+    typeof input.sound === "object" ? (input.sound.volume ?? config.attention.volume) : config.attention.volume,
+  )
+  // XCOD-311: at 0% nothing plays, rather than a silent voice that reports a sound was made.
+  return volume > 0 ? volume : undefined
 }
 
 function normalizePack(pack: TuiAttentionSoundPack): RegisteredSoundPack | undefined {
@@ -117,7 +131,7 @@ export function createTuiAttention(input: {
   renderer: AttentionRenderer
   config: Pick<TuiConfig.Resolved, "attention">
   kv?: TuiKV
-  audio?: Pick<typeof TuiAudio, "loadSoundFile" | "play">
+  audio?: Pick<typeof TuiAudio, "loadSoundFile" | "play"> & Partial<Pick<typeof TuiAudio, "stopVoice">>
 }): TuiAttentionHost {
   let focus: FocusState = "unknown"
   let disposed = false
@@ -145,9 +159,12 @@ export function createTuiAttention(input: {
   }
 
   function soundCandidates(name: TuiAttentionSoundName) {
-    return [input.config.attention.sounds[name], currentPack().sounds[name], BUILTIN_PACK.sounds[name]].filter(
-      (item, index, list): item is string => typeof item === "string" && list.indexOf(item) === index,
+    // The first choice that says anything decides; `none` there means silence, not "try the next".
+    const list = [input.config.attention.sounds[name], currentPack().sounds[name], BUILTIN_PACK.sounds[name]].map(
+      soundFile,
     )
+    if (list.find((item) => item !== undefined) === null) return []
+    return list.filter((item, index): item is string => typeof item === "string" && list.indexOf(item) === index)
   }
 
   async function playSound(name: TuiAttentionSoundName, volume: number) {
@@ -168,7 +185,7 @@ export function createTuiAttention(input: {
     }
   }
 
-  return {
+  const host: TuiAttentionHost = {
     async notify(request) {
       try {
         if (!input.config.attention.enabled) return skipped("attention_disabled")
@@ -252,11 +269,27 @@ export function createTuiAttention(input: {
         }))
       },
     },
+    async preview(sound, volume) {
+      const file = soundFile(sound)
+      const level = clampVolume(volume ?? input.config.attention.volume)
+      if (!file || level <= 0 || disposed) return undefined
+      const loaded = await audio.loadSoundFile(file).catch(() => null)
+      if (!loaded || disposed) return undefined
+      const voice = audio.play(loaded, { volume: level })
+      if (voice == null) return undefined
+      return () => void audio.stopVoice?.(voice)
+    },
+    packSound(name) {
+      return currentPack().sounds[name] ?? BUILTIN_PACK.sounds[name]!
+    },
     dispose() {
       if (disposed) return
       disposed = true
+      if (active === host) active = undefined
       input.renderer.off("focus", onFocus)
       input.renderer.off("blur", onBlur)
     },
   }
+  active = host
+  return host
 }

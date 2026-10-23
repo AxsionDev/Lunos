@@ -51,6 +51,7 @@ export const Definitions = {
   app_console: keybind("none", "Toggle console"),
   app_heap_snapshot: keybind("none", "Write heap snapshot"),
   app_toggle_animations: keybind("none", "Toggle animations"),
+  app_toggle_sounds: keybind("none", "Mute or unmute sounds"),
   app_toggle_file_context: keybind("none", "Toggle file context"),
   app_toggle_diffwrap: keybind("none", "Toggle diff wrapping"),
   app_toggle_paste_summary: keybind("none", "Toggle paste summary"),
@@ -235,6 +236,19 @@ export const Definitions = {
   "dialog.sessions.mark": keybind("space", "Mark or unmark the selected session for Delete in the Sessions view"),
   "dialog.sessions.stop": keybind("ctrl+s", "Stop the selected session in the Sessions view"),
   "dialog.sessions.state": keybind("ctrl+f", "Cycle the Sessions view's state filter"),
+  // XCOD-309: ctrl+v is paste and ctrl+t the variant cycle; ctrl+y has no input-editing binding.
+  "dialog.sessions.view": keybind(
+    "ctrl+y",
+    "Switch the Sessions view and the Agent Monitor's rail between groups (status) and projects",
+  ),
+  "dialog.sessions.project.new": keybind(
+    "n",
+    "Start a new session in the selected project (on its header, in the Projects view)",
+  ),
+  "dialog.sessions.project.settings": keybind(
+    "p",
+    "Open the selected project's settings (on its header, in the Projects view)",
+  ),
   "monitor.back": keybind("escape,right", "Leave the Agent Monitor (right only from an empty prompt)"),
   "monitor.focus": keybind("tab", "Move focus between the Agent Monitor's prompt and its rail"),
   "monitor.project": keybind("ctrl+p", "Pick the project a new session starts in, in the Agent Monitor"),
@@ -252,6 +266,8 @@ export const Definitions = {
     "t",
     "Take over the selected session, whose Lunos closed with prompts queued, and send or discard them, in the Agent Monitor",
   ),
+  // XCOD-308: r, not ctrl+r, so it doesn't clash with the rail's other keys.
+  "monitor.rename": keybind("r", "Rename the selected session in the Agent Monitor"),
   // XCOD-265's Stop all / Clear list in the Agent Monitor's rail: unbound, as in /sessions.
   "monitor.stop_all": keybind("none", "Stop every running or waiting session in the Agent Monitor's rail"),
   "monitor.clear": keybind("none", "Clear (archive) the finished sessions in the Agent Monitor's rail"),
@@ -335,6 +351,7 @@ export const CommandMap = {
   app_console: "app.console",
   app_heap_snapshot: "app.heap_snapshot",
   app_toggle_animations: "app.toggle.animations",
+  app_toggle_sounds: "app.toggle.sounds",
   app_toggle_file_context: "app.toggle.file_context",
   app_toggle_diffwrap: "app.toggle.diffwrap",
   app_toggle_paste_summary: "app.toggle.paste_summary",

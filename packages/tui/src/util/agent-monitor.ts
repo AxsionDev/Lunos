@@ -26,6 +26,9 @@ export const SECTION_TITLE: Record<Section, string> = GROUP_TITLE
 
 /** Where the rail's expand/collapse choices are kept (kv.json). */
 export const MONITOR_GROUPS_KEY = "agent_monitor_groups"
+/** XCOD-309: the rail's view ("status", the default, or "projects"), and its collapsed projects. */
+export const MONITOR_VIEW_KEY = "agent_monitor_view"
+export const MONITOR_PROJECTS_KEY = "agent_monitor_projects_collapsed"
 
 /** Completed sessions older than this are behind "Show older". */
 export const RECENT_MS = 24 * 60 * 60 * 1000

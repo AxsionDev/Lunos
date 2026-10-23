@@ -22,6 +22,9 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { SubagentModel } from "../agent/subagent-model"
 import { ConfigPolicy } from "@/config/policy"
+import { DynamicWorkflows } from "@/session/workflows"
+import { Budget } from "@/budget"
+import { Question } from "@/question"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -135,6 +138,8 @@ export const TaskTool = Tool.define(
     const scope = yield* Scope.Scope
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
+    // Optional so test layers without a question service still build the tool; the registry has one.
+    const question = yield* Effect.serviceOption(Question.Service)
 
     // XCOD-287: at most `subagent.max_parallel` subagents of one session run at once; the rest wait
     // for a slot, marked `subagent.queued` on their session so the TUI can say so.
@@ -189,6 +194,68 @@ export const TaskTool = Tool.define(
             `Subagent depth limit reached (${cfg.subagent_depth ?? 1}). Increase "subagent_depth" to allow nested subagents.`,
           ),
         )
+      }
+
+      // XCOD-303: in a Dynamic workflow, no new subagent starts once a budget with `on_limit: stop` is
+      // used up (steps already running finish), and a step re-dispatched MAX_REDISPATCH times goes
+      // to the user rather than round again.
+      const parentAgent = yield* agent.get(ctx.agent)
+      const dynamic =
+        !!parentAgent &&
+        DynamicWorkflows.decide({
+          config: cfg,
+          agent: parentAgent,
+          session: parent,
+          subagents: (yield* agent.list()).filter((item) => item.mode !== "primary"),
+        }).on
+      if (dynamic) {
+        const stop = yield* Budget.dispatchStop(
+          {
+            directory: parent.directory,
+            session: { id: parent.id, ...(parent.parentID ? { parentID: parent.parentID } : {}) },
+          },
+          cfg as Budget.Config,
+        ).pipe(
+          Effect.provideService(Database.Service, database),
+          // A budget that can't be read never stops work, as in the session loop.
+          Effect.orElseSucceed(() => undefined),
+        )
+        if (stop) return yield* Effect.fail(new Error(`${stop} No new subagent is dispatched.`))
+        const before = DynamicWorkflows.dispatches(ctx.messages, params)
+        if (before > DynamicWorkflows.MAX_REDISPATCH) {
+          const AGAIN = "Try again"
+          // Nobody to ask (`lunos run`, CI): refused, never left waiting.
+          const asker = Budget.unattended(current.permission) ? undefined : Option.getOrUndefined(question)
+          const answers = !asker
+            ? []
+            : yield* asker
+                .ask({
+                  sessionID: ctx.sessionID,
+                  questions: [
+                    {
+                      header: "Workflow step",
+                      question: `"${params.description}" has been re-dispatched ${before - 1} times without finishing. Dispatch it again?`,
+                      custom: true,
+                      options: [
+                        { label: AGAIN, description: `Dispatch ${params.subagent_type} once more` },
+                        { label: "Stop", description: "Leave this step; the main agent reports where it stands" },
+                      ],
+                    },
+                  ],
+                })
+                .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<ReadonlyArray<string>>))
+          const answer = answers[0]?.[0]
+          if (answer !== AGAIN)
+            return yield* Effect.fail(
+              new Error(
+                `"${params.description}" was re-dispatched ${DynamicWorkflows.MAX_REDISPATCH} times; ${
+                  answer
+                    ? `the user answered: ${answer}. Don't dispatch it again; follow the user's answer.`
+                    : "don't dispatch it again. Report where it stands and ask the user how to go on."
+                }`,
+              ),
+            )
+        }
       }
 
       if (!ctx.extra?.bypassAgentCheck) {

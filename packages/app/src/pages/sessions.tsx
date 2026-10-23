@@ -27,6 +27,10 @@ import {
   toolOnly,
   topLevel,
   UNGROUPED,
+  projectSections,
+  sectionItems,
+  type NamedProject,
+  type ProjectSection,
   waiting,
   type Filter,
   type Row,
@@ -74,7 +78,8 @@ const REFRESH_ON = new Set([
 
 const DRAG_TYPE = "application/x-lunos-session"
 
-const RAIL_VIEWS = ["status", "groups"] as const
+// XCOD-309: and by project.
+const RAIL_VIEWS = ["status", "groups", "projects"] as const
 type RailView = (typeof RAIL_VIEWS)[number]
 
 /** How long Undo stays offered after a Clear (XCOD-265), as in /sessions. */
@@ -115,7 +120,12 @@ export function SessionsPage() {
   const [railPrefs, setRailPrefs] = persisted(
     Persist.global("sessions.rail"),
     // XCOD-299: and which of its sections are collapsed.
-    createStore({ view: "status" as RailView, sections: {} as SectionOverrides }),
+    // XCOD-309: and which project sections are collapsed.
+    createStore({
+      view: "status" as RailView,
+      sections: {} as SectionOverrides,
+      projects: {} as Record<string, boolean>,
+    }),
   )
   const railView = (): RailView => (RAIL_VIEWS.includes(railPrefs.view) ? railPrefs.view : "status")
   const [error, setError] = createSignal<string>()
@@ -148,6 +158,12 @@ export function SessionsPage() {
     const archived = archivedView()
     try {
       const result = await sdk.experimental.session.overview(archived ? { archived: true } : undefined)
+      // XCOD-309: the named projects and this server's own, for the "By project" view.
+      const projects = await sdk.experimental.projectGroup.list().catch(() => undefined)
+      if (projects?.data) {
+        setNamed(projects.data.groups.filter((group) => !group.archived))
+        setHere(projects.data.current.id)
+      }
       if (result.data && archived === archivedView()) {
         setData({ groups: result.data.groups, sessions: result.data.sessions, loaded: true })
         setNow(Date.now())
@@ -203,6 +219,42 @@ export function SessionsPage() {
   })
 
   const sections = createMemo(() => build({ groups: data.groups, sessions: data.sessions, filter }))
+  // XCOD-309: the rail by project.
+  const [named, setNamed] = createSignal<NamedProject[]>([])
+  const [here, setHere] = createSignal<string>()
+  const byProject = () => !archivedView() && railView() === "projects"
+  const projectViews = createMemo(() =>
+    projectSections({ sessions: data.sessions, named: named(), filter, here: here() }),
+  )
+  const projectOpen = (section: ProjectSection) =>
+    section.here || !!filter.search.trim() || railPrefs.projects?.[section.id] !== true
+  // Each project's budget, read when the view is shown and then at most once a minute.
+  const [budgets, setBudgets] = createStore<Record<string, string>>({})
+  let budgetsRead = 0
+  createEffect(
+    on([byProject, projectViews], ([shown, views]) => {
+      const sdk = client()
+      if (!shown || !sdk || Date.now() - budgetsRead < 60_000 || views.length === 0) return
+      budgetsRead = Date.now()
+      void Promise.all(
+        views
+          .filter((view) => view.start)
+          .map(async (view) => {
+            const status = await sdk.experimental.budget
+              .status({ directory: view.start })
+              .then((result) => result.data)
+              .catch(() => undefined)
+            const budget = status?.budgets.find((item) => item.scope === "project")
+            if (!budget) return [view.id, ""] as const
+            const format = new Intl.NumberFormat(language.intl(), { style: "currency", currency: budget.currency })
+            return [
+              view.id,
+              `${format.format(budget.spent)} / ${format.format(budget.amount)} (${budget.period.label})`,
+            ] as const
+          }),
+      ).then((lines) => setBudgets(reconcile(Object.fromEntries(lines.filter(([, value]) => value)))))
+    }),
+  )
   const waitingCount = createMemo(() => waiting(data.sessions))
 
   const groupActions = {
@@ -259,9 +311,12 @@ export function SessionsPage() {
       openSession({ sessionID: item.id, directory: item.directory, worktree: item.project?.worktree })
     },
     rename: async (item: SessionOverviewItem) => {
-      const title = ui.draft.trim()
+      // Enter, then the blur it causes: only the first saves.
+      if (ui.renamingSession !== item.id) return
+      // XCOD-308: one line of at most 80 characters; empty goes back to the automatic name.
+      const title = ui.draft.replace(/\s+/g, " ").trim().slice(0, 80).trim()
       setUi("renamingSession", undefined)
-      if (!title || title === item.title) return
+      if (title === item.title) return
       await client()
         ?.session.update({ sessionID: item.id, directory: item.directory, title }, { throwOnError: true })
         .catch(fail)
@@ -359,8 +414,8 @@ export function SessionsPage() {
   }
 
   const bulkActions = {
-    stopAll: async () => {
-      const plan = stopPlan(viewItems())
+    stopAll: async (items = viewItems()) => {
+      const plan = stopPlan(items)
       const total = plan.targets.length
       if (total === 0) return info(t("sessions.bulk.nothingToStop"))
       // The window spans every project; when the view does too, Stop all can be kept to one of them.
@@ -401,12 +456,12 @@ export function SessionsPage() {
       }
       refresh()
     },
-    clear: async () => {
-      const plan = clearPlan(viewItems())
+    clear: async (items = viewItems()) => {
+      const plan = clearPlan(items)
       const running = stopPlan(plan.staying).targets.length
       if (plan.targets.length === 0 && running === 0) return info(t("sessions.bulk.nothingToClear"))
       // Nothing finished, only running ones: the one thing to offer is Stop all & clear.
-      if (plan.targets.length === 0) return bulkActions.stopAndClear()
+      if (plan.targets.length === 0) return bulkActions.stopAndClear(items)
       const choice = await confirm({
         title: language.plural("sessions.bulk.clear.question", plan.targets.length),
         lines: [
@@ -423,8 +478,7 @@ export function SessionsPage() {
       if (result) cleared(result.archived)
       refresh()
     },
-    stopAndClear: async () => {
-      const items = viewItems()
+    stopAndClear: async (items = viewItems()) => {
       const stop = stopPlan(items)
       const clear = clearPlan(items).targets
       const total = stop.targets.length + clear.length
@@ -900,6 +954,7 @@ export function SessionsPage() {
             <input
               class="rounded border border-v2-border-border-base bg-transparent px-1 text-14-regular"
               aria-label={language.t("sessions.session.name")}
+              maxLength={80}
               value={ui.draft}
               ref={(el) => queueMicrotask(() => el.focus())}
               onInput={(event) => setUi("draft", event.currentTarget.value)}
@@ -1248,6 +1303,86 @@ export function SessionsPage() {
   }
 
   /**
+   * XCOD-309: a project's section in the rail "By project": its name ("here" for this server's own),
+   * what its sessions are doing, its budget, and New session / Stop all / Clear list for it alone.
+   */
+  const ProjectSectionView = (props: { section: ProjectSection }) => {
+    const name = () => props.section.name ?? t("sessions.project.none")
+    const open = () => projectOpen(props.section)
+    const glyph = { running: "◐", waiting: "!", done: "✓" } as const
+    const label = { running: "running", waiting: "waiting", done: "finished" } as const
+    const summary = () =>
+      (["running", "waiting", "done"] as const)
+        .filter((state) => props.section.counts[state] > 0)
+        .map((state) => `${glyph[state]} ${props.section.counts[state]} ${t(`sessions.state.${label[state]}`)}`)
+        .join(" · ")
+    return (
+      <section
+        class="rounded-lg border border-v2-border-border-base"
+        data-project-id={props.section.id || "none"}
+        aria-label={name()}
+      >
+        <header
+          class="flex flex-wrap items-center gap-2 px-3 py-2"
+          classList={{ "border-b border-v2-border-border-base": open() }}
+        >
+          <h2 class="flex min-w-0 flex-1 items-center gap-2 text-14-medium text-v2-text-text-strong">
+            <button
+              type="button"
+              class="truncate text-left"
+              aria-expanded={open()}
+              disabled={props.section.here}
+              onClick={() => setRailPrefs("projects", { ...(railPrefs.projects ?? {}), [props.section.id]: open() })}
+            >
+              <span aria-hidden="true" class="text-12-regular text-v2-text-text-weak">
+                {open() ? "▼ " : "▶ "}
+              </span>
+              {name()}
+            </button>
+            <Show when={props.section.here}>
+              <span class="rounded border border-v2-border-border-base px-1 text-12-regular text-v2-text-text-weak">
+                {t("sessions.project.here")}
+              </span>
+            </Show>
+          </h2>
+          <span class="text-12-regular text-v2-text-text-weak">
+            {[summary(), budgets[props.section.id]].filter(Boolean).join(" · ")}
+          </span>
+          <Show when={props.section.start}>
+            <button
+              type="button"
+              class="rounded px-2 py-0.5 text-12-medium"
+              onClick={() => {
+                setChosen(props.section.start)
+                composer?.querySelector("textarea")?.focus()
+              }}
+            >
+              {t("command.session.new")}
+            </button>
+          </Show>
+          <button
+            type="button"
+            class="rounded px-2 py-0.5 text-12-medium"
+            onClick={() => void bulkActions.stopAll(sectionItems(props.section))}
+          >
+            {t("sessions.bulk.stopAll")}
+          </button>
+          <button
+            type="button"
+            class="rounded px-2 py-0.5 text-12-medium"
+            onClick={() => void bulkActions.clear(sectionItems(props.section))}
+          >
+            {t("sessions.bulk.clear")}
+          </button>
+        </header>
+        <Show when={open()}>
+          <Rows rows={props.section.rows} />
+        </Show>
+      </section>
+    )
+  }
+
+  /**
    * XCOD-262: a section of the rail by status, with its count. XCOD-299: Working, Waiting for action
    * and Completed are always there; an empty one is "(0)", dimmed and collapsed, and a collapsed one
    * says what it holds ("✕ 1 Failed · ✓ 2 Finished").
@@ -1482,7 +1617,7 @@ export function SessionsPage() {
           </p>
         </Show>
         <Show
-          when={byGroups()}
+          when={byGroups() || byProject()}
           fallback={
             <>
               <Show when={statusRail().rows.length > 0}>
@@ -1510,8 +1645,18 @@ export function SessionsPage() {
             </>
           }
         >
-          <For each={sections()}>{(section) => <SectionView section={section} />}</For>
-          <Show when={data.loaded && sections().every((section) => section.rows.length === 0)}>
+          <Show
+            when={byProject()}
+            fallback={<For each={sections()}>{(section) => <SectionView section={section} />}</For>}
+          >
+            <For each={projectViews()}>{(section) => <ProjectSectionView section={section} />}</For>
+          </Show>
+          <Show
+            when={
+              data.loaded &&
+              (byProject() ? projectViews().length === 0 : sections().every((section) => section.rows.length === 0))
+            }
+          >
             <p class="text-14-regular text-v2-text-text-weak">
               {archivedView() ? t("sessions.archived.empty") : language.t("sessions.empty")}
             </p>

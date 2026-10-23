@@ -13,19 +13,22 @@ export const SECTIONS = [
   { category: "Memory", slug: "memory", aliases: [] },
   { category: "Marketplace & plugins", slug: "marketplace", aliases: ["plugins", "plugin"] },
   { category: "Appearance", slug: "appearance", aliases: ["theme"] },
+  // XCOD-311: tui.json's attention.*: which sound each event plays, volume, desktop notifications.
+  { category: "Notifications & sounds", slug: "notifications", aliases: ["sounds", "sound"] },
   { category: "Updates", slug: "updates", aliases: ["update"] },
   { category: "Tools", slug: "tools", aliases: ["lsp", "mcp"] },
   { category: "Advanced / experimental", slug: "advanced", aliases: ["experimental"] },
 ] as const
 
 export const SUBTABS: Record<string, readonly string[]> = {
-  "Models & agents": ["Models", "Agents", "Subagents", "Providers", "External sessions"],
+  "Models & agents": ["Models", "Agents", "Subagents", "Workflows", "Providers", "External sessions"],
   Projects: ["Projects", "Budgets"],
   Permissions: ["Rules", "Tools", "Sandbox"],
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
   Memory: ["Overview", "Settings", "Advanced"],
   "Marketplace & plugins": ["Marketplaces", "Plugins", "Policy"],
   Appearance: ["Theme", "Layout"],
+  "Notifications & sounds": ["Sounds", "Notifications"],
   Tools: ["LSP", "Formatters", "MCP", "Commands", "Skills", "Hooks", "Shell", "References"],
 }
 
@@ -76,6 +79,24 @@ export function badges(rows: readonly Pick<SettingRow, "source" | "locked" | "ke
     .join(" · ")
 }
 
+/**
+ * XCOD-311: "Sounds on · 60% · 2 custom" (custom: events whose sound was chosen). Alerts as a whole
+ * are off by default, and then nothing plays or notifies whatever the rest says, so that comes first.
+ */
+export function soundsSummary(rows: readonly Pick<SettingRow, "key" | "display" | "source">[]) {
+  const value = (key: string) => rows.find((row) => row.key === `tui.attention.${key}`)?.display
+  if (value("enabled") !== "true") return "alerts off"
+  const volume = Math.round(Number(value("volume") ?? "0.4") * 100)
+  const custom = rows.filter((row) => row.key.startsWith("tui.attention.sounds.") && row.source !== "default").length
+  return [
+    value("sound") === "false" ? "Sounds off" : `Sounds on · ${Number.isFinite(volume) ? volume : 40}%`,
+    custom ? `${custom} custom` : undefined,
+    value("notifications") === "false" ? "notifications off" : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+}
+
 /** A section's one-line summary from its rows' values, so the home says what's set at a glance. */
 export function summary(category: string, rows: readonly Pick<SettingRow, "key" | "display" | "source">[]) {
   const value = (key: string) => rows.find((row) => row.key === key)?.display
@@ -115,11 +136,13 @@ export function summary(category: string, rows: readonly Pick<SettingRow, "key" 
                   ]
                 : category === "Appearance"
                   ? [value("tui.theme")]
-                  : category === "Updates"
-                    ? [`auto-update ${value("autoupdate") ?? "on"}`]
-                    : category === "Tools"
-                      ? [value("lsp") === "false" ? "LSP off" : "LSP on", set("mcp") ? "MCP servers set" : undefined]
-                      : ["for troubleshooting and early features"]
+                  : category === "Notifications & sounds"
+                    ? [soundsSummary(rows)]
+                    : category === "Updates"
+                      ? [`auto-update ${value("autoupdate") ?? "on"}`]
+                      : category === "Tools"
+                        ? [value("lsp") === "false" ? "LSP off" : "LSP on", set("mcp") ? "MCP servers set" : undefined]
+                        : ["for troubleshooting and early features"]
   return parts.filter(Boolean).join(" · ")
 }
 

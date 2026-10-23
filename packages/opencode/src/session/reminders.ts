@@ -15,7 +15,9 @@ import PLAN_MODE from "./prompt/plan-mode.txt"
 import RESEARCH_MODE from "./prompt/research-mode.txt"
 import DEV_CYCLE_MODE from "./prompt/dev-cycle-mode.txt"
 import DELEGATE from "./prompt/delegate.txt"
+import DYNAMIC_WORKFLOW from "./prompt/dynamic-workflow.txt"
 import { DevCycle } from "./dev-cycle"
+import { DynamicWorkflows } from "./workflows"
 
 /**
  * XCOD-287: Build splits development work across subagents by default. Only for a top-level Build
@@ -42,12 +44,43 @@ export function delegateReminder(background: boolean) {
   )
 }
 
+/**
+ * XCOD-303: the orchestrator reminder for a Build turn running as a Dynamic workflow (it replaces
+ * the delegation reminder). qa gets the project's pinned checks itself (`qaProof`, prompt.ts).
+ */
+export function dynamicReminder(input: { background: boolean; maxParallel: number }) {
+  return DYNAMIC_WORKFLOW.replace("${maxParallel}", () => String(input.maxParallel))
+    .replace("${maxRedispatch}", () => String(DynamicWorkflows.MAX_REDISPATCH))
+    .replace("${backgroundInfo}", () =>
+      input.background
+        ? "Launch them with background: true; you are notified as each one finishes, so never sleep, poll or ask for status. When nothing is left to do until they report, end your turn saying you are waiting for them."
+        : "Wait for their results before you build on them.",
+    )
+}
+
+/** XCOD-303: Dev-Cycle's build phase, done by the main agent itself or (Dynamic workflows) by a builder subagent. */
+export function devCycleSteps(dynamic: boolean) {
+  if (!dynamic)
+    return {
+      buildStep:
+        "Implement the approved plan yourself; you hold the plan context and the write permissions. Then dispatch the `qa` subagent to review and test what you wrote -- it must be a different agent from the one that wrote the code, because the point is fresh eyes.",
+      fixStep: "fix it.",
+    }
+  return {
+    buildStep:
+      "Dynamic workflows are on, so you don't write the code: dispatch a builder subagent (`general`, or a project agent whose description fits better) to implement the approved plan. Paste the approved plan and the context it needs into its prompt; it can't see this conversation and may not be able to read the cycle file. Parts of the plan that touch different files may go to separate builders in parallel. Then dispatch the `qa` subagent to review and test what the builder wrote -- it must be a different agent from the one that wrote the code, because the point is fresh eyes. Your own edit tools work on the cycle file only, and you can't run commands.",
+    fixStep: "dispatch a builder subagent to fix it (pass its task_id so the same one continues).",
+  }
+}
+
 export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   messages: SessionV1.WithParts[]
   agent: Agent.Info
   session: Session.Info
   /** XCOD-287: the delegation reminder, when `delegates()` says so. Built per request, never saved. */
   delegate?: string
+  /** XCOD-303: whether this turn runs as a Dynamic workflow (Dev-Cycle's build phase goes to a subagent). */
+  dynamic?: boolean
 }) {
   const flags = yield* RuntimeFlags.Service
   const fsys = yield* FSUtil.Service
@@ -115,20 +148,23 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
     // (`phase: Architect`, `phase: architect  # waiting`). Say the position is
     // unknown rather than assert a position nobody wrote.
     const unreadable = exists && !!contents?.trim() && !parsed.ok
+    const steps = devCycleSteps(input.dynamic === true)
     inject(
-      DEV_CYCLE_MODE.replace("${cycleInfo}", () =>
-        [
-          exists
-            ? `A cycle file already exists at ${file}. Read it and make incremental edits using the edit tool.`
-            : `No cycle file exists yet. Create it at ${file} using the write tool, opening with the frontmatter block described below.`,
-          `Current phase: ${cursor.phase}. Gate at the end of this phase: ${cursor.gate}.`,
-          ...(unreadable
-            ? [
-                "The cycle file exists but its frontmatter could not be parsed. Treat this position as unknown -- ask the human where the cycle stands before acting on it, and do not redo an earlier phase on the assumption that it was never done.",
-              ]
-            : []),
-        ].join("\n"),
-      ),
+      DEV_CYCLE_MODE.replace("${buildStep}", () => steps.buildStep)
+        .replace("${fixStep}", () => steps.fixStep)
+        .replace("${cycleInfo}", () =>
+          [
+            exists
+              ? `A cycle file already exists at ${file}. Read it and make incremental edits using the edit tool.`
+              : `No cycle file exists yet. Create it at ${file} using the write tool, opening with the frontmatter block described below.`,
+            `Current phase: ${cursor.phase}. Gate at the end of this phase: ${cursor.gate}.`,
+            ...(unreadable
+              ? [
+                  "The cycle file exists but its frontmatter could not be parsed. Treat this position as unknown -- ask the human where the cycle stands before acting on it, and do not redo an earlier phase on the assumption that it was never done.",
+                ]
+              : []),
+          ].join("\n"),
+        ),
     )
     return input.messages
   }
