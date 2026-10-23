@@ -20,7 +20,37 @@ test("defines package-owned plugin specs and attention sound names", () => {
   expect(decodePlugin("example-plugin")).toBe("example-plugin")
   expect(decodePlugin(["example-plugin", { enabled: true }])).toEqual(["example-plugin", { enabled: true }])
   expect(() => decodePlugin(["example-plugin"])).toThrow()
-  expect(AttentionSoundName.literals).toEqual(["default", "question", "permission", "error", "done", "subagent_done"])
+  expect(AttentionSoundName.literals).toEqual([
+    "default",
+    "question",
+    "permission",
+    "error",
+    "done",
+    "subagent_done",
+    "waiting",
+    "budget_warning",
+  ])
+})
+
+// XCOD-311: the two new events, the notification options, and bundled IDs / none as sounds.
+test("accepts the new attention events and notification options", () => {
+  expect(
+    decodeInfo({
+      attention: {
+        sounds: { waiting: "alert-01", budget_warning: "none", permission: "alert-04", done: "/tmp/x.wav" },
+        notify_when: "always",
+        notify_subagents: true,
+      },
+    }),
+  ).toEqual({
+    attention: {
+      sounds: { waiting: "alert-01", budget_warning: "none", permission: "alert-04", done: "/tmp/x.wav" },
+      notify_when: "always",
+      notify_subagents: true,
+    },
+  })
+  expect(() => decodeInfo({ attention: { notify_when: "focused" } })).toThrow()
+  expect(() => decodeInfo({ attention: { volume: -0.1 } })).toThrow()
 })
 
 test("validates config constraints", () => {
@@ -58,6 +88,8 @@ test("resolves host-neutral defaults", () => {
     volume: 0.4,
     sound_pack: "opencode.default",
     sounds: {},
+    notify_when: "blurred",
+    notify_subagents: false,
   })
   expect(config.leader_timeout).toBe(LeaderTimeoutDefault)
   expect(config.mouse).toBe(true)
