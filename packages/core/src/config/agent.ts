@@ -24,4 +24,6 @@ export class Info extends Schema.Class<Info>("ConfigV2.Agent")({
   permissions: Permission.Ruleset.pipe(Schema.optional),
   /** XCOD-288: Build checks its work before handing back unless this is false. */
   verify: Schema.Boolean.pipe(Schema.optional),
+  /** XCOD-302: Build continues by itself after announcing a next step unless this is false. */
+  auto_continue: Schema.Boolean.pipe(Schema.optional),
 }) {}

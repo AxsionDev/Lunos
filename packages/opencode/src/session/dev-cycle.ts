@@ -1,3 +1,5 @@
+import type { AutoContinue } from "./auto-continue"
+
 export const PHASES = ["discover", "architect", "plan", "build", "verify"] as const
 
 export type Phase = (typeof PHASES)[number]
@@ -56,6 +58,38 @@ export function parseCursorResult(text: string | undefined): ParseResult {
 /** The cursor alone, for callers that have nothing useful to do with a failure. */
 export function parseCursor(text: string | undefined): Cursor {
   return parseCursorResult(text).cursor
+}
+
+/**
+ * XCOD-302: the cycle's position as the auto-continue check reads it (see `AutoContinue.Position`).
+ *
+ * `gate` describes the gate at the *end* of the current phase. Discover has none, so it never
+ * holds a continuation back; every other phase does while its gate is `pending`, unless the human
+ * approved it this turn. After an approval the model writes `gate: approved` and advances `phase`,
+ * which is why `build` + `approved` reads as "plan approved → build". `verify` + `approved` is
+ * gate 3 passed: the cycle is done. A file whose phase can't be read is unknown, never a guess.
+ */
+export function position(input: { exists: boolean; contents?: string }): AutoContinue.Position {
+  const parsed = parseCursorResult(input.contents)
+  const { phase, gate } = parsed.cursor
+  const index = PHASES.indexOf(phase)
+  const next = PHASES[index + 1]
+  const unknown = input.exists && !!input.contents?.trim() && !parsed.ok
+  const approvedGate = phase === "architect" || phase === "plan" || phase === "verify"
+  return {
+    unknown,
+    done: phase === "verify" && gate === "approved",
+    pending: phase !== "discover" && gate === "pending",
+    label: gate === "approved" && index > 1 ? `${PHASES[index - 1]} approved → ${phase}` : phase,
+    approved: approvedGate
+      ? {
+          label: next ? `${phase} approved → ${next}` : `${phase} approved`,
+          note: next
+            ? `The human approved the gate at the end of ${phase}. If the cycle file still says \`gate: pending\`, set \`gate: approved\` and advance \`phase:\` to ${next} first.`
+            : `The human approved gate 3. If the cycle file still says \`gate: pending\`, set \`gate: approved\`; the cycle is then finished.`,
+        }
+      : { label: phase },
+  }
 }
 
 export * as DevCycle from "./dev-cycle"
