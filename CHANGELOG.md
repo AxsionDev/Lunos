@@ -21,6 +21,30 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- **Quitting Lunos with the sandbox gives you the shell back at once.** Handing the results back and
+  removing the container now happen in a background helper (`lunos sandbox conclude <id>`), which
+  carries on after Lunos has exited; the last line says so, and `lunos sandbox status <id>` follows
+  it (saving, done, or failed and why). When the agent changed nothing, no handoff is made: only the
+  transcript comes back and the container is removed. The network log is read only from where the
+  last read stopped. Results are never lost: if the handoff fails, the sandbox is kept, stopped,
+  whatever `sandbox.on_finish` says, the error goes to the run log, and the next `lunos` start in
+  the project shows "Results from sandbox … weren't saved" with Retry, Open log and Attach (`lunos
+sandbox conclude <id>` retries from the shell). A new start waits for a handoff still running in
+  the project. `sandbox.on_exit: "wait"` does it in the foreground instead, a progress line per step
+  with its time; Ctrl+C then moves it to the background. `lunos run` waits by default in CI and when
+  its output isn't a terminal. The "sandbox server …, workspace …" line is no longer printed on exit.
+  On Windows the helper is started detached and without a console window, which hasn't been tested
+  there yet. <!-- XCOD-301 -->
+
+### Fixed
+
+- **Quitting a TUI connected over HTTP (a sandbox, `lunos attach`) no longer ends in "Lunos stopped
+  because of an unexpected error: AbortError".** The cancelled event stream was reported as an
+  unhandled error, which stopped Lunos before it handed a sandbox's results back, leaving the
+  container running. <!-- XCOD-301 -->
+
 ## [1.18.55] - 2026-10-22
 
 ### Added

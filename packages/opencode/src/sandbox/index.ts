@@ -1,5 +1,5 @@
 import fs from "node:fs/promises"
-import { realpathSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { randomBytes } from "node:crypto"
@@ -16,6 +16,7 @@ import type { SandboxEgress } from "./egress"
 import { SandboxGit } from "./git"
 import { SandboxMount } from "./mount"
 import { SandboxDevcontainer } from "./devcontainer"
+import { SandboxConclude } from "./conclude"
 import { RunBudget } from "@/agent/run-budget"
 
 // XCOD-144 slice 1: the lifecycle of one sandbox. `create` copies the repo into a container volume
@@ -75,6 +76,11 @@ export type Meta = {
   expires?: string
   /** Lines of the audit log inside already copied into the host's audit trail. */
   auditLines?: number
+  /**
+   * XCOD-301: the workspace's tree as computed inside the container at its first start, before the
+   * agent ran (see SandboxDocker.workspaceTree). Never overwritten: what "nothing changed" compares to.
+   */
+  baseline?: string
 }
 
 export type Connection = { url: string; password: string; headers: Record<string, string>; directory: string }
@@ -95,6 +101,8 @@ export type Handoff = {
   workspace?: SandboxConfig.Resolved["workspace"]
   /** XCOD-282: "folder": the results stay with Lunos until `lunos sandbox apply <id>` writes them into `root`. */
   source?: SandboxGit.Source
+  /** XCOD-301: nothing in the workspace changed, so it wasn't copied out and no branch was made. */
+  unchanged?: boolean
   id: string
   root: string
 }
@@ -480,7 +488,7 @@ async function populate(
  */
 export async function collectEgress(info: Meta): Promise<SandboxEgress.Decision[]> {
   if (!info.network || info.network === "open") return []
-  const text = await SandboxDocker.egressLog(info.id).catch(() => "")
+  const text = await SandboxDocker.egressLog(info.id, info.egressUntil).catch(() => "")
   const decisions = text
     .split("\n")
     .flatMap((line) => {
@@ -585,7 +593,7 @@ export function connection(info: Meta, port: number): Connection {
 
 export async function start(
   info: Meta,
-  options: { secrets?: Record<string, string>; attach?: boolean; timeoutMs?: number } = {},
+  options: { secrets?: Record<string, string>; attach?: boolean; timeoutMs?: number; baseline?: boolean } = {},
 ): Promise<Connection> {
   const timeoutMs = options.timeoutMs ?? 60_000
   await SandboxFailure.at("start", async () => {
@@ -593,6 +601,18 @@ export async function start(
     await SandboxDocker.inject(info.id, runtime(info, options.secrets ?? {}), info.identity)
   })
   if (options.attach) AuditLog.emit("sandbox.attach", auditFields(info))
+  // XCOD-301: the first start records the workspace as the agent found it, while the server comes
+  // up (no prompt reaches it before this returns). A mounted tree's .git is read-only: never there.
+  const baseline =
+    options.baseline && !info.baseline && !info.handedOff && info.workspace !== "mount"
+      ? SandboxDocker.workspaceTree(info.id, info.identity)
+          .then(async (tree) => {
+            if (!tree) return
+            info.baseline = tree
+            await saveMeta(info)
+          })
+          .catch(() => {})
+      : Promise.resolve()
   const conn = connection(info, await SandboxFailure.at("connect", () => SandboxDocker.hostPort(info.id)))
   const started = Date.now()
   while (Date.now() - started < timeoutMs) {
@@ -601,9 +621,13 @@ export async function start(
     const ok = await fetch(`${conn.url}/global/health`, { headers: conn.headers, signal: AbortSignal.timeout(2000) })
       .then((response) => response.ok)
       .catch(() => false)
-    if (ok) return conn
+    if (ok) {
+      await baseline
+      return conn
+    }
     await sleep(250)
   }
+  await baseline
   throw new SandboxError({
     step: "connect",
     reason: `The sandbox server didn't become healthy within ${timeoutMs / 1000}s (its last log lines are below)`,
@@ -641,7 +665,12 @@ export function failed(sessions: { messages: { info: { role: string; error?: unk
  * then the workspace as commits on lunos/sandbox/<id>. Needs the server running (for the
  * transcript); stops the container before copying the workspace out, so the copy is consistent.
  */
-export async function handoff(info: Meta, conn: Connection, extra: Record<string, unknown> = {}): Promise<Handoff> {
+export async function handoff(
+  info: Meta,
+  conn: Connection,
+  extra: Record<string, unknown> = {},
+  options: { unchanged?: boolean } = {},
+): Promise<Handoff> {
   const results = resultsDir(info)
   const folder = info.source === "folder"
   const sessions = await transcript(conn)
@@ -686,6 +715,12 @@ export async function handoff(info: Meta, conn: Connection, extra: Record<string
     if (mode === "none") {
       await summary({ files: [] })
       return { mode, files: [], results, failed: failed(sessions), workspace: info.workspace, ...where }
+    }
+    // XCOD-301: nothing changed, so nothing to copy out or commit, and no branch. The transcript, the
+    // summary and the audit log inside still come back (above): they go with the container.
+    if (options.unchanged) {
+      await summary({ files: [], unchanged: true })
+      return { mode, files: [], results, failed: failed(sessions), unchanged: true, ...where }
     }
 
     await SandboxDocker.copyOut(info.id, out)
@@ -757,6 +792,22 @@ export async function apply(id: string) {
   return { ...applied, root: found.root }
 }
 
+/**
+ * XCOD-301: whether the agent changed nothing: the workspace's tree, computed in the running
+ * container, is still the one recorded at its first start. Only before any handoff (a later one
+ * compares with what was handed back, which isn't recorded inside); false whenever it can't tell.
+ */
+export async function unchanged(info: Meta, timeout?: number) {
+  if (!info.baseline || info.handedOff) return false
+  return (await SandboxDocker.workspaceTree(info.id, info.identity, timeout)) === info.baseline
+}
+
+/** Save the host metadata as it is now (attach clears the expiry before a helper re-reads it). */
+export const persist = (info: Meta) => saveMeta(info)
+
+/** Whether the host still holds metadata for this sandbox (it hasn't been destroyed). */
+export const exists = (id: string) => existsSync(metaFile(id))
+
 /** Whether a policy destroys the sandbox, given how the task went. */
 export function destroys(policy: Meta["on_finish"], outcome: { failed: boolean }) {
   return policy === "destroy" || (policy === "destroy_on_success" && !outcome.failed)
@@ -820,7 +871,8 @@ export async function expired(now = Date.now()) {
  * cheap enough to run at every start; Docker is only called for a sandbox that is due.
  */
 export async function prune(now = Date.now()) {
-  const due = await expired(now)
+  // XCOD-301: never one whose results are being handed back, or weren't (they're only in it).
+  const due = (await expired(now)).filter((info) => !SandboxConclude.held(info.id))
   const removed: string[] = []
   for (const info of due) {
     await collectEgress(info)

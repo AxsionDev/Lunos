@@ -2198,6 +2198,7 @@ export type Config = {
       target?: string
     }>
     on_finish?: "destroy" | "retain" | "destroy_on_success"
+    on_exit?: "background" | "wait"
     retain_for?: string
     network?: "policy" | "none" | "open"
     allow?: Array<string>

@@ -53,6 +53,8 @@ export type Resolved = {
   results: "branch" | "patch" | "none"
   runtime?: "docker" | "podman"
   on_finish: "destroy" | "retain" | "destroy_on_success"
+  /** XCOD-301: unset when no config file sets it, so `lunos run` can pick its own default (see `exitMode`). */
+  on_exit?: "background" | "wait"
   /** How long a retained sandbox is kept, in milliseconds; undefined keeps it until destroyed. */
   retain_for?: number
   network: Network
@@ -151,6 +153,7 @@ export function resolve(info: ConfigSandbox.Info): Resolved {
     results: info.results ?? "branch",
     runtime: info.runtime,
     on_finish: info.on_finish ?? "destroy",
+    on_exit: info.on_exit,
     retain_for: info.retain_for ? duration(info.retain_for) : undefined,
     network: info.network ?? "policy",
     allow: info.allow ?? [],
@@ -226,6 +229,23 @@ export function load(directory: string, worktree = worktreeOf(directory)): Resol
     requiredBy,
     imageSet: project.some((layer) => layer?.image !== undefined),
   }
+}
+
+/**
+ * XCOD-301: whether quitting waits for the results. sandbox.on_exit when a config file sets it; else
+ * `lunos run` waits in CI and when its output isn't a terminal (a job or a script needs the results
+ * before it goes on), and everything else returns at once.
+ */
+export function exitMode(
+  config: Pick<Resolved, "on_exit">,
+  command: "tui" | "run" | "attach",
+  env: Record<string, string | undefined> = process.env,
+  tty = Boolean(process.stdout.isTTY),
+): "background" | "wait" {
+  if (config.on_exit) return config.on_exit
+  const ci = !!env.CI && env.CI !== "false" && env.CI !== "0"
+  if (command === "run" && (ci || !tty)) return "wait"
+  return "background"
 }
 
 /**

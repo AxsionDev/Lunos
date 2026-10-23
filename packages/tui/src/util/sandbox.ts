@@ -86,6 +86,35 @@ export type SandboxHost = {
   }
 }
 
+/** XCOD-301: a sandbox whose results a background handoff couldn't save; it's kept, stopped. */
+export type SandboxUnsaved = {
+  id: string
+  reason: string
+  /** The helper's run log, with the full error. */
+  log?: { id: string; file: string }
+}
+
+/**
+ * XCOD-301: what the command that started the TUI offers for results that weren't saved: the toast
+ * at start, and its Retry, Open log and Attach.
+ */
+export type SandboxHandback = {
+  unsaved: () => SandboxUnsaved[]
+  /** Hand the results back again, in the background; settles once that has finished. */
+  retry: (id: string) => Promise<{ ok: true; detail: string } | { ok: false; reason: string }>
+  /** Reopen it (`lunos sandbox attach <id>`) once the TUI has exited. */
+  attach: (id: string) => void
+}
+
+/** The toast's text for results that weren't saved. */
+export function unsavedToast(item: SandboxUnsaved, more = 0) {
+  return [
+    `⚠ Results from sandbox ${item.id} weren't saved: ${item.reason}`,
+    "The sandbox is kept (stopped), with the agent's work in it.",
+    ...(more ? [`${more} more: \`lunos sandbox status <id>\``] : []),
+  ].join("\n")
+}
+
 /** Whether prompts wait: the sandbox is still starting, or required and not running. */
 export function holds(state: SandboxState | undefined) {
   return state?.status === "starting" || state?.status === "blocked" || state?.status === "failed"
