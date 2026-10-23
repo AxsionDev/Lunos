@@ -51,6 +51,14 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   is still being generated. Names are one line of up to 80 characters; save an empty name to get the
   automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
   Lunos name. <!-- XCOD-308 -->
+- **See your sessions by project.** `/sessions` and the Agent Monitor's list switch between their
+  usual layout and one section per project with `ctrl+y` or a click on the view switch in the
+  header; the desktop and web Sessions window gains **By project** next to By status and By group.
+  Named projects come first, then repositories and folders, then "No project". Each section shows its
+  working, waiting and done sessions and the project's budget, and the project you're in is marked
+  "here". From a project's header you can start a new session in it, open its settings, or stop and
+  clear just that project. Each view remembers your choice; Groups stays the default.
+  <!-- XCOD-309 -->
 ### Fixed
 
 - **Esc Esc while the agent is working clears what you've typed first** instead of stopping the

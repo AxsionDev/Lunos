@@ -31,18 +31,21 @@ Each row has a number, the title, the project, the agent (or Claude Code / Codex
 
 Press **Tab** to move between the prompt and the list. In the list:
 
-| Key   | Does                                                                         |
-| ----- | ---------------------------------------------------------------------------- |
-| ↑ ↓   | Move, across the sections and their headers                                  |
-| Enter | Open the session, or collapse or expand the selected section                 |
-| `a`   | Approve what the session asks (once)                                         |
-| `d`   | Deny it, or dismiss its question                                             |
-| `s`   | Stop the session, after you confirm                                          |
-| `r`   | Rename the session (empty brings back the automatic name)                    |
-| `x`   | Delete the session for good, after you confirm (as Delete in `/sessions`)    |
-| `/`   | Filter by title, project, state, agent or tool                               |
-| `o`   | Show or hide completed sessions older than 24 hours                          |
-| `t`   | Take over a session whose Lunos closed with prompts queued (shown only then) |
+| Key    | Does                                                                         |
+| ------ | ---------------------------------------------------------------------------- |
+| ↑ ↓    | Move, across the sections and their headers                                  |
+| Enter  | Open the session, or collapse or expand the selected section                 |
+| `a`    | Approve what the session asks (once)                                         |
+| `d`    | Deny it, or dismiss its question                                             |
+| `s`    | Stop the session, after you confirm                                          |
+| `r`    | Rename the session (empty brings back the automatic name)                    |
+| `x`    | Delete the session for good, after you confirm (as Delete in `/sessions`)    |
+| `/`    | Filter by title, project, state, agent or tool                               |
+| `o`    | Show or hide completed sessions older than 24 hours                          |
+| `t`    | Take over a session whose Lunos closed with prompts queued (shown only then) |
+| Ctrl+Y | Switch the list between **Status** and **Projects** (or click the switch)    |
+| `n`    | On a project's header: start new sessions in that project                    |
+| `p`    | On a project's header: open the project's settings                           |
 
 An approval given here goes to the Lunos that runs the session, which checks it and writes it to its [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md), as if you'd answered it there.
 

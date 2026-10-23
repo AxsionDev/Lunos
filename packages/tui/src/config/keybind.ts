@@ -236,6 +236,19 @@ export const Definitions = {
   "dialog.sessions.mark": keybind("space", "Mark or unmark the selected session for Delete in the Sessions view"),
   "dialog.sessions.stop": keybind("ctrl+s", "Stop the selected session in the Sessions view"),
   "dialog.sessions.state": keybind("ctrl+f", "Cycle the Sessions view's state filter"),
+  // XCOD-309: ctrl+v is paste and ctrl+t the variant cycle; ctrl+y has no input-editing binding.
+  "dialog.sessions.view": keybind(
+    "ctrl+y",
+    "Switch the Sessions view and the Agent Monitor's rail between groups (status) and projects",
+  ),
+  "dialog.sessions.project.new": keybind(
+    "n",
+    "Start a new session in the selected project (on its header, in the Projects view)",
+  ),
+  "dialog.sessions.project.settings": keybind(
+    "p",
+    "Open the selected project's settings (on its header, in the Projects view)",
+  ),
   "monitor.back": keybind("escape,right", "Leave the Agent Monitor (right only from an empty prompt)"),
   "monitor.focus": keybind("tab", "Move focus between the Agent Monitor's prompt and its rail"),
   "monitor.project": keybind("ctrl+p", "Pick the project a new session starts in, in the Agent Monitor"),
