@@ -453,6 +453,16 @@ export function DialogAgentDetail(props: {
       `${value === undefined ? fallback : String(value)}${set(field) ? "" : " (default)"}${lockedKey(locked(), key(field)) ? " 🔒" : ""}`
     const rows = [
       { value: "model", title: "Model", footer: show("model", item.model, "inherits") },
+      // XCOD-310: the approval a new session starts this workflow in; <leader>p switches it per session.
+      ...(kindOf(item) === "main"
+        ? [
+            {
+              value: "permission_mode",
+              title: "Default approval",
+              footer: show("permission_mode", own("permission_mode"), "manual"),
+            },
+          ]
+        : []),
       { value: "disable", title: "On / off", footer: show("disable", item.disabled ? "off" : "on", "on") },
       ...(helper
         ? []
@@ -539,6 +549,13 @@ export function DialogAgentDetail(props: {
     switch (field) {
       case "model":
         return model()
+      case "permission_mode":
+        return choose(
+          "permission_mode",
+          "default approval",
+          ["manual", "auto"],
+          own("permission_mode") as string | undefined,
+        )
       case "disable":
         return void save("disable")(item.disabled ? undefined : "true")
       case "hidden":

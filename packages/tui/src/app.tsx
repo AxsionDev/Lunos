@@ -55,6 +55,7 @@ import { SyncProvider, useSync } from "./context/sync"
 import { DataProvider } from "./context/data"
 import { LocationProvider } from "./context/location"
 import { LocalProvider, useLocal } from "./context/local"
+import { Locale } from "./util/locale"
 import { PermissionProvider } from "./context/permission"
 import { DialogModel } from "./component/dialog-model"
 import { DialogExternalModel } from "./component/dialog-external-model"
@@ -159,6 +160,7 @@ const appBindingCommands = [
   "model.cycle_favorite",
   "model.cycle_favorite_reverse",
   "mode.list",
+  "permission.mode",
   "mcp.list",
   "mode.cycle",
   "mode.cycle.reverse",
@@ -1698,12 +1700,15 @@ function App(props: {
         },
       },
       {
+        // XCOD-310: Manual / Auto for the current workflow in this session (<leader>p).
         name: "permission.mode",
         title:
-          local.permission.mode === "auto" ? "Disable auto-approve permissions" : "Enable auto-approve permissions",
+          local.approval.current()?.mode === "auto"
+            ? `Manual approval for ${Locale.titlecase(local.mode.current()?.name ?? "this workflow")}`
+            : `Auto-approve for ${Locale.titlecase(local.mode.current()?.name ?? "this workflow")}`,
         category: "System",
         run: () => {
-          local.permission.toggle()
+          local.approval.toggle()
           dialog.clear()
         },
       },

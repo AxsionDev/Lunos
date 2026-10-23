@@ -132,6 +132,8 @@ export const Definitions = {
   provider_list: keybind("none", "Manage providers"),
   console_org_switch: keybind("none", "Switch console organization"),
   mode_list: keybind("<leader>a", "List modes"),
+  // XCOD-310: Manual / Auto approval for the current workflow in this session.
+  permission_mode: keybind("<leader>p", "Switch Manual / Auto approval for this workflow"),
   mode_cycle: keybind("tab", "Next mode"),
   mode_cycle_reverse: keybind("shift+tab", "Previous mode"),
   variant_cycle: keybind("ctrl+t", "Cycle model variants"),
@@ -421,6 +423,7 @@ export const CommandMap = {
   model_favorite_toggle: "model.dialog.favorite",
   model_filter_cycle: "model.dialog.filter",
   model_list: "model.list",
+  permission_mode: "permission.mode",
   model_cycle_recent: "model.cycle_recent",
   model_cycle_recent_reverse: "model.cycle_recent_reverse",
   model_cycle_favorite: "model.cycle_favorite",

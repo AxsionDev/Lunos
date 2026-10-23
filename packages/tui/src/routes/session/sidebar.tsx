@@ -2,6 +2,7 @@ import { useProject } from "../../context/project"
 import { useSync } from "../../context/sync"
 import { createMemo, createResource, createSignal, Show } from "solid-js"
 import type { InputRenderable } from "@opentui/core"
+import { PaneHide } from "../../component/right-pane"
 import { useSDK } from "../../context/sdk"
 import { useToast } from "../../ui/toast"
 import { usePromptRef } from "../../context/prompt"
@@ -83,7 +84,7 @@ function SidebarRename(props: { sessionID: string; title: string }) {
   )
 }
 
-export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
+export function Sidebar(props: { sessionID: string; overlay?: boolean; onHide?: () => void }) {
   const pluginRuntime = usePluginRuntime()
   const project = useProject()
   const sync = useSync()
@@ -134,6 +135,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
           }}
         >
           <box flexShrink={0} gap={1} paddingRight={1}>
+            <Show when={props.onHide}>
+              <PaneHide onHide={props.onHide!} />
+            </Show>
             <pluginRuntime.Slot
               name="sidebar_title"
               mode="single_winner"

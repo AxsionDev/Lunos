@@ -26870,6 +26870,10 @@
           "verify": {
             "type": "boolean"
           },
+          "permission_mode": {
+            "type": "string",
+            "enum": ["manual", "auto"]
+          },
           "auto_continue": {
             "type": "boolean"
           }
