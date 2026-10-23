@@ -47,7 +47,6 @@ import {
   queuedDeleteNote,
   SESSIONS_PROJECTS_KEY,
   SESSIONS_VIEW_KEY,
-  budgetLine,
   buildProjects,
   projectCounts,
   projectSections,
@@ -56,6 +55,7 @@ import {
   type NamedProject,
 } from "../util/sessions-overview"
 import { useKV } from "../context/kv"
+import { loadProjectBudgets, projectBudgets as budgets } from "../util/project-budgets"
 import { DialogProject, DialogProjects } from "./dialog-projects"
 
 // Events after which the overview is re-read. The same list the desktop/web window uses.
@@ -89,10 +89,6 @@ const [marked, setMarked] = createSignal<ReadonlySet<string>>(new Set())
 const [failedDeletes, setFailedDeletes] = createSignal<Record<string, string>>({})
 /** How long Undo stays offered after a Clear. */
 const UNDO_MS = 2 * 60 * 1000
-// XCOD-309: each project's budget line ("€12.40 of €50 (Oct)"), by project id, when it has one; kept
-// across re-opening the view, and read at most once a minute.
-const [budgets, setBudgets] = createStore<Record<string, string>>({})
-let budgetsRead = 0
 
 export function DialogSessions(props: { select?: string }) {
   const dialog = useDialog()
@@ -175,28 +171,11 @@ export function DialogSessions(props: { select?: string }) {
     }
   }
 
-  /**
-   * XCOD-309: the budget each project section shows. There is one status per project (asked in one of
-   * its folders), so it is read when the Projects view is shown and then at most once a minute.
-   */
-  async function loadBudgets() {
-    if (Date.now() - budgetsRead < 60_000) return
-    budgetsRead = Date.now()
-    const sections = projectSections({ sessions: data.sessions, named: data.named, search: "", state: "all" })
-    const lines = await Promise.all(
-      sections
-        .filter((section) => section.directory)
-        .map(async (section) => {
-          const status = await sdk.client.experimental.budget
-            .status({ directory: section.directory })
-            .then((result) => result.data)
-            .catch(() => undefined)
-          const budget = status?.budgets.find((item) => item.scope === "project")
-          return [section.id, budget ? budgetLine(budget) : ""] as const
-        }),
+  const loadBudgets = () =>
+    loadProjectBudgets(
+      sdk.client,
+      projectSections({ sessions: data.sessions, named: data.named, search: "", state: "all" }),
     )
-    setBudgets(reconcile(Object.fromEntries(lines.filter(([, value]) => value))))
-  }
 
   let timer: ReturnType<typeof setTimeout> | undefined
   function refresh() {
