@@ -26705,6 +26705,24 @@
         },
         "additionalProperties": false
       },
+      "DevCycleConfig": {
+        "type": "object",
+        "properties": {
+          "auto_continue": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkflowsConfig": {
+        "type": "object",
+        "properties": {
+          "dynamic": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "PermissionActionConfig": {
         "type": "string",
         "enum": ["ask", "allow", "deny"]
@@ -26855,6 +26873,9 @@
           "permission_mode": {
             "type": "string",
             "enum": ["manual", "auto"]
+          },
+          "auto_continue": {
+            "type": "boolean"
           }
         },
         "additionalProperties": {}
@@ -27529,6 +27550,10 @@
                 "type": "string",
                 "enum": ["destroy", "retain", "destroy_on_success"]
               },
+              "on_exit": {
+                "type": "string",
+                "enum": ["background", "wait"]
+              },
               "retain_for": {
                 "type": "string",
                 "pattern": "^\\d+[mhd]$"
@@ -27936,6 +27961,12 @@
           },
           "verify": {
             "$ref": "#/components/schemas/VerifyConfig"
+          },
+          "dev_cycle": {
+            "$ref": "#/components/schemas/DevCycleConfig"
+          },
+          "workflows": {
+            "$ref": "#/components/schemas/WorkflowsConfig"
           },
           "subagent_depth": {
             "type": "integer",

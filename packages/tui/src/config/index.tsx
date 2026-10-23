@@ -34,6 +34,8 @@ export type Resolved = Omit<
     volume: number
     sound_pack: string
     sounds: AttentionSoundPaths
+    notify_when: "blurred" | "always"
+    notify_subagents: boolean
   }
   keybinds: TuiKeybind.BindingLookupView
   leader_timeout: number
@@ -78,6 +80,8 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
       volume: input.attention?.volume ?? 0.4,
       sound_pack: input.attention?.sound_pack ?? "opencode.default",
       sounds: input.attention?.sounds ?? {},
+      notify_when: input.attention?.notify_when ?? "blurred",
+      notify_subagents: input.attention?.notify_subagents ?? false,
     },
     keybinds: createBindingLookup(TuiKeybind.toBindingConfig(TuiKeybind.parse(keybinds)), {
       commandMap: TuiKeybind.CommandMap,

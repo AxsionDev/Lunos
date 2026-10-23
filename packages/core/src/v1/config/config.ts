@@ -21,6 +21,8 @@ import { ConfigHooks } from "../../config/hooks"
 import { ConfigResidency } from "../../config/residency"
 import { ConfigSubagent } from "../../config/subagent"
 import { ConfigVerify } from "../../config/verify"
+import { ConfigDevCycle } from "../../config/dev-cycle"
+import { ConfigWorkflows } from "../../config/workflows"
 import { ConfigCloud } from "../../config/cloud"
 import { ConfigAuth } from "../../config/auth"
 import { ConfigSync } from "../../config/sync"
@@ -183,6 +185,12 @@ export const Info = Schema.Struct({
   verify: Schema.optional(ConfigVerify.Info).annotate({
     description:
       "How the Build agent checks its work before handing back: build, test and start commands, the ready URL and checks (XCOD-288)",
+  }),
+  dev_cycle: Schema.optional(ConfigDevCycle.Info).annotate({
+    description: "Dev-Cycle mode: whether it continues by itself between gates (XCOD-302)",
+  }),
+  workflows: Schema.optional(ConfigWorkflows.Info).annotate({
+    description: "Dynamic workflows: whether Build and Dev-Cycle dispatch subagents to do the work (XCOD-303)",
   }),
   subagent_depth: Schema.optional(NonNegativeInt).annotate({
     description: "Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents.",

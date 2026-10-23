@@ -1890,6 +1890,14 @@ export type VerifyConfig = {
   timeout?: number
 }
 
+export type DevCycleConfig = {
+  auto_continue?: boolean
+}
+
+export type WorkflowsConfig = {
+  dynamic?: boolean
+}
+
 export type PermissionActionConfig = "ask" | "allow" | "deny"
 
 export type PermissionObjectConfig = {
@@ -1944,6 +1952,7 @@ export type AgentConfig = {
   permission?: PermissionConfig
   verify?: boolean
   permission_mode?: "manual" | "auto"
+  auto_continue?: boolean
   [key: string]:
     | unknown
     | string
@@ -2201,6 +2210,7 @@ export type Config = {
       target?: string
     }>
     on_finish?: "destroy" | "retain" | "destroy_on_success"
+    on_exit?: "background" | "wait"
     retain_for?: string
     network?: "policy" | "none" | "open"
     allow?: Array<string>
@@ -2330,6 +2340,8 @@ export type Config = {
   sync?: SyncConfig
   subagent?: SubagentConfig
   verify?: VerifyConfig
+  dev_cycle?: DevCycleConfig
+  workflows?: WorkflowsConfig
   subagent_depth?: number
   username?: string
   mode?: {

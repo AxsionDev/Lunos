@@ -47,6 +47,7 @@ export const Default = {
   INIT: "init",
   REVIEW: "review",
   MEMORY: "memory",
+  WORKFLOWS: "workflows",
 } as const
 
 export interface Interface {
@@ -94,6 +95,14 @@ const layer = Layer.effect(
         name: Default.MEMORY,
         description:
           "long-term memory: /memory off | on for this session; /memory sources [off | on <name>] for external sources; /memory alone opens the browser in the TUI",
+        source: "command",
+        template: "",
+        hints: [],
+      }
+      // XCOD-303: handled by SessionPrompt.command too; switches Dynamic workflows for the session.
+      commands[Default.WORKFLOWS] = {
+        name: Default.WORKFLOWS,
+        description: "Dynamic workflows: /workflows off | on for this session; /workflows alone says which applies",
         source: "command",
         template: "",
         hints: [],

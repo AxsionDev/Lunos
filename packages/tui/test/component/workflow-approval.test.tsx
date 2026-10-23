@@ -475,6 +475,8 @@ describe("edges", () => {
           .split("\n")
           .find((row) => row.includes("approval")) ?? ""
       expect(line).toContain("ctrl+x m model · ctrl+x p approval")
+      // Dynamic workflows' state shares the line; the modes key gives way at this width.
+      expect(line).toContain("Dynamic workflows: on")
       expect(line).toMatch(/commands\s*$/)
     } finally {
       await ui.cleanup()
