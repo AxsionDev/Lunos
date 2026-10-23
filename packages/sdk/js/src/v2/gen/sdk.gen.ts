@@ -164,6 +164,8 @@ import type {
   FindTextResponses,
   FormatterStatusErrors,
   FormatterStatusResponses,
+  GlobalAccountGetErrors,
+  GlobalAccountGetResponses,
   GlobalConfigGetErrors,
   GlobalConfigGetResponses,
   GlobalConfigUpdateErrors,
@@ -3087,6 +3089,20 @@ export class Config extends HeyApiClient {
   }
 }
 
+export class Account extends HeyApiClient {
+  /**
+   * Get the Lunos account's state
+   *
+   * Whether this machine was told the Lunos account is disabled, with the reason category and the end date. Reads this machine's record only.
+   */
+  public get<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalAccountGetResponses, GlobalAccountGetErrors, ThrowOnError>({
+      url: "/global/account",
+      ...options,
+    })
+  }
+}
+
 export class Global extends HeyApiClient {
   /**
    * Get health
@@ -3151,6 +3167,11 @@ export class Global extends HeyApiClient {
   private _config?: Config
   get config(): Config {
     return (this._config ??= new Config({ client: this.client }))
+  }
+
+  private _account?: Account
+  get account(): Account {
+    return (this._account ??= new Account({ client: this.client }))
   }
 }
 

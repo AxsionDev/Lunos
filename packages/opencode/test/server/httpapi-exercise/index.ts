@@ -69,6 +69,13 @@ const scenarios: Scenario[] = [
       check(body.healthy === true, "server should report healthy")
     }),
   http.protected
+    .get("/global/account", "global.account.get")
+    .global()
+    .json(200, (body) => {
+      object(body)
+      check(body.disabled === undefined, "no disabled-account record in the test home")
+    }),
+  http.protected
     .get("/global/event", "global.event")
     .global()
     .stream()

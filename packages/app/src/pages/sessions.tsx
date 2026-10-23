@@ -10,6 +10,7 @@ import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
+import { useAccount } from "@/context/account"
 import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { SessionPermissionDock } from "./session/composer/session-permission-dock"
@@ -653,6 +654,7 @@ export function SessionsPage() {
     setAsks(reconcile(next))
   }
 
+  const account = useAccount()
   const monitorActions = {
     /** A row's number puts its tag in the prompt. */
     tag: (item: SessionOverviewItem) => {
@@ -790,6 +792,8 @@ export function SessionsPage() {
     },
     /** The prompt with no tag starts a session; tagged, it goes to each tagged session. */
     submit: async (raw: string, interrupt: boolean) => {
+      // XCOD-312: a disabled Lunos account sends nothing; the draft stays.
+      if (account && !account.allowSend()) return false
       const parsed = tags(raw, byNumber())
       if (parsed.unknown.length) {
         showToast({

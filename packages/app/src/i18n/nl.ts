@@ -1365,4 +1365,18 @@ export const dict = {
   "sessions.monitor.sentMany": "Verstuurd: {{sent}} · In de wachtrij: {{queued}}",
   "sessions.monitor.started": "Sessie gestart in {{project}}",
   "command.sessions.open": "Sessievenster openen",
+  "account.disabled.title": "Je Lunos-account is uitgeschakeld",
+  "account.disabled.reason": "Reden: {{reason}}",
+  "account.disabled.until": "Tot {{date}}",
+  "account.disabled.contact": "Neem contact op met support: {{email}}",
+  "account.disabled.readOnly": "Eerdere sessies blijven leesbaar. Nieuwe prompts kunnen niet worden verzonden.",
+  "account.disabled.viewSessions": "Eerdere sessies bekijken (alleen lezen)",
+  "account.disabled.category.abuse": "Misbruik van de dienst",
+  "account.disabled.category.security": "Een beveiligingsprobleem",
+  "account.disabled.category.terms": "Een schending van de servicevoorwaarden",
+  "account.disabled.category.payment": "Een betalingsprobleem",
+  "account.disabled.category.offboarding": "Je organisatie heeft je uitgeschreven",
+  "account.disabled.category.other": "Overig",
+  "prompt.placeholder.accountDisabled":
+    "Je Lunos-account is uitgeschakeld: nieuwe prompts kunnen niet worden verzonden",
 }

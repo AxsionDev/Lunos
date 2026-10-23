@@ -506,6 +506,8 @@ jobs:
           OPENCODE_VERSION: ${{ needs.version.outputs.version }}
           OPENCODE_CHANNEL: ${{ (github.ref_name == 'beta' && 'beta') || 'prod' }}
           RUST_TARGET: ${{ matrix.settings.target }}
+          # XCOD-312: prepare.ts runs build-node.ts as well (see Build).
+          LUNOS_OFFICIAL_BUILD: "1"
 
       - name: Build
         run: bun run build
@@ -514,6 +516,9 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
           OPENCODE_VERSION: ${{ needs.version.outputs.version }}
           OPENCODE_CHANNEL: ${{ (github.ref_name == 'beta' && 'beta') || 'prod' }}
+          # XCOD-312: the desktop app's server (script/build-node.ts) is an official build too, so a
+          # disabled Lunos account is shown and refused there as in the CLI.
+          LUNOS_OFFICIAL_BUILD: "1"
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.WEB_SENTRY_PROJECT }}

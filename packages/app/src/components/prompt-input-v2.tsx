@@ -15,6 +15,7 @@ import type { PromptInputProps } from "@/components/prompt-input/contracts"
 import { normalizePromptHistoryEntry, promptLength, type PromptHistoryComment } from "@/components/prompt-input/history"
 import { createPersistedPromptInputHistory } from "@/components/prompt-input/history-store"
 import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-input/placeholder"
+import { useAccount } from "@/context/account"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
 import { useSessionTakeover } from "@/components/prompt-input/takeover"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
@@ -133,6 +134,8 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  // XCOD-312: a disabled Lunos account's prompt says why it can't be used.
+  const account = useAccount()
   const prompt = props.state ?? usePrompt()
   let editor: HTMLDivElement | undefined
 
@@ -178,12 +181,16 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       commentCount: commentCount(),
       example: mode() === "shell" ? "git status" : "",
       suggest: false,
+      accountDisabled: !!account?.disabled(),
       t: (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
     }),
   )
   const designPlaceholder = () =>
-    promptDesignPlaceholder(mode(), placeholder(), (key, params) =>
-      language.t(key as Parameters<typeof language.t>[0], params as never),
+    promptDesignPlaceholder(
+      mode(),
+      placeholder(),
+      (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
+      !!account?.disabled(),
     )
 
   const historyComments = () => {

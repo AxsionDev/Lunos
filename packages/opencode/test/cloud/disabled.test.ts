@@ -261,4 +261,16 @@ describe("a disabled account (XCOD-312)", () => {
     expect(await CloudDisabled.refusal({ ...required, CI: "true" })).toBeUndefined()
     expect(await CloudDisabled.refusal({})).toBeUndefined()
   })
+
+  test("what the desktop and web app are told (`active`): the record, behind the same exemptions", async () => {
+    await setup()
+    const required = { LUNOS_AUTH_REQUIRED: "1" }
+    expect(await CloudDisabled.active(required)).toBeUndefined()
+    await CloudDisabled.record({ category: "terms", until: UNTIL })
+    expect(await CloudDisabled.active(required)).toEqual({ category: "terms", until: UNTIL })
+    expect(await CloudDisabled.active({ ...required, LUNOS_OFFLINE: "1" })).toBeUndefined()
+    expect(await CloudDisabled.active({})).toBeUndefined()
+    await CloudDisabled.clear()
+    expect(await CloudDisabled.active(required)).toBeUndefined()
+  })
 })

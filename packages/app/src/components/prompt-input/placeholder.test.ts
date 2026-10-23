@@ -60,4 +60,17 @@ describe("promptDesignPlaceholder", () => {
   test("preserves the shell placeholder", () => {
     expect(promptDesignPlaceholder("shell", "Enter shell command...", t)).toBe("Enter shell command...")
   })
+
+  test("XCOD-312: a disabled Lunos account's placeholder says why the prompt can't be used", () => {
+    const disabled = promptPlaceholder({
+      mode: "normal",
+      commentCount: 2,
+      example: "example",
+      suggest: true,
+      accountDisabled: true,
+      t: (key) => key,
+    })
+    expect(disabled).toBe("prompt.placeholder.accountDisabled")
+    expect(promptDesignPlaceholder("normal", disabled, t, true)).toBe("prompt.placeholder.accountDisabled")
+  })
 })

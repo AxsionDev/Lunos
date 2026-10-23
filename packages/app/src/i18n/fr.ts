@@ -1401,4 +1401,19 @@ export const dict = {
   "sessions.monitor.sentMany": "Envoyés : {{sent}} · En file : {{queued}}",
   "sessions.monitor.started": "Session démarrée dans {{project}}",
   "command.sessions.open": "Ouvrir la fenêtre des sessions",
+  "account.disabled.title": "Votre compte Lunos est désactivé",
+  "account.disabled.reason": "Motif : {{reason}}",
+  "account.disabled.until": "Jusqu’au {{date}}",
+  "account.disabled.contact": "Contacter le support : {{email}}",
+  "account.disabled.readOnly":
+    "Les sessions passées restent consultables. Les nouveaux prompts ne peuvent pas être envoyés.",
+  "account.disabled.viewSessions": "Voir les sessions passées (lecture seule)",
+  "account.disabled.category.abuse": "Abus ou usage abusif du service",
+  "account.disabled.category.security": "Un problème de sécurité",
+  "account.disabled.category.terms": "Une violation des conditions d’utilisation",
+  "account.disabled.category.payment": "Un problème de paiement",
+  "account.disabled.category.offboarding": "Votre organisation vous a retiré",
+  "account.disabled.category.other": "Autre",
+  "prompt.placeholder.accountDisabled":
+    "Votre compte Lunos est désactivé : les nouveaux prompts ne peuvent pas être envoyés",
 }
