@@ -306,7 +306,8 @@ export function Session() {
   /** XCOD-307: one toggle for the keybind, the command palette, » and «. */
   const toggleSidebar = () => pane.toggle()
   // XCOD-307: what the hidden pane holds that needs you, on the « chip.
-  const paneBudget = useBudget(() => route.sessionID)
+  // Only while the pane (and its own budget meter) is hidden.
+  const paneBudget = useBudget(() => (sidebarVisible() ? undefined : route.sessionID))
   const attention = createMemo(() =>
     RightPane.attention({
       waiting: RightPane.waitingSubagents(
