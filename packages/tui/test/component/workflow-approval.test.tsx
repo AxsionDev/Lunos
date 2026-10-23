@@ -79,7 +79,9 @@ const asked = (id: string, sessionID: string) => ({
 })
 
 /** The session `ses_a` (with a subagent session `ses_child`) open in the prompt. `state` keeps kv.json between mounts. */
-async function mount(input: { config?: Record<string, unknown>; state?: string } = {}) {
+async function mount(
+  input: { config?: Record<string, unknown>; state?: string; width?: number; external?: "claude" | "codex" } = {},
+) {
   const calls: Call[] = []
   const tmp = await tmpdir()
   const state = input.state ?? path.join(tmp.path, "state")
@@ -87,7 +89,12 @@ async function mount(input: { config?: Record<string, unknown>; state?: string }
   if (!(await Bun.file(path.join(state, "kv.json")).exists())) await Bun.write(path.join(state, "kv.json"), "{}")
   const events = createEventSource()
   const base = createFetch(undefined, events)
-  const sessions = [session("ses_a"), session("ses_child", "ses_a")]
+  const sessions = [
+    input.external
+      ? { ...session("ses_a"), metadata: { external: { tool: input.external, session: "thread" } } }
+      : session("ses_a"),
+    session("ses_child", "ses_a"),
+  ]
   const fetch = (async (request: RequestInfo | URL, init?: RequestInit) => {
     const req = request instanceof Request ? request : new Request(String(request), init)
     const url = new URL(req.url)
@@ -251,10 +258,14 @@ async function mount(input: { config?: Record<string, unknown>; state?: string }
     )
   }
 
-  const app = await testRender(() => <Harness />, { kittyKeyboard: true, width: 120, height: 45 })
+  const app = await testRender(() => <Harness />, {
+    kittyKeyboard: true,
+    width: input.width ?? 120,
+    height: 45,
+  })
   const frame = () => app.captureCharFrame()
   lastFrame = frame
-  await wait(() => frame().includes("Ask anything") && frame().includes("Build"))
+  await wait(() => frame().includes("Ask anything") && (!!input.external || frame().includes("Build")))
   await Bun.sleep(100)
   const settle = () => Bun.sleep(80)
   return {
@@ -270,6 +281,14 @@ async function mount(input: { config?: Record<string, unknown>; state?: string }
         .find((line) => /(Build|Plan|Dev-Cycle) · (Manual|Auto)/.test(line))
         ?.replace(/^[┃\s]+/, "")
         .trimEnd() ?? "",
+    /** A session the server reports after the TUI loaded its list (a subagent started mid-turn). */
+    sessionCreated(id: string, parentID: string) {
+      events.emit({
+        directory,
+        project: "proj_test",
+        payload: { id: `evt_${id}`, type: "session.updated", properties: { info: session(id, parentID) } },
+      } as any)
+    },
     ask(id: string, sessionID: string) {
       events.emit({
         directory,
@@ -353,6 +372,12 @@ describe("approval and model per workflow", () => {
       ui.ask("per_2", "ses_child")
       await wait(() => replies(ui).length === 2)
       expect(replies(ui)[1]!.path).toBe("/permission/per_2/reply")
+      // One that started after the list loaded, known only from its event, follows it too.
+      ui.sessionCreated("ses_qa", "ses_a")
+      await Bun.sleep(50)
+      ui.ask("per_5", "ses_qa")
+      await wait(() => replies(ui).length === 3)
+      expect(replies(ui)[2]!.path).toBe("/permission/per_5/reply")
 
       // The next prompt runs Build, which is Manual: its asks wait for the user.
       await ui.tab()
@@ -362,7 +387,7 @@ describe("approval and model per workflow", () => {
       ui.ask("per_3", "ses_a")
       ui.ask("per_4", "ses_child")
       await Bun.sleep(300)
-      expect(replies(ui)).toHaveLength(2)
+      expect(replies(ui)).toHaveLength(3)
     } finally {
       await ui.cleanup()
     }
@@ -433,6 +458,37 @@ describe("approval and model per workflow", () => {
       ui.ask("per_1", "ses_a")
       await Bun.sleep(300)
       expect(replies(ui)).toEqual([])
+    } finally {
+      await ui.cleanup()
+    }
+  })
+})
+
+describe("edges", () => {
+  test("at 80 columns the hint line stays on one row and the keys stay whole", async () => {
+    const ui = await mount({ width: 80 })
+    try {
+      await wait(() => ui.indicator().startsWith("Build · Manual"))
+      const line =
+        ui
+          .frame()
+          .split("\n")
+          .find((row) => row.includes("approval")) ?? ""
+      expect(line).toContain("ctrl+x m model · ctrl+x p approval")
+      expect(line).toMatch(/commands\s*$/)
+    } finally {
+      await ui.cleanup()
+    }
+  })
+
+  test("in a Claude Code session <leader>p says the tool has its own mode and changes nothing", async () => {
+    const ui = await mount({ external: "claude" })
+    try {
+      await Bun.sleep(150)
+      await ui.approval()
+      await wait(() => (ui.toast() ?? "").includes("Claude Code uses its own permission mode"))
+      const kv = await Bun.file(path.join(ui.state, "kv.json")).json()
+      expect(kv.workflow_state).toBeUndefined()
     } finally {
       await ui.cleanup()
     }

@@ -491,6 +491,40 @@ describe("agent settings (XCOD-215)", () => {
     ).rejects.toThrow(`"x/y" isn't a model`)
   })
 
+  // XCOD-310: /settings → Agents → Default approval.
+  test("agent.<name>.permission_mode saves manual or auto, refuses anything else, and respects a lock", async () => {
+    expect(ConfigSettings.find("agent.dev-cycle.permission_mode")?.values).toEqual(["manual", "auto"])
+    await ConfigSettings.set({
+      key: "agent.dev-cycle.permission_mode",
+      value: "auto",
+      scope: "user",
+      ctx: ctx(),
+      locked: [],
+      models,
+    })
+    expect(JSON.parse(await read(userFile())).agent).toEqual({ "dev-cycle": { permission_mode: "auto" } })
+    await expect(
+      ConfigSettings.set({
+        key: "agent.build.permission_mode",
+        value: "yolo",
+        scope: "user",
+        ctx: ctx(),
+        locked: [],
+        models,
+      }),
+    ).rejects.toThrow()
+    await expect(
+      ConfigSettings.set({
+        key: "agent.build.permission_mode",
+        value: "auto",
+        scope: "user",
+        ctx: ctx(),
+        locked: ["agent.build.permission_mode"],
+        models,
+      }),
+    ).rejects.toThrow()
+  })
+
   test("an agent's model blocked by the residency policy is refused (XCOD-212 + XCOD-215)", () => {
     const blocked = new Map([["anthropic/claude-haiku-4-5", 'Provider "anthropic" processes in "us".']])
     const all = new Set(["anthropic/claude-haiku-4-5", "mistral/mistral-large"])

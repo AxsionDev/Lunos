@@ -15,6 +15,7 @@ import { useRoute } from "./route"
 import { DRAFT_SESSION, usePermission } from "./permission"
 import { resolveApproval, type ApprovalConfig } from "../util/approval"
 import { titlecase } from "../util/locale"
+import { EXTERNAL_LABEL, externalOf } from "../util/external"
 import { listed } from "../util/sessions-overview"
 
 export type LocalTheme = {
@@ -557,6 +558,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         return agent ? approval.of(agent.name) : undefined
       },
       toggle() {
+        // A Claude Code / Codex session runs in the tool's own permission mode, not a Lunos workflow's.
+        const external = route.data.type === "session" ? externalOf(sync.session.get(route.data.sessionID)) : undefined
+        if (external) {
+          toast.show({
+            variant: "info",
+            message: `${EXTERNAL_LABEL[external.tool]} uses its own permission mode: set it in /settings → Models & agents → External sessions`,
+            duration: 4000,
+          })
+          return
+        }
         const agent = mode.current()
         if (!agent) return
         const label = titlecase(agent.name)
