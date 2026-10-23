@@ -725,14 +725,18 @@ Use `OPENCODE_TUI_CONFIG` to load a custom TUI config path.
 
 ### Attention
 
-The TUI can request attention for questions, permissions, session errors, and completed sessions. Enable it with `attention.enabled`; built-in events play sounds when triggered, and non-subagent events request desktop notifications only when the terminal is blurred.
+The TUI can request attention for questions, permissions, session errors, completed sessions, subagents waiting for you, and budget warnings. Enable it with `attention.enabled`; built-in events play sounds when triggered, and non-subagent events request desktop notifications only when the terminal is blurred (see `notify_when`).
+
+Everything here can be set in `/settings notifications` (Settings › Notifications & sounds): a sound per event, previewed as you move through the list, the volume, a custom file, and the desktop notification options. Changes there apply at once. "Mute / unmute sounds" in the command palette switches `sound` (no key is bound to it by default; `app_toggle_sounds`).
 
 - `enabled` - Enable all attention notifications and sounds. Defaults to `false`.
 - `notifications` - Allow terminal-mediated desktop notifications when attention is enabled. Defaults to `true`.
 - `sound` - Allow attention sounds when attention is enabled. Defaults to `true`.
 - `volume` - Default sound volume from `0` to `1`. Defaults to `0.4`.
 - `sound_pack` - Sound pack ID to use. Defaults to `opencode.default`.
-- `sounds` - Override sound files for `default`, `question`, `permission`, `error`, `done`, or `subagent_done`. Paths can be absolute, `file://` URLs, or relative to `tui.json`.
+- `sounds` - The sound per event: `done`, `subagent_done`, `permission`, `question`, `waiting` (a subagent waiting for your approval or answer), `budget_warning`, `error`, or `default` (anything else). Each value is a bundled sound ID (`alert-01`–`alert-10`, `bip-bop-01`–`bip-bop-10`, `staplebops-01`–`staplebops-07`, `nope-01`–`nope-12`, `yup-01`–`yup-06`, the same as the desktop app's), `"none"` for silence, or a path to an `.mp3`, `.aac` or `.wav` file. Paths can be absolute, `file://` URLs, or relative to `tui.json`.
+- `notify_when` - `"blurred"` sends desktop notifications only while Lunos is in the background, `"always"` even while it's in front. Defaults to `"blurred"`.
+- `notify_subagents` - A subagent finishing also sends a desktop notification. Defaults to `false`.
 
 ---
 

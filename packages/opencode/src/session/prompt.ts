@@ -70,6 +70,7 @@ import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
 import { Budget } from "@/budget"
+import { BUDGET_TOAST_TITLE } from "@opencode-ai/tui/util/budget-toast"
 import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
@@ -1215,7 +1216,9 @@ const layer = Layer.effect(
         ),
       )
       const toast = (message: string, variant: "warning" | "error" = "warning") =>
-        events.publish(TuiEvent.ToastShow, { title: "Budget", message, variant, duration: 10000 }).pipe(Effect.ignore)
+        events
+          .publish(TuiEvent.ToastShow, { title: BUDGET_TOAST_TITLE, message, variant, duration: 10000 })
+          .pipe(Effect.ignore)
       for (const message of decision.toasts) yield* toast(message)
       if (decision.action === "run") return "run" as const
       if (decision.action === "warn") {

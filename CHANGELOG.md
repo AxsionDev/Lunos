@@ -21,6 +21,16 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Tell from the sound alone what Lunos needs.** Settings › Notifications & sounds (`/settings
+notifications`) picks a sound for each event (finished, subagent finished, needs your approval,
+  question for you, waiting for action, budget warning, error), playing each one as you move
+  through the list. Choose from the 45 sounds the desktop app has, none, or a sound file of your
+  own, which is checked before it's saved. Volume, the sound pack and when desktop notifications
+  appear are set there too, and every change applies at once. "Mute / unmute sounds" is in the
+  command palette. In the desktop and web app, Settings › Sound effects gains a volume and sounds
+  for a subagent finishing, a question, and a subagent waiting for you (off until you choose one).
 ### Changed
 
 - **Dev-Cycle no longer stalls between gates.** When a turn ends by announcing the next step ("Plan

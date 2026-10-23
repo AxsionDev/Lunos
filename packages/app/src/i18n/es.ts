@@ -1069,6 +1069,15 @@ export const dict = {
   "settings.general.sounds.permissions.description": "Reproducir sonido cuando se requiera un permiso",
   "settings.general.sounds.errors.title": "Errores",
   "settings.general.sounds.errors.description": "Reproducir sonido cuando ocurra un error",
+  "settings.general.sounds.subagent.title": "Subagente terminado",
+  "settings.general.sounds.subagent.description": "Reproducir sonido cuando un subagente termina",
+  "settings.general.sounds.question.title": "Pregunta para ti",
+  "settings.general.sounds.question.description": "Reproducir sonido cuando el agente te hace una pregunta",
+  "settings.general.sounds.waiting.title": "Esperando acción",
+  "settings.general.sounds.waiting.description":
+    "Reproducir sonido cuando un subagente espera tu aprobación o respuesta",
+  "settings.general.sounds.volume.title": "Volumen",
+  "settings.general.sounds.volume.description": "Volumen de los efectos de sonido",
 
   "settings.shortcuts.title": "Atajos de teclado",
   "settings.shortcuts.reset.button": "Restablecer a valores predeterminados",
