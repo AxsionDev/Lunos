@@ -440,9 +440,15 @@ export function DialogSessions(props: { select?: string }) {
   function projectSettings(entry: Extract<Line, { type: "project" }>) {
     const section = entry.section
     if (section.kind === "none") return
+    // ← and Esc come back here, as from a rename (cleared first, so /sessions isn't a screen of it).
+    const back = () => {
+      dialog.clear()
+      reopen(entry.key)
+    }
+    const nav = { back, escape: back }
     if (section.kind === "named")
-      return dialog.replace(() => <DialogProject id={section.id} onBack={() => reopen(entry.key)} />)
-    dialog.replace(() => <DialogProjects select={section.id} />)
+      return dialog.replace(() => <DialogProject id={section.id} onBack={back} />, undefined, nav)
+    dialog.replace(() => <DialogProjects select={section.id} nav={nav} />, undefined, nav)
   }
 
   async function toggle(entry: Extract<Line, { type: "group" }>) {
