@@ -34,6 +34,15 @@ export type Line =
       depth: 0 | 1
       groupID: string | null
     }
+  | {
+      /** XCOD-309: a project's section header, in the Projects view. */
+      type: "project"
+      /** projectKey(id), or NO_PROJECT_KEY. */
+      key: string
+      section: ProjectSection
+      count: number
+      collapsed: boolean
+    }
 
 export const UNGROUPED_KEY = "group:ungrouped"
 export const groupKey = (id: string) => `group:${id}`
@@ -198,6 +207,172 @@ export function build(input: {
   for (const group of input.groups) section(group)
   section(null)
   return lines
+}
+
+/**
+ * XCOD-309: the Sessions view's two layouts. Groups is the user's groups (above, unchanged and the
+ * default); Projects is one section per project. Each surface remembers its own choice (kv.json).
+ */
+export type SessionsView = "groups" | "projects"
+export const SESSIONS_VIEW_KEY = "sessions_view"
+/** The project sections collapsed in /sessions (true) or opened again (false), by section key. */
+export const SESSIONS_PROJECTS_KEY = "sessions_projects_collapsed"
+
+export function sessionsView(value: unknown): SessionsView {
+  return value === "projects" ? "projects" : "groups"
+}
+
+export const NO_PROJECT_KEY = "project:none"
+export const projectKey = (id: string) => (id ? `project:${id}` : NO_PROJECT_KEY)
+
+/** A named project (XCOD-298), as `experimental.projectGroup.list` gives it. */
+export type NamedProject = { id: string; name: string; folders: string[]; archived?: boolean }
+
+export type ProjectSection = {
+  /** The project's id (`pgrp_…`, a repository's id, or `global:<folder>`); "" is "No project". */
+  id: string
+  key: string
+  name: string
+  kind: "named" | "folder" | "none"
+  /** Where a new session in it starts; none for "No project". */
+  directory?: string
+  rows: { item: SessionOverviewItem; kids: SessionOverviewItem[] }[]
+  /** Its top-level sessions by their most urgent state (a parent counts as its busiest subagent). */
+  counts: { working: number; waiting: number; done: number }
+  /** The project the current session (or this folder) belongs to: always open, marked "here". */
+  here: boolean
+}
+
+/** What a session's state counts as in a project's header: the Agent Monitor's three sub-sections. */
+const COUNT: Record<SessionState, keyof ProjectSection["counts"]> = {
+  running: "working",
+  waiting: "waiting",
+  failed: "done",
+  finished: "done",
+  idle: "done",
+}
+const URGENCY: Record<SessionState, number> = { waiting: 0, running: 1, failed: 2, finished: 3, idle: 3 }
+
+/** The folder a repository or plain-folder project's sessions start in. */
+const home = (item: SessionOverviewItem) =>
+  item.project && item.project.id !== "global" ? item.project.worktree : item.directory
+
+const inside = (folder: string, directory: string) =>
+  directory === folder || directory.startsWith(folder.endsWith("/") || folder.endsWith("\\") ? folder : folder + "/")
+
+/**
+ * XCOD-309: the sessions in one section per project. Named projects first (A–Z), then the
+ * repository and folder projects (A–Z, named as `projectName` names them), then "No project". A
+ * session is in the project the server resolved for it (`projectGroupID`: the one it was moved to,
+ * else its parent's, else its folder's); a Claude Code / Codex row with none lands with the sessions
+ * whose repository holds its folder. Newest first inside each, subagents under their parent.
+ */
+export function projectSections(input: {
+  sessions: SessionOverviewItem[]
+  named: NamedProject[]
+  search: string
+  state: StateFilter
+  /** The project of the session open behind the view, or of this folder. */
+  here?: string
+}): ProjectSection[] {
+  const search = input.search.trim().toLowerCase()
+  const named = new Map(input.named.map((project) => [project.id, project]))
+  const ids = new Set(input.sessions.map((item) => item.id))
+  const children = new Map<string, SessionOverviewItem[]>()
+  for (const item of input.sessions) {
+    if (!item.parentID || !ids.has(item.parentID)) continue
+    children.set(item.parentID, [...(children.get(item.parentID) ?? []), item])
+  }
+  const newest = (a: SessionOverviewItem, b: SessionOverviewItem) => b.updated - a.updated
+
+  // Repository worktrees by project id, for rows the server couldn't place (a tool-only session).
+  const worktrees = new Map<string, string>()
+  for (const item of input.sessions)
+    if (item.projectGroupID && item.project && item.project.id !== "global" && !named.has(item.projectGroupID))
+      worktrees.set(item.projectGroupID, item.project.worktree)
+  const projectOf = (item: SessionOverviewItem) => {
+    if (item.projectGroupID) return item.projectGroupID
+    for (const [id, worktree] of worktrees) if (inside(worktree, item.directory)) return id
+    return ""
+  }
+
+  const sections = new Map<string, ProjectSection>()
+  for (const item of input.sessions.toSorted(newest)) {
+    if (item.parentID && ids.has(item.parentID)) continue
+    const id = projectOf(item)
+    const project = named.get(id)
+    const kids = (children.get(item.id) ?? []).toSorted(newest)
+    const name = project?.name ?? (id ? projectName(item) : "No project")
+    const own = matches(item, search, input.state, name)
+    const shown = own ? kids : kids.filter((kid) => matches(kid, search, input.state, name))
+    if (!own && shown.length === 0) continue
+    let section = sections.get(id)
+    if (!section) {
+      section = {
+        id,
+        key: projectKey(id),
+        name,
+        kind: project ? "named" : id ? "folder" : "none",
+        directory: project ? (project.folders[0] ?? home(item)) : id ? home(item) : undefined,
+        rows: [],
+        counts: { working: 0, waiting: 0, done: 0 },
+        here: !!id && id === input.here,
+      }
+      sections.set(id, section)
+    }
+    section.rows.push({ item, kids: shown })
+    const state = [item, ...kids].map((each) => each.state).reduce((a, b) => (URGENCY[b] < URGENCY[a] ? b : a))
+    section.counts[COUNT[state]]++
+  }
+
+  const rank = { named: 0, folder: 1, none: 2 }
+  return [...sections.values()].toSorted(
+    (a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  )
+}
+
+/** "2 working · 1 waiting · 5 done", leaving out what's zero ("no sessions" when all are). */
+export function projectCounts(counts: ProjectSection["counts"]) {
+  const parts = [
+    counts.working ? `${counts.working} working` : undefined,
+    counts.waiting ? `${counts.waiting} waiting` : undefined,
+    counts.done ? `${counts.done} done` : undefined,
+  ].filter(Boolean)
+  return parts.length ? parts.join(" · ") : "no sessions"
+}
+
+/**
+ * XCOD-309: the Projects view as the TUI's flat list: a header row per project (Enter collapses or
+ * expands it), then its sessions. The project marked "here" is always open; while searching or
+ * filtering every section is open, as in the Groups view.
+ */
+export function buildProjects(input: {
+  sessions: SessionOverviewItem[]
+  named: NamedProject[]
+  search: string
+  state: StateFilter
+  here?: string
+  /** Section key to collapsed (true) or opened again (false); unset sections are open. */
+  collapsed?: Record<string, boolean>
+}): Line[] {
+  const filtering = !!input.search.trim() || input.state !== "all"
+  const lines: Line[] = []
+  for (const section of projectSections(input)) {
+    const collapsed = !section.here && input.collapsed?.[section.key] === true
+    lines.push({ type: "project", key: section.key, section, count: section.rows.length, collapsed })
+    if (collapsed && !filtering) continue
+    for (const row of section.rows) {
+      lines.push({ type: "session", key: row.item.id, item: row.item, depth: 0, groupID: row.item.groupID ?? null })
+      for (const kid of row.kids)
+        lines.push({ type: "session", key: kid.id, item: kid, depth: 1, groupID: row.item.groupID ?? null })
+    }
+  }
+  return lines
+}
+
+/** XCOD-309: the sessions of one project section (its subagents too), for Stop all and Clear on it. */
+export function sectionItems(section: ProjectSection) {
+  return section.rows.flatMap((row) => [row.item, ...row.kids])
 }
 
 /**
