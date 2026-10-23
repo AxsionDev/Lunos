@@ -60,7 +60,9 @@ export function useSessionProject(
     async (key) =>
       ((await sdk.client.resource.list({ sessionID: key.id }).catch(() => undefined))?.data ?? []) as ResourceItem[],
   )
-  const ref = createMemo(() => Section.projectRef(budget(), groups()?.groups ?? []))
+  // A resource keeps its last value when its key goes away (the Agent Monitor with nothing
+  // selected): no session, no project.
+  const ref = createMemo(() => (sessionID() ? Section.projectRef(budget(), groups()?.groups ?? []) : undefined))
   const group = createMemo(() => {
     const id = ref()?.key
     return id ? groups()?.groups.find((item) => item.id === id) : undefined

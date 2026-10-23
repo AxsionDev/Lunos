@@ -1297,7 +1297,9 @@ export function Prompt(props: PromptProps) {
     if (/^\/project\s+settings\s*$/.test(store.prompt.input.trim())) {
       input.clear()
       setStore("prompt", { input: "", parts: [] })
-      keymap.dispatchCommand("project.settings")
+      if (!props.sessionID)
+        toast.show({ variant: "info", message: "Open a session in the project first; /projects lists them all" })
+      else keymap.dispatchCommand("project.settings")
       return false
     }
     // XCOD-128: `/settings key=value` (or `/config key=value`) changes one setting in the user

@@ -1209,3 +1209,41 @@ test("XCOD-307: the Agent Monitor's list hides with the pane keybind, « shows t
     await ui.cleanup()
   }
 }, 20_000)
+
+test("XCOD-306: the selected session's project theme applies in the monitor, and goes when nothing is selected", async () => {
+  const { useTheme } = await import("../../src/context/theme")
+  const { AgentMonitor } = await import("../../src/routes/monitor")
+  let theme!: ReturnType<typeof useTheme>
+  const server = fakeServer({
+    sessions: fixture(),
+    extra: (url) => {
+      if (url.pathname === "/experimental/budget")
+        return json({ project: { id: "pgrp_web", name: "Axsion web" }, budgets: [], line: "" })
+      if (url.pathname === "/experimental/project-group")
+        return json({
+          groups: [{ id: "pgrp_web", name: "Axsion web", folders: ["/work/alpha"], time: { created: 1, updated: 1 } }],
+          current: {},
+        })
+      return undefined
+    },
+  })
+  const ui = await mount({
+    server,
+    view: () => {
+      theme = useTheme()
+      return <AgentMonitor params={{ from: { type: "home" } }} />
+    },
+  })
+  try {
+    expect(theme.project()).toBeUndefined()
+    // The rail focused: its highlighted row is the session the monitor shows.
+    await ui.tab()
+    await wait(() => theme.project()?.key === "pgrp_web")
+    expect(theme.project()).toEqual({ key: "pgrp_web", name: "Axsion web", kind: "named" })
+    // Back to the prompt with nothing tagged: no session, so no project theme.
+    await ui.tab()
+    await wait(() => theme.project() === undefined)
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
