@@ -32,6 +32,22 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   Continuations count against budgets and the step limit like any turn. Turn it off with
   `dev_cycle.auto_continue: false` or `agent.build.auto_continue: false`; an organisation can lock
   either. <!-- XCOD-302 -->
+### Added
+
+- **Rename a session wherever you see it, and the name sticks.** Click the session's title in the
+  sidebar (or press `ctrl+r`) to edit it in place, press `r` on a session in the Agent Monitor, or
+  `ctrl+r` in `/sessions`, as well as `/rename`. A name you give is never replaced by the automatic
+  title, not on the first reply, after compaction or in a fork, even if you rename while the title
+  is still being generated. Names are one line of up to 80 characters; save an empty name to get the
+  automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
+  Lunos name. <!-- XCOD-308 -->
+### Fixed
+
+- **Esc Esc while the agent is working clears what you've typed first** instead of stopping the
+  run, in the terminal app, `/claude` and `/codex` sessions and the Agent Monitor. Once the prompt is
+  empty, Esc Esc stops the run as before, and the line under the prompt shows which it will do
+  (`esc esc clear` or `esc esc stop`). The undo key brings the cleared text back while the agent
+  keeps working. `"double_escape_clear": false` keeps the old behaviour. <!-- XCOD-313 -->
 
 ## [1.18.55] - 2026-10-22
 

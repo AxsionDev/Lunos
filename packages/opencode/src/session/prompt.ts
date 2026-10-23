@@ -261,13 +261,16 @@ const layer = Layer.effect(
       modelID: ModelV2.ID
     }) {
       if (input.session.parentID) return
+      // XCOD-308: a name the user gave is never replaced.
+      if (Session.titleSource(input.session) === "user") return
       if (!Session.isDefaultTitle(input.session.title)) return
 
       const real = (m: SessionV1.WithParts) =>
         m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic)
       const idx = input.history.findIndex(real)
       if (idx === -1) return
-      if (input.history.filter(real).length !== 1) return
+      // Only on the first prompt, unless the user cleared the name (then on the next turn).
+      if (input.history.filter(real).length !== 1 && !Session.titleReset(input.session)) return
 
       const context = input.history.slice(0, idx + 1)
       const firstUser = context[idx]
@@ -312,7 +315,8 @@ const layer = Layer.effect(
       if (!cleaned) return
       const t = cleaned.length > 100 ? cleaned.substring(0, 97) + "..." : cleaned
       yield* sessions
-        .setTitle({ sessionID: input.session.id, title: t })
+        // Only over the title it started from: a rename made while this was generated wins.
+        .setTitle({ sessionID: input.session.id, title: t, source: "auto", replace: input.session.title })
         .pipe(Effect.catchCause((cause) => Effect.logError("failed to generate title", { error: Cause.squash(cause) })))
     })
 

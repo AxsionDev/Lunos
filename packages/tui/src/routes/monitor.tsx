@@ -46,6 +46,7 @@ import { forgetWaiting, toggle, type Overrides } from "../util/subagent-groups"
 import { errorMessage } from "../util/error"
 import { externalAccent, type ExternalTool } from "../util/external"
 import { Locale } from "../util/locale"
+import { RENAME_HINT, renameValue } from "../util/session"
 import {
   STATE_GLYPH,
   clearPlan,
@@ -673,6 +674,25 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     refresh()
   }
 
+  /** XCOD-308: r renames the selected session, as ctrl+r does in /sessions (empty: the automatic name). */
+  async function rename(item: SessionOverviewItem) {
+    if (toolOnly(item)) {
+      toast.show({ variant: "info", message: `That session runs in ${kindLabel(item) ?? "its tool"}: rename it there` })
+      return
+    }
+    const typed = await DialogPrompt.show(dialog, "Rename session", {
+      value: item.title,
+      description: () => <text fg={theme.textMuted}>{RENAME_HINT}</text>,
+    })
+    dialog.clear()
+    const title = renameValue(typed, item.title)
+    if (title === undefined) return
+    await sdk.client.session
+      .update({ sessionID: item.id, directory: item.directory, title }, { throwOnError: true })
+      .catch(fail)
+    refresh()
+  }
+
   async function filter() {
     const value = await DialogPrompt.show(dialog, "Filter sessions", {
       value: search(),
@@ -719,6 +739,11 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       .join(",")
     return key ? { ...binding, key } : undefined
   }
+  /** XCOD-308: a key hint from the keybind config (its first key), empty when unbound. */
+  const keyHint = (name: string) => {
+    const binding = tuiConfig.keybinds.get(name)[0]
+    return typeof binding?.key === "string" ? (binding.key.split(",")[0]?.trim() ?? "") : ""
+  }
   const toggleFocus = () => setFocus((value) => (value === "prompt" ? "rail" : "prompt"))
   const promptBindings = createMemo(() => ({
     always: [
@@ -747,6 +772,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       ...keys("monitor.deny", () => current() && void answer(current()!, false)),
       ...keys("monitor.stop", () => current() && void stop(current()!)),
       ...keys("monitor.delete", () => current() && void remove(current()!)),
+      ...keys("monitor.rename", () => current() && void rename(current()!)),
       ...keys("monitor.filter", () => void filter()),
       ...keys("monitor.older", toggleOlder),
       ...keys("monitor.takeover", () => current() && void takeOver(current()!)),
@@ -962,9 +988,10 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
         </Show>
       </scrollbox>
       <box paddingLeft={1} flexShrink={0}>
-        <text fg={theme.textMuted} wrapMode="none">
+        {/* XCOD-308: wrapped, so every key (rename too) is seen in the narrow rail. */}
+        <text fg={theme.textMuted} wrapMode="word">
           {focus() === "rail"
-            ? `↑↓ move · enter ${enterHint()} · ${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · x delete · / filter · ctrl+p stop all, clear · tab prompt`
+            ? `↑↓ move · enter ${enterHint()} · ${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · ${keyHint("monitor.rename") ? `${keyHint("monitor.rename")} rename · ` : ""}x delete · / filter · ctrl+p stop all, clear · tab prompt`
             : "tab rail"}
         </text>
       </box>

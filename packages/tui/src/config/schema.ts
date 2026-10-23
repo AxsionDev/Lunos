@@ -96,7 +96,7 @@ export const Info = Schema.Struct({
   }),
   double_escape_clear: Schema.optional(Schema.Boolean).annotate({
     description:
-      "Esc twice in the prompt clears it while the session is idle; the cleared prompt can be undone and is kept in history (default: true)",
+      "Esc twice in the prompt clears it, idle or busy (with the prompt empty, Esc twice stops a busy session); the cleared prompt can be undone and is kept in history (default: true)",
   }),
   left_opens_monitor: Schema.optional(Schema.Boolean).annotate({
     description:
