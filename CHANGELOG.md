@@ -21,6 +21,17 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- **Dev-Cycle no longer stalls between gates.** When a turn ends by announcing the next step ("Plan
+  approved. Next I'll implement…") instead of taking it, Lunos continues by itself, and the
+  transcript shows a dim "↻ Dev-Cycle continued automatically (plan approved → build)" line. It
+  still stops at a gate, a real question, the end of the cycle, an error or a limit, never passes a
+  gate you haven't approved, and after 3 continuations in a row without progress it stops and asks
+  you, with Continue and Open cycle file. Build mode does the same; Plan mode never does.
+  Continuations count against budgets and the step limit like any turn. Turn it off with
+  `dev_cycle.auto_continue: false` or `agent.build.auto_continue: false`; an organisation can lock
+  either. <!-- XCOD-302 -->
 ### Added
 
 - **Rename a session wherever you see it, and the name sticks.** Click the session's title in the

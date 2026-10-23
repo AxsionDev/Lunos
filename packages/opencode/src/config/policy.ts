@@ -83,6 +83,9 @@ export const KNOWN = [
   "budget",
   "budget.organisation",
   "budget.on_limit",
+  // XCOD-302: whether Dev-Cycle continues by itself between gates (plus `agent.<name>.auto_continue`).
+  "dev_cycle",
+  "dev_cycle.auto_continue",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */
@@ -90,7 +93,7 @@ export function isKnown(key: string) {
   return (
     (KNOWN as ReadonlyArray<string>).includes(key) ||
     /^permission\.[^.]+$/.test(key) ||
-    /^agent\.[^.]+\.(model|verify)$/.test(key)
+    /^agent\.[^.]+\.(model|verify|auto_continue)$/.test(key)
   )
 }
 
