@@ -21,6 +21,16 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Rename a session wherever you see it, and the name sticks.** Click the session's title in the
+  sidebar (or press `ctrl+r`) to edit it in place, press `r` on a session in the Agent Monitor, or
+  `ctrl+r` in `/sessions`, as well as `/rename`. A name you give is never replaced by the automatic
+  title, not on the first reply, after compaction or in a fork, even if you rename while the title
+  is still being generated. Names are one line of up to 80 characters; save an empty name to get the
+  automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
+  Lunos name. <!-- XCOD-308 -->
+
 ## [1.18.55] - 2026-10-22
 
 ### Added

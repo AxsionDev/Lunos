@@ -259,9 +259,12 @@ export function SessionsPage() {
       openSession({ sessionID: item.id, directory: item.directory, worktree: item.project?.worktree })
     },
     rename: async (item: SessionOverviewItem) => {
-      const title = ui.draft.trim()
+      // Enter, then the blur it causes: only the first saves.
+      if (ui.renamingSession !== item.id) return
+      // XCOD-308: one line of at most 80 characters; empty goes back to the automatic name.
+      const title = ui.draft.replace(/\s+/g, " ").trim().slice(0, 80).trim()
       setUi("renamingSession", undefined)
-      if (!title || title === item.title) return
+      if (title === item.title) return
       await client()
         ?.session.update({ sessionID: item.id, directory: item.directory, title }, { throwOnError: true })
         .catch(fail)
@@ -900,6 +903,7 @@ export function SessionsPage() {
             <input
               class="rounded border border-v2-border-border-base bg-transparent px-1 text-14-regular"
               aria-label={language.t("sessions.session.name")}
+              maxLength={80}
               value={ui.draft}
               ref={(el) => queueMicrotask(() => el.focus())}
               onInput={(event) => setUi("draft", event.currentTarget.value)}

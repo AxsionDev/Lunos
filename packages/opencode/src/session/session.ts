@@ -56,6 +56,43 @@ export function isDefaultTitle(title: string) {
   ).test(title)
 }
 
+/**
+ * XCOD-308: who set a session's title. A name the user gave is never replaced by the automatic title
+ * (first reply, compaction, fork); clearing it hands the title back to the generator. Kept in the
+ * session's metadata (`titleSource`, and `titleReset` while a cleared name waits for its new title),
+ * so no migration is needed and every client already receives it.
+ */
+export type TitleSource = "user" | "auto"
+/** The longest name a user can give a session. */
+export const TITLE_MAX = 80
+
+export function titleSource(info: { metadata?: Record<string, unknown> }): TitleSource {
+  return info.metadata?.titleSource === "user" ? "user" : "auto"
+}
+
+/** Whether a cleared name is waiting for the next turn's automatic title. */
+export function titleReset(info: { metadata?: Record<string, unknown> }) {
+  return info.metadata?.titleReset === true
+}
+
+/** A name as the user typed it, as stored: one line, trimmed, at most TITLE_MAX characters. */
+export function cleanTitle(title: string) {
+  return title.replace(/\s+/g, " ").trim().slice(0, TITLE_MAX).trim()
+}
+
+/** The metadata keys the title rules own, which a metadata replace keeps unless it sets them. */
+function titleKeys(metadata: Record<string, unknown> | undefined) {
+  const keys: Record<string, unknown> = {}
+  if (metadata?.titleSource !== undefined) keys.titleSource = metadata.titleSource
+  if (metadata?.titleReset !== undefined) keys.titleReset = metadata.titleReset
+  return keys
+}
+
+function withoutTitleKeys(metadata: Record<string, unknown> | undefined) {
+  const { titleSource: _source, titleReset: _reset, ...rest } = metadata ?? {}
+  return rest
+}
+
 type SessionRow = typeof SessionTable.$inferSelect
 
 export function fromRow(row: SessionRow): Info {
@@ -449,7 +486,18 @@ export interface Interface {
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
   readonly get: (id: SessionID) => Effect.Effect<Info, NotFound>
-  readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
+  /**
+   * XCOD-308: `source: "user"` (the default) is a rename: the name is cleaned and sticks, and an empty
+   * name goes back to the automatic title (`fallback`, else the default title, regenerated on the next
+   * turn). `source: "auto"` never replaces a user's name, nor a title that is no longer `replace`.
+   */
+  readonly setTitle: (input: {
+    sessionID: SessionID
+    title: string
+    source?: TitleSource
+    replace?: string
+    fallback?: string
+  }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setMetadata: (input: typeof SetMetadataInput.Type) => Effect.Effect<void>
   readonly setAgentModel: (input: {
@@ -727,7 +775,13 @@ const layer: Layer.Layer<
         path: sessionPath(ctx.worktree, ctx.directory),
         workspaceID: original.workspaceID,
         title,
-        metadata: structuredClone(original.metadata),
+        // XCOD-308: a renamed session's fork keeps the user's name (titleSource "user"), so it sticks too.
+        metadata: original.metadata
+          ? structuredClone({
+              ...withoutTitleKeys(original.metadata),
+              ...(titleSource(original) === "user" ? { titleSource: "user" } : {}),
+            })
+          : undefined,
       })
       const msgs = yield* messages({ sessionID: input.sessionID })
       const idMap = new Map<string, MessageID>()
@@ -780,8 +834,37 @@ const layer: Layer.Layer<
       yield* patch(sessionID, { time: { updated: Date.now() } }).pipe(Effect.orDie)
     })
 
-    const setTitle = Effect.fn("Session.setTitle")(function* (input: { sessionID: SessionID; title: string }) {
-      yield* patch(input.sessionID, { title: input.title }).pipe(Effect.orDie)
+    const setTitle = Effect.fn("Session.setTitle")(function* (input: {
+      sessionID: SessionID
+      title: string
+      source?: TitleSource
+      replace?: string
+      fallback?: string
+    }) {
+      // Read right before writing: an automatic title takes seconds to generate, and a rename made
+      // meanwhile must win.
+      const current = yield* get(input.sessionID).pipe(Effect.orDie)
+      const rest = withoutTitleKeys(current.metadata)
+      if (input.source === "auto") {
+        if (titleSource(current) === "user") return
+        if (input.replace !== undefined && current.title !== input.replace) return
+        yield* patch(input.sessionID, { title: input.title, metadata: rest }).pipe(Effect.orDie)
+        return
+      }
+      const name = cleanTitle(input.title)
+      if (name) {
+        yield* patch(input.sessionID, { title: name, metadata: { ...rest, titleSource: "user" } }).pipe(Effect.orDie)
+        return
+      }
+      // Cleared: the automatic title comes back. Without a fallback that is the default title, which
+      // the next turn replaces (titleReset lets it, past the first prompt).
+      if (input.fallback) {
+        yield* patch(input.sessionID, { title: input.fallback, metadata: rest }).pipe(Effect.orDie)
+        return
+      }
+      const title =
+        (current.parentID ? childTitlePrefix : parentTitlePrefix) + new Date(current.time.created).toISOString()
+      yield* patch(input.sessionID, { title, metadata: { ...rest, titleReset: true } }).pipe(Effect.orDie)
     })
 
     const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
@@ -789,7 +872,10 @@ const layer: Layer.Layer<
     })
 
     const setMetadata = Effect.fn("Session.setMetadata")(function* (input: typeof SetMetadataInput.Type) {
-      yield* patch(input.sessionID, { metadata: input.metadata, time: { updated: Date.now() } }).pipe(Effect.orDie)
+      // XCOD-308: a replace keeps who set the title unless it says otherwise.
+      const current = yield* get(input.sessionID).pipe(Effect.orDie)
+      const metadata = { ...titleKeys(current.metadata), ...input.metadata }
+      yield* patch(input.sessionID, { metadata, time: { updated: Date.now() } }).pipe(Effect.orDie)
     })
 
     const setAgentModel = Effect.fn("Session.setAgentModel")(function* (input: {
