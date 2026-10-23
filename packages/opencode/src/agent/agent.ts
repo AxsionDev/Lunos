@@ -490,6 +490,24 @@ const layer = Layer.effect(
           item.permission = Permission.merge(item.permission, Permission.fromConfig(value.permission ?? {}))
         }
 
+        // XCOD-303: Plan mode dispatches read-only subagents only, custom ones included, whatever the
+        // config says: any subagent that can edit files or run commands is denied to it. `explore`
+        // keeps its read-only shell (the same accepted trade as `qa`'s, see below).
+        const plan = agents.plan
+        if (plan) {
+          const writers = Object.values(agents).filter(
+            (item) =>
+              item.mode !== "primary" &&
+              (!Permission.disabled(["edit"], item.permission).has("edit") ||
+                (item.name !== "explore" && !Permission.disabled(["bash"], item.permission).has("bash"))),
+          )
+          if (writers.length)
+            plan.permission = Permission.merge(
+              plan.permission,
+              Permission.fromConfig({ task: Object.fromEntries(writers.map((item) => [item.name, "deny"])) }),
+            )
+        }
+
         // Ensure Truncate.GLOB is allowed unless explicitly configured
         for (const name in agents) {
           const agent = agents[name]

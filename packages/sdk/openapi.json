@@ -26714,6 +26714,15 @@
         },
         "additionalProperties": false
       },
+      "WorkflowsConfig": {
+        "type": "object",
+        "properties": {
+          "dynamic": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "PermissionActionConfig": {
         "type": "string",
         "enum": ["ask", "allow", "deny"]
@@ -27951,6 +27960,9 @@
           },
           "dev_cycle": {
             "$ref": "#/components/schemas/DevCycleConfig"
+          },
+          "workflows": {
+            "$ref": "#/components/schemas/WorkflowsConfig"
           },
           "subagent_depth": {
             "type": "integer",

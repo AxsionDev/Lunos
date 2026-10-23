@@ -1894,6 +1894,10 @@ export type DevCycleConfig = {
   auto_continue?: boolean
 }
 
+export type WorkflowsConfig = {
+  dynamic?: boolean
+}
+
 export type PermissionActionConfig = "ask" | "allow" | "deny"
 
 export type PermissionObjectConfig = {
@@ -2334,6 +2338,7 @@ export type Config = {
   subagent?: SubagentConfig
   verify?: VerifyConfig
   dev_cycle?: DevCycleConfig
+  workflows?: WorkflowsConfig
   subagent_depth?: number
   username?: string
   mode?: {

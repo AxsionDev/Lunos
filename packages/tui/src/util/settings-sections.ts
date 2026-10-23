@@ -21,7 +21,7 @@ export const SECTIONS = [
 ] as const
 
 export const SUBTABS: Record<string, readonly string[]> = {
-  "Models & agents": ["Models", "Agents", "Subagents", "Providers", "External sessions"],
+  "Models & agents": ["Models", "Agents", "Subagents", "Workflows", "Providers", "External sessions"],
   Projects: ["Projects", "Budgets"],
   Permissions: ["Rules", "Tools", "Sandbox"],
   "Residency & privacy": ["Residency", "Audit", "Sharing"],

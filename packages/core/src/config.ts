@@ -27,6 +27,7 @@ import { ConfigResidency } from "./config/residency"
 import { ConfigSubagent } from "./config/subagent"
 import { ConfigVerify } from "./config/verify"
 import { ConfigDevCycle } from "./config/dev-cycle"
+import { ConfigWorkflows } from "./config/workflows"
 import { ConfigCloud } from "./config/cloud"
 import { ConfigAuth } from "./config/auth"
 import { ConfigSync } from "./config/sync"
@@ -152,6 +153,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   dev_cycle: ConfigDevCycle.Info.pipe(Schema.optional).annotate({
     description: "Dev-Cycle mode: whether it continues by itself between gates (XCOD-302)",
+  }),
+  workflows: ConfigWorkflows.Info.pipe(Schema.optional).annotate({
+    description: "Dynamic workflows: whether Build and Dev-Cycle dispatch subagents to do the work (XCOD-303)",
   }),
   memory: ConfigMemory.Info.pipe(Schema.optional).annotate({
     description: "Graph-based long-term memory, off by default",

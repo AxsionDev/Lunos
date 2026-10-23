@@ -1493,8 +1493,13 @@ it.instance("concurrent loop callers all receive same error result", () =>
 
 it.instance("prompt submitted during an active run is included in the next LLM input", () =>
   Effect.gen(function* () {
-    // XCOD-287: without Build's delegation reminder, so the last user message is the prompt alone.
-    const { llm } = yield* useServerConfig((url) => ({ ...providerCfg(url), subagent: { delegate: false } }))
+    // XCOD-287: without Build's delegation reminder, so the last user message is the prompt alone
+    // (XCOD-303: nor the Dynamic workflow one).
+    const { llm } = yield* useServerConfig((url) => ({
+      ...providerCfg(url),
+      subagent: { delegate: false },
+      workflows: { dynamic: false },
+    }))
     const gate = yield* Deferred.make<void>()
     const prompt = yield* SessionPrompt.Service
     const sessions = yield* Session.Service
@@ -1994,7 +1999,8 @@ unix(
   "cancel finalizes interrupted bash tool output through normal truncation",
   () =>
     Effect.gen(function* () {
-      const { dir, llm } = yield* useServerConfig(providerCfg)
+      // XCOD-303: the main agent runs bash itself only with Dynamic workflows off.
+      const { dir, llm } = yield* useServerConfig((url) => ({ ...providerCfg(url), workflows: { dynamic: false } }))
       const prompt = yield* SessionPrompt.Service
       const sessions = yield* Session.Service
       const chat = yield* sessions.create({

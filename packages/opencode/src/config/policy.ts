@@ -86,6 +86,9 @@ export const KNOWN = [
   // XCOD-302: whether Dev-Cycle continues by itself between gates (plus `agent.<name>.auto_continue`).
   "dev_cycle",
   "dev_cycle.auto_continue",
+  // XCOD-303: an organisation can lock Dynamic workflows on (review by a separate agent) or off (cost).
+  "workflows",
+  "workflows.dynamic",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */
