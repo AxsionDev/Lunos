@@ -489,6 +489,28 @@ export const guard = Effect.fn("Budget.guard")(function* (input: {
   return { action: "warn", message, toasts } as Decision
 })
 
+/**
+ * XCOD-303: the reason a limit with `on_limit: stop` has been reached (the budget, the day's cap or
+ * the session's), or undefined. Pure: unlike `guard` it claims no thresholds and records nothing,
+ * so the task tool can ask it before every dispatch.
+ */
+export function stopped(list: readonly Status[]) {
+  for (const item of list) {
+    if (item.on_limit !== "stop") continue
+    if (item.spent >= item.amount)
+      return `${item.project.name} has used its ${item.period.label} budget (${money(item.spent, item.currency)} of ${money(item.amount, item.currency)}). ${raise(item)}`
+    if (item.today && item.today.spent >= item.today.cap)
+      return `${item.project.name} has used its daily cap (${money(item.today.spent, item.currency)} of ${money(item.today.cap, item.currency)} today).`
+    if (item.session && item.session.spent >= item.session.cap)
+      return `This session has used its cap (${money(item.session.spent, item.currency)} of ${money(item.session.cap, item.currency)}).`
+  }
+}
+
+/** XCOD-303: before a subagent is dispatched: why no new one may start, or undefined. */
+export const dispatchStop = Effect.fn("Budget.dispatchStop")(function* (where: Where, config: Config | undefined) {
+  return stopped(yield* status(where, config))
+})
+
 /** After a turn: the estimate shown before it, against what it cost (USD), for the accuracy record. */
 export async function recordAccuracy(entry: BudgetState.Accuracy) {
   await BudgetState.record(entry).catch(() => undefined)

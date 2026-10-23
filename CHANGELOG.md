@@ -32,6 +32,18 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   Continuations count against budgets and the step limit like any turn. Turn it off with
   `dev_cycle.auto_continue: false` or `agent.build.auto_continue: false`; an organisation can lock
   either. <!-- XCOD-302 -->
+- **Build and Dev-Cycle now hand the work to subagents (Dynamic workflows, on by default).** The
+  main agent plans the task, dispatches subagents to do each step (independent steps in parallel,
+  up to `subagent.max_parallel`), integrates what they report and has a separate `qa` subagent
+  verify before it hands back with the Verification block. It keeps only read, search, todo and
+  question tools: it never edits, writes or runs a command itself. A plain question is still
+  answered directly, and a task that fits in one step goes to one subagent, at a little extra cost.
+  In Dev-Cycle a builder subagent implements the approved plan; the gates are unchanged. A step is
+  re-dispatched at most 3 times before you're asked, and no new subagent starts once a budget with
+  `on_limit: stop` is used up. Plan mode may dispatch only read-only subagents, your own included.
+  Turn it off with `/workflows off` for a session or `workflows.dynamic: false` in config, and the
+  main agent works directly as before; the footer shows "Dynamic workflows: on/off". An
+  organisation can lock it on or off. <!-- XCOD-303 -->
 
 ## [1.18.55] - 2026-10-22
 

@@ -55,6 +55,8 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   verify: "Models & agents",
   // XCOD-302: whether Dev-Cycle continues by itself between gates.
   dev_cycle: "Models & agents",
+  // XCOD-303: Settings › Models & agents › Workflows.
+  workflows: "Models & agents",
   // XCOD-298: Settings › Projects › Budgets (the named projects themselves aren't config).
   budget: "Projects",
   cloud: "Advanced / experimental",
@@ -117,7 +119,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
  * none. Memory's Overview holds the wizard and status, so it lists no keys of its own.
  */
 export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
-  "Models & agents": ["Models", "Agents", "Subagents", "Providers", "External sessions"],
+  "Models & agents": ["Models", "Agents", "Subagents", "Workflows", "Providers", "External sessions"],
   Projects: ["Projects", "Budgets"],
   Permissions: ["Rules", "Tools", "Sandbox"],
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
@@ -139,6 +141,7 @@ const SUBTAB: Record<string, string> = {
   // XCOD-287: Settings › Models & agents › Subagents.
   subagent: "Subagents",
   subagent_depth: "Subagents",
+  workflows: "Workflows",
   provider: "Providers",
   disabled_providers: "Providers",
   enabled_providers: "Providers",
@@ -219,6 +222,8 @@ const DEFAULTS: Record<string, unknown> = {
   "subagent.max_parallel": 3,
   "subagent.fun_names": true,
   "subagent.mascots": true,
+  // XCOD-303: Dynamic workflows on by default.
+  "workflows.dynamic": true,
   marketplace_default: true,
   "memory.enabled": false,
   "sandbox.enabled": false,

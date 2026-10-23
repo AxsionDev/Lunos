@@ -932,6 +932,16 @@
       },
       "additionalProperties": false
     },
+    "WorkflowsConfig": {
+      "type": "object",
+      "properties": {
+        "dynamic": {
+          "type": "boolean",
+          "description": "Build and Dev-Cycle plan the work and dispatch subagents to do it; the main agent keeps only read, search, todo and question tools (on by default; false has the main agent do the work itself, with subagents encouraged by subagent.delegate). /workflows on|off switches it for one session"
+        }
+      },
+      "additionalProperties": false
+    },
     "PermissionActionConfig": {
       "type": "string",
       "enum": ["ask", "allow", "deny"]
@@ -2300,6 +2310,10 @@
         "dev_cycle": {
           "$ref": "#/$defs/DevCycleConfig",
           "description": "Dev-Cycle mode: whether it continues by itself between gates (XCOD-302)"
+        },
+        "workflows": {
+          "$ref": "#/$defs/WorkflowsConfig",
+          "description": "Dynamic workflows: whether Build and Dev-Cycle dispatch subagents to do the work (XCOD-303)"
         },
         "subagent_depth": {
           "minimum": 0,

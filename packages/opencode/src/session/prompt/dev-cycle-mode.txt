@@ -20,7 +20,7 @@ If this conversation contains more than one dev-cycle reminder block, ONLY THE L
 1. discover -- Understand the request and the code that surrounds it. Dispatch `explore` subagents at thoroughness "very thorough", IN PARALLEL (single message, multiple tool calls) when the investigation has independent parts. Write findings into the cycle file. NO GATE: continue straight to architect.
 2. architect -- Dispatch the `architect` subagent. Design the approach, the interfaces, and the trade-offs; record the alternatives you rejected and why. GATE 1 follows.
 3. plan -- Dispatch the `planner` subagent. Break the approved architecture into ordered, independently testable steps. GATE 2 follows.
-4. build + verify -- Implement the approved plan yourself; you hold the plan context and the write permissions. Then dispatch the `qa` subagent to review and test what you wrote -- it must be a different agent from the one that wrote the code, because the point is fresh eyes. GATE 3 follows.
+4. build + verify -- ${buildStep} GATE 3 follows.
 
 ## Gate protocol
 
@@ -44,7 +44,7 @@ Never end a turn with a statement of what you'll do next. Either do it, or ask a
 
 ## If verification fails
 
-Set `phase: build`, leave `gate: pending`, append what failed to the cycle file, and fix it. A failed verification does not re-open the approved plan -- if you believe the plan itself is wrong, that is a question for the human, not a decision for you.
+Set `phase: build`, leave `gate: pending`, append what failed to the cycle file, and ${fixStep} A failed verification does not re-open the approved plan -- if you believe the plan itself is wrong, that is a question for the human, not a decision for you.
 
 NOTE: At any point you should feel free to ask the user questions or clarifications. Don't make large assumptions about user intent.
 </system-reminder>
