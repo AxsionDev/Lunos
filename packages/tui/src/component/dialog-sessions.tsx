@@ -16,6 +16,7 @@ import { useToast } from "../ui/toast"
 import { useCommandShortcut } from "../keymap"
 import { errorMessage } from "../util/error"
 import { Locale } from "../util/locale"
+import { RENAME_HINT, renameValue } from "../util/session"
 import { useStartExternal } from "./dialog-external"
 import { useSessionDelete } from "./session-delete"
 import { useTuiConfig } from "../config"
@@ -430,9 +431,16 @@ export function DialogSessions(props: { select?: string }) {
     }
     const item = sessionOf(option)
     if (!item || toolOnly(item)) return
-    const title = await DialogPrompt.show(dialog, "Rename session", { value: item.title })
-    if (title?.trim() && title.trim() !== item.title)
-      await sdk.client.session.update({ sessionID: item.id, title: title.trim() }, { throwOnError: true }).catch(fail)
+    // XCOD-308: the name sticks; empty goes back to the automatic name.
+    const typed = await DialogPrompt.show(dialog, "Rename session", {
+      value: item.title,
+      description: () => <text fg={theme.textMuted}>{RENAME_HINT}</text>,
+    })
+    const title = renameValue(typed, item.title)
+    if (title !== undefined)
+      await sdk.client.session
+        .update({ sessionID: item.id, directory: item.directory, title }, { throwOnError: true })
+        .catch(fail)
     reopen(option.value)
   }
 

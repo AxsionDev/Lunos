@@ -55,6 +55,8 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   subagent: "Models & agents",
   // XCOD-288: how the Build agent checks its work before handing back.
   verify: "Models & agents",
+  // XCOD-302: whether Dev-Cycle continues by itself between gates.
+  dev_cycle: "Models & agents",
   // XCOD-298: Settings › Projects › Budgets (the named projects themselves aren't config).
   budget: "Projects",
   cloud: "Advanced / experimental",
@@ -139,6 +141,7 @@ const SUBTAB: Record<string, string> = {
   agent: "Agents",
   agent_import: "Agents",
   verify: "Agents",
+  dev_cycle: "Agents",
   default_agent: "Agents",
   mode: "Agents",
   // XCOD-287: Settings › Models & agents › Subagents.

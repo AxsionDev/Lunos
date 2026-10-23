@@ -26705,6 +26705,15 @@
         },
         "additionalProperties": false
       },
+      "DevCycleConfig": {
+        "type": "object",
+        "properties": {
+          "auto_continue": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "PermissionActionConfig": {
         "type": "string",
         "enum": ["ask", "allow", "deny"]
@@ -26850,6 +26859,9 @@
             "$ref": "#/components/schemas/PermissionConfig"
           },
           "verify": {
+            "type": "boolean"
+          },
+          "auto_continue": {
             "type": "boolean"
           }
         },
@@ -27932,6 +27944,9 @@
           },
           "verify": {
             "$ref": "#/components/schemas/VerifyConfig"
+          },
+          "dev_cycle": {
+            "$ref": "#/components/schemas/DevCycleConfig"
           },
           "subagent_depth": {
             "type": "integer",

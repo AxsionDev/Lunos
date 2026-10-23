@@ -66,7 +66,7 @@ The output of the command is added to the conversation as a tool result.
 Press `Esc` twice to clear what you've typed and start again. The first `Esc` shows "esc again to clear" under the prompt; a second within a second clears the text, pasted blocks and `@` references.
 
 - Nothing is lost: the toast names the undo key (`input_undo`, `ctrl+-` by default, plus `ctrl+z` where the terminal doesn't use it to suspend), which brings the prompt back as it was, and `↑` finds it in prompt history.
-- While the agent is working, `Esc` `Esc` stops it as before, and what you've typed stays.
+- While the agent is working, `Esc` `Esc` clears what you've typed first and the agent keeps going. With the prompt empty, `Esc` `Esc` stops it (`session_interrupt`). The line under the prompt says which: `esc esc clear` or `esc esc stop`.
 - An `Esc` that closes autocomplete, leaves shell mode or clears a selection doesn't count as the first press.
 - It works the same in `/claude` and `/codex` sessions; the prompt is cleared in Lunos and nothing is sent to the tool.
 - Turn it off with `"double_escape_clear": false`, or change the window with `double_escape_ms`. `ctrl+c` (`input_clear`) still clears the prompt at once.

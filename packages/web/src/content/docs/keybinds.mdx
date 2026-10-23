@@ -244,7 +244,7 @@ You can disable a keybind by adding the key to `tui.json` with a value of `"none
 
 ## Clearing the Prompt
 
-`Esc` pressed twice within a second clears the prompt while the agent is idle; while it's working, `Esc` `Esc` stops it (`session_interrupt`) and keeps what you've typed. `input_undo` right after brings the cleared prompt back, and it's also in prompt history. It isn't a keybind: turn it off with `"double_escape_clear": false` in `tui.json`, or set the window with `double_escape_ms`. [Learn more](/docs/tui#clearing-the-prompt).
+`Esc` pressed twice within a second clears the prompt, whether the agent is idle or working. Only with the prompt empty does `Esc` `Esc` stop a working agent (`session_interrupt`). `input_undo` right after brings the cleared prompt back, and it's also in prompt history. It isn't a keybind: turn it off with `"double_escape_clear": false` in `tui.json`, or set the window with `double_escape_ms`. [Learn more](/docs/tui#clearing-the-prompt).
 
 ---
 
