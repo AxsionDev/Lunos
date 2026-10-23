@@ -44,6 +44,51 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
   stopped because of an unexpected error: AbortError".** The cancelled event stream could be
   reported as an unhandled error, which stopped Lunos before it handed a sandbox's results back and
   left the container running. <!-- XCOD-301 -->
+### Added
+
+- **Tell from the sound alone what Lunos needs.** Settings › Notifications & sounds (`/settings
+notifications`) picks a sound for each event (finished, subagent finished, needs your approval,
+  question for you, waiting for action, budget warning, error), playing each one as you move
+  through the list. Choose from the 45 sounds the desktop app has, none, or a sound file of your
+  own, which is checked before it's saved. Volume, the sound pack and when desktop notifications
+  appear are set there too, and every change applies at once. "Mute / unmute sounds" is in the
+  command palette. In the desktop and web app, Settings › Sound effects gains a volume and sounds
+  for a subagent finishing, a question, and a subagent waiting for you (off until you choose one).
+### Changed
+
+- **Dev-Cycle no longer stalls between gates.** When a turn ends by announcing the next step ("Plan
+  approved. Next I'll implement…") instead of taking it, Lunos continues by itself, and the
+  transcript shows a dim "↻ Dev-Cycle continued automatically (plan approved → build)" line. It
+  still stops at a gate, a real question, the end of the cycle, an error or a limit, never passes a
+  gate you haven't approved, and after 3 continuations in a row without progress it stops and asks
+  you, with Continue and Open cycle file. Build mode does the same; Plan mode never does.
+  Continuations count against budgets and the step limit like any turn. Turn it off with
+  `dev_cycle.auto_continue: false` or `agent.build.auto_continue: false`; an organisation can lock
+  either. <!-- XCOD-302 -->
+### Added
+
+- **Rename a session wherever you see it, and the name sticks.** Click the session's title in the
+  sidebar (or press `ctrl+r`) to edit it in place, press `r` on a session in the Agent Monitor, or
+  `ctrl+r` in `/sessions`, as well as `/rename`. A name you give is never replaced by the automatic
+  title, not on the first reply, after compaction or in a fork, even if you rename while the title
+  is still being generated. Names are one line of up to 80 characters; save an empty name to get the
+  automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
+  Lunos name. <!-- XCOD-308 -->
+- **See your sessions by project.** `/sessions` and the Agent Monitor's list switch between their
+  usual layout and one section per project with `ctrl+y` or a click on the view switch in the
+  header; the desktop and web Sessions window gains **By project** next to By status and By group.
+  Named projects come first, then repositories and folders, then "No project". Each section shows its
+  working, waiting and done sessions and the project's budget, and the project you're in is marked
+  "here". From a project's header you can start a new session in it, open its settings, or stop and
+  clear just that project. Each view remembers your choice; Groups stays the default.
+  <!-- XCOD-309 -->
+### Fixed
+
+- **Esc Esc while the agent is working clears what you've typed first** instead of stopping the
+  run, in the terminal app, `/claude` and `/codex` sessions and the Agent Monitor. Once the prompt is
+  empty, Esc Esc stops the run as before, and the line under the prompt shows which it will do
+  (`esc esc clear` or `esc esc stop`). The undo key brings the cleared text back while the agent
+  keeps working. `"double_escape_clear": false` keeps the old behaviour. <!-- XCOD-313 -->
 
 ## [1.18.55] - 2026-10-22
 

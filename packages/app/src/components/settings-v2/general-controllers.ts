@@ -118,7 +118,8 @@ export type SoundSelectOption = (typeof soundOptions)[number]
 
 export function createSoundSettingsController() {
   const settings = useSettings()
-  const preview = createSoundPreviewController(playSoundById)
+  const preview = createSoundPreviewController((id) => playSoundById(id, settings.sounds.volume()))
+  const volumePreview = createSoundPreviewController((id) => playSoundById(id, settings.sounds.volume()))
   const channel = (
     enabled: Accessor<boolean>,
     current: Accessor<string>,
@@ -164,6 +165,33 @@ export function createSoundSettingsController() {
       (value) => settings.sounds.setErrorsEnabled(value),
       (id) => settings.sounds.setErrors(id),
     ),
+    // XCOD-311: the TUI's events, and volume.
+    subagent: channel(
+      settings.sounds.subagentEnabled,
+      settings.sounds.subagent,
+      (value) => settings.sounds.setSubagentEnabled(value),
+      (id) => settings.sounds.setSubagent(id),
+    ),
+    question: channel(
+      settings.sounds.questionEnabled,
+      settings.sounds.question,
+      (value) => settings.sounds.setQuestionEnabled(value),
+      (id) => settings.sounds.setQuestion(id),
+    ),
+    waiting: channel(
+      settings.sounds.waitingEnabled,
+      settings.sounds.waiting,
+      (value) => settings.sounds.setWaitingEnabled(value),
+      (id) => settings.sounds.setWaiting(id),
+    ),
+    volume: {
+      current: settings.sounds.volume,
+      // Changing it plays the finished sound at the new level.
+      select: (value: number) => {
+        settings.sounds.setVolume(value)
+        volumePreview.play(value > 0 ? settings.sounds.agent() : undefined)
+      },
+    },
   }
 }
 

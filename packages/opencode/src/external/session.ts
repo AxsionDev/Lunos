@@ -644,8 +644,9 @@ export const turn = Effect.fn("ExternalSession.turn")(function* (deps: Deps, ses
           external: { ...previous, session: id, ...(commands ? { commands } : {}), ...extra },
         },
       })
+      // XCOD-308: only over the title it gave; a name the user gave stays (the tool's id is in the marker).
       if (latest.title === title(tool) || latest.title === title(tool, previous.session))
-        yield* sessions.setTitle({ sessionID, title: title(tool, id) })
+        yield* sessions.setTitle({ sessionID, title: title(tool, id), source: "auto", replace: latest.title })
     })
 
   // XCOD-254: the Lunos bridge for this turn, when the user agreed to share with this tool.

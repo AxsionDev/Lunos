@@ -220,7 +220,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       const current = yield* requireSession(ctx.params.sessionID)
       if (ctx.payload.title !== undefined) {
-        yield* session.setTitle({ sessionID: ctx.params.sessionID, title: ctx.payload.title })
+        // XCOD-308: a rename sticks; an empty name goes back to the automatic title (for a /claude or
+        // /codex session, the one naming its tool; the tool's own session id is never touched).
+        const external = ExternalSession.of(current)
+        yield* session.setTitle({
+          sessionID: ctx.params.sessionID,
+          title: ctx.payload.title,
+          source: "user",
+          fallback: external ? ExternalSession.title(external.tool, external.session) : undefined,
+        })
       }
       if (ctx.payload.metadata !== undefined) {
         yield* session.setMetadata({ sessionID: ctx.params.sessionID, metadata: ctx.payload.metadata })

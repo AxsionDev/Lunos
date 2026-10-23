@@ -181,6 +181,7 @@ const appBindingCommands = [
   "terminal.suspend",
   "terminal.title.toggle",
   "app.toggle.animations",
+  "app.toggle.sounds",
   "app.toggle.file_context",
   "app.toggle.diffwrap",
   "app.toggle.paste_summary",
@@ -1618,6 +1619,36 @@ function App(props: {
           if (tuiConfig.reduced_motion !== true)
             kv.set("animations_enabled", !animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled")))
           dialog.clear()
+        },
+      },
+      {
+        // XCOD-311: attention.sound, saved to the user config and applied at once. Unbound by default.
+        name: "app.toggle.sounds",
+        title: "Mute / unmute sounds",
+        category: "System",
+        run: () => {
+          dialog.clear()
+          const next = !tuiConfig.attention.sound
+          void sdk.client.config
+            .settingsSet({ settingsSetInput: { key: "tui.attention.sound", value: String(next), scope: "user" } })
+            .then((result) => {
+              if (!result.data?.ok) throw new Error(result.data && !result.data.ok ? result.data.error : "no answer")
+              tuiConfig.attention.sound = next
+              toast.show({
+                variant: "info",
+                message: next
+                  ? tuiConfig.attention.enabled
+                    ? "Sounds on"
+                    : "Sounds on, but alerts are off (/settings notifications)"
+                  : "Sounds muted",
+              })
+            })
+            .catch((error: unknown) =>
+              toast.show({
+                variant: "error",
+                message: `Sounds not changed: ${error instanceof Error ? error.message : String(error)}`,
+              }),
+            )
         },
       },
       {

@@ -38,6 +38,8 @@ export const CATEGORIES = [
   "Memory",
   "Marketplace & plugins",
   "Appearance",
+  // XCOD-311: tui.json's `attention.*`, which were under Appearance › Layout.
+  "Notifications & sounds",
   "Updates",
   "Tools",
   "Advanced / experimental",
@@ -53,6 +55,8 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   subagent: "Models & agents",
   // XCOD-288: how the Build agent checks its work before handing back.
   verify: "Models & agents",
+  // XCOD-302: whether Dev-Cycle continues by itself between gates.
+  dev_cycle: "Models & agents",
   // XCOD-298: Settings › Projects › Budgets (the named projects themselves aren't config).
   budget: "Projects",
   cloud: "Advanced / experimental",
@@ -122,8 +126,14 @@ export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
   Memory: ["Overview", "Settings", "Advanced"],
   "Marketplace & plugins": ["Marketplaces", "Plugins", "Policy"],
   Appearance: ["Theme", "Layout"],
+  "Notifications & sounds": ["Sounds", "Notifications"],
   Tools: ["LSP", "Formatters", "MCP", "Commands", "Skills", "Hooks", "Shell", "References"],
 }
+
+/** XCOD-311: the tui.json keys that have a section of their own rather than Appearance. */
+const TUI_CATEGORY: Record<string, Category> = { attention: "Notifications & sounds" }
+/** Notifications & sounds › Notifications; the rest of `tui.attention.*` is Sounds. */
+const NOTIFICATION_KEYS = ["tui.attention.notifications", "tui.attention.notify_when", "tui.attention.notify_subagents"]
 
 /** Top-level keys (or `tui.` keys) whose sub-tab isn't their section's first. */
 const SUBTAB: Record<string, string> = {
@@ -131,6 +141,7 @@ const SUBTAB: Record<string, string> = {
   agent: "Agents",
   agent_import: "Agents",
   verify: "Agents",
+  dev_cycle: "Agents",
   default_agent: "Agents",
   mode: "Agents",
   // XCOD-287: Settings › Models & agents › Subagents.
@@ -170,6 +181,7 @@ export function subtab(key: string, category: Category): string | undefined {
   if (category === "Memory")
     return MEMORY_SETTINGS.some((item) => key === item || key.startsWith(item + ".")) ? "Settings" : "Advanced"
   if (category === "Appearance") return key === "tui.theme" ? "Theme" : "Layout"
+  if (category === "Notifications & sounds") return NOTIFICATION_KEYS.includes(key) ? "Notifications" : "Sounds"
   return SUBTAB[key.split(".")[0]!] ?? tabs[0]
 }
 
@@ -200,7 +212,8 @@ const RESTART = [
   // Read once, when `lunos` / `lunos run` starts, to decide whether to start a sandbox.
   "sandbox",
 ]
-const NO_RESTART = ["tui.theme"]
+// XCOD-311: `tui.attention.` is read on every alert, and /settings updates the running app's copy.
+const NO_RESTART = ["tui.theme", "tui.attention."]
 
 const READONLY = ["$schema", "$locked"]
 
@@ -236,6 +249,14 @@ const DEFAULTS: Record<string, unknown> = {
   "tool_output.max_bytes": 51200,
   "tui.theme": "catppuccin",
   "tui.mouse": true,
+  // XCOD-311: TuiConfig.resolve's defaults; the per-event sounds' are the sound pack's.
+  "tui.attention.enabled": false,
+  "tui.attention.notifications": true,
+  "tui.attention.sound": true,
+  "tui.attention.volume": 0.4,
+  "tui.attention.sound_pack": "opencode.default",
+  "tui.attention.notify_when": "blurred",
+  "tui.attention.notify_subagents": false,
   // XCOD-229: the curated list the pickers use while `recommended` isn't set.
   recommended: ModelCuration.RECOMMENDED,
   // XCOD-256: external.*'s permission defaults are filled in by `list`, which knows the legacy key.
@@ -378,19 +399,26 @@ function labelOf(key: string) {
 }
 
 function needsRestart(key: string) {
-  if (NO_RESTART.includes(key)) return false
+  if (NO_RESTART.some((item) => (item.endsWith(".") ? key.startsWith(item) : key === item))) return false
   return RESTART.some((item) =>
     item.endsWith(".") ? key.startsWith(item) : key === item || key.startsWith(item + "."),
   )
 }
 
 function entry(key: string, target: Target, category: Category, ast: SchemaAST.AST, top: boolean): Entry {
-  const description = describe(ast)
+  const description =
+    describe(ast) ||
+    // XCOD-311: the per-event keys of a record share one description, on the record.
+    (key.startsWith("tui.attention.sounds.")
+      ? 'The sound this event plays: a bundled sound ID (e.g. "alert-04"), "none", or an .mp3, .aac or .wav file'
+      : "")
   const classified = classify(ast)
   return {
     key,
     target,
-    label: labelOf(key),
+    label:
+      (key.startsWith("tui.attention.") && TuiConfig.AttentionLabels[key.slice("tui.attention.".length)]) ||
+      labelOf(key),
     category,
     description,
     ...classified,
@@ -432,9 +460,10 @@ export function entries(): Entry[] {
   const tui = Object.entries(TuiConfig.Info.fields)
     .filter(([key]) => key !== "$schema")
     .flatMap(([key, schema]) => {
-      const top = entry(`tui.${key}`, "tui", "Appearance", schema.ast, true)
+      const category = TUI_CATEGORY[key] ?? "Appearance"
+      const top = entry(`tui.${key}`, "tui", category, schema.ast, true)
       if (key === "theme") top.kind = "string"
-      return [top, ...walk(`tui.${key}`, "tui", "Appearance", schema.ast, 1)]
+      return [top, ...walk(`tui.${key}`, "tui", category, schema.ast, 1)]
     })
   // Within a category, top-level keys follow CATEGORY's order (model first, not schema order).
   const order = Object.keys(CATEGORY)

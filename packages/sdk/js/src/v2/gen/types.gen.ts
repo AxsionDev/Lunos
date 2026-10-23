@@ -1890,6 +1890,10 @@ export type VerifyConfig = {
   timeout?: number
 }
 
+export type DevCycleConfig = {
+  auto_continue?: boolean
+}
+
 export type PermissionActionConfig = "ask" | "allow" | "deny"
 
 export type PermissionObjectConfig = {
@@ -1943,6 +1947,7 @@ export type AgentConfig = {
   maxSteps?: number
   permission?: PermissionConfig
   verify?: boolean
+  auto_continue?: boolean
   [key: string]:
     | unknown
     | string
@@ -2328,6 +2333,7 @@ export type Config = {
   sync?: SyncConfig
   subagent?: SubagentConfig
   verify?: VerifyConfig
+  dev_cycle?: DevCycleConfig
   subagent_depth?: number
   username?: string
   mode?: {

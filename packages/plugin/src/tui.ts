@@ -232,7 +232,16 @@ export type TuiToast = {
 
 export type TuiAttentionWhen = "always" | "focused" | "blurred"
 
-export const TuiAttentionSoundNames = ["default", "question", "permission", "error", "done", "subagent_done"] as const
+export const TuiAttentionSoundNames = [
+  "default",
+  "question",
+  "permission",
+  "error",
+  "done",
+  "subagent_done",
+  "waiting",
+  "budget_warning",
+] as const
 export type TuiAttentionSoundName = (typeof TuiAttentionSoundNames)[number]
 
 export type TuiAttentionSound =
@@ -414,6 +423,8 @@ type TuiAttentionConfigView = {
   volume: number
   sound_pack: string
   sounds: Partial<Record<TuiAttentionSoundName, string>>
+  notify_when: "blurred" | "always"
+  notify_subagents: boolean
 }
 
 type TuiConfigView = Pick<PluginConfig, "$schema" | "theme" | "plugin"> &

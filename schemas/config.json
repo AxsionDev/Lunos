@@ -922,6 +922,16 @@
       },
       "additionalProperties": false
     },
+    "DevCycleConfig": {
+      "type": "object",
+      "properties": {
+        "auto_continue": {
+          "type": "boolean",
+          "description": "Continue automatically when a Dev-Cycle turn ends by announcing its next step instead of doing it (on by default; false waits for you to say proceed). Never passes a pending gate, and stops after 3 continuations in a row without progress"
+        }
+      },
+      "additionalProperties": false
+    },
     "PermissionActionConfig": {
       "type": "string",
       "enum": ["ask", "allow", "deny"]
@@ -1078,6 +1088,10 @@
         "verify": {
           "type": "boolean",
           "description": "Build agent: check the work (build, tests, start the app and try it) before handing back (default true). false restores handing back without checking (XCOD-288)"
+        },
+        "auto_continue": {
+          "type": "boolean",
+          "description": "Build agent: continue automatically when a turn ends by announcing its next step instead of doing it (default true). Dev-Cycle uses dev_cycle.auto_continue; Plan never continues (XCOD-302)"
         }
       }
     },
@@ -2287,6 +2301,10 @@
         "verify": {
           "$ref": "#/$defs/VerifyConfig",
           "description": "How the Build agent checks its work before handing back: build, test and start commands, the ready URL and checks (XCOD-288)"
+        },
+        "dev_cycle": {
+          "$ref": "#/$defs/DevCycleConfig",
+          "description": "Dev-Cycle mode: whether it continues by itself between gates (XCOD-302)"
         },
         "subagent_depth": {
           "minimum": 0,

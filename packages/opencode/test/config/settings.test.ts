@@ -88,6 +88,25 @@ describe("settings registry", () => {
   test("every category is one of the ticket's", () => {
     for (const entry of ConfigSettings.entries()) expect(ConfigSettings.CATEGORIES).toContain(entry.category)
   })
+
+  // XCOD-311: attention.* has a section of its own, applied without a restart.
+  test("Notifications & sounds lists every attention key, per event, without a restart", () => {
+    const find = (key: string) => ConfigSettings.find(key)
+    for (const event of ["done", "permission", "waiting", "budget_warning", "default"]) {
+      expect(find(`tui.attention.sounds.${event}`)).toMatchObject({
+        category: "Notifications & sounds",
+        sub: "Sounds",
+        kind: "string",
+        restart: false,
+      })
+    }
+    expect(find("tui.attention.sounds.permission")?.label).toBe("Needs your approval")
+    expect(find("tui.attention.volume")).toMatchObject({ sub: "Sounds", kind: "number", restart: false })
+    expect(find("tui.attention.notify_when")).toMatchObject({ sub: "Notifications", values: ["blurred", "always"] })
+    expect(find("tui.attention.notifications")?.sub).toBe("Notifications")
+    expect(find("tui.mouse")?.category).toBe("Appearance")
+    expect(find("tui.mouse")?.restart).toBe(true)
+  })
 })
 
 describe("settings set", () => {
@@ -230,6 +249,24 @@ describe("settings set", () => {
     })
     expect(result.file).toBe(path.join(root, "user", "tui.json"))
     expect(JSON.parse(await read(result.file)).theme).toBe("tokyonight")
+  })
+
+  // XCOD-311: what Settings › Notifications & sounds saves, and what it can't.
+  test("sounds save to tui.json's attention, by bundled ID, none or file; volume stays within 0–1", async () => {
+    const set = (key: string, value: string) =>
+      ConfigSettings.set({ key, value, scope: "user", ctx: ctx(), locked: [] })
+    await set("tui.attention.sounds.permission", "alert-04")
+    await set("tui.attention.sounds.waiting", "none")
+    await set("tui.attention.volume", "0.6")
+    const result = await set("tui.attention.notify_when", "always")
+    expect(result.file).toBe(path.join(root, "user", "tui.json"))
+    expect(JSON.parse(await read(result.file)).attention).toEqual({
+      sounds: { permission: "alert-04", waiting: "none" },
+      volume: 0.6,
+      notify_when: "always",
+    })
+    await expect(set("tui.attention.volume", "1.5")).rejects.toThrow()
+    await expect(set("tui.attention.notify_when", "focused")).rejects.toThrow()
   })
 
   test("lists accept comma-separated values and check literals", async () => {
