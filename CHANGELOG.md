@@ -80,6 +80,15 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   (`agent.<name>.permission_mode`). Every workflow starts in Manual unless you set this, and an
   organisation can lock it. `deny` rules still block in Auto. <!-- XCOD-310 -->
 
+- **A clear screen when your Lunos account is disabled.** If Lunos Cloud disables your account, at
+  sign-in or when your session is next refreshed, the TUI says so in full screen: "Your Lunos account
+  is disabled", the kind of reason (a payment issue, a security concern, and so on), the date it ends
+  if it has one, and how to reach support (support@lunos.tech). New prompts are blocked, including in
+  the session loop itself, so `lunos run` and other clients refuse them too. A turn already running
+  finishes, and your past sessions on this computer stay readable. The notice comes back after a
+  restart until a sign-in or refresh succeeds. Self-hosted use, an organisation's own sign-in,
+  offline mode and CI are not affected. <!-- XCOD-312 -->
+
 ### Changed
 
 - **Quitting Lunos with the sandbox gives you the shell back at once.** Handing the results back and

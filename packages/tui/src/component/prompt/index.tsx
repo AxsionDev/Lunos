@@ -71,6 +71,7 @@ import { DialogMemory } from "../dialog-memory"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
 import { AccountContext } from "../../context/account"
+import { disabledNotice } from "../../util/account"
 import { stringifyKeyStroke, type Binding } from "@opentui/keymap"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
 import { useTuiConfig } from "../../config"
@@ -1281,7 +1282,12 @@ export function Prompt(props: PromptProps) {
     }
     // XCOD-273: signed out where the official build needs an account (`lunos logout` in another
     // terminal, say), a prompt shows the Welcome screen instead of failing; the draft stays.
-    if (account && !(await account.check())) return false
+    // XCOD-312: a disabled account: the draft stays, and the notice says why. Slash commands still run
+    // here (/logout, /account); any prompt one sends is refused by the session loop.
+    if (account && !(await account.check()) && !(account.disabled() && store.prompt.input.trim().startsWith("/"))) {
+      if (account.disabled()) toast.show({ variant: "error", message: disabledNotice(), duration: 8000 })
+      return false
+    }
     // XCOD-94: bare /memory opens the memory browser, before any session is created.
     // `/memory off|on` has arguments and goes to the server like any other command.
     if (store.prompt.input.trim() === "/memory") {
@@ -1951,6 +1957,8 @@ export function Prompt(props: PromptProps) {
 
   const placeholderText = createMemo(() => {
     if (props.showPlaceholder === false) return undefined
+    // XCOD-312: a disabled account's prompt says why it can't be used.
+    if (account?.disabled()) return disabledNotice()
     if (store.mode === "shell") {
       if (!shell().length) return undefined
       const example = shell()[store.placeholder % shell().length]

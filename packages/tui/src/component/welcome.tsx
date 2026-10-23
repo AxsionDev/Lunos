@@ -159,6 +159,8 @@ export function Welcome() {
     controller?.abort()
     const user = await pending.save().catch((error) => fail(error, () => save(pending)))
     if (!user) return
+    // XCOD-312: Lunos Cloud said at sign-in that the account is disabled: its notice, not "Signed in".
+    if (await host.disabled?.().catch(() => undefined)) return account.signedIn(user)
     go({ kind: "success", user })
     toast.show({ variant: "success", message: signedInLine(user), duration: 6000 })
     for (const note of user.notes ?? []) toast.show({ variant: "info", message: note, duration: 8000 })

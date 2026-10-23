@@ -19,6 +19,7 @@ import {
 } from "@opencode-ai/tui/util/account"
 import { CloudAccountApi } from "./account-api"
 import { CloudAuth } from "./auth"
+import { CloudDisabled } from "./disabled"
 import { CloudLegal } from "./legal"
 import { CloudOidc } from "./oidc"
 import { CloudSignin } from "./signin"
@@ -197,10 +198,15 @@ export function create(input: { gate: Gate; issuer: string; clientID: string }):
       return CloudAuth.session()
         .then(() => "ok" as const)
         .catch((error) => {
+          // XCOD-312: the refresh found the account disabled (and recorded it).
+          if (error instanceof CloudDisabled.DisabledError) return "disabled" as const
           // Offline, or the provider is down: the cached sign-in holds until it can be checked.
           const kind = CloudSignin.classify(error)
           return kind === "offline" || kind === "unreachable" ? ("ok" as const) : ("expired" as const)
         })
+    },
+    async disabled() {
+      return CloudDisabled.load()
     },
     accepted,
     async accept(versions, server) {

@@ -2724,3 +2724,64 @@ noLLMServer.instance(
     }),
   { config: cfg },
 )
+
+// XCOD-312: a disabled Lunos account (recorded on this machine) starts no new turn on the live v1
+// loop: the reason is the turn's error and no model is asked. Where this start needs no Lunos account
+// (here: a build from source without LUNOS_AUTH_REQUIRED), the record doesn't stop anything.
+for (const required of [true, false] as const) {
+  it.instance(
+    `a disabled account ${required ? "starts no new turn" : "doesn't stop a start that needs no account"}`,
+    () =>
+      Effect.gen(function* () {
+        const { llm } = yield* useServerConfig(providerCfg)
+        const { CloudDisabled } = yield* Effect.promise(() => import("../../src/cloud/disabled"))
+        const saved = {
+          required: process.env.LUNOS_AUTH_REQUIRED,
+          ci: process.env.CI,
+          offline: process.env.LUNOS_OFFLINE,
+        }
+        delete process.env.CI
+        delete process.env.LUNOS_OFFLINE
+        if (required) process.env.LUNOS_AUTH_REQUIRED = "1"
+        else delete process.env.LUNOS_AUTH_REQUIRED
+        yield* Effect.addFinalizer(() =>
+          Effect.promise(async () => {
+            await CloudDisabled.clear()
+            for (const [key, value] of [
+              ["LUNOS_AUTH_REQUIRED", saved.required],
+              ["CI", saved.ci],
+              ["LUNOS_OFFLINE", saved.offline],
+            ] as const)
+              if (value === undefined) delete process.env[key]
+              else process.env[key] = value
+          }),
+        )
+        yield* Effect.promise(() => CloudDisabled.record({ category: "payment" }))
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const chat = yield* sessions.create({
+          title: "Pinned",
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        })
+        yield* llm.text("world")
+        const result = yield* prompt.prompt({
+          sessionID: chat.id,
+          agent: "build",
+          parts: [{ type: "text", text: "hello" }],
+        })
+        expect(result.info.role).toBe("assistant")
+        if (!required) {
+          expect(yield* llm.hits).toHaveLength(1)
+          return
+        }
+        expect(yield* llm.hits).toHaveLength(0)
+        const error = (result.info as SessionV1.Assistant).error as { data?: { message?: string; ref?: string } }
+        expect(error?.data?.ref).toBe("account_disabled")
+        expect(error?.data?.message).toContain("Your Lunos account is disabled, so new prompts can't run.")
+        expect(error?.data?.message).toContain("Reason: A payment issue")
+        // Past messages stay: the prompt itself is kept, only the turn didn't start.
+        const messages = yield* sessions.messages({ sessionID: chat.id })
+        expect(messages.filter((message) => message.info.role === "user")).toHaveLength(1)
+      }),
+  )
+}

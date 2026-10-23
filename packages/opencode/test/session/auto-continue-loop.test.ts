@@ -604,3 +604,47 @@ describe("Build and Plan (XCOD-302)", () => {
     }),
   )
 })
+
+// XCOD-312: an account disabled while a turn runs: that turn finishes, but isn't continued
+// automatically (a continuation would be a new turn the session loop must refuse).
+describe("a disabled Lunos account (XCOD-312)", () => {
+  it.instance("a Build turn that stalls after the account was disabled isn't continued", () =>
+    Effect.gen(function* () {
+      const { CloudDisabled } = yield* Effect.promise(() => import("../../src/cloud/disabled"))
+      const saved = {
+        required: process.env.LUNOS_AUTH_REQUIRED,
+        ci: process.env.CI,
+        offline: process.env.LUNOS_OFFLINE,
+      }
+      process.env.LUNOS_AUTH_REQUIRED = "1"
+      delete process.env.CI
+      delete process.env.LUNOS_OFFLINE
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(async () => {
+          await CloudDisabled.clear()
+          for (const [key, value] of [
+            ["LUNOS_AUTH_REQUIRED", saved.required],
+            ["CI", saved.ci],
+            ["LUNOS_OFFLINE", saved.offline],
+          ] as const)
+            if (value === undefined) delete process.env[key]
+            else process.env[key] = value
+        }),
+      )
+      const { session, llm } = yield* setup({ agent: "build" })
+      yield* say(session.id, "build", "Add a health endpoint.")
+      // The reply is held until the account is recorded as disabled: after the turn started.
+      const disabled: PromiseLike<void> = { then: (done, fail) => CloudDisabled.record({}).then(done, fail) }
+      yield* llm.hold("Next I'll add the /health route and run the tests.", disabled)
+      yield* llm.text("Added GET /health; the tests pass.")
+
+      yield* run(session.id)
+
+      expect(continuations(yield* history(session.id))).toHaveLength(0)
+      expect(yield* modelCalls()).toHaveLength(1)
+      // The turn itself finished with the model's own reply, not an error.
+      const last = (yield* history(session.id)).findLast((msg) => msg.info.role === "assistant")
+      expect((last?.info as SessionV1.Assistant | undefined)?.error).toBeUndefined()
+    }),
+  )
+})

@@ -72,6 +72,7 @@ import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
 import { Budget } from "@/budget"
+import { CloudDisabled } from "@/cloud/disabled"
 import { BUDGET_TOAST_TITLE } from "@opencode-ai/tui/util/budget-toast"
 import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
@@ -1287,7 +1288,26 @@ const layer = Layer.effect(
         return "stop" as const
       }
       // stop: the reason, on the session and as its error (`lunos run` exits with code 3 on it).
-      const error = new NamedError.Unknown({ message: decision.message, ref: "budget" }).toObject()
+      yield* refuseTurn({
+        sessionID: input.sessionID,
+        lastUser: input.lastUser,
+        model: { id: input.model.id, providerID: input.model.providerID },
+        message: decision.message,
+        ref: "budget",
+      })
+      return "stop" as const
+    })
+
+    /** A turn that doesn't start: its reason, as an assistant message's error and the session's. */
+    const refuseTurn = Effect.fn("SessionPrompt.refuseTurn")(function* (input: {
+      sessionID: SessionID
+      lastUser: SessionV1.User
+      model: { id: string; providerID: string }
+      message: string
+      ref: string
+    }) {
+      const ctx = yield* InstanceState.context
+      const error = new NamedError.Unknown({ message: input.message, ref: input.ref }).toObject()
       const msg: SessionV1.Assistant = {
         id: MessageID.ascending(),
         parentID: input.lastUser.id,
@@ -1297,8 +1317,8 @@ const layer = Layer.effect(
         path: { cwd: ctx.directory, root: ctx.worktree },
         cost: 0,
         tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        modelID: input.model.id,
-        providerID: input.model.providerID,
+        modelID: input.model.id as SessionV1.Assistant["modelID"],
+        providerID: input.model.providerID as SessionV1.Assistant["providerID"],
         time: { created: Date.now(), completed: Date.now() },
         sessionID: input.sessionID,
         finish: "stop",
@@ -1306,7 +1326,6 @@ const layer = Layer.effect(
       }
       yield* sessions.updateMessage(msg)
       yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: msg.error })
-      return "stop" as const
     })
 
     /**
@@ -1324,6 +1343,11 @@ const layer = Layer.effect(
     }) {
       // Not for subagents: their parent reads the result and carries on itself.
       if (input.session.parentID) return false
+      // XCOD-312: nor for a disabled Lunos account: the running turn finishes, but isn't continued.
+      if (yield* Effect.promise(() => CloudDisabled.refusal().catch(() => undefined))) {
+        yield* Effect.logInfo("auto-continue: account disabled", { "session.id": input.sessionID })
+        return false
+      }
       // XCOD-303: nor while subagents it dispatched in the background still run: each one's result
       // resumes the session when it lands, so a turn that ends waiting for them hasn't stalled.
       const running = (yield* jobs.list()).some(
@@ -1482,6 +1506,23 @@ const layer = Layer.effect(
           }
 
           step++
+          // XCOD-312: a disabled Lunos account starts no new turn, before anything is asked of a model.
+          // Checked once, at the start of a top-level turn: a turn already running (and its subagents)
+          // finishes.
+          if (step === 1 && !session.parentID) {
+            const refused = yield* Effect.promise(() => CloudDisabled.refusal().catch(() => undefined))
+            if (refused) {
+              yield* Effect.logInfo("account disabled: turn not started", { "session.id": sessionID })
+              yield* refuseTurn({
+                sessionID,
+                lastUser,
+                model: { id: lastUser.model.modelID, providerID: lastUser.model.providerID },
+                message: refused,
+                ref: "account_disabled",
+              })
+              break
+            }
+          }
           if (step === 1)
             yield* title({
               session,

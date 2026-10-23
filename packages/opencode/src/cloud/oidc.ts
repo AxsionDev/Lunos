@@ -50,6 +50,8 @@ export class OidcError extends Error {
   constructor(
     message: string,
     readonly code?: string,
+    /** XCOD-312: the provider's `error_description`, where it gave one (a refused refresh). */
+    readonly description?: string,
   ) {
     super(message)
   }
@@ -234,6 +236,7 @@ export async function refresh(
     throw new OidcError(
       "The session has expired or was revoked; run lunos login again",
       String(result.json.error ?? ""),
+      typeof result.json.error_description === "string" ? result.json.error_description : undefined,
     )
   const next = toTokens(result.json)
   return { ...next, refresh_token: next.refresh_token ?? tokens.refresh_token }

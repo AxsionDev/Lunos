@@ -20,6 +20,13 @@ export type Options = {
   platformRole?: string
   /** Lunos Cloud's accounts and organisations (fake-lunoshq.ts); `defaultCloud` when not set. */
   cloud?: FakeLunoshq.Options
+  /** XCOD-312: the token endpoint refuses a refresh with this (Keycloak: `invalid_grant`, its description). */
+  refuseRefresh?: { error: string; description?: string }
+  /**
+   * XCOD-312: Lunos Cloud answers every `/v1/` call 403 `suspended` with these details (lunoshq's
+   * contract: `{ code, message, details: { scope, category?, until? }, error: { code, message } }`).
+   */
+  suspended?: Record<string, unknown>
 }
 
 /** Pat (u-1, the account the device flow signs in) is an Admin of Acme GmbH, whose owner is Olga. */
@@ -82,6 +89,11 @@ export function start(options: Options = {}) {
           interval: 1,
         })
       }
+      if (url.pathname === "/token" && form?.get("grant_type") === "refresh_token" && options.refuseRefresh)
+        return Response.json(
+          { error: options.refuseRefresh.error, error_description: options.refuseRefresh.description },
+          { status: 400 },
+        )
       if (url.pathname === "/token" && form?.get("grant_type") === "refresh_token")
         return Response.json({ access_token: access(), refresh_token: "rt-2", token_type: "Bearer", expires_in: 3600 })
       if (url.pathname === "/token") {
@@ -112,6 +124,18 @@ export function start(options: Options = {}) {
         return new Response(null, { status: 204 })
       }
       // Lunos Cloud (lunoshq): the account, organisations and session sync's devices.
+      if (url.pathname.startsWith("/v1/") && options.suspended) {
+        const account = options.suspended.scope === "account"
+        return Response.json(
+          {
+            code: "suspended",
+            message: "Free text only Lunos staff should read: chargeback 4471.",
+            details: options.suspended,
+            error: { code: account ? "account_suspended" : "org_suspended", message: "Suspended." },
+          },
+          { status: 403 },
+        )
+      }
       if (url.pathname.startsWith("/v1/")) return cloud.handle(req, url, body)
       return Response.json({ error: { code: "not_found", message: "No such route." } }, { status: 404 })
     },

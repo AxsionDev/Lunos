@@ -115,6 +115,44 @@ export type Legal = { terms: { version: string; url: string }; privacy: { versio
 
 export const versions = (legal: Legal): Versions => ({ terms: legal.terms.version, privacy: legal.privacy.version })
 
+/**
+ * XCOD-312: why Lunos Cloud disabled the account, as a category (never its free-text reason). An
+ * older server sends none.
+ */
+export type DisabledCategory = "abuse" | "security" | "terms" | "payment" | "offboarding" | "other"
+
+export const DISABLED_CATEGORY_TEXT: Record<DisabledCategory, string> = {
+  abuse: "Abuse or misuse of the service",
+  security: "A security concern",
+  terms: "A breach of the terms of service",
+  payment: "A payment issue",
+  offboarding: "Your organisation offboarded you",
+  other: "Other",
+}
+
+export const SUPPORT_EMAIL = "support@lunos.tech"
+
+/** XCOD-312: the account is disabled. `until` (ISO-8601) when it ends by itself; none: until lifted. */
+export type Disabled = { category?: DisabledCategory; until?: string }
+
+const day = (iso: string) => new Date(iso).toISOString().slice(0, 10)
+
+/** "Reason: A payment issue", "Until 2026-12-01", the support address: what the screen says under its title. */
+export function disabledLines(disabled: Disabled) {
+  return [
+    ...(disabled.category ? [`Reason: ${DISABLED_CATEGORY_TEXT[disabled.category]}`] : []),
+    ...(disabled.until ? [`Until ${day(disabled.until)}`] : []),
+    `Contact support: ${SUPPORT_EMAIL}`,
+  ]
+}
+
+export const DISABLED_TITLE = "Your Lunos account is disabled"
+
+/** One line, where the prompt's placeholder would be: why it can't be used, and whom to ask. */
+export function disabledNotice() {
+  return `${DISABLED_TITLE}: new prompts can't be sent; past sessions stay readable. Contact support: ${SUPPORT_EMAIL}`
+}
+
 export type Host = {
   gate: Gate
   /**
@@ -128,9 +166,14 @@ export type Host = {
   /**
    * Refreshes the stored session when it is due and the provider can be reached. Returns "expired"
    * when the provider refused the refresh (signed out elsewhere, revoked), "ok" otherwise, offline
-   * included: the cached sign-in holds.
+   * included: the cached sign-in holds. XCOD-312: "disabled" when the account turned out disabled.
    */
-  refresh(): Promise<"ok" | "expired" | "none">
+  refresh(): Promise<"ok" | "expired" | "none" | "disabled">
+  /**
+   * XCOD-312: whether Lunos Cloud (or the sign-in service) last said this account is disabled, from
+   * this machine's record only: no network. Cleared by a successful sign-in or refresh.
+   */
+  disabled?(): Promise<Disabled | undefined>
   /** The Terms and Privacy notice versions this account last accepted on this machine. */
   accepted(): Promise<Versions | undefined>
   /**

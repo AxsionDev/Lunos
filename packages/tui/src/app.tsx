@@ -130,6 +130,7 @@ import { DialogSelect } from "./ui/dialog-select"
 import { listed } from "./util/sessions-overview"
 import { AccountProvider, useAccount } from "./context/account"
 import { Welcome } from "./component/welcome"
+import { DisabledAccount } from "./component/disabled-account"
 import { DialogAccount } from "./component/dialog-account"
 import type { Host as AccountHost } from "./util/account"
 
@@ -1358,7 +1359,8 @@ function App(props: {
               title: "Your Lunos account",
               desc: "Plan, organisations, devices; sign out everywhere; delete the account",
               slashName: "account",
-              run: () => dialog.replace(() => <DialogAccount />),
+              // XCOD-312: a disabled account's /account is the notice again (Lunos Cloud would refuse the rest).
+              run: () => (account.disabled() ? account.showDisabled() : dialog.replace(() => <DialogAccount />)),
               category: "Account",
             },
           ]
@@ -1869,7 +1871,7 @@ function App(props: {
 
   // XCOD-276: the start-up timeline ends at the first frame that shows the home screen (or Welcome).
   createEffect(() => {
-    const welcome = account.blocks() && account.phase() === "welcome"
+    const welcome = account.blocks() && (account.phase() === "welcome" || account.phase() === "disabled")
     if (!welcome && !(shown() && !account.blocks())) return
     renderer.once("frame", () => StartupTrace.firstFrame(welcome ? "first frame (welcome)" : "first frame"))
     renderer.requestRender()
@@ -1918,6 +1920,10 @@ function App(props: {
       {/* XCOD-273: the Welcome screen stands in front of the app, without waiting for plugins or sync. */}
       <Show when={account.blocks() && account.phase() === "welcome"}>
         <Welcome />
+      </Show>
+      {/* XCOD-312: a disabled account's notice, in front of the app until it's left for read-only use. */}
+      <Show when={account.blocks() && account.phase() === "disabled"}>
+        <DisabledAccount />
       </Show>
       <Show when={!account.blocks()}>
         <box flexGrow={1} minHeight={0} flexDirection="column">

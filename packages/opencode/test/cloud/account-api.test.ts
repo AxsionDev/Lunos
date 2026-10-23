@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { CloudAccountApi } from "../../src/cloud/account-api"
+import { CloudDisabled } from "../../src/cloud/disabled"
 import { CloudOrgMembers } from "../../src/cloud/org-members"
 import * as FakeLunoshq from "./fixtures/fake-lunoshq"
 
@@ -152,9 +153,11 @@ describe("refusal codes (XCOD-275 contract)", () => {
     expect((await refused(403, { error: { code: "org_suspended", message: "x" } })).message).toStartWith(
       "This organisation or account is suspended",
     )
+    // XCOD-312: an older server's account_suspended is the account's own: the disabled notice.
     expect((await refused(403, { error: { code: "account_suspended", message: "x" } })).message).toStartWith(
-      "This organisation or account is suspended",
+      "Your Lunos account is disabled.",
     )
+    await CloudDisabled.clear()
     expect((await refused(403, { error: { code: "email_unverified", message: "x" } })).message).toStartWith(
       "Confirm your e-mail address first",
     )

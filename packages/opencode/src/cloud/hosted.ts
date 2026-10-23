@@ -5,7 +5,9 @@ import fs from "fs/promises"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import { Offline } from "@opencode-ai/core/offline"
+import { CloudAccountApi } from "./account-api"
 import { CloudDefaults } from "./defaults"
+import { CloudDisabled } from "./disabled"
 import { CloudOidc } from "./oidc"
 
 /**
@@ -119,6 +121,8 @@ export type Outcome =
   | { kind: "several"; orgs: string[] }
   | { kind: "on"; org: string }
   | { kind: "failed"; message: string }
+  /** XCOD-312: Lunos Cloud says the account is disabled (recorded on this machine). */
+  | { kind: "disabled"; disabled: CloudDisabled.Disabled }
 
 export type Options = { fetch?: typeof fetch; timeoutMs?: number }
 
@@ -143,7 +147,15 @@ export async function afterLogin(
       redirect: "error",
       signal: AbortSignal.timeout(opts.timeoutMs ?? 5_000),
     })
-    if (!response.ok) return { kind: "failed", message: `${new URL(origin()).host} answered ${response.status}` }
+    if (!response.ok) {
+      const found = await response.json().catch(() => undefined)
+      const disabled = CloudDisabled.suspension(response.status, CloudAccountApi.refusal(found))
+      if (disabled) {
+        await CloudDisabled.record(disabled).catch(() => undefined)
+        return { kind: "disabled", disabled }
+      }
+      return { kind: "failed", message: `${new URL(origin()).host} answered ${response.status}` }
+    }
     body = (await response.json().catch(() => undefined)) as typeof body
   } catch (error) {
     return { kind: "failed", message: error instanceof Error ? error.message : String(error) }
@@ -169,6 +181,8 @@ export function describe(outcome: Outcome): string | undefined {
       return `Team features: off. You're a member of several organisations on ${new URL(origin()).host} (${outcome.orgs.join(", ")}) and your sign-in doesn't name one; ask your administrator to set cloud.policy in managed config.`
     case "failed":
       return `Team features: couldn't check your organisations (${outcome.message}). Run lunos login again to retry.`
+    case "disabled":
+      return CloudDisabled.text(outcome.disabled)
     case "none":
     case "off":
       return

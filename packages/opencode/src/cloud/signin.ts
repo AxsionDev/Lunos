@@ -3,6 +3,7 @@ export * as CloudSignin from "./signin"
 import type { FailureKind } from "@opencode-ai/tui/util/account"
 import { ConfigManaged } from "@/config/managed"
 import { ConfigOrgPolicy } from "@/config/org-policy"
+import { CloudDisabled } from "./disabled"
 import { CloudHosted } from "./hosted"
 import { CloudOidc } from "./oidc"
 import { CloudStore } from "./store"
@@ -101,6 +102,8 @@ export async function keep(
     sub: confirmed.user.sub,
     savedAt: new Date().toISOString(),
   })
+  // XCOD-312: a new sign-in starts clean; Lunos Cloud's answer below records it again if it still holds.
+  await CloudDisabled.clear().catch(() => undefined)
   if (input.sync !== false)
     await loginSync({ issuer: confirmed.issuer, locked: input.syncLocked, print: input.print }).catch((error) =>
       input.print(`Session sync isn't set up: ${error instanceof Error ? error.message : String(error)}`),
@@ -130,6 +133,7 @@ export async function logout() {
     .catch(() => false)
   await CloudStore.clear()
   await CloudHosted.clear()
+  await CloudDisabled.clear().catch(() => undefined)
   return { session, revoked }
 }
 
