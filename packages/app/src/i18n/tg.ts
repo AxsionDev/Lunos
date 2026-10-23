@@ -1361,4 +1361,18 @@ export const dict = {
   "sessions.monitor.sentMany": "Фиристода: {{sent}} · Дар навбат: {{queued}}",
   "sessions.monitor.started": "Сеанс дар {{project}} оғоз шуд",
   "command.sessions.open": "Кушодани равзанаи сеансҳо",
+  "account.disabled.title": "Ҳисоби Lunos-и шумо ғайрифаъол шудааст",
+  "account.disabled.reason": "Сабаб: {{reason}}",
+  "account.disabled.until": "То {{date}}",
+  "account.disabled.contact": "Бо дастгирӣ тамос гиред: {{email}}",
+  "account.disabled.readOnly": "Сеансҳои қаблӣ хонданӣ боқӣ мемонанд. Дархостҳои навро фиристодан мумкин нест.",
+  "account.disabled.viewSessions": "Дидани сеансҳои қаблӣ (танҳо хондан)",
+  "account.disabled.category.abuse": "Сӯиистифода аз хизмат",
+  "account.disabled.category.security": "Масъалаи амниятӣ",
+  "account.disabled.category.terms": "Вайрон кардани шартҳои хизмат",
+  "account.disabled.category.payment": "Мушкилии пардохт",
+  "account.disabled.category.offboarding": "Ташкилоти шумо шуморо хориҷ кард",
+  "account.disabled.category.other": "Дигар",
+  "prompt.placeholder.accountDisabled":
+    "Ҳисоби Lunos-и шумо ғайрифаъол шудааст: дархостҳои навро фиристодан мумкин нест",
 }

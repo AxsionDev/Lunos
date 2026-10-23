@@ -2444,6 +2444,13 @@ export type Config = {
   }
 }
 
+export type GlobalAccount = {
+  disabled?: {
+    category?: "abuse" | "security" | "terms" | "payment" | "offboarding" | "other"
+    until?: string
+  }
+}
+
 export type SettingRow = {
   key: string
   target: "config" | "tui"
@@ -8860,6 +8867,31 @@ export type GlobalDisposeResponses = {
 }
 
 export type GlobalDisposeResponse = GlobalDisposeResponses[keyof GlobalDisposeResponses]
+
+export type GlobalAccountGetData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/account"
+}
+
+export type GlobalAccountGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalAccountGetError = GlobalAccountGetErrors[keyof GlobalAccountGetErrors]
+
+export type GlobalAccountGetResponses = {
+  /**
+   * The Lunos account's state on this machine
+   */
+  200: GlobalAccount
+}
+
+export type GlobalAccountGetResponse = GlobalAccountGetResponses[keyof GlobalAccountGetResponses]
 
 export type GlobalUpgradeData = {
   body?: {

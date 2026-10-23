@@ -484,6 +484,43 @@
         ]
       }
     },
+    "/global/account": {
+      "get": {
+        "tags": ["global"],
+        "operationId": "global.account.get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The Lunos account's state on this machine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Whether this machine was told the Lunos account is disabled, with the reason category and the end date. Reads this machine's record only.",
+        "summary": "Get the Lunos account's state",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.global.account.get({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/global/upgrade": {
       "post": {
         "tags": ["global"],
@@ -28261,6 +28298,25 @@
                 "items": {
                   "$ref": "#/components/schemas/ConfigV2ExperimentalPolicy"
                 }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "GlobalAccount": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": ["abuse", "security", "terms", "payment", "offboarding", "other"]
+              },
+              "until": {
+                "type": "string"
               }
             },
             "additionalProperties": false

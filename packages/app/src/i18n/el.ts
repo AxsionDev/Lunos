@@ -1367,4 +1367,18 @@ export const dict = {
   "sessions.monitor.sentMany": "Στάλθηκαν: {{sent}} · Σε αναμονή: {{queued}}",
   "sessions.monitor.started": "Ξεκίνησε συνεδρία στο {{project}}",
   "command.sessions.open": "Άνοιγμα παραθύρου συνεδριών",
+  "account.disabled.title": "Ο λογαριασμός σας στο Lunos έχει απενεργοποιηθεί",
+  "account.disabled.reason": "Αιτία: {{reason}}",
+  "account.disabled.until": "Έως {{date}}",
+  "account.disabled.contact": "Επικοινωνήστε με την υποστήριξη: {{email}}",
+  "account.disabled.readOnly": "Οι προηγούμενες συνεδρίες παραμένουν αναγνώσιμες. Δεν μπορούν να σταλούν νέα prompts.",
+  "account.disabled.viewSessions": "Προβολή προηγούμενων συνεδριών (μόνο ανάγνωση)",
+  "account.disabled.category.abuse": "Κατάχρηση της υπηρεσίας",
+  "account.disabled.category.security": "Ένα ζήτημα ασφάλειας",
+  "account.disabled.category.terms": "Παραβίαση των όρων χρήσης",
+  "account.disabled.category.payment": "Ένα πρόβλημα πληρωμής",
+  "account.disabled.category.offboarding": "Ο οργανισμός σας σάς αφαίρεσε",
+  "account.disabled.category.other": "Άλλο",
+  "prompt.placeholder.accountDisabled":
+    "Ο λογαριασμός σας στο Lunos έχει απενεργοποιηθεί: δεν μπορούν να σταλούν νέα prompts",
 }

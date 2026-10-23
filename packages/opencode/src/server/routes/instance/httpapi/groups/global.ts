@@ -68,12 +68,25 @@ const GlobalUpgradeResult = Schema.Union([
   }),
 ])
 
+// XCOD-312: what this machine was last told about the Lunos account being disabled (CloudDisabled):
+// the reason category and the end, never the free-text reason. No `disabled` when it isn't, or where
+// this start needs no Lunos account.
+const GlobalAccount = Schema.Struct({
+  disabled: Schema.optional(
+    Schema.Struct({
+      category: Schema.optional(Schema.Literals(["abuse", "security", "terms", "payment", "offboarding", "other"])),
+      until: Schema.optional(Schema.String),
+    }),
+  ),
+}).annotate({ identifier: "GlobalAccount" })
+
 export const GlobalPaths = {
   health: "/global/health",
   event: "/global/event",
   config: "/global/config",
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
+  account: "/global/account",
 } as const
 
 export const GlobalApi = HttpApi.make("global").add(
@@ -124,6 +137,16 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.dispose",
           summary: "Dispose instance",
           description: "Clean up and dispose all OpenCode instances, releasing all resources.",
+        }),
+      ),
+      HttpApiEndpoint.get("account", GlobalPaths.account, {
+        success: described(GlobalAccount, "The Lunos account's state on this machine"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.account.get",
+          summary: "Get the Lunos account's state",
+          description:
+            "Whether this machine was told the Lunos account is disabled, with the reason category and the end date. Reads this machine's record only.",
         }),
       ),
       HttpApiEndpoint.post("upgrade", GlobalPaths.upgrade, {

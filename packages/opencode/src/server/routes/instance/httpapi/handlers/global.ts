@@ -1,3 +1,4 @@
+import { CloudDisabled } from "@/cloud/disabled"
 import { Config } from "@/config/config"
 import { GlobalBus, type GlobalEvent as GlobalBusEvent } from "@/bus/global"
 import { EffectBridge } from "@/effect/bridge"
@@ -124,6 +125,12 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return HttpServerResponse.jsonUnsafe(result)
     })
 
+    // XCOD-312: the desktop and web app's disabled-account notice. Never fails: unreadable is "not known".
+    const account = Effect.fn("GlobalHttpApi.account")(function* () {
+      const disabled = yield* Effect.promise(() => CloudDisabled.active().catch(() => undefined))
+      return disabled ? { disabled } : {}
+    })
+
     return handlers
       .handle("health", health)
       .handleRaw("event", event)
@@ -131,5 +138,6 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("configUpdate", configUpdate)
       .handle("dispose", dispose)
       .handle("upgrade", upgrade)
+      .handle("account", account)
   }),
 )

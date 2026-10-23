@@ -89,6 +89,15 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   restart until a sign-in or refresh succeeds. Self-hosted use, an organisation's own sign-in,
   offline mode and CI are not affected. <!-- XCOD-312 -->
 
+- **The desktop app and the web UI show the same notice.** When this computer knows your Lunos
+  account is disabled, they cover the app with the same full-screen notice: the kind of reason, the
+  end date if there is one, and support@lunos.tech. **View past sessions (read-only)** opens the app
+  so you can read your sessions. The prompt says why it can't be used, and sending a prompt, a
+  command, a shell command or a queued follow-up is refused with the same message, keeping your
+  draft. The app checks when it starts, when you switch server and when its window comes back into
+  focus, using only this computer's record (no extra call to Lunos Cloud). The official desktop app's
+  built-in server now enforces the disabled account too, as the CLI already did. <!-- XCOD-312 -->
+
 ### Changed
 
 - **Quitting Lunos with the sandbox gives you the shell back at once.** Handing the results back and

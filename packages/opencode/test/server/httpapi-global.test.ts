@@ -1,5 +1,10 @@
 import { NodeHttpServer } from "@effect/platform-node"
 import { describe, expect } from "bun:test"
+import fs from "fs/promises"
+import os from "os"
+import path from "path"
+import { Global } from "@opencode-ai/core/global"
+import { CloudDisabled } from "../../src/cloud/disabled"
 import { Context, Effect, Layer, Option } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -74,6 +79,30 @@ describe("global HttpApi", () => {
       )
 
       expect(response.status).toBe(400)
+    }),
+  )
+
+  // XCOD-312: the desktop and web app's disabled-account notice reads this machine's record.
+  it.live("tells the app whether the Lunos account is disabled", () =>
+    Effect.gen(function* () {
+      const data = Global.Path.data
+      const required = process.env.LUNOS_AUTH_REQUIRED
+      const home = yield* Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), "lunos-account-")))
+      ;(Global.Path as { data: string }).data = home
+      process.env.LUNOS_AUTH_REQUIRED = "1"
+      try {
+        const before = yield* HttpClientRequest.get(GlobalPaths.account).pipe(HttpClient.execute)
+        expect(before.status).toBe(200)
+        expect(yield* before.json).toEqual({})
+        yield* Effect.promise(() => CloudDisabled.record({ category: "payment", until: "2026-12-01T00:00:00.000Z" }))
+        const after = yield* HttpClientRequest.get(GlobalPaths.account).pipe(HttpClient.execute)
+        expect(yield* after.json).toEqual({ disabled: { category: "payment", until: "2026-12-01T00:00:00.000Z" } })
+      } finally {
+        ;(Global.Path as { data: string }).data = data
+        if (required === undefined) delete process.env.LUNOS_AUTH_REQUIRED
+        else process.env.LUNOS_AUTH_REQUIRED = required
+        yield* Effect.promise(() => fs.rm(home, { recursive: true, force: true }))
+      }
     }),
   )
 

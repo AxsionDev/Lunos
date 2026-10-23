@@ -96,6 +96,18 @@ export class DisabledError extends Error {
  * run without one); the TUI's own Welcome screen decides that part.
  */
 export async function refusal(env: NodeJS.ProcessEnv = process.env): Promise<string | undefined> {
+  const disabled = await active(env)
+  if (!disabled) return undefined
+  return `${DISABLED_TITLE}, so new prompts can't run. ${disabledLines(disabled).join(". ")}.`
+}
+
+/**
+ * The record, where this start needs a Lunos account (the same CloudGate as `refusal`), else
+ * undefined. What the desktop and web app show (`GET /global/account`): no network, only this
+ * machine's record, which the TUI, `lunos login` and the server's own Lunos Cloud calls (session
+ * sync, sharing) write.
+ */
+export async function active(env: NodeJS.ProcessEnv = process.env): Promise<Disabled | undefined> {
   const disabled = await load()
   if (!disabled) return undefined
   const managed = await ConfigManaged.readOnDiskDocs().catch(() => [] as unknown[])
@@ -105,6 +117,5 @@ export async function refusal(env: NodeJS.ProcessEnv = process.env): Promise<str
     env,
     tty: { stdin: true, stdout: true },
   })
-  if (!gate.required) return undefined
-  return `${DISABLED_TITLE}, so new prompts can't run. ${disabledLines(disabled).join(". ")}.`
+  return gate.required ? disabled : undefined
 }
