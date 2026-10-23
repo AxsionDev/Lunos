@@ -187,11 +187,14 @@ async function mount(input: {
   view: "monitor" | ((modules: Contexts) => JSX.Element)
   config?: Record<string, unknown>
   ready?: (frame: string) => boolean
+  /** XCOD-307: the terminal width (120 by default), and what kv.json starts with. */
+  width?: number
+  kv?: Record<string, unknown>
 }) {
   const tmp = await tmpdir()
   const state = path.join(tmp.path, "state")
   await mkdir(state, { recursive: true })
-  await Bun.write(path.join(state, "kv.json"), "{}")
+  await Bun.write(path.join(state, "kv.json"), JSON.stringify(input.kv ?? {}))
   const events = createEventSource()
   const base = createFetch(undefined, events)
   const fetch = (async (request: RequestInfo | URL, init?: RequestInit) => {
@@ -326,7 +329,7 @@ async function mount(input: {
     )
   }
 
-  const app = await testRender(() => <Harness />, { kittyKeyboard: true, width: 120, height: 45 })
+  const app = await testRender(() => <Harness />, { kittyKeyboard: true, width: input.width ?? 120, height: 45 })
   const frame = () => app.captureCharFrame()
   lastFrame = frame
   await wait(() => (input.ready ?? ((value) => value.includes("Agent Monitor") && value.includes("title w1")))(frame()))
@@ -1037,7 +1040,11 @@ test("XCOD-284: x on the rail deletes the selected session after the same confir
     await ui.arrow("down")
     await ui.arrow("down")
     await ui.key("x")
-    await wait(() => text().includes(`Delete "title f1" (project alpha, 5 messages)? This can't be undone.`))
+    // (The rail beside the dialog can show through on its first line, so the two are read apart.)
+    await wait(
+      () =>
+        text().includes(`Delete "title f1" (project alpha, 5 messages)?`) && text().includes("This can't be undone."),
+    )
     // Cancel is the default.
     await ui.enter()
     await Bun.sleep(100)
@@ -1056,3 +1063,169 @@ test("XCOD-284: x on the rail deletes the selected session after the same confir
     await ui.cleanup()
   }
 })
+
+// XCOD-307: hiding the right pane. The session view's pane (`useRightPane`, the » and « controls)
+// in a host beside a stand-in conversation that prints its width, and the Agent Monitor's list.
+async function paneHost(input: { width: number; kv?: Record<string, unknown>; waiting?: () => number }) {
+  const RightPaneUI = await import("../../src/component/right-pane")
+  const { useTerminalDimensions } = await import("@opentui/solid")
+  const { useTuiConfig } = await import("../../src/config")
+  const ui = await mount({
+    server: fakeServer({ sessions: [] }),
+    width: input.width,
+    kv: input.kv,
+    ready: (frame) => frame.includes("conversation"),
+    view: (modules) => {
+      const dimensions = useTerminalDimensions()
+      const config = useTuiConfig()
+      const pane = RightPaneUI.useRightPane({ key: () => "sidebar", wide: () => dimensions().width > 120 })
+      modules.useBindings(() => ({
+        commands: [{ namespace: "palette", name: "session.sidebar.toggle", title: "Toggle", run: pane.toggle }],
+      }))
+      // As the session view binds it.
+      modules.useBindings(() => ({
+        mode: modules.OPENCODE_BASE_MODE,
+        bindings: config.keybinds.gather("session", ["session.sidebar.toggle"]),
+      }))
+      return (
+        <box flexDirection="row" flexGrow={1}>
+          <box flexGrow={1}>
+            <text>
+              conversation {dimensions().width - pane.taken() - 4} cols, pane {pane.placement()}
+            </text>
+          </box>
+          <Show when={!pane.visible()}>
+            <RightPaneUI.PaneChip
+              count={input.waiting?.() ?? 0}
+              label={`${input.waiting?.() ?? 0} waiting for action`}
+              onOpen={pane.toggle}
+            />
+          </Show>
+          <Show when={pane.visible()}>
+            <box width={42} position={pane.placement() === "overlay" ? "absolute" : "relative"} right={0}>
+              <RightPaneUI.PaneHide onHide={pane.toggle} />
+            </box>
+          </Show>
+        </box>
+      )
+    },
+  })
+  const click = async (text: string) => {
+    const lines = ui.frame().split("\n")
+    const y = lines.findIndex((line) => line.includes(text))
+    if (y < 0) throw new Error(`no "${text}" on screen:\n${ui.frame()}`)
+    await ui.app.mockMouse.click(lines[y]!.indexOf(text), y)
+    await Bun.sleep(80)
+  }
+  const leader = async (key: string) => {
+    await ui.key("x", { ctrl: true })
+    await ui.key(key)
+  }
+  return { ...ui, click, leader }
+}
+
+test("XCOD-307: on 160 columns » hides the pane, the conversation takes its 42 columns, « brings it back", async () => {
+  const ui = await paneHost({ width: 160 })
+  try {
+    expect(ui.frame()).toContain("conversation 114 cols, pane docked")
+    expect(ui.frame()).toContain("hide pane ctrl+x b »")
+    await ui.click("»")
+    await wait(() => ui.frame().includes("conversation 156 cols, pane hidden"))
+    expect(ui.frame()).toContain("« show pane ctrl+x b")
+    expect((await ui.kv()).sidebar).toBe("hide")
+    await ui.click("«")
+    await wait(() => ui.frame().includes("conversation 114 cols, pane docked"))
+    expect((await ui.kv()).sidebar).toBe("auto")
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
+
+test("XCOD-307: the keybind does what the buttons do", async () => {
+  const ui = await paneHost({ width: 160 })
+  try {
+    await ui.leader("b")
+    await wait(() => ui.frame().includes("pane hidden"))
+    expect((await ui.kv()).sidebar).toBe("hide")
+    await ui.leader("b")
+    await wait(() => ui.frame().includes("pane docked"))
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
+
+test("XCOD-307: Hidden is kept across a restart (kv.json); Always show docks even on a narrow terminal", async () => {
+  const hidden = await paneHost({ width: 160, kv: { sidebar: "hide" } })
+  try {
+    expect(hidden.frame()).toContain("pane hidden")
+    expect(hidden.frame()).toContain("« show pane")
+  } finally {
+    await hidden.cleanup()
+  }
+  const shown = await paneHost({ width: 100, kv: { sidebar: "show" } })
+  try {
+    expect(shown.frame()).toContain("conversation 54 cols, pane docked")
+  } finally {
+    await shown.cleanup()
+  }
+}, 20_000)
+
+test("XCOD-307: Auto on a narrow terminal opens as an overlay, and closing it doesn't save Hidden", async () => {
+  const ui = await paneHost({ width: 100 })
+  try {
+    expect(ui.frame()).toContain("conversation 96 cols, pane hidden")
+    await ui.click("«")
+    // Over the conversation: its width doesn't change.
+    await wait(() => ui.frame().includes("conversation 96 cols, pane overlay"))
+    await ui.click("»")
+    await wait(() => ui.frame().includes("pane hidden"))
+    expect((await ui.kv()).sidebar).toBeUndefined()
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
+
+test("XCOD-307: with the pane hidden, a subagent waiting for action puts a badge on « within a second", async () => {
+  const [waiting, setWaiting] = createSignal(0)
+  const ui = await paneHost({ width: 160, kv: { sidebar: "hide" }, waiting })
+  try {
+    expect(ui.frame()).not.toContain("need")
+    setWaiting(1)
+    const start = Date.now()
+    await wait(() => ui.frame().includes("● 1 needs you"))
+    expect(Date.now() - start).toBeLessThan(1000)
+    setWaiting(2)
+    await wait(() => ui.frame().includes("● 2 need you"))
+    // Opening the pane clears the badge (it's in the pane now).
+    await ui.click("«")
+    await wait(() => ui.frame().includes("pane docked"))
+    expect(ui.frame()).not.toContain("need you")
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
+
+test("XCOD-307: the Agent Monitor's list hides with the pane keybind, « shows the waiting count, and it's kept apart", async () => {
+  const ui = await mount({ server: fakeServer({ sessions: fixture() }), view: "monitor", width: 160 })
+  try {
+    expect(ui.frame()).toContain("hide list ctrl+x b »")
+    expect(ui.frame()).toContain("Sessions on this computer")
+    await ui.key("x", { ctrl: true })
+    await ui.key("b")
+    await wait(() => !ui.frame().includes("Sessions on this computer"))
+    await wait(() => ui.frame().includes("« show sessions ctrl+x b ● 2 need you"))
+    const kv = await ui.kv()
+    expect(kv.monitor_rail).toBe("hide")
+    expect(kv.sidebar).toBeUndefined()
+    // Tab doesn't move focus to a hidden list.
+    await ui.tab()
+    expect(ui.frame()).not.toContain("Sessions on this computer")
+    const lines = ui.frame().split("\n")
+    const y = lines.findIndex((line) => line.includes("« show sessions"))
+    await ui.app.mockMouse.click(lines[y]!.indexOf("«"), y)
+    await wait(() => ui.frame().includes("Sessions on this computer"))
+    expect((await ui.kv()).monitor_rail).toBe("auto")
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)

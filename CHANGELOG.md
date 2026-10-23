@@ -21,6 +21,39 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Hide the right pane for more room, without missing anything in it.** Click `»` at the top of a
+  session's right pane, or press `ctrl+x b`, and the conversation, diffs and prompt take the full
+  width. `«` at the bottom-right brings the pane back, and while it's hidden it shows a coloured dot
+  and a count when something there needs you: a subagent waiting for action, a budget warning, or a
+  failed LSP or MCP server. Settings › Appearance › Layout › **Right pane** chooses Auto (the default,
+  as before), Always show or Hidden, and remembers it across restarts. Claude Code and Codex
+  sessions and the Agent Monitor's session list each remember their own choice.
+- **Tell from the sound alone what Lunos needs.** Settings › Notifications & sounds (`/settings
+notifications`) picks a sound for each event (finished, subagent finished, needs your approval,
+  question for you, waiting for action, budget warning, error), playing each one as you move
+  through the list. Choose from the 45 sounds the desktop app has, none, or a sound file of your
+  own, which is checked before it's saved. Volume, the sound pack and when desktop notifications
+  appear are set there too, and every change applies at once. "Mute / unmute sounds" is in the
+  command palette. In the desktop and web app, Settings › Sound effects gains a volume and sounds
+  for a subagent finishing, a question, and a subagent waiting for you (off until you choose one).
+- **Rename a session wherever you see it, and the name sticks.** Click the session's title in the
+  sidebar (or press `ctrl+r`) to edit it in place, press `r` on a session in the Agent Monitor, or
+  `ctrl+r` in `/sessions`, as well as `/rename`. A name you give is never replaced by the automatic
+  title, not on the first reply, after compaction or in a fork, even if you rename while the title
+  is still being generated. Names are one line of up to 80 characters; save an empty name to get the
+  automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
+  Lunos name. <!-- XCOD-308 -->
+- **See your sessions by project.** `/sessions` and the Agent Monitor's list switch between their
+  usual layout and one section per project with `ctrl+y` or a click on the view switch in the
+  header; the desktop and web Sessions window gains **By project** next to By status and By group.
+  Named projects come first, then repositories and folders, then "No project". Each section shows its
+  working, waiting and done sessions and the project's budget, and the project you're in is marked
+  "here". From a project's header you can start a new session in it, open its settings, or stop and
+  clear just that project. Each view remembers your choice; Groups stays the default.
+  <!-- XCOD-309 -->
+
 ### Changed
 
 - **Quitting Lunos with the sandbox gives you the shell back at once.** Handing the results back and
@@ -37,25 +70,6 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
   its output isn't a terminal. The "sandbox server …, workspace …" line is no longer printed on exit.
   On Windows the helper is started detached and without a console window, which hasn't been tested
   there yet. <!-- XCOD-301 -->
-
-### Fixed
-
-- **Quitting a TUI connected over HTTP (a sandbox, `lunos attach`) can no longer end in "Lunos
-  stopped because of an unexpected error: AbortError".** The cancelled event stream could be
-  reported as an unhandled error, which stopped Lunos before it handed a sandbox's results back and
-  left the container running. <!-- XCOD-301 -->
-### Added
-
-- **Tell from the sound alone what Lunos needs.** Settings › Notifications & sounds (`/settings
-notifications`) picks a sound for each event (finished, subagent finished, needs your approval,
-  question for you, waiting for action, budget warning, error), playing each one as you move
-  through the list. Choose from the 45 sounds the desktop app has, none, or a sound file of your
-  own, which is checked before it's saved. Volume, the sound pack and when desktop notifications
-  appear are set there too, and every change applies at once. "Mute / unmute sounds" is in the
-  command palette. In the desktop and web app, Settings › Sound effects gains a volume and sounds
-  for a subagent finishing, a question, and a subagent waiting for you (off until you choose one).
-### Changed
-
 - **Dev-Cycle no longer stalls between gates.** When a turn ends by announcing the next step ("Plan
   approved. Next I'll implement…") instead of taking it, Lunos continues by itself, and the
   transcript shows a dim "↻ Dev-Cycle continued automatically (plan approved → build)" line. It
@@ -77,25 +91,13 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   Turn it off with `/workflows off` for a session or `workflows.dynamic: false` in config, and the
   main agent works directly as before; the footer shows "Dynamic workflows: on/off". An
   organisation can lock it on or off. <!-- XCOD-303 -->
-### Added
 
-- **Rename a session wherever you see it, and the name sticks.** Click the session's title in the
-  sidebar (or press `ctrl+r`) to edit it in place, press `r` on a session in the Agent Monitor, or
-  `ctrl+r` in `/sessions`, as well as `/rename`. A name you give is never replaced by the automatic
-  title, not on the first reply, after compaction or in a fork, even if you rename while the title
-  is still being generated. Names are one line of up to 80 characters; save an empty name to get the
-  automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
-  Lunos name. <!-- XCOD-308 -->
-- **See your sessions by project.** `/sessions` and the Agent Monitor's list switch between their
-  usual layout and one section per project with `ctrl+y` or a click on the view switch in the
-  header; the desktop and web Sessions window gains **By project** next to By status and By group.
-  Named projects come first, then repositories and folders, then "No project". Each section shows its
-  working, waiting and done sessions and the project's budget, and the project you're in is marked
-  "here". From a project's header you can start a new session in it, open its settings, or stop and
-  clear just that project. Each view remembers your choice; Groups stays the default.
-  <!-- XCOD-309 -->
 ### Fixed
 
+- **Quitting a TUI connected over HTTP (a sandbox, `lunos attach`) can no longer end in "Lunos
+  stopped because of an unexpected error: AbortError".** The cancelled event stream could be
+  reported as an unhandled error, which stopped Lunos before it handed a sandbox's results back and
+  left the container running. <!-- XCOD-301 -->
 - **Esc Esc while the agent is working clears what you've typed first** instead of stopping the
   run, in the terminal app, `/claude` and `/codex` sessions and the Agent Monitor. Once the prompt is
   empty, Esc Esc stops the run as before, and the line under the prompt shows which it will do
