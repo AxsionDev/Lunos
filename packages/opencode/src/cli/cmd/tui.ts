@@ -257,7 +257,7 @@ export const TuiThreadCommand = cmd({
     const restarted = Restart.takeHandoff()
     StartupTrace.mark("tui command", { blocking: true })
     // XCOD-144: the server and everything it spawns run in a container; only the TUI stays here.
-    const { startsSandboxed, sandboxTui, sandboxOff, refuseHost, strictArg } = await StartupTrace.span(
+    const { startsSandboxed, sandboxTui, sandboxOff, sandboxHandback, refuseHost, strictArg } = await StartupTrace.span(
       "import sandbox",
       () => import("./sandbox"),
     )
@@ -310,6 +310,8 @@ export const TuiThreadCommand = cmd({
     // and right after the failure the toast.
     const sandboxHost =
       sandbox?.host ?? sandboxOff(resolveThreadDirectory(args.project), restarted?.sandbox, restarted?.queued)
+    // XCOD-301: results a background handoff here couldn't save: the toast, with or without the sandbox.
+    const handback = sandboxHandback(resolveThreadDirectory(args.project))
     if (args.replay === true) {
       UI.error("--replay is not supported; replay is enabled by default")
       process.exitCode = 1
@@ -487,6 +489,7 @@ export const TuiThreadCommand = cmd({
             },
             directory: sandbox?.directory ?? cwd,
             sandbox: sandboxHost,
+            handback,
             fetch: transport.fetch,
             headers: transport.headers,
             events: transport.events,
@@ -520,6 +523,9 @@ export const TuiThreadCommand = cmd({
       (startupProbe.quit ? process.stdout : process.stderr).write(StartupTrace.format() + "\n")
     // XCOD-281: the sandbox's results come back (or a sandbox still starting is kept) before anything else.
     await sandbox?.finish()
+    // XCOD-301: the unsaved-results toast's Attach: `lunos sandbox attach <id>` in this one's place.
+    const attach = handback?.attachRequested()
+    if (attach) await Restart.replace(["sandbox", "attach", attach])
     if (process.exitCode) Restart.reportFailedStart()
     // XCOD-129: the TUI has exited and the worker (MCP, LSP, memory sidecar, local server) is shut
     // down; start Lunos again in its place.

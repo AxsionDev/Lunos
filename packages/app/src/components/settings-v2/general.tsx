@@ -1,4 +1,5 @@
-import { Component, Show, createMemo, createResource } from "solid-js"
+import { Component, For, Show, createMemo, createResource } from "solid-js"
+import { stepVolume } from "@opencode-ai/ui/sounds"
 import { UpdaterProgress } from "@/components/updater-progress"
 import { createMediaQuery } from "@solid-primitives/media"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
@@ -68,7 +69,25 @@ const soundSettings = {
     title: "settings.general.sounds.errors.title",
     description: "settings.general.sounds.errors.description",
   },
+  subagent: {
+    action: "settings-sounds-subagent",
+    title: "settings.general.sounds.subagent.title",
+    description: "settings.general.sounds.subagent.description",
+  },
+  question: {
+    action: "settings-sounds-question",
+    title: "settings.general.sounds.question.title",
+    description: "settings.general.sounds.question.description",
+  },
+  waiting: {
+    action: "settings-sounds-waiting",
+    title: "settings.general.sounds.waiting.title",
+    description: "settings.general.sounds.waiting.description",
+  },
 } as const
+/** XCOD-311: the same event order as the TUI's Settings › Notifications & sounds. */
+const soundKinds = ["agent", "subagent", "permissions", "question", "waiting", "errors"] as const
+const volumeSteps = Array.from({ length: 11 }, (_, index) => index / 10)
 
 const PermissionScopeSetting: Component<{ controller: PermissionScopeController }> = (props) => {
   const language = useLanguage()
@@ -215,16 +234,36 @@ const SoundsSection: Component<{ controller: SoundSettingsController }> = (props
     <div class="settings-v2-section">
       <h3 class="settings-v2-section-title">{language.t("settings.general.section.sounds")}</h3>
       <SettingsListV2>
-        <SoundSetting kind="agent" channel={props.controller.agent} />
-        <SoundSetting kind="permissions" channel={props.controller.permissions} />
-        <SoundSetting kind="errors" channel={props.controller.errors} />
+        <VolumeSetting volume={props.controller.volume} />
+        <For each={soundKinds}>{(kind) => <SoundSetting kind={kind} channel={props.controller[kind]} />}</For>
       </SettingsListV2>
     </div>
   )
 }
 
+const VolumeSetting: Component<{ volume: SoundSettingsController["volume"] }> = (props) => {
+  const language = useLanguage()
+  return (
+    <SettingsRowV2
+      title={language.t("settings.general.sounds.volume.title")}
+      description={language.t("settings.general.sounds.volume.description")}
+    >
+      <SelectV2
+        appearance="inline"
+        data-action="settings-sounds-volume"
+        options={volumeSteps}
+        current={volumeSteps.find((step) => step === stepVolume(props.volume.current()))}
+        label={(step) => `${Math.round(step * 100)}%`}
+        onSelect={(step) => step !== undefined && step !== null && props.volume.select(step)}
+        placement="bottom-end"
+        gutter={6}
+      />
+    </SettingsRowV2>
+  )
+}
+
 const SoundSetting: Component<{
-  kind: "agent" | "permissions" | "errors"
+  kind: (typeof soundKinds)[number]
   channel: SoundSettingsController["agent"]
 }> = (props) => {
   const language = useLanguage()

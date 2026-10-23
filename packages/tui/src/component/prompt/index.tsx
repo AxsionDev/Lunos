@@ -39,6 +39,7 @@ import { useProject } from "../../context/project"
 import { useSync } from "../../context/sync"
 import { useEvent } from "../../context/event"
 import { useBudget } from "../budget-meter"
+import { workflowsLabel } from "../../util/workflows"
 import { editorSelectionKey, useEditorContext, type EditorSelection } from "../../context/editor"
 import { normalizePromptContent, openEditor } from "../../editor"
 import { EXIT_WORDS, exitIntent, useExternalExit } from "../external-exit"
@@ -234,6 +235,9 @@ export function Prompt(props: PromptProps) {
   const modeShortcut = useCommandShortcut("mode.cycle")
   const paletteShortcut = useCommandShortcut("command.palette.show")
   const undoShortcut = useCommandShortcut("input.undo")
+  const interruptShortcut = useCommandShortcut("session.interrupt")
+  // The hint line's stop key, from the keybinds; the default reads "esc", as the clear key does.
+  const stopKey = () => (interruptShortcut() || "escape").replace(/^escape$/, "esc")
   const renderer = useRenderer()
   const externalExit = useExternalExit()
   const dimensions = useTerminalDimensions()
@@ -337,6 +341,17 @@ export function Prompt(props: PromptProps) {
 
   // XCOD-298: the next turn's estimate against what's left of the project's budget.
   const budget = useBudget(() => props.sessionID)
+  // XCOD-303: whether Build / Dev-Cycle dispatch subagents to do the work (/workflows on|off).
+  const workflows = createMemo(() => {
+    if (external()) return
+    const session = props.sessionID ? sync.session.get(props.sessionID) : undefined
+    return workflowsLabel({
+      agent: local.mode.current()?.name,
+      config: sync.data.config as Parameters<typeof workflowsLabel>[0]["config"],
+      metadata: session?.metadata as Record<string, unknown> | undefined,
+      child: !!session?.parentID,
+    })
+  })
   const usage = createMemo(() => {
     if (!props.sessionID) return
     const session = sync.session.get(props.sessionID)
@@ -481,6 +496,8 @@ export function Prompt(props: PromptProps) {
             return
           }
           if (!props.sessionID) return
+          // XCOD-313: with text in the prompt, Esc Esc clears it first (escapeClear); the run is untouched.
+          if (escapeClears()) return
 
           setStore("interrupt", store.interrupt + 1)
 
@@ -912,19 +929,12 @@ export function Prompt(props: PromptProps) {
     }
   })
 
-  // XCOD-255: Esc twice clears the prompt while the session is idle. Busy, Esc Esc interrupts
-  // (session.interrupt) and the text stays. Autocomplete and shell mode take their Esc first, so
-  // that press never counts as the first of two.
+  // XCOD-255/313: Esc twice clears the prompt, idle or busy: the typed text is the innermost thing Esc
+  // can undo. Only on an empty prompt does Esc Esc reach session.interrupt and stop the run.
+  // Autocomplete and shell mode take their Esc first, so that press never counts as the first of two.
   useBindings(() => ({
     target: inputTarget,
-    enabled:
-      inputTarget() !== undefined &&
-      !props.disabled &&
-      tuiConfig.double_escape_clear &&
-      status().type === "idle" &&
-      store.mode === "normal" &&
-      !auto()?.visible &&
-      hasContent(),
+    enabled: inputTarget() !== undefined && !props.disabled && escapeClears(),
     bindings: [{ key: "escape", desc: "Clear prompt (press twice)", group: "Prompt", cmd: escapeClear }],
   }))
 
@@ -1834,6 +1844,9 @@ export function Prompt(props: PromptProps) {
   }
 
   const hasContent = () => store.prompt.input !== "" || store.prompt.parts.length > 0
+  /** Esc goes to clearing the prompt (XCOD-255/313), idle or busy, rather than to session.interrupt. */
+  const escapeClears = () =>
+    tuiConfig.double_escape_clear && store.mode === "normal" && !auto()?.visible && hasContent()
   const escapeGuard = createDoublePress(() => tuiConfig.double_escape_ms)
   const [escapeArmed, setEscapeArmed] = createSignal(false)
   const [cleared, setCleared] = createSignal<{ prompt: PromptInfo; mode: "normal" | "shell"; cursor: number }>()
@@ -1847,6 +1860,9 @@ export function Prompt(props: PromptProps) {
   }
 
   function escapeClear() {
+    // A press spent on the prompt never counts toward stopping the run (session.interrupt), so an Esc
+    // straight after a clear can't abort it.
+    setStore("interrupt", 0)
     // A selection is the innermost thing Esc can undo: drop it, and don't count the press.
     if (input.hasSelection()) {
       input.clearSelection()
@@ -2232,10 +2248,17 @@ export function Prompt(props: PromptProps) {
                     })()}
                   </box>
                 </box>
-                <text fg={store.interrupt > 0 ? theme.primary : theme.text}>
-                  esc{" "}
-                  <span style={{ fg: store.interrupt > 0 ? theme.primary : theme.textMuted }}>
-                    {store.interrupt > 0 ? "again to interrupt" : "interrupt"}
+                {/* XCOD-313: Esc Esc clears typed text first; only on an empty prompt does it stop the run. */}
+                <text fg={escapeArmed() || store.interrupt > 0 ? theme.primary : theme.text}>
+                  {escapeClears() ? "esc" : stopKey()}{" "}
+                  <span style={{ fg: escapeArmed() || store.interrupt > 0 ? theme.primary : theme.textMuted }}>
+                    {escapeClears()
+                      ? escapeArmed()
+                        ? "again to clear"
+                        : "esc clear"
+                      : store.interrupt > 0
+                        ? "again to stop"
+                        : `${stopKey()} stop`}
                   </span>
                 </text>
               </box>
@@ -2347,11 +2370,19 @@ export function Prompt(props: PromptProps) {
               </Show>
               <Switch>
                 <Match when={store.mode === "normal"}>
+                  {/* XCOD-303: before the first turn there's no usage line to carry it. */}
+                  <Show when={!usage() && workflows()}>
+                    {(label) => (
+                      <text fg={theme.textMuted} wrapMode="none">
+                        {label()}
+                      </text>
+                    )}
+                  </Show>
                   <Switch>
                     <Match when={usage()}>
                       {(item) => (
                         <text fg={theme.textMuted} wrapMode="none">
-                          {[item().context, item().cost, budget()?.line].filter(Boolean).join(" · ")}
+                          {[item().context, item().cost, budget()?.line, workflows()].filter(Boolean).join(" · ")}
                         </text>
                       )}
                     </Match>

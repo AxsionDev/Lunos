@@ -20,6 +20,11 @@ function getAudio() {
   }
 }
 
+/** Whether this terminal session has audio at all (none in headless runs). */
+export function available() {
+  return getAudio() !== null
+}
+
 export function loadSoundFile(file: string) {
   const current = getAudio()
   if (!current) return Promise.resolve(null)

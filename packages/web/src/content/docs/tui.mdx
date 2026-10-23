@@ -66,7 +66,7 @@ The output of the command is added to the conversation as a tool result.
 Press `Esc` twice to clear what you've typed and start again. The first `Esc` shows "esc again to clear" under the prompt; a second within a second clears the text, pasted blocks and `@` references.
 
 - Nothing is lost: the toast names the undo key (`input_undo`, `ctrl+-` by default, plus `ctrl+z` where the terminal doesn't use it to suspend), which brings the prompt back as it was, and `↑` finds it in prompt history.
-- While the agent is working, `Esc` `Esc` stops it as before, and what you've typed stays.
+- While the agent is working, `Esc` `Esc` clears what you've typed first and the agent keeps going. With the prompt empty, `Esc` `Esc` stops it (`session_interrupt`). The line under the prompt says which: `esc esc clear` or `esc esc stop`.
 - An `Esc` that closes autocomplete, leaves shell mode or clears a selection doesn't count as the first press.
 - It works the same in `/claude` and `/codex` sessions; the prompt is cleared in Lunos and nothing is sent to the tool.
 - Turn it off with `"double_escape_clear": false`, or change the window with `double_escape_ms`. `ctrl+c` (`input_clear`) still clears the prompt at once.
@@ -328,6 +328,13 @@ waiting for approval opens at its prompt) or collapses and expands a group. `ctr
 to a group or to another [project](#projects), `ctrl+g` creates a group, `ctrl+r` renames a session
 or group, `ctrl+d` (twice) deletes a group without touching its sessions, `ctrl+s` stops a running
 session and `ctrl+f` cycles the state filter.
+
+`ctrl+y` (or a click on **View: Groups | Projects** in the header) switches to one section per
+project: named projects first, then repositories and folders, then "No project". Each header shows
+what its sessions are doing and the project's budget, if it has one; the project you're in is open
+and marked "here". On a project's header, **Enter** collapses it, `n` starts a new session in it, `p`
+opens its settings, and Stop all, Clear list and Delete all shown act on that project alone. The
+view you chose is remembered. The Agent Monitor's list has the same switch (**Status | Projects**).
 
 ---
 
@@ -725,14 +732,18 @@ Use `OPENCODE_TUI_CONFIG` to load a custom TUI config path.
 
 ### Attention
 
-The TUI can request attention for questions, permissions, session errors, and completed sessions. Enable it with `attention.enabled`; built-in events play sounds when triggered, and non-subagent events request desktop notifications only when the terminal is blurred.
+The TUI can request attention for questions, permissions, session errors, completed sessions, subagents waiting for you, and budget warnings. Enable it with `attention.enabled`; built-in events play sounds when triggered, and non-subagent events request desktop notifications only when the terminal is blurred (see `notify_when`).
+
+Everything here can be set in `/settings notifications` (Settings › Notifications & sounds): a sound per event, previewed as you move through the list, the volume, a custom file, and the desktop notification options. Changes there apply at once. "Mute / unmute sounds" in the command palette switches `sound` (no key is bound to it by default; `app_toggle_sounds`).
 
 - `enabled` - Enable all attention notifications and sounds. Defaults to `false`.
 - `notifications` - Allow terminal-mediated desktop notifications when attention is enabled. Defaults to `true`.
 - `sound` - Allow attention sounds when attention is enabled. Defaults to `true`.
 - `volume` - Default sound volume from `0` to `1`. Defaults to `0.4`.
 - `sound_pack` - Sound pack ID to use. Defaults to `opencode.default`.
-- `sounds` - Override sound files for `default`, `question`, `permission`, `error`, `done`, or `subagent_done`. Paths can be absolute, `file://` URLs, or relative to `tui.json`.
+- `sounds` - The sound per event: `done`, `subagent_done`, `permission`, `question`, `waiting` (a subagent waiting for your approval or answer), `budget_warning`, `error`, or `default` (anything else). Each value is a bundled sound ID (`alert-01`–`alert-10`, `bip-bop-01`–`bip-bop-10`, `staplebops-01`–`staplebops-07`, `nope-01`–`nope-12`, `yup-01`–`yup-06`, the same as the desktop app's), `"none"` for silence, or a path to an `.mp3`, `.aac` or `.wav` file. Paths can be absolute, `file://` URLs, or relative to `tui.json`.
+- `notify_when` - `"blurred"` sends desktop notifications only while Lunos is in the background, `"always"` even while it's in front. Defaults to `"blurred"`.
+- `notify_subagents` - A subagent finishing also sends a desktop notification. Defaults to `false`.
 
 ---
 

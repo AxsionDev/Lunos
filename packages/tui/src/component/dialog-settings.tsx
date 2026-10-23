@@ -44,6 +44,9 @@ import { StatusServers } from "./dialog-status"
 import { DialogAccount } from "./dialog-account"
 import { DialogProject, DialogProjects, folderCount } from "./dialog-projects"
 import { AccountContext } from "../context/account"
+import { useTuiConfig } from "../config"
+import { applySaved, packName, packSound, useSoundSettingsEditor } from "./dialog-sound-settings"
+import * as SoundSettings from "../util/sound-settings"
 import {
   AGENT_NAME,
   TABS,
@@ -262,6 +265,8 @@ export function DialogSettings(props: {
     // The home lists sections; typed words search every setting. Inside a section, the sub-tab's
     // rows, and a search covers the whole section.
     if (atHome() && !query()) return []
+    if (props.area === SoundSettings.AREA)
+      return SoundSettings.orderRows(query() ? visible() : visible().filter((row) => row.sub === sub()))
     if (props.area && !query() && tabsOf().length) return visible().filter((row) => row.sub === sub())
     return visible()
   })
@@ -536,6 +541,9 @@ export function DialogSettings(props: {
 
   /** XCOD-233: a screen opened from row `key`; ← comes back to the list with that row highlighted. */
   const backTo = (key: string) => ({ back: () => reopen(key), generation })
+  // XCOD-311: Notifications & sounds' volume, pack and per-event sound pickers.
+  const tuiConfig = useTuiConfig()
+  const soundEditor = useSoundSettingsEditor({ save: (...args) => save(...args), reopen, backTo })
 
   /** XCOD-306: the project's theme, for just you (this computer) or shared (the project's tui.json). */
   function pickProjectTheme() {
@@ -663,6 +671,9 @@ export function DialogSettings(props: {
       return false
     }
     if (row.key === "tui.theme" && typeof data.value === "string") themeState.set(data.value)
+    // XCOD-311: alerts read their config on every alert; this makes the change heard at once.
+    if (row.key.startsWith(SoundSettings.PREFIX))
+      applySaved(tuiConfig.attention, row.key, options.unset ? undefined : data.value)
     // XCOD-297: turned off. Saved on this computer (by the host when this is a sandbox), and the
     // restart starts without it; it isn't asked about, since the toast says it happens.
     if (row.key === "sandbox.enabled" && data.value === false && !options.unset && data.changed) {
@@ -824,6 +835,7 @@ export function DialogSettings(props: {
         backTo(row.key),
       )
     if (refuse(row)) return
+    if (soundEditor.edit(row)) return
     if (row.dialog === "themes") {
       dialog.replace(
         () => (
@@ -1106,7 +1118,10 @@ export function DialogSettings(props: {
           : // XCOD-264: where memory is stored, in plain words; the config value stays "embedded".
             row.key === "memory.backend.type"
             ? MemoryStorage.short({ type: row.display || undefined })
-            : row.display) + (variantProblem(row) || agentProblem(row) ? " ⚠" : "")
+            : // XCOD-311: "60%", "Alert 04", "Custom: chime.wav", not the raw config values.
+              row.key.startsWith(SoundSettings.PREFIX)
+              ? SoundSettings.display(row, { packSound, packName })
+              : row.display) + (variantProblem(row) || agentProblem(row) ? " ⚠" : "")
       const flags = [row.restart ? "↻" : "", row.source === "env" ? "env" : ""].filter(Boolean).join(" ")
       const right = `${value.length > 22 ? value.slice(0, 21) + "…" : value}  ${badge(row)}${flags ? " " + flags : ""}`
       return {
@@ -1317,6 +1332,13 @@ export function DialogSettings(props: {
       })
     else if (row.secret)
       lines.push({ text: "Secrets are never shown here: manage keys in /providers", color: theme.textMuted })
+    else if (row.key.startsWith(SoundSettings.SOUNDS_PREFIX))
+      lines.push({
+        text: "Enter lists the sounds; each plays as it's highlighted. None, a file of your own, or the pack's default.",
+        color: theme.textMuted,
+      })
+    else if (props.area === SoundSettings.AREA && !tuiConfig.attention.enabled && row.key !== "tui.attention.enabled")
+      lines.push({ text: "Alerts are off, so nothing plays or notifies until they're on", color: theme.warning })
     else if (row.key === "agent")
       lines.push({ text: `Enter lists every agent. ${AGENTS_HELP}`, color: theme.textMuted })
     else if (row.key === "mode")

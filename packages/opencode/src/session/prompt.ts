@@ -46,7 +46,7 @@ import { decodeDataUrl } from "@/util/data-url"
 import { Process } from "@/util/process"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { InstanceState } from "@/effect/instance-state"
-import { TaskTool, type TaskPromptOps } from "@/tool/task"
+import { TaskTool, DEFAULT_MAX_PARALLEL, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -57,6 +57,10 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { eq } from "drizzle-orm"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
+import { AutoContinue } from "./auto-continue"
+import { DevCycle } from "./dev-cycle"
+import { DynamicWorkflows } from "./workflows"
+import { BackgroundJob } from "@/background/job"
 import { Memory } from "@/memory"
 import { MemorySources } from "@/memory/sources"
 import { Resource } from "@/resource"
@@ -68,6 +72,7 @@ import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
 import { Budget } from "@/budget"
+import { BUDGET_TOAST_TITLE } from "@opencode-ai/tui/util/budget-toast"
 import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
@@ -94,6 +99,7 @@ IMPORTANT:
 - This tool provides your final answer - no further actions are taken after calling it`
 
 import BUILD_PROOF from "./prompt/build-proof.txt"
+import QA_PROOF from "./prompt/qa-proof.txt"
 import { BackgroundShell } from "@/tool/shell/background"
 
 type VerifyConfig = {
@@ -106,34 +112,61 @@ type VerifyConfig = {
   timeout?: number
 }
 
+/** XCOD-288: the checks a project pins in `verify`, one line each. */
+export function verifyChecks(verify: VerifyConfig | undefined) {
+  const v = verify ?? {}
+  return [
+    v.build ? `- build: \`${v.build}\`` : undefined,
+    v.test ? `- test: \`${v.test}\`` : undefined,
+    v.start ? `- start (in the background): \`${v.start}\`` : undefined,
+    v.ready ? `- ready when this answers: ${v.ready}` : undefined,
+    ...(v.check ?? []).map((check) => `- check: ${check}`),
+  ].filter((line): line is string => line !== undefined)
+}
+
 /**
  * XCOD-288: the build agent finishes with proof (it builds, tests, starts and tries what it changed)
  * rather than asking the user to test. Not for other agents, not where the shell is denied, and not
  * when `agent.build.verify` is false. Commands pinned in `verify` replace what it would look up.
+ * XCOD-303: nor in a Dynamic workflow, where the main agent has no shell and `qa` verifies instead.
  */
 export function buildProof(
   agent: { name: string; permission: PermissionV1.Ruleset },
   session?: PermissionV1.Ruleset,
   cfg: { verify?: VerifyConfig; agent?: Record<string, { verify?: boolean } | undefined> } = {},
+  dynamic = false,
 ) {
-  if (agent.name !== "build") return
+  if (agent.name !== "build" || dynamic) return
   if (cfg.agent?.[agent.name]?.verify === false) return
   const ruleset = Permission.merge(agent.permission, session ?? [])
   if (Permission.disabled([ShellID.ToolID], ruleset).has(ShellID.ToolID)) return
   const verify = cfg.verify ?? {}
-  const pinned = [
-    verify.build ? `- build: \`${verify.build}\`` : undefined,
-    verify.test ? `- test: \`${verify.test}\`` : undefined,
-    verify.start ? `- start (in the background): \`${verify.start}\`` : undefined,
-    verify.ready ? `- ready when this answers: ${verify.ready}` : undefined,
-    ...(verify.check ?? []).map((check) => `- check: ${check}`),
-  ].filter((line): line is string => line !== undefined)
+  const pinned = verifyChecks(verify)
   return BUILD_PROOF.replace(
     "${pinned}",
     pinned.length ? `\n\nThis project pins these; use them instead of looking for your own:\n${pinned.join("\n")}` : "",
   )
     .replace("${attempts}", String(verify.max_attempts ?? 3))
     .replace("${minutes}", String(verify.timeout ?? 10))
+}
+
+/**
+ * XCOD-303: the `qa` subagent verifies the same way and ends with the same Verification block, but
+ * reports a failure rather than fixing it. Not where its shell is denied.
+ */
+export function qaProof(
+  agent: { name: string; permission: PermissionV1.Ruleset },
+  session?: PermissionV1.Ruleset,
+  cfg: { verify?: VerifyConfig } = {},
+) {
+  if (agent.name !== "qa") return
+  if (Permission.disabled([ShellID.ToolID], Permission.merge(agent.permission, session ?? [])).has(ShellID.ToolID))
+    return
+  const pinned = verifyChecks(cfg.verify)
+  return QA_PROOF.replace(
+    "${pinned}",
+    pinned.length ? `\n\nThis project pins these; use them instead of looking for your own:\n${pinned.join("\n")}` : "",
+  )
 }
 
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
@@ -200,6 +233,7 @@ const layer = Layer.effect(
     const resources = yield* Resource.Service
     const skill = yield* Skill.Service
     const question = yield* Question.Service
+    const jobs = yield* BackgroundJob.Service
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
     const { db } = database
@@ -259,13 +293,16 @@ const layer = Layer.effect(
       modelID: ModelV2.ID
     }) {
       if (input.session.parentID) return
+      // XCOD-308: a name the user gave is never replaced.
+      if (Session.titleSource(input.session) === "user") return
       if (!Session.isDefaultTitle(input.session.title)) return
 
       const real = (m: SessionV1.WithParts) =>
         m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic)
       const idx = input.history.findIndex(real)
       if (idx === -1) return
-      if (input.history.filter(real).length !== 1) return
+      // Only on the first prompt, unless the user cleared the name (then on the next turn).
+      if (input.history.filter(real).length !== 1 && !Session.titleReset(input.session)) return
 
       const context = input.history.slice(0, idx + 1)
       const firstUser = context[idx]
@@ -310,7 +347,8 @@ const layer = Layer.effect(
       if (!cleaned) return
       const t = cleaned.length > 100 ? cleaned.substring(0, 97) + "..." : cleaned
       yield* sessions
-        .setTitle({ sessionID: input.session.id, title: t })
+        // Only over the title it started from: a rename made while this was generated wins.
+        .setTitle({ sessionID: input.session.id, title: t, source: "auto", replace: input.session.title })
         .pipe(Effect.catchCause((cause) => Effect.logError("failed to generate title", { error: Cause.squash(cause) })))
     })
 
@@ -1209,7 +1247,9 @@ const layer = Layer.effect(
         ),
       )
       const toast = (message: string, variant: "warning" | "error" = "warning") =>
-        events.publish(TuiEvent.ToastShow, { title: "Budget", message, variant, duration: 10000 }).pipe(Effect.ignore)
+        events
+          .publish(TuiEvent.ToastShow, { title: BUDGET_TOAST_TITLE, message, variant, duration: 10000 })
+          .pipe(Effect.ignore)
       for (const message of decision.toasts) yield* toast(message)
       if (decision.action === "run") return "run" as const
       if (decision.action === "warn") {
@@ -1269,6 +1309,125 @@ const layer = Layer.effect(
       return "stop" as const
     })
 
+    /**
+     * XCOD-302: when a Dev-Cycle or Build turn ends by announcing its next step instead of taking
+     * it, send an internal continuation rather than wait for "proceed". Returns whether it did (the
+     * loop then runs another step). Never past a pending gate; at most `AutoContinue.MAX` in a row
+     * without progress, then the human is asked.
+     */
+    const autoContinue = Effect.fn("SessionPrompt.autoContinue")(function* (input: {
+      sessionID: SessionID
+      session: Session.Info
+      msgs: SessionV1.WithParts[]
+      lastUser: SessionV1.User
+      step: number
+    }) {
+      // Not for subagents: their parent reads the result and carries on itself.
+      if (input.session.parentID) return false
+      // XCOD-303: nor while subagents it dispatched in the background still run: each one's result
+      // resumes the session when it lands, so a turn that ends waiting for them hasn't stalled.
+      const running = (yield* jobs.list()).some(
+        (job) => job.status === "running" && job.metadata?.parentSessionId === input.sessionID,
+      )
+      if (running) return false
+      const agent = yield* agents.get(input.lastUser.agent)
+      if (!agent || (agent.name !== "dev-cycle" && agent.name !== "build")) return false
+      const cfg = yield* config.get()
+      const cycle = agent.name === "dev-cycle"
+      if (cycle ? cfg.dev_cycle?.auto_continue === false : cfg.agent?.[agent.name]?.auto_continue === false)
+        return false
+      const title = cycle ? "Dev-Cycle" : "Build"
+
+      let position: AutoContinue.Position = { unknown: false, done: false, pending: false }
+      let file: string | undefined
+      if (cycle) {
+        file = Session.devcycle(input.session, yield* InstanceState.context)
+        const exists = yield* fsys.existsSafe(file)
+        const contents = exists
+          ? yield* fsys.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
+          : undefined
+        position = DevCycle.position({ exists, contents })
+      }
+      // Continuations count against the step limit like any step; at the limit the turn stops.
+      const stop = AutoContinue.classify({
+        messages: input.msgs,
+        position,
+        emptyStalls: cycle,
+        limit: input.step >= (agent.steps ?? Infinity) ? "step limit" : undefined,
+      })
+      if (stop.kind !== "stalled") {
+        if (stop.kind !== "finished")
+          yield* Effect.logInfo("auto-continue: stopped", { "session.id": input.sessionID, stop: stop.kind })
+        return false
+      }
+
+      const send = (text: string, metadata: Record<string, unknown>, synthetic: boolean) =>
+        Effect.gen(function* () {
+          const message = yield* sessions.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: input.sessionID,
+            time: { created: Date.now() },
+            agent: input.lastUser.agent,
+            model: input.lastUser.model,
+            ...(input.lastUser.format ? { format: input.lastUser.format } : {}),
+            ...(input.lastUser.system ? { system: input.lastUser.system } : {}),
+            ...(input.lastUser.tools ? { tools: input.lastUser.tools } : {}),
+          })
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: message.id,
+            sessionID: input.sessionID,
+            type: "text",
+            text,
+            synthetic,
+            metadata,
+            time: { start: Date.now(), end: Date.now() },
+          })
+        })
+
+      const attempt = AutoContinue.streak(input.msgs)
+      if (attempt >= AutoContinue.MAX) {
+        const CONTINUE = "Continue"
+        const OPEN = "Open cycle file"
+        const answers = yield* question
+          .ask({
+            sessionID: input.sessionID,
+            questions: [
+              {
+                header: title,
+                question: AutoContinue.gaveUp(title),
+                custom: false,
+                options: [
+                  { label: CONTINUE, description: "Try again" },
+                  cycle
+                    ? { label: OPEN, description: `Stop, and open the cycle file${file ? ` (${file})` : ""}` }
+                    : { label: "Stop", description: "Leave it here" },
+                ],
+              },
+            ],
+          })
+          .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<ReadonlyArray<string>>)))
+        const answer = answers[0]?.[0]
+        yield* Effect.logInfo("auto-continue: no progress", { "session.id": input.sessionID, answer })
+        if (answer === OPEN)
+          yield* events.publish(TuiEvent.CommandExecute, { command: "artifact.list" }).pipe(Effect.ignore)
+        if (answer !== CONTINUE) return false
+        // The human pressed Continue: a fresh start for the streak, and never an approval of a gate.
+        yield* send("Continue.", { [AutoContinue.RESUME]: true }, false)
+        return true
+      }
+
+      const line = AutoContinue.line(title, stop.label)
+      yield* send(
+        AutoContinue.prompt({ gated: cycle, note: stop.note }),
+        { [AutoContinue.METADATA]: { label: line, attempt: attempt + 1 } },
+        true,
+      )
+      yield* Effect.logInfo("auto-continue", { "session.id": input.sessionID, line, attempt: attempt + 1 })
+      return true
+    })
+
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
         const ctx = yield* InstanceState.context
@@ -1316,6 +1475,8 @@ const layer = Layer.effect(
                 callID: orphan.callID,
               })
             }
+            // XCOD-302: only a turn this loop ran; resuming an idle session never re-continues an old one.
+            if (!orphan && step > 0 && (yield* autoContinue({ sessionID, session, msgs, lastUser, step }))) continue
             yield* Effect.logInfo("exiting loop", { "session.id": sessionID })
             break
           }
@@ -1380,15 +1541,28 @@ const layer = Layer.effect(
           const isLastStep = step >= maxSteps
           // XCOD-287: Build's nudge to split development work across subagents.
           const stepConfig = yield* config.get()
-          const delegate = SessionReminders.delegates({
-            agent,
-            session,
+          const subagents = (yield* agents.list()).filter((item) => item.mode !== "primary")
+          const stepBackground = backgroundEnabled(flags.experimentalBackgroundSubagents, stepConfig)
+          // XCOD-303: Dynamic workflows, read every step so `/workflows on|off` applies to the next one.
+          const dynamic = DynamicWorkflows.decide({
             config: stepConfig,
-            subagents: (yield* agents.list()).filter((item) => item.mode !== "primary"),
-          })
-            ? SessionReminders.delegateReminder(backgroundEnabled(flags.experimentalBackgroundSubagents, stepConfig))
-            : undefined
-          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session, delegate }).pipe(
+            agent,
+            session: {
+              ...session,
+              metadata: (yield* sessions.get(sessionID).pipe(Effect.orDie)).metadata,
+            },
+            subagents,
+          }).on
+          const delegate =
+            dynamic && agent.name === "build"
+              ? SessionReminders.dynamicReminder({
+                  background: stepBackground,
+                  maxParallel: stepConfig.subagent?.max_parallel ?? DEFAULT_MAX_PARALLEL,
+                })
+              : !dynamic && SessionReminders.delegates({ agent, session, config: stepConfig, subagents })
+                ? SessionReminders.delegateReminder(stepBackground)
+                : undefined
+          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session, delegate, dynamic }).pipe(
             Effect.provideService(RuntimeFlags.Service, flags),
             Effect.provideService(FSUtil.Service, fsys),
             Effect.provideService(Session.Service, sessions),
@@ -1519,6 +1693,15 @@ const layer = Layer.effect(
             )
             // XCOD-157: with sandbox.required, no tool runs outside a sandbox, whatever started this session.
             SandboxGuard.guard(tools, (yield* config.get()).sandbox, sessionID)
+            // XCOD-303: in a Dynamic workflow the main agent coordinates and subagents do the work: no
+            // edit, write or command tool reaches the model. Dev-Cycle keeps editing its own cycle file.
+            if (dynamic) {
+              const dropped = DynamicWorkflows.gate(tools, {
+                directory: ctx.directory,
+                ...(agent.name === "dev-cycle" ? { allowFile: Session.devcycle(session, ctx) } : {}),
+              })
+              if (step === 1) yield* Effect.logInfo("dynamic workflow", { "session.id": sessionID, dropped })
+            }
 
             if (lastUser.format?.type === "json_schema") {
               tools["StructuredOutput"] = createStructuredOutputTool({
@@ -1541,7 +1724,10 @@ const layer = Layer.effect(
               sys.mcp(agent, session.permission),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
-            const proof = buildProof(agent, session.permission, yield* config.get())
+            const proofConfig = yield* config.get()
+            const proof =
+              buildProof(agent, session.permission, proofConfig, dynamic) ??
+              qaProof(agent, session.permission, proofConfig)
             // XCOD-300: the project's resources: the list (with how to reach each) and the Always ones in full.
             const projectResources = yield* resources.system(sessionID).pipe(
               Effect.orElseSucceed(() => ({
@@ -1719,6 +1905,48 @@ const layer = Layer.effect(
           model: input.model ? Provider.parseModel(input.model) : yield* currentModel(input.sessionID),
           agent: input.agent,
           parts: [{ type: "text", text: `/memory${arg ? " " + input.arguments.trim() : ""}\n\n${status}` }],
+          noReply: true,
+        })
+      }
+
+      // XCOD-303: /workflows off | on switches Dynamic workflows for this session (session metadata,
+      // read by the loop every step) and records that in the transcript without calling a model. An
+      // organisation lock can't be overridden: the attempt is refused and the reason shown.
+      if (input.command === Command.Default.WORKFLOWS) {
+        const arg = input.arguments.trim().toLowerCase()
+        const cfg = yield* config.get()
+        const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+        const before = DynamicWorkflows.setting({
+          config: cfg,
+          session: DynamicWorkflows.sessionValue(current.metadata),
+        })
+        let refusal = ""
+        if (arg === "off" || arg === "on") {
+          if (before.locked) {
+            yield* ConfigPolicy.refused(DynamicWorkflows.KEY, "/workflows")
+            refusal = `Can't turn Dynamic workflows ${arg}: ${ConfigPolicy.message(DynamicWorkflows.KEY)}.\n\n`
+          } else
+            yield* sessions.setMetadata({
+              sessionID: input.sessionID,
+              metadata: DynamicWorkflows.withSessionValue(current.metadata, arg === "on"),
+            })
+        }
+        // A lock wins over the session value, so after a refusal this still reads the lock.
+        const after = DynamicWorkflows.setting({
+          config: cfg,
+          session: arg === "off" || arg === "on" ? arg === "on" : DynamicWorkflows.sessionValue(current.metadata),
+        })
+        const status = `${refusal}Dynamic workflows: ${after.on ? "on" : "off"} (${after.reason}).${
+          after.on
+            ? " Build and Dev-Cycle plan the work and dispatch subagents to do it; the main agent doesn't edit, write or run commands itself."
+            : " The main agent does the work itself; subagents stay available."
+        }`
+        return yield* prompt({
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          model: input.model ? Provider.parseModel(input.model) : yield* currentModel(input.sessionID),
+          agent: input.agent,
+          parts: [{ type: "text", text: `/workflows${arg ? " " + arg : ""}\n\n${status}` }],
           noReply: true,
         })
       }
@@ -2049,6 +2277,7 @@ export const node = LayerNode.make({
     Resource.node,
     Skill.node,
     Question.node,
+    BackgroundJob.node,
   ],
 })
 

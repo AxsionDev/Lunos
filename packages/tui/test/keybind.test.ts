@@ -111,4 +111,6 @@ test("the Agent Monitor's keys collide with neither each other, the leader nor X
   expect(TuiKeybind.defaultValue("monitor.takeover")).toBe("t")
   // XCOD-284: Delete on the rail: d is deny and ctrl+d exits the app outside a dialog.
   expect(TuiKeybind.defaultValue("monitor.delete")).toBe("x,delete")
+  // XCOD-308: Rename on the rail is r (ctrl+r renames in /sessions and the session view).
+  expect(TuiKeybind.defaultValue("monitor.rename")).toBe("r")
 })

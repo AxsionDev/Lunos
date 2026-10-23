@@ -136,6 +136,8 @@ it.live("tool execution produces non-empty session diff (snapshot race)", () =>
       const session = yield* sessions.create({
         title: "snapshot race test",
         permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        // XCOD-303: the main agent runs bash itself only with Dynamic workflows off (`/workflows off`).
+        metadata: { workflows: { dynamic: false } },
       })
 
       // Use bash tool (always registered) to create a file

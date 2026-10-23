@@ -584,8 +584,16 @@ export async function hasEgress(id: string) {
 }
 
 /** The egress proxy's decisions, one JSON line each, from its log. */
-export async function egressLog(id: string) {
-  const result = await SandboxExec.run([bin(), "logs", egressName(id)])
+export async function egressLog(id: string, since?: string) {
+  // XCOD-301: only what's newer than the last collection, less a margin for skew between the proxy's
+  // clock and the runtime's log timestamps (the caller still filters by the decisions' own times).
+  const after = since ? new Date(Date.parse(since) - 5000) : undefined
+  const result = await SandboxExec.run([
+    bin(),
+    "logs",
+    ...(after && !Number.isNaN(after.getTime()) ? ["--since", after.toISOString()] : []),
+    egressName(id),
+  ])
   return result.stdout
 }
 
@@ -658,6 +666,42 @@ export async function streamLogs(id: string, options: { tail?: number; follow?: 
     windowsVerbatimArguments: target.verbatim,
   })
   return proc.exited
+}
+
+/** Whether the sandbox's container is running. */
+export async function running(id: string) {
+  const result = await run(["container", "inspect", "--format", "{{.State.Running}}", containerName(id)])
+  return result.code === 0 && result.stdout.trim() === "true"
+}
+
+/**
+ * XCOD-301: the tree object of the workspace as `git add --all` would record it, computed inside the
+ * running container with a throwaway index, so it is only ever compared with another tree computed
+ * there (the host's git config, Windows' core.fileMode for one, would hash differently). Without the
+ * sandbox user's own git config, which the agent could have changed. Undefined on any failure: an
+ * image without git, a stopped container, the timeout.
+ */
+export async function workspaceTree(id: string, identity: Identity = DEFAULT_IDENTITY, timeout = 20_000) {
+  const result = await run(
+    [
+      "exec",
+      "--user",
+      identity.user,
+      "--workdir",
+      WORKSPACE,
+      "--env",
+      "GIT_CONFIG_GLOBAL=/dev/null",
+      "--env",
+      "GIT_CONFIG_NOSYSTEM=1",
+      containerName(id),
+      "/bin/sh",
+      "-c",
+      'i=$(mktemp) && export GIT_INDEX_FILE="$i" && git read-tree HEAD && git add --all -- . && git write-tree; s=$?; rm -f "$i"; exit $s',
+    ],
+    { timeout },
+  ).catch(() => undefined)
+  const tree = result?.code === 0 && !result.timedOut ? result.stdout.trim() : ""
+  return /^[0-9a-f]{40,64}$/.test(tree) ? tree : undefined
 }
 
 /** One file's contents from the container (running or stopped), or undefined when it's absent. */

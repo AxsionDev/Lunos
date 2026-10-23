@@ -67,7 +67,7 @@ import { DialogDebug } from "./component/dialog-debug"
 import { DialogLog, DialogLogs } from "./component/dialog-logs"
 import { SandboxStatus } from "./component/sandbox-status"
 import { SandboxProvider, useSandbox } from "./context/sandbox"
-import { failureToast, type SandboxHost } from "./util/sandbox"
+import { failureToast, unsavedToast, type SandboxHandback, type SandboxHost } from "./util/sandbox"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogLsp } from "./component/dialog-lsp"
@@ -181,6 +181,7 @@ const appBindingCommands = [
   "terminal.suspend",
   "terminal.title.toggle",
   "app.toggle.animations",
+  "app.toggle.sounds",
   "app.toggle.file_context",
   "app.toggle.diffwrap",
   "app.toggle.paste_summary",
@@ -212,6 +213,8 @@ export type TuiInput = {
   account?: AccountHost
   /** XCOD-281: the sandbox starting behind the TUI, or turned off after a failure. */
   sandbox?: SandboxHost
+  /** XCOD-301: sandboxes whose results a background handoff couldn't save (the toast at start). */
+  handback?: SandboxHandback
 }
 
 function errorMessage(error: unknown) {
@@ -386,6 +389,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                                           restart={restartHost}
                                                                           restarted={input.restarted}
                                                                           onStarted={input.onStarted}
+                                                                          handback={input.handback}
                                                                         />
                                                                       </LocationProvider>
                                                                     </EditorContextProvider>
@@ -442,6 +446,7 @@ function App(props: {
   restart?: RestartHost
   restarted?: Restarted & { sessionID?: string }
   onStarted?: () => void
+  handback?: SandboxHandback
 }) {
   const tuiConfig = useTuiConfig()
   const route = useRoute()
@@ -625,6 +630,7 @@ function App(props: {
         duration: 8000,
       })
     announceSandbox()
+    announceUnsaved()
     // XCOD-248: the first start of a newer version shows what changed since the one seen before.
     const whatsNew = whatsNewOnStart({
       current: InstallationVersion,
@@ -791,6 +797,43 @@ function App(props: {
         {
           label: "Settings",
           onSelect: () => dialog.replace(() => <DialogSettings area="Permissions" sub="Sandbox" />),
+        },
+      ],
+    })
+  }
+
+  /**
+   * XCOD-301: results a background handoff couldn't save (the sandbox is kept, stopped): the newest
+   * one, with Retry, Open log and Attach; the others are counted. Shown at every start until saved.
+   */
+  function announceUnsaved() {
+    const handback = props.handback
+    const [item, ...rest] = handback?.unsaved() ?? []
+    if (!handback || !item) return
+    const log = item.log
+    toast.show({
+      variant: "warning",
+      sticky: true,
+      message: unsavedToast(item, rest.length),
+      actions: [
+        {
+          label: "Retry",
+          onSelect: () => {
+            toast.show({ variant: "info", sticky: true, message: `Saving the results from sandbox ${item.id}…` })
+            void handback.retry(item.id).then((result) => {
+              toast.dismiss()
+              if (!result.ok) return announceUnsaved()
+              toast.show({ variant: "success", message: `Saved the results from sandbox ${item.id}: ${result.detail}` })
+            })
+          },
+        },
+        ...(log ? [{ label: "Open log", onSelect: () => dialog.replace(() => <DialogLog file={log.file} />) }] : []),
+        {
+          label: "Attach",
+          onSelect: () => {
+            handback.attach(item.id)
+            exit()
+          },
         },
       ],
     })
@@ -1576,6 +1619,36 @@ function App(props: {
           if (tuiConfig.reduced_motion !== true)
             kv.set("animations_enabled", !animationsEnabled(tuiConfig.reduced_motion, kv.get("animations_enabled")))
           dialog.clear()
+        },
+      },
+      {
+        // XCOD-311: attention.sound, saved to the user config and applied at once. Unbound by default.
+        name: "app.toggle.sounds",
+        title: "Mute / unmute sounds",
+        category: "System",
+        run: () => {
+          dialog.clear()
+          const next = !tuiConfig.attention.sound
+          void sdk.client.config
+            .settingsSet({ settingsSetInput: { key: "tui.attention.sound", value: String(next), scope: "user" } })
+            .then((result) => {
+              if (!result.data?.ok) throw new Error(result.data && !result.data.ok ? result.data.error : "no answer")
+              tuiConfig.attention.sound = next
+              toast.show({
+                variant: "info",
+                message: next
+                  ? tuiConfig.attention.enabled
+                    ? "Sounds on"
+                    : "Sounds on, but alerts are off (/settings notifications)"
+                  : "Sounds muted",
+              })
+            })
+            .catch((error: unknown) =>
+              toast.show({
+                variant: "error",
+                message: `Sounds not changed: ${error instanceof Error ? error.message : String(error)}`,
+              }),
+            )
         },
       },
       {

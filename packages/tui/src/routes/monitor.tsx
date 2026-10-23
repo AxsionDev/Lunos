@@ -28,6 +28,8 @@ import { DialogSelect } from "../ui/dialog-select"
 import { Toast, useToast } from "../ui/toast"
 import {
   MONITOR_GROUPS_KEY,
+  MONITOR_PROJECTS_KEY,
+  MONITOR_VIEW_KEY,
   askText,
   build,
   elapsed,
@@ -49,6 +51,9 @@ import { PANE_KEY, pane } from "../util/right-pane"
 import { PaneChip, PaneHide } from "../component/right-pane"
 import { externalAccent, type ExternalTool } from "../util/external"
 import { Locale } from "../util/locale"
+import { RENAME_HINT, renameValue } from "../util/session"
+import { loadProjectBudgets, projectBudgets } from "../util/project-budgets"
+import { DialogProject, DialogProjects } from "../component/dialog-projects"
 import {
   STATE_GLYPH,
   clearPlan,
@@ -63,6 +68,11 @@ import {
   stopSummary,
   stoppable,
   toolOnly,
+  projectCounts,
+  projectSections,
+  sectionItems,
+  type NamedProject,
+  type ProjectSection,
 } from "../util/sessions-overview"
 
 /** The plugin-route id the monitor is shown under. */
@@ -114,7 +124,13 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
   const { theme } = useTheme()
   const kv = useKV()
 
-  const [data, setData] = createStore({ sessions: [] as SessionOverviewItem[], loaded: false })
+  const [data, setData] = createStore({
+    sessions: [] as SessionOverviewItem[],
+    loaded: false,
+    // XCOD-309: the named projects, and the project this folder is in, for the Projects view.
+    named: [] as NamedProject[],
+    current: undefined as string | undefined,
+  })
   const [asks, setAsks] = createStore<Record<string, Asks>>({})
   const [error, setError] = createSignal<string>()
   const [now, setNow] = createSignal(Date.now())
@@ -157,6 +173,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     try {
       const result = await sdk.client.experimental.session.overview(undefined, { throwOnError: true })
       const sessions = result.data.sessions
+      const projects = await sdk.client.experimental.projectGroup.list().catch(() => undefined)
       // A row that just turned Waiting is highlighted for a moment (not under reduced motion).
       const waiting = new Set(sessions.filter((item) => item.state === "waiting").map((item) => item.id))
       const fresh = waitingBefore ? [...waiting].filter((id) => !waitingBefore!.has(id)) : []
@@ -164,6 +181,16 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       batch(() => {
         setData("sessions", reconcile(sessions, { key: "id" }))
         setData("loaded", true)
+        if (projects?.data) {
+          setData(
+            "named",
+            reconcile(
+              projects.data.groups.filter((group) => !group.archived),
+              { key: "id" },
+            ),
+          )
+          setData("current", projects.data.current.id)
+        }
         setNow(Date.now())
         setError(undefined)
       })
@@ -250,12 +277,62 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     setShowOlder(showing)
     if (showing && overrides().completed === false) kv.set(MONITOR_GROUPS_KEY, { ...overrides(), completed: true })
   }
+  // XCOD-309: the rail by status (today's three sub-sections, the default) or by project, remembered.
+  const byProject = () => kv.get(MONITOR_VIEW_KEY, "status") === "projects"
+  const switchView = () => kv.set(MONITOR_VIEW_KEY, byProject() ? "status" : "projects")
+  const projectCollapsed = () => kv.get(MONITOR_PROJECTS_KEY, {}) as Record<string, boolean>
+  // The project of the session the monitor was opened from, else this folder's.
+  const here = createMemo(() => {
+    const from = monitorReturn(props.params)
+    const open = from.type === "session" ? data.sessions.find((item) => item.id === from.sessionID) : undefined
+    return open?.projectGroupID ?? data.current
+  })
+  /** The rail's rows (its filter and Show older applied), one section per project. */
+  const projects = createMemo(() =>
+    projectSections({
+      sessions: rail().rows.map((row) => row.item),
+      named: data.named,
+      search: "",
+      state: "all",
+      here: here(),
+    }).map((section) => ({
+      section,
+      open: section.here || !!search() || projectCollapsed()[section.key] !== true,
+    })),
+  )
+  createEffect(
+    on(
+      byProject,
+      (shown) =>
+        shown &&
+        void loadProjectBudgets(
+          sdk.client,
+          projects().map((view) => view.section),
+        ),
+    ),
+  )
+  const flipProject = (key: string) => {
+    const view = projects().find((each) => each.section.key === key)
+    if (!view || view.section.here) return
+    kv.set(MONITOR_PROJECTS_KEY, { ...projectCollapsed(), [key]: view.open })
+  }
+  const projectOfKey = (key: string | undefined) =>
+    key?.startsWith("project:") ? projects().find((view) => view.section.key === key) : undefined
+
   /** What ↑/↓ walk through: each sub-section's header, then its rows while it's open. */
   const headerKey = (section: Section) => `group:${section}`
   const sectionOfKey = (key: string | undefined) =>
     key?.startsWith("group:") ? (key.slice("group:".length) as Section) : undefined
   const stops = createMemo(() =>
-    rail().groups.flatMap((view) => [headerKey(view.group), ...(view.open ? view.rows.map((row) => row.item.id) : [])]),
+    byProject()
+      ? projects().flatMap((view) => [
+          view.section.key,
+          ...(view.open ? view.section.rows.flatMap((row) => [row.item.id, ...row.kids.map((kid) => kid.id)]) : []),
+        ])
+      : rail().groups.flatMap((view) => [
+          headerKey(view.group),
+          ...(view.open ? view.rows.map((row) => row.item.id) : []),
+        ]),
   )
   const byID = createMemo(() => new Map(data.sessions.map((item) => [item.id, item])))
   // Numbers stick to their session while the monitor is open (see `number`).
@@ -275,7 +352,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     if (rows.length === 0) return setSelected(undefined)
     if (selected() && stops().includes(selected()!)) return
     // The first row that's shown, else the first header.
-    setSelected(stops().find((key) => !sectionOfKey(key)) ?? stops()[0])
+    setSelected(stops().find((key) => !sectionOfKey(key) && !projectOfKey(key)) ?? stops()[0])
   })
   const current = createMemo(() => (selected() ? byID().get(selected()!) : undefined))
 
@@ -604,7 +681,17 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
   }
 
   /** XCOD-265: the rows Stop all and Clear list act on: what the rail shows (filter, Show older). */
-  const railView = () => rail().rows.map((row) => row.item)
+  const railView = () => {
+    // XCOD-309: on a project's header (Projects view) they act on that project alone.
+    const scope = projectOfKey(selected())
+    if (scope) return sectionItems(scope.section)
+    return rail().rows.map((row) => row.item)
+  }
+  /** "<project>: " before the confirmation when Stop all and Clear act on one project. */
+  const scopedQuestion = (question: string) => {
+    const scope = projectOfKey(selected())
+    return scope ? `${scope.section.name}: ${question}` : question
+  }
 
   /** Asks once, as /sessions does: the first option is the default and Esc cancels. */
   function choose<T extends string>(message: string, options: { value: T; title: string }[]) {
@@ -638,7 +725,9 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     const plan = stopPlan(railView())
     if (plan.targets.length === 0)
       return toast.show({ variant: "info", message: "Nothing in the list is running or waiting." })
-    const choice = await choose(stopQuestion(plan), [{ value: "all" as const, title: `Stop ${plan.targets.length}` }])
+    const choice = await choose(scopedQuestion(stopQuestion(plan)), [
+      { value: "all" as const, title: `Stop ${plan.targets.length}` },
+    ])
     if (!choice) return
     const result = await sdk.client.experimental.sessionBulk
       .stop({ sessionIDs: plan.targets.map((item) => item.id) }, { throwOnError: true })
@@ -657,15 +746,15 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       return toast.show({ variant: "info", message: "Nothing in the list to clear." })
     const choice =
       plan.targets.length === 0
-        ? await choose(clearQuestion(plan), [{ value: "stop" as const, title: "Stop all & clear" }])
-        : await choose(clearQuestion(plan), [
+        ? await choose(scopedQuestion(clearQuestion(plan)), [{ value: "stop" as const, title: "Stop all & clear" }])
+        : await choose(scopedQuestion(clearQuestion(plan)), [
             { value: "clear" as const, title: `Clear ${plan.targets.length}` },
             ...(running ? [{ value: "stop" as const, title: "Stop all & clear" }] : []),
           ])
     if (!choice) return
     if (choice === "stop") {
       const stop = stopPlan(items).targets
-      const go = await choose(stopAndClearQuestion(items), [
+      const go = await choose(scopedQuestion(stopAndClearQuestion(items)), [
         { value: "go" as const, title: `Stop ${stop.length} and clear ${stop.length + plan.targets.length}` },
       ])
       if (!go) return
@@ -694,6 +783,43 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     refresh()
   }
 
+  /** XCOD-308: r renames the selected session, as ctrl+r does in /sessions (empty: the automatic name). */
+  async function rename(item: SessionOverviewItem) {
+    if (toolOnly(item)) {
+      toast.show({ variant: "info", message: `That session runs in ${kindLabel(item) ?? "its tool"}: rename it there` })
+      return
+    }
+    const typed = await DialogPrompt.show(dialog, "Rename session", {
+      value: item.title,
+      description: () => <text fg={theme.textMuted}>{RENAME_HINT}</text>,
+    })
+    dialog.clear()
+    const title = renameValue(typed, item.title)
+    if (title === undefined) return
+    await sdk.client.session
+      .update({ sessionID: item.id, directory: item.directory, title }, { throwOnError: true })
+      .catch(fail)
+    refresh()
+  }
+
+  /** XCOD-309: n on a project's header: new sessions start in that project's folder (the prompt). */
+  function startIn(view: { section: ProjectSection }) {
+    const directory = view.section.directory
+    if (!directory) return
+    setProject(directory)
+    setFocus("prompt")
+    toast.show({ variant: "info", message: `New sessions start in ${view.section.name}: type the first prompt` })
+  }
+
+  /** XCOD-309: p on a project's header: the project's settings (a named project's, or the projects list). */
+  function settings(view: { section: ProjectSection }) {
+    const section = view.section
+    if (section.kind === "none") return
+    if (section.kind === "named")
+      return dialog.replace(() => <DialogProject id={section.id} onBack={() => dialog.clear()} />)
+    dialog.replace(() => <DialogProjects select={section.id} />)
+  }
+
   async function filter() {
     const value = await DialogPrompt.show(dialog, "Filter sessions", {
       value: search(),
@@ -709,11 +835,15 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     const next = list[Math.max(0, Math.min(list.length - 1, index + direction))]!
     setSelected(next)
     const section = sectionOfKey(next)
-    scroll?.scrollChildIntoView?.(section ? `monitor-group-${section}` : `monitor-row-${next}`)
+    scroll?.scrollChildIntoView?.(
+      section ? `monitor-group-${section}` : projectOfKey(next) ? `monitor-${next}` : `monitor-row-${next}`,
+    )
   }
 
   /** What Enter does on the selected line, for the key hint. */
   const enterHint = () => {
+    const project = projectOfKey(selected())
+    if (project) return project.section.here ? "open" : project.open ? "collapse" : "expand"
     const section = sectionOfKey(selected())
     if (!section) return "open"
     return rail().groups.find((view) => view.group === section)?.open ? "collapse" : "expand"
@@ -721,6 +851,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
 
   /** Enter: on a sub-section's header it opens or collapses it; on a row it opens the session. */
   function enter() {
+    if (projectOfKey(selected())) return flipProject(selected()!)
     const section = sectionOfKey(selected())
     if (section) return flip(section)
     if (current()) open(current()!)
@@ -739,6 +870,11 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       .filter((part) => part !== "ctrl+p" && part !== "ctrl+n")
       .join(",")
     return key ? { ...binding, key } : undefined
+  }
+  /** XCOD-308: a key hint from the keybind config (its first key), empty when unbound. */
+  const keyHint = (name: string) => {
+    const binding = tuiConfig.keybinds.get(name)[0]
+    return typeof binding?.key === "string" ? (binding.key.split(",")[0]?.trim() ?? "") : ""
   }
   // A hidden rail can't take focus; « or the pane keybind brings it back.
   const toggleFocus = () => !railHidden() && setFocus((value) => (value === "prompt" ? "rail" : "prompt"))
@@ -769,9 +905,20 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
       ...keys("monitor.deny", () => current() && void answer(current()!, false)),
       ...keys("monitor.stop", () => current() && void stop(current()!)),
       ...keys("monitor.delete", () => current() && void remove(current()!)),
+      ...keys("monitor.rename", () => current() && void rename(current()!)),
       ...keys("monitor.filter", () => void filter()),
       ...keys("monitor.older", toggleOlder),
       ...keys("monitor.takeover", () => current() && void takeOver(current()!)),
+      // XCOD-309: the same keys as /sessions: the view switch, and n / p on a project's header.
+      ...keys("dialog.sessions.view", switchView),
+      ...keys("dialog.sessions.project.new", () => {
+        const view = projectOfKey(selected())
+        if (view) startIn(view)
+      }),
+      ...keys("dialog.sessions.project.settings", () => {
+        const view = projectOfKey(selected())
+        if (view) settings(view)
+      }),
       ...keys("monitor.stop_all", () => void stopAll()),
       ...keys("monitor.clear", () => void clearList()),
     ],
@@ -928,6 +1075,15 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
           <text fg={theme.accent}>filter: {search()}</text>
         </Show>
       </box>
+      {/* XCOD-309: the view switch; click it, or press its key (dialog.sessions.view). */}
+      <box paddingLeft={1} flexShrink={0}>
+        <text fg={theme.textMuted} wrapMode="none" onMouseUp={switchView}>
+          View: <span style={{ fg: byProject() ? theme.textMuted : theme.text, bold: !byProject() }}>Status</span>
+          {" | "}
+          <span style={{ fg: byProject() ? theme.text : theme.textMuted, bold: byProject() }}>Projects</span>
+          {keyHint("dialog.sessions.view") ? ` · ${keyHint("dialog.sessions.view")}` : ""}
+        </text>
+      </box>
       <scrollbox
         flexGrow={1}
         ref={(r: ScrollBoxRenderable) => (scroll = r)}
@@ -950,8 +1106,64 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
             </box>
           }
         >
+          {/* XCOD-309: one section per project, its header with counts, budget and "here". */}
+          <Show when={byProject()}>
+            <For each={projects()}>
+              {(view) => {
+                const key = () => view.section.key
+                const active = () => focus() === "rail" && selected() === key()
+                return (
+                  <box flexDirection="column" flexShrink={0}>
+                    <box
+                      id={`monitor-${key()}`}
+                      flexDirection="row"
+                      gap={1}
+                      paddingLeft={1}
+                      paddingTop={1}
+                      flexShrink={0}
+                      backgroundColor={active() ? theme.backgroundElement : undefined}
+                      onMouseUp={() => {
+                        setSelected(key())
+                        setFocus("rail")
+                        flipProject(key())
+                      }}
+                    >
+                      <text fg={theme.text} flexShrink={0}>
+                        {view.open ? "▼" : "▶"}
+                      </text>
+                      <text
+                        fg={view.section.counts.waiting ? theme.warning : theme.text}
+                        attributes={TextAttributes.BOLD}
+                        wrapMode="none"
+                        flexShrink={0}
+                      >
+                        {view.section.name}
+                        {view.section.here ? " · here" : ""}
+                      </text>
+                      <text fg={theme.textMuted} wrapMode="none" flexShrink={1}>
+                        {[projectCounts(view.section.counts), projectBudgets[view.section.id]]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </text>
+                    </box>
+                    <Show when={view.open}>
+                      {/* Newest first, subagents under their parent, as in /sessions. */}
+                      <For
+                        each={view.section.rows.flatMap((row): Row[] => [
+                          { item: row.item, section: "completed", depth: 0 },
+                          ...row.kids.map((kid): Row => ({ item: kid, section: "completed", depth: 1 })),
+                        ])}
+                      >
+                        {(row) => <RailRow row={row} />}
+                      </For>
+                    </Show>
+                  </box>
+                )
+              }}
+            </For>
+          </Show>
           {/* XCOD-299: all three, always in this order; an empty one is "(0)", dimmed and collapsed. */}
-          <For each={rail().groups}>
+          <For each={byProject() ? [] : rail().groups}>
             {(view) => {
               const active = () => focus() === "rail" && selected() === headerKey(view.group)
               const urgent = () => view.group === "waiting" && view.count > 0
@@ -1006,9 +1218,10 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
         </Show>
       </scrollbox>
       <box paddingLeft={1} flexShrink={0}>
-        <text fg={theme.textMuted} wrapMode="none">
+        {/* XCOD-308: wrapped, so every key (rename too) is seen in the narrow rail. */}
+        <text fg={theme.textMuted} wrapMode="word">
           {focus() === "rail"
-            ? `↑↓ move · enter ${enterHint()} · ${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · x delete · / filter · ctrl+p stop all, clear · tab prompt`
+            ? `↑↓ move · enter ${enterHint()} · ${projectOfKey(selected()) ? `${keyHint("dialog.sessions.project.new")} new here · ${keyHint("dialog.sessions.project.settings")} settings · ` : ""}${current() && canTakeOver(current()!) ? "t take over · " : ""}a approve · d deny · s stop · ${keyHint("monitor.rename") ? `${keyHint("monitor.rename")} rename · ` : ""}x delete · / filter · ctrl+p stop all, clear · ${keyHint("dialog.sessions.view")} ${byProject() ? "status" : "projects"} · tab prompt`
             : "tab rail"}
         </text>
       </box>

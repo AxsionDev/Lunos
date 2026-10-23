@@ -43,6 +43,7 @@ import { usePermission } from "@/context/permission"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { retry } from "@opencode-ai/core/util/retry"
 import { playSoundById } from "@/utils/sound"
+import { askSound, soundChoices } from "@/utils/sound-events"
 import { createAim } from "@/utils/aim"
 import { Worktree as WorktreeState } from "@/utils/worktree"
 import { setSessionHandoff } from "@/pages/session/handoff"
@@ -441,10 +442,15 @@ export default function LegacyLayout(props: ParentProps) {
         if (now - lastAlerted < cooldownMs) return
         alertedAtBySession.set(sessionKey, now)
 
+        // XCOD-311: a subagent's ask is "Waiting for action"; a question has a sound of its own.
+        const sound = askSound(
+          e.details.type === "permission.asked" ? "permission" : "question",
+          !!session?.parentID,
+          soundChoices(settings.sounds),
+        )
+        if (sound) void playSoundById(sound, settings.sounds.volume())
+
         if (e.details.type === "permission.asked") {
-          if (settings.sounds.permissionsEnabled()) {
-            void playSoundById(settings.sounds.permissions())
-          }
           if (settings.notifications.permissions()) {
             void platform.notify(title, description, () => navigate(href))
           }

@@ -198,6 +198,102 @@ export function stopPlan(items: SessionOverviewItem[]) {
   }
 }
 
+/** A named project (XCOD-298), as `experimental.projectGroup.list` gives it. */
+export type NamedProject = { id: string; name: string; folders: string[]; archived?: boolean }
+
+/** XCOD-309: one project's section in the rail's "By project" view. */
+export type ProjectSection = {
+  /** The project's id (`pgrp_…`, a repository's id, or `global:<folder>`); "" is "No project". */
+  id: string
+  /** null is "No project"; otherwise the name. */
+  name: string | null
+  kind: "named" | "folder" | "none"
+  rows: Row[]
+  /** Its top-level sessions by their most urgent state, as the Agent Monitor's sub-sections count. */
+  counts: { running: number; waiting: number; done: number }
+  /** The project the composer starts sessions in when "New session" is used on it. */
+  start?: string
+  /** The project this window's server runs in: always open, marked "here". */
+  here: boolean
+}
+
+const URGENCY: Record<SessionState, number> = { waiting: 0, running: 1, failed: 2, finished: 3, idle: 3 }
+
+/**
+ * XCOD-309: the sessions in view, one section per project, as the TUI's Projects view: named
+ * projects first (A–Z), then repository and folder projects (A–Z), then "No project". A session is in
+ * the project the server resolved for it (`projectGroupID`); a Claude Code / Codex row with none lands
+ * with the sessions of the repository that holds its folder. Newest first, subagents under their parent.
+ */
+export function projectSections(input: {
+  sessions: SessionOverviewItem[]
+  named: NamedProject[]
+  filter: Filter
+  here?: string
+}): ProjectSection[] {
+  const named = new Map(input.named.map((project) => [project.id, project]))
+  const ids = new Set(input.sessions.map((item) => item.id))
+  const children = new Map<string, SessionOverviewItem[]>()
+  for (const item of input.sessions) {
+    if (!item.parentID || !ids.has(item.parentID)) continue
+    children.set(item.parentID, [...(children.get(item.parentID) ?? []), item])
+  }
+  const worktrees = new Map<string, string>()
+  for (const item of input.sessions)
+    if (item.projectGroupID && item.project && item.project.id !== "global" && !named.has(item.projectGroupID))
+      worktrees.set(item.projectGroupID, item.project.worktree)
+  const projectOf = (item: SessionOverviewItem) => {
+    if (item.projectGroupID) return item.projectGroupID
+    for (const [id, worktree] of worktrees)
+      if (item.directory === worktree || item.directory.startsWith(worktree.replace(/[\\/]$/, "") + "/")) return id
+    return ""
+  }
+  const newest = (a: SessionOverviewItem, b: SessionOverviewItem) => b.updated - a.updated
+
+  const sections = new Map<string, ProjectSection>()
+  for (const item of input.sessions.toSorted(newest)) {
+    if (item.parentID && ids.has(item.parentID)) continue
+    const id = projectOf(item)
+    const project = named.get(id)
+    // A plain folder's project (worktree "/") is named after the folder, as in the TUI.
+    const folder = projectKey(item)
+    const name =
+      project?.name ?? (id ? (item.project?.name ?? folder.split(/[\\/]/).filter(Boolean).pop() ?? folder) : null)
+    const kids = (children.get(item.id) ?? []).toSorted(newest)
+    const own = matches(item, input.filter, name ?? undefined)
+    const shown = own ? kids : kids.filter((kid) => matches(kid, input.filter, name ?? undefined))
+    if (!own && shown.length === 0) continue
+    let section = sections.get(id)
+    if (!section) {
+      section = {
+        id,
+        name,
+        kind: project ? "named" : id ? "folder" : "none",
+        rows: [],
+        counts: { running: 0, waiting: 0, done: 0 },
+        start: id ? projectKey(item) : undefined,
+        here: !!id && id === input.here,
+      }
+      sections.set(id, section)
+    }
+    section.rows.push({ item, children: shown })
+    const state = [item, ...kids].map((each) => each.state).reduce((a, b) => (URGENCY[b] < URGENCY[a] ? b : a))
+    if (state === "running") section.counts.running++
+    else if (state === "waiting") section.counts.waiting++
+    else section.counts.done++
+  }
+  const rank = { named: 0, folder: 1, none: 2 }
+  return [...sections.values()].toSorted(
+    (a, b) =>
+      rank[a.kind] - rank[b.kind] || (a.name ?? "").localeCompare(b.name ?? "", undefined, { sensitivity: "base" }),
+  )
+}
+
+/** XCOD-309: a project section's sessions (subagents too), for its own Stop all and Clear list. */
+export function sectionItems(section: ProjectSection) {
+  return section.rows.flatMap((row) => [row.item, ...row.children])
+}
+
 /** XCOD-265: what Clear list would archive, and what stays because it's running or waiting. */
 export function clearPlan(items: SessionOverviewItem[]) {
   return {
