@@ -422,3 +422,53 @@ export function defaultDeps(): RelaunchDeps {
     },
   }
 }
+
+/**
+ * XCOD-301: how to start another Lunos command from this one (`lunos sandbox conclude <id>`, `lunos
+ * sandbox attach <id>`): the executable `relaunch` would pick, and the environment Lunos was started
+ * with, minus this run's log and handoff, which belong to this process.
+ */
+export function selfCommand(args: string[], platform: NodeJS.Platform = process.platform) {
+  const env = relaunchEnv(launchEnv, platform)
+  delete env[HANDOFF_ENV]
+  delete env[RunLog.ENV]
+  // Taken at import, which can come after the CLI middleware marked this process (`lunos run` loads
+  // this module late): the markers are this process's, not the next one's.
+  if (env.OPENCODE_PID === String(process.pid))
+    for (const name of ["AGENT", "OPENCODE", "OPENCODE_PID"]) delete env[name]
+  const command = resolveCommand({
+    execPath: process.execPath,
+    argv: process.argv,
+    execArgv: process.execArgv,
+    args,
+    upgraded: false,
+    platform,
+    which: (name) =>
+      Bun.which(name, { PATH: Object.entries(env).find(([key]) => key.toUpperCase() === "PATH")?.[1] ?? "" }),
+    exists: (file) => fs.existsSync(file),
+  })
+  return { ...spawnArgv(command, platform, env.ComSpec ?? env.COMSPEC), env, cwd: launchCwd }
+}
+
+/**
+ * XCOD-301: run another Lunos command in this one's place, in this terminal: exec on Linux/macOS; on
+ * Windows a child attached to the console, whose exit code this process then exits with.
+ */
+export async function replace(args: string[], deps: RelaunchDeps = defaultDeps()) {
+  const self = selfCommand(args, deps.platform)
+  await deps.flush?.()
+  deps.write(TERMINAL_RESET)
+  if (deps.platform !== "win32") {
+    try {
+      deps.execve(self.argv[0], self.argv, self.env)
+      return
+    } catch (error) {
+      deps.error(
+        `Couldn't start \`lunos ${args.join(" ")}\`: ${error instanceof Error ? error.message : String(error)}\n`,
+      )
+      return deps.exit(1)
+    }
+  }
+  const code = await deps.spawn(self.argv, { cwd: self.cwd, env: self.env, verbatim: self.verbatim }).catch(() => 1)
+  return deps.exit(code)
+}

@@ -235,6 +235,7 @@ const DEFAULTS: Record<string, unknown> = {
   "sandbox.required": false,
   "sandbox.workspace": "copy",
   "sandbox.on_finish": "destroy",
+  "sandbox.on_exit": "background",
   "sandbox.network": "policy",
   "sandbox.results": "branch",
   "sandbox.devcontainer": "image",

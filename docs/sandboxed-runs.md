@@ -51,7 +51,25 @@ In `/settings` (Permissions › Sandbox), the **Sandbox on** row shows what the 
    - writes every session's transcript (`transcript.json`) and a run summary (`summary.json`: image digest, resource limits, base commit, changed files) to `.opencode/sandbox/<id>/` in your repository (ignored by git by default);
    - stops the container and copies its workspace out;
    - creates the branch **`lunos/sandbox/<id>`** on your repository, starting at the commit you were on. If you had uncommitted changes, they become the first commit on the branch, so the second commit holds exactly the agent's changes. Your working tree, index and current branch are not touched.
-4. **Finish.** Then `sandbox.on_finish` applies (below). **Nothing is destroyed until the hand-back has succeeded.** If it fails — the repository is read-only, the branch already exists, the disk is full — the container is kept (stopped) whatever the policy says, and the reason is shown.
+4. **Finish.** Then `sandbox.on_finish` applies (below). **Nothing is destroyed until the hand-back has succeeded.** If it fails — the repository is read-only, the branch already exists, the disk is full, Docker stopped — the container is kept (stopped) whatever the policy says, and the reason is shown.
+
+If the agent changed nothing in the workspace, step 3's copy and branch are skipped ("handoff skipped: no changes" in the run log): only the transcript and summary come back, and the container is removed.
+
+### Quitting: in the background
+
+Steps 3 and 4 run in a helper, `lunos sandbox conclude <id>`, started detached when you quit, so the shell is back at once and the helper carries on after Lunos has exited. The last line says what it's doing:
+
+```
+Saving your sandbox results in the background (sandbox a1b2) — `lunos sandbox status a1b2` to follow.
+No changes in the sandbox. Removing it in the background.
+```
+
+- `lunos sandbox status <id>` shows where it is: saving (each step so far, with its time), done (the branch, the files), or failed and why, with the log.
+- If it fails, the next `lunos` start in the project shows "Results from sandbox a1b2 weren't saved: …" with **Retry** (hand them back again), **Open log** and **Attach** (reopen the sandbox). `lunos sandbox conclude <id>` retries from the shell.
+- Starting Lunos again in the project while a hand-back is still running waits for it first ("waiting for sandbox a1b2 to finish saving its results"), so the two never overlap.
+- `sandbox.on_exit: "wait"` does it in the foreground instead, a line per step with its time (`Handing back results… 3 files, 1 commit · 2.1 s`). Ctrl+C then moves it to the background; it still finishes.
+- `lunos run` waits by default in CI and when its output isn't a terminal, since a job or a script needs the results before it goes on. A `sandbox.on_exit` in your config wins.
+- On Windows the helper is started detached, without a console window, so closing the terminal doesn't stop it. This hasn't been tested on Windows yet.
 
 If you interrupt a run (Ctrl-C), the agent stops at once; there are no results to hand back, so the sandbox is kept, stopped. `lunos sandbox destroy <id>` removes it.
 
@@ -133,6 +151,8 @@ lunos sandbox stop <id>        # stop a running sandbox and keep it
 lunos sandbox destroy <id>     # remove the container and its volumes
 lunos sandbox prune            # remove kept sandboxes whose retain_for has expired
 lunos sandbox status           # whether the sandbox is on here, and which config file turns it on
+lunos sandbox status <id>      # where that sandbox's hand-back is: saving, done, or failed and why
+lunos sandbox conclude <id>    # hand its results back and apply on_finish (retries a failed hand-back)
 lunos sandbox off              # turn it off here (see "Turning it off" above)
 ```
 
@@ -326,6 +346,7 @@ From your global and managed config only. Refused: `/`, your home directory itse
 | `sandbox.results`          | `"branch"`                          | `branch`, `patch` or `none`; see [Getting the results back](#getting-the-results-back)  |
 | `sandbox.runtime`          | Docker, else Podman                 | `docker` or `podman`                                                                    |
 | `sandbox.on_finish`        | `"destroy"`                         | `destroy`, `retain` or `destroy_on_success`, after the hand-back                        |
+| `sandbox.on_exit`          | `"background"`                      | `background` or `wait`; see [Quitting: in the background](#quitting-in-the-background)  |
 | `sandbox.retain_for`       | unset (kept until destroyed)        | How long a kept sandbox stays, e.g. `"72h"`; then it's pruned                           |
 | `sandbox.network`          | `"policy"`                          | `policy`, `none` or `open`; see [Network](#network)                                     |
 | `sandbox.allow`            | `[]`                                | Extra hosts under `policy`; global and managed config only                              |

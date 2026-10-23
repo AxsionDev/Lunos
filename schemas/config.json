@@ -1854,6 +1854,11 @@
               "enum": ["destroy", "retain", "destroy_on_success"],
               "description": "What happens once the results are back on the host: \"destroy\" (default) removes the container and its volume, \"retain\" stops it so `lunos sandbox attach` can reopen it, \"destroy_on_success\" keeps it only when the task failed. --keep and --rm override it for one run. A failed handoff always retains"
             },
+            "on_exit": {
+              "type": "string",
+              "enum": ["background", "wait"],
+              "description": "What happens when you quit Lunos: \"background\" (default) returns to the shell at once while a helper hands the results back and applies sandbox.on_finish (`lunos sandbox status <id>` follows it); \"wait\" does it in the foreground, a progress line per step (Ctrl+C then moves it to the background). `lunos run` waits by default in CI and when its output isn't a terminal"
+            },
             "retain_for": {
               "pattern": "^\\d+[mhd]$",
               "type": "string",
