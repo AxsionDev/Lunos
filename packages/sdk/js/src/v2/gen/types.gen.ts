@@ -1951,6 +1951,7 @@ export type AgentConfig = {
   maxSteps?: number
   permission?: PermissionConfig
   verify?: boolean
+  permission_mode?: "manual" | "auto"
   auto_continue?: boolean
   [key: string]:
     | unknown
@@ -1976,6 +1977,8 @@ export type AgentConfig = {
     | "info"
     | number
     | PermissionConfig
+    | "manual"
+    | "auto"
     | undefined
 }
 

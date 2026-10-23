@@ -96,7 +96,7 @@ export function isKnown(key: string) {
   return (
     (KNOWN as ReadonlyArray<string>).includes(key) ||
     /^permission\.[^.]+$/.test(key) ||
-    /^agent\.[^.]+\.(model|verify|auto_continue)$/.test(key)
+    /^agent\.[^.]+\.(model|verify|auto_continue|permission_mode)$/.test(key)
   )
 }
 

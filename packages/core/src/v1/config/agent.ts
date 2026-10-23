@@ -39,6 +39,10 @@ const AgentFields = Schema.Struct({
     description:
       "Build agent: check the work (build, tests, start the app and try it) before handing back (default true). false restores handing back without checking (XCOD-288)",
   }),
+  permission_mode: Schema.optional(Schema.Literals(["manual", "auto"])).annotate({
+    description:
+      "Main agents: the approval mode a new session starts this workflow in. manual (default) asks before each action an ask rule covers; auto approves those. deny rules still block",
+  }),
   auto_continue: Schema.optional(Schema.Boolean).annotate({
     description:
       "Build agent: continue automatically when a turn ends by announcing its next step instead of doing it (default true). Dev-Cycle uses dev_cycle.auto_continue; Plan never continues (XCOD-302)",
@@ -64,6 +68,7 @@ const KNOWN_KEYS = new Set([
   "permission",
   "disable",
   "tools",
+  "permission_mode",
 ])
 
 const normalize = (agent: Schema.Schema.Type<typeof AgentSchema>): Schema.Schema.Type<typeof AgentSchema> => {

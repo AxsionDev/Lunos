@@ -235,6 +235,8 @@ export function Prompt(props: PromptProps) {
   const modeShortcut = useCommandShortcut("mode.cycle")
   const paletteShortcut = useCommandShortcut("command.palette.show")
   const undoShortcut = useCommandShortcut("input.undo")
+  const modelShortcut = useCommandShortcut("model.list")
+  const approvalShortcut = useCommandShortcut("permission.mode")
   const interruptShortcut = useCommandShortcut("session.interrupt")
   // The hint line's stop key, from the keybinds; the default reads "esc", as the clear key does.
   const stopKey = () => (interruptShortcut() || "escape").replace(/^escape$/, "esc")
@@ -416,7 +418,8 @@ export function Prompt(props: PromptProps) {
         // Keep command line --mode if specified.
         if (!args.mode) local.mode.set(msg.agent)
         // XCOD-218: an external session's messages name the tool, not a model to switch to.
-        if (msg.model && msg.model.providerID !== "external") {
+        // XCOD-310: a model this session chose for the workflow since (kept across restarts) stays.
+        if (msg.model && msg.model.providerID !== "external" && !local.model.chosen(msg.agent)) {
           local.model.set(msg.model)
           local.model.variant.set(msg.model.variant)
         }
@@ -1535,7 +1538,11 @@ export function Prompt(props: PromptProps) {
       }
 
       sessionID = res.data.id
+      // XCOD-310: the new session keeps the model and approval chosen on home.
+      local.permission.adopt(sessionID)
     }
+    // XCOD-310: asks in this session (and its subagents') are answered under this workflow's approval.
+    local.permission.setWorkflow(sessionID, agent.name)
 
     const inputText = expandTrackedPastedText(
       store.prompt.input,
@@ -2104,8 +2111,22 @@ export function Prompt(props: PromptProps) {
                       <text fg={fadeColor(highlight(), agentMetaAlpha())}>
                         {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
                       </text>
-                      <Show when={store.mode === "normal" && local.permission.mode === "auto"}>
-                        <text fg={fadeColor(theme.textMuted, agentMetaAlpha())}>auto</text>
+                      {/* XCOD-310: Workflow · Approval · model; Auto stands out, Manual is muted. */}
+                      <Show when={store.mode === "normal" ? local.approval.current() : undefined}>
+                        {(approval) => (
+                          <box flexDirection="row" gap={1}>
+                            <text fg={fadeColor(theme.textMuted, agentMetaAlpha())}>·</text>
+                            <text
+                              flexShrink={0}
+                              fg={fadeColor(
+                                approval().mode === "auto" ? theme.warning : theme.textMuted,
+                                agentMetaAlpha(),
+                              )}
+                            >
+                              {approval().mode === "auto" ? "Auto" : "Manual"}
+                            </text>
+                          </box>
+                        )}
                       </Show>
                       <Show when={store.mode === "normal"}>
                         <box flexDirection="row" gap={1}>
@@ -2314,17 +2335,14 @@ export function Prompt(props: PromptProps) {
             <Match when={true}>
               {props.hint ?? (
                 <Show when={props.sessionID} fallback={<text />}>
-                  {/* XCOD-286: in an external session this side gives way (cut, one line), so the exit hint
-                      and the commands on the right stay whole. */}
-                  <box
-                    marginLeft={1}
-                    {...(external() ? { flexShrink: 1, minWidth: 0, marginRight: 2, overflow: "hidden" as const } : {})}
-                  >
+                  {/* XCOD-286/310: this side gives way (cut, one line), so the exit hint, the model and
+                      approval keys and the commands on the right stay whole. */}
+                  <box marginLeft={1} flexShrink={1} minWidth={0} marginRight={2} overflow="hidden">
                     {/* XCOD-254: an external session shows what the Lunos bridge offers instead of the directory. */}
                     <Show
                       when={bridgeLine(external()?.bridge)}
                       fallback={
-                        <text fg={theme.textMuted} wrapMode={external() ? "none" : undefined}>
+                        <text fg={theme.textMuted} wrapMode="none">
                           {location()?.directory ?? paths.cwd}
                         </text>
                       }
@@ -2341,7 +2359,7 @@ export function Prompt(props: PromptProps) {
             </Match>
           </Switch>
           <Show when={status().type !== "retry"}>
-            <box gap={2} flexDirection="row" flexShrink={external() ? 0 : undefined}>
+            <box gap={2} flexDirection="row" flexShrink={0}>
               <Show when={external()}>
                 {(marker) => (
                   <text fg={accent() ?? theme.text} wrapMode="none" flexShrink={0}>
@@ -2379,9 +2397,19 @@ export function Prompt(props: PromptProps) {
                     </Match>
                     {/* XCOD-260: Lunos's agent modes don't apply to a Claude Code / Codex session. */}
                     <Match when={!external()}>
-                      <text fg={theme.text}>
-                        {modeShortcut()} <span style={{ fg: theme.textMuted }}>modes</span>
-                      </text>
+                      <box flexDirection="row" gap={2}>
+                        {/* XCOD-310: the model and approval keys, from config. */}
+                        <text fg={theme.text} wrapMode="none">
+                          {modelShortcut()} <span style={{ fg: theme.textMuted }}>model</span> · {approvalShortcut()}{" "}
+                          <span style={{ fg: theme.textMuted }}>approval</span>
+                        </text>
+                        {/* Narrow, with "Dynamic workflows" on the line, the modes key (tab) gives way first. */}
+                        <Show when={!workflows() || dimensions().width >= 100}>
+                          <text fg={theme.text}>
+                            {modeShortcut()} <span style={{ fg: theme.textMuted }}>modes</span>
+                          </text>
+                        </Show>
+                      </box>
                     </Match>
                   </Switch>
                   {/* XCOD-286: here exit closes the tool's session; quitting Lunos is explicit. */}

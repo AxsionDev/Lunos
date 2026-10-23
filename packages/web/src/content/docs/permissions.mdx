@@ -35,7 +35,19 @@ opencode run --auto "Refactor this module"
 
 Explicit `"deny"` rules are still enforced. Auto mode only changes requests that would otherwise ask for approval.
 
-In the TUI, open the command palette and select **Enable auto-approve permissions** or **Disable auto-approve permissions** to change modes. When auto mode is active, the prompt displays a muted `auto` indicator next to the current agent.
+In the TUI, approval is set per workflow (Build, Plan, Research, Dev-Cycle) in each session. Press `<leader>p` (`permission_mode`, also in the command palette) to switch the current workflow between **Manual** and **Auto**. Turning Auto on for Dev-Cycle doesn't turn it on for Build. The prompt always shows `Workflow · Approval · model`, for example `Dev-Cycle · Auto · sonnet-4.6`, with Auto in the warning colour. A subagent's requests follow the approval of the session that started it. The session keeps each workflow's approval and model across restarts.
+
+A new session starts each workflow in Manual, unless `agent.<name>.permission_mode` is `"auto"` (in `/settings` → Agents → the agent → **Default approval**) or you started Lunos with `--auto`:
+
+```json title="opencode.json"
+{
+  "agent": {
+    "dev-cycle": { "permission_mode": "auto" }
+  }
+}
+```
+
+An organisation can fix a workflow's approval by locking `agent.<name>.permission_mode` (or `agent.<name>`, or `agent`) in managed config. When the lock leaves it Manual, `<leader>p` shows "Auto-approve is turned off by your organisation" and changes nothing.
 
 ---
 

@@ -38,6 +38,7 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   appear are set there too, and every change applies at once. "Mute / unmute sounds" is in the
   command palette. In the desktop and web app, Settings › Sound effects gains a volume and sounds
   for a subagent finishing, a question, and a subagent waiting for you (off until you choose one).
+
 - **Rename a session wherever you see it, and the name sticks.** Click the session's title in the
   sidebar (or press `ctrl+r`) to edit it in place, press `r` on a session in the Agent Monitor, or
   `ctrl+r` in `/sessions`, as well as `/rename`. A name you give is never replaced by the automatic
@@ -45,6 +46,7 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   is still being generated. Names are one line of up to 80 characters; save an empty name to get the
   automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
   Lunos name. <!-- XCOD-308 -->
+
 - **See your sessions by project.** `/sessions` and the Agent Monitor's list switch between their
   usual layout and one section per project with `ctrl+y` or a click on the view switch in the
   header; the desktop and web Sessions window gains **By project** next to By status and By group.
@@ -53,6 +55,16 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   "here". From a project's header you can start a new session in it, open its settings, or stop and
   clear just that project. Each view remembers your choice; Groups stays the default.
   <!-- XCOD-309 -->
+
+- **Each workflow keeps its own model and approval mode, and one key switches Manual and Auto.**
+  In the terminal app, `<leader>p` switches between Manual and Auto for the workflow you're in
+  (Build, Plan, Research or Dev-Cycle), so turning on Auto for a Dev-Cycle run no longer turns it on
+  for Build. The model you pick is also kept per workflow. Both are remembered per session, across
+  restarts too. The prompt always shows `Workflow · Approval · model`, with Auto in the warning
+  colour, and the hint line shows the model and approval keys. A subagent's requests follow its
+  session's approval. Set a workflow's default in `/settings` → Agents → **Default approval**
+  (`agent.<name>.permission_mode`). Every workflow starts in Manual unless you set this, and an
+  organisation can lock it. `deny` rules still block in Auto. <!-- XCOD-310 -->
 
 ### Changed
 
@@ -70,6 +82,7 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
   its output isn't a terminal. The "sandbox server …, workspace …" line is no longer printed on exit.
   On Windows the helper is started detached and without a console window, which hasn't been tested
   there yet. <!-- XCOD-301 -->
+
 - **Dev-Cycle no longer stalls between gates.** When a turn ends by announcing the next step ("Plan
   approved. Next I'll implement…") instead of taking it, Lunos continues by itself, and the
   transcript shows a dim "↻ Dev-Cycle continued automatically (plan approved → build)" line. It
@@ -79,6 +92,7 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
   Continuations count against budgets and the step limit like any turn. Turn it off with
   `dev_cycle.auto_continue: false` or `agent.build.auto_continue: false`; an organisation can lock
   either. <!-- XCOD-302 -->
+
 - **Build and Dev-Cycle now hand the work to subagents (Dynamic workflows, on by default).** The
   main agent plans the task, dispatches subagents to do each step (independent steps in parallel,
   up to `subagent.max_parallel`), integrates what they report and has a separate `qa` subagent
@@ -98,6 +112,7 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
   stopped because of an unexpected error: AbortError".** The cancelled event stream could be
   reported as an unhandled error, which stopped Lunos before it handed a sandbox's results back and
   left the container running. <!-- XCOD-301 -->
+
 - **Esc Esc while the agent is working clears what you've typed first** instead of stopping the
   run, in the terminal app, `/claude` and `/codex` sessions and the Agent Monitor. Once the prompt is
   empty, Esc Esc stops the run as before, and the line under the prompt shows which it will do

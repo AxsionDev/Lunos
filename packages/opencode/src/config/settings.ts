@@ -502,6 +502,8 @@ export const AGENT_FIELDS = [
   "color",
   "permission",
   "options",
+  // XCOD-310: the approval a new session starts this workflow in (/settings → Agents → Default approval).
+  "permission_mode",
 ] as const
 export type AgentField = (typeof AGENT_FIELDS)[number]
 
