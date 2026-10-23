@@ -267,8 +267,8 @@ describe("internal notifications TUI plugin", () => {
   // XCOD-311: the Notifications sub-tab's options, read on every alert.
   test("notifies always, and for a finishing subagent, when the settings say so", async () => {
     const harness = await setup()
-    harness.api.tuiConfig.attention.notify_when = "always"
-    harness.api.tuiConfig.attention.notify_subagents = true
+    // The plugin API's view is read-only; /settings updates the same object in the running app.
+    Object.assign(harness.api.tuiConfig.attention, { notify_when: "always", notify_subagents: true })
 
     harness.emit({ id: "event-1", type: "permission.asked", properties: permission("permission-1", "subagent") })
     harness.emit({
