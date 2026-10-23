@@ -300,6 +300,16 @@
     "text": "Press {key:mode_cycle} to cycle between your primary agents"
   },
   {
+    "id": "permission-mode-per-workflow",
+    "category": "Agents & subagents",
+    "text": "Press {key:permission_mode} to switch between Manual and Auto approval; each workflow keeps its own"
+  },
+  {
+    "id": "model-per-workflow",
+    "category": "Agents & subagents",
+    "text": "Press {key:model_list} to pick a model for this workflow; Build and Dev-Cycle each remember theirs"
+  },
+  {
     "id": "agents-agent-does-edit",
     "category": "Agents & subagents",
     "text": "Run {highlight}/agents{/highlight} to see every agent, what it does, and edit it with proper controls"

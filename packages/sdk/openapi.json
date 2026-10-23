@@ -26851,6 +26851,10 @@
           },
           "verify": {
             "type": "boolean"
+          },
+          "permission_mode": {
+            "type": "string",
+            "enum": ["manual", "auto"]
           }
         },
         "additionalProperties": {}

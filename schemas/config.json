@@ -1078,6 +1078,11 @@
         "verify": {
           "type": "boolean",
           "description": "Build agent: check the work (build, tests, start the app and try it) before handing back (default true). false restores handing back without checking (XCOD-288)"
+        },
+        "permission_mode": {
+          "type": "string",
+          "enum": ["manual", "auto"],
+          "description": "Main agents: the approval mode a new session starts this workflow in. manual (default) asks before each action an ask rule covers; auto approves those. deny rules still block"
         }
       }
     },

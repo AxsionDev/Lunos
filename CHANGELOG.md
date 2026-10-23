@@ -21,6 +21,18 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Each workflow keeps its own model and approval mode, and one key switches Manual and Auto.**
+  In the terminal app, `<leader>p` switches between Manual and Auto for the workflow you're in
+  (Build, Plan, Research or Dev-Cycle), so turning on Auto for a Dev-Cycle run no longer turns it on
+  for Build. The model you pick is also kept per workflow. Both are remembered per session, across
+  restarts too. The prompt always shows `Workflow · Approval · model`, with Auto in the warning
+  colour, and the hint line shows the model and approval keys. A subagent's requests follow its
+  session's approval. Set a workflow's default in `/settings` → Agents → **Default approval**
+  (`agent.<name>.permission_mode`). Every workflow starts in Manual unless you set this, and an
+  organisation can lock it. `deny` rules still block in Auto. <!-- XCOD-310 -->
+
 ## [1.18.55] - 2026-10-22
 
 ### Added

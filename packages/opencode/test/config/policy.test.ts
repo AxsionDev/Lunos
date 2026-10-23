@@ -118,3 +118,20 @@ describe("locked models (XCOD-219)", () => {
     )
   })
 })
+
+// XCOD-310: a workflow's default approval can be locked, and decodes as a field, not a model option.
+describe("agent.<name>.permission_mode (XCOD-310)", () => {
+  test("is a key an organisation can lock", () => {
+    expect(ConfigPolicy.isKnown("agent.dev-cycle.permission_mode")).toBe(true)
+    expect(ConfigPolicy.isKnown("agent.dev-cycle.permission_modes")).toBe(false)
+  })
+
+  test("decodes as manual or auto, kept out of the provider options", async () => {
+    const { ConfigAgentV1 } = await import("@opencode-ai/core/v1/config/agent")
+    const { Schema } = await import("effect")
+    const decoded = Schema.decodeUnknownSync(ConfigAgentV1.Info)({ permission_mode: "auto" })
+    expect(decoded.permission_mode).toBe("auto")
+    expect(decoded.options?.permission_mode).toBeUndefined()
+    expect(() => Schema.decodeUnknownSync(ConfigAgentV1.Info)({ permission_mode: "yolo" })).toThrow()
+  })
+})
