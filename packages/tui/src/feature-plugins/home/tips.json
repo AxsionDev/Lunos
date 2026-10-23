@@ -1217,6 +1217,11 @@
     "text": "Press {key:sidebar_toggle} to show or hide the sidebar"
   },
   {
+    "id": "right-pane-hide-more-room",
+    "category": "Keyboard",
+    "text": "Need more room: hide the right pane with {key:sidebar_toggle}, or click » at its top"
+  },
+  {
     "id": "session-timeline-jump-any",
     "category": "Keyboard",
     "text": "Press {key:session_timeline} to jump to any point in the session"

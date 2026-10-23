@@ -603,16 +603,19 @@ test("XCOD-284: Delete all shown deletes only what the search shows; space still
   try {
     // Typed key by key, as a person types (space included: it isn't "select" while searching). The
     // search box takes focus a moment after the view opens: the first key is sent until it lands.
-    for (let attempt = 0; attempt < 20 && !ui.frame().includes("6 sessions b "); attempt++) {
+    // (The search follows the header's view switch, "View: Groups | Projects · ctrl+y".)
+    const searched = (text: string) => ui.frame().includes(`6 sessions View: Groups | Projects · ctrl+y ${text} `)
+    for (let attempt = 0; attempt < 20 && !searched("b"); attempt++) {
       ui.app.mockInput.pressKey("b")
-      await wait(() => ui.frame().includes("6 sessions b "), 300).catch(() => undefined)
+      await wait(() => searched("b"), 300).catch(() => undefined)
     }
     for (const ch of "eta t") {
       ui.app.mockInput.pressKey(ch)
       await Bun.sleep(40)
     }
     await wait(() => ui.frame().includes("beta two") && !ui.frame().includes("title d1"))
-    expect(ui.frame()).toContain("Sessions — all projects · 6 sessions beta t ")
+    expect(ui.frame()).toContain("Sessions — all projects · 6 sessions")
+    expect(searched("beta t")).toBe(true)
     expect(ui.frame()).not.toContain("beta one")
     // Backspace to "beta": both beta rows, nothing else.
     ui.app.mockInput.pressBackspace()
