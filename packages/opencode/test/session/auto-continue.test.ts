@@ -21,7 +21,11 @@ function user(text: string, metadata?: Record<string, unknown>, synthetic = fals
 
 function assistant(
   parent: SessionV1.WithParts,
-  input: { text?: string; reasoning?: string; tools?: { tool: string; status: string; answers?: string[][] }[] },
+  input: {
+    text?: string
+    reasoning?: string
+    tools?: { tool: string; status: string; answers?: string[][]; questions?: string[] }[]
+  },
   info: Record<string, unknown> = {},
 ): SessionV1.WithParts {
   const message = {
@@ -39,7 +43,11 @@ function assistant(
     parts.push({
       type: "tool",
       tool: tool.tool,
-      state: { status: tool.status, metadata: tool.answers ? { answers: tool.answers } : {} },
+      state: {
+        status: tool.status,
+        input: { questions: (tool.questions ?? []).map((question) => ({ question, header: "Question" })) },
+        metadata: tool.answers ? { answers: tool.answers } : {},
+      },
     })
   if (input.text !== undefined) parts.push({ type: "text", text: input.text })
   return { info: message, parts } as unknown as SessionV1.WithParts
@@ -183,17 +191,42 @@ describe("classify", () => {
     const asked = user("Write the plan.")
     expect(classify([asked, assistant(asked, { text: stall })], gated).kind).toBe("gate")
 
+    // A typed approval counts only as the reply to a gate the turn before put to the human.
+    const gateAsked = assistant(asked, {
+      tools: [{ tool: "question", status: "error", questions: ["Approve the plan (gate 2)?"] }],
+    })
     const typed = user("approved")
-    expect(classify([typed, assistant(typed, { text: stall })], gated)).toEqual({
+    expect(classify([asked, gateAsked, typed, assistant(typed, { text: stall })], gated)).toEqual({
       kind: "stalled",
       label: "plan approved → build",
       note: "record it",
     })
+    const askedInText = assistant(asked, { text: "The plan is in the cycle file. Do you approve it?" })
+    expect(classify([asked, askedInText, typed, assistant(typed, { text: stall })], gated).kind).toBe("stalled")
 
-    const picked = assistant(asked, { tools: [{ tool: "question", status: "completed", answers: [["Approve"]] }] })
+    const gate = ["Approve the plan?"]
+    const picked = assistant(asked, {
+      tools: [{ tool: "question", status: "completed", questions: gate, answers: [["Approve"]] }],
+    })
     expect(classify([asked, picked, assistant(asked, { text: stall })], gated).kind).toBe("stalled")
-    const rejected = assistant(asked, { tools: [{ tool: "question", status: "completed", answers: [["Revise"]] }] })
+    const rejected = assistant(asked, {
+      tools: [{ tool: "question", status: "completed", questions: gate, answers: [["Revise"]] }],
+    })
     expect(classify([asked, rejected, assistant(asked, { text: stall })], gated).kind).toBe("gate")
+  })
+
+  test("a nudge mid-phase, or a yes to another question, approves no gate", () => {
+    const gated: AutoContinue.Position = { unknown: false, done: false, pending: true, approved: { label: "x" } }
+    const stall = "Next I'll dispatch the architect subagent."
+    const asked = user("Design it.")
+    const nudge = user("proceed")
+    const msgs = [asked, assistant(asked, { text: stall }), nudge, assistant(nudge, { text: stall })]
+    expect(classify(msgs, gated).kind).toBe("gate")
+
+    const other = assistant(asked, {
+      tools: [{ tool: "question", status: "completed", questions: ["Include caching?"], answers: [["Yes"]] }],
+    })
+    expect(classify([asked, other, assistant(asked, { text: stall })], gated).kind).toBe("gate")
   })
 })
 
@@ -233,9 +266,14 @@ describe("streak and approval history", () => {
   })
 
   test("Lunos's own continuations and the Continue button are never approvals", () => {
+    const first = user("Write the plan.")
+    const ask = assistant(first, { text: "Gate 2: approve the plan?" })
     const u = user("approved")
     const c1 = cont(1)
-    expect(AutoContinue.approved([u, assistant(u, { text: "…" }), c1, assistant(c1, { text: "…" })])).toBe(true)
+    const msgs = [first, ask, u, assistant(u, { text: "…" }), c1, assistant(c1, { text: "…" })]
+    expect(AutoContinue.approved(msgs)).toBe(true)
+    // Approval read through Lunos's continuations still needs the gate the human replied to.
+    expect(AutoContinue.approved(msgs.slice(2))).toBe(false)
     const resume = user("Continue.", { [AutoContinue.RESUME]: true })
     expect(AutoContinue.approved([resume, assistant(resume, { text: "…" })])).toBe(false)
   })

@@ -142,19 +142,47 @@ export function streak(messages: readonly SessionV1.WithParts[]) {
   return count
 }
 
+const GATE = /\b(?:approv\w*|gate)\b/i
+
+/** Which of a `question` call's questions put a gate to the human (by their wording), by index. */
+function gateQuestions(part: SessionV1.Part) {
+  if (part.type !== "tool" || part.tool !== "question") return []
+  const questions = (part.state.input?.questions ?? []) as ReadonlyArray<{ question?: string; header?: string }>
+  return questions.flatMap((q, index) => (GATE.test(`${q.header ?? ""} ${q.question ?? ""}`) ? [index] : []))
+}
+
+/** Whether the turn before `index` put a gate to the human: a gate question (even a dismissed one) or asking in text. */
+function askedForApproval(messages: readonly SessionV1.WithParts[], index: number) {
+  const turn: SessionV1.WithParts[] = []
+  for (let i = index - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.info.role === "user") {
+      if (isContinuation(message)) continue
+      break
+    }
+    turn.push(message)
+  }
+  if (turn.some((message) => message.parts.some((part) => gateQuestions(part).length > 0))) return true
+  return GATE.test(tail(finalText(turn[0])))
+}
+
 /**
- * Whether the human approved this turn: an answer they picked in the `question` tool, or else the
- * message that started the turn. The "Continue" button and Lunos's own continuations never count.
+ * Whether the human approved a gate this turn: the answer to a gate question in the `question` tool,
+ * or else the message that started the turn, but only as the reply to a gate the turn before put
+ * to them. "proceed" in the middle of a phase is a nudge, not an approval, and a "Yes" to an
+ * unrelated question approves nothing. The "Continue" button and Lunos's own continuations never
+ * count.
  */
 export function approved(messages: readonly SessionV1.WithParts[]) {
-  for (const message of [...messages].reverse()) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
     if (message.info.role === "assistant") {
-      const answers = message.parts.flatMap((part) =>
-        part.type === "tool" && part.tool === "question" && part.state.status === "completed"
-          ? ((part.state.metadata?.answers ?? []) as ReadonlyArray<ReadonlyArray<string>>)
-          : [],
-      )
-      if (answers.length) return answers.every((answer) => answer.length > 0 && answer.every(approves))
+      for (const part of [...message.parts].reverse()) {
+        const gates = gateQuestions(part)
+        if (!gates.length || part.type !== "tool" || part.state.status !== "completed") continue
+        const answers = (part.state.metadata?.answers ?? []) as ReadonlyArray<ReadonlyArray<string>>
+        return gates.every((index) => !!answers[index]?.length && answers[index].every(approves))
+      }
       continue
     }
     if (isContinuation(message)) continue
@@ -162,7 +190,7 @@ export function approved(messages: readonly SessionV1.WithParts[]) {
     const typed = message.parts
       .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
       .join("\n")
-    return approves(typed)
+    return approves(typed) && askedForApproval(messages, i)
   }
   return false
 }

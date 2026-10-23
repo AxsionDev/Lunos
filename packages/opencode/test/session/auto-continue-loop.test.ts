@@ -318,22 +318,49 @@ describe("Dev-Cycle auto-continue on the live loop (XCOD-302)", () => {
     )
   }
 
-  it.instance("an approval typed as a message lets it continue past the pending gate it approves", () =>
+  it.instance("an approval typed in reply to a dismissed gate question lets it continue past that gate", () =>
     Effect.gen(function* () {
       const { session, llm } = yield* setup({ agent: "dev-cycle", cursor: { phase: "plan", gate: "pending" } })
+      const question = yield* Question.Service
+      // Turn 1: the gate is put to the human, who dismisses the card and types instead.
+      yield* say(session.id, "dev-cycle", "Write the plan.")
+      yield* llm.tool("question", {
+        questions: [
+          { header: "Gate 2", question: "Approve the plan?", options: [{ label: "Approve", description: "Build" }] },
+        ],
+      })
+      const first = yield* run(session.id).pipe(Effect.forkScoped)
+      yield* question.reject((yield* waitForQuestion).id)
+      yield* Fiber.join(first)
+
+      // Turn 2: "approved", and the model stalls instead of building.
       yield* say(session.id, "dev-cycle", "approved")
       yield* llm.text("Plan approved. Next I'll implement the host vertical slice.")
       yield* llm.tool("glob", { pattern: "**/*" })
       yield* llm.text("Step 1 is built.")
-
       yield* run(session.id)
 
       const msgs = yield* history(session.id)
       expect(label(continuations(msgs)[0])?.label).toBe("Dev-Cycle continued automatically (plan approved → build)")
       const calls = yield* modelCalls()
-      expect(calls).toHaveLength(3)
+      expect(calls).toHaveLength(4)
       // The model is told to record the approval in the cycle file first.
-      expect(JSON.stringify(calls[1])).toContain("advance `phase:` to build")
+      expect(JSON.stringify(calls[2])).toContain("advance `phase:` to build")
+    }),
+  )
+
+  it.instance('"proceed" in the middle of a gated phase is a nudge, not an approval of its gate', () =>
+    Effect.gen(function* () {
+      const { session, llm } = yield* setup({ agent: "dev-cycle", cursor: { phase: "architect", gate: "pending" } })
+      yield* say(session.id, "dev-cycle", "Design it.")
+      yield* llm.text("Next I'll dispatch the architect subagent.")
+      yield* run(session.id)
+      yield* say(session.id, "dev-cycle", "proceed")
+      yield* llm.text("Next I'll dispatch the architect subagent.")
+      yield* run(session.id)
+
+      expect(continuations(yield* history(session.id))).toHaveLength(0)
+      expect(yield* modelCalls()).toHaveLength(2)
     }),
   )
 
