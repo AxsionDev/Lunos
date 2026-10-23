@@ -39,6 +39,10 @@ const AgentFields = Schema.Struct({
     description:
       "Build agent: check the work (build, tests, start the app and try it) before handing back (default true). false restores handing back without checking (XCOD-288)",
   }),
+  auto_continue: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Build agent: continue automatically when a turn ends by announcing its next step instead of doing it (default true). Dev-Cycle uses dev_cycle.auto_continue; Plan never continues (XCOD-302)",
+  }),
 })
 
 const AgentSchema = Schema.StructWithRest(AgentFields, [Schema.Record(Schema.String, Schema.Any)])

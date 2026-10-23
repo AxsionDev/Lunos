@@ -15,6 +15,8 @@ export function resolveHostAttentionSoundPaths(
       if (typeof file !== "string") return []
       const value = options?.trim ? file.trim() : file
       if (!value) return []
+      // XCOD-311: a bundled sound ID ("alert-04") or "none" isn't a file next to tui.json.
+      if (TuiConfig.isNamedSound(value)) return [[name, value.trim()]]
       return [[name, Filesystem.resolveFilePath(root, value)]]
     }),
   )

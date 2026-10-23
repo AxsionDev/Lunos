@@ -154,6 +154,8 @@ it.instance("resolves attention config defaults and overrides", () =>
         volume: 0.4,
         sound_pack: "opencode.default",
         sounds: {},
+        notify_when: "blurred",
+        notify_subagents: false,
       })
 
       yield* fs.writeJson(path.join(test.directory, "tui.json"), {
@@ -168,7 +170,13 @@ it.instance("resolves attention config defaults and overrides", () =>
             question: pathToFileURL(path.join(test.directory, "question.mp3")).href,
             error: "./error.mp3",
             subagent_done: "./subagent-done.mp3",
+            // XCOD-311: bundled sound IDs and "none" aren't files next to tui.json.
+            permission: "alert-04",
+            done: "yup-02",
+            waiting: "none",
           },
+          notify_when: "always",
+          notify_subagents: true,
         },
       })
 
@@ -183,7 +191,12 @@ it.instance("resolves attention config defaults and overrides", () =>
           question: path.join(test.directory, "question.mp3"),
           error: path.join(test.directory, "error.mp3"),
           subagent_done: path.join(test.directory, "subagent-done.mp3"),
+          permission: "alert-04",
+          done: "yup-02",
+          waiting: "none",
         },
+        notify_when: "always",
+        notify_subagents: true,
       })
     }),
   ),

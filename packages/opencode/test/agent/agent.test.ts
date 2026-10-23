@@ -215,12 +215,15 @@ it.instance("research agent allows broad read-only tool access", () =>
 )
 
 it.instance(
-  "user permission can allow the general subagent from plan mode",
+  // XCOD-303: Plan mode dispatches read-only subagents only, whatever the config allows.
+  "user permission can't allow a writing subagent from plan mode",
   () =>
     Effect.gen(function* () {
       const plan = yield* load((svc) => svc.get("plan"))
       expect(plan).toBeDefined()
-      expect(Permission.evaluate("task", "general", plan!.permission).action).toBe("allow")
+      expect(Permission.evaluate("task", "general", plan!.permission).action).toBe("deny")
+      expect(Permission.evaluate("task", "explore", plan!.permission).action).toBe("allow")
+      expect(Permission.evaluate("task", "architect", plan!.permission).action).toBe("allow")
     }),
   {
     config: {
@@ -228,6 +231,28 @@ it.instance(
         task: {
           general: "allow",
         },
+      },
+    },
+  },
+)
+
+it.instance(
+  "plan mode may dispatch a read-only custom subagent but not a writing one (XCOD-303)",
+  () =>
+    Effect.gen(function* () {
+      const plan = yield* load((svc) => svc.get("plan"))
+      expect(Permission.evaluate("task", "reviewer", plan!.permission).action).toBe("allow")
+      expect(Permission.evaluate("task", "dotnet-builder", plan!.permission).action).toBe("deny")
+    }),
+  {
+    config: {
+      agent: {
+        reviewer: {
+          mode: "subagent",
+          description: "Reads code",
+          permission: { "*": "deny", read: "allow", grep: "allow" },
+        },
+        "dotnet-builder": { mode: "subagent", description: "Writes .NET code" },
       },
     },
   },

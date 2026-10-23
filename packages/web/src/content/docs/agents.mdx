@@ -52,6 +52,22 @@ _Mode_: `primary`
 
 Build is the **default** primary agent with all tools enabled. This is the standard agent for development work where you need full access to file operations and system commands.
 
+#### Dynamic workflows
+
+By default Build (and Dev-Cycle) runs every task that needs work as a **Dynamic workflow**: the main agent plans the steps in its todo list, dispatches a subagent for each one (independent steps in parallel, at most `subagent.max_parallel` at once, default 3), integrates what they report, and has a separate `qa` subagent verify the result before it hands back with the Verification block. The main agent keeps only read, search, todo and question tools; editing files, writing files and running commands are done by the subagents. A plain question it can answer from what it already knows is answered directly.
+
+A task that fits in one step still goes to one subagent, which costs a little extra. A step is re-dispatched at most 3 times before you're asked how to go on, and once a budget with `on_limit: stop` is used up no new subagent starts. Every subagent inherits the session's permissions, residency rules, sandbox and hooks.
+
+To have the main agent do the work itself, as before, type `/workflows off` (for this session; `/workflows on` turns it back on) or set:
+
+```json title="opencode.json"
+{
+  "workflows": { "dynamic": false }
+}
+```
+
+Subagents then stay available but optional, as `subagent.delegate` describes. The footer shows "Dynamic workflows: on" or "off". An organisation can lock `workflows.dynamic` on (to always have work reviewed by a separate agent) or off (to control cost) in managed config; `/workflows` then shows the reason and changes nothing.
+
 #### Build checks its work
 
 Before it hands back, Build verifies what it changed on your machine: it builds, runs the relevant tests, starts the app in the background and tries the change (a health URL, the changed endpoint, the page), then ends with a **Verification** block listing what it ran and what it saw. If something can't be checked here, such as a missing `.env` value or a service it can't start, it says exactly what and why instead of asking you to test.
@@ -90,6 +106,8 @@ By default, all of the following are set to `ask`:
 
 This agent is useful when you want the LLM to analyze code, suggest changes, or create plans without making any actual modifications to your codebase.
 
+Plan may dispatch only read-only subagents (`explore`, `architect`, `planner`, and your own whose permissions deny edits and commands). A subagent that can edit files or run commands is denied to it, whatever the config allows.
+
 ---
 
 ### Use research
@@ -116,6 +134,8 @@ gate: pending
 ```
 
 That position is read from the file at the start of every turn, so editing those two lines is how you approve a gate, rewind to an earlier phase, or redirect a cycle mid-flight. Rewinding changes only that file, not the conversation record — each turn's reminder is persisted, so earlier phases stay visible in the history, and only the newest reminder block is authoritative.
+
+With [Dynamic workflows](#dynamic-workflows) on (the default), the build phase is handed to a builder subagent with the approved plan, `qa` is a different subagent, and the main agent's own edit tools work on the cycle file only. With them off it implements the plan itself.
 
 The gates are advisory. Unlike `plan` and `research`, this agent holds full write permissions for the whole run — it is _instructed_ to stop at each gate rather than prevented from continuing, so a cycle that ignores a gate is possible. Review the diff at gate 3 rather than assuming nothing was written before gate 2 opened.
 

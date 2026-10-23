@@ -53,7 +53,7 @@ import { DialogConfirm } from "../../ui/dialog-confirm"
 import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
-import { Sidebar } from "./sidebar"
+import { Sidebar, startRename } from "./sidebar"
 import { PaneChip, useRightPane } from "../../component/right-pane"
 import * as RightPane from "../../util/right-pane"
 import { useBudget } from "../../component/budget-meter"
@@ -606,6 +606,12 @@ export function Session() {
         name: "rename",
       },
       run: () => {
+        // XCOD-308: in place in the sidebar when it is shown; otherwise in a prompt.
+        if (sidebarVisible()) {
+          dialog.clear()
+          startRename(route.sessionID)
+          return
+        }
         dialog.replace(() => <DialogSessionRename session={route.sessionID} />)
       },
     },
@@ -1530,6 +1536,15 @@ export function Session() {
   )
 }
 
+/** XCOD-302: the label on an automatic continuation (`metadata.auto_continue.label`), if this is one. */
+function autoContinueLine(parts: Part[]) {
+  for (const part of parts) {
+    if (part.type !== "text") continue
+    const label = (part.metadata?.auto_continue as { label?: unknown } | undefined)?.label
+    if (typeof label === "string") return label
+  }
+}
+
 function UserMessage(props: {
   message: UserMessage
   parts: Part[]
@@ -1559,9 +1574,16 @@ function UserMessage(props: {
   const metadataVisible = createMemo(() => queued() || ctx.showTimestamps())
 
   const compaction = createMemo(() => props.parts.find((x) => x.type === "compaction"))
+  // XCOD-302: Lunos's own continuation after a stalled turn shows as one dim line, not as a message.
+  const continued = createMemo(() => autoContinueLine(props.parts))
 
   return (
     <>
+      <Show when={continued()}>
+        <box paddingLeft={3} marginTop={1}>
+          <text fg={theme.textMuted}>↻ {continued()}</text>
+        </box>
+      </Show>
       <Show when={text()}>
         <box
           id={props.message.id}
@@ -1762,6 +1784,9 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
               </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>
                 <span style={{ fg: theme.textMuted }}> · interrupted</span>
+              </Show>
+              <Show when={autoContinueLine(sync.data.part[props.message.parentID] ?? [])}>
+                <span style={{ fg: theme.textMuted }}> · ↻ continued automatically</span>
               </Show>
             </text>
           </box>

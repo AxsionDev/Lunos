@@ -91,6 +91,8 @@ function config(attention: Partial<AttentionConfig["attention"]> = {}): Attentio
       volume: 0.4,
       sound_pack: "opencode.default",
       sounds: {},
+      notify_when: "blurred",
+      notify_subagents: false,
       ...attention,
     },
   }
@@ -480,5 +482,117 @@ describe("createTuiAttention", () => {
       sound: false,
       skipped: "renderer_destroyed",
     })
+  })
+})
+
+// XCOD-311: sounds chosen by bundled ID, "none", volume 0, and the settings' preview. The fake audio
+// engine stands in for the player, so nothing is heard.
+describe("createTuiAttention sound choices", () => {
+  const file = (id: string) => expect.stringMatching(new RegExp(`/ui/src/assets/audio/${id}\\.mp3$`))
+
+  test("plays the chosen bundled sound per event: approval alert-04, finished yup-02", async () => {
+    const renderer = new FakeRenderer()
+    const audio = new FakeAudioEngine()
+    const attention = createTuiAttention({
+      renderer,
+      config: config({ sounds: { permission: "alert-04", done: "yup-02" } }),
+      audio,
+    })
+
+    await attention.notify({ message: "Permission needs input", sound: { name: "permission" } })
+    await attention.notify({ message: "Session done", sound: { name: "done" } })
+    await attention.notify({ message: "Question needs input", sound: { name: "question" } })
+
+    expect(audio.loadPaths).toEqual([file("alert-04"), file("yup-02"), file("bip-bop-03")])
+  })
+
+  test("defaults stay what they were, and the two new events have their own", async () => {
+    const renderer = new FakeRenderer()
+    const audio = new FakeAudioEngine()
+    const attention = createTuiAttention({ renderer, config: config(), audio })
+
+    for (const name of ["default", "question", "permission", "error", "done", "subagent_done"] as const)
+      await attention.notify({ message: name, sound: { name } })
+    await attention.notify({ message: "waiting", sound: { name: "waiting" } })
+    await attention.notify({ message: "budget", sound: { name: "budget_warning" } })
+
+    expect(audio.loadPaths).toEqual([
+      file("bip-bop-01"),
+      file("bip-bop-03"),
+      file("staplebops-06"),
+      file("nope-03"),
+      file("bip-bop-01"),
+      file("yup-01"),
+      file("staplebops-06"),
+      file("alert-02"),
+    ])
+    expect(attention.packSound("budget_warning")).toBe("alert-02")
+  })
+
+  test('"none" is silence, not a fall-through to the pack', async () => {
+    const renderer = new FakeRenderer()
+    const audio = new FakeAudioEngine()
+    const attention = createTuiAttention({ renderer, config: config({ sounds: { error: "none" } }), audio })
+    renderer.emit("blur")
+
+    expect(await attention.notify({ message: "boom", sound: { name: "error" } })).toEqual({
+      ok: true,
+      notification: true,
+      sound: false,
+    })
+    expect(audio.loadCalls).toBe(0)
+  })
+
+  test("volume 0 or sounds off plays nothing; notifications follow their own switch", async () => {
+    for (const settings of [{ volume: 0 }, { sound: false }]) {
+      const renderer = new FakeRenderer()
+      const audio = new FakeAudioEngine()
+      const attention = createTuiAttention({ renderer, config: config(settings), audio })
+      renderer.emit("blur")
+
+      expect(await attention.notify({ message: "done", sound: { name: "done" } })).toEqual({
+        ok: true,
+        notification: true,
+        sound: false,
+      })
+      expect(audio.playCalls).toBe(0)
+      expect(renderer.notifications).toHaveLength(1)
+    }
+  })
+
+  test("a change to the running config is heard at once", async () => {
+    const renderer = new FakeRenderer()
+    const audio = new FakeAudioEngine()
+    const settings = config()
+    const attention = createTuiAttention({ renderer, config: settings, audio })
+
+    settings.attention.sounds = { done: "yup-02" }
+    settings.attention.volume = 0.7
+    await attention.notify({ message: "done", sound: { name: "done" } })
+
+    expect(audio.loadPaths).toEqual([file("yup-02")])
+    expect(audio.volumes).toEqual([0.7])
+  })
+
+  test("preview plays one sound at the configured volume and returns a stop", async () => {
+    const renderer = new FakeRenderer()
+    const audio = new FakeAudioEngine()
+    const stopped: unknown[] = []
+    const attention = createTuiAttention({
+      renderer,
+      // Alerts off: a preview still plays, it's the settings asking.
+      config: config({ enabled: false, volume: 0.6 }),
+      audio: Object.assign(audio, { stopVoice: (voice: unknown) => stopped.push(voice) > 0 }),
+    })
+
+    const stop = await attention.preview("alert-07")
+    expect(audio.loadPaths).toEqual([file("alert-07")])
+    expect(audio.volumes).toEqual([0.6])
+    stop?.()
+    expect(stopped).toEqual([1])
+
+    expect(await attention.preview("alert-07", 0)).toBeUndefined()
+    expect(await attention.preview("none")).toBeUndefined()
+    expect(audio.playCalls).toBe(1)
   })
 })

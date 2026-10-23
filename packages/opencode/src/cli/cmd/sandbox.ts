@@ -1,4 +1,6 @@
 import { EOL } from "os"
+import { spawn as spawnProcess } from "node:child_process"
+import { rmSync } from "node:fs"
 import { Effect } from "effect"
 import { cmd } from "./cmd"
 import { effectCmd, fail } from "../effect-cmd"
@@ -13,8 +15,11 @@ import { SandboxDisabled } from "@/sandbox/disabled"
 import { SandboxEffective } from "@/sandbox/effective"
 import { SandboxBackground } from "@/sandbox/background"
 import { SandboxGit } from "@/sandbox/git"
+import { SandboxConclude } from "@/sandbox/conclude"
+import { Restart } from "../restart"
 import type {
   SandboxFailure as SandboxFailureInfo,
+  SandboxHandback,
   SandboxHost,
   SandboxSaved,
   SandboxState,
@@ -103,68 +108,290 @@ async function credentials(): Promise<Record<string, unknown>> {
 const secrets = (all: Record<string, unknown>): Record<string, string> =>
   Object.keys(all).length ? { OPENCODE_AUTH_CONTENT: JSON.stringify(all) } : {}
 
-function reportHandoff(result: Sandbox.Handoff) {
+/** What came back, as lines (printed with the "sandbox" prefix). */
+export function reportLines(result: Sandbox.Handoff) {
+  const lines: string[] = []
+  // XCOD-301: nothing changed: there was nothing to copy out, and no branch was made.
+  if (result.unchanged) lines.push("no changes in the workspace, so nothing was handed back")
   // XCOD-282: nothing is written into a plain folder until you ask.
-  const folder = result.source === "folder" && result.mode !== "none"
+  const folder = result.source === "folder" && result.mode !== "none" && !result.unchanged
   if (folder)
-    say(
+    lines.push(
       `results kept for ${result.root} (not a git repository): ` +
         `${UI.Style.TEXT_HIGHLIGHT_BOLD}lunos sandbox apply ${result.id}${UI.Style.TEXT_NORMAL} writes them into it`,
     )
-  else if (result.mode === "branch")
-    say(
+  else if (result.mode === "branch" && !result.unchanged)
+    lines.push(
       `results on branch ${UI.Style.TEXT_HIGHLIGHT_BOLD}${result.branch}${UI.Style.TEXT_NORMAL} (${result.commit?.slice(0, 12)})`,
     )
-  if (result.mode === "patch")
-    say(
+  if (result.mode === "patch" && !result.unchanged)
+    lines.push(
       `${folder ? "also " : ""}the agent's changes are in ${UI.Style.TEXT_HIGHLIGHT_BOLD}${result.patch}${UI.Style.TEXT_NORMAL} (git apply)`,
     )
-  if (result.mode !== "none") {
-    for (const file of result.files) say(`  ${file.status}\t${file.path}`)
-    if (result.files.length === 0) say("  no changes")
-  } else if (result.workspace === "mount") say("the agent's changes are already in your working tree (workspace mount)")
-  else say('changes not handed back (sandbox.results is "none")')
-  say(`transcript and summary in ${result.results}`)
+  if (result.mode !== "none" && !result.unchanged) {
+    for (const file of result.files) lines.push(`  ${file.status}\t${file.path}`)
+    if (result.files.length === 0) lines.push("  no changes")
+  } else if (result.mode === "none" && result.workspace === "mount")
+    lines.push("the agent's changes are already in your working tree (workspace mount)")
+  else if (result.mode === "none") lines.push('changes not handed back (sandbox.results is "none")')
+  lines.push(`transcript and summary in ${result.results}`)
+  return lines
+}
+
+/** The handoff step's detail: "3 files, 1 commit", "skipped: no changes". */
+function handoffDetail(result: Sandbox.Handoff) {
+  if (result.unchanged) return "skipped: no changes"
+  if (result.mode === "none") return "transcript only"
+  const files = `${result.files.length} file${result.files.length === 1 ? "" : "s"}`
+  return result.files.length && result.commit ? `${files}, 1 commit` : files
+}
+
+type Outcome = { failed: boolean; label: string }
+
+/** The server of a sandbox the helper concludes: still running (the usual case), or started again (Retry). */
+async function reconnect(info: Sandbox.Meta) {
+  if (await Sandbox.SandboxDocker.running(info.id)) {
+    const conn = Sandbox.connection(info, await Sandbox.SandboxDocker.hostPort(info.id))
+    const ok = await fetch(`${conn.url}/global/health`, { headers: conn.headers, signal: AbortSignal.timeout(5000) })
+      .then((response) => response.ok)
+      .catch(() => false)
+    if (ok) return conn
+  }
+  return Sandbox.start(info, { secrets: secrets(await credentials()) })
 }
 
 /**
- * Hand the results back, then apply the lifecycle policy. Nothing is destroyed unless the handoff
- * succeeded: on failure the container is stopped and kept, and the reason is shown.
+ * XCOD-301: hand the results back, then apply the lifecycle policy, writing each step to the
+ * helper's state file (`lunos sandbox status <id>`). Nothing is destroyed unless the handoff
+ * succeeded: on failure the container is stopped and kept, the error goes to the run log, and the
+ * next start in the project says so. What used to run in the foreground when Lunos exited.
  */
-async function conclude(
-  info: Sandbox.Meta,
-  conn: Sandbox.Connection,
-  outcome: { failed: boolean; label: string },
-  policy = info.on_finish,
-) {
+export async function concludeWork(info: Sandbox.Meta, outcome: Outcome, policy = info.on_finish) {
+  const previous = SandboxConclude.read(info.id)
+  const state: SandboxConclude.State = {
+    id: info.id,
+    root: info.root,
+    state: "running",
+    pid: process.pid,
+    started: previous?.state === "running" ? previous.started : new Date().toISOString(),
+    steps: [],
+    lines: [],
+    ...(RunLog.current() ? { log: RunLog.current() } : {}),
+    input: { ...outcome, policy },
+  }
+  const save = () => {
+    try {
+      SandboxConclude.write(state)
+    } catch {}
+  }
+  save()
+  const step = async <T>(label: string, run: () => Promise<T>, detail?: (value: T) => string | undefined) => {
+    const item: SandboxConclude.Step = { label, started: new Date().toISOString() }
+    state.steps.push(item)
+    save()
+    const value = await run()
+    item.finished = new Date().toISOString()
+    item.detail = detail?.(value)
+    save()
+    return value
+  }
+
   let result: Sandbox.Handoff
   try {
-    result = await Sandbox.handoff(info, conn, { outcome: outcome.label })
-  } catch (error) {
-    await Sandbox.retain(info, "handoff failed")
-    UI.error(
-      `Couldn't hand the results back, so sandbox ${info.id} was kept (stopped) whatever sandbox.on_finish says: ` +
-        (error instanceof Error ? error.message : String(error)),
+    const conn = await step("Connecting to the sandbox", () => reconnect(info))
+    const same = await step(
+      "Checking for changes",
+      () => Sandbox.unchanged(info),
+      (value) => (value ? "none" : undefined),
     )
-    say(`inspect it with \`lunos sandbox attach ${info.id}\`, remove it with \`lunos sandbox destroy ${info.id}\``)
-    process.exitCode = 1
-    return
-  }
-  reportHandoff(result)
-  const refused = (await Sandbox.collectEgress(info)).filter((item) => !item.allowed)
-  if (refused.length) {
-    const hosts = [...new Set(refused.map((item) => `${item.host}:${item.port}`))]
-    say(`network ${info.network}: refused ${refused.length} connection(s) to ${hosts.join(", ")}`)
-  }
-  const failed = outcome.failed || result.failed
-  const done = await Sandbox.finish(info, { failed, commit: result.commit, files: result.files.length }, policy)
-  if (done === "destroyed") say(`destroyed ${info.id} (container and volumes)`)
-  else
-    say(
-      `kept ${info.id} (stopped${failed && policy === "destroy_on_success" ? ", because the task failed" : ""}` +
-        `${info.expires ? `, until ${info.expires}` : ""}): ` +
+    if (same) RunLog.note("sandbox", `${info.id}: handoff skipped: no changes`)
+    result = await step(
+      same ? "Saving the transcript" : "Handing back results",
+      () => Sandbox.handoff(info, conn, { outcome: outcome.label }, { unchanged: same }),
+      handoffDetail,
+    )
+  } catch (error) {
+    await Sandbox.retain(info, "handoff failed").catch(() => {})
+    RunLog.failure("sandbox", error, { headline: `Couldn't hand the results of sandbox ${info.id} back` })
+    state.state = "failed"
+    state.finished = new Date().toISOString()
+    state.reason = SandboxFailure.describe(error)
+    state.outcome = "retained"
+    state.lines.push(
+      `kept ${info.id} (stopped) whatever sandbox.on_finish says: \`lunos sandbox conclude ${info.id}\` tries again, ` +
         `\`lunos sandbox attach ${info.id}\` reopens it, \`lunos sandbox destroy ${info.id}\` removes it`,
     )
+    save()
+    return state
+  }
+  state.lines.push(...reportLines(result))
+  // Only a policy can refuse anything; collectEgress reads only what's new since the last time.
+  if (info.network && info.network !== "open") {
+    const refused = await step(
+      "Reading the network log",
+      async () => (await Sandbox.collectEgress(info)).filter((item) => !item.allowed),
+      (items) => (items.length ? `${items.length} refused` : "nothing refused"),
+    ).catch(() => [])
+    if (refused.length) {
+      const hosts = [...new Set(refused.map((item) => `${item.host}:${item.port}`))]
+      state.lines.push(`network ${info.network}: refused ${refused.length} connection(s) to ${hosts.join(", ")}`)
+    }
+  }
+  const failed = outcome.failed || result.failed
+  const destroying = Sandbox.destroys(policy, { failed })
+  try {
+    state.outcome = await step(destroying ? "Removing the container" : "Stopping the container", () =>
+      Sandbox.finish(info, { failed, commit: result.commit, files: result.files.length }, policy),
+    )
+    if (state.outcome === "destroyed") state.lines.push(`destroyed ${info.id} (container and volumes)`)
+    else
+      state.lines.push(
+        `kept ${info.id} (stopped${failed && policy === "destroy_on_success" ? ", because the task failed" : ""}` +
+          `${info.expires ? `, until ${info.expires}` : ""}): ` +
+          `\`lunos sandbox attach ${info.id}\` reopens it, \`lunos sandbox destroy ${info.id}\` removes it`,
+      )
+  } catch (error) {
+    // The results are back; only the clean-up didn't happen.
+    RunLog.note("sandbox", `${info.id}: couldn't ${destroying ? "remove" : "stop"} it: ${RunLog.describe(error)}`)
+    state.lines.push(
+      `the results are back, but ${info.id} couldn't be ${destroying ? "removed" : "stopped"}: ${SandboxFailure.describe(error)}; ` +
+        `\`lunos sandbox destroy ${info.id}\` removes it`,
+    )
+  }
+  state.state = "done"
+  state.finished = new Date().toISOString()
+  save()
+  return state
+}
+
+/** The helper's arguments: `lunos sandbox conclude <id> --background …`. */
+export function concludeArgs(id: string, outcome: Outcome, policy: Sandbox.Meta["on_finish"]) {
+  return [
+    "sandbox",
+    "conclude",
+    id,
+    "--background",
+    "--label",
+    outcome.label,
+    "--policy",
+    policy,
+    ...(outcome.failed ? ["--failed"] : []),
+  ]
+}
+
+/**
+ * XCOD-301: start the helper, detached: its own process group (a session on Linux/macOS), so the
+ * terminal's Ctrl+C and hang-up never reach it; on Windows without a console window, so closing
+ * the terminal doesn't end it (untested there). False when it couldn't be started.
+ */
+export function spawnHelper(id: string, root: string, args: string[]) {
+  SandboxConclude.write({ id, root, state: "running", started: new Date().toISOString(), steps: [], lines: [] })
+  try {
+    const self = Restart.selfCommand(args)
+    const child = spawnProcess(self.argv[0], self.argv.slice(1), {
+      cwd: self.cwd,
+      env: self.env as NodeJS.ProcessEnv,
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      windowsVerbatimArguments: self.verbatim,
+    })
+    child.on("error", (error) => RunLog.note("sandbox", `the background helper failed: ${RunLog.describe(error)}`))
+    child.unref()
+    if (child.pid !== undefined) return true
+  } catch (error) {
+    RunLog.note("sandbox", `couldn't start the background helper: ${RunLog.describe(error)}`)
+  }
+  rmSync(SandboxConclude.file(id), { force: true })
+  return false
+}
+
+const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+/**
+ * XCOD-301: `on_exit: "wait"`: follow the helper, a line per finished step with its time and a
+ * spinner on the running one. Ctrl+C stops following (undefined); the helper goes on.
+ */
+export async function follow(id: string, print = say) {
+  const tty = Boolean(process.stderr.isTTY)
+  let shown = 0
+  let frame = 0
+  let interrupted = false
+  const onInterrupt = () => {
+    interrupted = true
+  }
+  process.on("SIGINT", onInterrupt)
+  const clear = () => tty && process.stderr.write("\r\x1b[2K")
+  try {
+    while (true) {
+      const state = SandboxConclude.current(id)
+      clear()
+      for (; state && shown < state.steps.length && state.steps[shown].finished; shown++)
+        print(SandboxConclude.stepLine(state.steps[shown]))
+      if (!state || state.state !== "running") return state
+      if (interrupted) return undefined
+      const running = state.steps[shown]
+      if (tty)
+        process.stderr.write(
+          `${SPINNER[frame++ % SPINNER.length]} ${running ? SandboxConclude.stepLine(running) : "Starting…"}`,
+        )
+      await Bun.sleep(100)
+    }
+  } finally {
+    process.off("SIGINT", onInterrupt)
+    clear()
+  }
+}
+
+/** A finished helper's report, as the foreground printed it before XCOD-301; failure sets the exit code. */
+function report(state: SandboxConclude.State) {
+  if (state.state === "failed") {
+    UI.error(`Couldn't hand the results of sandbox ${state.id} back: ${state.reason ?? "unknown error"}`)
+    process.exitCode = 1
+  }
+  for (const line of state.lines) say(line)
+  if (state.state === "failed" && state.log) say(`log: ${state.log.file}`)
+}
+
+/** How long quitting may spend finding out whether anything changed, for its last line. */
+const QUICK_CHECK = 600
+
+/**
+ * XCOD-301: Lunos is done with the sandbox. The detached helper hands the results back and applies
+ * the lifecycle policy; "background" returns at once with one line saying so, "wait" follows it.
+ * When the helper can't be started, the work is done here, as before.
+ */
+async function leave(
+  info: Sandbox.Meta,
+  conn: Sandbox.Connection,
+  outcome: Outcome,
+  mode: "background" | "wait",
+  policy = info.on_finish,
+) {
+  RunLog.note("sandbox", `${info.id}: server ${conn.url}, workspace ${conn.directory}`)
+  // The helper reads the metadata from disk: what changed here (attach clears the expiry) goes first.
+  await Sandbox.persist(info).catch(() => {})
+  if (!spawnHelper(info.id, info.root, concludeArgs(info.id, outcome, policy))) {
+    for (const step of (await concludeWork(info, outcome, policy)).steps) say(SandboxConclude.stepLine(step))
+    report(SandboxConclude.read(info.id)!)
+    return
+  }
+  if (mode === "background") {
+    const same = await Promise.race([
+      Sandbox.unchanged(info, QUICK_CHECK).catch(() => false),
+      Bun.sleep(QUICK_CHECK).then(() => false),
+    ])
+    const removing = Sandbox.destroys(policy, outcome) ? "Removing" : "Stopping"
+    UI.println(
+      same
+        ? `No changes in the sandbox. ${removing} it in the background.`
+        : `Saving your sandbox results in the background (sandbox ${info.id}) — \`lunos sandbox status ${info.id}\` to follow.`,
+    )
+    return
+  }
+  const state = await follow(info.id)
+  if (state) return report(state)
+  UI.println(`Continuing in the background (sandbox ${info.id}) — \`lunos sandbox status ${info.id}\` to follow.`)
 }
 
 /**
@@ -183,6 +410,9 @@ async function launch(
     const loaded = SandboxConfig.load(directory)
     const config = { ...loaded, on_finish: override ?? loaded.on_finish }
     await hostAudit()
+    // XCOD-301: a handoff still running in the background for this project finishes first: the new
+    // sandbox and the results branch never overlap it.
+    await SandboxConclude.settle(directory, log)
     await pruneExpired(log)
     log("starting")
     const stored = await credentials()
@@ -192,7 +422,7 @@ async function launch(
   options.created?.(info)
   log(`${info.id}: image ${info.image.digest ?? info.image.id}, on_finish ${info.on_finish}`)
   try {
-    const conn = await Sandbox.start(info, { secrets: secrets(stored) })
+    const conn = await Sandbox.start(info, { secrets: secrets(stored), baseline: true })
     return { info, conn }
   } catch (error) {
     await Sandbox.retain(info, "start failed").catch(() => {})
@@ -263,7 +493,9 @@ async function session(
     process.off("SIGTERM", interrupted)
     const failed = process.exitCode !== undefined && process.exitCode !== 0
     process.exitCode = failed ? process.exitCode : before
-    await conclude(info, conn, { failed, label: failed ? "failed" : "finished" }, policy)
+    // XCOD-301: `lunos run` waits in CI and when piped (a job needs the results), unless sandbox.on_exit says.
+    const mode = SandboxConfig.exitMode(SandboxConfig.load(info.root), "run")
+    await leave(info, conn, { failed, label: failed ? "failed" : "finished" }, mode, policy)
   }
 }
 
@@ -370,6 +602,44 @@ export function sandboxOff(
     retry: () => {},
     reenable: () => SandboxDisabled.clear(directory),
     doctor: () => doctor(directory),
+  }
+}
+
+/**
+ * XCOD-301: results from this project that a background handoff couldn't save, for the toast at
+ * start; undefined when there are none (reading the files is all it costs). Retry runs the helper
+ * again; Attach is remembered for `attachRequested`, which reopens it once the TUI has exited.
+ */
+export function sandboxHandback(
+  directory: string,
+): (SandboxHandback & { attachRequested(): string | undefined }) | undefined {
+  const list = () =>
+    SandboxConclude.unsaved(directory, Sandbox.exists).map((item) => ({
+      id: item.id,
+      reason: item.reason ?? "unknown error",
+      ...(item.log ? { log: item.log } : {}),
+    }))
+  if (!list().length) return undefined
+  let attach: string | undefined
+  return {
+    unsaved: list,
+    async retry(id) {
+      const before = SandboxConclude.read(id)
+      const input = before?.input ?? { failed: false, label: "finished", policy: "retain" as const }
+      if (!spawnHelper(id, before?.root ?? directory, concludeArgs(id, input, input.policy)))
+        return { ok: false, reason: "the background helper couldn't be started" }
+      while (SandboxConclude.busy(id)) await Bun.sleep(250)
+      const state = SandboxConclude.current(id)
+      if (state?.state !== "done") return { ok: false, reason: state?.reason ?? "unknown error" }
+      const handed = state.steps.find(
+        (step) => step.label === "Handing back results" || step.label === "Saving the transcript",
+      )
+      return { ok: true, detail: handed?.detail ?? "done" }
+    },
+    attach(id) {
+      attach = id
+    },
+    attachRequested: () => attach,
   }
 }
 
@@ -484,9 +754,15 @@ export async function sandboxTui(
       process.off("SIGTERM", interrupted)
       const conn = background.connection()
       if (conn && info) {
-        say(`server ${conn.url}, workspace ${conn.directory}`)
+        // XCOD-301: no more "server …, workspace …" here: it was the last line on screen while the
+        // results came back, and looked frozen. It's in the run log; the helper does the rest.
         const unsuccessful = process.exitCode !== undefined && process.exitCode !== 0
-        await conclude(info, conn, { failed: unsuccessful, label: unsuccessful ? "failed" : "finished" })
+        await leave(
+          info,
+          conn,
+          { failed: unsuccessful, label: unsuccessful ? "failed" : "finished" },
+          SandboxConfig.exitMode(SandboxConfig.load(directory), "tui"),
+        )
         return
       }
       const state = background.host.state()
@@ -496,6 +772,17 @@ export async function sandboxTui(
       }
     },
   }
+}
+
+/**
+ * XCOD-301: refused while a helper is handing this sandbox's results back: it starts and stops the
+ * same container.
+ */
+async function notBusy(id: string) {
+  if (SandboxConclude.busy(id))
+    throw new Error(
+      `Sandbox ${id} is still saving its results in the background. \`lunos sandbox status ${id}\` follows it; try again once it's done`,
+    )
 }
 
 /** Every `lunos sandbox` subcommand runs these first. */
@@ -575,7 +862,7 @@ export const SandboxAttachCommand = effectCmd({
   builder: (yargs) => yargs.positional("id", { type: "string", demandOption: true }),
   handler: Effect.fn("Cli.sandbox.attach")(function* (args) {
     yield* prepare
-    const info = yield* attempt(() => Sandbox.meta(args.id))
+    const info = yield* attempt(() => notBusy(args.id).then(() => Sandbox.meta(args.id)))
     yield* Effect.promise(async () => {
       // Reopened, it no longer expires on the old schedule; leaving it again sets a new one.
       info.expires = undefined
@@ -585,7 +872,8 @@ export const SandboxAttachCommand = effectCmd({
         await attachTui(conn, { continue: true })
       } finally {
         // A reopened sandbox is kept whatever on_finish says: it was retained to be inspected.
-        await conclude(info, conn, { failed: false, label: "attached" }, "retain")
+        const mode = SandboxConfig.exitMode(SandboxConfig.load(info.root), "attach")
+        await leave(info, conn, { failed: false, label: "attached" }, mode, "retain")
       }
     })
   }),
@@ -598,7 +886,7 @@ export const SandboxDestroyCommand = effectCmd({
   builder: (yargs) => yargs.positional("id", { type: "string", demandOption: true }),
   handler: Effect.fn("Cli.sandbox.destroy")(function* (args) {
     yield* prepare
-    yield* attempt(() => Sandbox.destroy(args.id))
+    yield* attempt(() => notBusy(args.id).then(() => Sandbox.destroy(args.id)))
     yield* writeStdoutEffect(`Destroyed sandbox ${args.id}.${EOL}`)
   }),
 })
@@ -611,7 +899,7 @@ export const SandboxApplyCommand = effectCmd({
   builder: (yargs) => yargs.positional("id", { type: "string", demandOption: true }),
   handler: Effect.fn("Cli.sandbox.apply")(function* (args) {
     yield* prepare
-    const applied = yield* attempt(() => Sandbox.apply(args.id))
+    const applied = yield* attempt(() => notBusy(args.id).then(() => Sandbox.apply(args.id)))
     const lines = [
       ...applied.written.map((file) => `  wrote    ${file}`),
       ...applied.deleted.map((file) => `  deleted  ${file}`),
@@ -667,7 +955,7 @@ export const SandboxStopCommand = effectCmd({
   builder: (yargs) => yargs.positional("id", { type: "string", demandOption: true }),
   handler: Effect.fn("Cli.sandbox.stop")(function* (args) {
     yield* prepare
-    const info = yield* attempt(() => Sandbox.meta(args.id))
+    const info = yield* attempt(() => notBusy(args.id).then(() => Sandbox.meta(args.id)))
     yield* attempt(() => Sandbox.retain(info, "stopped"))
     yield* writeStdoutEffect(`Stopped sandbox ${args.id}; it is kept.${EOL}`)
   }),
@@ -677,11 +965,38 @@ export const SandboxStopCommand = effectCmd({
  * XCOD-297: `lunos sandbox status`: whether the next start here uses the sandbox, and which files
  * decide it. Files only: no Docker, no project instance, so it works when nothing else starts.
  */
+/** XCOD-301: `lunos sandbox status <id>`: where its background handoff is, or how it ended. */
+export function statusLines(state: SandboxConclude.State, now = Date.now()) {
+  const head = {
+    running: `Sandbox ${state.id}: saving its results in the background`,
+    done: `Sandbox ${state.id}: done, ${state.outcome === "destroyed" ? "results saved and the sandbox removed" : "results saved"}`,
+    failed: `Sandbox ${state.id}: failed, the results weren't saved: ${state.reason ?? "unknown error"}`,
+  }[state.state]
+  return [
+    head,
+    ...state.steps.map(
+      (step) =>
+        `  ${step.finished ? "✓" : state.state === "running" ? "…" : "✗"} ${SandboxConclude.stepLine(step, now)}`,
+    ),
+    ...(state.state === "running" ? [] : state.lines.map((line) => `  ${line}`)),
+    ...(state.log ? [`  log: ${state.log.file}`] : []),
+  ]
+}
+
 export const SandboxStatusCommand = effectCmd({
-  command: "status",
-  describe: "whether the sandbox is on here, and which config file turns it on",
+  command: "status [id]",
+  describe:
+    "whether the sandbox is on here, and which config file turns it on; with an id, where that sandbox's results are (saving in the background, done, or failed and why)",
   instance: false,
-  handler: Effect.fn("Cli.sandbox.status")(function* () {
+  builder: (yargs) => yargs.positional("id", { type: "string", describe: "a sandbox's id" }),
+  handler: Effect.fn("Cli.sandbox.status")(function* (args) {
+    if (args.id) {
+      const id = args.id
+      const state = SandboxConclude.current(id)
+      if (state) return yield* writeStdoutEffect(statusLines(state).join(EOL) + EOL)
+      yield* attempt(() => Sandbox.meta(id))
+      return yield* writeStdoutEffect(`Sandbox ${id}: no results being saved or saved in the background.${EOL}`)
+    }
     const directory = process.env.PWD ?? process.cwd()
     const state = SandboxEffective.resolve(directory)
     const view = SandboxEffective.view(state)
@@ -721,6 +1036,48 @@ export const SandboxOffCommand = effectCmd({
   }),
 })
 
+/**
+ * XCOD-301: hand a sandbox's results back and apply sandbox.on_finish. Quitting Lunos starts it
+ * detached (`--background`); run by hand, it tries again after a failed handoff, with the same
+ * policy unless --policy says otherwise.
+ */
+export const SandboxConcludeCommand = effectCmd({
+  command: "conclude <id>",
+  describe:
+    "hand a sandbox's results back and apply sandbox.on_finish (what quitting Lunos runs in the background); tries again after a failed handoff",
+  instance: false,
+  builder: (yargs) =>
+    yargs
+      .positional("id", { type: "string", demandOption: true })
+      .option("policy", {
+        type: "string",
+        choices: ["destroy", "retain", "destroy_on_success"] as const,
+        describe: "what to do with it once the results are back (default: as before, else sandbox.on_finish)",
+      })
+      .option("failed", { type: "boolean", hidden: true })
+      .option("label", { type: "string", hidden: true })
+      .option("background", { type: "boolean", hidden: true }),
+  handler: Effect.fn("Cli.sandbox.conclude")(function* (args) {
+    const id = args.id
+    yield* Effect.promise(() => hostAudit())
+    // The process that started this helper marked it running already; run by hand, it may not overlap one.
+    if (!args.background) yield* attempt(() => notBusy(id))
+    const info = yield* attempt(() => Sandbox.meta(id))
+    const before = SandboxConclude.read(id)?.input
+    const outcome = {
+      failed: args.failed ?? before?.failed ?? false,
+      label: args.label ?? before?.label ?? "finished",
+    }
+    const policy = (args.policy as Sandbox.Meta["on_finish"] | undefined) ?? before?.policy ?? info.on_finish
+    const state = yield* Effect.promise(() => concludeWork(info, outcome, policy))
+    yield* Effect.promise(() => Promise.race([AuditLog.flush(), Bun.sleep(3000)]))
+    if (!args.background) {
+      for (const step of state.steps) say(SandboxConclude.stepLine(step))
+      report(state)
+    } else if (state.state === "failed") process.exitCode = 1
+  }),
+})
+
 /** Run by the egress container (see src/sandbox/egress.ts); not for people. */
 export const SandboxEgressCommand = cmd({
   command: "egress",
@@ -751,6 +1108,7 @@ export const SandboxCommand = cmd({
       .command(SandboxApplyCommand)
       .command(SandboxLogsCommand)
       .command(SandboxStopCommand)
+      .command(SandboxConcludeCommand)
       .command(SandboxDestroyCommand)
       .command(SandboxPruneCommand)
       .command(SandboxDoctorCommand)
