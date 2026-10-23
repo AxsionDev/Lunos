@@ -21,6 +21,16 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Hide the right pane for more room, without missing anything in it.** Click `»` at the top of a
+  session's right pane, or press `ctrl+x b`, and the conversation, diffs and prompt take the full
+  width. `«` at the bottom-right brings the pane back, and while it's hidden it shows a coloured dot
+  and a count when something there needs you: a subagent waiting for action, a budget warning, or a
+  failed LSP or MCP server. Settings › Appearance › Layout › **Right pane** chooses Auto (the default,
+  as before), Always show or Hidden, and remembers it across restarts. Claude Code and Codex
+  sessions and the Agent Monitor's session list each remember their own choice.
+
 ## [1.18.55] - 2026-10-22
 
 ### Added
