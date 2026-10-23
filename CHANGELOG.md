@@ -40,10 +40,10 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
 
 ### Fixed
 
-- **Quitting a TUI connected over HTTP (a sandbox, `lunos attach`) no longer ends in "Lunos stopped
-  because of an unexpected error: AbortError".** The cancelled event stream was reported as an
-  unhandled error, which stopped Lunos before it handed a sandbox's results back, leaving the
-  container running. <!-- XCOD-301 -->
+- **Quitting a TUI connected over HTTP (a sandbox, `lunos attach`) can no longer end in "Lunos
+  stopped because of an unexpected error: AbortError".** The cancelled event stream could be
+  reported as an unhandled error, which stopped Lunos before it handed a sandbox's results back and
+  left the container running. <!-- XCOD-301 -->
 
 ## [1.18.55] - 2026-10-22
 

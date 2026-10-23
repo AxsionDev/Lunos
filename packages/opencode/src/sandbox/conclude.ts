@@ -155,6 +155,23 @@ export function unsaved(directory: string, exists: (id: string) => boolean) {
   return all().filter((item) => item.state === "failed" && belongs(item, directory) && exists(item.id))
 }
 
+/** How long a finished helper's state stays for `lunos sandbox status <id>`: as long as run logs do. */
+export const KEEP = 14 * 86_400_000
+
+/**
+ * Remove what no one needs any more: finished helpers older than `keep`, and failed ones whose
+ * sandbox has been destroyed since (nothing left to save). Run with `prune`. Returns the ids.
+ */
+export function tidy(exists: (id: string) => boolean, now = Date.now(), keep = KEEP) {
+  const gone = all().filter(
+    (item) =>
+      (item.state === "done" && now - Date.parse(item.finished ?? item.started) > keep) ||
+      (item.state === "failed" && !exists(item.id)),
+  )
+  for (const item of gone) fs.rmSync(file(item.id), { force: true })
+  return gone.map((item) => item.id)
+}
+
 /**
  * Wait for this project's running helpers, so a new sandbox (or anything touching the results
  * branch) never overlaps one. `log` gets a line when the wait starts. Gives up after `timeout`.

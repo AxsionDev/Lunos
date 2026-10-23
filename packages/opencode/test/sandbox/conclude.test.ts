@@ -123,6 +123,19 @@ describe("the helper's state", () => {
     expect(none).toEqual([])
   })
 
+  test("tidy drops old finished states and failed ones whose sandbox is gone; keeps the rest", () => {
+    const now = Date.parse("2026-10-23T00:00:00.000Z")
+    const old = state({ id: "x301t1", root: "/p", state: "done", finished: "2026-09-01T00:00:00.000Z" })
+    const recent = state({ id: "x301t2", root: "/p", state: "done", finished: "2026-10-22T00:00:00.000Z" })
+    const orphan = state({ id: "x301t3", root: "/p", state: "failed" })
+    const kept = state({ id: "x301t4", root: "/p", state: "failed" })
+    for (const item of [old, recent, orphan, kept]) SandboxConclude.write(item)
+    const removed = SandboxConclude.tidy((id) => id === kept.id, now)
+    expect(removed.sort()).toEqual([old.id, orphan.id].sort())
+    expect(SandboxConclude.read(recent.id)).toBeDefined()
+    expect(SandboxConclude.read(kept.id)).toBeDefined()
+  })
+
   test("prune leaves a sandbox alone while its results are being handed back, or weren't", async () => {
     const dir = path.join(Global.Path.state, "sandbox")
     await fs.mkdir(dir, { recursive: true })

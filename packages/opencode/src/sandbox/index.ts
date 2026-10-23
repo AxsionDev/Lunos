@@ -17,6 +17,7 @@ import { SandboxGit } from "./git"
 import { SandboxMount } from "./mount"
 import { SandboxDevcontainer } from "./devcontainer"
 import { SandboxConclude } from "./conclude"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
 import { RunBudget } from "@/agent/run-budget"
 
 // XCOD-144 slice 1: the lifecycle of one sandbox. `create` copies the repo into a container volume
@@ -591,6 +592,9 @@ export function connection(info: Meta, port: number): Connection {
   }
 }
 
+/** XCOD-301: how long the first start may spend recording the workspace (see `unchanged`). */
+export const BASELINE_TIMEOUT = 5_000
+
 export async function start(
   info: Meta,
   options: { secrets?: Record<string, string>; attach?: boolean; timeoutMs?: number; baseline?: boolean } = {},
@@ -603,11 +607,13 @@ export async function start(
   if (options.attach) AuditLog.emit("sandbox.attach", auditFields(info))
   // XCOD-301: the first start records the workspace as the agent found it, while the server comes
   // up (no prompt reaches it before this returns). A mounted tree's .git is read-only: never there.
+  // About a second for 8,000 files; capped, since without it the only cost is no skipped handoff.
   const baseline =
     options.baseline && !info.baseline && !info.handedOff && info.workspace !== "mount"
-      ? SandboxDocker.workspaceTree(info.id, info.identity)
+      ? SandboxDocker.workspaceTree(info.id, info.identity, BASELINE_TIMEOUT)
           .then(async (tree) => {
-            if (!tree) return
+            if (!tree)
+              return RunLog.note("sandbox", `${info.id}: no baseline of the workspace, so the handoff won't be skipped`)
             info.baseline = tree
             await saveMeta(info)
           })
@@ -880,6 +886,9 @@ export async function prune(now = Date.now()) {
     AuditLog.emit("sandbox.prune", { ...auditFields(info), expires: info.expires })
     removed.push(info.id)
   }
+  try {
+    SandboxConclude.tidy(exists, now)
+  } catch {}
   return removed
 }
 

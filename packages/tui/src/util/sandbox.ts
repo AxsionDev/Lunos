@@ -111,6 +111,8 @@ export function unsavedToast(item: SandboxUnsaved, more = 0) {
   return [
     `⚠ Results from sandbox ${item.id} weren't saved: ${item.reason}`,
     "The sandbox is kept (stopped), with the agent's work in it.",
+    // The actions are mouse-only; the same from the shell.
+    `\`lunos sandbox conclude ${item.id}\` tries again; \`lunos sandbox destroy ${item.id}\` gives them up.`,
     ...(more ? [`${more} more: \`lunos sandbox status <id>\``] : []),
   ].join("\n")
 }
