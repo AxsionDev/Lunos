@@ -1,6 +1,7 @@
 // The tui.json schema, without the Solid context, so the CLI can read it outside the TUI (XCOD-128).
 import { Schema } from "effect"
 import { TuiKeybind } from "./keybind"
+import { NO_SOUND, SOUND_EVENTS, isSoundID } from "@opencode-ai/ui/sounds"
 
 export const AttentionSoundName = Schema.Literals([
   "default",
@@ -9,6 +10,9 @@ export const AttentionSoundName = Schema.Literals([
   "error",
   "done",
   "subagent_done",
+  // XCOD-311: a subagent blocked on your approval or answer, and a budget threshold reached.
+  "waiting",
+  "budget_warning",
 ])
 export type AttentionSoundName = Schema.Schema.Type<typeof AttentionSoundName>
 
@@ -36,15 +40,47 @@ export const Cursor = Schema.Struct({
   }),
 }).annotate({ description: "Terminal cursor settings" })
 
-export const AttentionSounds = Schema.Record(AttentionSoundName, Schema.optionalKey(Schema.String))
+export const AttentionSounds = Schema.Record(AttentionSoundName, Schema.optionalKey(Schema.String)).annotate({
+  description:
+    'Per event: a bundled sound ID (e.g. "alert-04"), "none" for silence, or a path to an .mp3, .aac or .wav file',
+})
 export type AttentionSoundPaths = Schema.Schema.Type<typeof AttentionSounds>
+/** XCOD-311: a bundled sound ID or `none`, as opposed to a file path (which is resolved against tui.json). */
+export function isNamedSound(value: string) {
+  const text = value.trim()
+  return text === NO_SOUND || isSoundID(text)
+}
+/** XCOD-311: what /settings calls each `attention.*` key, and each event (`attention.sounds.done`, …). */
+export const AttentionLabels: Record<string, string> = {
+  enabled: "Alerts",
+  notifications: "Desktop notifications",
+  sound: "Sounds",
+  volume: "Volume",
+  sound_pack: "Sound pack",
+  notify_when: "When",
+  notify_subagents: "Subagents",
+  ...Object.fromEntries(SOUND_EVENTS.map((item) => [`sounds.${item.id}`, item.label])),
+}
+export const AttentionNotifyWhen = Schema.Literals(["blurred", "always"])
 export const Attention = Schema.Struct({
-  enabled: Schema.optional(Schema.Boolean),
-  notifications: Schema.optional(Schema.Boolean),
-  sound: Schema.optional(Schema.Boolean),
-  volume: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1))),
-  sound_pack: Schema.optional(Schema.String),
+  enabled: Schema.optional(Schema.Boolean).annotate({
+    description: "Turns alerts (desktop notifications and sounds) on or off as a whole (default: false)",
+  }),
+  notifications: Schema.optional(Schema.Boolean).annotate({ description: "Desktop notifications (default: true)" }),
+  sound: Schema.optional(Schema.Boolean).annotate({ description: "Sounds (default: true)" }),
+  volume: Schema.optional(
+    Schema.Number.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1)),
+  ).annotate({ description: "Sound volume, 0 to 1 (default: 0.4)" }),
+  sound_pack: Schema.optional(Schema.String).annotate({
+    description: "The sound pack: the built-in one, or one a plugin registers",
+  }),
   sounds: Schema.optional(AttentionSounds),
+  notify_when: Schema.optional(AttentionNotifyWhen).annotate({
+    description: "'blurred' notifies only while Lunos is in the background, 'always' even in front (default: blurred)",
+  }),
+  notify_subagents: Schema.optional(Schema.Boolean).annotate({
+    description: "A subagent finishing also sends a desktop notification (default: false)",
+  }),
 }).annotate({ description: "Attention notification and sound settings" })
 
 export const QuestionDismissWindowDefault = 2000
@@ -96,7 +132,7 @@ export const Info = Schema.Struct({
   }),
   double_escape_clear: Schema.optional(Schema.Boolean).annotate({
     description:
-      "Esc twice in the prompt clears it while the session is idle; the cleared prompt can be undone and is kept in history (default: true)",
+      "Esc twice in the prompt clears it, idle or busy (with the prompt empty, Esc twice stops a busy session); the cleared prompt can be undone and is kept in history (default: true)",
   }),
   left_opens_monitor: Schema.optional(Schema.Boolean).annotate({
     description:

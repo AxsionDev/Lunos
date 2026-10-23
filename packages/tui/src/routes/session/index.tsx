@@ -53,7 +53,7 @@ import { DialogConfirm } from "../../ui/dialog-confirm"
 import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
-import { Sidebar } from "./sidebar"
+import { Sidebar, startRename } from "./sidebar"
 import { SubagentFooter } from "./subagent-footer.tsx"
 import { filetype } from "../../util/filetype"
 import parsers from "../../parsers-config"
@@ -587,6 +587,12 @@ export function Session() {
         name: "rename",
       },
       run: () => {
+        // XCOD-308: in place in the sidebar when it is shown; otherwise in a prompt.
+        if (sidebarVisible()) {
+          dialog.clear()
+          startRename(route.sessionID)
+          return
+        }
         dialog.replace(() => <DialogSessionRename session={route.sessionID} />)
       },
     },

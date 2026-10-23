@@ -72,6 +72,7 @@ import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
 import { Budget } from "@/budget"
+import { BUDGET_TOAST_TITLE } from "@opencode-ai/tui/util/budget-toast"
 import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
@@ -292,13 +293,16 @@ const layer = Layer.effect(
       modelID: ModelV2.ID
     }) {
       if (input.session.parentID) return
+      // XCOD-308: a name the user gave is never replaced.
+      if (Session.titleSource(input.session) === "user") return
       if (!Session.isDefaultTitle(input.session.title)) return
 
       const real = (m: SessionV1.WithParts) =>
         m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic)
       const idx = input.history.findIndex(real)
       if (idx === -1) return
-      if (input.history.filter(real).length !== 1) return
+      // Only on the first prompt, unless the user cleared the name (then on the next turn).
+      if (input.history.filter(real).length !== 1 && !Session.titleReset(input.session)) return
 
       const context = input.history.slice(0, idx + 1)
       const firstUser = context[idx]
@@ -343,7 +347,8 @@ const layer = Layer.effect(
       if (!cleaned) return
       const t = cleaned.length > 100 ? cleaned.substring(0, 97) + "..." : cleaned
       yield* sessions
-        .setTitle({ sessionID: input.session.id, title: t })
+        // Only over the title it started from: a rename made while this was generated wins.
+        .setTitle({ sessionID: input.session.id, title: t, source: "auto", replace: input.session.title })
         .pipe(Effect.catchCause((cause) => Effect.logError("failed to generate title", { error: Cause.squash(cause) })))
     })
 
@@ -1242,7 +1247,9 @@ const layer = Layer.effect(
         ),
       )
       const toast = (message: string, variant: "warning" | "error" = "warning") =>
-        events.publish(TuiEvent.ToastShow, { title: "Budget", message, variant, duration: 10000 }).pipe(Effect.ignore)
+        events
+          .publish(TuiEvent.ToastShow, { title: BUDGET_TOAST_TITLE, message, variant, duration: 10000 })
+          .pipe(Effect.ignore)
       for (const message of decision.toasts) yield* toast(message)
       if (decision.action === "run") return "run" as const
       if (decision.action === "warn") {

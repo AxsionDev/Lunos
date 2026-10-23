@@ -57,7 +57,9 @@ const view = (lines: Line[]) =>
   lines.map((line) =>
     line.type === "group"
       ? `[${line.group?.name ?? "Ungrouped"} ${line.count}${line.collapsed ? " collapsed" : ""}]`
-      : `${line.depth ? "  " : ""}${line.item.id}`,
+      : line.type === "session"
+        ? `${line.depth ? "  " : ""}${line.item.id}`
+        : `[project ${line.section.name}]`,
   )
 
 describe("TUI /sessions model (XCOD-205)", () => {

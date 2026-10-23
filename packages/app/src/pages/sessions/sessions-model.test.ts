@@ -6,6 +6,8 @@ import {
   inView,
   money,
   projectName,
+  projectSections,
+  sectionItems,
   stopPlan,
   topLevel,
   UNGROUPED,
@@ -204,5 +206,54 @@ describe("bulk actions (XCOD-265)", () => {
     expect(
       build({ groups: [], sessions, filter: { ...all, state: "archived" } })[0]!.rows.map((row) => row.item.id),
     ).toEqual(["b", "a"])
+  })
+})
+
+describe("Sessions window by project (XCOD-309)", () => {
+  const web = { id: "pgrp_web", name: "Axsion web", folders: ["/work/web"] }
+  const sessions = [
+    item("alpha", { projectGroupID: "prj_a", updated: 5, state: "running" }),
+    item("web", {
+      directory: "/work/web",
+      project: { id: "prj_w", worktree: "/work/web" },
+      projectGroupID: "pgrp_web",
+      updated: 3,
+      state: "waiting",
+    }),
+    item("plain", {
+      directory: "/tmp/scratch",
+      project: { id: "global", worktree: "/" },
+      projectGroupID: "global:/tmp/scratch",
+      updated: 4,
+      state: "failed",
+    }),
+    item("loose", { directory: "/elsewhere", project: undefined, updated: 2 }),
+    item("external:x", { kind: "external", directory: "/work/alpha/sub", project: undefined, updated: 1 }),
+  ]
+
+  test("named first, then repositories and folders, then No project; counts and here", () => {
+    const sections = projectSections({ sessions, named: [web], filter: all, here: "prj_a" })
+    expect(sections.map((section) => [section.name, section.kind, section.here])).toEqual([
+      ["Axsion web", "named", false],
+      ["alpha", "folder", true],
+      ["scratch", "folder", false],
+      [null, "none", false],
+    ])
+    expect(sections[1]!.rows.map((row) => row.item.id)).toEqual(["alpha", "external:x"])
+    expect(sections.map((section) => section.counts)).toEqual([
+      { running: 0, waiting: 1, done: 0 },
+      { running: 1, waiting: 0, done: 1 },
+      { running: 0, waiting: 0, done: 1 },
+      { running: 0, waiting: 0, done: 1 },
+    ])
+    expect(sections[1]!.start).toBe("/work/alpha")
+    expect(sections[3]!.start).toBeUndefined()
+    expect(sectionItems(sections[1]!).map((each) => each.id)).toEqual(["alpha", "external:x"])
+  })
+
+  test("the search matches the project's name", () => {
+    expect(
+      projectSections({ sessions, named: [web], filter: { ...all, search: "axsion" } }).map((s) => s.name),
+    ).toEqual(["Axsion web"])
   })
 })

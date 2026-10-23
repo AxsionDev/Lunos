@@ -27546,6 +27546,10 @@
                 "type": "string",
                 "enum": ["destroy", "retain", "destroy_on_success"]
               },
+              "on_exit": {
+                "type": "string",
+                "enum": ["background", "wait"]
+              },
               "retain_for": {
                 "type": "string",
                 "pattern": "^\\d+[mhd]$"
