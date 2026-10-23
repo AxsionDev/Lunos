@@ -36,6 +36,6 @@ describe("app sound events", () => {
   })
 
   test("the app offers the same sound IDs as the TUI", () => {
-    expect(SOUND_OPTIONS.map((option) => option.id)).toEqual([...SOUND_IDS])
+    expect(SOUND_OPTIONS.map((option): string => option.id)).toEqual([...SOUND_IDS])
   })
 })

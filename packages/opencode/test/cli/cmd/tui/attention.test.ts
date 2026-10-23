@@ -91,6 +91,8 @@ function config(attention: Partial<AttentionConfig["attention"]> = {}): Attentio
       volume: 0.4,
       sound_pack: "opencode.default",
       sounds: {},
+      notify_when: "blurred",
+      notify_subagents: false,
       ...attention,
     },
   }
