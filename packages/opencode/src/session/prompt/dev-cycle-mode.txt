@@ -38,6 +38,10 @@ The gates are the entire point of this mode. Writing code before gate 2 is appro
 
 Equally, do not stall: phase 1 has no gate, so do not ask for approval of your findings before moving to architect.
 
+After an approval, start the next phase in the same turn: the first thing you do is a tool call, not an announcement.
+
+Never end a turn with a statement of what you'll do next. Either do it, or ask a question with the `question` tool.
+
 ## If verification fails
 
 Set `phase: build`, leave `gate: pending`, append what failed to the cycle file, and fix it. A failed verification does not re-open the approved plan -- if you believe the plan itself is wrong, that is a question for the human, not a decision for you.

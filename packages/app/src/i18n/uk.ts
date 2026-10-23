@@ -1168,6 +1168,15 @@ export const dict = {
   "settings.general.sounds.permissions.description": "Відтворювати звук, коли потрібен дозвіл",
   "settings.general.sounds.errors.title": "Помилки",
   "settings.general.sounds.errors.description": "Відтворювати звук, коли виникає помилка",
+  "settings.general.sounds.subagent.title": "Субагент завершив роботу",
+  "settings.general.sounds.subagent.description": "Відтворювати звук, коли субагент завершує роботу",
+  "settings.general.sounds.question.title": "Запитання для вас",
+  "settings.general.sounds.question.description": "Відтворювати звук, коли агент ставить вам запитання",
+  "settings.general.sounds.waiting.title": "Очікує дії",
+  "settings.general.sounds.waiting.description":
+    "Відтворювати звук, коли субагент чекає вашого схвалення або відповіді",
+  "settings.general.sounds.volume.title": "Гучність",
+  "settings.general.sounds.volume.description": "Гучність звукових ефектів",
 
   "settings.shortcuts.title": "Клавіатурні скорочення",
   "settings.shortcuts.reset.button": "Відновити стандартні",

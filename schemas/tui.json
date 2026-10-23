@@ -1244,6 +1244,182 @@
           ],
           "description": "Toggle animations"
         },
+        "app_toggle_sounds": {
+          "anyOf": [
+            {
+              "type": "boolean",
+              "enum": [false]
+            },
+            {
+              "type": "string",
+              "enum": ["none"]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ctrl": {
+                      "type": "boolean"
+                    },
+                    "shift": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "boolean"
+                    },
+                    "super": {
+                      "type": "boolean"
+                    },
+                    "hyper": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "ctrl": {
+                              "type": "boolean"
+                            },
+                            "shift": {
+                              "type": "boolean"
+                            },
+                            "meta": {
+                              "type": "boolean"
+                            },
+                            "super": {
+                              "type": "boolean"
+                            },
+                            "hyper": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["name"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string",
+                      "enum": ["press", "release"]
+                    },
+                    "preventDefault": {
+                      "type": "boolean"
+                    },
+                    "fallthrough": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["key"]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ctrl": {
+                        "type": "boolean"
+                      },
+                      "shift": {
+                        "type": "boolean"
+                      },
+                      "meta": {
+                        "type": "boolean"
+                      },
+                      "super": {
+                        "type": "boolean"
+                      },
+                      "hyper": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ctrl": {
+                                "type": "boolean"
+                              },
+                              "shift": {
+                                "type": "boolean"
+                              },
+                              "meta": {
+                                "type": "boolean"
+                              },
+                              "super": {
+                                "type": "boolean"
+                              },
+                              "hyper": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "event": {
+                        "type": "string",
+                        "enum": ["press", "release"]
+                      },
+                      "preventDefault": {
+                        "type": "boolean"
+                      },
+                      "fallthrough": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["key"]
+                  }
+                ]
+              }
+            }
+          ],
+          "description": "Mute or unmute sounds"
+        },
         "app_toggle_file_context": {
           "anyOf": [
             {
@@ -42295,13 +42471,16 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Turns alerts (desktop notifications and sounds) on or off as a whole (default: false)"
         },
         "notifications": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Desktop notifications (default: true)"
         },
         "sound": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Sounds (default: true)"
         },
         "volume": {
           "anyOf": [
@@ -42328,10 +42507,12 @@
             {
               "maximum": 1
             }
-          ]
+          ],
+          "description": "Sound volume, 0 to 1 (default: 0.4)"
         },
         "sound_pack": {
-          "type": "string"
+          "type": "string",
+          "description": "The sound pack: the built-in one, or one a plugin registers"
         },
         "sounds": {
           "type": "object",
@@ -42353,9 +42534,25 @@
             },
             "subagent_done": {
               "type": "string"
+            },
+            "waiting": {
+              "type": "string"
+            },
+            "budget_warning": {
+              "type": "string"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Per event: a bundled sound ID (e.g. \"alert-04\"), \"none\" for silence, or a path to an .mp3, .aac or .wav file"
+        },
+        "notify_when": {
+          "type": "string",
+          "enum": ["blurred", "always"],
+          "description": "'blurred' notifies only while Lunos is in the background, 'always' even in front (default: blurred)"
+        },
+        "notify_subagents": {
+          "type": "boolean",
+          "description": "A subagent finishing also sends a desktop notification (default: false)"
         }
       },
       "additionalProperties": false,
@@ -42475,7 +42672,7 @@
     },
     "double_escape_clear": {
       "type": "boolean",
-      "description": "Esc twice in the prompt clears it while the session is idle; the cleared prompt can be undone and is kept in history (default: true)"
+      "description": "Esc twice in the prompt clears it, idle or busy (with the prompt empty, Esc twice stops a busy session); the cleared prompt can be undone and is kept in history (default: true)"
     },
     "left_opens_monitor": {
       "type": "boolean",

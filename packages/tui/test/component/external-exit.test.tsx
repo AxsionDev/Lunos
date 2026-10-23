@@ -91,7 +91,12 @@ const PROVIDER = {
  * The view: a Lunos session `ses_lunos` was open, then the session under test. The prompt is shown
  * on whichever session the route is on; `@route` on screen says where it is.
  */
-async function mount(input: { tool?: Tool; busy?: boolean; pending?: boolean }) {
+async function mount(input: {
+  tool?: Tool
+  busy?: boolean
+  pending?: boolean
+  config?: { double_escape_clear?: boolean }
+}) {
   const target = input.tool ? "ses_ext" : "ses_lunos"
   const sessions = [
     session("ses_lunos", "lunos work"),
@@ -236,7 +241,7 @@ async function mount(input: { tool?: Tool; busy?: boolean; pending?: boolean }) 
   function Harness() {
     const renderer = useRenderer()
     const keymap = createDefaultOpenTuiKeymap(renderer)
-    const config = createTuiResolvedConfig({ leader_timeout: 1000 })
+    const config = createTuiResolvedConfig({ leader_timeout: 1000, ...input.config })
     onCleanup(registerOpencodeKeymap(keymap, renderer, config))
     return (
       <TestTuiContexts directory={tmp.path} paths={{ home: tmp.path, state, worktree: tmp.path }}>
@@ -318,6 +323,10 @@ async function mount(input: { tool?: Tool; busy?: boolean; pending?: boolean }) 
           properties: { sessionID: target, status: { type } },
         },
       } as any)
+    },
+    async type(text: string) {
+      await app.mockInput.typeText(text)
+      await settle()
     },
     async send(text: string) {
       await app.mockInput.typeText(text)
@@ -522,6 +531,117 @@ describe("a Lunos session: unchanged", () => {
       }
     })
 })
+
+// XCOD-313: while the agent works, Esc Esc clears typed text first and stops the run only once the
+// prompt is empty. The same in a Lunos session and in Claude Code / Codex sessions.
+const ESC_LABEL = { lunos: "Lunos", claude: LABEL.claude, codex: LABEL.codex } as const
+const hintLine = (screen: string) => screen.split("\n").find((line) => /esc (esc|again)/.test(line)) ?? ""
+for (const kind of ["lunos", "claude", "codex"] as const) {
+  const tool = kind === "lunos" ? undefined : kind
+  const abort = new RegExp(`/session/${tool ? "ses_ext" : "ses_lunos"}/abort$`)
+  describe(`Esc Esc in a ${ESC_LABEL[kind]} session`, () => {
+    test("working with text: clears it and the run goes on; with the prompt empty it stops the run", async () => {
+      const ui = await mount({ tool, busy: true })
+      try {
+        await wait(() => hintLine(ui.frame()).includes("esc esc stop"))
+        await ui.type("half a thought")
+        expect(hintLine(ui.frame())).toContain("esc esc clear")
+        await ui.escape()
+        expect(hintLine(ui.frame())).toContain("esc again to clear")
+        await ui.escape()
+        await wait(() => !ui.frame().includes("half a thought"))
+        expect(ui.toast()).toContain("Prompt cleared")
+        expect(posts(ui, abort)).toEqual([])
+        expect(hintLine(ui.frame())).toContain("esc esc stop")
+        await ui.escape()
+        expect(hintLine(ui.frame())).toContain("esc again to stop")
+        expect(posts(ui, abort)).toEqual([])
+        await ui.escape()
+        await wait(() => posts(ui, abort).length === 1)
+      } finally {
+        await ui.cleanup()
+      }
+    })
+
+    test("working, empty prompt: Esc Esc stops the run, as before", async () => {
+      const ui = await mount({ tool, busy: true })
+      try {
+        await wait(() => hintLine(ui.frame()).includes("esc esc stop"))
+        await ui.escape()
+        await ui.escape()
+        await wait(() => posts(ui, abort).length === 1)
+      } finally {
+        await ui.cleanup()
+      }
+    })
+
+    test("a single Esc right after a clear doesn't stop the run, even after an Esc on the empty prompt", async () => {
+      const ui = await mount({ tool, busy: true })
+      try {
+        await wait(() => hintLine(ui.frame()).includes("esc esc stop"))
+        // One Esc on the empty prompt counts toward stopping...
+        await ui.escape()
+        await ui.type("draft")
+        // ...but the presses spent clearing reset that count, so the next single Esc doesn't stop.
+        await ui.escape()
+        await ui.escape()
+        await wait(() => !ui.frame().includes("draft"))
+        await ui.escape()
+        await Bun.sleep(150)
+        expect(posts(ui, abort)).toEqual([])
+      } finally {
+        await ui.cleanup()
+      }
+    })
+
+    test("undo brings the cleared text back while the run still works", async () => {
+      const ui = await mount({ tool, busy: true })
+      try {
+        await ui.type("keep me")
+        await ui.escape()
+        await ui.escape()
+        await wait(() => !ui.frame().includes("keep me"))
+        // input.undo's default (ctrl+z is the terminal's suspend here).
+        await ui.key("-", { ctrl: true })
+        await wait(() => ui.frame().includes("keep me"))
+        expect(posts(ui, abort)).toEqual([])
+      } finally {
+        await ui.cleanup()
+      }
+    })
+
+    test("idle with text: Esc Esc clears it, as before", async () => {
+      const ui = await mount({ tool })
+      try {
+        await ui.type("idle text")
+        await ui.escape()
+        await ui.escape()
+        await wait(() => !ui.frame().includes("idle text"))
+        expect(ui.toast()).toContain("Prompt cleared")
+        expect(posts(ui, abort)).toEqual([])
+      } finally {
+        await ui.cleanup()
+      }
+    })
+
+    test("double_escape_clear off: working with text, Esc Esc stops the run and the text stays", async () => {
+      const ui = await mount({ tool, busy: true, config: { double_escape_clear: false } })
+      try {
+        await ui.type("stays put")
+        expect(hintLine(ui.frame())).toContain("esc esc stop")
+        await ui.escape()
+        await ui.escape()
+        await wait(() => posts(ui, abort).length === 1)
+        expect(ui.frame()).toContain("stays put")
+        // The prompt carries unsent text to the next one it mounts, and cleanup's Esc Esc is off here.
+        await ui.key("c", { ctrl: true })
+        await wait(() => !ui.frame().includes("stays put"))
+      } finally {
+        await ui.cleanup()
+      }
+    })
+  })
+}
 
 test("leaving a session goes back past every visit to it, to the view before; home when there is none", async () => {
   const { RouteProvider, useRoute } = await import("../../src/context/route")

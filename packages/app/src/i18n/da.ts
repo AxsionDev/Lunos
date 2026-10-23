@@ -933,6 +933,15 @@ export const dict = {
   "settings.general.sounds.permissions.description": "Afspil lyd når en tilladelse er påkrævet",
   "settings.general.sounds.errors.title": "Fejl",
   "settings.general.sounds.errors.description": "Afspil lyd når der opstår en fejl",
+  "settings.general.sounds.subagent.title": "Underagent færdig",
+  "settings.general.sounds.subagent.description": "Afspil lyd, når en underagent er færdig",
+  "settings.general.sounds.question.title": "Spørgsmål til dig",
+  "settings.general.sounds.question.description": "Afspil lyd, når agenten stiller dig et spørgsmål",
+  "settings.general.sounds.waiting.title": "Venter på handling",
+  "settings.general.sounds.waiting.description":
+    "Afspil lyd, når en underagent venter på din godkendelse eller dit svar",
+  "settings.general.sounds.volume.title": "Lydstyrke",
+  "settings.general.sounds.volume.description": "Hvor højt lydeffekter afspilles",
 
   "settings.shortcuts.title": "Tastaturgenveje",
   "settings.shortcuts.reset.button": "Nulstil til standard",

@@ -57,6 +57,8 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { eq } from "drizzle-orm"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
+import { AutoContinue } from "./auto-continue"
+import { DevCycle } from "./dev-cycle"
 import { Memory } from "@/memory"
 import { MemorySources } from "@/memory/sources"
 import { Resource } from "@/resource"
@@ -68,6 +70,7 @@ import { SessionTools } from "./tools"
 import { SandboxGuard } from "@/sandbox/guard"
 import { RunBudget } from "@/agent/run-budget"
 import { Budget } from "@/budget"
+import { BUDGET_TOAST_TITLE } from "@opencode-ai/tui/util/budget-toast"
 import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
@@ -1213,7 +1216,9 @@ const layer = Layer.effect(
         ),
       )
       const toast = (message: string, variant: "warning" | "error" = "warning") =>
-        events.publish(TuiEvent.ToastShow, { title: "Budget", message, variant, duration: 10000 }).pipe(Effect.ignore)
+        events
+          .publish(TuiEvent.ToastShow, { title: BUDGET_TOAST_TITLE, message, variant, duration: 10000 })
+          .pipe(Effect.ignore)
       for (const message of decision.toasts) yield* toast(message)
       if (decision.action === "run") return "run" as const
       if (decision.action === "warn") {
@@ -1273,6 +1278,119 @@ const layer = Layer.effect(
       return "stop" as const
     })
 
+    /**
+     * XCOD-302: when a Dev-Cycle or Build turn ends by announcing its next step instead of taking
+     * it, send an internal continuation rather than wait for "proceed". Returns whether it did (the
+     * loop then runs another step). Never past a pending gate; at most `AutoContinue.MAX` in a row
+     * without progress, then the human is asked.
+     */
+    const autoContinue = Effect.fn("SessionPrompt.autoContinue")(function* (input: {
+      sessionID: SessionID
+      session: Session.Info
+      msgs: SessionV1.WithParts[]
+      lastUser: SessionV1.User
+      step: number
+    }) {
+      // Not for subagents: their parent reads the result and carries on itself.
+      if (input.session.parentID) return false
+      const agent = yield* agents.get(input.lastUser.agent)
+      if (!agent || (agent.name !== "dev-cycle" && agent.name !== "build")) return false
+      const cfg = yield* config.get()
+      const cycle = agent.name === "dev-cycle"
+      if (cycle ? cfg.dev_cycle?.auto_continue === false : cfg.agent?.[agent.name]?.auto_continue === false)
+        return false
+      const title = cycle ? "Dev-Cycle" : "Build"
+
+      let position: AutoContinue.Position = { unknown: false, done: false, pending: false }
+      let file: string | undefined
+      if (cycle) {
+        file = Session.devcycle(input.session, yield* InstanceState.context)
+        const exists = yield* fsys.existsSafe(file)
+        const contents = exists
+          ? yield* fsys.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
+          : undefined
+        position = DevCycle.position({ exists, contents })
+      }
+      // Continuations count against the step limit like any step; at the limit the turn stops.
+      const stop = AutoContinue.classify({
+        messages: input.msgs,
+        position,
+        emptyStalls: cycle,
+        limit: input.step >= (agent.steps ?? Infinity) ? "step limit" : undefined,
+      })
+      if (stop.kind !== "stalled") {
+        if (stop.kind !== "finished")
+          yield* Effect.logInfo("auto-continue: stopped", { "session.id": input.sessionID, stop: stop.kind })
+        return false
+      }
+
+      const send = (text: string, metadata: Record<string, unknown>, synthetic: boolean) =>
+        Effect.gen(function* () {
+          const message = yield* sessions.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: input.sessionID,
+            time: { created: Date.now() },
+            agent: input.lastUser.agent,
+            model: input.lastUser.model,
+            ...(input.lastUser.format ? { format: input.lastUser.format } : {}),
+            ...(input.lastUser.system ? { system: input.lastUser.system } : {}),
+            ...(input.lastUser.tools ? { tools: input.lastUser.tools } : {}),
+          })
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: message.id,
+            sessionID: input.sessionID,
+            type: "text",
+            text,
+            synthetic,
+            metadata,
+            time: { start: Date.now(), end: Date.now() },
+          })
+        })
+
+      const attempt = AutoContinue.streak(input.msgs)
+      if (attempt >= AutoContinue.MAX) {
+        const CONTINUE = "Continue"
+        const OPEN = "Open cycle file"
+        const answers = yield* question
+          .ask({
+            sessionID: input.sessionID,
+            questions: [
+              {
+                header: title,
+                question: AutoContinue.gaveUp(title),
+                custom: false,
+                options: [
+                  { label: CONTINUE, description: "Try again" },
+                  cycle
+                    ? { label: OPEN, description: `Stop, and open the cycle file${file ? ` (${file})` : ""}` }
+                    : { label: "Stop", description: "Leave it here" },
+                ],
+              },
+            ],
+          })
+          .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<ReadonlyArray<string>>)))
+        const answer = answers[0]?.[0]
+        yield* Effect.logInfo("auto-continue: no progress", { "session.id": input.sessionID, answer })
+        if (answer === OPEN)
+          yield* events.publish(TuiEvent.CommandExecute, { command: "artifact.list" }).pipe(Effect.ignore)
+        if (answer !== CONTINUE) return false
+        // The human pressed Continue: a fresh start for the streak, and never an approval of a gate.
+        yield* send("Continue.", { [AutoContinue.RESUME]: true }, false)
+        return true
+      }
+
+      const line = AutoContinue.line(title, stop.label)
+      yield* send(
+        AutoContinue.prompt({ gated: cycle, note: stop.note }),
+        { [AutoContinue.METADATA]: { label: line, attempt: attempt + 1 } },
+        true,
+      )
+      yield* Effect.logInfo("auto-continue", { "session.id": input.sessionID, line, attempt: attempt + 1 })
+      return true
+    })
+
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
         const ctx = yield* InstanceState.context
@@ -1320,6 +1438,8 @@ const layer = Layer.effect(
                 callID: orphan.callID,
               })
             }
+            // XCOD-302: only a turn this loop ran; resuming an idle session never re-continues an old one.
+            if (!orphan && step > 0 && (yield* autoContinue({ sessionID, session, msgs, lastUser, step }))) continue
             yield* Effect.logInfo("exiting loop", { "session.id": sessionID })
             break
           }
