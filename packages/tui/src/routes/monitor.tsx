@@ -787,6 +787,7 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
    * XCOD-308: r renames the selected session, as ctrl+r does in /sessions (empty: the automatic name).
    * XCOD-325: any row: a Claude Code / Codex session gets a Lunos name; another Lunos's is renamed there.
    */
+  const [failedRenames, setFailedRenames] = createSignal<Record<string, string>>({})
   async function rename(item: SessionOverviewItem) {
     const typed = await DialogPrompt.show(dialog, "Rename session", {
       value: item.title,
@@ -795,8 +796,11 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     dialog.clear()
     const title = renameValue(typed, item.title)
     if (title === undefined) return
-    await renameSession(sdk.client, item, title).catch((cause) =>
-      toast.show({ variant: "error", message: `Couldn't rename: ${renameFailure(cause)}` }),
+    // On the row (which keeps its old name) until a rename of it works.
+    const { [item.id]: _, ...rest } = failedRenames()
+    await renameSession(sdk.client, item, title).then(
+      () => setFailedRenames(rest),
+      (cause) => setFailedRenames({ ...rest, [item.id]: renameFailure(cause) }),
     )
     refresh()
   }
@@ -1034,6 +1038,15 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
               {ask()}
             </text>
           </box>
+        </Show>
+        <Show when={failedRenames()[item().id]}>
+          {(reason) => (
+            <box paddingLeft={rowProps.row.depth ? 8 : 5}>
+              <text fg={theme.error} wrapMode="none">
+                Couldn't rename: {reason()}
+              </text>
+            </box>
+          )}
         </Show>
       </box>
     )

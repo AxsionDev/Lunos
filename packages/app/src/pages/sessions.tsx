@@ -331,7 +331,7 @@ export function SessionsPage() {
       const request = toolOnly(item)
         ? sdk.experimental.external.rename({ sessionID: item.id.slice("external:".length), title }, options)
         : item.elsewhere
-          ? sdk.experimental.peer.rename({ sessionID: item.id, title }, options)
+          ? sdk.experimental.peer.rename({ sessionID: item.id, directory: item.directory, title }, options)
           : sdk.session.update({ sessionID: item.id, directory: item.directory, title }, options)
       const { [item.id]: _, ...rest } = failedRenames()
       await request.then(

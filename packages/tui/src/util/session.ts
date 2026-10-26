@@ -35,7 +35,9 @@ export async function renameSession(
   const options = { throwOnError: true } as const
   if (item.id.startsWith("external:"))
     return client.experimental.external.rename({ sessionID: item.id.slice("external:".length), title }, options)
-  if (item.elsewhere) return client.experimental.peer.rename({ sessionID: item.id, title }, options)
+  // The directory: if its Lunos has gone, it is renamed here, in its own project.
+  if (item.elsewhere)
+    return client.experimental.peer.rename({ sessionID: item.id, directory: item.directory, title }, options)
   return client.session.update({ sessionID: item.id, directory: item.directory, title }, options)
 }
 
