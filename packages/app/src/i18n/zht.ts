@@ -1421,5 +1421,13 @@ export const dict = {
   "account.disabled.category.payment": "付款問題",
   "account.disabled.category.offboarding": "你的組織已將你移除",
   "account.disabled.category.other": "其他",
+  "feedback.title": "傳送意見回饋",
+  "feedback.description":
+    "告訴 Lunos 團隊哪些好用、哪些不好用、還缺什麼。會附上你的 Lunos 版本與作業系統，絕不包含你的對話。",
+  "feedback.screenshot": "附加螢幕截圖（選填：PNG、JPEG 或 WebP，最大 2 MB）",
+  "feedback.screenshot.invalid": "此檔案不是 2 MB 以內的 PNG、JPEG 或 WebP 圖片。",
+  "feedback.consent": "一併分享此工作階段的 ID（方便我們在記錄中找到它）",
+  "feedback.sent": "謝謝。你的意見回饋已送達 Lunos 團隊。",
+  "feedback.failed": "你的意見回饋未送出",
   "prompt.placeholder.accountDisabled": "你的 Lunos 帳戶已停用：無法傳送新的提示",
 } satisfies Partial<Record<Keys, string>>

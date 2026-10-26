@@ -174,6 +174,9 @@ import type {
   GlobalDisposeResponses,
   GlobalEventErrors,
   GlobalEventResponses,
+  GlobalFeedbackErrors,
+  GlobalFeedbackInput,
+  GlobalFeedbackResponses,
   GlobalHealthErrors,
   GlobalHealthResponses,
   GlobalUpgradeErrors,
@@ -3137,6 +3140,30 @@ export class Global extends HeyApiClient {
     return (options?.client ?? this.client).post<GlobalDisposeResponses, GlobalDisposeErrors, ThrowOnError>({
       url: "/global/dispose",
       ...options,
+    })
+  }
+
+  /**
+   * Send feedback to the Lunos team
+   *
+   * Sends feedback to Lunos Cloud with this machine's sign-in: the text, an optional screenshot, the Lunos version and OS, and the session id only when consent is true. Never a transcript.
+   */
+  public feedback<ThrowOnError extends boolean = false>(
+    parameters?: {
+      globalFeedbackInput?: GlobalFeedbackInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ key: "globalFeedbackInput", map: "body" }] }])
+    return (options?.client ?? this.client).post<GlobalFeedbackResponses, GlobalFeedbackErrors, ThrowOnError>({
+      url: "/global/feedback",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

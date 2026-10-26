@@ -1364,5 +1364,13 @@ export const dict = {
   "account.disabled.category.payment": "ਭੁਗਤਾਨ ਦੀ ਸਮੱਸਿਆ",
   "account.disabled.category.offboarding": "ਤੁਹਾਡੀ ਸੰਸਥਾ ਨੇ ਤੁਹਾਨੂੰ ਹਟਾ ਦਿੱਤਾ",
   "account.disabled.category.other": "ਹੋਰ",
+  "feedback.title": "ਫੀਡਬੈਕ ਭੇਜੋ",
+  "feedback.description":
+    "Lunos ਟੀਮ ਨੂੰ ਦੱਸੋ ਕਿ ਕੀ ਕੰਮ ਕਰਦਾ ਹੈ, ਕੀ ਨਹੀਂ ਅਤੇ ਕੀ ਘਾਟ ਹੈ। ਤੁਹਾਡਾ Lunos ਸੰਸਕਰਣ ਅਤੇ OS ਨਾਲ ਜਾਂਦੇ ਹਨ, ਤੁਹਾਡੀ ਗੱਲਬਾਤ ਕਦੇ ਨਹੀਂ।",
+  "feedback.screenshot": "ਸਕ੍ਰੀਨਸ਼ਾਟ ਨੱਥੀ ਕਰੋ (ਵਿਕਲਪਿਕ: PNG, JPEG ਜਾਂ WebP, 2 MB ਤੱਕ)",
+  "feedback.screenshot.invalid": "ਇਹ ਫਾਈਲ 2 MB ਤੱਕ ਦੀ PNG, JPEG ਜਾਂ WebP ਤਸਵੀਰ ਨਹੀਂ ਹੈ।",
+  "feedback.consent": "ਇਸ ਸੈਸ਼ਨ ਦੀ ID ਸਾਂਝੀ ਕਰੋ (ਲੌਗ ਵਿੱਚ ਲੱਭਣ ਵਿੱਚ ਮਦਦ ਕਰਦੀ ਹੈ)",
+  "feedback.sent": "ਧੰਨਵਾਦ। ਤੁਹਾਡਾ ਫੀਡਬੈਕ Lunos ਟੀਮ ਤੱਕ ਪਹੁੰਚ ਗਿਆ।",
+  "feedback.failed": "ਤੁਹਾਡਾ ਫੀਡਬੈਕ ਨਹੀਂ ਭੇਜਿਆ ਗਿਆ",
   "prompt.placeholder.accountDisabled": "ਤੁਹਾਡਾ Lunos ਖਾਤਾ ਅਯੋਗ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ: ਨਵੇਂ ਪ੍ਰੌਂਪਟ ਨਹੀਂ ਭੇਜੇ ਜਾ ਸਕਦੇ",
 }

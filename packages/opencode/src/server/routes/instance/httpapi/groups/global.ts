@@ -80,6 +80,23 @@ const GlobalAccount = Schema.Struct({
   ),
 }).annotate({ identifier: "GlobalAccount" })
 
+// XCOD-318: the desktop and web app's Feedback button. Sent on to Lunos Cloud with this machine's
+// sign-in (CloudBeta.feedback): the text, an optional screenshot, the version and OS, and the session
+// id only with `consent: true`. Never a transcript: there is no field for one.
+export const GlobalFeedbackInput = Schema.Struct({
+  text: Schema.String,
+  source: Schema.Literals(["app", "desktop"]),
+  consent: Schema.Boolean,
+  sessionId: Schema.optional(Schema.String),
+  os: Schema.optional(Schema.String),
+  screenshot: Schema.optional(Schema.Struct({ type: Schema.String, data: Schema.String })),
+}).annotate({ identifier: "GlobalFeedbackInput" })
+
+const GlobalFeedbackResult = Schema.Union([
+  Schema.Struct({ success: Schema.Literal(true), sessionShared: Schema.Boolean }),
+  Schema.Struct({ success: Schema.Literal(false), error: Schema.String }),
+]).annotate({ identifier: "GlobalFeedbackResult" })
+
 export const GlobalPaths = {
   health: "/global/health",
   event: "/global/event",
@@ -87,6 +104,7 @@ export const GlobalPaths = {
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
   account: "/global/account",
+  feedback: "/global/feedback",
 } as const
 
 export const GlobalApi = HttpApi.make("global").add(
@@ -147,6 +165,18 @@ export const GlobalApi = HttpApi.make("global").add(
           summary: "Get the Lunos account's state",
           description:
             "Whether this machine was told the Lunos account is disabled, with the reason category and the end date. Reads this machine's record only.",
+        }),
+      ),
+      HttpApiEndpoint.post("feedback", GlobalPaths.feedback, {
+        payload: GlobalFeedbackInput,
+        success: described(GlobalFeedbackResult, "Whether Lunos Cloud took the feedback"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.feedback",
+          summary: "Send feedback to the Lunos team",
+          description:
+            "Sends feedback to Lunos Cloud with this machine's sign-in: the text, an optional screenshot, the Lunos version and OS, and the session id only when consent is true. Never a transcript.",
         }),
       ),
       HttpApiEndpoint.post("upgrade", GlobalPaths.upgrade, {

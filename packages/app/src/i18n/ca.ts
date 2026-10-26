@@ -1386,5 +1386,13 @@ export const dict = {
   "account.disabled.category.payment": "Un problema de pagament",
   "account.disabled.category.offboarding": "La teva organització t’ha donat de baixa",
   "account.disabled.category.other": "Altres",
+  "feedback.title": "Envia comentaris",
+  "feedback.description":
+    "Explica a l'equip de Lunos què funciona, què no i què trobes a faltar. S'hi envien la teva versió de Lunos i el sistema operatiu, mai la teva conversa.",
+  "feedback.screenshot": "Adjunta una captura de pantalla (opcional: PNG, JPEG o WebP, fins a 2 MB)",
+  "feedback.screenshot.invalid": "Aquest fitxer no és una imatge PNG, JPEG o WebP de fins a 2 MB.",
+  "feedback.consent": "Comparteix l'identificador d'aquesta sessió (ens ajuda a trobar-la als registres)",
+  "feedback.sent": "Gràcies. Els teus comentaris han arribat a l'equip de Lunos.",
+  "feedback.failed": "No s'han enviat els teus comentaris",
   "prompt.placeholder.accountDisabled": "El teu compte de Lunos està desactivat: no es poden enviar prompts nous",
 }

@@ -1375,5 +1375,13 @@ export const dict = {
   "account.disabled.category.payment": "O problemă de plată",
   "account.disabled.category.offboarding": "Organizația ta te-a eliminat",
   "account.disabled.category.other": "Altul",
+  "feedback.title": "Trimite feedback",
+  "feedback.description":
+    "Spune echipei Lunos ce funcționează, ce nu și ce îți lipsește. Se trimit versiunea Lunos și sistemul de operare, niciodată conversația ta.",
+  "feedback.screenshot": "Atașează o captură de ecran (opțional: PNG, JPEG sau WebP, până la 2 MB)",
+  "feedback.screenshot.invalid": "Fișierul nu este o imagine PNG, JPEG sau WebP de până la 2 MB.",
+  "feedback.consent": "Partajează id-ul acestei sesiuni (ne ajută să o găsim în jurnale)",
+  "feedback.sent": "Mulțumim. Feedbackul tău a ajuns la echipa Lunos.",
+  "feedback.failed": "Feedbackul tău nu a fost trimis",
   "prompt.placeholder.accountDisabled": "Contul tău Lunos este dezactivat: nu se pot trimite prompturi noi",
 }

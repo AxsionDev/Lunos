@@ -1354,5 +1354,13 @@ export const dict: Record<string, string> = {
   "account.disabled.category.payment": "পেমেন্টের সমস্যা",
   "account.disabled.category.offboarding": "আপনার প্রতিষ্ঠান আপনাকে সরিয়ে দিয়েছে",
   "account.disabled.category.other": "অন্যান্য",
+  "feedback.title": "মতামত পাঠান",
+  "feedback.description":
+    "Lunos টিমকে জানান কী কাজ করে, কী করে না এবং কী নেই। আপনার Lunos সংস্করণ ও OS সঙ্গে যায়, আপনার কথোপকথন কখনো নয়।",
+  "feedback.screenshot": "স্ক্রিনশট যুক্ত করুন (ঐচ্ছিক: PNG, JPEG বা WebP, ২ MB পর্যন্ত)",
+  "feedback.screenshot.invalid": "এই ফাইলটি ২ MB পর্যন্ত PNG, JPEG বা WebP ছবি নয়।",
+  "feedback.consent": "এই সেশনের ID শেয়ার করুন (লগে এটি খুঁজে পেতে সাহায্য করে)",
+  "feedback.sent": "ধন্যবাদ। আপনার মতামত Lunos টিমের কাছে পৌঁছেছে।",
+  "feedback.failed": "আপনার মতামত পাঠানো হয়নি",
   "prompt.placeholder.accountDisabled": "আপনার Lunos অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে: নতুন প্রম্পট পাঠানো যাবে না",
 }

@@ -19,6 +19,7 @@ import {
 } from "@opencode-ai/tui/util/account"
 import { CloudAccountApi } from "./account-api"
 import { CloudAuth } from "./auth"
+import { CloudBeta } from "./beta"
 import { CloudDisabled } from "./disabled"
 import { CloudLegal } from "./legal"
 import { CloudOidc } from "./oidc"
@@ -358,6 +359,11 @@ export function create(input: { gate: Gate; issuer: string; clientID: string }):
       return joined
         ? `You joined ${name}${invitation?.role ? ` as ${ROLE_TEXT[invitation.role] ?? invitation.role}` : ""}.`
         : `You're already a member of ${name}.`
+    },
+    async feedback(input) {
+      await CloudBeta.feedback({ ...input, source: "tui" }).catch((error: unknown) => {
+        throw new AccountError("other", error instanceof Error ? error.message : String(error))
+      })
     },
   }
 }

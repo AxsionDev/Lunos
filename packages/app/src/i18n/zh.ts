@@ -1449,5 +1449,13 @@ export const dict = {
   "account.disabled.category.payment": "付款问题",
   "account.disabled.category.offboarding": "你的组织已将你移除",
   "account.disabled.category.other": "其他",
+  "feedback.title": "发送反馈",
+  "feedback.description":
+    "告诉 Lunos 团队哪些好用、哪些不好用、还缺什么。会附带你的 Lunos 版本和操作系统，绝不包含你的对话。",
+  "feedback.screenshot": "附加截图（可选：PNG、JPEG 或 WebP，最大 2 MB）",
+  "feedback.screenshot.invalid": "该文件不是不超过 2 MB 的 PNG、JPEG 或 WebP 图片。",
+  "feedback.consent": "同时分享此会话的 ID（便于我们在日志中找到它）",
+  "feedback.sent": "谢谢。你的反馈已发送给 Lunos 团队。",
+  "feedback.failed": "你的反馈未发送",
   "prompt.placeholder.accountDisabled": "你的 Lunos 账户已被停用：无法发送新的提示",
 } satisfies Partial<Record<Keys, string>>

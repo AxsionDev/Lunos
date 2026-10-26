@@ -200,6 +200,11 @@ export type Host = {
   deleteAccount(): Promise<Deletion>
   /** XCOD-274: accepts or declines an invitation to an organisation; says what happened. */
   answerInvitation?(org: string, accept: boolean): Promise<string>
+  /**
+   * XCOD-318: /feedback to the Lunos team. The text, this client's version and OS, and `sessionId`
+   * only when `consent` is true (the person ticked the box). Never a transcript.
+   */
+  feedback?(input: { text: string; consent: boolean; sessionId?: string }): Promise<void>
 }
 
 /** "p…@example.com": enough to recognise the address on a shared screen. */

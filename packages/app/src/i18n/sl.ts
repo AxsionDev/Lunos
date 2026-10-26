@@ -1383,5 +1383,13 @@ export const dict = {
   "account.disabled.category.payment": "Težava s plačilom",
   "account.disabled.category.offboarding": "Vaša organizacija vas je odjavila",
   "account.disabled.category.other": "Drugo",
+  "feedback.title": "Pošlji povratne informacije",
+  "feedback.description":
+    "Povejte ekipi Lunos, kaj deluje, kaj ne in kaj pogrešate. Pošljeta se različica Lunos in operacijski sistem, nikoli vaš pogovor.",
+  "feedback.screenshot": "Priloži posnetek zaslona (neobvezno: PNG, JPEG ali WebP, do 2 MB)",
+  "feedback.screenshot.invalid": "Ta datoteka ni slika PNG, JPEG ali WebP do 2 MB.",
+  "feedback.consent": "Deli ID te seje (pomaga nam, da jo najdemo v dnevnikih)",
+  "feedback.sent": "Hvala. Vaše povratne informacije so prispele do ekipe Lunos.",
+  "feedback.failed": "Vaše povratne informacije niso bile poslane",
   "prompt.placeholder.accountDisabled": "Vaš račun Lunos je onemogočen: novih pozivov ni mogoče poslati",
 }

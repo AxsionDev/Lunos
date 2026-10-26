@@ -1387,5 +1387,13 @@ export const dict: Record<string, string> = {
   "account.disabled.category.payment": "དངུལ་སྤྲོད་ཀྱི་དཀའ་ངལ།",
   "account.disabled.category.offboarding": "ཁྱོད་ཀྱི་ལས་སྡེ་གིས་ ཁྱོད་བཏོན་ཡོདཔ།",
   "account.disabled.category.other": "གཞན།",
+  "feedback.title": "བསམ་འཆར་གཏང་།",
+  "feedback.description":
+    "Lunos སྡེ་ཚན་ལུ་ ག་ཅི་ལཱ་འབད་ནི་དང་ ག་ཅི་མི་འབད་ནི་ ག་ཅི་མེདཔ་ཨིན་ན་ སླབ་གནང་། Lunos ཐོན་རིམ་དང་ OS མཉམ་དུ་གཏང་ནི་ཨིན་ ཁྱོད་ཀྱི་གྲོས་གླེང་ནམ་ཡང་མེན།",
+  "feedback.screenshot": "གསལ་གཞི་པར་ མཉམ་སྦྲགས་འབད་ (གདམ་ཁ: PNG, JPEG ཡང་ན་ WebP, 2 MB ཚུན)",
+  "feedback.screenshot.invalid": "ཡིག་སྣོད་འདི་ 2 MB ཚུན་གྱི་ PNG, JPEG ཡང་ན་ WebP པར་མེན།",
+  "feedback.consent": "ལཱ་ཡུན་འདིའི་ ID བགོ་བཤའ་རྐྱབ་ (ཐོ་བཀོད་ནང་འཚོལ་ནི་ལུ་ཕན་ཐོགས)",
+  "feedback.sent": "བཀའ་དྲིན་ཆེ། ཁྱོད་ཀྱི་བསམ་འཆར་ Lunos སྡེ་ཚན་ལུ་ལྷོད་ཡི།",
+  "feedback.failed": "ཁྱོད་ཀྱི་བསམ་འཆར་ གཏང་མ་ཚུགས།",
   "prompt.placeholder.accountDisabled": "ཁྱོད་ཀྱི་ Lunos རྩིས་ཐོ་ ལག་ལེན་མེད་པར་བཟོ་ཡོདཔ: དྲི་བ་གསརཔ་ གཏང་མི་ཚུགས།",
 }

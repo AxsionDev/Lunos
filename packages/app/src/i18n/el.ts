@@ -1379,6 +1379,15 @@ export const dict = {
   "account.disabled.category.payment": "Ένα πρόβλημα πληρωμής",
   "account.disabled.category.offboarding": "Ο οργανισμός σας σάς αφαίρεσε",
   "account.disabled.category.other": "Άλλο",
+  "feedback.title": "Αποστολή σχολίων",
+  "feedback.description":
+    "Πείτε στην ομάδα του Lunos τι λειτουργεί, τι όχι και τι σας λείπει. Μαζί στέλνονται η έκδοση του Lunos και το λειτουργικό σύστημα, ποτέ η συνομιλία σας.",
+  "feedback.screenshot": "Επισύναψη στιγμιότυπου οθόνης (προαιρετικά: PNG, JPEG ή WebP, έως 2 MB)",
+  "feedback.screenshot.invalid": "Το αρχείο δεν είναι εικόνα PNG, JPEG ή WebP έως 2 MB.",
+  "feedback.consent":
+    "Κοινοποίηση του αναγνωριστικού αυτής της συνεδρίας (μας βοηθά να τη βρούμε στα αρχεία καταγραφής)",
+  "feedback.sent": "Ευχαριστούμε. Τα σχόλιά σας έφτασαν στην ομάδα του Lunos.",
+  "feedback.failed": "Τα σχόλιά σας δεν στάλθηκαν",
   "prompt.placeholder.accountDisabled":
     "Ο λογαριασμός σας στο Lunos έχει απενεργοποιηθεί: δεν μπορούν να σταλούν νέα prompts",
 }

@@ -1387,5 +1387,13 @@ export const dict = {
   "account.disabled.category.payment": "ފައިސާ ދެއްކުމުގެ މައްސަލައެއް",
   "account.disabled.category.offboarding": "ތިޔަ ފަރާތުގެ ޖަމާޢަތުން ތިޔަ ފަރާތް ވަކިކޮށްފި",
   "account.disabled.category.other": "އެހެނިހެން",
+  "feedback.title": "ފީޑްބެކް ފޮނުވާ",
+  "feedback.description":
+    "ކަމްކުރާ އެއްޗަކާއި ނުކުރާ އެއްޗަކާއި ނެތް އެއްޗެއް Lunos ޓީމަށް ބުނެދީ. Lunos ވާޝަނާއި OS އެކުގައި ފޮނުވޭ، ތިބާގެ ވާހަކަ ދުވަހަކުވެސް ނޫން.",
+  "feedback.screenshot": "ސްކްރީންޝޮޓެއް ހިމަނާ (އިޚްތިޔާރީ: PNG، JPEG ނުވަތަ WebP، 2 MB އަށް)",
+  "feedback.screenshot.invalid": "މި ފައިލަކީ 2 MB އަށް ވާ PNG، JPEG ނުވަތަ WebP ފޮޓޯއެއް ނޫން.",
+  "feedback.consent": "މި ސެޝަންގެ ID ހިއްސާކުރޭ (ލޮގުތަކުން ހޯދަން އެހީވޭ)",
+  "feedback.sent": "ޝުކުރިއްޔާ. ތިބާގެ ފީޑްބެކް Lunos ޓީމަށް ލިބިއްޖެ.",
+  "feedback.failed": "ތިބާގެ ފީޑްބެކް ނުފޮނުވުނު",
   "prompt.placeholder.accountDisabled": "ތިޔަ Lunos އެކައުންޓް ހުއްޓުވާލެވިފައި: އާ ޕްރޮމްޕްޓް ފޮނުވޭކަށް ނެތް",
 }

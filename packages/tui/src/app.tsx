@@ -132,6 +132,7 @@ import { AccountProvider, useAccount } from "./context/account"
 import { Welcome } from "./component/welcome"
 import { DisabledAccount } from "./component/disabled-account"
 import { DialogAccount } from "./component/dialog-account"
+import { DialogFeedback } from "./component/dialog-feedback"
 import type { Host as AccountHost } from "./util/account"
 
 registerOpencodeSpinner()
@@ -1361,6 +1362,33 @@ function App(props: {
               slashName: "account",
               // XCOD-312: a disabled account's /account is the notice again (Lunos Cloud would refuse the rest).
               run: () => (account.disabled() ? account.showDisabled() : dialog.replace(() => <DialogAccount />)),
+              category: "Account",
+            },
+            {
+              // XCOD-318: feedback to the Lunos team (the session's id only if you choose to share it).
+              name: "account.feedback",
+              title: "Send feedback to the Lunos team",
+              slashName: "feedback",
+              run: async () => {
+                if (!account.host?.feedback)
+                  return toast.show({
+                    variant: "warning",
+                    message: "This Lunos can't send feedback; update it (/update).",
+                  })
+                if (account.exempt() === "offline")
+                  return toast.show({
+                    variant: "warning",
+                    message: "Offline mode (LUNOS_OFFLINE) is on: feedback can't be sent.",
+                  })
+                if (!(await account.host?.current()))
+                  return toast.show({
+                    variant: "info",
+                    message: "Sign in to your Lunos account first (/login) to send feedback.",
+                  })
+                dialog.replace(() => (
+                  <DialogFeedback sessionID={route.data.type === "session" ? route.data.sessionID : undefined} />
+                ))
+              },
               category: "Account",
             },
           ]

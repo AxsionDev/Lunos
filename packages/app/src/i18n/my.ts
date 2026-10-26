@@ -1383,5 +1383,13 @@ export const dict = {
   "account.disabled.category.payment": "ငွေပေးချေမှု ပြဿနာ",
   "account.disabled.category.offboarding": "သင့်အဖွဲ့အစည်းက သင့်ကို ဖယ်ရှားလိုက်သည်",
   "account.disabled.category.other": "အခြား",
+  "feedback.title": "အကြံပြုချက် ပို့ရန်",
+  "feedback.description":
+    "ဘာအလုပ်ဖြစ်သလဲ၊ ဘာမဖြစ်သလဲ၊ ဘာလိုနေသလဲ Lunos အဖွဲ့ကို ပြောပါ။ သင့် Lunos ဗားရှင်းနှင့် OS ကို တွဲပို့ပြီး သင့်စကားဝိုင်းကို ဘယ်တော့မှ မပို့ပါ။",
+  "feedback.screenshot": "မျက်နှာပြင်ပုံ တွဲရန် (ရွေးချယ်နိုင်: PNG, JPEG သို့မဟုတ် WebP, 2 MB အထိ)",
+  "feedback.screenshot.invalid": "ဤဖိုင်သည် 2 MB အထိ PNG, JPEG သို့မဟုတ် WebP ပုံ မဟုတ်ပါ။",
+  "feedback.consent": "ဤဆက်ရှင်၏ ID ကို မျှဝေရန် (မှတ်တမ်းများတွင် ရှာရန် ကူညီသည်)",
+  "feedback.sent": "ကျေးဇူးတင်ပါသည်။ သင့်အကြံပြုချက် Lunos အဖွဲ့ထံ ရောက်ပါပြီ။",
+  "feedback.failed": "သင့်အကြံပြုချက် မပို့ရသေးပါ",
   "prompt.placeholder.accountDisabled": "သင့် Lunos အကောင့်ကို ပိတ်ထားသည်- prompt အသစ်များ ပို့၍မရပါ",
 }

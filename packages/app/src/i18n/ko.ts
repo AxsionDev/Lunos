@@ -1371,5 +1371,13 @@ export const dict = {
   "account.disabled.category.payment": "결제 문제",
   "account.disabled.category.offboarding": "소속 조직에서 회원님을 제외했습니다",
   "account.disabled.category.other": "기타",
+  "feedback.title": "피드백 보내기",
+  "feedback.description":
+    "잘 되는 점, 안 되는 점, 아쉬운 점을 Lunos 팀에 알려 주세요. Lunos 버전과 OS가 함께 전송되며, 대화 내용은 절대 전송되지 않습니다.",
+  "feedback.screenshot": "스크린샷 첨부 (선택: PNG, JPEG 또는 WebP, 최대 2MB)",
+  "feedback.screenshot.invalid": "이 파일은 2MB 이하의 PNG, JPEG 또는 WebP 이미지가 아닙니다.",
+  "feedback.consent": "이 세션의 ID 공유 (로그에서 찾는 데 도움이 됩니다)",
+  "feedback.sent": "감사합니다. 피드백이 Lunos 팀에 전달되었습니다.",
+  "feedback.failed": "피드백을 보내지 못했습니다",
   "prompt.placeholder.accountDisabled": "Lunos 계정이 비활성화되었습니다: 새 프롬프트를 보낼 수 없습니다",
 }

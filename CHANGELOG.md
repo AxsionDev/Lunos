@@ -23,6 +23,11 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Tell us what you think, and join the Lunos Cloud beta with a code.** `/feedback` in the TUI and the
+  Feedback button in the desktop and web app send what you write (and, in the app, a screenshot you
+  attach) to the Lunos team, with your Lunos version and OS. Your session's id goes with it only if you
+  choose to share it; your conversation never does. `lunos cloud redeem <code>` redeems a Lunos Cloud
+  beta code for your account; an expired or used-up code says so.
 - **See your project at a glance, and give each project its own theme.** When a session belongs to a
   project, the right sidebar shows a Project section. Collapsed, it's one line: the budget used
   ("€38 of €50 · Oct"), with ⚠ if a budget is past its warning line or a resource failed to index.

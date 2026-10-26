@@ -1487,5 +1487,13 @@ export const dict = {
   "account.disabled.category.payment": "Проблема з оплатою",
   "account.disabled.category.offboarding": "Ваша організація вилучила вас",
   "account.disabled.category.other": "Інше",
+  "feedback.title": "Надіслати відгук",
+  "feedback.description":
+    "Розкажіть команді Lunos, що працює, що ні і чого бракує. Разом із відгуком надсилаються версія Lunos і ОС, але ніколи не ваша розмова.",
+  "feedback.screenshot": "Додати знімок екрана (необов'язково: PNG, JPEG або WebP, до 2 МБ)",
+  "feedback.screenshot.invalid": "Цей файл не є зображенням PNG, JPEG або WebP розміром до 2 МБ.",
+  "feedback.consent": "Передати ідентифікатор цього сеансу (допомагає знайти його в наших журналах)",
+  "feedback.sent": "Дякуємо. Ваш відгук отримала команда Lunos.",
+  "feedback.failed": "Ваш відгук не надіслано",
   "prompt.placeholder.accountDisabled": "Ваш обліковий запис Lunos вимкнено: нові запити надіслати не можна",
 }

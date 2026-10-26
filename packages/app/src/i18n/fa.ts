@@ -1359,5 +1359,13 @@ export const dict = {
   "account.disabled.category.payment": "یک مشکل پرداخت",
   "account.disabled.category.offboarding": "سازمان شما شما را حذف کرده است",
   "account.disabled.category.other": "سایر",
+  "feedback.title": "ارسال بازخورد",
+  "feedback.description":
+    "به تیم Lunos بگویید چه چیزی کار می‌کند، چه چیزی نه و چه چیزی کم است. نسخهٔ Lunos و سیستم‌عامل شما همراه آن فرستاده می‌شود، هرگز گفت‌وگوی شما.",
+  "feedback.screenshot": "پیوست تصویر صفحه (اختیاری: PNG، JPEG یا WebP، تا ۲ مگابایت)",
+  "feedback.screenshot.invalid": "این فایل تصویر PNG، JPEG یا WebP تا ۲ مگابایت نیست.",
+  "feedback.consent": "اشتراک شناسهٔ این جلسه (به ما کمک می‌کند آن را در گزارش‌ها پیدا کنیم)",
+  "feedback.sent": "سپاس. بازخورد شما به تیم Lunos رسید.",
+  "feedback.failed": "بازخورد شما فرستاده نشد",
   "prompt.placeholder.accountDisabled": "حساب Lunos شما غیرفعال شده است: ارسال درخواست جدید ممکن نیست",
 }

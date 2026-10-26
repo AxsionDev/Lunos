@@ -1350,5 +1350,13 @@ export const dict = {
   "account.disabled.category.payment": "ບັນຫາການຊຳລະເງິນ",
   "account.disabled.category.offboarding": "ອົງກອນຂອງທ່ານໄດ້ນຳທ່ານອອກ",
   "account.disabled.category.other": "ອື່ນໆ",
+  "feedback.title": "ສົ່ງຄຳຕິຊົມ",
+  "feedback.description":
+    "ບອກທີມ Lunos ວ່າຫຍັງໃຊ້ໄດ້ດີ ຫຍັງບໍ່ດີ ແລະ ຫຍັງທີ່ຍັງຂາດ. ເວີຊັນ Lunos ແລະ OS ຂອງທ່ານຈະຖືກສົ່ງໄປນຳ ແຕ່ບໍ່ສົ່ງການສົນທະນາຂອງທ່ານ.",
+  "feedback.screenshot": "ແນບຮູບໜ້າຈໍ (ບໍ່ບັງຄັບ: PNG, JPEG ຫຼື WebP, ບໍ່ເກີນ 2 MB)",
+  "feedback.screenshot.invalid": "ໄຟລ໌ນີ້ບໍ່ແມ່ນຮູບ PNG, JPEG ຫຼື WebP ຂະໜາດບໍ່ເກີນ 2 MB.",
+  "feedback.consent": "ແບ່ງປັນ ID ຂອງເຊດຊັນນີ້ (ຊ່ວຍໃຫ້ພວກເຮົາຊອກຫາໃນບັນທຶກ)",
+  "feedback.sent": "ຂອບໃຈ. ຄຳຕິຊົມຂອງທ່ານໄປຮອດທີມ Lunos ແລ້ວ.",
+  "feedback.failed": "ຄຳຕິຊົມຂອງທ່ານບໍ່ໄດ້ຖືກສົ່ງ",
   "prompt.placeholder.accountDisabled": "ບັນຊີ Lunos ຂອງທ່ານຖືກປິດການນຳໃຊ້: ບໍ່ສາມາດສົ່ງຄຳຖາມໃໝ່ໄດ້",
 }

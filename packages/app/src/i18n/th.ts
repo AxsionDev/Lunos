@@ -1441,5 +1441,13 @@ export const dict = {
   "account.disabled.category.payment": "ปัญหาการชำระเงิน",
   "account.disabled.category.offboarding": "องค์กรของคุณนำคุณออก",
   "account.disabled.category.other": "อื่น ๆ",
+  "feedback.title": "ส่งความคิดเห็น",
+  "feedback.description":
+    "บอกทีม Lunos ว่าอะไรใช้ได้ดี อะไรไม่ดี และอะไรที่ยังขาด ระบบจะส่งเวอร์ชัน Lunos และระบบปฏิบัติการไปด้วย แต่ไม่ส่งบทสนทนาของคุณ",
+  "feedback.screenshot": "แนบภาพหน้าจอ (ไม่บังคับ: PNG, JPEG หรือ WebP ไม่เกิน 2 MB)",
+  "feedback.screenshot.invalid": "ไฟล์นี้ไม่ใช่รูปภาพ PNG, JPEG หรือ WebP ขนาดไม่เกิน 2 MB",
+  "feedback.consent": "แชร์ ID ของเซสชันนี้ (ช่วยให้เราหาในบันทึกได้)",
+  "feedback.sent": "ขอบคุณ ความคิดเห็นของคุณถึงทีม Lunos แล้ว",
+  "feedback.failed": "ไม่ได้ส่งความคิดเห็นของคุณ",
   "prompt.placeholder.accountDisabled": "บัญชี Lunos ของคุณถูกปิดใช้งาน: ไม่สามารถส่งพรอมต์ใหม่ได้",
 }

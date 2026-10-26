@@ -1377,5 +1377,13 @@ export const dict = {
   "account.disabled.category.payment": "To‘lov muammosi",
   "account.disabled.category.offboarding": "Tashkilotingiz sizni chiqarib yubordi",
   "account.disabled.category.other": "Boshqa",
+  "feedback.title": "Fikr yuborish",
+  "feedback.description":
+    "Lunos jamoasiga nima ishlayotgani, nima ishlamayotgani va nima yetishmayotganini ayting. Lunos versiyangiz va operatsion tizimingiz ham yuboriladi, suhbatingiz hech qachon.",
+  "feedback.screenshot": "Skrinshot biriktirish (ixtiyoriy: PNG, JPEG yoki WebP, 2 MB gacha)",
+  "feedback.screenshot.invalid": "Bu fayl 2 MB gacha bo‘lgan PNG, JPEG yoki WebP rasm emas.",
+  "feedback.consent": "Ushbu seans ID sini ulashish (uni jurnallarda topishimizga yordam beradi)",
+  "feedback.sent": "Rahmat. Fikringiz Lunos jamoasiga yetib bordi.",
+  "feedback.failed": "Fikringiz yuborilmadi",
   "prompt.placeholder.accountDisabled": "Lunos hisobingiz o‘chirilgan: yangi so‘rovlarni yuborib bo‘lmaydi",
 }

@@ -1375,5 +1375,13 @@ export const dict = {
   "account.disabled.category.payment": "Проблем с плащането",
   "account.disabled.category.offboarding": "Вашата организация ви премахна",
   "account.disabled.category.other": "Друго",
+  "feedback.title": "Изпратете отзив",
+  "feedback.description":
+    "Кажете на екипа на Lunos какво работи, какво не и какво ви липсва. Изпращат се версията на Lunos и операционната система, никога разговорът ви.",
+  "feedback.screenshot": "Прикачете екранна снимка (по избор: PNG, JPEG или WebP, до 2 MB)",
+  "feedback.screenshot.invalid": "Този файл не е изображение PNG, JPEG или WebP до 2 MB.",
+  "feedback.consent": "Споделете идентификатора на тази сесия (помага ни да я намерим в логовете)",
+  "feedback.sent": "Благодарим ви. Отзивът ви стигна до екипа на Lunos.",
+  "feedback.failed": "Отзивът ви не беше изпратен",
   "prompt.placeholder.accountDisabled": "Вашият акаунт в Lunos е деактивиран: не могат да се изпращат нови заявки",
 }

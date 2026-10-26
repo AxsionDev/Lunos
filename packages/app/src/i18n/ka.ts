@@ -1360,5 +1360,13 @@ export const dict = {
   "account.disabled.category.payment": "გადახდის პრობლემა",
   "account.disabled.category.offboarding": "თქვენმა ორგანიზაციამ ამოგიშალათ",
   "account.disabled.category.other": "სხვა",
+  "feedback.title": "გამოხმაურების გაგზავნა",
+  "feedback.description":
+    "უთხარით Lunos-ის გუნდს, რა მუშაობს, რა არა და რა გაკლიათ. იგზავნება Lunos-ის ვერსია და ოპერაციული სისტემა, თქვენი საუბარი არასოდეს.",
+  "feedback.screenshot": "ეკრანის ანაბეჭდის მიმაგრება (არასავალდებულო: PNG, JPEG ან WebP, 2 MB-მდე)",
+  "feedback.screenshot.invalid": "ეს ფაილი არ არის 2 MB-მდე PNG, JPEG ან WebP სურათი.",
+  "feedback.consent": "ამ სესიის ID-ის გაზიარება (გვეხმარება ჟურნალებში მის პოვნაში)",
+  "feedback.sent": "გმადლობთ. თქვენი გამოხმაურება Lunos-ის გუნდს მიუვიდა.",
+  "feedback.failed": "თქვენი გამოხმაურება არ გაიგზავნა",
   "prompt.placeholder.accountDisabled": "თქვენი Lunos ანგარიში გათიშულია: ახალი მოთხოვნების გაგზავნა შეუძლებელია",
 }

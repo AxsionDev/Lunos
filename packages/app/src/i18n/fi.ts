@@ -1373,5 +1373,13 @@ export const dict = {
   "account.disabled.category.payment": "Maksuongelma",
   "account.disabled.category.offboarding": "Organisaatiosi poisti sinut",
   "account.disabled.category.other": "Muu",
+  "feedback.title": "Lähetä palautetta",
+  "feedback.description":
+    "Kerro Lunos-tiimille, mikä toimii, mikä ei ja mitä kaipaat. Mukaan lähtevät Lunos-versiosi ja käyttöjärjestelmäsi, ei koskaan keskusteluasi.",
+  "feedback.screenshot": "Liitä kuvakaappaus (valinnainen: PNG, JPEG tai WebP, enintään 2 Mt)",
+  "feedback.screenshot.invalid": "Tiedosto ei ole enintään 2 Mt:n PNG-, JPEG- tai WebP-kuva.",
+  "feedback.consent": "Jaa tämän istunnon tunniste (auttaa meitä löytämään sen lokeista)",
+  "feedback.sent": "Kiitos. Palautteesi meni Lunos-tiimille.",
+  "feedback.failed": "Palautettasi ei lähetetty",
   "prompt.placeholder.accountDisabled": "Lunos-tilisi on poistettu käytöstä: uusia kehotteita ei voi lähettää",
 }

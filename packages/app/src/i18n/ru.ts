@@ -1482,5 +1482,13 @@ export const dict = {
   "account.disabled.category.payment": "Проблема с оплатой",
   "account.disabled.category.offboarding": "Ваша организация исключила вас",
   "account.disabled.category.other": "Другое",
+  "feedback.title": "Отправить отзыв",
+  "feedback.description":
+    "Расскажите команде Lunos, что работает, что нет и чего не хватает. Вместе с отзывом отправляются версия Lunos и ОС, но никогда не ваш разговор.",
+  "feedback.screenshot": "Прикрепить снимок экрана (необязательно: PNG, JPEG или WebP, до 2 МБ)",
+  "feedback.screenshot.invalid": "Этот файл не является изображением PNG, JPEG или WebP размером до 2 МБ.",
+  "feedback.consent": "Передать идентификатор этой сессии (помогает найти её в наших журналах)",
+  "feedback.sent": "Спасибо. Ваш отзыв получила команда Lunos.",
+  "feedback.failed": "Ваш отзыв не отправлен",
   "prompt.placeholder.accountDisabled": "Ваша учётная запись Lunos отключена: новые запросы отправить нельзя",
 }

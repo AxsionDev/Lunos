@@ -1378,5 +1378,13 @@ export const dict = {
   "account.disabled.category.payment": "Fizetési probléma",
   "account.disabled.category.offboarding": "A szervezeted eltávolított",
   "account.disabled.category.other": "Egyéb",
+  "feedback.title": "Visszajelzés küldése",
+  "feedback.description":
+    "Mondja el a Lunos csapatának, mi működik, mi nem és mi hiányzik. A Lunos verziója és az operációs rendszer is megy vele, a beszélgetése soha.",
+  "feedback.screenshot": "Képernyőkép csatolása (nem kötelező: PNG, JPEG vagy WebP, legfeljebb 2 MB)",
+  "feedback.screenshot.invalid": "Ez a fájl nem legfeljebb 2 MB-os PNG-, JPEG- vagy WebP-kép.",
+  "feedback.consent": "A munkamenet azonosítójának megosztása (segít megtalálni a naplóinkban)",
+  "feedback.sent": "Köszönjük. Visszajelzése eljutott a Lunos csapatához.",
+  "feedback.failed": "A visszajelzés nem lett elküldve",
   "prompt.placeholder.accountDisabled": "A Lunos-fiókod le van tiltva: új promptot nem lehet küldeni",
 }
