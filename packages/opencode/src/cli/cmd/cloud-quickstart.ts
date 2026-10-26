@@ -156,6 +156,8 @@ async function quickstart(input: {
     throw new Stop(
       `This repository's config sends cloud runs to ${workers}, but your Lunos account is checked at ${base}. Set cloud.endpoint in your user config (lunos settings set cloud.endpoint ${workers}), not in the project's.`,
     )
+  // The repository first: a wrong folder or an unpushed commit is said before any sign-in or checkout.
+  const found = await CloudWorkers.repo(input.dir, config)
 
   // 1. Signed in, as an account Lunos Cloud may be asked about.
   if (!(await CloudStore.load())) {
@@ -171,10 +173,11 @@ async function quickstart(input: {
   const session = await CloudAuth.session("Lunos Cloud quickstart")
   const why = await CloudAccountApi.allowed(session.issuer)
   if (why) throw new Stop(`Lunos Cloud quickstart can't check your account: ${why}.`)
-  const token = session.tokens.access_token
+  // Asked again before each call: the checkout can take longer than an access token lasts.
+  const token = async () => (await CloudAuth.session("Lunos Cloud quickstart")).tokens.access_token
   const opts = { endpoint: base }
   // An unverified address, a suspended account: refused here, in plain words (CloudAccountApi.explain).
-  let account = await CloudQuickstart.account(token, opts)
+  let account = await CloudQuickstart.account(await token(), opts)
   done(`Signed in${account.email ? ` as ${account.email}` : ""}, e-mail address verified.`)
 
   // 2. A plan, or the trial.
@@ -187,7 +190,7 @@ async function quickstart(input: {
     const answer = await ask("Start the trial now? [Y/n] ")
     if (answer === undefined || /^n(o)?$/i.test(answer.trim()))
       throw new Stop("No plan yet, so no cloud run. Run lunos cloud quickstart again when you want the trial.")
-    const url = await CloudQuickstart.trial(token, opts)
+    const url = await CloudQuickstart.trial(await token(), opts)
     out(`Finish the checkout at ${url}`)
     if (input.browser) await openUrl(url).catch(() => undefined)
     out(dim("Waiting for the trial to start… (ctrl+c to stop; run lunos cloud quickstart again later)"))
@@ -196,7 +199,7 @@ async function quickstart(input: {
       if (Date.now() > deadline)
         throw new Stop("The trial hasn't started yet. Once the checkout is done, run lunos cloud quickstart again.")
       await Bun.sleep(5000)
-      account = await CloudQuickstart.account(token, opts)
+      account = await CloudQuickstart.account(await token(), opts)
     }
   }
   done(
@@ -205,8 +208,7 @@ async function quickstart(input: {
       : "No plan needed on this Lunos Cloud.",
   )
 
-  // 3. The repository, and a git token for its host.
-  const found = await CloudWorkers.repo(input.dir, config)
+  // 3. A git token for the repository's host.
   const host = CloudQuickstart.remoteHost(found.repo.url)
   if (!CloudQuickstart.localHost(host) && !account.gitHosts.includes(host!)) {
     if (!input.interactive) throw new Stop(CloudQuickstart.noGitToken(host!))
