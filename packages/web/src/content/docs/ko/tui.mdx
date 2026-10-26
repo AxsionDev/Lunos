@@ -163,6 +163,18 @@ OpenCode를 종료합니다. _별칭_: `/quit`, `/q`
 
 ---
 
+### marketplace
+
+마켓플레이스에서 플러그인, 스킬, 훅, MCP 서버를 둘러보고 설치합니다. 탭 이름(`plugins`, `skills`, `hooks`, `mcp`)을 붙이면 해당 탭이 열리고, `installed`를 붙이면 설치된 항목을 사용 가능한 업데이트 표시와 함께 보여 주며, 다른 단어를 붙이면 검색합니다. _별칭_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 사용 가능한 모델 목록을 표시합니다.
@@ -187,6 +199,16 @@ OpenCode를 종료합니다. _별칭_: `/quit`, `/q`
 
 ---
 
+### plugins
+
+설치된 플러그인 목록을 표시하고 켜거나 끕니다.
+
+```bash frame="none"
+/plugins
+```
+
+---
+
 ### redo
 
 이전에 실행 취소한 메시지를 다시 실행합니다. `/undo`를 사용한 후에만 사용할 수 있습니다.
@@ -207,10 +229,20 @@ OpenCode를 종료합니다. _별칭_: `/quit`, `/q`
 
 ### sessions
 
-세션 목록을 표시하고 세션 간을 전환합니다. _별칭_: `/resume`, `/continue`
+이 컴퓨터의 모든 프로젝트에 걸친 모든 세션을 상태, 프로젝트, 모델, 마지막 활동, 비용과 함께 사용자 그룹으로 표시합니다.
 
 ```bash frame="none"
 /sessions
+```
+
+---
+
+### resume
+
+이 프로젝트의 세션 목록을 표시하고 세션 간을 전환합니다. _별칭_: `/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **키바인드:** `ctrl+x l`

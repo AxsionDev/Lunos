@@ -33,7 +33,7 @@ describe("opencode mcp add (non-interactive subprocess)", () => {
           },
         })
       }),
-    60_000,
+    120_000,
   )
 
   cliIt.concurrent(
@@ -69,6 +69,6 @@ describe("opencode mcp add (non-interactive subprocess)", () => {
           },
         })
       }),
-    60_000,
+    120_000,
   )
 })

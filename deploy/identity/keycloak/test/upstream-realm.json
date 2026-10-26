@@ -1,0 +1,60 @@
+{
+  "realm": "upstream",
+  "displayName": "Upstream (an organisation's identity provider, tests only)",
+  "enabled": true,
+  "sslRequired": "none",
+  "clients": [
+    {
+      "clientId": "lunos-broker",
+      "name": "Lunos (brokered sign-in)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "broker-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:18180/realms/Lunos/broker/*"],
+      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "basic", "email"]
+    }
+  ],
+  "users": [
+    {
+      "username": "uma",
+      "email": "uma@acme.test",
+      "emailVerified": true,
+      "firstName": "Uma",
+      "lastName": "Acme",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "uma-pass", "temporary": false }]
+    },
+    {
+      "username": "vic",
+      "email": "vic@plain.test",
+      "emailVerified": true,
+      "firstName": "Vic",
+      "lastName": "Plain",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "vic-pass", "temporary": false }]
+    },
+    {
+      "username": "bea",
+      "email": "bea@bad.test",
+      "emailVerified": true,
+      "firstName": "Bea",
+      "lastName": "Bad",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "bea-pass", "temporary": false }]
+    },
+    {
+      "username": "dee",
+      "email": "dee@acme.test",
+      "emailVerified": true,
+      "firstName": "Dee",
+      "lastName": "Acme",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "dee-pass", "temporary": false }]
+    }
+  ]
+}

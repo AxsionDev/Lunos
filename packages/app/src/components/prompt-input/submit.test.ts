@@ -40,6 +40,8 @@ let selected = "/repo/worktree-a"
 let variant: string | undefined
 let permissionServer = "server-a"
 let createSessionGate: Promise<void> | undefined
+let accountDisabled = false
+const refusedSends: string[] = []
 
 let promptValue: Prompt = [{ type: "text", content: "ls", start: 0, end: 2 }]
 const [promptStore, setPromptStore] = createStore<PromptStore>({
@@ -135,6 +137,7 @@ beforeAll(async () => {
   mock.module("@opencode-ai/ui/toast", () => ({
     Toast: { Region: () => null },
     showToast: () => 0,
+    toaster: { dismiss: () => undefined },
   }))
 
   mock.module("@opencode-ai/core/util/encode", () => ({
@@ -148,6 +151,9 @@ beforeAll(async () => {
         variant: { current: () => variant },
       },
       agent: {
+        current: () => ({ name: "agent" }),
+      },
+      mode: {
         current: () => ({ name: "agent" }),
       },
       session: {
@@ -268,6 +274,17 @@ beforeAll(async () => {
     }),
   }))
 
+  // XCOD-312: the disabled-account guard; refusing records why instead of showing a toast.
+  mock.module("@/context/account", () => ({
+    useAccount: () => ({
+      allowSend: () => {
+        if (!accountDisabled) return true
+        refusedSends.push("disabled")
+        return false
+      },
+    }),
+  }))
+
   mock.module("@/context/language", () => ({
     useLanguage: () => ({
       t: (key: string) => key,
@@ -300,8 +317,44 @@ beforeEach(() => {
   variant = undefined
   permissionServer = "server-a"
   createSessionGate = undefined
+  accountDisabled = false
+  refusedSends.length = 0
   serverSessionSyncs = 0
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
+})
+
+describe("XCOD-312: a disabled Lunos account", () => {
+  test("sends no prompt, shell command or new session; the draft isn't cleared", async () => {
+    accountDisabled = true
+    let cleared = 0
+    const submit = createPromptSubmit({
+      prompt: { ...prompt, reset: () => void cleared++ },
+      info: () => undefined,
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "shell",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      newSessionWorktree: () => selected,
+      onNewSessionWorktreeReset: () => undefined,
+      onSubmit: () => undefined,
+    })
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+    expect(refusedSends).toEqual(["disabled"])
+    expect([createdSessions, sentShell, sentPrompts, cleared]).toEqual([[], [], [], 0])
+
+    // Lifted: the same draft goes out.
+    accountDisabled = false
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+    expect(createdSessions).toEqual(["/repo/worktree-a"])
+  })
 })
 
 describe("prompt submit worktree selection", () => {

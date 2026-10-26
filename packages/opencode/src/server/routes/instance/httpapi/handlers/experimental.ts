@@ -1,4 +1,7 @@
 import { Account } from "@/account/account"
+import { SessionArtifacts } from "@/session/artifacts"
+import * as BackgroundList from "@/background/list"
+import { backgroundEnabled } from "@/background/enabled"
 import { Agent } from "@/agent/agent"
 import { BackgroundJob } from "@/background/job"
 import { Config } from "@/config/config"
@@ -7,7 +10,8 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { MCP } from "@/mcp"
 import { Project } from "@/project/project"
 import { Session } from "@/session/session"
-import type { SessionID } from "@/session/schema"
+import { SessionID } from "@/session/schema"
+import { SessionRunState } from "@/session/run-state"
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { ToolRegistry } from "@/tool/registry"
 import { Worktree } from "@/worktree"
@@ -15,7 +19,99 @@ import { Effect, Option } from "effect"
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { ConsoleSwitchPayload, SessionListQuery, ToolListQuery, WorktreeApiError } from "../groups/experimental"
+import {
+  PeerAsks,
+  ConsoleSwitchPayload,
+  ExternalConfigCommandPayload,
+  SessionEnqueuePayload,
+  SessionTakeoverPayload,
+  BudgetStatusQuery,
+  ProjectGroupCreatePayload,
+  ProjectGroupFoldersPayload,
+  ProjectGroupMovePayload,
+  ProjectGroupUpdatePayload,
+  SessionGroupCreatePayload,
+  SessionGroupMovePayload,
+  SessionGroupUpdatePayload,
+  SessionBulkArchivePayload,
+  SessionBulkDeletePayload,
+  SessionBulkPayload,
+  SessionBulkStopPayload,
+  SessionListQuery,
+  SessionOverviewQuery,
+  ToolListQuery,
+  WorktreeApiError,
+} from "../groups/experimental"
+import { InvalidRequestError, notFound } from "../errors"
+import { SessionGroups } from "@/session/groups"
+import { ProjectGroup } from "@/project/group"
+import { Budget } from "@/budget"
+import { BudgetEstimate } from "@/budget/estimate"
+import { Database } from "@opencode-ai/core/database/database"
+import { Provider } from "@/provider/provider"
+import { SessionLive } from "@/session/live"
+import { SessionPeers } from "@/session/peers"
+import { SessionPeerControl } from "@/session/peer-control"
+import { SessionOverview } from "@/session/overview"
+import { SessionPromptQueue } from "@/session/prompt-queue"
+import { SessionBulk } from "@/session/bulk"
+import { SessionShare } from "@/share/session"
+import { ExternalRegistry } from "@/external/registry"
+import { ExternalDetect } from "@/external/detect"
+import { ExternalPolicy } from "@/external/policy"
+import { ExternalRun } from "@/external/run"
+import { ExternalSession } from "@/external/session"
+import { ExternalConsent } from "@/external/consent"
+import { ExternalConfig } from "@/external/config"
+import { ConfigExternal } from "@opencode-ai/core/config/external"
+import { GlobalBus } from "@/bus/global"
+import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
+
+// XCOD-298: project store errors become the endpoint's declared errors.
+function projectErrors<A>(run: () => Promise<A>) {
+  return Effect.tryPromise({
+    try: run,
+    catch: (error) => {
+      if (error instanceof ProjectGroup.NotFoundError) return notFound(error.message)
+      if (error instanceof ProjectGroup.InvalidError) return new InvalidRequestError({ message: error.message })
+      throw error
+    },
+  })
+}
+
+// XCOD-205: group store errors become the endpoint's declared errors.
+function groupErrors<A>(run: () => Promise<A>) {
+  return Effect.tryPromise({
+    try: run,
+    catch: (error) => {
+      if (error instanceof SessionGroups.NotFoundError) return notFound(error.message)
+      if (error instanceof SessionGroups.InvalidError) return new InvalidRequestError({ message: error.message })
+      throw error
+    },
+  })
+}
+
+let peerEvents: (() => void) | undefined
+// XCOD-234: other Lunos processes' sessions changed (or one stopped responding): every surface re-reads.
+function publishPeerChanges() {
+  peerEvents ??= SessionPeers.subscribe(() =>
+    GlobalBus.emit("event", {
+      directory: "global",
+      payload: { type: SessionGroupEvent.LiveUpdated.type, properties: {} },
+    }),
+  )
+}
+
+let groupEvents: (() => void) | undefined
+// Every surface (this process's and other processes' changes alike) hears about it on the global stream.
+function publishGroupChanges() {
+  groupEvents ??= SessionGroups.subscribe(() =>
+    GlobalBus.emit("event", {
+      directory: "global",
+      payload: { type: SessionGroupEvent.Updated.type, properties: {} },
+    }),
+  )
+}
 
 function mapWorktreeError<A, R>(self: Effect.Effect<A, Worktree.Error, R>) {
   return self.pipe(
@@ -33,11 +129,19 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const registry = yield* ToolRegistry.Service
     const worktreeSvc = yield* Worktree.Service
     const sessions = yield* Session.Service
+    const shareSvc = yield* SessionShare.Service
     const background = yield* BackgroundJob.Service
+    const runState = yield* SessionRunState.Service
     const flags = yield* RuntimeFlags.Service
+    const database = yield* Database.Service
+    const provider = yield* Provider.Service
+    SessionLive.start()
+    SessionLive.withControl(SessionPeerControl.start)
+    publishGroupChanges()
+    publishPeerChanges()
 
     const capabilities = Effect.fn("ExperimentalHttpApi.capabilities")(function* () {
-      return { backgroundSubagents: flags.experimentalBackgroundSubagents }
+      return { backgroundSubagents: backgroundEnabled(flags.experimentalBackgroundSubagents, yield* config.get()) }
     })
 
     const getConsole = Effect.fn("ExperimentalHttpApi.console")(function* () {
@@ -159,7 +263,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const sessionBackground = Effect.fn("ExperimentalHttpApi.sessionBackground")(function* (ctx: {
       params: { sessionID: SessionID }
     }) {
-      if (!flags.experimentalBackgroundSubagents) return false
+      if (!backgroundEnabled(flags.experimentalBackgroundSubagents, yield* config.get())) return false
       const jobs = (yield* background.list()).filter(
         (job) =>
           job.type === "task" &&
@@ -169,6 +273,554 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       )
       const promoted = yield* Effect.forEach(jobs, (job) => background.promote(job.id), { concurrency: "unbounded" })
       return promoted.some((job) => job !== undefined)
+    })
+
+    const artifacts = Effect.fn("ExperimentalHttpApi.artifacts")(function* (ctx: {
+      query: { kind?: SessionArtifacts.Kind }
+    }) {
+      const instance = yield* InstanceState.context
+      return yield* Effect.promise(() => SessionArtifacts.list(instance, ctx.query.kind))
+    })
+
+    // XCOD-82: the list the TUI, app and ACP render. Task jobs only; newest first.
+    const backgroundJobs = Effect.fn("ExperimentalHttpApi.backgroundJobs")(function* (ctx: {
+      query: { sessionID?: string }
+    }) {
+      return BackgroundList.list(yield* background.list(), ctx.query.sessionID)
+    })
+
+    const backgroundJobCancel = Effect.fn("ExperimentalHttpApi.backgroundJobCancel")(function* (ctx: {
+      params: { jobID: string }
+    }) {
+      const job = yield* background.get(ctx.params.jobID)
+      if (job?.status !== "running") return false
+      // Same path as aborting the job's own session: cancels the job and its descendants.
+      yield* runState.cancel(SessionID.make(ctx.params.jobID))
+      return true
+    })
+
+    const sessionOverview = Effect.fn("ExperimentalHttpApi.sessionOverview")(function* (ctx: {
+      query: typeof SessionOverviewQuery.Type
+    }) {
+      return yield* SessionOverview.build({ archived: ctx.query.archived }).pipe(
+        Effect.provideService(Session.Service, sessions),
+      )
+    })
+
+    // XCOD-265: Stop all, Clear list, Unarchive, Delete archived.
+    const sessionBulkStop = Effect.fn("ExperimentalHttpApi.sessionBulkStop")(function* (ctx: {
+      payload: typeof SessionBulkStopPayload.Type
+    }) {
+      return yield* SessionBulk.stop(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkArchive = Effect.fn("ExperimentalHttpApi.sessionBulkArchive")(function* (ctx: {
+      payload: typeof SessionBulkArchivePayload.Type
+    }) {
+      const run = ctx.payload.stop
+        ? SessionBulk.stopAndArchive(ctx.payload)
+        : SessionBulk.archive({ sessionIDs: ctx.payload.sessionIDs })
+      return yield* run.pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkUnarchive = Effect.fn("ExperimentalHttpApi.sessionBulkUnarchive")(function* (ctx: {
+      payload: typeof SessionBulkPayload.Type
+    }) {
+      return yield* SessionBulk.unarchive(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkDelete = Effect.fn("ExperimentalHttpApi.sessionBulkDelete")(function* (ctx: {
+      payload: typeof SessionBulkDeletePayload.Type
+    }) {
+      return yield* SessionBulk.remove({
+        ...ctx.payload,
+        // Callers from before XCOD-284 (Delete archived in the TUI and the desktop/web app) never
+        // reached Lunos Cloud: they still don't unless they ask.
+        keepCloud: ctx.payload.keepCloud ?? true,
+        reason: ctx.payload.stop ? "Stopped to delete it" : undefined,
+        unshare: shareSvc.unshare,
+      }).pipe(Effect.provideService(Session.Service, sessions))
+    })
+    const sessionBulkPreview = Effect.fn("ExperimentalHttpApi.sessionBulkPreview")(function* (ctx: {
+      payload: typeof SessionBulkPayload.Type
+    }) {
+      return yield* SessionBulk.preview(ctx.payload).pipe(Effect.provideService(Session.Service, sessions))
+    })
+
+    const budgetStatus = Effect.fn("ExperimentalHttpApi.budgetStatus")(function* (ctx: {
+      query: typeof BudgetStatusQuery.Type
+    }) {
+      const instance = yield* InstanceState.context
+      const cfg = (yield* config.get()) as Budget.Config
+      const repo = { id: instance.project.id, worktree: instance.project.worktree, name: instance.project.name }
+      const session = ctx.query.sessionID
+        ? yield* sessions.get(ctx.query.sessionID as SessionID).pipe(Effect.option)
+        : Option.none()
+      const info = Option.getOrUndefined(session)
+      const where = {
+        directory: info?.directory ?? instance.directory,
+        project: repo,
+        ...(info ? { session: { id: info.id, ...(info.parentID ? { parentID: info.parentID } : {}) } } : {}),
+      }
+      const { group } = yield* Budget.applicable(where, cfg).pipe(Effect.provideService(Database.Service, database))
+      const list = yield* Budget.status(where, cfg).pipe(Effect.provideService(Database.Service, database))
+      // The next turn's estimate, from the session's recent turns and its model's price.
+      let estimate: BudgetEstimate.Range | undefined
+      let unpriced = false
+      if (info) {
+        const messages = yield* sessions
+          .messages({ sessionID: info.id, limit: 200 })
+          .pipe(Effect.orElseSucceed(() => []))
+        const last = messages.findLast((message) => message.info.role === "assistant")?.info as
+          | { providerID?: string; modelID?: string }
+          | undefined
+        const model =
+          last?.providerID && last.modelID
+            ? yield* provider.getModel(last.providerID as never, last.modelID as never).pipe(Effect.option)
+            : Option.none()
+        const price = Option.getOrUndefined(model)?.cost
+        if (Option.isSome(model)) {
+          estimate = BudgetEstimate.estimate({ ...Budget.turnsOf(messages), price })
+          unpriced = !estimate
+        }
+      }
+      const tightest = Budget.tightest(list)
+      return {
+        project: { id: group.id, name: group.name },
+        budgets: list.map((item) => ({
+          id: item.id,
+          scope: item.scope,
+          name: item.project.name,
+          locked: item.locked,
+          currency: item.currency,
+          amount: item.amount,
+          spent: item.spent,
+          remaining: item.remaining,
+          percent: item.percent,
+          unknown: item.unknown,
+          ...(item.forecast !== undefined ? { forecast: item.forecast } : {}),
+          on_limit: item.on_limit,
+          period: { key: item.period.key, label: item.period.label },
+        })),
+        line:
+          list.length || unpriced
+            ? Budget.line({ estimate, unpriced, status: tightest, settings: Budget.settings(cfg) })
+            : "",
+      }
+    })
+
+    const projectGroupList = Effect.fn("ExperimentalHttpApi.projectGroupList")(function* () {
+      const ctx = yield* InstanceState.context
+      const snap = yield* Effect.promise(() => ProjectGroup.snapshot())
+      return {
+        groups: snap.groups,
+        current: snap.resolve(ctx.directory, ctx.project) ?? ProjectGroup.implicit(ctx.directory, ctx.project),
+      }
+    })
+
+    const projectGroupCreate = Effect.fn("ExperimentalHttpApi.projectGroupCreate")(function* (ctx: {
+      payload: typeof ProjectGroupCreatePayload.Type
+    }) {
+      return yield* projectErrors(() => ProjectGroup.create({ name: ctx.payload.name, folders: ctx.payload.folders }))
+    })
+
+    const projectGroupUpdate = Effect.fn("ExperimentalHttpApi.projectGroupUpdate")(function* (ctx: {
+      params: { groupID: string }
+      payload: typeof ProjectGroupUpdatePayload.Type
+    }) {
+      const { groupID } = ctx.params
+      return yield* projectErrors(async () => {
+        let group = ctx.payload.name !== undefined ? await ProjectGroup.rename(groupID, ctx.payload.name) : undefined
+        if (ctx.payload.archived !== undefined) group = await ProjectGroup.archive(groupID, ctx.payload.archived)
+        if (group) return group
+        const found = await ProjectGroup.get(groupID)
+        if (!found) throw new ProjectGroup.NotFoundError(groupID)
+        return found
+      })
+    })
+
+    const projectGroupAdd = Effect.fn("ExperimentalHttpApi.projectGroupAdd")(function* (ctx: {
+      params: { groupID: string }
+      payload: typeof ProjectGroupFoldersPayload.Type
+    }) {
+      return yield* projectErrors(() => ProjectGroup.add(ctx.params.groupID, ctx.payload.folders))
+    })
+
+    const projectGroupRemove = Effect.fn("ExperimentalHttpApi.projectGroupRemove")(function* (ctx: {
+      params: { groupID: string }
+      payload: typeof ProjectGroupFoldersPayload.Type
+    }) {
+      return yield* projectErrors(() => ProjectGroup.remove(ctx.params.groupID, ctx.payload.folders))
+    })
+
+    const projectGroupMove = Effect.fn("ExperimentalHttpApi.projectGroupMove")(function* (ctx: {
+      payload: typeof ProjectGroupMovePayload.Type
+    }) {
+      return yield* projectErrors(() => ProjectGroup.move(ctx.payload.sessionIDs, ctx.payload.projectID ?? null))
+    })
+
+    const sessionGroupList = Effect.fn("ExperimentalHttpApi.sessionGroupList")(function* () {
+      return (yield* Effect.promise(() => SessionGroups.read())).groups
+    })
+
+    const sessionGroupCreate = Effect.fn("ExperimentalHttpApi.sessionGroupCreate")(function* (ctx: {
+      payload: typeof SessionGroupCreatePayload.Type
+    }) {
+      return yield* groupErrors(() => SessionGroups.create(ctx.payload))
+    })
+
+    const sessionGroupUpdate = Effect.fn("ExperimentalHttpApi.sessionGroupUpdate")(function* (ctx: {
+      params: { groupID: string }
+      payload: typeof SessionGroupUpdatePayload.Type
+    }) {
+      return yield* groupErrors(() => SessionGroups.patch(ctx.params.groupID, ctx.payload))
+    })
+
+    const sessionGroupDelete = Effect.fn("ExperimentalHttpApi.sessionGroupDelete")(function* (ctx: {
+      params: { groupID: string }
+    }) {
+      return yield* groupErrors(() => SessionGroups.remove(ctx.params.groupID))
+    })
+
+    const sessionGroupMove = Effect.fn("ExperimentalHttpApi.sessionGroupMove")(function* (ctx: {
+      payload: typeof SessionGroupMovePayload.Type
+    }) {
+      return yield* groupErrors(() => SessionGroups.move(ctx.payload.sessionIDs, ctx.payload.groupID ?? null))
+    })
+
+    // XCOD-234: the same as `lunos external stop`; the registry finds the tool's process by pid, so
+    // this works whichever Lunos process started it.
+    const externalStop = Effect.fn("ExperimentalHttpApi.externalStop")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      const result = yield* Effect.promise(() => ExternalRegistry.stop(ctx.params.sessionID))
+      if (result.ok) return true
+      const missing = !(yield* Effect.promise(() => ExternalRegistry.get(ctx.params.sessionID)))
+      return yield* missing
+        ? Effect.fail(notFound(result.reason))
+        : Effect.fail(new InvalidRequestError({ message: result.reason }))
+    })
+
+    // XCOD-250: availability for /claude and /codex. Detection runs the tools' own --version/--help,
+    // so it's asked when the commands are offered, not on every keystroke.
+    const externalTools = Effect.fn("ExperimentalHttpApi.externalTools")(function* () {
+      const cfg = yield* config.get()
+      const instance = yield* InstanceState.context
+      return yield* Effect.promise(() =>
+        Promise.all(
+          (["claude", "codex"] as const).map(async (tool) => {
+            const status = await ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, cfg))
+            const refused = ExternalPolicy.evaluate(tool, cfg)
+            const consent = await ExternalConsent.get(ExternalConsent.project(instance), tool)
+            return {
+              tool,
+              label: status.label,
+              installed: status.installed && !status.outdated,
+              ...(status.loggedIn !== undefined ? { loggedIn: status.loggedIn } : {}),
+              ...(status.hint || status.outdated ? { hint: status.hint ?? status.outdated } : {}),
+              ...(refused ? { refused } : {}),
+              ...(status.permissionModes ? { permissionModes: status.permissionModes } : {}),
+              ...(consent ? { consent } : {}),
+            }
+          }),
+        ),
+      )
+    })
+
+    // XCOD-254: /models and its choice in a Claude Code / Codex session.
+    const externalMarker = Effect.fn("ExperimentalHttpApi.externalMarker")(function* (sessionID: string) {
+      const info = yield* sessions
+        .get(SessionID.make(sessionID))
+        .pipe(Effect.catch(() => Effect.fail(notFound(`Session ${sessionID} not found`))))
+      const marker = ExternalSession.of(info)
+      if (!marker) return yield* Effect.fail(new InvalidRequestError({ message: "Not a Claude Code or Codex session" }))
+      return marker
+    })
+
+    const externalModels = Effect.fn("ExperimentalHttpApi.externalModels")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      const marker = yield* externalMarker(ctx.params.sessionID)
+      const cfg = yield* config.get()
+      const instance = yield* InstanceState.context
+      const listed = yield* Effect.promise(() => ExternalSession.models(marker.tool, cfg, instance.directory))
+      return {
+        tool: marker.tool,
+        label: ExternalSession.label(marker.tool),
+        ...(marker.model ? { current: marker.model } : {}),
+        ...listed,
+      }
+    })
+
+    const externalModel = Effect.fn("ExperimentalHttpApi.externalModel")(function* (ctx: {
+      params: { sessionID: string }
+      payload: { model?: string }
+    }) {
+      yield* externalMarker(ctx.params.sessionID)
+      const model = ctx.payload.model?.trim() || undefined
+      const invalid = model ? ExternalSession.invalidModel(model) : undefined
+      if (invalid) return yield* Effect.fail(new InvalidRequestError({ message: invalid }))
+      yield* ExternalSession.setModel(sessions, SessionID.make(ctx.params.sessionID), model)
+      return true
+    })
+
+    const externalMode = Effect.fn("ExperimentalHttpApi.externalMode")(function* (ctx: {
+      params: { sessionID: string }
+      payload: { mode?: string }
+    }) {
+      const marker = yield* externalMarker(ctx.params.sessionID)
+      const mode = ctx.payload.mode?.trim() || undefined
+      const invalid = mode ? ExternalSession.invalidMode(marker.tool, mode, undefined) : undefined
+      if (invalid) return yield* Effect.fail(new InvalidRequestError({ message: invalid }))
+      yield* ExternalSession.setMode(sessions, SessionID.make(ctx.params.sessionID), mode)
+      return true
+    })
+
+    // XCOD-254: the answer to sharing Lunos with a tool in this project, as `lunos external share`.
+    const externalConsent = Effect.fn("ExperimentalHttpApi.externalConsent")(function* (ctx: {
+      payload: { tool: "claude" | "codex"; answer: "share" | "never" | "ask" }
+    }) {
+      const cfg = yield* config.get()
+      const instance = yield* InstanceState.context
+      const { tool, answer } = ctx.payload
+      yield* Effect.promise(() =>
+        ExternalConsent.set(ExternalConsent.project(instance), tool, answer === "ask" ? undefined : answer),
+      )
+      ExternalPolicy.record(cfg, "external.consent", {
+        tool,
+        provider: ExternalDetect.TOOLS[tool].provider,
+        answer,
+        origin: "settings",
+      })
+      return true
+    })
+
+    // XCOD-285 §4: the tool's own configuration, read from the installed tool. Gated like starting a
+    // session (reading starts the tool, which reaches its vendor), but a refusal here isn't audited.
+    const externalConfigTool = Effect.fn("ExperimentalHttpApi.externalConfigTool")(function* (
+      tool: "claude" | "codex",
+    ) {
+      const cfg = yield* config.get()
+      const refused = ExternalPolicy.evaluate(tool, cfg)
+      if (refused) return { cfg, error: refused.message }
+      const status = yield* Effect.promise(() => ExternalDetect.detect(tool, ExternalRun.configuredPath(tool, cfg)))
+      if (!status.installed || status.outdated || !status.path)
+        return { cfg, error: status.hint ?? status.outdated ?? `${status.label} isn't usable here` }
+      return { cfg, status, executable: status.path }
+    })
+
+    const externalConfig = Effect.fn("ExperimentalHttpApi.externalConfig")(function* (ctx: {
+      params: { tool: "claude" | "codex" }
+    }) {
+      const { tool } = ctx.params
+      const found = yield* externalConfigTool(tool)
+      const label = ExternalDetect.TOOLS[tool].label
+      if (!found.executable) return { tool, label, error: found.error, sections: [], notes: [] }
+      const instance = yield* InstanceState.context
+      const launch = ConfigExternal.launch(tool, found.cfg.external)
+      return yield* Effect.promise(() =>
+        ExternalConfig.read({
+          tool,
+          executable: found.executable,
+          cwd: instance.directory,
+          version: found.status.version,
+          lunos: launch,
+        }),
+      )
+    })
+
+    const externalConfigCommand = Effect.fn("ExperimentalHttpApi.externalConfigCommand")(function* (ctx: {
+      params: { tool: "claude" | "codex" }
+      payload: typeof ExternalConfigCommandPayload.Type
+    }) {
+      const { tool } = ctx.params
+      // A name the tool can't take is refused before the tool is started at all.
+      if (!ExternalConfig.SAFE_NAME.test(ctx.payload.name.trim()))
+        return yield* Effect.fail(
+          new InvalidRequestError({ message: `"${ctx.payload.name}" isn't a server name the tool accepts here` }),
+        )
+      const found = yield* externalConfigTool(tool)
+      if (!found.executable)
+        return yield* Effect.fail(new InvalidRequestError({ message: found.error ?? "Not available" }))
+      const executable = found.executable
+      const instance = yield* InstanceState.context
+      const cwd = instance.directory
+      // What the tool's own --help and config say, asked again here: nothing the client sends is trusted.
+      const context = yield* Effect.promise(async () => {
+        if (tool === "claude") {
+          const help = await ExternalDetect.run(executable, ["mcp", "add", "--help"])
+          return { cwd, scopes: help.code === 0 ? ExternalConfig.claudeAddHelp(help.stdout).scopes : [] }
+        }
+        return { cwd, userFile: await ExternalConfig.codexUserFile({ executable, cwd }) }
+      })
+      if (tool === "codex" && !context.userFile)
+        return yield* Effect.fail(new InvalidRequestError({ message: "Codex didn't say where its user config is" }))
+      const planned = yield* Effect.try({
+        try: () =>
+          ExternalConfig.plan(tool, ctx.payload, {
+            ...context,
+            shell: ExternalDetect.command(executable, []).shell,
+          }),
+        catch: (cause) => new InvalidRequestError({ message: cause instanceof Error ? cause.message : String(cause) }),
+      })
+      const base = { command: planned.command, ...(planned.file ? { file: planned.file } : {}) }
+      if (!ctx.payload.run) return { ...base, ran: false }
+      const result = yield* Effect.promise(() => ExternalConfig.run(executable, planned, cwd))
+      ExternalPolicy.record(found.cfg, "external.config", {
+        tool,
+        provider: ExternalDetect.TOOLS[tool].provider,
+        action: ctx.payload.action,
+        name: ctx.payload.name,
+        ...(ctx.payload.scope ? { scope: ctx.payload.scope } : {}),
+        ...(planned.file ? { file: planned.file } : {}),
+        ok: result.ok,
+      })
+      return { ...base, ran: true, ok: result.ok, output: result.output }
+    })
+
+    // XCOD-234: sessions another Lunos process runs; that process does the work (and the audit).
+    const peer = <A>(sessionID: string, path: string, init?: { method?: string; body?: unknown }) =>
+      Effect.tryPromise({
+        try: () => SessionPeerControl.call(sessionID, path, init) as Promise<A>,
+        catch: (error) =>
+          error instanceof SessionPeerControl.PeerError && error.status === 404
+            ? notFound(error.message)
+            : new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+    const peerStop = Effect.fn("ExperimentalHttpApi.peerStop")(function* (ctx: { params: { sessionID: string } }) {
+      return Boolean(yield* peer<boolean>(ctx.params.sessionID, "/stop", { method: "POST" }))
+    })
+    const peerAsks = Effect.fn("ExperimentalHttpApi.peerAsks")(function* (ctx: { params: { sessionID: string } }) {
+      return yield* peer<typeof PeerAsks.Type>(ctx.params.sessionID, "/asks")
+    })
+    const peerPermissionReply = Effect.fn("ExperimentalHttpApi.peerPermissionReply")(function* (ctx: {
+      params: { sessionID: string; requestID: string }
+      payload: { reply: string; message?: string }
+    }) {
+      return Boolean(
+        yield* peer<boolean>(ctx.params.sessionID, `/permission/${ctx.params.requestID}/reply`, {
+          method: "POST",
+          body: ctx.payload,
+        }),
+      )
+    })
+    const peerQuestionReply = Effect.fn("ExperimentalHttpApi.peerQuestionReply")(function* (ctx: {
+      params: { sessionID: string; requestID: string }
+      payload: { answers: ReadonlyArray<unknown> }
+    }) {
+      return Boolean(
+        yield* peer<boolean>(ctx.params.sessionID, `/question/${ctx.params.requestID}/reply`, {
+          method: "POST",
+          body: ctx.payload,
+        }),
+      )
+    })
+    const peerQuestionReject = Effect.fn("ExperimentalHttpApi.peerQuestionReject")(function* (ctx: {
+      params: { sessionID: string; requestID: string }
+    }) {
+      return Boolean(
+        yield* peer<boolean>(ctx.params.sessionID, `/question/${ctx.params.requestID}/reject`, { method: "POST" }),
+      )
+    })
+
+    // XCOD-262: the Agent Monitor's prompts. A session another live Lunos runs is that process's to
+    // drive, so it is refused here and goes through peerPrompt.
+    const promptText = (text: string) =>
+      text.trim() && text.length <= SessionPromptQueue.MAX_TEXT
+        ? Effect.succeed(text)
+        : Effect.fail(new InvalidRequestError({ message: "A prompt is non-empty text of at most 100,000 characters." }))
+    const notDrivenElsewhere = (sessionID: string) => {
+      const peer = SessionPeers.read().get(sessionID)
+      return peer?.fresh && (peer.status || peer.permissions > 0 || peer.questions > 0 || peer.queued)
+        ? Effect.fail(
+            new InvalidRequestError({
+              message: "Another Lunos on this computer runs that session; the prompt goes to it.",
+            }),
+          )
+        : Effect.void
+    }
+    const agentOf = Effect.fn("ExperimentalHttpApi.agentOf")(function* (info: Session.Info) {
+      const lastUser = yield* sessions
+        .findMessage(info.id, (message) => message.info.role === "user")
+        .pipe(Effect.orElseSucceed(() => Option.none()))
+      return SessionPromptQueue.agentFor(
+        info,
+        Option.isSome(lastUser) ? (lastUser.value.info as { agent?: string }).agent : undefined,
+      )
+    })
+    const sessionEnqueue = Effect.fn("ExperimentalHttpApi.sessionEnqueue")(function* (ctx: {
+      params: { sessionID: string }
+      payload: typeof SessionEnqueuePayload.Type
+    }) {
+      const text = yield* promptText(ctx.payload.text)
+      const sessionID = SessionID.make(ctx.params.sessionID)
+      const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.fail(notFound("No such session."))))
+      yield* notDrivenElsewhere(sessionID)
+      // Prompts a stopped Lunos queued for it go first, and only once the user has taken it over.
+      const orphaned = SessionPeers.orphans().get(sessionID)
+      if (orphaned)
+        return yield* new InvalidRequestError({
+          message: `A Lunos that closed queued ${orphaned} prompt(s) for this session that haven't been sent. Take the session over first, sending or discarding them.`,
+        })
+      const agent = yield* agentOf(info)
+      return yield* Effect.tryPromise({
+        try: () =>
+          SessionPromptQueue.submit({
+            sessionID,
+            directory: info.directory,
+            text,
+            ...(agent ? { agent } : {}),
+            ...(ctx.payload.model ? { model: ctx.payload.model } : {}),
+            ...(ctx.payload.variant ? { variant: ctx.payload.variant } : {}),
+            interrupt: ctx.payload.interrupt === true,
+            via: ctx.payload.via ?? "local",
+          }),
+        catch: (error) => new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+    })
+    // XCOD-262: the user confirmed "Take over this session here?"; the prompts its stopped Lunos
+    // queued are sent or discarded, then the new prompt runs.
+    const sessionTakeover = Effect.fn("ExperimentalHttpApi.sessionTakeover")(function* (ctx: {
+      params: { sessionID: string }
+      payload: typeof SessionTakeoverPayload.Type
+    }) {
+      const text = ctx.payload.text === undefined ? undefined : yield* promptText(ctx.payload.text)
+      const sessionID = SessionID.make(ctx.params.sessionID)
+      const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.fail(notFound("No such session."))))
+      yield* notDrivenElsewhere(sessionID)
+      const agent = yield* agentOf(info)
+      return yield* Effect.tryPromise({
+        try: () =>
+          SessionPromptQueue.takeover({
+            sessionID,
+            directory: info.directory,
+            queued: ctx.payload.queued,
+            ...(text !== undefined ? { text } : {}),
+            ...(agent ? { agent } : {}),
+            ...(text !== undefined && ctx.payload.request ? { request: ctx.payload.request } : {}),
+            ...(ctx.payload.origin ? { origin: ctx.payload.origin } : {}),
+          }),
+        catch: (error) => new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+    })
+    const sessionQueued = Effect.fn("ExperimentalHttpApi.sessionQueued")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      return {
+        orphaned: SessionPromptQueue.orphaned(ctx.params.sessionID),
+        held: SessionPromptQueue.held(ctx.params.sessionID),
+      }
+    })
+    const peerPrompt = Effect.fn("ExperimentalHttpApi.peerPrompt")(function* (ctx: {
+      params: { sessionID: string }
+      payload: { text: string; interrupt?: boolean }
+    }) {
+      const text = yield* promptText(ctx.payload.text)
+      return yield* peer<{ delivery: SessionPromptQueue.Delivery; position?: number }>(
+        ctx.params.sessionID,
+        "/prompt",
+        {
+          method: "POST",
+          body: { text, interrupt: ctx.payload.interrupt === true },
+        },
+      )
     })
 
     const resource = Effect.fn("ExperimentalHttpApi.resource")(function* () {
@@ -188,6 +840,44 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("worktreeReset", worktreeReset)
       .handle("session", session)
       .handle("sessionBackground", sessionBackground)
+      .handle("backgroundJobs", backgroundJobs)
+      .handle("artifacts", artifacts)
+      .handle("backgroundJobCancel", backgroundJobCancel)
+      .handle("sessionOverview", sessionOverview)
+      .handle("sessionBulkStop", sessionBulkStop)
+      .handle("sessionBulkArchive", sessionBulkArchive)
+      .handle("sessionBulkUnarchive", sessionBulkUnarchive)
+      .handle("sessionBulkDelete", sessionBulkDelete)
+      .handle("sessionBulkPreview", sessionBulkPreview)
+      .handle("budgetStatus", budgetStatus)
+      .handle("projectGroupList", projectGroupList)
+      .handle("projectGroupCreate", projectGroupCreate)
+      .handle("projectGroupUpdate", projectGroupUpdate)
+      .handle("projectGroupAdd", projectGroupAdd)
+      .handle("projectGroupRemove", projectGroupRemove)
+      .handle("projectGroupMove", projectGroupMove)
+      .handle("sessionGroupList", sessionGroupList)
+      .handle("sessionGroupCreate", sessionGroupCreate)
+      .handle("sessionGroupUpdate", sessionGroupUpdate)
+      .handle("sessionGroupDelete", sessionGroupDelete)
+      .handle("sessionGroupMove", sessionGroupMove)
+      .handle("externalStop", externalStop)
+      .handle("externalTools", externalTools)
+      .handle("externalModels", externalModels)
+      .handle("externalModel", externalModel)
+      .handle("externalMode", externalMode)
+      .handle("externalConsent", externalConsent)
+      .handle("externalConfig", externalConfig)
+      .handle("externalConfigCommand", externalConfigCommand)
+      .handle("peerStop", peerStop)
+      .handle("peerAsks", peerAsks)
+      .handle("peerPermissionReply", peerPermissionReply)
+      .handle("peerQuestionReply", peerQuestionReply)
+      .handle("peerQuestionReject", peerQuestionReject)
+      .handle("sessionEnqueue", sessionEnqueue)
+      .handle("sessionTakeover", sessionTakeover)
+      .handle("sessionQueued", sessionQueued)
+      .handle("peerPrompt", peerPrompt)
       .handle("resource", resource)
   }),
 )

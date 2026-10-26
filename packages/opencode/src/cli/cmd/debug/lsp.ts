@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import { effectCmd } from "../../effect-cmd"
 import { cmd } from "../cmd"
 import { EOL } from "os"
+import { writeStdoutEffect } from "../../stdout"
 
 export const LSPCommand = cmd({
   command: "lsp",
@@ -23,7 +24,7 @@ const DiagnosticsCommand = effectCmd({
         return yield* lsp.diagnostics()
       }),
     )
-    process.stdout.write(JSON.stringify(out, null, 2) + EOL)
+    yield* writeStdoutEffect(JSON.stringify(out, null, 2) + EOL)
   }),
 })
 
@@ -34,7 +35,7 @@ export const SymbolsCommand = effectCmd({
   handler: Effect.fn("Cli.debug.lsp.symbols")(function* (args) {
     yield* Effect.logInfo("symbols")
     const results = yield* LSP.Service.use((lsp) => lsp.workspaceSymbol(args.query))
-    process.stdout.write(JSON.stringify(results, null, 2) + EOL)
+    yield* writeStdoutEffect(JSON.stringify(results, null, 2) + EOL)
   }),
 })
 
@@ -45,6 +46,6 @@ export const DocumentSymbolsCommand = effectCmd({
   handler: Effect.fn("Cli.debug.lsp.documentSymbols")(function* (args) {
     yield* Effect.logInfo("document-symbols")
     const results = yield* LSP.Service.use((lsp) => lsp.documentSymbol(args.uri))
-    process.stdout.write(JSON.stringify(results, null, 2) + EOL)
+    yield* writeStdoutEffect(JSON.stringify(results, null, 2) + EOL)
   }),
 })

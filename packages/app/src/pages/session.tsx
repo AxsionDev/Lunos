@@ -24,6 +24,7 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { debounce } from "@solid-primitives/scheduled"
 import { useLocal } from "@/context/local"
+import { useAccount } from "@/context/account"
 import { FileProvider, selectionFromLines, useFile, type FileSelection, type SelectedLineRange } from "@/context/file"
 import { createStore } from "solid-js/store"
 import type { SessionReviewLineComment } from "@opencode-ai/session-ui/session-review"
@@ -367,6 +368,7 @@ export default function Page() {
   const comments = useComments()
   const command = useCommand()
   const terminal = useTerminal()
+  const account = useAccount()
   const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
   const location = useLocation()
   const navigate = useNavigate()
@@ -1790,6 +1792,11 @@ export default function Page() {
     const item = (followup.items[sessionID] ?? []).find((entry) => entry.id === id)
     if (!item) return Promise.resolve()
     if (followupBusy(sessionID)) return Promise.resolve()
+    // XCOD-312: a disabled Lunos account sends no queued follow-up; it stays queued, paused.
+    if (account && !account.allowSend()) {
+      setFollowup("paused", sessionID, true)
+      return Promise.resolve()
+    }
 
     return followupMutation.mutateAsync({ sessionID, id, manual: opts?.manual })
   }

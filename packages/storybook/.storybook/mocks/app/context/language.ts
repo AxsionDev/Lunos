@@ -34,7 +34,7 @@ const dict: Record<string, string> = {
   "dialog.provider.group.other": "Other",
   "dialog.provider.tag.recommended": "Recommended",
   "settings.providers.tag.custom": "Custom",
-  "command.provider.connect": "Connect provider",
+  "command.provider.connect": "Add provider",
   "provider.connect.title": "Connect {{provider}}",
   "provider.connect.selectMethod": "Select login method for {{provider}}.",
   "provider.connect.method.apiKey": "API key",

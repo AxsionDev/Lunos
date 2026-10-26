@@ -5,7 +5,14 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
 import { Permission } from "@/permission"
 import { SessionShare } from "@/share/session"
+import { ShareNext } from "@/share/share-next"
+import { CloudAuth } from "@/cloud/auth"
+import { CloudOrg } from "@/cloud/org"
+import { CloudShare } from "@/cloud/share"
+import { CloudShareRecord } from "@/cloud/share-record"
 import { Session } from "@/session/session"
+import { SessionPromptQueue } from "@/session/prompt-queue"
+import { AuditLog } from "@/audit/log"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
@@ -30,13 +37,16 @@ import {
   ListQuery,
   MessagesQuery,
   PermissionResponsePayload,
+  ShareConsolePayload,
   PromptPayload,
   RevertPayload,
   ShellPayload,
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
-import { PermissionNotFoundError } from "../errors"
+import { ForbiddenError, PermissionNotFoundError, ShareDisabledApiError } from "../errors"
+import { ExternalSession } from "@/external/session"
+import { Config } from "@/config/config"
 import * as SessionError from "./session-errors"
 
 const tryParseJson = (text: string) =>
@@ -59,6 +69,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const todoSvc = yield* Todo.Service
     const summary = yield* SessionSummary.Service
     const events = yield* EventV2Bridge.Service
+    const configSvc = yield* Config.Service
     const scope = yield* Scope.Scope
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
@@ -153,6 +164,21 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload?: Session.CreateInput }) {
+      // XCOD-218: an external session (Claude Code / Codex) passes the same gate as `lunos external run`;
+      // a refusal is audited (external.denied) and comes back with its reason.
+      const external = ctx.payload?.metadata ? ExternalSession.of(ctx.payload) : undefined
+      if (external) {
+        const refused = ExternalSession.refused(external.tool, yield* configSvc.get())
+        if (refused) return yield* new ForbiddenError({ message: refused })
+        return yield* shareSvc.create({
+          ...ctx.payload,
+          title: ctx.payload?.title ?? ExternalSession.title(external.tool, external.session),
+          model: {
+            providerID: ExternalSession.model(external.tool).providerID,
+            id: ExternalSession.model(external.tool).modelID,
+          },
+        })
+      }
       return yield* shareSvc.create(ctx.payload)
     })
 
@@ -176,7 +202,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const remove = Effect.fn("SessionHttpApi.remove")(function* (ctx: { params: { sessionID: SessionID } }) {
+      // XCOD-269: prompts queued for it and never sent go too (Session.remove); audited as a count.
+      const queued = SessionPromptQueue.held(ctx.params.sessionID)
       yield* SessionError.mapStorageNotFound(session.remove(ctx.params.sessionID))
+      AuditLog.emit("session.delete", {
+        origin: "api",
+        count: 1,
+        ids: [ctx.params.sessionID],
+        queued_discarded: queued,
+      })
       return true
     })
 
@@ -186,7 +220,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       const current = yield* requireSession(ctx.params.sessionID)
       if (ctx.payload.title !== undefined) {
-        yield* session.setTitle({ sessionID: ctx.params.sessionID, title: ctx.payload.title })
+        // XCOD-308: a rename sticks; an empty name goes back to the automatic title (for a /claude or
+        // /codex session, the one naming its tool; the tool's own session id is never touched).
+        const external = ExternalSession.of(current)
+        yield* session.setTitle({
+          sessionID: ctx.params.sessionID,
+          title: ctx.payload.title,
+          source: "user",
+          fallback: external ? ExternalSession.title(external.tool, external.session) : undefined,
+        })
       }
       if (ctx.payload.metadata !== undefined) {
         yield* session.setMetadata({ sessionID: ctx.params.sessionID, metadata: ctx.payload.metadata })
@@ -258,8 +300,59 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     // every failure to a 400 BadRequest.
     const share = Effect.fn("SessionHttpApi.share")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
-      yield* shareSvc.share(ctx.params.sessionID).pipe(Effect.mapError(() => new HttpApiError.InternalServerError({})))
+      yield* shareSvc.share(ctx.params.sessionID).pipe(
+        Effect.mapError((err) =>
+          // Sharing switched off, the residency policy refused the share host (XCOD-80), or there's
+          // no host to share to (XCOD-266): expected refusals with a message saying what to change,
+          // not server faults.
+          err instanceof ShareNext.NoTargetError
+            ? new ShareDisabledApiError({ message: err.message, reason: "no-target" })
+            : err instanceof SessionShare.ShareDisabledError || err instanceof ShareNext.ResidencyDeniedError
+              ? new ShareDisabledApiError({ message: err.message })
+              : new HttpApiError.InternalServerError({}),
+        ),
+      )
       return yield* requireSession(ctx.params.sessionID)
+    })
+
+    // XCOD-191: the same rules as `lunos share <session>`, through the same code (CloudShare). Every
+    // refusal (sharing off, residency, signed out, no console, the console's own error) comes back
+    // as a 403 with a message to show, never a server fault.
+    const shareConsole = Effect.fn("SessionHttpApi.shareConsole")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof ShareConsolePayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      const refuse = (error: unknown) =>
+        new ShareDisabledApiError({
+          message:
+            error instanceof CloudShare.RefusedError || error instanceof CloudAuth.SignedOutError
+              ? error.message
+              : `Not shared: ${error instanceof Error ? error.message : String(error)}`,
+        })
+      const config = yield* configSvc.get()
+      const org = yield* Effect.promise(() => CloudOrg.resolve())
+      if (!org) return yield* new ShareDisabledApiError({ message: new CloudOrg.NotConfiguredError("/share").message })
+      const input = yield* CloudShare.sessionInput(ctx.params.sessionID, { sanitize: ctx.payload.sanitize }).pipe(
+        Effect.mapError(refuse),
+      )
+      const link = ctx.payload.link === false ? undefined : ctx.payload.link
+      if (typeof link === "number" && !(link > 0 && link <= 720))
+        return yield* new ShareDisabledApiError({ message: "A link works for more than 0 and at most 720 hours." })
+      const shared = yield* Effect.tryPromise({
+        try: () => CloudShare.upload(config, org, { ...input, linkHours: link }),
+        catch: refuse,
+      })
+      // Deleting the session revokes it too (SessionBulk.remove). Not noted: it's shared all the
+      // same, and `lunos share revoke` still takes it back.
+      yield* Effect.promise(() => CloudShareRecord.record(ctx.params.sessionID, org, shared).catch(() => undefined))
+      return {
+        org: org.org,
+        host: org.host,
+        id: shared.id,
+        url: shared.url,
+        ...(shared.link ? { link: { url: shared.link.url, expiresAt: shared.link.expiresAt } } : {}),
+      }
     })
 
     const unshare = Effect.fn("SessionHttpApi.unshare")(function* (ctx: { params: { sessionID: SessionID } }) {
@@ -426,6 +519,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("abort", abort)
       .handle("init", init)
       .handle("share", share)
+      .handle("shareConsole", shareConsole)
       .handle("unshare", unshare)
       .handle("summarize", summarize)
       .handle("prompt", prompt)

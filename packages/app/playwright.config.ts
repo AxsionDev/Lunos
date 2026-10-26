@@ -9,7 +9,11 @@ const reuse = !process.env.CI
 const workers = Number(process.env.PLAYWRIGHT_WORKERS ?? (process.env.CI ? 5 : 0)) || undefined
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: process.env.OPENCODE_PERFORMANCE === "1" ? "performance/**/*.test.ts" : "performance/**",
+  testIgnore: [
+    process.env.OPENCODE_PERFORMANCE === "1" ? "performance/**/*.test.ts" : "performance/**",
+    // axe-core audits run in their own CI job (`accessibility` in test.yml) via `bun run test:a11y`.
+    ...(process.env.OPENCODE_A11Y === "1" ? [] : ["accessibility/**"]),
+  ],
   outputDir: "./e2e/test-results",
   timeout: 60_000,
   expect: {

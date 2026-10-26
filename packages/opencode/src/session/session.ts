@@ -19,6 +19,7 @@ import { eq } from "drizzle-orm"
 import { and } from "drizzle-orm"
 import { gte } from "drizzle-orm"
 import { isNull } from "drizzle-orm"
+import { isNotNull } from "drizzle-orm"
 import { desc } from "drizzle-orm"
 import { like } from "drizzle-orm"
 import { sql } from "drizzle-orm"
@@ -43,6 +44,7 @@ import { NonNegativeInt, optional } from "@opencode-ai/core/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { BackgroundShell } from "@/tool/shell/background"
 import { SessionMessage } from "@opencode-ai/schema/session-message"
 
 const parentTitlePrefix = "New session - "
@@ -52,6 +54,43 @@ export function isDefaultTitle(title: string) {
   return new RegExp(
     `^(${parentTitlePrefix}|${childTitlePrefix})\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$`,
   ).test(title)
+}
+
+/**
+ * XCOD-308: who set a session's title. A name the user gave is never replaced by the automatic title
+ * (first reply, compaction, fork); clearing it hands the title back to the generator. Kept in the
+ * session's metadata (`titleSource`, and `titleReset` while a cleared name waits for its new title),
+ * so no migration is needed and every client already receives it.
+ */
+export type TitleSource = "user" | "auto"
+/** The longest name a user can give a session. */
+export const TITLE_MAX = 80
+
+export function titleSource(info: { metadata?: Record<string, unknown> }): TitleSource {
+  return info.metadata?.titleSource === "user" ? "user" : "auto"
+}
+
+/** Whether a cleared name is waiting for the next turn's automatic title. */
+export function titleReset(info: { metadata?: Record<string, unknown> }) {
+  return info.metadata?.titleReset === true
+}
+
+/** A name as the user typed it, as stored: one line, trimmed, at most TITLE_MAX characters. */
+export function cleanTitle(title: string) {
+  return title.replace(/\s+/g, " ").trim().slice(0, TITLE_MAX).trim()
+}
+
+/** The metadata keys the title rules own, which a metadata replace keeps unless it sets them. */
+function titleKeys(metadata: Record<string, unknown> | undefined) {
+  const keys: Record<string, unknown> = {}
+  if (metadata?.titleSource !== undefined) keys.titleSource = metadata.titleSource
+  if (metadata?.titleReset !== undefined) keys.titleReset = metadata.titleReset
+  return keys
+}
+
+function withoutTitleKeys(metadata: Record<string, unknown> | undefined) {
+  const { titleSource: _source, titleReset: _reset, ...rest } = metadata ?? {}
+  return rest
 }
 
 type SessionRow = typeof SessionTable.$inferSelect
@@ -317,7 +356,8 @@ export type GlobalListInput = {
   cursor?: number
   search?: string
   limit?: number
-  archived?: boolean
+  /** true includes archived sessions; "only" lists nothing else (XCOD-265's "Show archived"). */
+  archived?: boolean | "only"
 }
 
 export const Event = {
@@ -328,11 +368,32 @@ export const Event = {
   Error: SessionV1.Event.Error,
 }
 
+// `plan`, `research` and `dev-cycle` must stay in lockstep: each agent's
+// permissions are built from the same directory name (see agent/agent.ts), so
+// a change here that isn't mirrored there leaves a mode allowed to write to a
+// path it is never told about, or told about a path it cannot write. For
+// `dev-cycle` the keyed entry is `external_directory` rather than `edit`
+// (agent.ts:230) — it does not restrict edits, but an unmirrored rename there
+// sends every artifact write outside the worktree to the `"*": "ask"` default.
+/** Directory an artifact kind lives in: in the worktree (reviewable, committable) under VCS. */
+export function artifactDir(dir: string, instance: InstanceContext) {
+  return instance.project.vcs ? path.join(instance.worktree, ".opencode", dir) : path.join(Global.Path.data, dir)
+}
+
+function artifact(dir: string, input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return path.join(artifactDir(dir, instance), [input.time.created, input.slug].join("-") + ".md")
+}
+
 export function plan(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
-  const base = instance.project.vcs
-    ? path.join(instance.worktree, ".opencode", "plans")
-    : path.join(Global.Path.data, "plans")
-  return path.join(base, [input.time.created, input.slug].join("-") + ".md")
+  return artifact("plans", input, instance)
+}
+
+export function research(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return artifact("research", input, instance)
+}
+
+export function devcycle(input: { slug: string; time: { created: number } }, instance: InstanceContext) {
+  return artifact("dev-cycle", input, instance)
 }
 
 export const getUsage = (input: { model: Provider.Model; usage: Usage; metadata?: ProviderMetadata }) => {
@@ -425,7 +486,18 @@ export interface Interface {
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
   readonly get: (id: SessionID) => Effect.Effect<Info, NotFound>
-  readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
+  /**
+   * XCOD-308: `source: "user"` (the default) is a rename: the name is cleaned and sticks, and an empty
+   * name goes back to the automatic title (`fallback`, else the default title, regenerated on the next
+   * turn). `source: "auto"` never replaces a user's name, nor a title that is no longer `replace`.
+   */
+  readonly setTitle: (input: {
+    sessionID: SessionID
+    title: string
+    source?: TitleSource
+    replace?: string
+    fallback?: string
+  }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setMetadata: (input: typeof SetMetadataInput.Type) => Effect.Effect<void>
   readonly setAgentModel: (input: {
@@ -560,6 +632,7 @@ const layer: Layer.Layer<
       if (input?.cursor) conditions.push(lt(SessionTable.time_updated, input.cursor))
       if (input?.search) conditions.push(like(SessionTable.title, `%${input.search}%`))
       if (!input?.archived) conditions.push(isNull(SessionTable.time_archived))
+      if (input?.archived === "only") conditions.push(isNotNull(SessionTable.time_archived))
 
       const query =
         conditions.length > 0
@@ -614,6 +687,8 @@ const layer: Layer.Layer<
         )
 
         if (hasInstance) yield* cancelBackgroundJobs(background, sessionID)
+        // XCOD-288: dev servers and watchers the agent started in this session stop with it.
+        yield* Effect.promise(() => BackgroundShell.stopSession(sessionID))
         const kids = yield* children(sessionID)
         for (const child of kids) {
           yield* remove(child.id)
@@ -621,6 +696,9 @@ const layer: Layer.Layer<
 
         yield* events.publish(SessionV1.Event.Deleted, { sessionID, info: session })
         yield* events.remove(sessionID)
+        // XCOD-269: prompts queued for it and never sent go too, from every Lunos's file. Imported
+        // here, not at the top: the queue module reaches this one through the overview.
+        yield* Effect.promise(() => import("./prompt-queue").then((queue) => queue.discard(sessionID)).catch(() => 0))
       } catch (error) {
         yield* Effect.logError("failed to remove session", { sessionID, error })
       }
@@ -697,7 +775,13 @@ const layer: Layer.Layer<
         path: sessionPath(ctx.worktree, ctx.directory),
         workspaceID: original.workspaceID,
         title,
-        metadata: structuredClone(original.metadata),
+        // XCOD-308: a renamed session's fork keeps the user's name (titleSource "user"), so it sticks too.
+        metadata: original.metadata
+          ? structuredClone({
+              ...withoutTitleKeys(original.metadata),
+              ...(titleSource(original) === "user" ? { titleSource: "user" } : {}),
+            })
+          : undefined,
       })
       const msgs = yield* messages({ sessionID: input.sessionID })
       const idMap = new Map<string, MessageID>()
@@ -750,8 +834,37 @@ const layer: Layer.Layer<
       yield* patch(sessionID, { time: { updated: Date.now() } }).pipe(Effect.orDie)
     })
 
-    const setTitle = Effect.fn("Session.setTitle")(function* (input: { sessionID: SessionID; title: string }) {
-      yield* patch(input.sessionID, { title: input.title }).pipe(Effect.orDie)
+    const setTitle = Effect.fn("Session.setTitle")(function* (input: {
+      sessionID: SessionID
+      title: string
+      source?: TitleSource
+      replace?: string
+      fallback?: string
+    }) {
+      // Read right before writing: an automatic title takes seconds to generate, and a rename made
+      // meanwhile must win.
+      const current = yield* get(input.sessionID).pipe(Effect.orDie)
+      const rest = withoutTitleKeys(current.metadata)
+      if (input.source === "auto") {
+        if (titleSource(current) === "user") return
+        if (input.replace !== undefined && current.title !== input.replace) return
+        yield* patch(input.sessionID, { title: input.title, metadata: rest }).pipe(Effect.orDie)
+        return
+      }
+      const name = cleanTitle(input.title)
+      if (name) {
+        yield* patch(input.sessionID, { title: name, metadata: { ...rest, titleSource: "user" } }).pipe(Effect.orDie)
+        return
+      }
+      // Cleared: the automatic title comes back. Without a fallback that is the default title, which
+      // the next turn replaces (titleReset lets it, past the first prompt).
+      if (input.fallback) {
+        yield* patch(input.sessionID, { title: input.fallback, metadata: rest }).pipe(Effect.orDie)
+        return
+      }
+      const title =
+        (current.parentID ? childTitlePrefix : parentTitlePrefix) + new Date(current.time.created).toISOString()
+      yield* patch(input.sessionID, { title, metadata: { ...rest, titleReset: true } }).pipe(Effect.orDie)
     })
 
     const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
@@ -759,7 +872,10 @@ const layer: Layer.Layer<
     })
 
     const setMetadata = Effect.fn("Session.setMetadata")(function* (input: typeof SetMetadataInput.Type) {
-      yield* patch(input.sessionID, { metadata: input.metadata, time: { updated: Date.now() } }).pipe(Effect.orDie)
+      // XCOD-308: a replace keeps who set the title unless it says otherwise.
+      const current = yield* get(input.sessionID).pipe(Effect.orDie)
+      const metadata = { ...titleKeys(current.metadata), ...input.metadata }
+      yield* patch(input.sessionID, { metadata, time: { updated: Date.now() } }).pipe(Effect.orDie)
     })
 
     const setAgentModel = Effect.fn("Session.setAgentModel")(function* (input: {

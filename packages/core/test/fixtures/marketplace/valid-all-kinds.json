@@ -1,0 +1,24 @@
+{
+  "name": "all-kinds",
+  "owner": { "name": "Lunos" },
+  "plugins": [{ "name": "a-plugin", "source": { "type": "npm", "package": "a-plugin" } }],
+  "mcp": [{ "name": "a-server", "type": "remote", "url": "https://example.test/mcp" }],
+  "skills": [
+    {
+      "name": "team-skills",
+      "url": "https://example.test/.well-known/skills/",
+      "description": "A hosted skill source",
+      "category": "docs"
+    }
+  ],
+  "hooks": [
+    {
+      "name": "format-on-edit",
+      "event": "tool.execute.after",
+      "command": ["prettier", "--write", "."],
+      "matcher": { "tool": "edit", "file": "**/*.ts" },
+      "timeout": 10000,
+      "description": "Run prettier after an edit"
+    }
+  ]
+}

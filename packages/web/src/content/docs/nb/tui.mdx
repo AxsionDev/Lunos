@@ -163,6 +163,18 @@ Opprett eller oppdater `AGENTS.md`-fil. [Finn ut mer](/docs/rules).
 
 ---
 
+### marketplace
+
+Bla gjennom og installer plugins, skills, hooks og MCP-servere fra markedsplassene dine. Legg til et fanenavn (`plugins`, `skills`, `hooks`, `mcp`) for å åpne den fanen, `installed` for å se hva som er installert med tilgjengelige oppdateringer merket, eller andre ord for å søke. _Alias_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 Liste over tilgjengelige modeller.
@@ -187,6 +199,16 @@ Start en ny økt. _Alias_: `/clear`
 
 ---
 
+### plugins
+
+List opp installerte plugins og slå dem av eller på.
+
+```bash frame="none"
+/plugins
+```
+
+---
+
 ### redo
 
 Gjenta en tidligere angret melding. Kun tilgjengelig etter bruk av `/undo`.
@@ -208,10 +230,20 @@ være et Git-repo**.
 
 ### sessions
 
-List opp og bytt mellom økter. _Aliaser_: `/resume`, `/continue`
+Alle økter på denne maskinen, på tvers av prosjektene dine: tilstand, prosjekt, modell, siste aktivitet og kostnad, i dine egne grupper.
 
 ```bash frame="none"
 /sessions
+```
+
+---
+
+### resume
+
+List opp og bytt mellom dette prosjektets økter. _Aliaser_: `/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **Nøkkelbinding:** `ctrl+x l`

@@ -44,6 +44,9 @@ export function FormatError(input: unknown): string | undefined {
     return stringField(input, "message") ?? ""
   }
 
+  // SandboxError (XCOD-279): the step, the command, its exit code and stderr, and the fix
+  if (isTaggedError(input, "SandboxError")) return stringField(input, "message") || "The sandbox couldn't start"
+
   // MCPFailed: { name: string }
   if (NamedError.hasName(input, "MCPFailed")) {
     const data = isRecord(input) && isRecord(input.data) ? stringField(input.data, "name") : undefined
@@ -64,9 +67,21 @@ export function FormatError(input: unknown): string | undefined {
     return [
       `Model not found: ${stringField(providerModelNotFound, "providerID")}/${stringField(providerModelNotFound, "modelID")}`,
       ...(suggestions.length ? ["Did you mean: " + suggestions.join(", ")] : []),
-      `Try: \`opencode models\` to list available models`,
-      `Or check your config (opencode.json) provider/model names`,
+      `Try: \`lunos models\` to list available models`,
+      `Or declare it in your config (opencode.json): provider.${stringField(providerModelNotFound, "providerID")}.models`,
     ].join("\n")
+  }
+
+  // ProviderNoProvidersError: { message: string }
+  const noProviders = configData(input, "ProviderNoProvidersError")
+  if (noProviders) {
+    return stringField(noProviders, "message") ?? ""
+  }
+
+  // PolicyLockedError (XCOD-219): { key: string, message: string }
+  const locked = configData(input, "PolicyLockedError")
+  if (locked) {
+    return stringField(locked, "message") ?? ""
   }
 
   // ProviderInitError: { providerID: string }
@@ -102,7 +117,7 @@ export function FormatError(input: unknown): string | undefined {
     return [
       `Failed to load remote config${remote ? ` from ${remote}` : ""}: the server returned a login page instead of JSON.`,
       `Authentication is missing or has expired (the endpoint is likely behind an SSO or identity-aware proxy).`,
-      ...(url ? [`Run \`opencode auth login ${url}\` to re-authenticate.`] : []),
+      ...(url ? [`Run \`lunos auth login ${url}\` to re-authenticate.`] : []),
     ].join("\n")
   }
 
@@ -125,6 +140,29 @@ export function FormatError(input: unknown): string | undefined {
   return undefined
 }
 
+/**
+ * An error nothing above recognises, for the screen: the error and what caused it, one line each.
+ * A thrown value that isn't an Error says what it was (`non-Error value thrown (string): …`) instead
+ * of a bare value or `{}`. The stack and the full cause chain go to the run log (`RunLog.describe`).
+ */
 export function FormatUnknownError(input: unknown): string {
-  return errorFormat(input)
+  const lines: string[] = []
+  const seen = new Set<unknown>()
+  for (
+    let current = input, depth = 0;
+    (depth === 0 || current !== undefined) && depth < 5 && !seen.has(current);
+    depth++
+  ) {
+    seen.add(current)
+    const prefix = depth === 0 ? "" : "caused by: "
+    if (!(current instanceof Error)) {
+      lines.push(`${prefix}non-Error value thrown (${typeOf(current)}): ${errorFormat(current)}`)
+      break
+    }
+    lines.push(prefix + (current.message ? `${current.name}: ${current.message}` : current.name))
+    current = current.cause
+  }
+  return lines.join("\n")
 }
+
+const typeOf = (value: unknown) => (value === null ? "null" : Array.isArray(value) ? "array" : typeof value)

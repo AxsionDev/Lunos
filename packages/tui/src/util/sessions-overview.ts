@@ -1,0 +1,614 @@
+import type { SessionGroup, SessionOverviewItem } from "@opencode-ai/sdk/v2"
+import { EXTERNAL_BADGE } from "./external"
+
+const EXTERNAL_TOOL_NAMES: Record<string, string> = { ...EXTERNAL_BADGE, "claude-code": EXTERNAL_BADGE.claude }
+
+/**
+ * XCOD-205: the model behind the TUI's /sessions view. Pure, so grouping, filtering and collapsing
+ * are tested without a terminal. Same ordering as the desktop/web Sessions window: groups in
+ * creation order, then Ungrouped; newest first inside each; subagents under their parent.
+ *
+ * The TUI shows one flat, keyboard-navigable list, so a group header is a row of its own (Enter
+ * collapses or expands it) and a subagent is a row indented under its parent.
+ */
+
+export type SessionState = SessionOverviewItem["state"]
+/** XCOD-265: "archived" is the "Show archived" view: the sessions Clear list hid, and nothing else. */
+export type StateFilter = SessionState | "all" | "archived"
+
+export type Line =
+  | {
+      type: "group"
+      /** "group:<id>", or UNGROUPED_KEY. */
+      key: string
+      /** null is "Ungrouped". */
+      group: SessionGroup | null
+      count: number
+      collapsed: boolean
+    }
+  | {
+      type: "session"
+      key: string
+      item: SessionOverviewItem
+      /** 1 for a subagent shown under its parent. */
+      depth: 0 | 1
+      groupID: string | null
+    }
+  | {
+      /** XCOD-309: a project's section header, in the Projects view. */
+      type: "project"
+      /** projectKey(id), or NO_PROJECT_KEY. */
+      key: string
+      section: ProjectSection
+      count: number
+      collapsed: boolean
+    }
+
+export const UNGROUPED_KEY = "group:ungrouped"
+export const groupKey = (id: string) => `group:${id}`
+
+// XCOD-141: every state has its own glyph as well as its colour, so it never relies on colour alone.
+export const STATE_GLYPH: Record<SessionState, string> = {
+  waiting: "!",
+  running: "»",
+  idle: "○",
+  finished: "✓",
+  failed: "✕",
+}
+
+export const STATE_LABEL: Record<SessionState, string> = {
+  waiting: "waiting for approval",
+  running: "running",
+  idle: "idle",
+  finished: "finished",
+  failed: "failed",
+}
+
+/** The state filter cycles through these, "all" first. Waiting first: it is what needs you. Archived last. */
+export const STATE_FILTERS: StateFilter[] = ["all", "waiting", "running", "idle", "finished", "failed", "archived"]
+
+export function nextStateFilter(current: StateFilter): StateFilter {
+  const index = STATE_FILTERS.indexOf(current)
+  return STATE_FILTERS[(index + 1) % STATE_FILTERS.length]!
+}
+
+export function stateLabel(item: Pick<SessionOverviewItem, "state" | "elsewhere" | "stale">) {
+  // XCOD-234: the Lunos that ran it stopped without finishing the turn.
+  if (item.stale) return "not responding (its Lunos closed)"
+  if (item.elsewhere) return item.state === "waiting" ? "waiting in another Lunos" : "running in another Lunos"
+  return STATE_LABEL[item.state]
+}
+
+/** "subagent", "scheduled", "Claude Code", "Codex"; nothing for an ordinary session. */
+export function kindLabel(item: Pick<SessionOverviewItem, "kind" | "tool">) {
+  // XCOD-260: an external session is named by its tool, as the session's own badge names it.
+  if (item.kind === "external")
+    return EXTERNAL_TOOL_NAMES[item.tool ?? ""] ?? (item.tool ? `external (${item.tool})` : "external")
+  if (item.kind === "session") return undefined
+  return item.kind
+}
+
+export function projectName(item: Pick<SessionOverviewItem, "project" | "directory">) {
+  if (item.project?.name) return item.project.name
+  // Folders that aren't a git repo with commits share the "global" project: the folder says more.
+  const path = item.project && item.project.id !== "global" ? item.project.worktree : item.directory
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path
+}
+
+/** Compact relative time for a narrow column: "now", "5m ago", "3h ago", "2d ago". */
+export function ago(time: number, now: number) {
+  const seconds = Math.max(0, Math.round((now - time) / 1000))
+  if (seconds < 60) return "now"
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`
+  return `${Math.round(seconds / 86400)}d ago`
+}
+
+export function money(cost: number) {
+  if (!cost) return "$0.00"
+  if (cost < 0.01) return "<$0.01"
+  return `$${cost.toFixed(2)}`
+}
+
+/**
+ * A Claude Code / Codex session Lunos started that has no Lunos session of its own (from `lunos
+ * external` or the external tool): only its tool can open it. One started with /external (XCOD-218)
+ * is a Lunos session labelled external, and opens, renames and stops like any other.
+ */
+export function toolOnly(item: Pick<SessionOverviewItem, "id">) {
+  return item.id.startsWith("external:")
+}
+
+/**
+ * Whether a row can be stopped from here: a Lunos session this Lunos is running or waiting on.
+ * Tool-only sessions run in their own process; "elsewhere" ones are stopped by the Lunos that runs them.
+ */
+export function stoppable(item: Pick<SessionOverviewItem, "id" | "state" | "elsewhere" | "stale">) {
+  // XCOD-234: a running Claude Code / Codex session stops like `lunos external stop`.
+  if (toolOnly(item)) return item.state === "running"
+  // XCOD-234: a session another Lunos runs is stopped by that Lunos.
+  return item.state === "running" || item.state === "waiting"
+}
+
+function matches(item: SessionOverviewItem, search: string, state: StateFilter, groupName: string | undefined) {
+  // The archived view lists archived sessions whatever their state.
+  if (state !== "all" && state !== "archived" && item.state !== state) return false
+  if (!search) return true
+  return [
+    item.title,
+    projectName(item),
+    item.directory,
+    item.state,
+    stateLabel(item),
+    kindLabel(item),
+    item.agent,
+    item.model,
+    groupName,
+  ]
+    .filter((value): value is string => !!value)
+    .some((value) => value.toLowerCase().includes(search))
+}
+
+export function build(input: {
+  groups: SessionGroup[]
+  sessions: SessionOverviewItem[]
+  search: string
+  state: StateFilter
+  /** Whether Ungrouped is collapsed. It isn't a stored group, so this view keeps it. */
+  ungroupedCollapsed?: boolean
+}): Line[] {
+  const search = input.search.trim().toLowerCase()
+  const filtering = !!search || input.state !== "all"
+  const known = new Map(input.groups.map((group) => [group.id, group]))
+  const ids = new Set(input.sessions.map((item) => item.id))
+
+  // A subagent sits under its parent when the parent is listed; otherwise it is a row of its own.
+  const children = new Map<string, SessionOverviewItem[]>()
+  for (const item of input.sessions) {
+    if (!item.parentID || !ids.has(item.parentID)) continue
+    const list = children.get(item.parentID) ?? []
+    list.push(item)
+    children.set(item.parentID, list)
+  }
+  const newest = (a: SessionOverviewItem, b: SessionOverviewItem) => b.updated - a.updated
+
+  // Rows per group id ("" is Ungrouped). A session whose group is gone reads as Ungrouped.
+  const rows = new Map<string, { item: SessionOverviewItem; kids: SessionOverviewItem[] }[]>()
+  for (const item of input.sessions) {
+    if (item.parentID && ids.has(item.parentID)) continue
+    const groupID = item.groupID && known.has(item.groupID) ? item.groupID : ""
+    const name = groupID ? known.get(groupID)!.name : undefined
+    const kids = (children.get(item.id) ?? []).toSorted(newest)
+    const own = matches(item, search, input.state, name)
+    const shown = own ? kids : kids.filter((kid) => matches(kid, search, input.state, name))
+    if (!own && shown.length === 0) continue
+    const list = rows.get(groupID) ?? []
+    list.push({ item, kids: shown })
+    rows.set(groupID, list)
+  }
+
+  const lines: Line[] = []
+  const section = (group: SessionGroup | null) => {
+    const id = group?.id ?? ""
+    const list = (rows.get(id) ?? []).toSorted((a, b) => newest(a.item, b.item))
+    // While filtering, a section without a match is noise. Otherwise an empty group stays visible,
+    // so it can be moved into; an empty Ungrouped is left out.
+    if (list.length === 0 && (filtering || !group)) return
+    const collapsed = group ? group.collapsed : input.ungroupedCollapsed === true
+    lines.push({ type: "group", key: group ? groupKey(group.id) : UNGROUPED_KEY, group, count: list.length, collapsed })
+    // A search never hides a hit, so filtering shows matches inside collapsed groups too.
+    if (collapsed && !filtering) return
+    for (const row of list) {
+      lines.push({ type: "session", key: row.item.id, item: row.item, depth: 0, groupID: group?.id ?? null })
+      for (const kid of row.kids)
+        lines.push({ type: "session", key: kid.id, item: kid, depth: 1, groupID: group?.id ?? null })
+    }
+  }
+  for (const group of input.groups) section(group)
+  section(null)
+  return lines
+}
+
+/**
+ * XCOD-309: the Sessions view's two layouts. Groups is the user's groups (above, unchanged and the
+ * default); Projects is one section per project. Each surface remembers its own choice (kv.json).
+ */
+export type SessionsView = "groups" | "projects"
+export const SESSIONS_VIEW_KEY = "sessions_view"
+/** The project sections collapsed in /sessions (true) or opened again (false), by section key. */
+export const SESSIONS_PROJECTS_KEY = "sessions_projects_collapsed"
+
+export function sessionsView(value: unknown): SessionsView {
+  return value === "projects" ? "projects" : "groups"
+}
+
+export const NO_PROJECT_KEY = "project:none"
+export const projectKey = (id: string) => (id ? `project:${id}` : NO_PROJECT_KEY)
+
+/** A named project (XCOD-298), as `experimental.projectGroup.list` gives it. */
+export type NamedProject = { id: string; name: string; folders: string[]; archived?: boolean }
+
+export type ProjectSection = {
+  /** The project's id (`pgrp_…`, a repository's id, or `global:<folder>`); "" is "No project". */
+  id: string
+  key: string
+  name: string
+  kind: "named" | "folder" | "none"
+  /** Where a new session in it starts; none for "No project". */
+  directory?: string
+  rows: { item: SessionOverviewItem; kids: SessionOverviewItem[] }[]
+  /** Its top-level sessions by their most urgent state (a parent counts as its busiest subagent). */
+  counts: { working: number; waiting: number; done: number }
+  /** The project the current session (or this folder) belongs to: always open, marked "here". */
+  here: boolean
+}
+
+/** What a session's state counts as in a project's header: the Agent Monitor's three sub-sections. */
+const COUNT: Record<SessionState, keyof ProjectSection["counts"]> = {
+  running: "working",
+  waiting: "waiting",
+  failed: "done",
+  finished: "done",
+  idle: "done",
+}
+const URGENCY: Record<SessionState, number> = { waiting: 0, running: 1, failed: 2, finished: 3, idle: 3 }
+
+/** The folder a repository or plain-folder project's sessions start in. */
+const home = (item: SessionOverviewItem) =>
+  item.project && item.project.id !== "global" ? item.project.worktree : item.directory
+
+const inside = (folder: string, directory: string) =>
+  directory === folder || directory.startsWith(folder.endsWith("/") || folder.endsWith("\\") ? folder : folder + "/")
+
+/**
+ * XCOD-309: the sessions in one section per project. Named projects first (A–Z), then the
+ * repository and folder projects (A–Z, named as `projectName` names them), then "No project". A
+ * session is in the project the server resolved for it (`projectGroupID`: the one it was moved to,
+ * else its parent's, else its folder's); a Claude Code / Codex row with none lands with the sessions
+ * whose repository holds its folder. Newest first inside each, subagents under their parent.
+ */
+export function projectSections(input: {
+  sessions: SessionOverviewItem[]
+  named: NamedProject[]
+  search: string
+  state: StateFilter
+  /** The project of the session open behind the view, or of this folder. */
+  here?: string
+}): ProjectSection[] {
+  const search = input.search.trim().toLowerCase()
+  const named = new Map(input.named.map((project) => [project.id, project]))
+  const ids = new Set(input.sessions.map((item) => item.id))
+  const children = new Map<string, SessionOverviewItem[]>()
+  for (const item of input.sessions) {
+    if (!item.parentID || !ids.has(item.parentID)) continue
+    children.set(item.parentID, [...(children.get(item.parentID) ?? []), item])
+  }
+  const newest = (a: SessionOverviewItem, b: SessionOverviewItem) => b.updated - a.updated
+
+  // Repository worktrees by project id, for rows the server couldn't place (a tool-only session).
+  const worktrees = new Map<string, string>()
+  for (const item of input.sessions)
+    if (item.projectGroupID && item.project && item.project.id !== "global" && !named.has(item.projectGroupID))
+      worktrees.set(item.projectGroupID, item.project.worktree)
+  const projectOf = (item: SessionOverviewItem) => {
+    if (item.projectGroupID) return item.projectGroupID
+    for (const [id, worktree] of worktrees) if (inside(worktree, item.directory)) return id
+    return ""
+  }
+
+  const sections = new Map<string, ProjectSection>()
+  for (const item of input.sessions.toSorted(newest)) {
+    if (item.parentID && ids.has(item.parentID)) continue
+    const id = projectOf(item)
+    const project = named.get(id)
+    const kids = (children.get(item.id) ?? []).toSorted(newest)
+    const name = project?.name ?? (id ? projectName(item) : "No project")
+    const own = matches(item, search, input.state, name)
+    const shown = own ? kids : kids.filter((kid) => matches(kid, search, input.state, name))
+    if (!own && shown.length === 0) continue
+    let section = sections.get(id)
+    if (!section) {
+      section = {
+        id,
+        key: projectKey(id),
+        name,
+        kind: project ? "named" : id ? "folder" : "none",
+        directory: project ? (project.folders[0] ?? home(item)) : id ? home(item) : undefined,
+        rows: [],
+        counts: { working: 0, waiting: 0, done: 0 },
+        here: !!id && id === input.here,
+      }
+      sections.set(id, section)
+    }
+    section.rows.push({ item, kids: shown })
+    const state = [item, ...kids].map((each) => each.state).reduce((a, b) => (URGENCY[b] < URGENCY[a] ? b : a))
+    section.counts[COUNT[state]]++
+  }
+
+  const rank = { named: 0, folder: 1, none: 2 }
+  return [...sections.values()].toSorted(
+    (a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  )
+}
+
+/** "2 working · 1 waiting · 5 done", leaving out what's zero ("no sessions" when all are). */
+export function projectCounts(counts: ProjectSection["counts"]) {
+  const parts = [
+    counts.working ? `${counts.working} working` : undefined,
+    counts.waiting ? `${counts.waiting} waiting` : undefined,
+    counts.done ? `${counts.done} done` : undefined,
+  ].filter(Boolean)
+  return parts.length ? parts.join(" · ") : "no sessions"
+}
+
+/**
+ * XCOD-309: the Projects view as the TUI's flat list: a header row per project (Enter collapses or
+ * expands it), then its sessions. The project marked "here" is always open; while searching or
+ * filtering every section is open, as in the Groups view.
+ */
+export function buildProjects(input: {
+  sessions: SessionOverviewItem[]
+  named: NamedProject[]
+  search: string
+  state: StateFilter
+  here?: string
+  /** Section key to collapsed (true) or opened again (false); unset sections are open. */
+  collapsed?: Record<string, boolean>
+}): Line[] {
+  const filtering = !!input.search.trim() || input.state !== "all"
+  const lines: Line[] = []
+  for (const section of projectSections(input)) {
+    const collapsed = !section.here && input.collapsed?.[section.key] === true
+    lines.push({ type: "project", key: section.key, section, count: section.rows.length, collapsed })
+    if (collapsed && !filtering) continue
+    for (const row of section.rows) {
+      lines.push({ type: "session", key: row.item.id, item: row.item, depth: 0, groupID: row.item.groupID ?? null })
+      for (const kid of row.kids)
+        lines.push({ type: "session", key: kid.id, item: kid, depth: 1, groupID: row.item.groupID ?? null })
+    }
+  }
+  return lines
+}
+
+/** XCOD-309: a project budget in a section header: "€12.40 of €50 (Oct)". */
+export function budgetLine(budget: {
+  currency: "EUR" | "USD"
+  amount: number
+  spent: number
+  period: { label: string }
+}) {
+  const sign = budget.currency === "USD" ? "$" : "€"
+  const value = (amount: number) => `${sign}${Number.isInteger(amount) ? amount : amount.toFixed(2)}`
+  return `${value(Math.round(budget.spent * 100) / 100)} of ${value(budget.amount)}${budget.period.label ? ` (${budget.period.label})` : ""}`
+}
+
+/** XCOD-309: the sessions of one project section (its subagents too), for Stop all and Clear on it. */
+export function sectionItems(section: ProjectSection) {
+  return section.rows.flatMap((row) => [row.item, ...row.kids])
+}
+
+/**
+ * XCOD-265: whether a session belongs in the session list, the quick-switch slots and `--continue`:
+ * one cleared from /sessions (archived) doesn't, though it is still on disk and opens by id.
+ */
+export function listed(session: { time: { archived?: number | null } }) {
+  return !session.time.archived
+}
+
+/** Sessions needing an answer, for the title. */
+export function waiting(sessions: Pick<SessionOverviewItem, "state">[]) {
+  return sessions.filter((item) => item.state === "waiting").length
+}
+
+/**
+ * XCOD-265: the sessions in the current view, for Stop all and Clear list: those matching the state
+ * filter and the search (which also matches group names), whether or not their group is collapsed.
+ * A subagent counts on its own: with the filter on "waiting", only waiting sessions are in view.
+ */
+export function inView(input: {
+  groups: SessionGroup[]
+  sessions: SessionOverviewItem[]
+  search: string
+  state: StateFilter
+}) {
+  const search = input.search.trim().toLowerCase()
+  const known = new Map(input.groups.map((group) => [group.id, group]))
+  const byID = new Map(input.sessions.map((item) => [item.id, item]))
+  return input.sessions.filter((item) => {
+    // A subagent listed under its parent is in the parent's group, as build() shows it.
+    const top = item.parentID ? (byID.get(item.parentID) ?? item) : item
+    const name = top.groupID ? known.get(top.groupID)?.name : undefined
+    return matches(item, search, input.state, name)
+  })
+}
+
+/** What clearing the list archives: anything not running or waiting for an answer. */
+export function clearable(item: Pick<SessionOverviewItem, "state">) {
+  return item.state === "finished" || item.state === "idle" || item.state === "failed"
+}
+
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`
+
+/** XCOD-265: what Stop all would stop, counted the way its confirmation says it. */
+export function stopPlan(items: SessionOverviewItem[]) {
+  const targets = items.filter((item) => stoppable(item))
+  const tools = new Map<string, number>()
+  let running = 0
+  let waitingCount = 0
+  for (const item of targets) {
+    if (item.kind === "external") {
+      const name = kindLabel(item) ?? "external"
+      tools.set(name, (tools.get(name) ?? 0) + 1)
+      continue
+    }
+    if (item.state === "waiting") waitingCount++
+    else running++
+  }
+  return {
+    targets,
+    running,
+    waiting: waitingCount,
+    tools: [...tools],
+    elsewhere: targets.filter((item) => item.elsewhere).length,
+    projects: [...new Set(targets.map((item) => projectName(item)))],
+  }
+}
+
+/** "4 running, 2 waiting for an answer, 1 Claude Code" */
+function stopBreakdown(plan: ReturnType<typeof stopPlan>) {
+  return [
+    plan.running ? `${plan.running} running` : undefined,
+    plan.waiting ? `${plan.waiting} waiting for an answer` : undefined,
+    ...plan.tools.map(([name, count]) => `${count} ${name}`),
+  ]
+    .filter(Boolean)
+    .join(", ")
+}
+
+/** "Stop 7 sessions? 4 running, 2 waiting for an answer, 1 Claude Code. 2 of them run in another Lunos window." */
+export function stopQuestion(plan: ReturnType<typeof stopPlan>) {
+  const total = plan.targets.length
+  const elsewhere = plan.elsewhere
+    ? ` ${plan.elsewhere} of them ${plan.elsewhere === 1 ? "runs" : "run"} in another Lunos window.`
+    : ""
+  return `Stop ${plural(total, "session")}? ${stopBreakdown(plan)}.${elsewhere}`
+}
+
+/**
+ * A subagent whose parent is in the list goes with its parent (archived, restored and deleted
+ * together), so it isn't counted or sent on its own.
+ */
+export function topLevel<T extends Pick<SessionOverviewItem, "id" | "parentID">>(items: T[]) {
+  const ids = new Set(items.map((item) => item.id))
+  return items.filter((item) => !item.parentID || !ids.has(item.parentID))
+}
+
+/** XCOD-265: what Clear list would archive, and what stays because it's running or waiting. */
+export function clearPlan(items: SessionOverviewItem[]) {
+  return {
+    targets: topLevel(items.filter((item) => clearable(item))),
+    staying: items.filter((item) => !clearable(item)),
+  }
+}
+
+/** "Clear 4 sessions from the list? … 3 running sessions stay; stop them first, or use Stop all & clear." */
+export function clearQuestion(plan: ReturnType<typeof clearPlan>) {
+  const stays = plan.staying.length
+    ? ` ${plural(plan.staying.length, "running session")} ${plan.staying.length === 1 ? "stays" : "stay"}; stop ${plan.staying.length === 1 ? "it" : "them"} first, or use Stop all & clear.`
+    : ""
+  return `Clear ${plural(plan.targets.length, "session")} from the list? They're archived, not deleted: Show archived brings them back.${stays}`
+}
+
+/** "Stop 3 sessions and clear 7 from the list? 1. Stop: … 2. Clear: …" */
+export function stopAndClearQuestion(items: SessionOverviewItem[]) {
+  const stop = stopPlan(items)
+  const clear = clearPlan(items)
+  const total = stop.targets.length + clear.targets.length
+  const elsewhere = stop.elsewhere ? ` (${stop.elsewhere} in another Lunos window)` : ""
+  return (
+    `Stop ${plural(stop.targets.length, "session")} and clear ${total} from the list? ` +
+    `1. Stop ${stopBreakdown(stop) || "nothing"}${elsewhere}. ` +
+    `2. Archive all ${total}: they're hidden, not deleted, and Show archived brings them back.`
+  )
+}
+
+/** "Stopped 7 · 1 couldn't be stopped (another Lunos didn't respond)" */
+export function stopSummary(result: { stopped: string[]; failed: { id: string; reason: string }[] }) {
+  const reasons = [...new Set(result.failed.map((item) => item.reason))].join("; ")
+  const failed = result.failed.length ? ` · ${result.failed.length} couldn't be stopped (${reasons})` : ""
+  return `Stopped ${result.stopped.length}${failed}`
+}
+
+/** XCOD-269: what a delete confirmation adds when prompts queued for the session(s) were never sent. */
+export function queuedDeleteNote(count: number) {
+  if (count <= 0) return undefined
+  return `Also deletes ${count === 1 ? "1 queued prompt" : `${count} queued prompts`} that ${count === 1 ? "was" : "were"} never sent.`
+}
+
+/** XCOD-284: what the delete confirmation knows about each session (experimental.sessionBulk.preview). */
+export type DeletePreview = {
+  id: string
+  messages: number
+  children: number
+  queued: number
+  shared: boolean
+  tool?: string
+  /** Console shares made from it or its subagents (`lunos share`): revoked first. */
+  consoleShares?: { id: string; url?: string }[]
+}
+
+/**
+ * XCOD-284: the delete confirmation's text: what goes, what is kept, and what happens to running
+ * sessions. `items` are the sessions asked about (top-level rows), `preview` what the server says.
+ */
+export function deleteQuestion(input: {
+  items: SessionOverviewItem[]
+  preview: DeletePreview[]
+  /** Show archived: "Clear list (archive)" isn't the way back from there. */
+  archivedView?: boolean
+  /** The organisation console configured here (its host), when there is one. */
+  console?: string
+}) {
+  const { items } = input
+  const byID = new Map(input.preview.map((item) => [item.id, item]))
+  const running = stopPlan(items)
+  const single = items.length === 1 ? items[0] : undefined
+  const messages = items.reduce((sum, item) => sum + (byID.get(item.id)?.messages ?? 0), 0)
+  const children = items.reduce((sum, item) => sum + (byID.get(item.id)?.children ?? 0), 0)
+  const queued = items.reduce((sum, item) => sum + (byID.get(item.id)?.queued ?? item.queued ?? 0), 0)
+  const shared = items.filter((item) => byID.get(item.id)?.shared).length
+  const tools = [
+    ...new Set(
+      items.filter((item) => item.kind === "external" || byID.get(item.id)?.tool).map((item) => kindLabel(item) ?? ""),
+    ),
+  ].filter(Boolean)
+
+  const title = single
+    ? `Delete "${single.title}" (project ${projectName(single)}${toolOnly(single) ? "" : `, ${plural(messages, "message")}`})? This can't be undone.`
+    : `Delete ${items.length} sessions? This can't be undone.`
+  const projects = new Map<string, number>()
+  for (const item of items) projects.set(projectName(item), (projects.get(projectName(item)) ?? 0) + 1)
+  const lines: string[] = []
+  if (!single) lines.push(`By project: ${[...projects].map(([name, count]) => `${name} ${count}`).join(", ")}.`)
+  const removed = [
+    single ? "its history and messages" : "their history and messages",
+    children ? plural(children, "subagent session") : undefined,
+    queued ? `${plural(queued, "queued prompt")} never sent` : undefined,
+  ].filter(Boolean)
+  lines.push(`Removed: ${removed.join(", ")}.`)
+  if (shared) lines.push(single ? "Its share link is removed first." : `${plural(shared, "share link")} removed first.`)
+  const consoleShares = items.flatMap((item) => byID.get(item.id)?.consoleShares ?? [])
+  if (consoleShares.length)
+    lines.push(
+      `${plural(consoleShares.length, "console share")} made from ${single ? "it" : "them"} on ${input.console ?? "your organisation's console"} ${consoleShares.length === 1 ? "is" : "are"} revoked first: ${consoleShares.map((share) => share.id).join(", ")}.`,
+    )
+  if (input.console)
+    lines.push(
+      "Console shares made before this version aren't linked to their session and stay live: lunos share list, then lunos share revoke <id>.",
+    )
+  for (const tool of tools) lines.push(`${tool} keeps its own copy; only the Lunos record goes.`)
+  lines.push("Files the agent changed in your projects are never touched.")
+  if (running.targets.length) {
+    const elsewhere = running.targets.filter((item) => item.elsewhere).length
+    lines.push(
+      `${single ? "It's" : `${running.targets.length} ${running.targets.length === 1 ? "is" : "are"}`} running or waiting: Stop and delete stops ${running.targets.length === 1 ? "it" : "them"} first${elsewhere ? ` (${elsewhere} in another Lunos)` : ""}.`,
+    )
+  }
+  if (!input.archivedView) lines.push("Want it back later? Use Clear list (archive) instead.")
+  return { title, lines, running: running.targets }
+}
+
+/** XCOD-284: the toast after a delete: "Deleted 7 sessions", or what couldn't be deleted and why. */
+export function deleteSummary(result: {
+  deleted: string[]
+  skipped: { id: string; reason: string }[]
+  sharesRevoked?: string[]
+}) {
+  const done = result.deleted.length
+  const revoked = result.sharesRevoked?.length
+    ? ` · ${plural(result.sharesRevoked.length, "console share")} revoked`
+    : ""
+  if (!result.skipped.length) return `Deleted ${plural(done, "session")}${revoked}`
+  const reasons = [...new Set(result.skipped.map((item) => item.reason))].join("; ")
+  return `Deleted ${done}${revoked} · ${result.skipped.length} couldn't be deleted (${reasons})`
+}

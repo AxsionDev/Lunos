@@ -141,6 +141,9 @@ const lsp = Layer.succeed(
   LSP.Service.of({
     init: () => Effect.void,
     status: () => Effect.succeed([]),
+    overview: () => Effect.succeed({ enabled: true, downloads: true, servers: [] }),
+    stop: () => Effect.void,
+    log: () => Effect.succeed([]),
     hasClients: () => Effect.succeed(false),
     touchFile: () => Effect.void,
     diagnostics: () => Effect.succeed({}),
@@ -311,7 +314,7 @@ const writeText = Effect.fn("test.writeText")(function* (file: string, text: str
 const writeConfig = Effect.fn("test.writeConfig")(function* (dir: string, config: Partial<ConfigV1.Info>) {
   yield* writeText(
     path.join(dir, "opencode.json"),
-    JSON.stringify({ $schema: "https://opencode.ai/config.json", ...config }),
+    JSON.stringify({ $schema: "https://lunos.tech/config.json", ...config }),
   )
 })
 
@@ -917,6 +920,61 @@ it.instance("glob tool keeps instance context during prompt runs", () =>
   }),
 )
 
+// XCOD-98: a dismissed question keeps what the user had answered on the stored, rejected tool
+// part, so the TUI can reopen it after the turn ends. A reject without drafts is unchanged.
+for (const drafts of [{ answers: [["Blue"], []], custom: ["", "half-typed"] }, undefined]) {
+  it.instance(
+    `rejected question part ${drafts ? "keeps the drafts it was dismissed with" : "is unchanged without drafts"}`,
+    () =>
+      Effect.gen(function* () {
+        const { llm } = yield* useServerConfig(providerCfg)
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const question = yield* Question.Service
+        const session = yield* sessions.create({
+          title: "Dismissed question",
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        })
+        yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [{ type: "text", text: "ask me" }],
+        })
+        const questions = [
+          { question: "Colour?", header: "Colour", options: [{ label: "Blue", description: "blue" }] },
+          { question: "Name?", header: "Name", options: [{ label: "Ada", description: "ada" }] },
+        ]
+        yield* llm.tool("question", { questions })
+
+        const loop = yield* prompt.loop({ sessionID: session.id }).pipe(Effect.forkScoped)
+        const pending = yield* Effect.gen(function* () {
+          for (;;) {
+            const [item] = yield* question.list()
+            if (item) return item
+            yield* Effect.sleep("20 millis")
+          }
+        }).pipe(Effect.timeout("10 seconds"))
+        yield* question.reject(pending.id, drafts)
+        yield* Fiber.join(loop)
+
+        const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+        const part = msgs
+          .flatMap((msg) => msg.parts)
+          .find((item): item is SessionV1.ToolPart => item.type === "tool" && item.tool === "question")
+        expect(part?.state.status).toBe("error")
+        if (part?.state.status !== "error") return
+        expect(part.state.error).toContain("dismissed")
+        // The card is rendered from the input, which the part keeps either way.
+        expect(part.state.input).toEqual({ questions })
+        if (drafts) expect(part.state.metadata?.dismissed).toEqual(drafts)
+        else expect(part.state.metadata?.dismissed).toBeUndefined()
+        // The turn still ends on the rejection, as before.
+        expect(yield* llm.calls).toBe(1)
+      }),
+  )
+}
+
 it.instance("loop continues when finish is stop but assistant has tool parts", () =>
   Effect.gen(function* () {
     const { llm } = yield* useServerConfig(providerCfg)
@@ -963,13 +1021,16 @@ it.instance("failed subtask preserves metadata on error tool state", () =>
       prompt: "look into the cache key path",
       subagent_type: "general",
     })
+    // XCOD-214: the subagent's missing model is replaced by the next best one, so the subtask's own
+    // model call is what fails here.
+    yield* llm.error(400, { error: { message: "subtask failed" } })
     yield* llm.text("done")
     const msg = yield* user(chat.id, "hello")
     yield* addSubtask(chat.id, msg.id)
 
     const result = yield* prompt.loop({ sessionID: chat.id })
     expect(result.info.role).toBe("assistant")
-    expect(yield* llm.calls).toBe(2)
+    expect(yield* llm.calls).toBe(3)
 
     const msgs = yield* MessageV2.filterCompactedEffect(chat.id)
     const taskMsg = msgs.find((item) => item.info.role === "assistant" && item.info.agent === "general")
@@ -1432,7 +1493,13 @@ it.instance("concurrent loop callers all receive same error result", () =>
 
 it.instance("prompt submitted during an active run is included in the next LLM input", () =>
   Effect.gen(function* () {
-    const { llm } = yield* useServerConfig(providerCfg)
+    // XCOD-287: without Build's delegation reminder, so the last user message is the prompt alone
+    // (XCOD-303: nor the Dynamic workflow one).
+    const { llm } = yield* useServerConfig((url) => ({
+      ...providerCfg(url),
+      subagent: { delegate: false },
+      workflows: { dynamic: false },
+    }))
     const gate = yield* Deferred.make<void>()
     const prompt = yield* SessionPrompt.Service
     const sessions = yield* Session.Service
@@ -1932,7 +1999,8 @@ unix(
   "cancel finalizes interrupted bash tool output through normal truncation",
   () =>
     Effect.gen(function* () {
-      const { dir, llm } = yield* useServerConfig(providerCfg)
+      // XCOD-303: the main agent runs bash itself only with Dynamic workflows off.
+      const { dir, llm } = yield* useServerConfig((url) => ({ ...providerCfg(url), workflows: { dynamic: false } }))
       const prompt = yield* SessionPrompt.Service
       const sessions = yield* Session.Service
       const chat = yield* sessions.create({
@@ -2468,3 +2536,252 @@ noLLMServer.instance(
     }),
   30_000,
 )
+
+// XCOD-298: on_limit "ask" in an interactive session: the turn waits for the answer. "Run anyway"
+// runs it; "Stop" doesn't start it.
+for (const answer of ["Run anyway", "Stop"] as const) {
+  it.instance(`a turn estimated past the budget asks first; ${answer}`, () =>
+    Effect.gen(function* () {
+      const { llm, dir } = yield* useServerConfig((url) => {
+        const value = providerCfg(url)
+        value.provider.test.models["test-model"].cost = { input: 1000, output: 1000 }
+        return value
+      })
+      const { ProjectGroup } = yield* Effect.promise(() => import("../../src/project/group"))
+      const { Budget } = yield* Effect.promise(() => import("../../src/budget"))
+      Budget.reset()
+      const group = yield* Effect.promise(() => ProjectGroup.create({ name: `Budgeted ${answer}`, folders: [dir] }))
+      // €50 a month, €49.90 already spent (at the default 0.9 €/$), so any turn may go over.
+      yield* Effect.promise(() => ProjectGroup.setBudget(group.id, { amount: 50 }))
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const question = yield* Question.Service
+      const session = yield* sessions.create({
+        title: "Budget",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      yield* sessions.updateMessage({
+        id: MessageID.ascending(),
+        role: "assistant",
+        sessionID: session.id,
+        parentID: MessageID.ascending(),
+        mode: "build",
+        agent: "build",
+        path: { cwd: dir, root: dir },
+        cost: 49.9 / 0.9,
+        tokens: { input: 1000, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: "test-model",
+        providerID: "test",
+        time: { created: Date.now() - 1000, completed: Date.now() - 1000 },
+      } as never)
+      yield* prompt.prompt({
+        sessionID: session.id,
+        agent: "build",
+        noReply: true,
+        parts: [{ type: "text", text: "go" }],
+      })
+      yield* llm.text("done", { usage: { input: 10, output: 10 } })
+
+      const loop = yield* prompt.loop({ sessionID: session.id }).pipe(Effect.forkScoped)
+      const pending = yield* Effect.gen(function* () {
+        for (;;) {
+          const [item] = yield* question.list()
+          if (item) return item
+          yield* Effect.sleep("20 millis")
+        }
+      }).pipe(Effect.timeout("10 seconds"))
+      expect(pending.questions[0]?.question).toContain("may take Budgeted")
+      expect(pending.questions[0]?.options.map((option) => option.label)).toEqual([
+        "Run anyway",
+        "Use a cheaper model…",
+        "Stop",
+      ])
+      yield* question.reply({ requestID: pending.id, answers: [[answer]] })
+      yield* Fiber.join(loop)
+      expect(yield* llm.calls).toBe(answer === "Run anyway" ? 1 : 0)
+      yield* Effect.promise(() => ProjectGroup.archive(group.id))
+    }),
+  )
+}
+
+// XCOD-308: a name the user gives a session is never replaced by the automatic title.
+const waitTitle = (sessions: Session.Interface, id: SessionID, value: string) =>
+  pollWithTimeout(
+    sessions.get(id).pipe(Effect.map((info) => (info.title === value ? info : undefined))),
+    `timed out waiting for the title "${value}"`,
+  )
+
+it.instance("the first reply titles a new session automatically", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({})
+    expect(Session.isDefaultTitle(chat.title)).toBe(true)
+    yield* llm.title("Generated name")
+    yield* user(chat.id, "hello")
+    yield* llm.text("world")
+    yield* prompt.loop({ sessionID: chat.id })
+    const info = yield* waitTitle(sessions, chat.id, "Generated name")
+    expect(Session.titleSource(info)).toBe("auto")
+  }),
+)
+
+it.instance("a rename made while the title is generated wins", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({})
+    const release = Promise.withResolvers<void>()
+    yield* llm.title("Generated name", release.promise)
+    yield* user(chat.id, "hello")
+    yield* llm.text("world")
+    yield* prompt.loop({ sessionID: chat.id })
+    yield* pollWithTimeout(
+      llm.titles.pipe(Effect.map((list) => (list.length ? list : undefined))),
+      "timed out waiting for the title request",
+    )
+    yield* sessions.setTitle({ sessionID: chat.id, title: "  My   name \n" })
+    release.resolve()
+    // The generated title arrives and is dropped.
+    yield* Effect.sleep("500 millis")
+    const info = yield* sessions.get(chat.id)
+    expect(info.title).toBe("My name")
+    expect(Session.titleSource(info)).toBe("user")
+  }),
+)
+
+it.instance("a user's name survives more prompts and a metadata replace", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({})
+    yield* sessions.setTitle({ sessionID: chat.id, title: "Release notes" })
+    yield* user(chat.id, "hello")
+    yield* llm.text("world")
+    yield* prompt.loop({ sessionID: chat.id })
+    yield* user(chat.id, "again")
+    yield* llm.text("more")
+    yield* prompt.loop({ sessionID: chat.id })
+    yield* Effect.sleep("200 millis")
+    expect(yield* llm.titles).toHaveLength(0)
+    yield* sessions.setMetadata({ sessionID: chat.id, metadata: { other: true } })
+    const info = yield* sessions.get(chat.id)
+    expect(info.title).toBe("Release notes")
+    expect(info.metadata).toMatchObject({ other: true, titleSource: "user" })
+  }),
+)
+
+it.instance("clearing the name brings the automatic title back on the next turn", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({})
+    yield* sessions.setTitle({ sessionID: chat.id, title: "Mine" })
+    yield* user(chat.id, "hello")
+    yield* llm.text("world")
+    yield* prompt.loop({ sessionID: chat.id })
+    yield* sessions.setTitle({ sessionID: chat.id, title: "   " })
+    const cleared = yield* sessions.get(chat.id)
+    expect(cleared.title).toBe(chat.title)
+    expect(Session.titleSource(cleared)).toBe("auto")
+    expect(Session.titleReset(cleared)).toBe(true)
+    yield* llm.title("Back to auto")
+    yield* user(chat.id, "second prompt")
+    yield* llm.text("ok")
+    yield* prompt.loop({ sessionID: chat.id })
+    const info = yield* waitTitle(sessions, chat.id, "Back to auto")
+    expect(Session.titleReset(info)).toBe(false)
+  }),
+)
+
+noLLMServer.instance(
+  "a rename is one trimmed line of at most 80 characters, and a fork keeps it",
+  () =>
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({})
+      yield* sessions.setTitle({ sessionID: chat.id, title: "a".repeat(100) })
+      expect((yield* sessions.get(chat.id)).title).toBe("a".repeat(Session.TITLE_MAX))
+      yield* sessions.setTitle({ sessionID: chat.id, title: "line one\nline two" })
+      expect((yield* sessions.get(chat.id)).title).toBe("line one line two")
+      const fork = yield* sessions.fork({ sessionID: chat.id })
+      expect(fork.title).toBe("line one line two (fork #1)")
+      expect(Session.titleSource(fork)).toBe("user")
+      // An automatic title never replaces it.
+      yield* sessions.setTitle({ sessionID: fork.id, title: "auto", source: "auto" })
+      expect((yield* sessions.get(fork.id)).title).toBe("line one line two (fork #1)")
+      // A /claude or /codex session's name, cleared, goes back to the one naming its tool (the
+      // handler passes it as the fallback), and the tool's later id updates may replace it again.
+      yield* sessions.setTitle({ sessionID: fork.id, title: "", fallback: "Claude Code · abcd1234" })
+      const cleared = yield* sessions.get(fork.id)
+      expect(cleared.title).toBe("Claude Code · abcd1234")
+      expect(Session.titleSource(cleared)).toBe("auto")
+      expect(Session.titleReset(cleared)).toBe(false)
+    }),
+  { config: cfg },
+)
+
+// XCOD-312: a disabled Lunos account (recorded on this machine) starts no new turn on the live v1
+// loop: the reason is the turn's error and no model is asked. Where this start needs no Lunos account
+// (here: a build from source without LUNOS_AUTH_REQUIRED), the record doesn't stop anything.
+for (const required of [true, false] as const) {
+  it.instance(
+    `a disabled account ${required ? "starts no new turn" : "doesn't stop a start that needs no account"}`,
+    () =>
+      Effect.gen(function* () {
+        const { llm } = yield* useServerConfig(providerCfg)
+        const { CloudDisabled } = yield* Effect.promise(() => import("../../src/cloud/disabled"))
+        const saved = {
+          required: process.env.LUNOS_AUTH_REQUIRED,
+          ci: process.env.CI,
+          offline: process.env.LUNOS_OFFLINE,
+        }
+        delete process.env.CI
+        delete process.env.LUNOS_OFFLINE
+        if (required) process.env.LUNOS_AUTH_REQUIRED = "1"
+        else delete process.env.LUNOS_AUTH_REQUIRED
+        yield* Effect.addFinalizer(() =>
+          Effect.promise(async () => {
+            await CloudDisabled.clear()
+            for (const [key, value] of [
+              ["LUNOS_AUTH_REQUIRED", saved.required],
+              ["CI", saved.ci],
+              ["LUNOS_OFFLINE", saved.offline],
+            ] as const)
+              if (value === undefined) delete process.env[key]
+              else process.env[key] = value
+          }),
+        )
+        yield* Effect.promise(() => CloudDisabled.record({ category: "payment" }))
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const chat = yield* sessions.create({
+          title: "Pinned",
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        })
+        yield* llm.text("world")
+        const result = yield* prompt.prompt({
+          sessionID: chat.id,
+          agent: "build",
+          parts: [{ type: "text", text: "hello" }],
+        })
+        expect(result.info.role).toBe("assistant")
+        if (!required) {
+          expect(yield* llm.hits).toHaveLength(1)
+          return
+        }
+        expect(yield* llm.hits).toHaveLength(0)
+        const error = (result.info as SessionV1.Assistant).error as { data?: { message?: string; ref?: string } }
+        expect(error?.data?.ref).toBe("account_disabled")
+        expect(error?.data?.message).toContain("Your Lunos account is disabled, so new prompts can't run.")
+        expect(error?.data?.message).toContain("Reason: A payment issue")
+        // Past messages stay: the prompt itself is kept, only the turn didn't start.
+        const messages = yield* sessions.messages({ sessionID: chat.id })
+        expect(messages.filter((message) => message.info.role === "user")).toHaveLength(1)
+      }),
+  )
+}

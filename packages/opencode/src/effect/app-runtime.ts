@@ -44,7 +44,11 @@ import { Vcs } from "@/project/vcs"
 import { Workspace } from "@/control-plane/workspace"
 import { Worktree } from "@/worktree"
 import { Installation } from "@/installation"
+import { ShareNext } from "@/share/share-next"
+import { CloudSync } from "@/cloud/sync"
 import { SessionShare } from "@/share/session"
+import { Memory } from "@/memory"
+import { Resource } from "@/resource"
 import { Npm } from "@opencode-ai/core/npm"
 import { memoMap } from "@opencode-ai/core/effect/memo-map"
 import { BackgroundJob } from "@/background/job"
@@ -102,7 +106,11 @@ export const AppLayer = AppNodeBuilderV1.build(
     Workspace.node,
     Worktree.node,
     Installation.node,
+    ShareNext.node,
+    CloudSync.node,
     SessionShare.node,
+    Memory.node,
+    Resource.node,
   ]),
 ).pipe(Layer.provideMerge(AppNodeBuilderV1.build(Ripgrep.node)), Layer.provideMerge(Observability.layer))
 

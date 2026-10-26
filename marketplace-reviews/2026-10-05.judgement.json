@@ -1,0 +1,43 @@
+{
+  "model": "openai/gpt-5.3-codex",
+  "date": "2026-10-05",
+  "judgements": [
+    {
+      "name": "opencode-devcontainers",
+      "recommendation": "delist",
+      "reasons": [
+        "criterion 3 warning: repository is archived (no active maintainer)",
+        "criterion 5 info: no egress declared, so network behavior cannot be verified"
+      ],
+      "user_note": "This entry is archived and lacks an egress declaration, so it does not currently meet marketplace trust criteria."
+    },
+    {
+      "name": "opencode-dynamic-context-pruning",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 1 (warn): AGPL-3.0-or-later is OSI-approved copyleft and should be clearly disclosed to users.",
+        "Criterion 5 (info): no egress is declared, so network/telemetry behavior cannot yet be verified."
+      ],
+      "user_note": "This plugin remains listed, but users should be informed of AGPL copyleft terms and that egress disclosure is still pending verification."
+    },
+    {
+      "name": "opencode-conductor",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 6 warning: runs a postinstall script on install (`node scripts/postinstall.cjs`), which must be reviewed before verification.",
+        "Criterion 5 info: no egress is declared, so network behavior cannot be verified yet."
+      ],
+      "user_note": "This entry can remain community-listed, but it should not be marked verified until egress is declared and the postinstall script is reviewed."
+    },
+    {
+      "name": "opencode-sentry-monitor",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 2 warning: no public source repository found, so public maintained source cannot be confirmed.",
+        "Criterion 5 info: no egress declared, which is needed before network behavior can be verified."
+      ],
+      "user_note": "This plugin can remain listed in community status, but should disclose source and egress details before any verified promotion."
+    }
+  ],
+  "dropped": []
+}

@@ -2,13 +2,11 @@ name: publish
 run-name: "${{ format('release {0}', inputs.bump) }}"
 
 on:
-  push:
-    branches:
-      - ci
-      - v1
-      - beta
-      - fix/npm-native-binary-install
-      - snapshot-*
+  # NOTE: the inherited `push` trigger (ci/dev/beta/snapshot-*) is deliberately
+  # removed. With the repository guards now re-pointed at AxsionDev/Lunos, leaving
+  # it in place would turn every merge to dev into a live npm publish and GitHub
+  # release. Releases are manual until that is an explicit decision — restore the
+  # push block to go back to release-on-merge.
   workflow_dispatch:
     inputs:
       bump:
@@ -24,27 +22,69 @@ on:
         required: false
         type: string
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version || inputs.bump }}
+# XCOD-48: two no-bump dispatches produce an identical key (both `inputs.version` and
+# `inputs.bump` empty), so the second queued behind the first indefinitely — a dead
+# Blacksmith-era run held the group for 15 minutes on 2026-09-18. `github.run_id` makes
+# every dispatch its own group, which is the right behaviour for a manually-triggered
+# release: two deliberate dispatches should not silently block each other.
+concurrency: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version || inputs.bump || github.run_id }}
 
 permissions:
   id-token: write
   contents: write
   packages: write
 
-env:
-  # V1 previews keep the dev channel so existing opencode-ai@dev installs keep upgrading and their data path.
-  OPENCODE_CHANNEL: ${{ (github.ref_name == 'v1' && !inputs.bump && !inputs.version && 'dev') || '' }}
-
 jobs:
+  # XCOD-49: signing posture is "unsigned for now". Rather than hard-disabling the signing
+  # jobs, detect whether the credentials exist and let them skip cleanly when they don't.
+  # This is self-healing — provisioning the secrets turns signing back on with no workflow
+  # edit. Secrets are not available in job-level `if:`, hence this job publishing outputs.
+  preflight:
+    runs-on: ubuntu-24.04
+    if: github.repository == 'AxsionDev/Lunos'
+    outputs:
+      sign_windows: ${{ steps.check.outputs.sign_windows }}
+      sign_macos: ${{ steps.check.outputs.sign_macos }}
+    steps:
+      - name: Detect available signing credentials
+        id: check
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        run: |
+          if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_TRUSTED_SIGNING_ENDPOINT" ]; then
+            echo "sign_windows=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign_windows=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Windows signing skipped — Azure Trusted Signing secrets absent (XCOD-49)"
+          fi
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            echo "sign_macos=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign_macos=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::macOS signing skipped — APPLE_CERTIFICATE absent (XCOD-49)"
+          fi
+
   version:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    if: github.repository == 'anomalyco/opencode'
+    runs-on: ubuntu-24.04
+    if: github.repository == 'AxsionDev/Lunos'
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
           fetch-depth: 0
 
       - uses: ./.github/actions/setup-bun
+
+      # XCOD-227: v1.18.46 shipped with no CHANGELOG.md section. Fail before ./script/version.ts,
+      # which creates the draft release, so a refused dispatch leaves no draft behind. The script
+      # computes the version the same way version.ts does, and skips preview/beta builds.
+      - name: Check CHANGELOG.md has a section for this version
+        timeout-minutes: 3
+        run: bun script/check-changelog.ts
+        env:
+          OPENCODE_BUMP: ${{ inputs.bump }}
+          OPENCODE_VERSION: ${{ inputs.version }}
 
       - name: Setup git committer
         id: committer
@@ -64,8 +104,20 @@ jobs:
           GH_TOKEN: ${{ steps.committer.outputs.token }}
           OPENCODE_BUMP: ${{ inputs.bump }}
           OPENCODE_VERSION: ${{ inputs.version }}
+          GH_REPO: ${{ github.repository }}
+          # Changelog generation is provider-agnostic: whichever of these is set gets used, and
+          # NONE is required. A provider is auto-detected when any of its declared env vars is
+          # present (provider.ts:186). If none is set, version.ts falls back to raw-changelog.ts,
+          # which needs no AI at all — so the release never blocks on an AI vendor.
+          # Optionally pin one with the CHANGELOG_MODEL variable, e.g. "anthropic/claude-sonnet-5".
+          CHANGELOG_MODEL: ${{ vars.CHANGELOG_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Upstream's Zen gateway — supported like any other vendor, not privileged over them.
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          GH_REPO: ${{ (github.ref_name == 'beta' && 'anomalyco/opencode-beta') || github.repository }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       release: ${{ steps.version.outputs.release }}
@@ -74,8 +126,8 @@ jobs:
 
   build-cli:
     needs: version
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    if: github.repository == 'anomalyco/opencode'
+    runs-on: ubuntu-24.04
+    if: github.repository == 'AxsionDev/Lunos'
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
@@ -98,6 +150,9 @@ jobs:
         env:
           OPENCODE_VERSION: ${{ needs.version.outputs.version }}
           OPENCODE_RELEASE: ${{ needs.version.outputs.release }}
+          # XCOD-273: the official build asks for a free Lunos account at start (docs: "Your Lunos
+          # account"). Builds from source don't.
+          LUNOS_OFFICIAL_BUILD: "1"
           GH_REPO: ${{ needs.version.outputs.repo }}
           GH_TOKEN: ${{ steps.committer.outputs.token }}
 
@@ -105,110 +160,153 @@ jobs:
         with:
           name: opencode-cli
           path: |
-            packages/opencode/dist/opencode-darwin*
-            packages/opencode/dist/opencode-linux*
+            packages/opencode/dist/lunos-darwin*
+            packages/opencode/dist/lunos-linux*
+          # Fail loudly on an empty glob. The default (`warn`) uploads nothing, leaves this
+          # job green, and defers the error to `publish`'s download-artifact three jobs
+          # later — which is exactly how the opencode-* → lunos- rename went unnoticed.
+          if-no-files-found: error
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: opencode-cli-windows
-          path: packages/opencode/dist/opencode-windows*
+          path: packages/opencode/dist/lunos-windows*
+          if-no-files-found: error
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: opencode-preview-cli
           path: packages/cli/dist/cli-*
+          if-no-files-found: error
 
     outputs:
       version: ${{ needs.version.outputs.version }}
 
+  # Software Bill of Materials for the release (XCOD-64).
+  #
+  # This is manufacturer-readiness groundwork, not a compliance obligation: on the XCOD-54
+  # assessment Lunos is outside CRA scope today, so an SBOM is not legally owed. It exists so
+  # the dependency tree can be checked against a newly disclosed upstream vulnerability, and so
+  # a procurement reviewer has something concrete to read.
+  sbom:
+    needs: version
+    runs-on: ubuntu-24.04
+    if: github.repository == 'AxsionDev/Lunos'
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+
+      # Pinned deliberately. syft only learned to read bun's lockfile recently: v1.20.0 parses
+      # bun.lock into ZERO components and still emits a schema-valid CycloneDX document. An
+      # accidental downgrade would therefore publish a convincing, empty SBOM. The verify step
+      # below is what actually catches that, but pin anyway so it does not happen quietly.
+      - name: Install syft
+        env:
+          SYFT_VERSION: v1.52.0
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b "$RUNNER_TEMP/bin" "$SYFT_VERSION"
+          "$RUNNER_TEMP/bin/syft" version
+
+      - name: Generate SBOM
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          "$RUNNER_TEMP/bin/syft" scan file:bun.lock \
+            -o cyclonedx-json > "lunos-sbom-${VERSION}.cdx.json"
+
+      # XCOD-108: bun.lock carries no licences, so the SBOM had none (the XCOD-64 gap). Install the
+      # locked tree, then add each component's declared licence from its package.json (or, for
+      # other-platform optional packages not installed here, from the registry's metadata).
+      - uses: ./.github/actions/setup-bun
+
+      - name: Add licences to the SBOM
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          bun install --frozen-lockfile
+          bun script/sbom-licenses.ts "lunos-sbom-${VERSION}.cdx.json"
+          with=$(jq '[.components[] | select(.licenses)] | length' "lunos-sbom-${VERSION}.cdx.json")
+          total=$(jq '.components | length' "lunos-sbom-${VERSION}.cdx.json")
+          echo "Components with a licence: $with of $total"
+          if [ $((with * 100 / total)) -lt 95 ]; then
+            echo "::error::Only $with of $total SBOM components have a licence (expected >=95%)."
+            exit 1
+          fi
+
+      # Same philosophy as `if-no-files-found: error` above: an empty artifact that leaves the
+      # job green is worse than a failure, because it defers the error to whoever trusts the SBOM.
+      - name: Verify SBOM is not empty
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          count=$(jq '.components | length' "lunos-sbom-${VERSION}.cdx.json")
+          echo "SBOM components: $count"
+          if [ "$count" -lt 100 ]; then
+            echo "::error::SBOM has $count components (expected >=100). syft likely failed to" \
+                 "parse bun.lock — check whether the pinned syft version still supports it."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lunos-sbom
+          path: lunos-sbom-*.cdx.json
+          if-no-files-found: error
+
+      - name: Attach SBOM to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+          REPO: ${{ needs.version.outputs.repo }}
+        run: |
+          gh release upload "v${VERSION}" "lunos-sbom-${VERSION}.cdx.json" \
+            --clobber --repo "${REPO}"
+
+  # XCOD-207: build-cli cross-compiles the darwin binaries on Linux, and embedding the JS bundle
+  # leaves each one with an invalid signature. This re-signs them ad-hoc on a Mac, repacks the
+  # darwin zips, and smoke-tests the arm64 binary out of its zip. `publish` swaps these in for the
+  # unsigned files before npm packing, the Homebrew sha, SHA256SUMS and the offline bundles.
+  # No credentials: ad-hoc signing needs no certificate, and the zips are uploaded to the release
+  # by `publish`, not here. A Developer ID identity, once there is one, replaces `-` in the script.
   sign-cli-macos:
     needs:
       - build-cli
       - version
     runs-on: macos-26
-    if: github.repository == 'anomalyco/opencode'
+    if: github.repository == 'AxsionDev/Lunos'
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
-
-      - uses: apple-actions/import-codesign-certs@8f3fb608891dd2244cdab3d69cd68c0d37a7fe93 # v2.0.0
-        with:
-          keychain: build
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: opencode-cli
           path: packages/opencode/dist
 
-      - name: Setup git committer
-        id: committer
-        uses: ./.github/actions/setup-git-committer
-        with:
-          opencode-app-id: ${{ vars.OPENCODE_APP_ID }}
-          opencode-app-secret: ${{ secrets.OPENCODE_APP_SECRET }}
-
-      - name: Sign macOS CLI binaries
-        run: |
-          identity=$(security find-identity -v -p codesigning build.keychain | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -n 1)
-          if [ -z "$identity" ]; then
-            echo "Developer ID Application identity not found"
-            exit 1
-          fi
-
-          for name in opencode-darwin-arm64 opencode-darwin-x64 opencode-darwin-x64-baseline; do
-            file="packages/opencode/dist/$name/bin/opencode"
-            chmod +x "$file"
-            codesign \
-              --force \
-              --timestamp \
-              --options runtime \
-              --entitlements packages/opencode/script/entitlements.plist \
-              --sign "$identity" \
-              "$file"
-            codesign --verify --deep --strict --verbose=4 "$file"
-            codesign --display --requirements - "$file"
-          done
-
-      - name: Smoke test signed binary
-        run: ./packages/opencode/dist/opencode-darwin-arm64/bin/opencode --version
-
-      - name: Repack macOS CLI archives
-        working-directory: packages/opencode/dist
-        run: |
-          for name in opencode-darwin-arm64 opencode-darwin-x64 opencode-darwin-x64-baseline; do
-            rm -f "$name.zip"
-            (cd "$name/bin" && zip -r "../../$name.zip" *)
-          done
-
-      - name: Upload signed macOS CLI release assets
-        if: needs.version.outputs.release != ''
-        env:
-          GH_TOKEN: ${{ steps.committer.outputs.token }}
-        run: |
-          gh release upload "v${{ needs.version.outputs.version }}" \
-            packages/opencode/dist/opencode-darwin-arm64.zip \
-            packages/opencode/dist/opencode-darwin-x64.zip \
-            packages/opencode/dist/opencode-darwin-x64-baseline.zip \
-            --clobber \
-            --repo "${{ needs.version.outputs.repo }}"
+      - name: Re-sign, repack and smoke-test macOS CLI binaries
+        run: ./packages/opencode/script/macos-resign.sh packages/opencode/dist "${{ needs.version.outputs.version }}"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: opencode-cli-signed-macos
           path: |
-            packages/opencode/dist/opencode-darwin-arm64
-            packages/opencode/dist/opencode-darwin-x64
-            packages/opencode/dist/opencode-darwin-x64-baseline
-            packages/opencode/dist/opencode-darwin-*.zip
+            packages/opencode/dist/lunos-darwin-arm64
+            packages/opencode/dist/lunos-darwin-x64
+            packages/opencode/dist/lunos-darwin-x64-baseline
+            packages/opencode/dist/lunos-darwin-*.zip
           if-no-files-found: error
 
   sign-cli-windows:
     needs:
       - build-cli
       - version
-    runs-on: blacksmith-4vcpu-windows-2025
-    if: github.repository == 'anomalyco/opencode'
+      - preflight
+    runs-on: windows-2025
+    # Skips entirely without Azure Trusted Signing credentials. `release-gate` allows this one
+    # skip, and `publish` falls back to the unsigned `opencode-cli-windows` artifact from build-cli.
+    if: github.repository == 'AxsionDev/Lunos' && needs.preflight.outputs.sign_windows == 'true'
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -244,9 +342,9 @@ jobs:
           signing-account-name: ${{ env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           certificate-profile-name: ${{ env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
           files: |
-            ${{ github.workspace }}\packages\opencode\dist\opencode-windows-arm64\bin\opencode.exe
-            ${{ github.workspace }}\packages\opencode\dist\opencode-windows-x64\bin\opencode.exe
-            ${{ github.workspace }}\packages\opencode\dist\opencode-windows-x64-baseline\bin\opencode.exe
+            ${{ github.workspace }}\packages\opencode\dist\lunos-windows-arm64\bin\opencode.exe
+            ${{ github.workspace }}\packages\opencode\dist\lunos-windows-x64\bin\opencode.exe
+            ${{ github.workspace }}\packages\opencode\dist\lunos-windows-x64-baseline\bin\opencode.exe
           exclude-environment-credential: true
           exclude-workload-identity-credential: true
           exclude-managed-identity-credential: true
@@ -262,9 +360,9 @@ jobs:
         shell: pwsh
         run: |
           $files = @(
-            "${{ github.workspace }}\packages\opencode\dist\opencode-windows-arm64\bin\opencode.exe",
-            "${{ github.workspace }}\packages\opencode\dist\opencode-windows-x64\bin\opencode.exe",
-            "${{ github.workspace }}\packages\opencode\dist\opencode-windows-x64-baseline\bin\opencode.exe"
+            "${{ github.workspace }}\packages\opencode\dist\lunos-windows-arm64\bin\opencode.exe",
+            "${{ github.workspace }}\packages\opencode\dist\lunos-windows-x64\bin\opencode.exe",
+            "${{ github.workspace }}\packages\opencode\dist\lunos-windows-x64-baseline\bin\opencode.exe"
           )
 
           foreach ($file in $files) {
@@ -278,9 +376,9 @@ jobs:
         working-directory: packages/opencode/dist
         shell: pwsh
         run: |
-          Compress-Archive -Path "opencode-windows-arm64\bin\*" -DestinationPath "opencode-windows-arm64.zip" -Force
-          Compress-Archive -Path "opencode-windows-x64\bin\*" -DestinationPath "opencode-windows-x64.zip" -Force
-          Compress-Archive -Path "opencode-windows-x64-baseline\bin\*" -DestinationPath "opencode-windows-x64-baseline.zip" -Force
+          Compress-Archive -Path "lunos-windows-arm64\bin\*" -DestinationPath "lunos-windows-arm64.zip" -Force
+          Compress-Archive -Path "lunos-windows-x64\bin\*" -DestinationPath "lunos-windows-x64.zip" -Force
+          Compress-Archive -Path "lunos-windows-x64-baseline\bin\*" -DestinationPath "lunos-windows-x64-baseline.zip" -Force
 
       - name: Upload signed Windows CLI release assets
         if: needs.version.outputs.release != ''
@@ -289,9 +387,9 @@ jobs:
           GH_TOKEN: ${{ steps.committer.outputs.token }}
         run: |
           gh release upload "v${{ needs.version.outputs.version }}" `
-            "${{ github.workspace }}\packages\opencode\dist\opencode-windows-arm64.zip" `
-            "${{ github.workspace }}\packages\opencode\dist\opencode-windows-x64.zip" `
-            "${{ github.workspace }}\packages\opencode\dist\opencode-windows-x64-baseline.zip" `
+            "${{ github.workspace }}\packages\opencode\dist\lunos-windows-arm64.zip" `
+            "${{ github.workspace }}\packages\opencode\dist\lunos-windows-x64.zip" `
+            "${{ github.workspace }}\packages\opencode\dist\lunos-windows-x64-baseline.zip" `
             --clobber `
             --repo "${{ needs.version.outputs.repo }}"
 
@@ -299,14 +397,15 @@ jobs:
         with:
           name: opencode-cli-signed-windows
           path: |
-            packages/opencode/dist/opencode-windows-arm64
-            packages/opencode/dist/opencode-windows-x64
-            packages/opencode/dist/opencode-windows-x64-baseline
+            packages/opencode/dist/lunos-windows-arm64
+            packages/opencode/dist/lunos-windows-x64
+            packages/opencode/dist/lunos-windows-x64-baseline
 
   build-electron:
     needs:
       - version
-    if: github.repository == 'anomalyco/opencode'
+      - preflight
+    if: github.repository == 'AxsionDev/Lunos'
     continue-on-error: false
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -331,36 +430,41 @@ jobs:
           - host: "windows-2025"
             target: aarch64-pc-windows-msvc
             platform_flag: --win --arm64
-          - host: "blacksmith-4vcpu-windows-2025"
+          - host: "windows-2025"
             target: x86_64-pc-windows-msvc
             platform_flag: --win
-          - host: "blacksmith-4vcpu-ubuntu-2404"
+          - host: "ubuntu-24.04"
             target: x86_64-unknown-linux-gnu
             platform_flag: --linux
-          - host: "blacksmith-4vcpu-ubuntu-2404-arm"
+          - host: "ubuntu-24.04-arm"
             target: aarch64-unknown-linux-gnu
             platform_flag: --linux --arm64
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
 
+      # XCOD-49: without APPLE_CERTIFICATE this step fails at `security import` with
+      # "Unable to decode the provided data", taking the whole macOS build with it.
       - uses: apple-actions/import-codesign-certs@8f3fb608891dd2244cdab3d69cd68c0d37a7fe93 # v2.0.0
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && needs.preflight.outputs.sign_macos == 'true'
         with:
           keychain: build
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Setup Apple API Key
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && needs.preflight.outputs.sign_macos == 'true'
         run: echo "${{ secrets.APPLE_API_KEY_PATH }}" > $RUNNER_TEMP/apple-api-key.p8
 
       - uses: ./.github/actions/setup-bun
         with:
           install-flags: ${{ matrix.settings.bun_install_flags }}
 
+      # XCOD-49: without Azure Trusted Signing credentials this fails with "Not all values are
+      # present", which failed both Windows matrix legs and — because `publish` needs
+      # build-electron — skipped the publish entirely. Same gate as sign-cli-windows.
       - name: Azure login
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && needs.preflight.outputs.sign_windows == 'true'
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -402,6 +506,8 @@ jobs:
           OPENCODE_VERSION: ${{ needs.version.outputs.version }}
           OPENCODE_CHANNEL: ${{ (github.ref_name == 'beta' && 'beta') || 'prod' }}
           RUST_TARGET: ${{ matrix.settings.target }}
+          # XCOD-312: prepare.ts runs build-node.ts as well (see Build).
+          LUNOS_OFFICIAL_BUILD: "1"
 
       - name: Build
         run: bun run build
@@ -410,6 +516,9 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
           OPENCODE_VERSION: ${{ needs.version.outputs.version }}
           OPENCODE_CHANNEL: ${{ (github.ref_name == 'beta' && 'beta') || 'prod' }}
+          # XCOD-312: the desktop app's server (script/build-node.ts) is an official build too, so a
+          # disabled Lunos account is shown and refused there as in the CLI.
+          LUNOS_OFFICIAL_BUILD: "1"
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.WEB_SENTRY_PROJECT }}
@@ -426,7 +535,11 @@ jobs:
         env:
           OPENCODE_CHANNEL: ${{ (github.ref_name == 'beta' && 'beta') || 'prod' }}
           GH_TOKEN: ${{ steps.committer.outputs.token }}
-          CSC_KEYCHAIN: build.keychain
+          # XCOD-49: when unsigned, `build.keychain` was never created — point nowhere and tell
+          # electron-builder not to go hunting for an identity, or it fails instead of
+          # producing an unsigned artifact.
+          CSC_KEYCHAIN: ${{ needs.preflight.outputs.sign_macos == 'true' && 'build.keychain' || '' }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ needs.preflight.outputs.sign_macos == 'true' && 'true' || 'false' }}
           APPLE_API_KEY: ${{ runner.temp }}/apple-api-key.p8
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -445,10 +558,10 @@ jobs:
         run: |
           if [[ "${{ matrix.settings.target }}" == "x86_64-apple-darwin" ]]; then
             APP_DIR="mac"
-            OUT_NAME="opencode-desktop-mac-x64.app.tar.gz"
+            OUT_NAME="lunos-desktop-mac-x64.app.tar.gz"
           elif [[ "${{ matrix.settings.target }}" == "aarch64-apple-darwin" ]]; then
             APP_DIR="mac-arm64"
-            OUT_NAME="opencode-desktop-mac-arm64.app.tar.gz"
+            OUT_NAME="lunos-desktop-mac-arm64.app.tar.gz"
           else
             echo "Unknown macOS target: ${{ matrix.settings.target }}"
             exit 1
@@ -461,7 +574,7 @@ jobs:
           tar -czf "$OUT_NAME" -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
 
       - name: Verify signed Windows Electron artifacts
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && needs.preflight.outputs.sign_windows == 'true'
         shell: pwsh
         run: |
           $files = @()
@@ -478,7 +591,7 @@ jobs:
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: opencode-desktop-${{ matrix.settings.target }}
+          name: lunos-desktop-${{ matrix.settings.target }}
           path: packages/desktop/dist/*
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -487,15 +600,85 @@ jobs:
           name: latest-yml-${{ matrix.settings.target }}
           path: packages/desktop/dist/latest*.yml
 
-  publish:
+  # XCOD-283: the one place that decides whether the release may go out. `publish` used to gate on
+  # `always() && !failure() && !cancelled()`, but those only see the *run* being cancelled: when
+  # GitHub never found a macOS arm64 runner (1.18.52, 1.18.53) the cancelled job counted as neither,
+  # and publish started without the arm64 desktop build or the re-signed macOS CLI. Every required
+  # job must now be `success`; the only exception is a skipped sign-cli-windows (no Azure secrets,
+  # XCOD-49). On a block this job fails the run and names each job and why, and the draft release
+  # is left as it is, so `gh run rerun --failed` (or publish-retry.yml) picks it up again.
+  release-gate:
     needs:
       - version
+      - preflight
       - build-cli
+      # XCOD-207: not skippable. A failed re-sign must stop the release, not ship unsigned.
       - sign-cli-macos
       - sign-cli-windows
       - build-electron
-    if: always() && !failure() && !cancelled()
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+      # XCOD-106: the SBOM must be on the release before SHA256SUMS is computed and signed.
+      - sbom
+    if: github.repository == 'AxsionDev/Lunos' && !cancelled()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      checks: read
+    steps:
+      - name: Require every build job to have succeeded
+        timeout-minutes: 3
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          blocked=$(jq -r 'to_entries[]
+            | select(.value.result != "success")
+            | select(.key != "sign-cli-windows" or .value.result != "skipped")
+            | "\(.key): \(.value.result)"' <<<"$NEEDS")
+          # Also ask the API for every finished job in this attempt, one row per matrix leg, rather
+          # than trusting how `needs.build-electron.result` aggregates a single cancelled leg. Only
+          # this job and publish are unfinished (null conclusion). If the API is unreachable, the
+          # `needs` check above still decides on its own.
+          if jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '.jobs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped")
+              | "\(.id)\t\(.conclusion)\t\(.name)"'); then
+            if [ -n "$jobs" ] && [ -z "$blocked" ]; then blocked="(see jobs below)"; fi
+          else
+            jobs=""
+            echo "::warning::Could not list this attempt's jobs; gating on needs results only."
+          fi
+          if [ -z "$blocked" ]; then
+            echo "Every required job succeeded."
+            exit 0
+          fi
+          {
+            echo "### Release blocked: publish skipped, draft release left for a rerun"
+            echo
+            while IFS= read -r line; do echo "- $line"; done <<<"$blocked"
+            echo
+            echo "Jobs that did not succeed in attempt $GITHUB_RUN_ATTEMPT:"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Name the exact matrix leg and GitHub's reason, e.g. "The job was not acquired by Runner
+          # of type hosted even after multiple attempts".
+          while IFS=$'\t' read -r id conclusion name; do
+            [ -n "$id" ] || continue
+            reason=$(gh api "repos/$GITHUB_REPOSITORY/check-runs/$id/annotations" \
+              --jq '[.[] | select(.annotation_level == "failure") | .message | split("\n")[0]] | first // ""') || reason=""
+            echo "::error title=Release blocked::$name was $conclusion${reason:+: $reason}"
+            echo "- \`$name\`: $conclusion${reason:+ ($reason)}" >> "$GITHUB_STEP_SUMMARY"
+          done <<<"$jobs"
+          exit 1
+
+  publish:
+    needs:
+      - version
+      - preflight
+      - release-gate
+    # `!cancelled()` rather than the default `success()`: release-gate itself runs past a skipped
+    # sign-cli-windows, and a human cancelling the whole run must still stop publish.
+    if: github.repository == 'AxsionDev/Lunos' && !cancelled() && needs.release-gate.result == 'success'
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
 
@@ -519,13 +702,21 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
+      # XCOD-106: keyless Sigstore signing of SHA256SUMS and the SBOM (release-checksums.ts).
+      # Uses the workflow's OIDC token (`id-token: write` above); no key or certificate to hold.
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: "v3.1.3"
+
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: opencode-cli
           path: packages/opencode/dist
 
+      # XCOD-207: replace the unsigned darwin binaries and zips with sign-cli-macos's, so the npm
+      # platform packages and the Homebrew sha are built from the re-signed files.
       - name: Remove unsigned macOS CLI binaries
-        run: rm -rf packages/opencode/dist/opencode-darwin*
+        run: rm -rf packages/opencode/dist/lunos-darwin*
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -537,7 +728,12 @@ jobs:
           name: opencode-cli-windows
           path: packages/opencode/dist
 
+      # XCOD-49: only produced by sign-cli-windows. When that job skips the artifact does not
+      # exist and download-artifact errors, so gate on the same flag. The unsigned Windows
+      # binaries downloaded just above (opencode-cli-windows) stay in place instead — this
+      # download only overwrites them with signed equivalents when signing actually ran.
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: needs.preflight.outputs.sign_windows == 'true'
         with:
           name: opencode-cli-signed-windows
           path: packages/opencode/dist
@@ -556,7 +752,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         if: needs.version.outputs.release
         with:
-          pattern: opencode-desktop-*
+          pattern: lunos-desktop-*
           path: /tmp/desktop
           merge-multiple: true
 
@@ -599,6 +795,21 @@ jobs:
           fi
           gh release upload "v${{ needs.version.outputs.version }}" "${files[@]}" --clobber --repo "${{ needs.version.outputs.repo }}"
 
+      # XCOD-207: overwrite the unsigned darwin zips build-cli put on the draft. Must run before
+      # ./script/publish.ts, whose release-checksums.ts and offline-bundles.ts download the release
+      # assets to write SHA256SUMS and build the offline bundles.
+      - name: Upload re-signed macOS CLI release assets
+        if: needs.version.outputs.release
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ steps.committer.outputs.token }}
+        run: |
+          gh release upload "v${{ needs.version.outputs.version }}" \
+            packages/opencode/dist/lunos-darwin-arm64.zip \
+            packages/opencode/dist/lunos-darwin-x64.zip \
+            packages/opencode/dist/lunos-darwin-x64-baseline.zip \
+            --clobber --repo "${{ needs.version.outputs.repo }}"
+
       - run: ./script/publish.ts
         env:
           OPENCODE_VERSION: ${{ needs.version.outputs.version }}
@@ -607,6 +818,44 @@ jobs:
           GITHUB_TOKEN: ${{ steps.committer.outputs.token }}
           GH_REPO: ${{ needs.version.outputs.repo }}
           NPM_CONFIG_PROVENANCE: false
+          # XCOD-48: `registry-url` is set on setup-node above, which writes an .npmrc
+          # expecting NODE_AUTH_TOKEN — but nothing ever supplied it, so `npm publish`
+          # could never authenticate. Upstream relies on npm Trusted Publishing (OIDC);
+          # this fork uses an automation token instead. Empty until NPM_TOKEN is added
+          # as a repository secret, at which point publishing works with no further edit.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           LATEST_YML_DIR: /tmp/latest-yml
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      # XCOD-261: tell lunos.tech a release is out, so its changelog page is rebuilt from the tagged
+      # CHANGELOG.md instead of being edited by hand. Sends a `lunos-changelog` repository_dispatch to
+      # the repo in the CHANGELOG_DISPATCH_REPO variable (owner/name). GITHUB_TOKEN can't dispatch to
+      # another repository: CHANGELOG_DISPATCH_TOKEN is a fine-grained PAT with Contents read/write on
+      # that repo. Skipped, with a notice, while either is unset. The release is already public here,
+      # so a failed dispatch must not fail the run; changelog-drift.yml catches a site left behind.
+      - name: Notify the website of the release
+        if: needs.version.outputs.release && !startsWith(needs.version.outputs.version, '0.0.0-')
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          DISPATCH_REPO: ${{ vars.CHANGELOG_DISPATCH_REPO }}
+          DISPATCH_TOKEN: ${{ secrets.CHANGELOG_DISPATCH_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+          REPO: ${{ needs.version.outputs.repo }}
+        run: |
+          if [ -z "$DISPATCH_REPO" ] || [ -z "$DISPATCH_TOKEN" ]; then
+            echo "::notice title=Website not notified::Set the CHANGELOG_DISPATCH_REPO variable and the CHANGELOG_DISPATCH_TOKEN secret to update lunos.tech/changelog on release."
+            exit 0
+          fi
+          tag="v$VERSION"
+          body=$(jq -n --arg version "$VERSION" --arg tag "$tag" \
+            --arg url "https://raw.githubusercontent.com/$REPO/$tag/CHANGELOG.md" \
+            '{event_type: "lunos-changelog", client_payload: {version: $version, tag: $tag, changelog_url: $url}}')
+          curl --fail-with-body --silent --show-error --max-time 30 --retry 2 \
+            -X POST "https://api.github.com/repos/$DISPATCH_REPO/dispatches" \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d "$body"
+          echo "Sent lunos-changelog for $tag to $DISPATCH_REPO"

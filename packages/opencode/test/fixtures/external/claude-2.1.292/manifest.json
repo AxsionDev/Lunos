@@ -1,0 +1,26 @@
+{
+  "tool": "claude",
+  "version": "2.1.292",
+  "fake": false,
+  "scenarios": {
+    "start-models": {
+      "steps": [
+        {
+          "file": "start-models.1.jsonl",
+          "kind": "models",
+          "home": {
+            "added": [
+              ".claude/sessions/131.d2b53b292d0ade438ab8e65f59e548cf74cf89660b3caec5e05b88f99c31e6e6.key",
+              ".claude/sessions/131.json"
+            ],
+            "changed": [".claude.json"],
+            "removed": [
+              ".claude/sessions/86.86c1e0efaf7ef9a230ff75f9b9d3c7f7bcf176efa1f48c2c5bc3803a6882904e.key",
+              ".claude/sessions/86.json"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

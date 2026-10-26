@@ -25,6 +25,7 @@ import { useProject } from "./project"
 import { useEvent } from "./event"
 import { useSDK } from "./sdk"
 import { useTuiStartup } from "./runtime"
+import { StartupTrace } from "@opencode-ai/core/startup-trace"
 import { createSimpleContext } from "./helper"
 import { useExit } from "./exit"
 import { useArgs } from "./args"
@@ -32,6 +33,7 @@ import { batch, onMount } from "solid-js"
 import path from "path"
 import { useKV } from "./kv"
 import { usePermission } from "./permission"
+import { resolveApproval, rootSession, type ApprovalConfig } from "../util/approval"
 
 const emptyConsoleState: ConsoleState = {
   consoleManagedProviders: [],
@@ -63,6 +65,9 @@ export const {
   provider: SyncProvider,
 } = createSimpleContext({
   name: "Sync",
+  // XCOD-276: the home screen and prompt show before the server has answered; `ready` (and `status`)
+  // say when the data is in. A prompt sent before then waits for it (component/prompt).
+  blocking: false,
   init: () => {
     const startup = useTuiStartup()
     const kv = useKV()
@@ -157,6 +162,28 @@ export const {
       hydratingSessions.get(sessionID)?.parts.add(partID)
     }
 
+    /**
+     * XCOD-310: the approval mode an ask is answered under: that of the workflow the request's
+     * top-level session last ran (a subagent's asks follow it), in that session.
+     */
+    function approvalOf(sessionID: string) {
+      const root = rootSession(sessionID, (id) => {
+        const match = search(store.session, id, (s) => s.id)
+        return match.found ? store.session[match.index]?.parentID : undefined
+      })
+      const agent =
+        permission.workflow(root) ??
+        store.config.default_agent ??
+        store.agent.find((item) => item.mode !== "subagent" && !item.hidden)?.name
+      if (!agent) return permission.auto ? "auto" : "normal"
+      return resolveApproval({
+        agent,
+        stored: permission.choice(root, agent)?.approval,
+        config: store.config as ApprovalConfig,
+        auto: permission.auto,
+      }).mode
+    }
+
     function sessionListQuery(): { scope?: "project"; path?: string } {
       if (!kv.get("session_directory_filter_enabled", true)) return { scope: "project" }
       if (!project.data.instance.path.worktree || !project.data.instance.path.directory) return { scope: "project" }
@@ -195,7 +222,7 @@ export const {
 
         case "permission.asked": {
           const request = event.properties
-          if (permission.mode === "auto") {
+          if (approvalOf(request.sessionID) === "auto") {
             void sdk.client.permission.reply({
               requestID: request.id,
               reply: "once",
@@ -448,8 +475,12 @@ export const {
     const exit = useExit()
     const args = useArgs()
 
+    let traced = false
     async function bootstrap(input: { fatal?: boolean } = {}) {
       const fatal = input.fatal ?? true
+      // Only the first load is part of start-up; later ones (a reconnect) aren't traced.
+      const loaded = traced ? () => {} : StartupTrace.begin("load session data", { blocking: false })
+      traced = true
       const workspace = project.workspace.current()
       const projectPromise = project.sync()
       const sessionListPromise = projectPromise.then(() => listSessions())
@@ -515,6 +546,7 @@ export const {
           })
         })
         .then(() => {
+          loaded()
           if (store.status !== "complete") setStore("status", "partial")
           // non-blocking
           void Promise.all([

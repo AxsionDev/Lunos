@@ -4,6 +4,8 @@ import { client } from "./client.gen.js"
 import { buildClientParams, type Client, type Options as Options2, type TDataShape } from "./client/index.js"
 import type {
   AgentPartInput,
+  AgentSaveInput,
+  AgentsMigrateInput,
   AppAgentsErrors,
   AppAgentsResponses,
   AppLogErrors,
@@ -18,10 +20,20 @@ import type {
   CommandListErrors,
   CommandListResponses,
   Config as Config3,
+  ConfigAgentSaveErrors,
+  ConfigAgentSaveResponses,
+  ConfigAgentsErrors,
+  ConfigAgentsMigrateErrors,
+  ConfigAgentsMigrateResponses,
+  ConfigAgentsResponses,
   ConfigGetErrors,
   ConfigGetResponses,
   ConfigProvidersErrors,
   ConfigProvidersResponses,
+  ConfigSettingsErrors,
+  ConfigSettingsResponses,
+  ConfigSettingsSetErrors,
+  ConfigSettingsSetResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
   EventSubscribeResponses,
@@ -29,6 +41,14 @@ import type {
   EventTuiPromptAppend,
   EventTuiSessionSelect,
   EventTuiToastShow,
+  ExperimentalArtifactListErrors,
+  ExperimentalArtifactListResponses,
+  ExperimentalBackgroundCancelErrors,
+  ExperimentalBackgroundCancelResponses,
+  ExperimentalBackgroundListErrors,
+  ExperimentalBackgroundListResponses,
+  ExperimentalBudgetStatusErrors,
+  ExperimentalBudgetStatusResponses,
   ExperimentalCapabilitiesGetErrors,
   ExperimentalCapabilitiesGetResponses,
   ExperimentalConsoleGetErrors,
@@ -38,14 +58,82 @@ import type {
   ExperimentalConsoleSwitchOrgResponses,
   ExperimentalControlPlaneMoveSessionErrors,
   ExperimentalControlPlaneMoveSessionResponses,
+  ExperimentalExternalConfigCommandErrors,
+  ExperimentalExternalConfigCommandResponses,
+  ExperimentalExternalConfigErrors,
+  ExperimentalExternalConfigResponses,
+  ExperimentalExternalConsentErrors,
+  ExperimentalExternalConsentResponses,
+  ExperimentalExternalModeErrors,
+  ExperimentalExternalModelErrors,
+  ExperimentalExternalModelResponses,
+  ExperimentalExternalModelsErrors,
+  ExperimentalExternalModelsResponses,
+  ExperimentalExternalModeResponses,
+  ExperimentalExternalStopErrors,
+  ExperimentalExternalStopResponses,
+  ExperimentalExternalToolsErrors,
+  ExperimentalExternalToolsResponses,
+  ExperimentalPeerAsksErrors,
+  ExperimentalPeerAsksResponses,
+  ExperimentalPeerPermissionReplyErrors,
+  ExperimentalPeerPermissionReplyResponses,
+  ExperimentalPeerPromptErrors,
+  ExperimentalPeerPromptResponses,
+  ExperimentalPeerQuestionRejectErrors,
+  ExperimentalPeerQuestionRejectResponses,
+  ExperimentalPeerQuestionReplyErrors,
+  ExperimentalPeerQuestionReplyResponses,
+  ExperimentalPeerStopErrors,
+  ExperimentalPeerStopResponses,
   ExperimentalProjectCopyGenerateNameErrors,
   ExperimentalProjectCopyGenerateNameResponses,
+  ExperimentalProjectGroupAddErrors,
+  ExperimentalProjectGroupAddResponses,
+  ExperimentalProjectGroupCreateErrors,
+  ExperimentalProjectGroupCreateResponses,
+  ExperimentalProjectGroupListErrors,
+  ExperimentalProjectGroupListResponses,
+  ExperimentalProjectGroupMoveErrors,
+  ExperimentalProjectGroupMoveResponses,
+  ExperimentalProjectGroupRemoveErrors,
+  ExperimentalProjectGroupRemoveResponses,
+  ExperimentalProjectGroupUpdateErrors,
+  ExperimentalProjectGroupUpdateResponses,
   ExperimentalResourceListErrors,
   ExperimentalResourceListResponses,
   ExperimentalSessionBackgroundErrors,
   ExperimentalSessionBackgroundResponses,
+  ExperimentalSessionBulkArchiveErrors,
+  ExperimentalSessionBulkArchiveResponses,
+  ExperimentalSessionBulkDeleteErrors,
+  ExperimentalSessionBulkDeleteResponses,
+  ExperimentalSessionBulkPreviewErrors,
+  ExperimentalSessionBulkPreviewResponses,
+  ExperimentalSessionBulkStopErrors,
+  ExperimentalSessionBulkStopResponses,
+  ExperimentalSessionBulkUnarchiveErrors,
+  ExperimentalSessionBulkUnarchiveResponses,
+  ExperimentalSessionEnqueueErrors,
+  ExperimentalSessionEnqueueResponses,
+  ExperimentalSessionGroupCreateErrors,
+  ExperimentalSessionGroupCreateResponses,
+  ExperimentalSessionGroupDeleteErrors,
+  ExperimentalSessionGroupDeleteResponses,
+  ExperimentalSessionGroupListErrors,
+  ExperimentalSessionGroupListResponses,
+  ExperimentalSessionGroupMoveErrors,
+  ExperimentalSessionGroupMoveResponses,
+  ExperimentalSessionGroupUpdateErrors,
+  ExperimentalSessionGroupUpdateResponses,
   ExperimentalSessionListErrors,
   ExperimentalSessionListResponses,
+  ExperimentalSessionOverviewErrors,
+  ExperimentalSessionOverviewResponses,
+  ExperimentalSessionQueuedErrors,
+  ExperimentalSessionQueuedResponses,
+  ExperimentalSessionTakeoverErrors,
+  ExperimentalSessionTakeoverResponses,
   ExperimentalWorkspaceAdapterListErrors,
   ExperimentalWorkspaceAdapterListResponses,
   ExperimentalWorkspaceCreateErrors,
@@ -76,6 +164,8 @@ import type {
   FindTextResponses,
   FormatterStatusErrors,
   FormatterStatusResponses,
+  GlobalAccountGetErrors,
+  GlobalAccountGetResponses,
   GlobalConfigGetErrors,
   GlobalConfigGetResponses,
   GlobalConfigUpdateErrors,
@@ -91,8 +181,14 @@ import type {
   InstanceDisposeErrors,
   InstanceDisposeResponses,
   LocationRef,
+  LspLogErrors,
+  LspLogResponses,
+  LspServersErrors,
+  LspServersResponses,
   LspStatusErrors,
   LspStatusResponses,
+  LspStopErrors,
+  LspStopResponses,
   McpAddErrors,
   McpAddResponses,
   McpAuthAuthenticateErrors,
@@ -111,6 +207,49 @@ import type {
   McpRemoteConfig,
   McpStatusErrors,
   McpStatusResponses,
+  MemoryExportErrors,
+  MemoryExportInput,
+  MemoryExportResponses,
+  MemoryForgetErrors,
+  MemoryForgetResponses,
+  MemoryImportApplyInput,
+  MemoryImportErrors,
+  MemoryImportInput,
+  MemoryImportPreviewErrors,
+  MemoryImportPreviewResponses,
+  MemoryImportResponses,
+  MemoryListErrors,
+  MemoryListResponses,
+  MemoryOutdateErrors,
+  MemoryOutdateResponses,
+  MemoryRelatedErrors,
+  MemoryRelatedResponses,
+  MemorySetupBackendErrors,
+  MemorySetupBackendResponses,
+  MemorySetupCheckErrors,
+  MemorySetupCheckResponses,
+  MemorySetupEnvironmentErrors,
+  MemorySetupEnvironmentResponses,
+  MemorySetupInput,
+  MemorySetupMoveErrors,
+  MemorySetupMoveResponses,
+  MemorySetupTemplateApplyErrors,
+  MemorySetupTemplateApplyResponses,
+  MemorySetupTemplateInput,
+  MemorySetupTemplatePreviewErrors,
+  MemorySetupTemplatePreviewResponses,
+  MemorySetupTemplateStartErrors,
+  MemorySetupTemplateStartResponses,
+  MemorySetupTestErrors,
+  MemorySetupTestResponses,
+  MemoryStatsErrors,
+  MemoryStatsResponses,
+  MemoryStorageGetErrors,
+  MemoryStorageGetResponses,
+  MemoryStorageStartErrors,
+  MemoryStorageStartResponses,
+  MemoryStorageTestErrors,
+  MemoryStorageTestResponses,
   ModelRef,
   MoveSessionDestination,
   OutputFormat,
@@ -145,6 +284,8 @@ import type {
   PromptInput,
   ProviderAuthErrors,
   ProviderAuthResponses,
+  ProviderConfiguredErrors,
+  ProviderConfiguredResponses,
   ProviderListErrors,
   ProviderListResponses,
   ProviderOauthAuthorizeErrors,
@@ -168,6 +309,7 @@ import type {
   PtyUpdateErrors,
   PtyUpdateResponses,
   QuestionAnswer,
+  QuestionDrafts,
   QuestionListErrors,
   QuestionListResponses,
   QuestionRejectErrors,
@@ -175,6 +317,12 @@ import type {
   QuestionReplyErrors,
   QuestionReplyResponses,
   QuestionV2Reply,
+  ResourceContextErrors,
+  ResourceContextResponses,
+  ResourceExcludeErrors,
+  ResourceExcludeResponses,
+  ResourceListErrors,
+  ResourceListResponses,
   SessionAbortErrors,
   SessionAbortResponses,
   SessionChildrenErrors,
@@ -207,6 +355,9 @@ import type {
   SessionPromptResponses,
   SessionRevertErrors,
   SessionRevertResponses,
+  SessionShareConsoleErrors,
+  SessionShareConsoleInput,
+  SessionShareConsoleResponses,
   SessionShareErrors,
   SessionShareResponses,
   SessionShellErrors,
@@ -223,6 +374,7 @@ import type {
   SessionUnshareResponses,
   SessionUpdateErrors,
   SessionUpdateResponses,
+  SettingsSetInput,
   SubtaskPartInput,
   SyncHistoryListErrors,
   SyncHistoryListResponses,
@@ -884,6 +1036,1588 @@ export class Session extends HeyApiClient {
       ...params,
     })
   }
+
+  /**
+   * Sessions overview
+   *
+   * Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups. Archived sessions are left out; with archived=true only they are listed, however old.
+   */
+  public overview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      archived?: boolean | "true" | "false"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "archived" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalSessionOverviewResponses,
+      ExperimentalSessionOverviewErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-overview",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Send a prompt to a session from the Agent Monitor
+   *
+   * Run a prompt as the session's next turn: now when it is idle, after the current turn when it is busy (or now, stopping the turn, with interrupt), or as the answer to its one open question. A prompt never answers a permission request. Refused when another Lunos process runs the session; use experimental.peer.prompt.
+   */
+  public enqueue<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      text?: string
+      interrupt?: boolean
+      via?: "local" | "peer"
+      model?: {
+        providerID: string
+        modelID: string
+      }
+      variant?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "text" },
+            { in: "body", key: "interrupt" },
+            { in: "body", key: "via" },
+            { in: "body", key: "model" },
+            { in: "body", key: "variant" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionEnqueueResponses,
+      ExperimentalSessionEnqueueErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/enqueue",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Take over a session whose Lunos stopped
+   *
+   * Run a session here whose Lunos process stopped, after the user confirmed it. The prompts that process had queued for it are sent first, in order (queued: send), or dropped (queued: discard); then text, if given. Refused while another Lunos runs the session, or while the process that queued them still exists. Audited as session.takeover, without the text.
+   */
+  public takeover<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      queued?: "send" | "discard"
+      text?: string
+      origin?: "monitor" | "session"
+      request?: {
+        kind: "prompt" | "command" | "shell"
+        body: {
+          [key: string]: unknown
+        }
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "queued" },
+            { in: "body", key: "text" },
+            { in: "body", key: "origin" },
+            { in: "body", key: "request" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionTakeoverResponses,
+      ExperimentalSessionTakeoverErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/takeover",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Prompts held for a session
+   *
+   * How many prompts a Lunos process that stopped still holds for the session (orphaned), and how many any Lunos holds (held, which deleting the session also deletes); never their text. While any are orphaned, a prompt typed in the session asks to take it over first (experimental.session.takeover).
+   */
+  public queued<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalSessionQueuedResponses,
+      ExperimentalSessionQueuedErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/queued",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Artifact extends HeyApiClient {
+  /**
+   * List artifacts
+   *
+   * List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      kind?: "plan" | "research" | "dev-cycle"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "kind" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalArtifactListResponses,
+      ExperimentalArtifactListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/artifact",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Background extends HeyApiClient {
+  /**
+   * List background subagents
+   *
+   * List subagent jobs with status, elapsed time, agent and resolved model. Pass sessionID to list only that session's jobs.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalBackgroundListResponses,
+      ExperimentalBackgroundListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Cancel a background subagent
+   *
+   * Cancel a running background subagent job and its child session.
+   */
+  public cancel<ThrowOnError extends boolean = false>(
+    parameters: {
+      jobID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "jobID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalBackgroundCancelResponses,
+      ExperimentalBackgroundCancelErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background/{jobID}/cancel",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class SessionBulk extends HeyApiClient {
+  /**
+   * Stop sessions
+   *
+   * Stop several sessions at once: Lunos sessions here or in another Lunos on this machine, and Claude Code / Codex sessions. Pending approvals are rejected with the reason first. Audited as session.stop.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      reason?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "reason" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkStopResponses,
+      ExperimentalSessionBulkStopErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/stop",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Archive sessions
+   *
+   * Hide sessions from every list without deleting anything. Running and waiting sessions are skipped unless stop is set, which stops them first. Audited as session.archive.
+   */
+  public archive<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      stop?: boolean
+      reason?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "stop" },
+            { in: "body", key: "reason" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkArchiveResponses,
+      ExperimentalSessionBulkArchiveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/archive",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Unarchive sessions
+   *
+   * Put archived sessions back in the lists. Audited as session.archive (unarchive).
+   */
+  public unarchive<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkUnarchiveResponses,
+      ExperimentalSessionBulkUnarchiveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/unarchive",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete sessions
+   *
+   * Delete sessions and their history for good: messages, subagent sessions and queued prompts. By default only archived sessions (others are skipped); archivedOnly false reaches listed ones too. Running ones are stopped first with stop, or skipped. A share link is removed first, and the synced copy on Lunos Cloud is deleted unless keepCloud. Audited as session.delete.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      archivedOnly?: boolean
+      stop?: boolean
+      keepCloud?: boolean
+      origin?: "single" | "bulk"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "archivedOnly" },
+            { in: "body", key: "stop" },
+            { in: "body", key: "keepCloud" },
+            { in: "body", key: "origin" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkDeleteResponses,
+      ExperimentalSessionBulkDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/delete",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview deleting sessions
+   *
+   * For each session: its message, subagent and queued-prompt counts, whether it's shared, the console shares made from it (revoked when it's deleted), and the external tool that keeps its own history. Changes nothing.
+   */
+  public preview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionBulkPreviewResponses,
+      ExperimentalSessionBulkPreviewErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-bulk/preview",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class SessionGroup extends HeyApiClient {
+  /**
+   * List session groups
+   *
+   * List the session groups on this machine.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalSessionGroupListResponses,
+      ExperimentalSessionGroupListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create session group
+   *
+   * Create a session group, with an optional colour (#rrggbb).
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      name?: string
+      color?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "color" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionGroupCreateResponses,
+      ExperimentalSessionGroupCreateErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Move sessions to a group
+   *
+   * Put sessions in a group, taking them out of any other group. Without a groupID they go back to Ungrouped.
+   */
+  public move<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      groupID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "groupID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionGroupMoveResponses,
+      ExperimentalSessionGroupMoveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group/move",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Delete session group
+   *
+   * Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      ExperimentalSessionGroupDeleteResponses,
+      ExperimentalSessionGroupDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group/{groupID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update session group
+   *
+   * Rename, recolour (an empty colour clears it), collapse or expand a session group.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+      name?: string
+      color?: string
+      collapsed?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "color" },
+            { in: "body", key: "collapsed" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<
+      ExperimentalSessionGroupUpdateResponses,
+      ExperimentalSessionGroupUpdateErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session-group/{groupID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Budget extends HeyApiClient {
+  /**
+   * Budget status
+   *
+   * Where the budgets of this directory's (or the session's) project stand, and, for a session, the estimate of its next turn as the prompt shows it.
+   */
+  public status<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalBudgetStatusResponses,
+      ExperimentalBudgetStatusErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/budget",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class ProjectGroup extends HeyApiClient {
+  /**
+   * List projects
+   *
+   * The named projects on this computer (archived ones marked), and the project this directory belongs to: a named project, or its repository project.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalProjectGroupListResponses,
+      ExperimentalProjectGroupListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create project
+   *
+   * Create a named project grouping folders (absolute paths), kept on this computer only.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      name?: string
+      folders?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "folders" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalProjectGroupCreateResponses,
+      ExperimentalProjectGroupCreateErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Move sessions to a project
+   *
+   * Count sessions in another project. Without a projectID they go back to the project of their directory.
+   */
+  public move<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionIDs?: Array<string>
+      projectID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionIDs" },
+            { in: "body", key: "projectID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalProjectGroupMoveResponses,
+      ExperimentalProjectGroupMoveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group/move",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Update project
+   *
+   * Rename a named project, or archive it (archived: true) or bring it back (archived: false).
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+      name?: string
+      archived?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "archived" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<
+      ExperimentalProjectGroupUpdateResponses,
+      ExperimentalProjectGroupUpdateErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group/{groupID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Add folders to a project
+   *
+   * Add folders (absolute paths) to a named project. A folder another live project has is refused.
+   */
+  public add<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+      folders?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "folders" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalProjectGroupAddResponses,
+      ExperimentalProjectGroupAddErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group/{groupID}/folders",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Remove folders from a project
+   *
+   * Remove folders from a named project. Its sessions there go back to their repository's project.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      groupID: string
+      directory?: string
+      workspace?: string
+      folders?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "groupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "folders" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalProjectGroupRemoveResponses,
+      ExperimentalProjectGroupRemoveErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/project-group/{groupID}/folders/remove",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class External extends HeyApiClient {
+  /**
+   * External tools
+   *
+   * Whether Claude Code and Codex CLI can be started from Lunos here: installed, signed in, and allowed by external.enabled and the residency policy. Asking doesn't audit anything.
+   */
+  public tools<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalExternalToolsResponses,
+      ExperimentalExternalToolsErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/tools",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Stop an external session
+   *
+   * Stop a running Claude Code or Codex session Lunos started (as lunos external stop), from any Lunos process on this machine.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalStopResponses,
+      ExperimentalExternalStopErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/stop",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * External session models
+   *
+   * The models Claude Code or Codex offers for an external session, asked from the tool without a prompt (no model is called), and the one chosen for the session.
+   */
+  public models<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalExternalModelsResponses,
+      ExperimentalExternalModelsErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/models",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Choose an external session's model
+   *
+   * Save the model Claude Code or Codex uses in an external session from its next turn on (resumes included). Omit it to go back to the tool's default.
+   */
+  public model<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      model?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "model" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalModelResponses,
+      ExperimentalExternalModelErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/model",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Switch an external session's permission mode
+   *
+   * Claude Code's permission mode for an external session, as Shift+Tab cycles it in the tool: the running turn switches now (set_permission_mode) and later turns start in it. Modes that skip approvals are refused. Omit it to go back to external.claude.permission_mode.
+   */
+  public mode<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      mode?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "mode" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalModeResponses,
+      ExperimentalExternalModeErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/mode",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Share Lunos with Claude Code or Codex
+   *
+   * Whether Lunos's MCP servers, skills and memory are offered to Claude Code or Codex sessions in this project (share), never offered without asking (never), or asked about in the next session (ask). Kept on this machine, never in config. Audited as external.consent.
+   */
+  public consent<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      tool?: "claude" | "codex"
+      answer?: "share" | "never" | "ask"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "tool" },
+            { in: "body", key: "answer" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalConsentResponses,
+      ExperimentalExternalConsentErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/consent",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Claude Code or Codex configuration
+   *
+   * Claude Code's or Codex's own configuration as the installed tool reports it (model, permissions, instruction files, MCP servers, hooks, agents or profiles), with the layer and file each comes from where the tool says. No prompt is sent and the user's hooks don't run. Refused like starting a session under external.enabled and the residency policy. Secrets are never returned.
+   */
+  public config<ThrowOnError extends boolean = false>(
+    parameters: {
+      tool: "claude" | "codex"
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "tool" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalExternalConfigResponses,
+      ExperimentalExternalConfigErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/config/{tool}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Change Claude Code or Codex configuration with its own command
+   *
+   * Add or remove an MCP server with the tool's own command (claude mcp add -s …, codex mcp remove …). With run false, returns the exact command and the file it changes, and runs nothing; with run true, runs it and returns the tool's output. Lunos never writes the tool's files itself. Audited as external.config.
+   */
+  public configCommand<ThrowOnError extends boolean = false>(
+    parameters: {
+      tool: "claude" | "codex"
+      directory?: string
+      workspace?: string
+      action?: "mcp.add" | "mcp.remove"
+      name?: string
+      scope?: string
+      target?: string
+      run?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "tool" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "action" },
+            { in: "body", key: "name" },
+            { in: "body", key: "scope" },
+            { in: "body", key: "target" },
+            { in: "body", key: "run" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalConfigCommandResponses,
+      ExperimentalExternalConfigCommandErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/config/{tool}/command",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Peer extends HeyApiClient {
+  /**
+   * Stop a session another Lunos runs
+   *
+   * Stop a session that another Lunos process on this machine is running, through that process.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerStopResponses,
+      ExperimentalPeerStopErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/stop",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * What a session another Lunos runs is waiting for
+   *
+   * The pending permission requests and questions of a session another Lunos process on this machine runs.
+   */
+  public asks<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalPeerAsksResponses,
+      ExperimentalPeerAsksErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/asks",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Answer a permission request in another Lunos
+   *
+   * Answer a permission request of a session another Lunos process on this machine runs. That process checks and audits the answer.
+   */
+  public permissionReply<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      requestID: string
+      directory?: string
+      workspace?: string
+      reply?: "once" | "always" | "reject"
+      message?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "requestID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "reply" },
+            { in: "body", key: "message" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerPermissionReplyResponses,
+      ExperimentalPeerPermissionReplyErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/permission/{requestID}/reply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Answer a question in another Lunos
+   *
+   * Answer a question of a session another Lunos process on this machine runs.
+   */
+  public questionReply<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      requestID: string
+      directory?: string
+      workspace?: string
+      answers?: Array<QuestionAnswer>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "requestID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "answers" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerQuestionReplyResponses,
+      ExperimentalPeerQuestionReplyErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/question/{requestID}/reply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Dismiss a question in another Lunos
+   *
+   * Dismiss a question of a session another Lunos process on this machine runs.
+   */
+  public questionReject<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      requestID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "requestID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerQuestionRejectResponses,
+      ExperimentalPeerQuestionRejectErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/question/{requestID}/reject",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Send a prompt to a session another Lunos runs
+   *
+   * Send a prompt to a session that another Lunos process on this machine runs. That process runs it, with its own agent, policy and audit, as experimental.session.enqueue does.
+   */
+  public prompt<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      text?: string
+      interrupt?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "text" },
+            { in: "body", key: "interrupt" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerPromptResponses,
+      ExperimentalPeerPromptErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/prompt",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
 }
 
 export class Resource extends HeyApiClient {
@@ -1261,6 +2995,46 @@ export class Experimental extends HeyApiClient {
     return (this._session ??= new Session({ client: this.client }))
   }
 
+  private _artifact?: Artifact
+  get artifact(): Artifact {
+    return (this._artifact ??= new Artifact({ client: this.client }))
+  }
+
+  private _background?: Background
+  get background(): Background {
+    return (this._background ??= new Background({ client: this.client }))
+  }
+
+  private _sessionBulk?: SessionBulk
+  get sessionBulk(): SessionBulk {
+    return (this._sessionBulk ??= new SessionBulk({ client: this.client }))
+  }
+
+  private _sessionGroup?: SessionGroup
+  get sessionGroup(): SessionGroup {
+    return (this._sessionGroup ??= new SessionGroup({ client: this.client }))
+  }
+
+  private _budget?: Budget
+  get budget(): Budget {
+    return (this._budget ??= new Budget({ client: this.client }))
+  }
+
+  private _projectGroup?: ProjectGroup
+  get projectGroup(): ProjectGroup {
+    return (this._projectGroup ??= new ProjectGroup({ client: this.client }))
+  }
+
+  private _external?: External
+  get external(): External {
+    return (this._external ??= new External({ client: this.client }))
+  }
+
+  private _peer?: Peer
+  get peer(): Peer {
+    return (this._peer ??= new Peer({ client: this.client }))
+  }
+
   private _resource?: Resource
   get resource(): Resource {
     return (this._resource ??= new Resource({ client: this.client }))
@@ -1315,6 +3089,20 @@ export class Config extends HeyApiClient {
   }
 }
 
+export class Account extends HeyApiClient {
+  /**
+   * Get the Lunos account's state
+   *
+   * Whether this machine was told the Lunos account is disabled, with the reason category and the end date. Reads this machine's record only.
+   */
+  public get<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalAccountGetResponses, GlobalAccountGetErrors, ThrowOnError>({
+      url: "/global/account",
+      ...options,
+    })
+  }
+}
+
 export class Global extends HeyApiClient {
   /**
    * Get health
@@ -1353,9 +3141,9 @@ export class Global extends HeyApiClient {
   }
 
   /**
-   * Upgrade opencode
+   * Upgrade Lunos
    *
-   * Upgrade opencode to the specified version.
+   * Upgrade Lunos to the specified version, or to the latest release when no target is given.
    */
   public upgrade<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1379,6 +3167,11 @@ export class Global extends HeyApiClient {
   private _config?: Config
   get config(): Config {
     return (this._config ??= new Config({ client: this.client }))
+  }
+
+  private _account?: Account
+  get account(): Account {
+    return (this._account ??= new Account({ client: this.client }))
   }
 }
 
@@ -1480,6 +3273,179 @@ export class Config2 extends HeyApiClient {
         ...params.headers,
       },
     })
+  }
+
+  /**
+   * List settings
+   *
+   * Every configuration option generated from the config schema, with its current value (secrets masked), the layer it came from, whether organisation policy locks it, the loaded config files and 30-day usage.
+   */
+  public settings<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ConfigSettingsResponses, ConfigSettingsErrors, ThrowOnError>({
+      url: "/config/settings",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Change one setting
+   *
+   * Validate one setting against the config schema and write it to the user or project config, keeping comments. Refuses keys locked by organisation policy.
+   */
+  public settingsSet<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      settingsSetInput?: SettingsSetInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "settingsSetInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<ConfigSettingsSetResponses, ConfigSettingsSetErrors, ThrowOnError>({
+      url: "/config/settings",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * List agents for editing
+   *
+   * Every agent, built-ins included, with the markdown file that defines it and that file's text when Lunos can edit it (XCOD-210).
+   */
+  public agents<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ConfigAgentsResponses, ConfigAgentsErrors, ThrowOnError>({
+      url: "/config/agents",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Save an agent's file
+   *
+   * Validate an edited agent file against the models, tools, skills and MCP servers available here and write it. Nothing is written if anything is wrong.
+   */
+  public agentSave<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      agentSaveInput?: AgentSaveInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "agentSaveInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).put<ConfigAgentSaveResponses, ConfigAgentSaveErrors, ThrowOnError>({
+      url: "/config/agents",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Migrate deprecated agent keys
+   *
+   * Rewrite one scope's deprecated agent config without losing values: top-level `mode` moves under `agent`, `tools` becomes `permission` and `maxSteps` becomes `steps` (XCOD-215).
+   */
+  public agentsMigrate<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      agentsMigrateInput?: AgentsMigrateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "agentsMigrateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ConfigAgentsMigrateResponses, ConfigAgentsMigrateErrors, ThrowOnError>(
+      {
+        url: "/config/agents/migrate",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
   }
 
   /**
@@ -2214,6 +4180,107 @@ export class Lsp extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<LspStatusResponses, LspStatusErrors, ThrowOnError>({
       url: "/lsp",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List LSP servers
+   *
+   * XCOD-257: every built-in and custom language server with its state (running, starting, failed with the reason, not started, off), source, PID and diagnostics count, and whether LSP and downloads are on.
+   */
+  public servers<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<LspServersResponses, LspServersErrors, ThrowOnError>({
+      url: "/lsp/servers",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Stop or restart an LSP server
+   *
+   * Stops the server's running clients. With restart, a recorded failure is forgotten too, so the next matching file starts it again.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      serverID: string
+      directory?: string
+      workspace?: string
+      restart?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "serverID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "restart" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<LspStopResponses, LspStopErrors, ThrowOnError>({
+      url: "/lsp/{serverID}/stop",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * LSP server log
+   *
+   * The last 200 lines the server wrote to stderr in this session.
+   */
+  public log<ThrowOnError extends boolean = false>(
+    parameters: {
+      serverID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "serverID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<LspLogResponses, LspLogErrors, ThrowOnError>({
+      url: "/lsp/{serverID}/log",
       ...options,
       ...params,
     })
@@ -3059,6 +5126,7 @@ export class Question extends HeyApiClient {
       requestID: string
       directory?: string
       workspace?: string
+      drafts?: QuestionDrafts
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3070,12 +5138,811 @@ export class Question extends HeyApiClient {
             { in: "path", key: "requestID" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "body", key: "drafts" },
           ],
         },
       ],
     )
     return (options?.client ?? this.client).post<QuestionRejectResponses, QuestionRejectErrors, ThrowOnError>({
       url: "/question/{requestID}/reject",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Storage extends HeyApiClient {
+  /**
+   * Memory storage
+   *
+   * What memory uses now: on this computer, a database in Docker, a team database or a managed cloud database, the template that set it up, and its live status. Credentials are never included, only the names of the environment variables or files they come from.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryStorageGetResponses, MemoryStorageGetErrors, ThrowOnError>({
+      url: "/memory/storage",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Test the memory storage
+   *
+   * For a database: connect, write, read and delete a probe. On this computer: the memory check (remember, recall and remove a test fact). Never touches stored facts.
+   */
+  public test<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryStorageTestResponses, MemoryStorageTestErrors, ThrowOnError>({
+      url: "/memory/storage/test",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Start the memory database container
+   *
+   * Start the stopped Docker or Podman container of the memory template in use.
+   */
+  public start<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryStorageStartResponses, MemoryStorageStartErrors, ThrowOnError>({
+      url: "/memory/storage/start",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Setup extends HeyApiClient {
+  /**
+   * Check a memory database
+   *
+   * Run the checks Lunos makes before connecting to an external memory database (URL, TLS, credentials by reference, jurisdiction against the residency policy) on a proposed memory block. Connects to nothing.
+   */
+  public backend<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupBackendResponses, MemorySetupBackendErrors, ThrowOnError>({
+      url: "/memory/setup/backend",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Memory storage facts
+   *
+   * What the storage step shows about this machine: the memory paths, the model that extracts facts and its region, whether Docker or Podman is installed, local model providers, and the memory templates to offer (built-in and from managed config).
+   */
+  public environment<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      MemorySetupEnvironmentResponses,
+      MemorySetupEnvironmentErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/environment",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Test a memory database connection
+   *
+   * Run the checks Lunos makes before connecting, then connect, write, read and delete a probe in a namespace of its own. Never touches stored facts.
+   */
+  public test<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupTestResponses, MemorySetupTestErrors, ThrowOnError>({
+      url: "/memory/setup/test",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview a memory template
+   *
+   * Everything a memory template would write, in full, without writing it. A generated password is shown masked.
+   */
+  public templatePreview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplatePreviewResponses,
+      MemorySetupTemplatePreviewErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/preview",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Write a memory template's files
+   *
+   * Write a Docker template's compose file, .env (0600, holding the generated password) and .env.example. An existing file is replaced only when named in overwrite. Starts nothing.
+   */
+  public templateApply<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplateApplyResponses,
+      MemorySetupTemplateApplyErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/apply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Start a memory template's database
+   *
+   * Run docker compose up -d for a written Docker template, then wait up to two minutes for its healthcheck. Call only after the user confirmed the command.
+   */
+  public templateStart<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupTemplateInput?: MemorySetupTemplateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupTemplateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      MemorySetupTemplateStartResponses,
+      MemorySetupTemplateStartErrors,
+      ThrowOnError
+    >({
+      url: "/memory/setup/template/start",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Move facts to new memory storage
+   *
+   * Switching storage, "Move my facts": export every fact from the storage in use now and import it into the proposed one, keeping each fact's provenance. The old copy is left as it is.
+   */
+  public move<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupMoveResponses, MemorySetupMoveErrors, ThrowOnError>({
+      url: "/memory/setup/move",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Check memory works
+   *
+   * Remember, recall and remove a test fact with a proposed memory block, in a separate Lunos process (memory settings apply on restart). The first run downloads the engine's packages and embedding model.
+   */
+  public check<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memorySetupInput?: MemorySetupInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memorySetupInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemorySetupCheckResponses, MemorySetupCheckErrors, ThrowOnError>({
+      url: "/memory/setup/check",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Memory extends HeyApiClient {
+  /**
+   * Memory analytics
+   *
+   * What's in memory, where it came from, how it grows and which facts are recalled, computed locally from the ledger and the local audit log. Never starts memory; `days` limits the time-based figures (default: all).
+   */
+  public stats<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      scope?: "project" | "user"
+      days?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "scope" },
+            { in: "query", key: "days" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryStatsResponses, MemoryStatsErrors, ThrowOnError>({
+      url: "/memory/stats",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List memory
+   *
+   * List facts in long-term memory with where each came from. Does not start memory.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryListResponses, MemoryListErrors, ThrowOnError>({
+      url: "/memory",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Fact connections
+   *
+   * Entities and relationships in the memory graph around one fact.
+   */
+  public related<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<MemoryRelatedResponses, MemoryRelatedErrors, ThrowOnError>({
+      url: "/memory/{id}/related",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Export memory
+   *
+   * Export long-term memory as a versioned bundle (facts, graph, notes, provenance), or as one Markdown file per fact.
+   */
+  public export<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryExportInput?: MemoryExportInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryExportInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryExportResponses, MemoryExportErrors, ThrowOnError>({
+      url: "/memory/export",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Preview a memory import
+   *
+   * Read and verify a bundle, Markdown or another agent's memory file, screen every fact with the write guard, and show each as new, duplicate, conflict or rejected. Writes nothing.
+   */
+  public importPreview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryImportInput?: MemoryImportInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryImportInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryImportPreviewResponses, MemoryImportPreviewErrors, ThrowOnError>(
+      {
+        url: "/memory/import/preview",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  /**
+   * Import memory
+   *
+   * Import the approved rows of a preview. The input is read, verified and screened again; only rows named in accept are written.
+   */
+  public import<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      memoryImportApplyInput?: MemoryImportApplyInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "memoryImportApplyInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryImportResponses, MemoryImportErrors, ThrowOnError>({
+      url: "/memory/import",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Mark a fact outdated
+   *
+   * Mark a fact as no longer true, optionally replaced by another. It is kept, but no longer recalled.
+   */
+  public outdate<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+      by?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "by" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryOutdateResponses, MemoryOutdateErrors, ThrowOnError>({
+      url: "/memory/{id}/outdate",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Forget a fact
+   *
+   * Remove one fact from long-term memory.
+   */
+  public forget<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<MemoryForgetResponses, MemoryForgetErrors, ThrowOnError>({
+      url: "/memory/{id}/forget",
+      ...options,
+      ...params,
+    })
+  }
+
+  private _storage?: Storage
+  get storage(): Storage {
+    return (this._storage ??= new Storage({ client: this.client }))
+  }
+
+  private _setup?: Setup
+  get setup(): Setup {
+    return (this._setup ??= new Setup({ client: this.client }))
+  }
+}
+
+export class Resource2 extends HeyApiClient {
+  /**
+   * List project resources
+   *
+   * The project's resources with mode, scope, size and index status. Doesn't index anything.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResourceListResponses, ResourceListErrors, ThrowOnError>({
+      url: "/resource",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Exclude a resource for a session
+   *
+   * Leave a resource out of one session's context, or put it back.
+   */
+  public exclude<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+      name?: string
+      excluded?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionID" },
+            { in: "body", key: "name" },
+            { in: "body", key: "excluded" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ResourceExcludeResponses, ResourceExcludeErrors, ThrowOnError>({
+      url: "/resource/exclude",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Context breakdown
+   *
+   * What the session's last turn sent as context, in estimated tokens: system prompt, instructions, Always resources, memory, attachments and searched resources.
+   */
+  public context<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      workspace?: string
+      sessionID: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ResourceContextResponses, ResourceContextErrors, ThrowOnError>({
+      url: "/resource/context",
       ...options,
       ...params,
     })
@@ -3318,6 +6185,36 @@ export class Provider extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<ProviderListResponses, ProviderListErrors, ThrowOnError>({
       url: "/provider",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List configured providers
+   *
+   * List the providers with a stored credential or loaded from the environment or config, with auth method, status and jurisdiction. Never includes secrets.
+   */
+  public configured<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ProviderConfiguredResponses, ProviderConfiguredErrors, ThrowOnError>({
+      url: "/provider/configured",
       ...options,
       ...params,
     })
@@ -4042,6 +6939,47 @@ export class Session2 extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  /**
+   * Share session with your organisation
+   *
+   * Upload the session to your organisation's Lunos console (with "share": "cloud"), as lunos share does: the residency policy is checked first and the upload is recorded in the audit log.
+   */
+  public shareConsole<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      sessionShareConsoleInput?: SessionShareConsoleInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "sessionShareConsoleInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionShareConsoleResponses, SessionShareConsoleErrors, ThrowOnError>(
+      {
+        url: "/session/{sessionID}/share/console",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
   }
 
   /**
@@ -7180,6 +10118,16 @@ export class OpencodeClient extends HeyApiClient {
   private _question?: Question
   get question(): Question {
     return (this._question ??= new Question({ client: this.client }))
+  }
+
+  private _memory?: Memory
+  get memory(): Memory {
+    return (this._memory ??= new Memory({ client: this.client }))
+  }
+
+  private _resource?: Resource2
+  get resource(): Resource2 {
+    return (this._resource ??= new Resource2({ client: this.client }))
   }
 
   private _permission?: Permission

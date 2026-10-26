@@ -1,0 +1,613 @@
+export * as ExternalCodex from "./codex"
+
+import { spawn, type ChildProcess } from "child_process"
+import { createInterface } from "readline"
+import { ExternalDetect } from "./detect"
+import type { ExternalClaude } from "./claude"
+import { ExternalNative } from "./native"
+
+/**
+ * XCOD-204: drive the user's own Codex CLI through `codex app-server`, its JSON-RPC protocol
+ * over stdio. Unlike `codex exec`, the app server sends each approval it needs to the client
+ * (`item/fileChange/requestApproval`, `item/commandExecution/requestApproval`), so Lunos answers
+ * them. Recorded from Codex 0.160.1 into test/external/fixtures/codex-app-server.jsonl:
+ *
+ *   host → initialize { clientInfo }  ·  initialized
+ *   host → thread/start { cwd, model?, approvalPolicy, sandbox }  (or thread/resume { threadId })
+ *   host → turn/start { threadId, input: [{ type: "text", text }] }
+ *   tool → item/started / item/completed / thread/tokenUsage/updated / turn/completed
+ *   tool → item/…/requestApproval (a request, with an id)   host → { id, result: { decision } }
+ *
+ * XCOD-292: also read, for showing the turn as Codex does (schema excerpt in
+ * test/fixtures/external/codex-0.160.1/render-items.json): `turn/plan/updated` (its plan),
+ * `collabAgentToolCall` and `subAgentActivity` items (its subagents), and `thread/tokenUsage/updated`'s
+ * last call and window (the context in use).
+ *
+ * The app server is marked experimental by OpenAI; `lunos external list` reports the version.
+ * Codex reports tokens, not money, so a session's cost is "not reported".
+ */
+
+/** Safe default: read-only, and ask for anything not known safe, so every edit and command asks. */
+export const SAFE_SANDBOX = "read-only"
+export const SAFE_APPROVAL = "untrusted"
+const SANDBOXES = ["read-only", "workspace-write", "danger-full-access"]
+const APPROVALS = ["untrusted", "on-request", "never"]
+/** Settings that skip approval or the sandbox. Only used when given explicitly for one run. */
+export const UNSAFE = new Set(["danger-full-access", "never"])
+
+export type Event = ExternalClaude.Event
+export type PermissionRequest = ExternalClaude.PermissionRequest
+export type PermissionDecision = ExternalClaude.PermissionDecision
+
+export interface Options {
+  cwd: string
+  prompt: string
+  /** A thread id to continue. */
+  resume?: string
+  model?: string
+  sandbox?: string
+  approvalPolicy?: string
+  allowUnsafe?: boolean
+  executable?: string
+  /**
+   * XCOD-254: config overrides for the thread (`config` on thread/start and thread/resume, Codex's
+   * `-c` keys), which carry the Lunos bridge. Every turn after the first resumes in a fresh app
+   * server, so it's sent on both. A Codex that refuses them runs the turn without (`onConfigRefused`).
+   */
+  config?: Record<string, unknown>
+  onConfigRefused?: (message: string) => void
+  ask: (request: PermissionRequest) => Promise<PermissionDecision>
+  onEvent?: (event: Event) => void
+}
+
+export class UnsafeModeError extends Error {
+  override name = "ExternalUnsafeMode"
+}
+
+/** The thread settings to send, after checking them. */
+export function settings(options: Pick<Options, "sandbox" | "approvalPolicy" | "allowUnsafe">) {
+  const sandbox = options.sandbox ?? SAFE_SANDBOX
+  const approvalPolicy = options.approvalPolicy ?? SAFE_APPROVAL
+  if (!SANDBOXES.includes(sandbox)) throw new Error(`"${sandbox}" isn't a Codex sandbox (${SANDBOXES.join(", ")})`)
+  if (!APPROVALS.includes(approvalPolicy))
+    throw new Error(`"${approvalPolicy}" isn't a Codex approval policy (${APPROVALS.join(", ")})`)
+  for (const value of [sandbox, approvalPolicy])
+    if (UNSAFE.has(value) && !options.allowUnsafe)
+      throw new UnsafeModeError(
+        `"${value}" skips Codex's approvals or sandbox. Pass it explicitly for this run (--permission-mode ${value} --unsafe) if you mean it.`,
+      )
+  return { sandbox, approvalPolicy }
+}
+
+export class UnsupportedCommandError extends Error {
+  override name = "ExternalUnsupportedCommand"
+}
+
+/**
+ * Codex's own slash commands belong to its TUI; the app server has no prompt-level `/` parsing.
+ * The ones it can run headless have their own methods, so Lunos maps them (recorded from 0.160.1):
+ *
+ *   /review                  → review/start { target: uncommittedChanges }
+ *   /review base <branch>    → review/start { target: baseBranch }
+ *   /review commit <sha>     → review/start { target: commit }
+ *   /review <instructions>   → review/start { target: custom }
+ *   /compact                 → thread/compact/start (a resumed session only)
+ *
+ * Any other `/name` is refused before Codex starts, rather than sent to the model as text.
+ */
+export const COMMANDS = ["/review", "/compact"]
+
+export type Turn =
+  | { method: "turn/start"; params: { input: { type: "text"; text: string }[] } }
+  | { method: "review/start"; params: { target: Record<string, string>; delivery: "inline" } }
+  | { method: "thread/compact/start"; params: {} }
+
+export function command(prompt: string, resuming: boolean): Turn {
+  const match = /^\/([a-z][\w:-]*)(?:\s+([\s\S]*))?$/.exec(prompt.trim())
+  if (!match) return { method: "turn/start", params: { input: [{ type: "text", text: prompt }] } }
+  const [, name, rest = ""] = match
+  const arg = rest.trim()
+  if (name === "review") {
+    const [kind, value, ...more] = arg.split(/\s+/)
+    const target: Record<string, string> = !arg
+      ? { type: "uncommittedChanges" }
+      : kind === "base" && value && !more.length
+        ? { type: "baseBranch", branch: value }
+        : kind === "commit" && value && !more.length
+          ? { type: "commit", sha: value }
+          : { type: "custom", instructions: arg }
+    return { method: "review/start", params: { target, delivery: "inline" } }
+  }
+  if (name === "compact") {
+    if (!resuming)
+      throw new UnsupportedCommandError(
+        "/compact compacts an existing Codex session: lunos external resume codex <session> /compact",
+      )
+    return { method: "thread/compact/start", params: {} }
+  }
+  throw new UnsupportedCommandError(
+    `Codex can't run /${name} without its TUI. Supported here: ${COMMANDS.join(", ")}. Anything else, ask in words.`,
+  )
+}
+
+/** The models in a `model/list` page (`data`: `{ id, model, displayName, description, isDefault }`). */
+export function parseModels(result: unknown): ExternalClaude.Model[] {
+  const body = result as { data?: unknown; models?: unknown } | undefined
+  const list = Array.isArray(body?.data) ? body.data : Array.isArray(body?.models) ? body.models : []
+  return list.flatMap((item: any) => {
+    const id = item?.model ?? item?.id
+    if (typeof id !== "string" || !id) return []
+    return [
+      {
+        id,
+        name: String(item.displayName ?? item.display_name ?? id),
+        ...(typeof item.description === "string" && item.description ? { description: item.description } : {}),
+        ...(item.isDefault === true || item.is_default === true ? { default: true } : {}),
+      },
+    ]
+  })
+}
+
+/**
+ * A short-lived `codex app-server` for questions that start no turn (models, configuration): JSON-RPC
+ * requests over stdio, answered by id. `close` stops it; `exited` resolves when it ends on its own.
+ */
+export function appServer(options: { executable: string; cwd: string }) {
+  const cmd = ExternalDetect.command(options.executable, ["app-server"])
+  const child = spawn(cmd.file, cmd.args, {
+    cwd: options.cwd,
+    shell: cmd.shell,
+    env: ExternalDetect.environment(),
+    stdio: ["pipe", "pipe", "ignore"],
+  })
+  child.stdin?.on("error", () => undefined)
+  const write = (message: unknown) => {
+    if (child.stdin && !child.stdin.destroyed) child.stdin.write(JSON.stringify(message) + "\n")
+  }
+  let nextID = 0
+  const waiting = new Map<number, (message: any) => void>()
+  const request = (method: string, params: unknown) =>
+    new Promise<any>((resolve, reject) => {
+      const id = ++nextID
+      waiting.set(id, (message) =>
+        message.error ? reject(new Error(message.error.message ?? method)) : resolve(message.result),
+      )
+      write({ id, method, params })
+    })
+  createInterface({ input: child.stdout! }).on("line", (line) => {
+    let message: any
+    try {
+      message = JSON.parse(line)
+    } catch {
+      return
+    }
+    if (message.id === undefined || message.method) return
+    waiting.get(message.id)?.(message)
+    waiting.delete(message.id)
+  })
+  const exited = new Promise<void>((resolve) => {
+    child.on("error", () => resolve())
+    child.on("close", () => resolve())
+  })
+  /** initialize, then the `initialized` notification; resolves with initialize's result. */
+  const initialize = async () => {
+    const result = await request("initialize", { clientInfo: { name: "lunos", version: "1" } })
+    write({ method: "initialized" })
+    return result
+  }
+  return { child, request, initialize, exited, close: () => child.kill() }
+}
+
+/**
+ * XCOD-254: the models this Codex offers, from the app server's `model/list` (a few pages at most).
+ * No thread is started, so no model is called. Empty when it doesn't list them in time.
+ */
+export function models(options: { executable: string; cwd: string; timeoutMs?: number }) {
+  const server = appServer(options)
+  const list = async () => {
+    await server.initialize()
+    const result: ExternalClaude.Model[] = []
+    let cursor: string | undefined
+    for (let page = 0; page < 5; page++) {
+      const response = await server.request("model/list", cursor ? { cursor } : {})
+      result.push(...parseModels(response))
+      cursor = response?.nextCursor ?? undefined
+      if (!cursor) break
+    }
+    return result
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<ExternalClaude.Model[]>((resolve) => {
+    timer = setTimeout(() => resolve([]), options.timeoutMs ?? 15_000)
+  })
+  const exited = server.exited.then((): ExternalClaude.Model[] => [])
+  return Promise.race([list().catch(() => []), timeout, exited]).finally(() => {
+    clearTimeout(timer)
+    server.close()
+  })
+}
+
+const APPROVAL_METHODS: Record<string, string> = {
+  "item/fileChange/requestApproval": "FileChange",
+  "item/commandExecution/requestApproval": "Bash",
+  "item/permissions/requestApproval": "Permissions",
+}
+
+/**
+ * XCOD-285: the decisions Codex's app server takes for a command or file-change approval, from the
+ * protocol schema 0.160.1 generates (`codex app-server generate-json-schema`, kept in
+ * test/fixtures/external/codex-0.160.1/approval-decisions.json): accept, acceptForSession, decline
+ * (the turn carries on) and cancel (the turn stops). Its execpolicy and network-policy amendments are
+ * left out: they persist into Codex's own config, which Lunos never has it change on its own.
+ */
+export const DECISIONS = ["accept", "acceptForSession", "decline", "cancel"] as const
+
+/** The wire decision for a Lunos answer. */
+export function decision(answer: PermissionDecision): (typeof DECISIONS)[number] {
+  if (answer.allow) return answer.always ? "acceptForSession" : "accept"
+  return answer.interrupt ? "cancel" : "decline"
+}
+
+const ALLOW = /^(allow|accept|approve|yes|run)\b/i
+const DECLINE = /^(decline|deny|reject|cancel|no)\b/i
+/** Options that would also approve later calls, which only the user can choose in Lunos. */
+const STANDING = /session|always|remember|don't ask/i
+
+/**
+ * XCOD-254: Codex asking to approve an MCP server's tool call, the Lunos bridge's included. Not in
+ * the recorded fixtures and not verified against 0.160.1: shaped on the app server's v2 protocol as
+ * far as it's known, which has it in one of two forms:
+ *
+ *   mcpServer/elicitation/request { serverName, request: { message, _meta: { codex_approval_kind: "mcp_tool_call" } } }
+ *     → { action: "accept" | "decline", content }
+ *   item/tool/requestUserInput { itemId, questions: [{ id: "mcp_tool_call_approval…", options: [{ label }] }] }
+ *     → { answers: { <id>: { answers: [<label>] } } }
+ *
+ * Before, both were refused as unknown requests, which would decline every call to the bridge. Any
+ * other elicitation or question is still refused, as is a question whose options can't be read.
+ */
+export function mcpApproval(method: string, params: any, items: Map<string, any>) {
+  const running = (server?: string) =>
+    [...items.values()].findLast(
+      (item) => item?.type === "mcpToolCall" && item.status !== "completed" && (!server || item.server === server),
+    )
+  if (method === "mcpServer/elicitation/request") {
+    const request = params.request ?? {}
+    const meta = request._meta ?? params._meta
+    if (meta?.codex_approval_kind !== "mcp_tool_call") return undefined
+    const item = items.get(params.itemId) ?? running(params.serverName) ?? {}
+    return {
+      tool: `mcp__${params.serverName ?? item.server ?? "unknown"}__${meta.tool_name ?? item.tool ?? "unknown"}`,
+      input: (meta.tool_params ?? item.arguments ?? {}) as Record<string, unknown>,
+      description: typeof request.message === "string" ? request.message : undefined,
+      itemID: item.id ?? params.itemId,
+      reply: (allow: boolean) => (allow ? { action: "accept", content: {} } : { action: "decline", content: null }),
+    }
+  }
+  if (method === "item/tool/requestUserInput") {
+    const questions: any[] = Array.isArray(params.questions) ? params.questions : []
+    if (!questions.length || !questions.every((q) => String(q?.id ?? "").startsWith("mcp_tool_call_approval")))
+      return undefined
+    const pick = (question: any, pattern: RegExp) =>
+      (Array.isArray(question.options) ? question.options : [])
+        .map((option: any) => String(option?.label ?? ""))
+        .find((label: string) => pattern.test(label) && !STANDING.test(label))
+    if (!questions.every((q) => pick(q, ALLOW) && pick(q, DECLINE))) return undefined
+    const item = items.get(params.itemId) ?? running() ?? {}
+    return {
+      tool: `mcp__${item.server ?? "unknown"}__${item.tool ?? "unknown"}`,
+      input: (item.arguments ?? {}) as Record<string, unknown>,
+      description: questions.map((q) => q.question).find((text) => typeof text === "string"),
+      itemID: item.id ?? params.itemId,
+      reply: (allow: boolean) => ({
+        answers: Object.fromEntries(questions.map((q) => [q.id, { answers: [pick(q, allow ? ALLOW : DECLINE)] }])),
+      }),
+    }
+  }
+  return undefined
+}
+
+export interface Running {
+  child: ChildProcess
+  done: Promise<Extract<Event, { type: "result" }> | Extract<Event, { type: "error" }>>
+  stop: () => void
+}
+
+export function start(options: Options): Running {
+  const executable = options.executable ?? ExternalDetect.locate("codex")
+  if (!executable) throw new Error(`Codex CLI isn't installed. ${ExternalDetect.TOOLS.codex.install}`)
+  const thread = settings(options)
+  if (options.resume !== undefined && !/^[A-Za-z0-9_-]+$/.test(options.resume))
+    throw new Error(`"${options.resume}" isn't a Codex thread id`)
+  const first = command(options.prompt, options.resume !== undefined)
+  const cmd = ExternalDetect.command(executable, ["app-server"])
+  const child = spawn(cmd.file, cmd.args, {
+    cwd: options.cwd,
+    shell: cmd.shell,
+    env: ExternalDetect.environment(),
+    stdio: ["pipe", "pipe", "pipe"],
+  })
+  let stderr = ""
+  child.stderr?.on("data", (chunk) => (stderr += chunk))
+  const write = (message: unknown) => {
+    if (child.stdin && !child.stdin.destroyed) child.stdin.write(JSON.stringify(message) + "\n")
+  }
+  let nextID = 0
+  const waiting = new Map<number, (message: any) => void>()
+  const request = (method: string, params: unknown) =>
+    new Promise<any>((resolve, reject) => {
+      const id = ++nextID
+      waiting.set(id, (message) =>
+        message.error ? reject(new Error(message.error.message ?? method)) : resolve(message.result),
+      )
+      write({ id, method, params })
+    })
+
+  // Items in flight, so an approval request can say what it's for (the request only names the item).
+  const items = new Map<string, any>()
+  let threadID = options.resume ?? ""
+  let turnID = ""
+  let lastText = ""
+  let tokens: number | undefined
+  /** XCOD-292: plan updates in this turn (each is its own checklist, as Codex shows each update). */
+  let plans = 0
+  /** XCOD-292: subagent activity items already shown (shown once, whichever of started/completed comes). */
+  const activity = new Set<string>()
+  const denied: { tool: string; id: string }[] = []
+
+  const showActivity = (item: any) => {
+    const input = ExternalNative.codexAgentActivity(item)
+    if (!input || activity.has(item.id)) return
+    activity.add(item.id)
+    options.onEvent?.({ type: "tool", id: item.id, name: "Agent", input, progress: true })
+    options.onEvent?.({
+      type: "tool_result",
+      id: item.id,
+      isError: false,
+      output: `${input.agent ?? "agent"} ${input.activity}`,
+    })
+  }
+
+  const done = new Promise<Extract<Event, { type: "result" }> | Extract<Event, { type: "error" }>>((resolve) => {
+    let settled = false
+    const finish = (event: Extract<Event, { type: "result" }> | Extract<Event, { type: "error" }>) => {
+      if (settled) return
+      settled = true
+      options.onEvent?.(event)
+      child.stdin?.end()
+      resolve(event)
+    }
+
+    createInterface({ input: child.stdout! }).on("line", (line) => {
+      let message: any
+      try {
+        message = JSON.parse(line)
+      } catch {
+        return
+      }
+      // A response to one of our requests.
+      if (message.id !== undefined && !message.method) {
+        const handler = waiting.get(message.id)
+        waiting.delete(message.id)
+        handler?.(message)
+        return
+      }
+      const params = message.params ?? {}
+      // A request from Codex: an approval.
+      if (message.id !== undefined && APPROVAL_METHODS[message.method]) {
+        const item = items.get(params.itemId) ?? {}
+        const tool = APPROVAL_METHODS[message.method]
+        const input: Record<string, unknown> =
+          tool === "Bash"
+            ? { command: params.command ?? item.command }
+            : { file_path: item.changes?.map((change: any) => change.path).join(", "), changes: item.changes }
+        const permission: PermissionRequest = {
+          requestID: String(message.id),
+          tool,
+          input,
+          description: params.reason ?? undefined,
+          toolUseID: params.itemId,
+          decisions: [...DECISIONS],
+        }
+        void options
+          .ask(permission)
+          .catch((error: unknown) => ({ allow: false as const, message: String(error) }))
+          .then((answer) => {
+            if (!answer.allow) denied.push({ tool, id: params.itemId })
+            write({ id: message.id, result: { decision: decision(answer) } })
+          })
+        return
+      }
+      // XCOD-254: an MCP tool call's approval, asked in Lunos like the others.
+      const mcp = message.id !== undefined ? mcpApproval(message.method, params, items) : undefined
+      if (mcp) {
+        const permission: PermissionRequest = {
+          requestID: String(message.id),
+          tool: mcp.tool,
+          input: mcp.input,
+          description: mcp.description,
+          toolUseID: mcp.itemID,
+        }
+        void options
+          .ask(permission)
+          .catch((error: unknown) => ({ allow: false as const, message: String(error) }))
+          .then((decision) => {
+            if (!decision.allow) denied.push({ tool: mcp.tool, id: mcp.itemID })
+            write({ id: message.id, result: mcp.reply(decision.allow) })
+          })
+        return
+      }
+      if (message.id !== undefined) {
+        // Any other request we don't handle: refuse it rather than leave Codex waiting.
+        write({ id: message.id, error: { code: -32601, message: `Lunos doesn't handle ${message.method}` } })
+        return
+      }
+      switch (message.method) {
+        // Every way of starting a turn announces it here; /compact's response doesn't carry its id.
+        case "turn/started":
+          turnID = params.turn?.id ?? turnID
+          return
+        case "item/started": {
+          const item = params.item ?? {}
+          items.set(item.id, item)
+          if (item.type === "commandExecution")
+            options.onEvent?.({ type: "tool", id: item.id, name: "Bash", input: { command: item.command } })
+          if (item.type === "fileChange")
+            options.onEvent?.({ type: "tool", id: item.id, name: "FileChange", input: { changes: item.changes } })
+          // XCOD-292: one agent asking another (spawn, send input, wait, close, …), from the 0.160.1 schema.
+          if (item.type === "collabAgentToolCall")
+            options.onEvent?.({
+              type: "tool",
+              id: item.id,
+              name: "Agent",
+              input: ExternalNative.codexAgentCall(item),
+              progress: true,
+            })
+          if (item.type === "subAgentActivity") showActivity(item)
+          // XCOD-254: an MCP server's tool, the Lunos bridge's included (v2 `mcpToolCall`; not recorded).
+          if (item.type === "mcpToolCall")
+            options.onEvent?.({
+              type: "tool",
+              id: item.id,
+              name: `mcp__${item.server}__${item.tool}`,
+              input: item.arguments ?? {},
+            })
+          return
+        }
+        case "item/completed": {
+          const item = params.item ?? {}
+          items.set(item.id, item)
+          if (item.type === "agentMessage" && item.text) {
+            lastText = item.text
+            options.onEvent?.({ type: "text", text: item.text })
+          }
+          if (item.type === "collabAgentToolCall") {
+            const agents = ExternalNative.codexAgentStates(item)
+            options.onEvent?.({
+              type: "tool_result",
+              id: item.id,
+              isError: item.status === "failed",
+              output: agents
+                .map((agent) => `${agent.id}: ${agent.status}${agent.message ? ` (${agent.message})` : ""}`)
+                .join("\n"),
+              ...(agents.length ? { metadata: { agents } } : {}),
+            })
+          }
+          if (item.type === "subAgentActivity") showActivity(item)
+          // Compaction says nothing itself, so the result would otherwise be empty.
+          if (item.type === "contextCompaction" && !lastText) lastText = "Codex compacted the session."
+          if (item.type === "mcpToolCall")
+            options.onEvent?.({
+              type: "tool_result",
+              id: item.id,
+              isError: item.status !== "completed" || !!item.error,
+              output: item.error?.message ?? JSON.stringify(item.result?.content ?? item.result ?? ""),
+            })
+          if (item.type === "commandExecution" || item.type === "fileChange")
+            options.onEvent?.({
+              type: "tool_result",
+              id: item.id,
+              isError: item.status !== "completed",
+              output: String(item.aggregatedOutput ?? item.status ?? ""),
+            })
+          return
+        }
+        case "thread/tokenUsage/updated": {
+          tokens = params.tokenUsage?.total?.totalTokens ?? tokens
+          // XCOD-292: the context in use is the last call's tokens, out of the model's window (when given).
+          const used = params.tokenUsage?.last?.totalTokens
+          const window = params.tokenUsage?.modelContextWindow
+          if (typeof used === "number" && used > 0)
+            options.onEvent?.({
+              type: "context",
+              used,
+              ...(typeof window === "number" && window > 0 ? { window } : {}),
+            })
+          return
+        }
+        // XCOD-292: Codex's plan, as a checklist each time it updates it (schema: TurnPlanUpdatedNotification).
+        case "turn/plan/updated": {
+          const plan = ExternalNative.codexPlan(params)
+          if (!plan) return
+          const id = `plan-${params.turnId ?? turnID}-${++plans}`
+          options.onEvent?.({ type: "tool", id, name: "Plan", input: plan, progress: true })
+          options.onEvent?.({
+            type: "tool_result",
+            id,
+            isError: false,
+            output: plan.todos.map((todo) => `[${todo.status === "completed" ? "x" : " "}] ${todo.content}`).join("\n"),
+          })
+          return
+        }
+        case "turn/completed": {
+          const turn = params.turn ?? {}
+          finish({
+            type: "result",
+            ok: turn.status === "completed",
+            subtype: turn.status ?? "unknown",
+            text: lastText || (turn.error?.message ?? ""),
+            sessionID: threadID,
+            costUSD: undefined,
+            turns: 1,
+            tokens,
+            denied,
+          })
+          return
+        }
+      }
+    })
+    child.on("error", (error) => finish({ type: "error", message: error.message }))
+    child.on("close", (code) =>
+      finish({
+        type: "error",
+        message: `Codex exited (${code ?? "signal"}) without finishing the turn${stderr.trim() ? `: ${stderr.trim().slice(-500)}` : ""}`,
+      }),
+    )
+
+    void (async () => {
+      try {
+        await request("initialize", { clientInfo: { name: "lunos", version: "1" } })
+        write({ method: "initialized" })
+        const common = { cwd: options.cwd, ...thread, ...(options.model ? { model: options.model } : {}) }
+        const open = (config?: Record<string, unknown>) =>
+          options.resume
+            ? request("thread/resume", { threadId: options.resume, ...common, ...(config ? { config } : {}) })
+            : request("thread/start", { ...common, ...(config ? { config } : {}) })
+        const started = options.config
+          ? await open(options.config).catch((error: unknown) => {
+              // Not an error for the turn: it runs as it would without the bridge.
+              options.onConfigRefused?.(error instanceof Error ? error.message : String(error))
+              return open()
+            })
+          : await open()
+        threadID = started?.thread?.id ?? threadID
+        // XCOD-285: the /commands this adapter can run through the app server (its review/start and
+        // thread/compact/start methods, recorded from 0.160.1); Codex's other TUI commands aren't offered.
+        options.onEvent?.({
+          type: "init",
+          sessionID: threadID,
+          model: started?.model,
+          tools: [],
+          commands: COMMANDS.map((item) => item.slice(1)),
+        })
+        const turn = await request(first.method, { threadId: threadID, ...first.params })
+        turnID = turn?.turn?.id ?? turnID
+      } catch (error) {
+        finish({
+          type: "error",
+          message: `Codex refused the session: ${error instanceof Error ? error.message : String(error)}`,
+        })
+      }
+    })()
+  })
+
+  return {
+    child,
+    done,
+    stop: () => {
+      if (threadID && turnID)
+        write({ id: ++nextID, method: "turn/interrupt", params: { threadId: threadID, turnId: turnID } })
+      setTimeout(() => child.kill("SIGINT"), 2000).unref?.()
+    },
+  }
+}

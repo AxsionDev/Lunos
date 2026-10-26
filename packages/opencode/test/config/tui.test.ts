@@ -154,6 +154,8 @@ it.instance("resolves attention config defaults and overrides", () =>
         volume: 0.4,
         sound_pack: "opencode.default",
         sounds: {},
+        notify_when: "blurred",
+        notify_subagents: false,
       })
 
       yield* fs.writeJson(path.join(test.directory, "tui.json"), {
@@ -168,7 +170,13 @@ it.instance("resolves attention config defaults and overrides", () =>
             question: pathToFileURL(path.join(test.directory, "question.mp3")).href,
             error: "./error.mp3",
             subagent_done: "./subagent-done.mp3",
+            // XCOD-311: bundled sound IDs and "none" aren't files next to tui.json.
+            permission: "alert-04",
+            done: "yup-02",
+            waiting: "none",
           },
+          notify_when: "always",
+          notify_subagents: true,
         },
       })
 
@@ -183,7 +191,12 @@ it.instance("resolves attention config defaults and overrides", () =>
           question: path.join(test.directory, "question.mp3"),
           error: path.join(test.directory, "error.mp3"),
           subagent_done: path.join(test.directory, "subagent-done.mp3"),
+          permission: "alert-04",
+          done: "yup-02",
+          waiting: "none",
         },
+        notify_when: "always",
+        notify_subagents: true,
       })
     }),
   ),
@@ -465,6 +478,44 @@ it.instance("ignores unknown keybind names without dropping valid overrides from
       const config = yield* getTuiConfig(test.directory)
       expect(config.keybinds.get("session.delete")?.[0]?.key).toBe("ctrl+d")
       expect(config.keybinds.get("not_a_real_keybind")).toEqual([])
+    }),
+  ),
+)
+
+// XCOD-130 / XCOD-40: a legacy keybind name in a user's tui.json must survive the loader
+// (unknown-key drop + schema decode) so the TUI can resolve it onto the renamed command.
+it.instance("keeps a legacy provider_connect keybind working as provider.list, and reports it deprecated", () =>
+  withCleanState(
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const test = yield* TestInstance
+      yield* fs.writeJson(path.join(Global.Path.config, "tui.json"), {
+        keybinds: { provider_connect: "ctrl+k", agent_list: "ctrl+y", not_a_real_keybind: "ctrl+q" },
+      })
+
+      const config = yield* getTuiConfig(test.directory)
+      expect(config.keybinds.get("provider.list")?.[0]?.key).toBe("ctrl+k")
+      expect(config.keybinds.get("mode.list")?.[0]?.key).toBe("ctrl+y")
+      expect(config.keybinds.get("not_a_real_keybind")).toEqual([])
+      expect(config.deprecatedKeybinds).toEqual([
+        { legacy: "agent_list", canonical: "mode_list" },
+        { legacy: "provider_connect", canonical: "provider_list" },
+      ])
+    }),
+  ),
+)
+
+// XCOD-129: /restart has an optional keybind, unbound until tui.json sets app_restart.
+it.instance("app_restart is unbound by default and binds app.restart from tui.json", () =>
+  withCleanState(
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const test = yield* TestInstance
+      const before = yield* getTuiConfig(test.directory)
+      expect(before.keybinds.get("app.restart")).toEqual([])
+      yield* fs.writeJson(path.join(Global.Path.config, "tui.json"), { keybinds: { app_restart: "<leader>r" } })
+      const config = yield* getTuiConfig(test.directory)
+      expect(config.keybinds.get("app.restart").length).toBe(1)
     }),
   ),
 )

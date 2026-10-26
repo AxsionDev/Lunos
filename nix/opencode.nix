@@ -62,7 +62,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   installPhase = ''
     runHook preInstall
 
-    install -Dm755 dist/opencode-*/bin/opencode $out/bin/opencode
+    # XCOD-49: the rebrand renamed the dist directories opencode-* -> lunos-*; the binary inside
+    # each one is still called `opencode`. This glob matched nothing until it was repointed.
+    install -Dm755 dist/lunos-*/bin/opencode $out/bin/opencode
     install -Dm644 schema.json $out/share/opencode/schema.json
 
     wrapProgram $out/bin/opencode \

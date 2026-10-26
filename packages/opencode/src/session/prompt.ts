@@ -27,12 +27,14 @@ import * as Stream from "effect/Stream"
 import { Command } from "../command"
 import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
+import { ConfigPolicy } from "@/config/policy"
 import { ConfigMarkdown } from "@/config/markdown"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
+import { backgroundEnabled } from "@/background/enabled"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { Shell } from "@opencode-ai/core/shell"
@@ -44,17 +46,35 @@ import { decodeDataUrl } from "@/util/data-url"
 import { Process } from "@/util/process"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { InstanceState } from "@/effect/instance-state"
-import { TaskTool, type TaskPromptOps } from "@/tool/task"
+import { TaskTool, DEFAULT_MAX_PARALLEL, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { TuiEvent } from "@/server/tui-event"
 import { Database } from "@opencode-ai/core/database/database"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { eq } from "drizzle-orm"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
+import { AutoContinue } from "./auto-continue"
+import { DevCycle } from "./dev-cycle"
+import { DynamicWorkflows } from "./workflows"
+import { BackgroundJob } from "@/background/job"
+import { Memory } from "@/memory"
+import { MemorySources } from "@/memory/sources"
+import { Resource } from "@/resource"
+import type { ResourceCore } from "@/resource/resource"
+import { Token } from "@/util/token"
+import { Skill } from "@/skill"
+import { Question } from "@/question"
 import { SessionTools } from "./tools"
+import { SandboxGuard } from "@/sandbox/guard"
+import { RunBudget } from "@/agent/run-budget"
+import { Budget } from "@/budget"
+import { CloudDisabled } from "@/cloud/disabled"
+import { BUDGET_TOAST_TITLE } from "@opencode-ai/tui/util/budget-toast"
+import { ExternalSession } from "@/external/session"
 import { LLMEvent } from "@opencode-ai/llm"
 
 // @ts-ignore
@@ -78,6 +98,77 @@ IMPORTANT:
 - The input must be valid JSON matching the required schema
 - Complete all necessary research and tool calls BEFORE calling this tool
 - This tool provides your final answer - no further actions are taken after calling it`
+
+import BUILD_PROOF from "./prompt/build-proof.txt"
+import QA_PROOF from "./prompt/qa-proof.txt"
+import { BackgroundShell } from "@/tool/shell/background"
+
+type VerifyConfig = {
+  build?: string
+  test?: string
+  start?: string
+  ready?: string
+  check?: readonly string[]
+  max_attempts?: number
+  timeout?: number
+}
+
+/** XCOD-288: the checks a project pins in `verify`, one line each. */
+export function verifyChecks(verify: VerifyConfig | undefined) {
+  const v = verify ?? {}
+  return [
+    v.build ? `- build: \`${v.build}\`` : undefined,
+    v.test ? `- test: \`${v.test}\`` : undefined,
+    v.start ? `- start (in the background): \`${v.start}\`` : undefined,
+    v.ready ? `- ready when this answers: ${v.ready}` : undefined,
+    ...(v.check ?? []).map((check) => `- check: ${check}`),
+  ].filter((line): line is string => line !== undefined)
+}
+
+/**
+ * XCOD-288: the build agent finishes with proof (it builds, tests, starts and tries what it changed)
+ * rather than asking the user to test. Not for other agents, not where the shell is denied, and not
+ * when `agent.build.verify` is false. Commands pinned in `verify` replace what it would look up.
+ * XCOD-303: nor in a Dynamic workflow, where the main agent has no shell and `qa` verifies instead.
+ */
+export function buildProof(
+  agent: { name: string; permission: PermissionV1.Ruleset },
+  session?: PermissionV1.Ruleset,
+  cfg: { verify?: VerifyConfig; agent?: Record<string, { verify?: boolean } | undefined> } = {},
+  dynamic = false,
+) {
+  if (agent.name !== "build" || dynamic) return
+  if (cfg.agent?.[agent.name]?.verify === false) return
+  const ruleset = Permission.merge(agent.permission, session ?? [])
+  if (Permission.disabled([ShellID.ToolID], ruleset).has(ShellID.ToolID)) return
+  const verify = cfg.verify ?? {}
+  const pinned = verifyChecks(verify)
+  return BUILD_PROOF.replace(
+    "${pinned}",
+    pinned.length ? `\n\nThis project pins these; use them instead of looking for your own:\n${pinned.join("\n")}` : "",
+  )
+    .replace("${attempts}", String(verify.max_attempts ?? 3))
+    .replace("${minutes}", String(verify.timeout ?? 10))
+}
+
+/**
+ * XCOD-303: the `qa` subagent verifies the same way and ends with the same Verification block, but
+ * reports a failure rather than fixing it. Not where its shell is denied.
+ */
+export function qaProof(
+  agent: { name: string; permission: PermissionV1.Ruleset },
+  session?: PermissionV1.Ruleset,
+  cfg: { verify?: VerifyConfig } = {},
+) {
+  if (agent.name !== "qa") return
+  if (Permission.disabled([ShellID.ToolID], Permission.merge(agent.permission, session ?? [])).has(ShellID.ToolID))
+    return
+  const pinned = verifyChecks(cfg.verify)
+  return QA_PROOF.replace(
+    "${pinned}",
+    pinned.length ? `\n\nThis project pins these; use them instead of looking for your own:\n${pinned.join("\n")}` : "",
+  )
+}
 
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
@@ -138,6 +229,12 @@ const layer = Layer.effect(
     const sys = yield* SystemPrompt.Service
     const llm = yield* LLM.Service
     const events = yield* EventV2Bridge.Service
+    const memory = yield* Memory.Service
+    const memorySources = yield* MemorySources.Service
+    const resources = yield* Resource.Service
+    const skill = yield* Skill.Service
+    const question = yield* Question.Service
+    const jobs = yield* BackgroundJob.Service
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
     const { db } = database
@@ -197,13 +294,16 @@ const layer = Layer.effect(
       modelID: ModelV2.ID
     }) {
       if (input.session.parentID) return
+      // XCOD-308: a name the user gave is never replaced.
+      if (Session.titleSource(input.session) === "user") return
       if (!Session.isDefaultTitle(input.session.title)) return
 
       const real = (m: SessionV1.WithParts) =>
         m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic)
       const idx = input.history.findIndex(real)
       if (idx === -1) return
-      if (input.history.filter(real).length !== 1) return
+      // Only on the first prompt, unless the user cleared the name (then on the next turn).
+      if (input.history.filter(real).length !== 1 && !Session.titleReset(input.session)) return
 
       const context = input.history.slice(0, idx + 1)
       const firstUser = context[idx]
@@ -248,7 +348,8 @@ const layer = Layer.effect(
       if (!cleaned) return
       const t = cleaned.length > 100 ? cleaned.substring(0, 97) + "..." : cleaned
       yield* sessions
-        .setTitle({ sessionID: input.session.id, title: t })
+        // Only over the title it started from: a rename made while this was generated wins.
+        .setTitle({ sessionID: input.session.id, title: t, source: "auto", replace: input.session.title })
         .pipe(Effect.catchCause((cause) => Effect.logError("failed to generate title", { error: Cause.squash(cause) })))
     })
 
@@ -306,7 +407,7 @@ const layer = Layer.effect(
       }
       yield* plugin.trigger(
         "tool.execute.before",
-        { tool: TaskTool.id, sessionID, callID: part.id },
+        { tool: TaskTool.id, sessionID, agent: lastUser.agent, callID: part.id },
         { args: taskArgs },
       )
 
@@ -388,7 +489,7 @@ const layer = Layer.effect(
 
       yield* plugin.trigger(
         "tool.execute.after",
-        { tool: TaskTool.id, sessionID, callID: part.id, args: taskArgs },
+        { tool: TaskTool.id, sessionID, agent: lastUser.agent, callID: part.id, args: taskArgs },
         result,
       )
 
@@ -599,6 +700,26 @@ const layer = Layer.effect(
       const exit = yield* provider.getModel(providerID, modelID).pipe(Effect.exit)
       if (Exit.isSuccess(exit)) return exit.value
       const err = Cause.squash(exit.cause)
+      // XCOD-214 (PO, 2026-10-07): a model from config or --model that isn't available here is a
+      // warning: the next best one is used instead of failing the prompt.
+      if (Provider.ModelNotFoundError.isInstance(err)) {
+        const resolved = yield* provider.resolve(providerID, modelID).pipe(Effect.option)
+        if (Option.isSome(resolved) && resolved.value.warning) {
+          const next = yield* provider.getModel(resolved.value.providerID, resolved.value.modelID).pipe(Effect.option)
+          if (Option.isSome(next)) {
+            yield* Effect.logWarning(resolved.value.warning)
+            yield* events
+              .publish(TuiEvent.ToastShow, {
+                title: "Model not available",
+                message: resolved.value.warning,
+                variant: "warning",
+                duration: 8000,
+              })
+              .pipe(Effect.ignore)
+            return next.value
+          }
+        }
+      }
       if (Provider.ModelNotFoundError.isInstance(err)) {
         const hint = err.suggestions?.length ? ` Did you mean: ${err.suggestions.join(", ")}?` : ""
         yield* events.publish(Session.Event.Error, {
@@ -643,7 +764,27 @@ const layer = Layer.effect(
         throw error
       }
 
-      const model = input.model ?? ag.model ?? (yield* currentModel(input.sessionID))
+      // XCOD-219: under a locked `model` (or `agent.<name>.model`) a main session runs on the locked
+      // model. Asking for another one is refused with the policy message and audited; a model that
+      // only came from an agent's own config or the session's history is replaced. Subagent sessions
+      // follow the subagent locks, checked by the task tool.
+      // XCOD-218: no Lunos model answers in an external session, whatever the client sent, so the
+      // model lock doesn't apply there; the external tool's own policy gate does.
+      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const external = ExternalSession.of(current)
+      const lock = external || current.parentID ? undefined : ConfigPolicy.lockedModel(yield* config.get(), ag.name)
+      if (lock && input.model && `${input.model.providerID}/${input.model.modelID}` !== lock.model) {
+        yield* ConfigPolicy.refused(lock.key, `session model ${input.model.providerID}/${input.model.modelID}`)
+        const reason = ConfigPolicy.modelLockReason(lock)
+        const error = new NamedError.Unknown({ message: reason })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw new ConfigPolicy.LockedError(lock.key, "session model", reason)
+      }
+      const model = external
+        ? ExternalSession.model(external.tool)
+        : lock
+          ? Provider.parseModel(lock.model)
+          : (input.model ?? ag.model ?? (yield* currentModel(input.sessionID)))
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
@@ -669,7 +810,6 @@ const layer = Layer.effect(
         format: input.format,
       }
 
-      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
       if (
         current.agent !== info.agent ||
         current.model?.providerID !== info.model.providerID ||
@@ -1078,6 +1218,240 @@ const layer = Layer.effect(
       throw new Error("Impossible")
     })
 
+    /** XCOD-298: the budget guard's decision, acted on: a toast, a question, or the turn stopped. */
+    const budgetCheck = Effect.fn("SessionPrompt.budget")(function* (input: {
+      sessionID: SessionID
+      session: Session.Info
+      step: number
+      model: Provider.Model
+      msgs: SessionV1.WithParts[]
+      lastUser: SessionV1.User
+    }) {
+      const ctx = yield* InstanceState.context
+      const cfg = yield* config.get()
+      const decision = yield* Budget.guard({
+        session: { id: input.sessionID, ...(input.session.parentID ? { parentID: input.session.parentID } : {}) },
+        directory: input.session.directory ?? ctx.directory,
+        project: { id: ctx.project.id, worktree: ctx.project.worktree, name: ctx.project.name },
+        config: cfg as Budget.Config,
+        start: input.step === 1,
+        price: input.model.cost,
+        model: `${input.model.providerID}/${input.model.id}`,
+        turn: Budget.turnsOf(input.msgs),
+      }).pipe(
+        Effect.provideService(Database.Service, database),
+        // A budget that can't be read never stops work; it's logged.
+        Effect.catchCause((cause) =>
+          Effect.logWarning("budget check failed", { "session.id": input.sessionID, cause }).pipe(
+            Effect.as({ action: "run", toasts: [] } as Budget.Decision),
+          ),
+        ),
+      )
+      const toast = (message: string, variant: "warning" | "error" = "warning") =>
+        events
+          .publish(TuiEvent.ToastShow, { title: BUDGET_TOAST_TITLE, message, variant, duration: 10000 })
+          .pipe(Effect.ignore)
+      for (const message of decision.toasts) yield* toast(message)
+      if (decision.action === "run") return "run" as const
+      if (decision.action === "warn") {
+        yield* toast(decision.message)
+        return "run" as const
+      }
+      if (decision.action === "ask") {
+        const RUN = "Run anyway"
+        const CHEAPER = "Use a cheaper model…"
+        const answers = yield* question
+          .ask({
+            sessionID: input.sessionID,
+            questions: [
+              {
+                header: "Budget",
+                question: decision.message,
+                custom: false,
+                options: [
+                  { label: RUN, description: "Run this turn; the overspend is shown" },
+                  { label: CHEAPER, description: "Stop, and pick another model for the next turn" },
+                  { label: "Stop", description: "Don't start it" },
+                ],
+              },
+            ],
+          })
+          .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<ReadonlyArray<string>>)))
+        const answer = answers[0]?.[0]
+        if (answer === RUN) {
+          Budget.approve(decision.root)
+          return "run" as const
+        }
+        if (answer === CHEAPER)
+          yield* events.publish(TuiEvent.CommandExecute, { command: "model.list" }).pipe(Effect.ignore)
+        yield* Effect.logInfo("budget: turn not started", { "session.id": input.sessionID, answer })
+        return "stop" as const
+      }
+      // stop: the reason, on the session and as its error (`lunos run` exits with code 3 on it).
+      yield* refuseTurn({
+        sessionID: input.sessionID,
+        lastUser: input.lastUser,
+        model: { id: input.model.id, providerID: input.model.providerID },
+        message: decision.message,
+        ref: "budget",
+      })
+      return "stop" as const
+    })
+
+    /** A turn that doesn't start: its reason, as an assistant message's error and the session's. */
+    const refuseTurn = Effect.fn("SessionPrompt.refuseTurn")(function* (input: {
+      sessionID: SessionID
+      lastUser: SessionV1.User
+      model: { id: string; providerID: string }
+      message: string
+      ref: string
+    }) {
+      const ctx = yield* InstanceState.context
+      const error = new NamedError.Unknown({ message: input.message, ref: input.ref }).toObject()
+      const msg: SessionV1.Assistant = {
+        id: MessageID.ascending(),
+        parentID: input.lastUser.id,
+        role: "assistant",
+        mode: input.lastUser.agent,
+        agent: input.lastUser.agent,
+        path: { cwd: ctx.directory, root: ctx.worktree },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: input.model.id as SessionV1.Assistant["modelID"],
+        providerID: input.model.providerID as SessionV1.Assistant["providerID"],
+        time: { created: Date.now(), completed: Date.now() },
+        sessionID: input.sessionID,
+        finish: "stop",
+        error: error as SessionV1.Assistant["error"],
+      }
+      yield* sessions.updateMessage(msg)
+      yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: msg.error })
+    })
+
+    /**
+     * XCOD-302: when a Dev-Cycle or Build turn ends by announcing its next step instead of taking
+     * it, send an internal continuation rather than wait for "proceed". Returns whether it did (the
+     * loop then runs another step). Never past a pending gate; at most `AutoContinue.MAX` in a row
+     * without progress, then the human is asked.
+     */
+    const autoContinue = Effect.fn("SessionPrompt.autoContinue")(function* (input: {
+      sessionID: SessionID
+      session: Session.Info
+      msgs: SessionV1.WithParts[]
+      lastUser: SessionV1.User
+      step: number
+    }) {
+      // Not for subagents: their parent reads the result and carries on itself.
+      if (input.session.parentID) return false
+      // XCOD-312: nor for a disabled Lunos account: the running turn finishes, but isn't continued.
+      if (yield* Effect.promise(() => CloudDisabled.refusal().catch(() => undefined))) {
+        yield* Effect.logInfo("auto-continue: account disabled", { "session.id": input.sessionID })
+        return false
+      }
+      // XCOD-303: nor while subagents it dispatched in the background still run: each one's result
+      // resumes the session when it lands, so a turn that ends waiting for them hasn't stalled.
+      const running = (yield* jobs.list()).some(
+        (job) => job.status === "running" && job.metadata?.parentSessionId === input.sessionID,
+      )
+      if (running) return false
+      const agent = yield* agents.get(input.lastUser.agent)
+      if (!agent || (agent.name !== "dev-cycle" && agent.name !== "build")) return false
+      const cfg = yield* config.get()
+      const cycle = agent.name === "dev-cycle"
+      if (cycle ? cfg.dev_cycle?.auto_continue === false : cfg.agent?.[agent.name]?.auto_continue === false)
+        return false
+      const title = cycle ? "Dev-Cycle" : "Build"
+
+      let position: AutoContinue.Position = { unknown: false, done: false, pending: false }
+      let file: string | undefined
+      if (cycle) {
+        file = Session.devcycle(input.session, yield* InstanceState.context)
+        const exists = yield* fsys.existsSafe(file)
+        const contents = exists
+          ? yield* fsys.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
+          : undefined
+        position = DevCycle.position({ exists, contents })
+      }
+      // Continuations count against the step limit like any step; at the limit the turn stops.
+      const stop = AutoContinue.classify({
+        messages: input.msgs,
+        position,
+        emptyStalls: cycle,
+        limit: input.step >= (agent.steps ?? Infinity) ? "step limit" : undefined,
+      })
+      if (stop.kind !== "stalled") {
+        if (stop.kind !== "finished")
+          yield* Effect.logInfo("auto-continue: stopped", { "session.id": input.sessionID, stop: stop.kind })
+        return false
+      }
+
+      const send = (text: string, metadata: Record<string, unknown>, synthetic: boolean) =>
+        Effect.gen(function* () {
+          const message = yield* sessions.updateMessage({
+            id: MessageID.ascending(),
+            role: "user",
+            sessionID: input.sessionID,
+            time: { created: Date.now() },
+            agent: input.lastUser.agent,
+            model: input.lastUser.model,
+            ...(input.lastUser.format ? { format: input.lastUser.format } : {}),
+            ...(input.lastUser.system ? { system: input.lastUser.system } : {}),
+            ...(input.lastUser.tools ? { tools: input.lastUser.tools } : {}),
+          })
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: message.id,
+            sessionID: input.sessionID,
+            type: "text",
+            text,
+            synthetic,
+            metadata,
+            time: { start: Date.now(), end: Date.now() },
+          })
+        })
+
+      const attempt = AutoContinue.streak(input.msgs)
+      if (attempt >= AutoContinue.MAX) {
+        const CONTINUE = "Continue"
+        const OPEN = "Open cycle file"
+        const answers = yield* question
+          .ask({
+            sessionID: input.sessionID,
+            questions: [
+              {
+                header: title,
+                question: AutoContinue.gaveUp(title),
+                custom: false,
+                options: [
+                  { label: CONTINUE, description: "Try again" },
+                  cycle
+                    ? { label: OPEN, description: `Stop, and open the cycle file${file ? ` (${file})` : ""}` }
+                    : { label: "Stop", description: "Leave it here" },
+                ],
+              },
+            ],
+          })
+          .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<ReadonlyArray<string>>)))
+        const answer = answers[0]?.[0]
+        yield* Effect.logInfo("auto-continue: no progress", { "session.id": input.sessionID, answer })
+        if (answer === OPEN)
+          yield* events.publish(TuiEvent.CommandExecute, { command: "artifact.list" }).pipe(Effect.ignore)
+        if (answer !== CONTINUE) return false
+        // The human pressed Continue: a fresh start for the streak, and never an approval of a gate.
+        yield* send("Continue.", { [AutoContinue.RESUME]: true }, false)
+        return true
+      }
+
+      const line = AutoContinue.line(title, stop.label)
+      yield* send(
+        AutoContinue.prompt({ gated: cycle, note: stop.note }),
+        { [AutoContinue.METADATA]: { label: line, attempt: attempt + 1 } },
+        true,
+      )
+      yield* Effect.logInfo("auto-continue", { "session.id": input.sessionID, line, attempt: attempt + 1 })
+      return true
+    })
+
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
         const ctx = yield* InstanceState.context
@@ -1125,11 +1499,30 @@ const layer = Layer.effect(
                 callID: orphan.callID,
               })
             }
+            // XCOD-302: only a turn this loop ran; resuming an idle session never re-continues an old one.
+            if (!orphan && step > 0 && (yield* autoContinue({ sessionID, session, msgs, lastUser, step }))) continue
             yield* Effect.logInfo("exiting loop", { "session.id": sessionID })
             break
           }
 
           step++
+          // XCOD-312: a disabled Lunos account starts no new turn, before anything is asked of a model.
+          // Checked once, at the start of a top-level turn: a turn already running (and its subagents)
+          // finishes.
+          if (step === 1 && !session.parentID) {
+            const refused = yield* Effect.promise(() => CloudDisabled.refusal().catch(() => undefined))
+            if (refused) {
+              yield* Effect.logInfo("account disabled: turn not started", { "session.id": sessionID })
+              yield* refuseTurn({
+                sessionID,
+                lastUser,
+                model: { id: lastUser.model.modelID, providerID: lastUser.model.providerID },
+                message: refused,
+                ref: "account_disabled",
+              })
+              break
+            }
+          }
           if (step === 1)
             yield* title({
               session,
@@ -1175,13 +1568,112 @@ const layer = Layer.effect(
             yield* events.publish(Session.Event.Error, { sessionID, error: error.toObject() })
             throw error
           }
+          // XCOD-211: an unattended run's step and spend limits, subagents included, checked before the
+          // model call.
+          if (!RunBudget.take()) {
+            yield* Effect.logInfo("unattended run limit reached", { "session.id": sessionID })
+            break
+          }
+          // XCOD-298: project and organisation budgets, before every step (subagents' included). A step
+          // already running always finishes; this decides whether the next one starts.
+          const budget = yield* budgetCheck({ sessionID, session, step, model, msgs, lastUser })
+          if (budget === "stop") break
           const maxSteps = agent.steps ?? Infinity
           const isLastStep = step >= maxSteps
-          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session }).pipe(
+          // XCOD-287: Build's nudge to split development work across subagents.
+          const stepConfig = yield* config.get()
+          const subagents = (yield* agents.list()).filter((item) => item.mode !== "primary")
+          const stepBackground = backgroundEnabled(flags.experimentalBackgroundSubagents, stepConfig)
+          // XCOD-303: Dynamic workflows, read every step so `/workflows on|off` applies to the next one.
+          const dynamic = DynamicWorkflows.decide({
+            config: stepConfig,
+            agent,
+            session: {
+              ...session,
+              metadata: (yield* sessions.get(sessionID).pipe(Effect.orDie)).metadata,
+            },
+            subagents,
+          }).on
+          const delegate =
+            dynamic && agent.name === "build"
+              ? SessionReminders.dynamicReminder({
+                  background: stepBackground,
+                  maxParallel: stepConfig.subagent?.max_parallel ?? DEFAULT_MAX_PARALLEL,
+                })
+              : !dynamic && SessionReminders.delegates({ agent, session, config: stepConfig, subagents })
+                ? SessionReminders.delegateReminder(stepBackground)
+                : undefined
+          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session, delegate, dynamic }).pipe(
             Effect.provideService(RuntimeFlags.Service, flags),
             Effect.provideService(FSUtil.Service, fsys),
             Effect.provideService(Session.Service, sessions),
           )
+          // XCOD-94: recalled memory, computed once per user message and never saved, like the
+          // reminders above. Skipped for an agent whose permission denies memory.
+          const memoryUser = msgs.findLast((m) => m.info.role === "user")
+          if (memoryUser && !Permission.disabled(["memory_search"], agent.permission).size) {
+            const query = memoryUser.parts
+              .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+              .join("\n")
+              .trim()
+            const recalled = query
+              ? yield* memory.recallFor({
+                  sessionID,
+                  userMessageID: memoryUser.info.id,
+                  query,
+                  parent: { providerID: model.providerID, modelID: model.id },
+                })
+              : undefined
+            if (recalled)
+              memoryUser.parts.push({
+                id: PartID.ascending(),
+                messageID: memoryUser.info.id,
+                sessionID,
+                type: "text",
+                text: recalled,
+                synthetic: true,
+              })
+          }
+          // XCOD-300: project resources the user mentioned as @name, added to their message for this
+          // turn only (never saved), like recalled memory. Images and PDFs only for models that take them.
+          let mentionedTokens = 0
+          if (memoryUser) {
+            const typed = memoryUser.parts
+              .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+              .join("\n")
+            const mentioned = typed.includes("@")
+              ? yield* resources
+                  .mention({
+                    sessionID,
+                    text: typed,
+                    image: model.capabilities.input.image,
+                    pdf: model.capabilities.input.pdf,
+                  })
+                  .pipe(Effect.orElseSucceed(() => ({ parts: [], tokens: 0, names: [] })))
+              : undefined
+            mentionedTokens = mentioned?.tokens ?? 0
+            for (const part of mentioned?.parts ?? [])
+              memoryUser.parts.push(
+                part.type === "text"
+                  ? {
+                      id: PartID.ascending(),
+                      messageID: memoryUser.info.id,
+                      sessionID,
+                      type: "text",
+                      text: part.text,
+                      synthetic: true,
+                    }
+                  : {
+                      id: PartID.ascending(),
+                      messageID: memoryUser.info.id,
+                      sessionID,
+                      type: "file",
+                      mime: part.mime,
+                      url: part.url,
+                      filename: part.filename,
+                    },
+              )
+          }
 
           const msg: SessionV1.Assistant = {
             id: MessageID.ascending(),
@@ -1238,7 +1730,19 @@ const layer = Layer.effect(
               Effect.provideService(MCP.Service, mcp),
               Effect.provideService(Truncate.Service, truncate),
               Effect.provideService(RuntimeFlags.Service, flags),
+              Effect.provideService(Memory.Service, memory),
             )
+            // XCOD-157: with sandbox.required, no tool runs outside a sandbox, whatever started this session.
+            SandboxGuard.guard(tools, (yield* config.get()).sandbox, sessionID)
+            // XCOD-303: in a Dynamic workflow the main agent coordinates and subagents do the work: no
+            // edit, write or command tool reaches the model. Dev-Cycle keeps editing its own cycle file.
+            if (dynamic) {
+              const dropped = DynamicWorkflows.gate(tools, {
+                directory: ctx.directory,
+                ...(agent.name === "dev-cycle" ? { allowFile: Session.devcycle(session, ctx) } : {}),
+              })
+              if (step === 1) yield* Effect.logInfo("dynamic workflow", { "session.id": sessionID, dropped })
+            }
 
             if (lastUser.format?.type === "json_schema") {
               tools["StructuredOutput"] = createStructuredOutputTool({
@@ -1261,12 +1765,43 @@ const layer = Layer.effect(
               sys.mcp(agent, session.permission),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
+            const proofConfig = yield* config.get()
+            const proof =
+              buildProof(agent, session.permission, proofConfig, dynamic) ??
+              qaProof(agent, session.permission, proofConfig)
+            // XCOD-300: the project's resources: the list (with how to reach each) and the Always ones in full.
+            const projectResources = yield* resources.system(sessionID).pipe(
+              Effect.orElseSucceed(() => ({
+                catalog: undefined as string | undefined,
+                always: { included: [], dropped: [], tokens: 0 } as ResourceCore.Always,
+              })),
+            )
             const system = [
               ...env,
               ...instructions,
               ...(mcpInstructions ? [mcpInstructions] : []),
               ...(skills ? [skills] : []),
+              ...(proof ? [proof] : []),
+              ...(projectResources.catalog ? [projectResources.catalog] : []),
+              ...(projectResources.always.text ? [projectResources.always.text] : []),
             ]
+            yield* resources.record(
+              sessionID,
+              contextBreakdown({
+                model,
+                system: [
+                  ...env,
+                  ...(mcpInstructions ? [mcpInstructions] : []),
+                  ...(skills ? [skills] : []),
+                  ...(proof ? [proof] : []),
+                  projectResources.catalog ?? "",
+                ],
+                instructions,
+                always: projectResources.always,
+                messages: msgs,
+                mentioned: mentionedTokens,
+              }),
+            )
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
@@ -1343,7 +1878,24 @@ const layer = Layer.effect(
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
       input: LoopInput,
     ) {
-      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+      // XCOD-218: an external session's reply comes from Claude Code / Codex, not a Lunos model.
+      const info = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      if (ExternalSession.of(info))
+        return yield* state.ensureRunning(
+          input.sessionID,
+          lastAssistant(input.sessionID),
+          ExternalSession.turn(
+            { sessions, permission, agents, config, events, status, mcp, plugin, memory, skill, question },
+            input.sessionID,
+          ),
+        )
+      return yield* state.ensureRunning(
+        input.sessionID,
+        lastAssistant(input.sessionID),
+        // XCOD-288: background commands this turn started and didn't keep stop with it, however
+        // it ends (finished, failed or interrupted).
+        runLoop(input.sessionID).pipe(Effect.ensuring(Effect.promise(() => BackgroundShell.endTurn(input.sessionID)))),
+      )
     })
 
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(
@@ -1368,6 +1920,77 @@ const layer = Layer.effect(
         throw error
       }
       const agentName = cmd.agent ?? input.agent
+
+      // XCOD-94: /memory off | on switches memory for this session and records that in the
+      // transcript without calling a model.
+      if (input.command === Command.Default.MEMORY) {
+        const arg = input.arguments.trim().toLowerCase()
+        if (arg === "off" || arg === "on") yield* memory.setSessionOff(input.sessionID, arg === "off")
+        const verdict = yield* memory.decision(input.sessionID)
+        let status = verdict.on ? "Memory is on for this session." : `Memory is off: ${verdict.reason}.`
+        // XCOD-135: /memory sources [on|off <name>] lists external sources, or toggles one for this session.
+        const [sub, toggle, ...rest] = input.arguments.trim().split(/\s+/)
+        if (sub?.toLowerCase() === "sources") {
+          const name = rest.join(" ")
+          const known =
+            (toggle === "on" || toggle === "off") && name
+              ? yield* memorySources.setSessionOff(input.sessionID, name, toggle === "off")
+              : undefined
+          status =
+            (known === false ? `No memory source is named "${name}".\n\n` : "") +
+            MemorySources.describe(yield* memorySources.list(input.sessionID), verdict.on)
+        }
+        return yield* prompt({
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          model: input.model ? Provider.parseModel(input.model) : yield* currentModel(input.sessionID),
+          agent: input.agent,
+          parts: [{ type: "text", text: `/memory${arg ? " " + input.arguments.trim() : ""}\n\n${status}` }],
+          noReply: true,
+        })
+      }
+
+      // XCOD-303: /workflows off | on switches Dynamic workflows for this session (session metadata,
+      // read by the loop every step) and records that in the transcript without calling a model. An
+      // organisation lock can't be overridden: the attempt is refused and the reason shown.
+      if (input.command === Command.Default.WORKFLOWS) {
+        const arg = input.arguments.trim().toLowerCase()
+        const cfg = yield* config.get()
+        const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+        const before = DynamicWorkflows.setting({
+          config: cfg,
+          session: DynamicWorkflows.sessionValue(current.metadata),
+        })
+        let refusal = ""
+        if (arg === "off" || arg === "on") {
+          if (before.locked) {
+            yield* ConfigPolicy.refused(DynamicWorkflows.KEY, "/workflows")
+            refusal = `Can't turn Dynamic workflows ${arg}: ${ConfigPolicy.message(DynamicWorkflows.KEY)}.\n\n`
+          } else
+            yield* sessions.setMetadata({
+              sessionID: input.sessionID,
+              metadata: DynamicWorkflows.withSessionValue(current.metadata, arg === "on"),
+            })
+        }
+        // A lock wins over the session value, so after a refusal this still reads the lock.
+        const after = DynamicWorkflows.setting({
+          config: cfg,
+          session: arg === "off" || arg === "on" ? arg === "on" : DynamicWorkflows.sessionValue(current.metadata),
+        })
+        const status = `${refusal}Dynamic workflows: ${after.on ? "on" : "off"} (${after.reason}).${
+          after.on
+            ? " Build and Dev-Cycle plan the work and dispatch subagents to do it; the main agent doesn't edit, write or run commands itself."
+            : " The main agent does the work itself; subagents stay available."
+        }`
+        return yield* prompt({
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          model: input.model ? Provider.parseModel(input.model) : yield* currentModel(input.sessionID),
+          agent: input.agent,
+          parts: [{ type: "text", text: `/workflows${arg ? " " + arg : ""}\n\n${status}` }],
+          noReply: true,
+        })
+      }
 
       const raw = input.arguments.match(argsRegex) ?? []
       const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
@@ -1408,7 +2031,15 @@ const layer = Layer.effect(
       }
       template = template.trim()
 
+      // XCOD-219: under a locked model a command's own `model` (or its agent's) is ignored, like an
+      // agent's own model is. A model the caller asked for still goes through, to be refused.
+      const commandLock = ConfigPolicy.lockedModel(yield* config.get(), agentName)
+      // XCOD-254: in a Claude Code / Codex session Lunos expands the command and the tool answers;
+      // no Lunos model is involved (as in the prompt loop), so none is looked up or required.
+      const external = ExternalSession.of(yield* sessions.get(input.sessionID).pipe(Effect.orDie))
       const taskModel = yield* Effect.gen(function* () {
+        if (external) return ExternalSession.model(external.tool)
+        if (commandLock) return Provider.parseModel(input.model ?? commandLock.model)
         if (cmd.model) return Provider.parseModel(cmd.model)
         if (cmd.agent) {
           const cmdAgent = yield* agents.get(cmd.agent)
@@ -1418,13 +2049,26 @@ const layer = Layer.effect(
         return yield* currentModel(input.sessionID)
       })
 
-      yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
+      if (!external) yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
 
       const agent = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
       if (!agent) {
         const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
         const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
         const error = new NamedError.Unknown({ message: `Agent not found: "${agentName}".${hint}` })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw error
+      }
+
+      // Every skill is promoted to a slash command (Command.state), but that table is
+      // built once per instance with no agent in scope, while skill permissions are
+      // per-agent. The model-facing list already filters via Skill.available(agent);
+      // without this check the same denied skill stays typeable as a command. Listing
+      // is not enforcement, so enforce here, at invocation.
+      if (cmd.source === "skill" && Permission.evaluate("skill", cmd.name, agent.permission).action === "deny") {
+        const error = new NamedError.Unknown({
+          message: `Skill "${cmd.name}" is not permitted for agent "${agent.name}".`,
+        })
         yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
         throw error
       }
@@ -1436,7 +2080,8 @@ const layer = Layer.effect(
       const uniqueTemplateParts = templateParts.filter(
         (part) => part.type !== "file" || !inputFiles.has(fileURLToPath(part.url)),
       )
-      const isSubtask = (agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true
+      // A subtask would run a Lunos subagent; in an external session the text goes to the tool instead.
+      const isSubtask = !external && ((agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true)
       const parts = isSubtask
         ? [
             {
@@ -1589,6 +2234,49 @@ export function createStructuredOutputTool(input: {
     },
   })
 }
+/**
+ * XCOD-300: what this turn's context is made of, in tokens (estimated as Lunos does elsewhere), for
+ * /context: the system prompt, instructions, Always resources, recalled memory, attachments, and
+ * what project_resources_search and @mentions pulled in since the last user message.
+ */
+function contextBreakdown(input: {
+  model: Provider.Model
+  system: string[]
+  instructions: string[]
+  always: {
+    included: { name: string; tokens: number }[]
+    dropped: { name: string; tokens: number; reason: string }[]
+    tokens: number
+  }
+  messages: SessionV1.WithParts[]
+  mentioned: number
+}) {
+  const lastUser = input.messages.findLastIndex((message) => message.info.role === "user")
+  const user = input.messages[lastUser]
+  let memory = 0
+  let attachments = 0
+  for (const part of user?.parts ?? []) {
+    if (part.type === "text" && part.synthetic && part.text.startsWith("<memory>")) memory += Token.estimate(part.text)
+    if (part.type === "file") attachments += part.url.startsWith("data:") ? Math.round(part.url.length / 4) : 0
+  }
+  let searched = 0
+  for (const message of input.messages.slice(lastUser + 1))
+    for (const part of message.parts)
+      if (part.type === "tool" && part.tool === "project_resources_search" && part.state.status === "completed")
+        searched += Token.estimate(part.state.output)
+  return {
+    system: Token.estimate([...SystemPrompt.provider(input.model), ...input.system].join("\n")),
+    instructions: Token.estimate(input.instructions.join("\n")),
+    always: input.always.tokens,
+    memory,
+    attachments,
+    searched,
+    mentioned: input.mentioned,
+    resources: input.always.included,
+    dropped: input.always.dropped,
+  }
+}
+
 const bashRegex = /!`([^`]+)`/g
 // Match [Image N] as single token, quoted strings, or non-space sequences
 const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
@@ -1625,6 +2313,12 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     RuntimeFlags.node,
     Database.node,
+    Memory.node,
+    MemorySources.node,
+    Resource.node,
+    Skill.node,
+    Question.node,
+    BackgroundJob.node,
   ],
 })
 

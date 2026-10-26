@@ -142,6 +142,7 @@ export function SortableTerminalTab(props: { terminal: LocalPTY; onClose?: () =>
               aria-label={language.t("terminal.close")}
             />
           }
+          onMiddleClick={close}
         >
           <span onDblClick={edit} classList={{ invisible: store.editing }}>
             {label()}

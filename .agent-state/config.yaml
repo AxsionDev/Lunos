@@ -1,0 +1,5 @@
+version: "1.0"
+project_name: "auto-detect"
+auto_compact_threshold: 50
+session_naming: "auto"
+workspace_enabled: true

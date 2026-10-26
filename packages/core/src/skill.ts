@@ -34,8 +34,17 @@ const Frontmatter = Schema.Struct({
   name: Schema.String.pipe(Schema.optional),
   description: Schema.String.pipe(Schema.optional),
   slash: Schema.Boolean.pipe(Schema.optional),
+  "allowed-tools": Schema.Union([Schema.String, Schema.Array(Schema.String)]).pipe(Schema.optional),
 })
 const decodeFrontmatter = Schema.decodeUnknownOption(Frontmatter)
+
+// Same parsing as the v1 skill loader (packages/opencode/src/skill/scope.ts): Claude Code's
+// `Read, Grep, Glob` or a YAML list, mapped to lower-case Lunos tool ids.
+function allowedTools(value: string | readonly string[] | undefined) {
+  if (value === undefined) return undefined
+  const items = typeof value === "string" ? value.split(/[,\s]+/) : value
+  return [...new Set(items.map((item) => item.trim().toLowerCase()).filter(Boolean))]
+}
 
 export type Data = {
   sources: Types.DeepMutable<Source>[]
@@ -96,6 +105,7 @@ const layer = Layer.effect(
             name,
             description: frontmatter.description,
             slash: frontmatter.slash,
+            allowedTools: allowedTools(frontmatter["allowed-tools"]),
             location: AbsolutePath.make(filepath),
             content: markdown.content,
           })

@@ -3,9 +3,10 @@ import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { createSignal, For, Show } from "solid-js"
 import { getScrollAcceleration } from "../util/scroll"
 import { useClipboard } from "../context/clipboard"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { versionDetail, versionLabel } from "@opencode-ai/core/installation/version"
 import { useExit } from "../context/exit"
 import { describeOS, describeTerminal } from "../util/system"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
 
 export function ErrorComponent(props: { error: Error; reset: () => void; mode?: "dark" | "light" }) {
   const term = useTerminalDimensions()
@@ -39,6 +40,10 @@ export function ErrorComponent(props: { error: Error; reset: () => void; mode?: 
         error: "#e06c75",
         success: "#7fd88f",
       }
+
+  // The full error goes to this run's log; Lunos prints its path when it exits.
+  RunLog.failure("the TUI", props.error)
+  const log = RunLog.current()
 
   const message = props.error.message || "An unknown error occurred."
   const stack = props.error.stack || "No stack trace available."
@@ -108,11 +113,12 @@ export function ErrorComponent(props: { error: Error; reset: () => void; mode?: 
         {/* Headline */}
         <box flexDirection="column" alignItems="center" flexShrink={0}>
           <text attributes={TextAttributes.BOLD} fg={colors.text}>
-            opencode crashed
+            Lunos crashed
           </text>
           <Show when={showSubtext()}>
             <text fg={colors.muted}>An unexpected error stopped the session.</text>
           </Show>
+          <Show when={log}>{(log) => <text fg={colors.muted}>Full log: {log().file}</text>}</Show>
         </box>
 
         {/* Error message panel */}
@@ -192,7 +198,7 @@ export function ErrorComponent(props: { error: Error; reset: () => void; mode?: 
                 ? "Report copied — paste it into a new GitHub issue."
                 : "Copy the report and open a GitHub issue to help us fix this."}
             </text>
-            <text fg={colors.muted}>opencode {InstallationVersion}</text>
+            <text fg={colors.muted}>{versionLabel()}</text>
           </box>
         </Show>
       </box>
@@ -200,18 +206,18 @@ export function ErrorComponent(props: { error: Error; reset: () => void; mode?: 
   )
 }
 
-function buildIssueURL(message: string, stack: string) {
+export function buildIssueURL(message: string, stack: string) {
   // Field keys match the ids in .github/ISSUE_TEMPLATE/bug-report.yml so the issue
   // form opens pre-filled. Populating os/terminal/reproduce keeps the report past
   // the contributing-guidelines compliance check, which pushes for system info.
-  const url = new URL("https://github.com/anomalyco/opencode/issues/new?template=bug-report.yml")
+  const url = new URL("https://github.com/AxsionDev/Lunos/issues/new?template=bug-report.yml")
   url.searchParams.set("title", `TUI crash: ${message}`)
-  url.searchParams.set("opencode-version", InstallationVersion)
+  url.searchParams.set("lunos-version", versionDetail())
   url.searchParams.set("os", describeOS())
   url.searchParams.set("terminal", describeTerminal())
   url.searchParams.set(
     "reproduce",
-    "Reported automatically from the opencode crash screen. If you can, describe what you were doing when it crashed.",
+    "Reported automatically from the Lunos crash screen. If you can, describe what you were doing when it crashed.",
   )
 
   // Budget the stack against the fully URL-encoded length (not the raw length) so
@@ -220,7 +226,7 @@ function buildIssueURL(message: string, stack: string) {
   // so measuring url.toString() is both correct and safe on any input.
   const MAX_URL_LENGTH = 6000
   const marker = "\n… (truncated)"
-  const head = `The opencode TUI crashed with an unexpected error.\n\n**Error:** ${message}\n\n**Stack trace:**\n`
+  const head = `The Lunos TUI crashed with an unexpected error.\n\n**Error:** ${message}\n\n**Stack trace:**\n`
   const setBody = (body: string) => url.searchParams.set("description", head + "```\n" + body + "\n```")
 
   setBody(stack)

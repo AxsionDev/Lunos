@@ -2,10 +2,11 @@ import type { Session as SDKSession, Message, Part } from "@opencode-ai/sdk/v2"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Session } from "@/session/session"
 import { MessageV2 } from "../../session/message-v2"
-import { CliError, effectCmd, fail } from "../effect-cmd"
+import { CliError, effectCmd } from "../effect-cmd"
 import { Database } from "@opencode-ai/core/database/database"
 import { SessionTable, MessageTable, PartTable } from "@opencode-ai/core/session/sql"
 import { InstanceRef } from "@/effect/instance-ref"
+import { ShareNext } from "@/share/share-next"
 import { EOL } from "os"
 import path from "path"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -14,6 +15,42 @@ import type { InstanceContext } from "@/project/instance-context"
 
 const decodeMessageInfo = Schema.decodeUnknownSync(SessionV1.Info)
 const decodePart = Schema.decodeUnknownSync(SessionV1.Part)
+
+/** Discriminated union returned by the ShareNext API (GET /api/shares/:id/data) */
+export type ShareData =
+  | { type: "session"; data: SDKSession }
+  | { type: "message"; data: Message }
+  | { type: "part"; data: Part }
+  | { type: "session_diff"; data: unknown }
+  | { type: "model"; data: unknown }
+
+/**
+ * XCOD-266: upstream shut its share service down in v1.19.3, so its links have nothing left to fetch.
+ * Refused by host (any subdomain too), whatever the path.
+ */
+export const DISCONTINUED_MESSAGE = "opncd.ai sharing was discontinued upstream; this link can't be imported."
+
+export function isDiscontinuedShareUrl(url: string) {
+  try {
+    return /(^|\.)opncd\.ai$/i.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Extract share ID from a share URL like https://console.example.com/share/abc123 */
+export function parseShareUrl(url: string): string | null {
+  const match = url.match(/^https?:\/\/[^/]+\/share\/([a-zA-Z0-9_-]+)$/)
+  return match ? match[1] : null
+}
+
+export function shouldAttachShareAuthHeaders(shareUrl: string, accountBaseUrl: string): boolean {
+  try {
+    return new URL(shareUrl).origin === new URL(accountBaseUrl).origin
+  } catch {
+    return false
+  }
+}
 
 export function formatImportFileError(file: string, error: FSUtil.Error) {
   if (error._tag === "PlatformError") {
@@ -26,14 +63,54 @@ export function formatImportFileError(file: string, error: FSUtil.Error) {
   return `Invalid JSON in ${file}: ${detail}`
 }
 
+/**
+ * Transform ShareNext API response (flat array) into the nested structure for local file storage.
+ *
+ * The API returns a flat array: [session, message, message, part, part, ...]
+ * Local storage expects: { info: session, messages: [{ info: message, parts: [part, ...] }, ...] }
+ *
+ * This groups parts by their messageID to reconstruct the hierarchy before writing to disk.
+ */
+export function transformShareData(shareData: ShareData[]): {
+  info: SDKSession
+  messages: Array<{ info: Message; parts: Part[] }>
+} | null {
+  const sessionItem = shareData.find((d) => d.type === "session")
+  if (!sessionItem) return null
+
+  const messageMap = new Map<string, Message>()
+  const partMap = new Map<string, Part[]>()
+
+  for (const item of shareData) {
+    if (item.type === "message") {
+      messageMap.set(item.data.id, item.data)
+    } else if (item.type === "part") {
+      if (!partMap.has(item.data.messageID)) {
+        partMap.set(item.data.messageID, [])
+      }
+      partMap.get(item.data.messageID)!.push(item.data)
+    }
+  }
+
+  if (messageMap.size === 0) return null
+
+  return {
+    info: sessionItem.data,
+    messages: Array.from(messageMap.values()).map((msg) => ({
+      info: msg,
+      parts: partMap.get(msg.id) ?? [],
+    })),
+  }
+}
+
 type ExportData = { info: SDKSession; messages: Array<{ info: Message; parts: Part[] }> }
 
 export const ImportCommand = effectCmd({
   command: "import <file>",
-  describe: "import session data from JSON file",
+  describe: "import session data from JSON file or URL",
   builder: (yargs) =>
     yargs.positional("file", {
-      describe: "path to JSON file",
+      describe: "path to JSON file, or a share URL from your organisation's console or enterprise.url",
       type: "string",
       demandOption: true,
     }),
@@ -45,15 +122,71 @@ export const ImportCommand = effectCmd({
 })
 
 const runImport = Effect.fn("Cli.import.body")(function* (file: string, ctx: InstanceContext) {
+  const share = yield* ShareNext.Service
   const fs = yield* FSUtil.Service
   const { db } = yield* Database.Service
 
-  if (file.startsWith("http://") || file.startsWith("https://"))
-    return yield* fail("Importing from share URLs is no longer supported: session sharing has been discontinued")
+  let exportData: ExportData | undefined
 
-  const exportData = (yield* fs
-    .readJson(file)
-    .pipe(Effect.mapError((error) => new CliError({ message: formatImportFileError(file, error) })))) as ExportData
+  const isUrl = file.startsWith("http://") || file.startsWith("https://")
+
+  if (isUrl) {
+    if (isDiscontinuedShareUrl(file)) return yield* new CliError({ message: DISCONTINUED_MESSAGE })
+    // Without an organisation or enterprise.url a link still imports from its own host, unsigned
+    // (XCOD-266).
+    const req = yield* Effect.orDie(
+      share.request().pipe(Effect.catchIf(ShareNext.isNoTarget, () => Effect.succeed(undefined))),
+    )
+    const slug = parseShareUrl(file)
+    if (!slug) {
+      process.stdout.write(`Invalid URL format. Expected: ${req?.baseUrl ?? "https://<share host>"}/share/<slug>`)
+      process.stdout.write(EOL)
+      return
+    }
+
+    const baseUrl = new URL(file).origin
+    const headers = req && shouldAttachShareAuthHeaders(file, req.baseUrl) ? req.headers : {}
+
+    const tryFetch = (url: string) =>
+      Effect.tryPromise({
+        try: () => fetch(url, { headers }),
+        catch: (e) =>
+          new CliError({
+            message: `Failed to fetch share data: ${e instanceof Error ? e.message : String(e)}`,
+          }),
+      })
+
+    const dataPath = req?.api.data(slug) ?? `/api/share/${slug}/data`
+    let response = yield* tryFetch(`${baseUrl}${dataPath}`)
+
+    if (!response.ok && dataPath !== `/api/share/${slug}/data`) {
+      response = yield* tryFetch(`${baseUrl}/api/share/${slug}/data`)
+    }
+
+    if (!response.ok) {
+      process.stdout.write(`Failed to fetch share data: ${response.statusText}`)
+      process.stdout.write(EOL)
+      return
+    }
+
+    const shareData = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<ShareData[]>,
+      catch: () => new CliError({ message: "Share data was not valid JSON" }),
+    })
+    const transformed = transformShareData(shareData)
+
+    if (!transformed) {
+      process.stdout.write(`Share not found or empty: ${slug}`)
+      process.stdout.write(EOL)
+      return
+    }
+
+    exportData = transformed
+  } else {
+    exportData = (yield* fs
+      .readJson(file)
+      .pipe(Effect.mapError((error) => new CliError({ message: formatImportFileError(file, error) })))) as ExportData
+  }
 
   if (!exportData) {
     process.stdout.write(`Failed to read session data`)

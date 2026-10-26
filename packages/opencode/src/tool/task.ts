@@ -1,6 +1,7 @@
 import * as Tool from "./tool"
 import DESCRIPTION from "./task.txt"
 import { ToolJsonSchema } from "./json-schema"
+import type { JSONSchema7, JSONSchema7Definition } from "@ai-sdk/provider"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { BackgroundJob } from "@/background/job"
 import { Session } from "@/session/session"
@@ -10,10 +11,20 @@ import { Agent } from "../agent/agent"
 import { deriveSubagentSessionPermission } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
-import { Effect, Exit, Schema, Scope } from "effect"
+import { Effect, Exit, Option, Schema, Scope, Semaphore } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { backgroundEnabled } from "@/background/enabled"
 import { Database } from "@opencode-ai/core/database/database"
+import { Residency } from "@opencode-ai/core/residency"
+import { AuditLog } from "@/audit/log"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
+import { SubagentModel } from "../agent/subagent-model"
+import { ConfigPolicy } from "@/config/policy"
+import { DynamicWorkflows } from "@/session/workflows"
+import { Budget } from "@/budget"
+import { Question } from "@/question"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -22,6 +33,9 @@ export interface TaskPromptOps {
 }
 
 const id = "task"
+
+/** XCOD-287: subagents that run at once per session unless `subagent.max_parallel` says otherwise. */
+export const DEFAULT_MAX_PARALLEL = 3
 const BACKGROUND_DESCRIPTION = [
   "Background mode: background=true launches the subagent asynchronously and returns immediately.",
   "Foreground is the default; use it when you need the result before continuing.",
@@ -49,6 +63,9 @@ const BaseParameterFields = {
       "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
   }),
   command: Schema.optional(Schema.String).annotate({ description: "The command that triggered this task" }),
+  model: Schema.optional(Schema.String).annotate({
+    description: "Model for this task, from the allowed list. Only offered when subagent.dynamic is enabled.",
+  }),
 }
 
 const BaseParameters = Schema.Struct(BaseParameterFields)
@@ -60,6 +77,39 @@ export const Parameters = Schema.Struct({
       "Run the agent in the background. You will be notified when it completes. DO NOT sleep, poll, or proactively check on its progress",
   }),
 })
+
+/**
+ * The task tool's JSON schema with the `model` parameter constrained to `allowed`, or removed when
+ * nothing is allowed (XCOD-82). An enum, so the main agent can't invent a model id; the resolver
+ * still refuses anything off the list.
+ */
+export function withModelParameter(schema: JSONSchema7, allowed: readonly string[]): JSONSchema7 {
+  const properties = { ...(schema.properties ?? {}) } as Record<string, JSONSchema7Definition>
+  delete properties.model
+  if (allowed.length)
+    properties.model = {
+      type: "string",
+      enum: [...allowed],
+      description:
+        "Model for this task. Pick by the nature of the work: a cheap, fast model for broad search or simple lookups; a strong model for design, review or subtle debugging. Omit to use the configured default.",
+    }
+  return { ...schema, properties }
+}
+
+/**
+ * XCOD-287: the task tool's description and JSON schema as the model sees them for one request:
+ * without the `background` parameter and its explanation when background subagents are off in the
+ * live config. Tool init can't always read config, so it can't decide this on its own.
+ */
+export function withBackground(input: { description: string; schema: JSONSchema7 }, enabled: boolean) {
+  if (enabled) return input
+  const properties = { ...(input.schema.properties ?? {}) } as Record<string, JSONSchema7Definition>
+  delete properties.background
+  return {
+    description: input.description.replace(`\n\n${BACKGROUND_DESCRIPTION}`, ""),
+    schema: { ...input.schema, properties },
+  }
+}
 
 function renderOutput(input: {
   sessionID: SessionID
@@ -88,6 +138,34 @@ export const TaskTool = Tool.define(
     const scope = yield* Scope.Scope
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
+    // Optional so test layers without a question service still build the tool; the registry has one.
+    const question = yield* Effect.serviceOption(Question.Service)
+
+    // XCOD-287: at most `subagent.max_parallel` subagents of one session run at once; the rest wait
+    // for a slot, marked `subagent.queued` on their session so the TUI can say so.
+    const slots = new Map<string, Semaphore.Semaphore>()
+    const slot = Effect.fn("TaskTool.slot")(function* (parentID: string, max: number) {
+      const hit = slots.get(parentID)
+      if (hit) {
+        // A changed setting applies to the next subagent; running ones keep their slot.
+        yield* hit.resize(max)
+        return hit
+      }
+      const next = Semaphore.makeUnsafe(max)
+      slots.set(parentID, next)
+      return next
+    })
+    const markQueued = Effect.fn("TaskTool.markQueued")(function* (sessionID: SessionID, queued: boolean) {
+      const latest = yield* sessions.get(sessionID)
+      const { subagent: _, ...rest } = (latest.metadata ?? {}) as Record<string, unknown>
+      yield* sessions.setMetadata({ sessionID, metadata: queued ? { ...rest, subagent: { queued: true } } : rest })
+    })
+
+    const lastAssistant = Effect.fn("TaskTool.lastAssistant")(function* (sessionID: SessionID) {
+      const messages = yield* sessions.messages({ sessionID }).pipe(Effect.orElseSucceed(() => []))
+      const info = messages.findLast((item) => item.info.role === "assistant")?.info
+      return info?.role === "assistant" ? info : undefined
+    })
 
     const run = Effect.fn("TaskTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
@@ -95,9 +173,11 @@ export const TaskTool = Tool.define(
     ) {
       const cfg = yield* config.get()
       const runInBackground = params.background === true
-      if (runInBackground && !flags.experimentalBackgroundSubagents) {
+      if (runInBackground && !backgroundEnabled(flags.experimentalBackgroundSubagents, cfg)) {
         return yield* Effect.fail(
-          new Error("Background subagents require OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true"),
+          new Error(
+            'Background subagents are off. Enable them with "subagent": { "background": true } in your Lunos config.',
+          ),
         )
       }
 
@@ -114,6 +194,68 @@ export const TaskTool = Tool.define(
             `Subagent depth limit reached (${cfg.subagent_depth ?? 1}). Increase "subagent_depth" to allow nested subagents.`,
           ),
         )
+      }
+
+      // XCOD-303: in a Dynamic workflow, no new subagent starts once a budget with `on_limit: stop` is
+      // used up (steps already running finish), and a step re-dispatched MAX_REDISPATCH times goes
+      // to the user rather than round again.
+      const parentAgent = yield* agent.get(ctx.agent)
+      const dynamic =
+        !!parentAgent &&
+        DynamicWorkflows.decide({
+          config: cfg,
+          agent: parentAgent,
+          session: parent,
+          subagents: (yield* agent.list()).filter((item) => item.mode !== "primary"),
+        }).on
+      if (dynamic) {
+        const stop = yield* Budget.dispatchStop(
+          {
+            directory: parent.directory,
+            session: { id: parent.id, ...(parent.parentID ? { parentID: parent.parentID } : {}) },
+          },
+          cfg as Budget.Config,
+        ).pipe(
+          Effect.provideService(Database.Service, database),
+          // A budget that can't be read never stops work, as in the session loop.
+          Effect.orElseSucceed(() => undefined),
+        )
+        if (stop) return yield* Effect.fail(new Error(`${stop} No new subagent is dispatched.`))
+        const before = DynamicWorkflows.dispatches(ctx.messages, params)
+        if (before > DynamicWorkflows.MAX_REDISPATCH) {
+          const AGAIN = "Try again"
+          // Nobody to ask (`lunos run`, CI): refused, never left waiting.
+          const asker = Budget.unattended(current.permission) ? undefined : Option.getOrUndefined(question)
+          const answers = !asker
+            ? []
+            : yield* asker
+                .ask({
+                  sessionID: ctx.sessionID,
+                  questions: [
+                    {
+                      header: "Workflow step",
+                      question: `"${params.description}" has been re-dispatched ${before - 1} times without finishing. Dispatch it again?`,
+                      custom: true,
+                      options: [
+                        { label: AGAIN, description: `Dispatch ${params.subagent_type} once more` },
+                        { label: "Stop", description: "Leave this step; the main agent reports where it stands" },
+                      ],
+                    },
+                  ],
+                })
+                .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<ReadonlyArray<string>>))
+          const answer = answers[0]?.[0]
+          if (answer !== AGAIN)
+            return yield* Effect.fail(
+              new Error(
+                `"${params.description}" was re-dispatched ${DynamicWorkflows.MAX_REDISPATCH} times; ${
+                  answer
+                    ? `the user answered: ${answer}. Don't dispatch it again; follow the user's answer.`
+                    : "don't dispatch it again. Report where it stands and ask the user how to go on."
+                }`,
+              ),
+            )
+        }
       }
 
       if (!ctx.extra?.bypassAgentCheck) {
@@ -177,15 +319,58 @@ export const TaskTool = Tool.define(
       )
       if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
       const variant = msg.info.variant
+      const parentModel = { providerID: msg.info.providerID, modelID: msg.info.modelID }
 
-      const model = next.model ?? {
-        modelID: msg.info.modelID,
-        providerID: msg.info.providerID,
+      // XCOD-82: per-call → per-type → global → inherit. Resuming a task keeps the model of its
+      // original run unless this call explicitly (and allowably) overrides it.
+      const previous = session ? yield* lastAssistant(nextSession.id) : undefined
+      // XCOD-219: a locked subagent model also outranks a resumed task's earlier model.
+      const lock = ConfigPolicy.lockedSubagentModel(cfg, next.name)
+      const resolved = yield* Effect.try({
+        try: () => {
+          const out = (() => {
+            try {
+              return SubagentModel.resolve({
+                subagentType: next.name,
+                parent: { ...parentModel, variant },
+                perCall: params.model,
+                typeModel: next.modelSpec,
+                typeVariant: next.modelSpec ? next.variant : undefined,
+                lock,
+                config: cfg,
+              })
+            } catch (error) {
+              if (error instanceof SubagentModel.RefusedError && error.lockedKey)
+                ConfigPolicy.notifyRefused(error.lockedKey, `task model ${params.model}`)
+              throw error
+            }
+          })()
+          const final =
+            previous && params.model === undefined && !lock
+              ? {
+                  ...out,
+                  model: { providerID: previous.providerID, modelID: previous.modelID },
+                  variant: previous.variant,
+                  source: "resumed task",
+                }
+              : out
+          SubagentModel.checkResidency(final, AuditLog.residency(cfg))
+          return final
+        },
+        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+      })
+      const model = {
+        providerID: ProviderV2.ID.make(resolved.model.providerID),
+        modelID: ModelV2.ID.make(resolved.model.modelID),
       }
       const metadata = {
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
         model,
+        agent: next.name,
+        modelRule: resolved.rule,
+        modelSource: resolved.source,
+
         ...(runInBackground ? { background: true } : {}),
       }
 
@@ -197,7 +382,18 @@ export const TaskTool = Tool.define(
       const ops = ctx.extra?.promptOps as TaskPromptOps
       if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
 
-      const runTask = Effect.fn("TaskTool.runTask")(function* () {
+      const gate = yield* slot(ctx.sessionID, cfg.subagent?.max_parallel ?? DEFAULT_MAX_PARALLEL)
+      const runTask = () =>
+        Effect.gen(function* () {
+          const now = yield* gate.withPermitsIfAvailable(1)(prompt())
+          if (Option.isSome(now)) return now.value
+          yield* markQueued(nextSession.id, true).pipe(Effect.ignore)
+          return yield* gate
+            .withPermits(1)(markQueued(nextSession.id, false).pipe(Effect.ignore, Effect.andThen(prompt())))
+            .pipe(Effect.onInterrupt(() => markQueued(nextSession.id, false).pipe(Effect.ignore)))
+        })
+
+      const prompt = Effect.fn("TaskTool.runTask")(function* () {
         const parts = yield* ops.resolvePromptParts(params.prompt)
         const result = yield* ops.prompt({
           messageID: MessageID.ascending(),
@@ -206,7 +402,7 @@ export const TaskTool = Tool.define(
             modelID: model.modelID,
             providerID: model.providerID,
           },
-          variant: next.model ? undefined : variant,
+          variant: resolved.variant,
           agent: next.name,
           parts,
         })
@@ -358,12 +554,17 @@ export const TaskTool = Tool.define(
       )
     })
 
+    // Tool init can run outside an instance (tests, tool listings), where config isn't
+    // reachable; fall back to the default there. Execution re-checks with live config, and the
+    // registry drops the background parameter per request when it's off (withBackground).
+    const initialConfig = yield* config.get().pipe(Effect.catchCause(() => Effect.succeed({})))
+    const backgroundOn = backgroundEnabled(flags.experimentalBackgroundSubagents, initialConfig)
     return {
-      description: flags.experimentalBackgroundSubagents
-        ? [DESCRIPTION, BACKGROUND_DESCRIPTION].join("\n\n")
-        : DESCRIPTION,
+      description: backgroundOn ? [DESCRIPTION, BACKGROUND_DESCRIPTION].join("\n\n") : DESCRIPTION,
       parameters: Parameters,
-      jsonSchema: flags.experimentalBackgroundSubagents ? undefined : ToolJsonSchema.fromSchema(BaseParameters),
+      // `model` is never offered by default; the registry adds it, as an enum of the allowed models,
+      // only when subagent.dynamic is enabled (withModelParameter).
+      jsonSchema: withModelParameter(ToolJsonSchema.fromSchema(backgroundOn ? Parameters : BaseParameters), []),
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         run(params, ctx).pipe(Effect.orDie),
     }

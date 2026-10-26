@@ -46,10 +46,12 @@ export const Definitions = {
   leader: keybind(LeaderDefault, "Leader key for keybind combinations"),
 
   app_exit: keybind("ctrl+c,ctrl+d,<leader>q", "Exit the application"),
+  app_restart: keybind("none", "Restart Lunos"),
   app_debug: keybind("none", "Toggle debug panel"),
   app_console: keybind("none", "Toggle console"),
   app_heap_snapshot: keybind("none", "Write heap snapshot"),
   app_toggle_animations: keybind("none", "Toggle animations"),
+  app_toggle_sounds: keybind("none", "Mute or unmute sounds"),
   app_toggle_file_context: keybind("none", "Toggle file context"),
   app_toggle_diffwrap: keybind("none", "Toggle diff wrapping"),
   app_toggle_paste_summary: keybind("none", "Toggle paste summary"),
@@ -100,6 +102,7 @@ export const Definitions = {
   session_toggle_timestamps: keybind("none", "Toggle message timestamps"),
   session_toggle_generic_tool_output: keybind("none", "Toggle generic tool output"),
   session_queued_prompts: keybind("<leader>q", "Manage queued prompts"),
+  agent_monitor: keybind("<leader>o", "Open the Agent Monitor"),
   session_child_first: keybind("<leader>down", "Go to first child session"),
   session_child_cycle: keybind("right", "Go to next child session"),
   session_child_cycle_reverse: keybind("left", "Go to previous child session"),
@@ -116,19 +119,23 @@ export const Definitions = {
   session_quick_switch_9: keybind("<leader>9", "Switch to session in quick slot 9"),
 
   stash_delete: keybind("ctrl+d", "Delete stash entry"),
+  background_cancel: keybind("ctrl+d", "Cancel background subagent"),
   model_provider_list: keybind("ctrl+a", "Open provider list from model dialog"),
   model_favorite_toggle: keybind("ctrl+f", "Toggle model favorite status"),
+  model_filter_cycle: keybind("ctrl+l", "Cycle the model dialog filter: All, Recommended, Large, Small"),
   model_list: keybind("<leader>m", "List available models"),
   model_cycle_recent: keybind("f2", "Next recently used model"),
   model_cycle_recent_reverse: keybind("shift+f2", "Previous recently used model"),
   model_cycle_favorite: keybind("none", "Next favorite model"),
   model_cycle_favorite_reverse: keybind("none", "Previous favorite model"),
   mcp_list: keybind("none", "List MCP servers"),
-  provider_connect: keybind("none", "Connect provider"),
+  provider_list: keybind("none", "Manage providers"),
   console_org_switch: keybind("none", "Switch console organization"),
-  agent_list: keybind("<leader>a", "List agents"),
-  agent_cycle: keybind("tab", "Next agent"),
-  agent_cycle_reverse: keybind("shift+tab", "Previous agent"),
+  mode_list: keybind("<leader>a", "List modes"),
+  // XCOD-310: Manual / Auto approval for the current workflow in this session.
+  permission_mode: keybind("<leader>p", "Switch Manual / Auto approval for this workflow"),
+  mode_cycle: keybind("tab", "Next mode"),
+  mode_cycle_reverse: keybind("shift+tab", "Previous mode"),
   variant_cycle: keybind("ctrl+t", "Cycle model variants"),
   variant_list: keybind("none", "List model variants"),
 
@@ -211,6 +218,73 @@ export const Definitions = {
   "dialog.move_session.new": keybind("ctrl+m", "New project copy"),
   "dialog.move_session.delete": keybind("ctrl+d", "Delete project copy"),
   "dialog.move_session.refresh": keybind("ctrl+r", "Refresh project copies"),
+  "dialog.memory.forget": keybind("ctrl+d", "Forget a fact in the memory browser"),
+  "dialog.memory.outdate": keybind("ctrl+u", "Mark a fact outdated in the memory browser"),
+  "dialog.memory.export": keybind("ctrl+s", "Export memory from the memory browser"),
+  "dialog.memory.import": keybind("ctrl+o", "Import memory from the memory browser"),
+  "dialog.memory.tab": keybind("tab", "Next tab (Overview, Activity, Facts) in the memory browser"),
+  "dialog.memory.range": keybind("ctrl+r", "Change the time range (7d, 30d, 90d, all) in the memory browser"),
+  "dialog.memory.forget_all": keybind("ctrl+k", "Forget every fact a drill-down lists, after typing their count"),
+  "dialog.memory.import.all": keybind("ctrl+a", "Approve or reject every importable row in the import preview"),
+  "dialog.memory.import.apply": keybind("ctrl+s", "Write the approved rows of the import preview"),
+  "dialog.memory.setup.compare": keybind("c", "Compare the storage options side by side in memory setup"),
+  "dialog.memory.setup.help": keybind("?", "Help me choose where memory is stored, in memory setup"),
+  "dialog.sessions.group.new": keybind("ctrl+g", "New session group in the Sessions view"),
+  "dialog.sessions.move": keybind("ctrl+o", "Move the selected session to a group in the Sessions view"),
+  "dialog.sessions.rename": keybind("ctrl+r", "Rename the selected session or group in the Sessions view"),
+  // XCOD-284: ctrl+d is Delete (the marked sessions, the highlighted one, or a group row's group).
+  "dialog.sessions.delete": keybind("ctrl+d", "Delete the selected sessions (or group) in the Sessions view"),
+  "dialog.sessions.group.delete": keybind("none", "Delete the selected group in the Sessions view"),
+  "dialog.sessions.mark": keybind("space", "Mark or unmark the selected session for Delete in the Sessions view"),
+  "dialog.sessions.stop": keybind("ctrl+s", "Stop the selected session in the Sessions view"),
+  "dialog.sessions.state": keybind("ctrl+f", "Cycle the Sessions view's state filter"),
+  // XCOD-309: ctrl+v is paste and ctrl+t the variant cycle; ctrl+y has no input-editing binding.
+  "dialog.sessions.view": keybind(
+    "ctrl+y",
+    "Switch the Sessions view and the Agent Monitor's rail between groups (status) and projects",
+  ),
+  "dialog.sessions.project.new": keybind(
+    "n",
+    "Start a new session in the selected project (on its header, in the Projects view)",
+  ),
+  "dialog.sessions.project.settings": keybind(
+    "p",
+    "Open the selected project's settings (on its header, in the Projects view)",
+  ),
+  "monitor.back": keybind("escape,right", "Leave the Agent Monitor (right only from an empty prompt)"),
+  "monitor.focus": keybind("tab", "Move focus between the Agent Monitor's prompt and its rail"),
+  "monitor.project": keybind("ctrl+p", "Pick the project a new session starts in, in the Agent Monitor"),
+  "monitor.send_now": keybind(
+    "ctrl+return",
+    "Interrupt a running session and send the prompt now, in the Agent Monitor",
+  ),
+  "monitor.approve": keybind("a", "Approve the shown request of the selected session in the Agent Monitor"),
+  "monitor.deny": keybind("d", "Deny the shown request of the selected session in the Agent Monitor"),
+  "monitor.stop": keybind("s", "Stop the selected session in the Agent Monitor"),
+  "monitor.delete": keybind("x,delete", "Delete the selected session for good in the Agent Monitor (after confirming)"),
+  "monitor.filter": keybind("/", "Filter the Agent Monitor's rail"),
+  "monitor.older": keybind("o", "Show or hide older completed sessions in the Agent Monitor"),
+  "monitor.takeover": keybind(
+    "t",
+    "Take over the selected session, whose Lunos closed with prompts queued, and send or discard them, in the Agent Monitor",
+  ),
+  // XCOD-308: r, not ctrl+r, so it doesn't clash with the rail's other keys.
+  "monitor.rename": keybind("r", "Rename the selected session in the Agent Monitor"),
+  // XCOD-265's Stop all / Clear list in the Agent Monitor's rail: unbound, as in /sessions.
+  "monitor.stop_all": keybind("none", "Stop every running or waiting session in the Agent Monitor's rail"),
+  "monitor.clear": keybind("none", "Clear (archive) the finished sessions in the Agent Monitor's rail"),
+  // XCOD-265: unbound by default (ctrl+x is the leader); always in the view's footer and Tab menu.
+  "dialog.sessions.stop_all": keybind("none", "Stop every running or waiting session in the Sessions view"),
+  "dialog.sessions.clear": keybind("none", "Clear (archive) the finished sessions in the Sessions view"),
+  "dialog.sessions.stop_all_clear": keybind("none", "Stop all, then clear the Sessions view"),
+  "dialog.sessions.undo": keybind("none", "Undo the last Clear in the Sessions view"),
+  "dialog.sessions.archived": keybind("none", "Show the archived sessions in the Sessions view, or go back"),
+  "dialog.sessions.unarchive": keybind("none", "Put the selected archived session back in the Sessions view"),
+  "dialog.sessions.delete_archived": keybind("none", "Delete the archived sessions for good, after typing their count"),
+  "dialog.sessions.delete_all": keybind(
+    "none",
+    "Delete every session shown in the Sessions view, after typing their count",
+  ),
   "prompt.autocomplete.prev": keybind("up,ctrl+p", "Move to previous autocomplete item"),
   "prompt.autocomplete.next": keybind("down,ctrl+n", "Move to next autocomplete item"),
   "prompt.autocomplete.hide": keybind("escape", "Hide autocomplete"),
@@ -219,12 +293,16 @@ export const Definitions = {
   "permission.prompt.fullscreen": keybind("ctrl+f", "Toggle permission prompt fullscreen"),
   "plugins.toggle": keybind("space", "Toggle plugin"),
   "dialog.plugins.install": keybind("shift+i", "Install plugin from plugin dialog"),
+  "dialog.plugins.discover": keybind("shift+d", "Discover plugins from plugin dialog"),
+  "dialog.plugins.discover.next_kind": keybind("ctrl+o", "Next content tab (Plugins, Skills, Hooks, MCP) in Discover"),
 
   terminal_suspend: keybind("ctrl+z", "Suspend terminal"),
   terminal_title_toggle: keybind("none", "Toggle terminal title"),
   tips_toggle: keybind("<leader>h", "Toggle tips on home screen"),
+  tips_next: keybind("none", "Show another tip"),
   plugin_manager: keybind("none", "Open plugin manager dialog"),
   plugin_install: keybind("none", "Install plugin"),
+  plugin_discover: keybind("none", "Discover plugins"),
 
   which_key_toggle: keybind("ctrl+alt+k", "Toggle which-key panel"),
   which_key_layout_toggle: keybind("ctrl+alt+shift+k", "Switch which-key layout"),
@@ -242,12 +320,27 @@ export const Definitions = {
 type KeybindName = keyof typeof Definitions
 const KeybindNames = new Set<string>(Object.keys(Definitions))
 
+/**
+ * Pre-rename keybind names, kept working as deprecated aliases so existing
+ * user configs don't hard-error (XCOD-40). Each maps to the canonical
+ * post-rename name it now resolves to.
+ */
+export const KeybindAliases: Record<string, KeybindName> = {
+  agent_list: "mode_list",
+  agent_cycle: "mode_cycle",
+  agent_cycle_reverse: "mode_cycle_reverse",
+  // XCOD-130: the provider command was renamed to /providers.
+  provider_connect: "provider_list",
+}
+
 export const KeybindOverrides = Schema.Struct(
   Object.fromEntries(
-    Object.entries(Definitions).map(([name, item]) => [
-      name,
-      Schema.optional(BindingValueSchema).annotate({ description: item.description }),
-    ]),
+    [
+      ...Object.entries(Definitions).map(([name, item]) => [name, item.description]),
+      // Legacy names stay in the schema so a config decode keeps them for resolveKeybindAliases,
+      // which maps them onto their canonical names and reports them as deprecated.
+      ...Object.entries(KeybindAliases).map(([legacy, canonical]) => [legacy, `Deprecated: use ${canonical}`]),
+    ].map(([name, description]) => [name, Schema.optional(BindingValueSchema).annotate({ description })]),
   ),
 ).annotate({ description: "TUI keybinding overrides" })
 export const Descriptions = Object.fromEntries(
@@ -255,10 +348,12 @@ export const Descriptions = Object.fromEntries(
 ) as Record<KeybindName, string>
 export const CommandMap = {
   app_exit: "app.exit",
+  app_restart: "app.restart",
   app_debug: "app.debug",
   app_console: "app.console",
   app_heap_snapshot: "app.heap_snapshot",
   app_toggle_animations: "app.toggle.animations",
+  app_toggle_sounds: "app.toggle.sounds",
   app_toggle_file_context: "app.toggle.file_context",
   app_toggle_diffwrap: "app.toggle.diffwrap",
   app_toggle_paste_summary: "app.toggle.paste_summary",
@@ -307,6 +402,7 @@ export const CommandMap = {
   session_toggle_timestamps: "session.toggle.timestamps",
   session_toggle_generic_tool_output: "session.toggle.generic_tool_output",
   session_queued_prompts: "session.queued_prompts",
+  agent_monitor: "agent.monitor",
   session_child_first: "session.child.first",
   session_child_cycle: "session.child.next",
   session_child_cycle_reverse: "session.child.previous",
@@ -322,19 +418,22 @@ export const CommandMap = {
   session_quick_switch_8: "session.quick_switch.8",
   session_quick_switch_9: "session.quick_switch.9",
   stash_delete: "stash.delete",
+  background_cancel: "background.cancel",
   model_provider_list: "model.dialog.provider",
   model_favorite_toggle: "model.dialog.favorite",
+  model_filter_cycle: "model.dialog.filter",
   model_list: "model.list",
+  permission_mode: "permission.mode",
   model_cycle_recent: "model.cycle_recent",
   model_cycle_recent_reverse: "model.cycle_recent_reverse",
   model_cycle_favorite: "model.cycle_favorite",
   model_cycle_favorite_reverse: "model.cycle_favorite_reverse",
   mcp_list: "mcp.list",
-  provider_connect: "provider.connect",
+  provider_list: "provider.list",
   console_org_switch: "console.org.switch",
-  agent_list: "agent.list",
-  agent_cycle: "agent.cycle",
-  agent_cycle_reverse: "agent.cycle.reverse",
+  mode_list: "mode.list",
+  mode_cycle: "mode.cycle",
+  mode_cycle_reverse: "mode.cycle.reverse",
   variant_cycle: "variant.cycle",
   variant_list: "variant.list",
   messages_page_up: "session.page.up",
@@ -404,8 +503,10 @@ export const CommandMap = {
   terminal_suspend: "terminal.suspend",
   terminal_title_toggle: "terminal.title.toggle",
   tips_toggle: "tips.toggle",
+  tips_next: "tips.next",
   plugin_manager: "plugins.list",
   plugin_install: "plugins.install",
+  plugin_discover: "plugins.discover",
   which_key_toggle: "which-key.toggle",
   which_key_layout_toggle: "which-key.layout.toggle",
   which_key_pending_toggle: "which-key.pending.toggle",
@@ -446,13 +547,37 @@ export function defaultValue(name: KeybindName) {
   return Definitions[name].default
 }
 
+/**
+ * Resolves legacy keybind names in a raw overrides object onto their
+ * canonical names, without mutating the input. Returns the resolved object
+ * (safe to validate/parse) and the list of legacy aliases that were found,
+ * so a caller can surface a deprecation notice.
+ */
+export function resolveKeybindAliases(input: Record<string, unknown>): {
+  resolved: Record<string, unknown>
+  deprecated: { legacy: string; canonical: KeybindName }[]
+} {
+  const resolved = { ...input }
+  const deprecated: { legacy: string; canonical: KeybindName }[] = []
+  for (const [legacy, canonical] of Object.entries(KeybindAliases)) {
+    if (!(legacy in resolved)) continue
+    const value = resolved[legacy]
+    delete resolved[legacy]
+    deprecated.push({ legacy, canonical })
+    if (resolved[canonical] !== undefined) continue
+    resolved[canonical] = value
+  }
+  return { resolved, deprecated }
+}
+
 export function parse(keybinds: KeybindOverrides): Keybinds {
-  const invalid = unknownKeys(keybinds)
+  const { resolved } = resolveKeybindAliases(keybinds)
+  const invalid = unknownKeys(resolved)
   if (invalid.length) throw new Error(`Unrecognized keybind${invalid.length === 1 ? "" : "s"}: ${invalid.join(", ")}`)
   return Object.fromEntries(
     Object.entries(Definitions).map(([name, item]) => [
       name,
-      decodeBindingValue(keybinds[name as KeybindName] ?? item.default),
+      decodeBindingValue(resolved[name as KeybindName] ?? item.default),
     ]),
   ) as Keybinds
 }
@@ -460,7 +585,7 @@ export function parse(keybinds: KeybindOverrides): Keybinds {
 export const Keybinds = { parse }
 
 export function unknownKeys(input: object) {
-  return Object.keys(input).filter((key) => !KeybindNames.has(key))
+  return Object.keys(input).filter((key) => !KeybindNames.has(key) && !(key in KeybindAliases))
 }
 
 export function bindingDefaults(): BindingDefaults<Renderable, KeyEvent> {

@@ -19,12 +19,22 @@ import { pathToFileURL } from "url"
 import { open } from "node:fs/promises"
 import { Effect } from "effect"
 import { UI } from "../ui"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, fail } from "../effect-cmd"
+import { wanted as sandboxWanted, strictArg } from "./sandbox"
 import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
+import { RunLog } from "@opencode-ai/core/observability/run-log"
+import { Failure } from "../failure"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { RunBudget } from "@/agent/run-budget"
+import { RunEnding } from "./run/ending"
+import { RunSettle } from "./run/settle"
+import { ShareNotice } from "@/share/notice"
+
+const isAbort = (error: unknown) =>
+  !!error && typeof error === "object" && (error as { name?: unknown }).name === "MessageAbortedError"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
@@ -83,7 +93,26 @@ function block(info: Inline, output?: string) {
   UI.empty()
 }
 
+/** How long an attached run waits for the session's last events after the prompt returns. */
+const ATTACH_GRACE_MS = 5_000
+
+/** The error on the assistant message a prompt or command returned, if it ended in one. */
+function messageError(data: unknown) {
+  if (!data || typeof data !== "object" || !("info" in data)) return undefined
+  const info = (data as { info?: { error?: unknown } }).info
+  return info?.error ?? undefined
+}
+
+/** XCOD-280: the full error goes to the run log before its message becomes the command's failure. */
+const failRecorded = (error: unknown) => {
+  Failure.record("lunos run", error)
+  return fail(error instanceof Error ? error.message : String(error))
+}
+
 function formatRunError(error: unknown) {
+  // XCOD-237: an attached run's session can be aborted from the server side (e.g. Lunos Cloud
+  // stopping it for billing, which then says why); a JSON dump of the abort helps no one.
+  if (isAbort(error)) return "The session was aborted."
   return FormatError(error) ?? FormatUnknownError(error)
 }
 
@@ -123,12 +152,26 @@ async function toolError(part: ToolPart) {
   }
 }
 
+/** `--cloud-secret A --cloud-secret B,C` → ["A", "B", "C"]. */
+export function cloudSecretNames(value: string | string[] | undefined): string[] | undefined {
+  if (value === undefined) return undefined
+  return [value]
+    .flat()
+    .flatMap((item) => String(item).split(","))
+    .map((name) => name.trim())
+    .filter(Boolean)
+}
+
+/** XCOD-298: the exit code of a run a budget stopped. */
+export const BUDGET_EXIT = 3
+
 export const RunCommand = effectCmd({
   command: "run [message..]",
   describe: "run opencode with a message",
   // --attach connects to a remote server (no local instance needed); the
   // default path runs an in-process server and needs the project instance.
-  instance: (args) => !args.attach,
+  // --sandbox (XCOD-144) doesn't either: it must not initialise the project's plugins on the host.
+  instance: (args) => !args.attach && !sandboxWanted(args),
   // For --dir without --attach, load instance for the resolved target dir.
   // The handler also chdirs (preserving the legacy order: chdir → file resolution).
   directory: (args) => (args.dir && !args.attach ? path.resolve(process.cwd(), args.dir) : process.cwd()),
@@ -160,17 +203,21 @@ export const RunCommand = effectCmd({
       })
       .option("share", {
         type: "boolean",
-        describe: "deprecated: session sharing was discontinued",
-        hidden: true,
+        describe: "share the session",
       })
       .option("model", {
         type: "string",
         alias: ["m"],
         describe: "model to use in the format of provider/model",
       })
+      .option("mode", {
+        type: "string",
+        describe: "mode to use",
+      })
       .option("agent", {
         type: "string",
-        describe: "agent to use",
+        hidden: true,
+        describe: "deprecated, use --mode",
       })
       .option("format", {
         type: "string",
@@ -260,8 +307,118 @@ export const RunCommand = effectCmd({
         default: false,
         hidden: true,
         describe: "enable direct interactive demo slash commands; pass one as the message to run it immediately",
-      }),
+      })
+      .option("sandbox", {
+        type: "boolean",
+        describe:
+          "run in an isolated Docker sandbox; results come back as branch lunos/sandbox/<id> (outside a git repository: `lunos sandbox apply <id>` writes them back). If it can't start, the run warns and goes on without it; --sandbox=strict fails instead",
+      })
+      .option("unattended", {
+        // XCOD-211: set by `lunos agent run`. Nobody can answer a permission prompt, so each one is
+        // refused with a message saying why, which lets the agent carry on without that action.
+        type: "boolean",
+        default: false,
+        hidden: true,
+      })
+      .option("keep", {
+        type: "boolean",
+        describe: "with --sandbox: keep the sandbox when done, whatever sandbox.on_finish says",
+      })
+      .option("rm", {
+        type: "boolean",
+        describe: "with --sandbox: remove the sandbox when done, whatever sandbox.on_finish says",
+      })
+      .option("cloud", {
+        type: "boolean",
+        describe:
+          "run on a Lunos Cloud worker (needs lunos login and cloud.endpoint); results come back as branch lunos/cloud/<id>",
+      })
+      .option("cloud-size", {
+        type: "string",
+        choices: ["standard", "large"],
+        describe: "with --cloud: worker size (large counts double)",
+      })
+      .option("cloud-secret", {
+        // XCOD-236: not `array: true`, which also swallowed the message after it ("--cloud-secret X
+        // "fix it"" sent a secret named "fix it"). Repeating the flag still gives a list.
+        type: "string",
+        coerce: cloudSecretNames,
+        describe:
+          "with --cloud: send this environment variable to the worker for this run (repeat it, or NAME,NAME); nothing else is sent",
+      })
+      // XCOD-281: `--sandbox=strict` is --sandbox that may not fall back; yargs would read it as false.
+      .middleware((argv) => {
+        if (strictArg()) argv.sandbox = true
+      }, true),
   handler: Effect.fn("Cli.run")(function* (args) {
+    if (args.sandbox === false && !args.attach) {
+      const { refuseHost } = yield* Effect.promise(() => import("./sandbox"))
+      const refused = yield* Effect.promise(() => refuseHost("`lunos run --no-sandbox`"))
+      if (refused) return yield* fail(refused)
+    }
+    if (sandboxWanted(args)) {
+      if (args.attach) return yield* fail("--sandbox cannot be used with --attach")
+      if (args.mini) return yield* fail("--sandbox cannot be used with --mini yet")
+      const { runSandboxed } = yield* Effect.promise(() => import("./sandbox"))
+      const here = Filesystem.resolve(process.env.PWD ?? process.cwd())
+      const directory = args.dir ? path.resolve(here, args.dir) : here
+      return yield* Effect.tryPromise({
+        try: () =>
+          runSandboxed(
+            directory,
+            async (conn) => {
+              await RunCommand.handler!({
+                ...args,
+                sandbox: false,
+                attach: conn.url,
+                dir: conn.directory,
+                password: conn.password,
+                username: "opencode",
+              } as never)
+            },
+            { keep: args.keep, rm: args.rm },
+            // XCOD-281: a sandbox that can't start warns and runs here, unless --sandbox=strict or required.
+            {
+              strict: strictArg(),
+              host: async () => {
+                await RunCommand.handler!({ ...args, sandbox: false } as never)
+              },
+            },
+          ),
+        catch: (error) => error,
+      }).pipe(Effect.catch((error) => failRecorded(error)))
+    }
+    if (args.cloud) {
+      if (args.attach) return yield* fail("--cloud cannot be used with --attach")
+      if (args.mini) return yield* fail("--cloud cannot be used with --mini yet")
+      const { runCloud, requireModel } = yield* Effect.promise(() => import("./cloud-run"))
+      const { Config } = yield* Effect.promise(() => import("@/config/config"))
+      const config = yield* (yield* Config.Service).get()
+      const here = Filesystem.resolve(process.env.PWD ?? process.cwd())
+      const directory = args.dir ? path.resolve(here, args.dir) : here
+      return yield* Effect.tryPromise({
+        try: () =>
+          runCloud(
+            directory,
+            config,
+            { size: args["cloud-size"] as "standard" | "large" | undefined, secrets: args["cloud-secret"] },
+            async (conn) => {
+              // XCOD-236: a model asked for by name must run on the worker. The local fallback to
+              // the next best model (XCOD-214) would silently run something else there.
+              if (args.model) await requireModel(conn, args.model)
+              await RunCommand.handler!({
+                ...args,
+                cloud: false,
+                attach: conn.url,
+                dir: conn.directory,
+                password: conn.password,
+                username: conn.username,
+              } as never)
+            },
+          ),
+        catch: (error) => error,
+      }).pipe(Effect.catch((error) => failRecorded(error)))
+    }
     const { Agent } = yield* Effect.promise(() => import("@/agent/agent"))
     const { RuntimeFlags } = yield* Effect.promise(() => import("@/effect/runtime-flags"))
     const { InstanceRef } = yield* Effect.promise(() => import("@/effect/instance-ref"))
@@ -273,6 +430,11 @@ export const RunCommand = effectCmd({
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
       const auto = args.auto || args.yolo || args["dangerously-skip-permissions"]
+      // XCOD-40: --agent is deprecated in favor of --mode; --mode wins if both are set.
+      if (args.agent && !args.mode) {
+        UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL, `--agent is deprecated, use --mode instead`)
+      }
+      const modeArg = args.mode ?? args.agent
       const thinking = interactive ? (args.thinking ?? true) : (args.thinking ?? false)
       const die = (message: string): never => {
         UI.error(message)
@@ -520,6 +682,8 @@ export const RunCommand = effectCmd({
         const result = await sdk.session.create({
           title: name,
           permission: [...rules],
+          // XCOD-205: the Sessions window labels unattended (scheduled) agent runs.
+          ...(args.unattended ? { metadata: { unattended: true } } : {}),
         })
         const id = result.data?.id
         if (!id) {
@@ -533,8 +697,36 @@ export const RunCommand = effectCmd({
         }
       }
 
-      async function share(_sdk: OpencodeClient, _sessionID: string) {
-        if (args.share) UI.println(UI.Style.TEXT_DANGER_BOLD + "!  Session sharing has been discontinued")
+      const warned = new Set<string>()
+      async function share(sdk: OpencodeClient, sessionID: string) {
+        const cfg = await sdk.config.get()
+        if (!cfg.data) return
+        if (cfg.data.share !== "auto" && !flags.autoShare && !args.share) return
+        const res = await sdk.session.share({ sessionID }).catch((error) => ({ error }))
+        const refusal = res.error as { _tag?: string; message?: string; reason?: string } | undefined
+        // XCOD-266: nowhere to share to. Asked for with --share, always say so; from "auto", once
+        // per project, or every run would repeat it.
+        const quiet =
+          refusal?.reason === "no-target" &&
+          !args.share &&
+          !(await sdk.project
+            .current()
+            .then((project) =>
+              ShareNotice.once(
+                `cli:${ShareNotice.project({ project: project.data ?? { id: "global" }, directory: directory ?? root })}`,
+              ),
+            )
+            .catch(() => true))
+        if (
+          !quiet &&
+          (refusal?._tag === "ShareDisabledError" || (refusal instanceof Error && refusal.message.includes("disabled")))
+        ) {
+          UI.println(UI.Style.TEXT_WARNING_BOLD + "!  " + refusal.message)
+          if (refusal.message) warned.add(refusal.message)
+        }
+        if (!res.error && "data" in res && res.data?.share?.url) {
+          UI.println(UI.Style.TEXT_INFO_BOLD + "~  " + res.data.share.url)
+        }
       }
 
       async function createFreshSession(
@@ -552,6 +744,8 @@ export const RunCommand = effectCmd({
               }
             : undefined,
           permission: [...rules],
+          // XCOD-205: the Sessions window labels unattended (scheduled) agent runs.
+          ...(args.unattended ? { metadata: { unattended: true } } : {}),
         })
         const id = result.data?.id
         if (!id) {
@@ -583,8 +777,8 @@ export const RunCommand = effectCmd({
       }
 
       async function localAgent() {
-        if (!args.agent) return undefined
-        const name = args.agent
+        if (!modeArg) return undefined
+        const name = modeArg
 
         const entry = await Effect.runPromise(
           agentSvc.get(name).pipe(Effect.provideService(InstanceRef, localInstance)),
@@ -593,7 +787,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" not found. Falling back to default agent`,
+            `mode "${name}" not found. Falling back to default mode`,
           )
           return undefined
         }
@@ -601,7 +795,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" is a subagent, not a primary agent. Falling back to default agent`,
+            `mode "${name}" is a subagent, not a primary mode. Falling back to default mode`,
           )
           return undefined
         }
@@ -609,8 +803,8 @@ export const RunCommand = effectCmd({
       }
 
       async function attachAgent(sdk: OpencodeClient) {
-        if (!args.agent) return undefined
-        const name = args.agent
+        if (!modeArg) return undefined
+        const name = modeArg
 
         const modes = await sdk.app
           .agents(undefined, { throwOnError: true })
@@ -621,7 +815,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `failed to list agents from ${args.attach}. Falling back to default agent`,
+            `failed to list modes from ${args.attach}. Falling back to default mode`,
           )
           return undefined
         }
@@ -631,7 +825,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" not found. Falling back to default agent`,
+            `mode "${name}" not found. Falling back to default mode`,
           )
           return undefined
         }
@@ -640,7 +834,7 @@ export const RunCommand = effectCmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${name}" is a subagent, not a primary agent. Falling back to default agent`,
+            `mode "${name}" is a subagent, not a primary mode. Falling back to default mode`,
           )
           return undefined
         }
@@ -649,7 +843,7 @@ export const RunCommand = effectCmd({
       }
 
       async function pickAgent(sdk: OpencodeClient) {
-        if (!args.agent) return undefined
+        if (!modeArg) return undefined
         if (args.attach) {
           return attachAgent(sdk)
         }
@@ -664,6 +858,7 @@ export const RunCommand = effectCmd({
           process.exit(1)
         }
         const sessionID = sess.id
+        let timeUp = false
 
         function emit(type: string, data: Record<string, unknown>) {
           if (args.format === "json") {
@@ -680,14 +875,36 @@ export const RunCommand = effectCmd({
           return false
         }
 
+        // XCOD-148: a rejected prompt can be reported both by the prompt call and by the session's
+        // error event, whichever arrives first; --format json gets exactly one error record. Returns
+        // whether JSON mode handled it (as emit does), so text mode is unchanged.
+        let errorRecorded = false
+        // XCOD-298: a budget stopped the run (nobody here can answer "run anyway?"): exit code 3.
+        let budgetExceeded = false
+        function emitError(error: unknown) {
+          // XCOD-211: aborting at the deadline is how an unattended run ends on time, not an error.
+          if (timeUp && isAbort(error)) return true
+          if (args.format !== "json") return false
+          if (errorRecorded) return true
+          errorRecorded = true
+          return emit("error", { error })
+        }
+
         // Consume one subscribed event stream for the active session and mirror it
         // to stdout/UI. `client` is passed explicitly because attach mode may
         // rebind the SDK to the session's directory after the subscription is
         // created, and replies issued from inside the loop must use that client.
+        // XCOD-287: this session's subagents still running, queued ones included.
+        async function runningSubagents(client: OpencodeClient) {
+          const result = await client.experimental.background.list({ sessionID }).catch(() => undefined)
+          return (result?.data ?? []).filter((job) => job.status === "running").length
+        }
+
         async function loop(client: OpencodeClient, events: Awaited<ReturnType<typeof sdk.event.subscribe>>) {
           const toggles = new Map<string, boolean>()
           const sessions = new Set([sessionID])
           let error: string | undefined
+          let settle = RunSettle.create()
 
           for await (const event of events.stream) {
             if (event.type === "session.created" && event.properties.info.parentID) {
@@ -709,6 +926,12 @@ export const RunCommand = effectCmd({
 
             if (event.type === "message.part.updated") {
               const part = event.properties.part
+              // XCOD-211: a subagent's steps count against an unattended run's limits too. A separate
+              // event type, so readers of `step_finish` don't count the subagent's cost twice.
+              if (part.sessionID !== sessionID && sessions.has(part.sessionID) && part.type === "step-finish") {
+                emit("subagent_step_finish", { part })
+                continue
+              }
               if (part.sessionID !== sessionID) continue
 
               if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
@@ -768,24 +991,61 @@ export const RunCommand = effectCmd({
               }
             }
 
+            // XCOD-214: warnings the TUI would show as a toast, e.g. a --model that isn't available here
+            // and was replaced by the next best one.
+            if (event.type === "tui.toast.show" && event.properties.variant === "warning") {
+              // XCOD-266: "auto" share's notice can arrive here too, after share() already said it.
+              if (warned.has(event.properties.message)) continue
+              if (emit("warning", { message: event.properties.message })) continue
+              UI.println(UI.Style.TEXT_WARNING_BOLD + "!", UI.Style.TEXT_NORMAL + event.properties.message)
+              continue
+            }
+
             if (event.type === "session.error") {
               const props = event.properties
               if (props.sessionID !== sessionID || !props.error) continue
+              if (timeUp && isAbort(props.error)) continue
               let err = String(props.error.name)
               if ("data" in props.error && props.error.data && "message" in props.error.data) {
                 err = String(props.error.data.message)
               }
+              if (
+                "data" in props.error &&
+                props.error.data &&
+                "ref" in props.error.data &&
+                props.error.data.ref === "budget"
+              ) {
+                budgetExceeded = true
+                err = `budget exceeded: ${err}`
+                if (args.format === "json") process.stderr.write(err + EOL)
+              }
               error = error ? error + EOL + err : err
-              if (emit("error", { error: props.error })) continue
+              RunLog.failure("lunos run: the session", props.error)
+              if (emitError(props.error)) continue
               UI.error(err)
             }
 
-            if (
-              event.type === "session.status" &&
-              event.properties.sessionID === sessionID &&
-              event.properties.status.type === "idle"
-            ) {
-              break
+            // XCOD-287: the session going idle ends the run only once its background subagents have
+            // finished and their results have been integrated (run/settle.ts).
+            if (event.type === "session.status" && event.properties.sessionID === sessionID) {
+              if (event.properties.status.type !== "idle") settle = RunSettle.busy()
+              else {
+                const next = RunSettle.check(settle, {
+                  running: await runningSubagents(client),
+                  now: Date.now(),
+                  idleEvent: true,
+                })
+                settle = next.state
+                if (next.end) break
+              }
+            } else if (settle.idle && (event as { type: string }).type === "server.heartbeat") {
+              const next = RunSettle.check(settle, {
+                running: await runningSubagents(client),
+                now: Date.now(),
+                idleEvent: false,
+              })
+              settle = next.state
+              if (next.end) break
             }
 
             if (event.type === "permission.asked") {
@@ -798,6 +1058,12 @@ export const RunCommand = effectCmd({
                   reply: "once",
                 })
               } else {
+                // XCOD-211: every refusal is in the JSON stream, so an unattended run can report it.
+                emit("permission_rejected", {
+                  permission: permission.permission,
+                  patterns: permission.patterns,
+                  childSession: permission.sessionID !== sessionID,
+                })
                 UI.println(
                   UI.Style.TEXT_WARNING_BOLD + "!",
                   UI.Style.TEXT_NORMAL +
@@ -806,6 +1072,11 @@ export const RunCommand = effectCmd({
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "reject",
+                  ...(args.unattended
+                    ? {
+                        message: `This is an unattended run, so nobody can approve "${permission.permission}". It was refused; carry on without it if you can, or stop and say what you needed.`,
+                      }
+                    : {}),
                 })
               }
             }
@@ -815,6 +1086,32 @@ export const RunCommand = effectCmd({
         const cwd = args.attach ? (directory ?? sess.directory ?? (await current(sdk))) : (directory ?? root)
         const client = args.attach ? attachSDK(cwd) : sdk
 
+        // XCOD-211: an unattended run's time limit. At the deadline the session is aborted, the step
+        // in progress included, and the run ends the normal way: a sandboxed run hands back its results.
+        // If the session doesn't end after the abort (seen on Windows CI: the run outlived its limit
+        // by 30s and more), the run stops waiting for it 10s later and ends anyway; a local run, with
+        // nothing to hand back, then exits 10s after that whatever is still holding it.
+        const deadline = args.unattended ? Number(process.env[RunBudget.DEADLINE]) : NaN
+        let stopWaiting = () => {}
+        const stopped = new Promise<void>((resolve) => (stopWaiting = resolve))
+        if (deadline > 0)
+          setTimeout(
+            () => {
+              timeUp = true
+              process.stderr.write(`time limit reached: stopping session ${sessionID}${EOL}`)
+              void client.session.abort({ sessionID }).catch(() => {})
+              setTimeout(() => {
+                process.stderr.write(`session ${sessionID} didn't stop within 10s of the abort; ending the run${EOL}`)
+                stopWaiting()
+                if (!args.attach) setTimeout(() => process.exit(0), 10_000).unref()
+              }, 10_000).unref()
+            },
+            Math.max(0, deadline - Date.now()),
+          ).unref()
+        // The prompt call returns when the session ends; after the deadline, not later than `stopped`.
+        const untilStopped = <T>(call: Promise<T>) =>
+          Promise.race([call, stopped.then(() => ({ error: undefined }) as T)])
+
         // Validate agent if specified
         const agent = await pickAgent(client)
 
@@ -823,51 +1120,78 @@ export const RunCommand = effectCmd({
         if (!interactive) {
           const events = await client.event.subscribe()
           const completed = loop(client, events).catch((e) => {
+            // XCOD-236: Ctrl+C on an attached run stops its server, which closes this stream.
+            if (RunEnding.interrupted) return
             console.error(e)
-            process.exitCode = 1
+            RunLog.failure("lunos run: the event stream", e)
+            process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
           })
-          async function finish() {
-            if (args.attach) return
-            const error = await completed
-            if (error) process.exitCode = 1
+          // XCOD-236: an attached run (--attach, --cloud, --sandbox) ends in error as a local one
+          // does: non-zero. The session's error event normally arrives with the idle that ends the
+          // loop; if the stream lags, the assistant message the prompt returned says it too.
+          async function finish(info?: unknown) {
+            const error = await Promise.race([
+              completed,
+              stopped.then(() => undefined),
+              ...(args.attach
+                ? [new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ATTACH_GRACE_MS).unref())]
+                : []),
+            ])
+            if (error) {
+              process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
+              return
+            }
+            const failed = args.attach ? messageError(info) : undefined
+            if (!failed || (timeUp && isAbort(failed))) return
+            if (!emitError(failed)) UI.error(formatRunError(failed))
+            process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
           }
 
           if (args.command) {
-            const result = await client.session.command({
-              sessionID,
-              agent,
-              model: args.model,
-              command: args.command,
-              arguments: message,
-              variant: args.variant,
-            })
-            if (result.error) {
-              if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
-              process.exitCode = 1
+            const result = await untilStopped(
+              client.session.command({
+                sessionID,
+                agent,
+                model: args.model,
+                command: args.command,
+                arguments: message,
+                variant: args.variant,
+              }),
+            )
+            if (RunEnding.interrupted) return
+            if (result.error && !(timeUp && isAbort(result.error))) {
+              if (!emitError(result.error)) UI.error(formatRunError(result.error))
+              process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
               return
             }
-            await finish()
+            await finish(result.data)
             return
           }
 
           const model = pick(args.model)
-          const result = await client.session.prompt({
-            sessionID,
-            agent,
-            model,
-            variant: args.variant,
-            parts: [...files, { type: "text", text: message }],
-          })
-          if (result.error) {
-            if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))
-            process.exitCode = 1
+          const result = await untilStopped(
+            client.session.prompt({
+              sessionID,
+              agent,
+              model,
+              variant: args.variant,
+              parts: [...files, { type: "text", text: message }],
+            }),
+          )
+          if (RunEnding.interrupted) return
+          if (result.error && !(timeUp && isAbort(result.error))) {
+            if (!emitError(result.error)) UI.error(formatRunError(result.error))
+            process.exitCode = budgetExceeded ? BUDGET_EXIT : 1
             return
           }
-          await finish()
+          await finish(result.data)
           return
         }
 
         const model = pick(args.model)
+        // The server answers from `subagent.background` config or the old env flag (XCOD-82).
+        const capabilities = await client.experimental.capabilities.get().catch(() => undefined)
+        const backgroundSubagents = capabilities?.data?.backgroundSubagents ?? flags.experimentalBackgroundSubagents
         const { runInteractiveMode } = await import("./run/runtime")
         try {
           await runInteractiveMode({
@@ -885,7 +1209,7 @@ export const RunCommand = effectCmd({
             initialInput,
             createSession: createFreshSession,
             thinking,
-            backgroundSubagents: flags.experimentalBackgroundSubagents,
+            backgroundSubagents,
             demo: args.demo,
           })
         } catch (error) {
@@ -914,7 +1238,7 @@ export const RunCommand = effectCmd({
             session,
             share,
             createSession: createFreshSession,
-            agent: args.agent,
+            agent: modeArg,
             model,
             variant: args.variant,
             replay,
@@ -962,7 +1286,7 @@ type MiniCommandInput = {
   session?: string
   fork?: boolean
   model?: string
-  agent?: string
+  mode?: string
   prompt?: string
   replay?: boolean
   replayLimit?: number
@@ -981,7 +1305,8 @@ export async function runMini(input: MiniCommandInput) {
     fork: input.fork,
     share: undefined,
     model: input.model,
-    agent: input.agent,
+    mode: input.mode,
+    agent: undefined,
     format: "default",
     file: undefined,
     title: undefined,
@@ -1002,5 +1327,14 @@ export async function runMini(input: MiniCommandInput) {
     "dangerously-skip-permissions": false,
     dangerouslySkipPermissions: false,
     demo: input.demo ?? false,
+    sandbox: undefined,
+    unattended: false,
+    keep: undefined,
+    rm: undefined,
+    cloud: undefined,
+    "cloud-size": undefined,
+    cloudSize: undefined,
+    "cloud-secret": undefined,
+    cloudSecret: undefined,
   })
 }

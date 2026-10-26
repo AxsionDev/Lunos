@@ -86,13 +86,17 @@ function windowLastActiveUrlKey(windowID: string) {
   return `opencode.desktop.window.${windowID}.last-active-url`
 }
 
+// XCOD-205: matches SESSIONS_WINDOW_ID in the main process; that window starts on the Sessions page.
+const SESSIONS_WINDOW_ID = "sessions"
+
 function getLastActiveUrl(windowID: string) {
-  if (typeof localStorage !== "object") return "/"
+  const fallback = windowID === SESSIONS_WINDOW_ID ? "/sessions" : "/"
+  if (typeof localStorage !== "object") return fallback
   try {
     const value = localStorage.getItem(windowLastActiveUrlKey(windowID))
     if (value?.startsWith("/") && !value.startsWith("//")) return value
   } catch {}
-  return "/"
+  return fallback
 }
 
 function setLastActiveUrl(windowID: string, value: string) {
@@ -136,6 +140,8 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     return window.api.runDesktopMenuAction(action)
   }
 
+  const openSessionsWindow: Platform["openSessionsWindow"] = () => window.api.runDesktopMenuAction("window.sessions")
+
   const storage = (() => {
     const cache = new Map<string, AsyncStorage>()
 
@@ -170,6 +176,19 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     os,
     version: pkg.version,
     windowID: windowState.id,
+    openSessionsWindow,
+    // XCOD-235: the Sessions window opens sessions in the main window; every other window opens them.
+    ...(windowState.id === SESSIONS_WINDOW_ID
+      ? {
+          openSessionInMain: (directory: string, sessionID: string) =>
+            window.api.openSessionInMain(directory, sessionID),
+        }
+      : {
+          onOpenSession: (cb: (target: { directory: string; sessionID: string }) => void) => {
+            void window.api.takePendingOpenSession().then((items) => items.forEach(cb))
+            return window.api.onOpenSession(cb)
+          },
+        }),
 
     async openDirectoryPickerDialog(opts) {
       return window.api.openDirectoryPicker({
@@ -257,7 +276,6 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
 
       const notification = new Notification(title, {
         body: description ?? "",
-        icon: "https://opencode.ai/favicon-96x96-v3.png",
       })
       notification.onclick = () => {
         void window.api.showWindow()

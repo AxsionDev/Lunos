@@ -1,5 +1,7 @@
 import { AccountID, OrgID } from "@/account/schema"
 import { MCP } from "@/mcp"
+import { Question } from "@/question"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 
 import { Session } from "@/session/session"
 import { SessionID } from "@/session/schema"
@@ -15,6 +17,7 @@ import {
   WorkspaceRoutingQueryFields,
 } from "../middleware/workspace-routing"
 import { described } from "./metadata"
+import { ApiNotFoundError, InvalidRequestError } from "../errors"
 import { QueryBoolean } from "./query"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -28,6 +31,30 @@ const ConsoleStateResponse = Schema.Struct({
 const CapabilitiesResponse = Schema.Struct({
   backgroundSubagents: Schema.Boolean,
 }).annotate({ identifier: "ExperimentalCapabilities" })
+
+// XCOD-82: one background subagent job, as the monitoring surfaces show it.
+export const BackgroundJobItem = Schema.Struct({
+  id: Schema.String,
+  title: Schema.optional(Schema.String),
+  status: Schema.Literals(["running", "completed", "error", "cancelled"]),
+  startedAt: Schema.Number,
+  completedAt: Schema.optional(Schema.Number),
+  elapsedMs: Schema.Number,
+  agent: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  modelRule: Schema.optional(Schema.String),
+  parentSessionID: Schema.optional(Schema.String),
+  sessionID: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "BackgroundJobItem" })
+
+// XCOD-84: a plan, research note or dev-cycle record an agent wrote. The file is the source of truth.
+export const ArtifactItem = Schema.Struct({
+  kind: Schema.Literals(["plan", "research", "dev-cycle"]),
+  title: Schema.String,
+  path: Schema.String,
+  created: Schema.Number,
+}).annotate({ identifier: "ArtifactItem" })
 
 const ConsoleOrgOption = Schema.Struct({
   accountID: Schema.String,
@@ -87,6 +114,314 @@ export const SessionListQuery = Schema.Struct({
   archived: Schema.optional(QueryBoolean),
 })
 
+// XCOD-205: a user-defined group of sessions, kept on this machine only.
+export const SessionGroupInfo = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  color: Schema.optional(Schema.String),
+  collapsed: Schema.Boolean,
+  created: Schema.Finite,
+  updated: Schema.Finite,
+}).annotate({ identifier: "SessionGroup" })
+
+// XCOD-298: a named project (several folders), or a repository project shown as one (implicit).
+export const ProjectGroupInfo = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  folders: Schema.mutable(Schema.Array(Schema.String)),
+  archived: Schema.optional(Schema.Boolean),
+  implicit: Schema.optional(Schema.Boolean),
+  time: Schema.Struct({ created: Schema.Finite, updated: Schema.Finite }),
+}).annotate({ identifier: "ProjectGroup" })
+
+export const ProjectGroupListResponse = Schema.Struct({
+  groups: Schema.mutable(Schema.Array(ProjectGroupInfo)),
+  /** The project this instance's directory belongs to. */
+  current: ProjectGroupInfo,
+}).annotate({ identifier: "ProjectGroupList" })
+
+export const ProjectGroupCreatePayload = Schema.Struct({
+  name: Schema.String,
+  folders: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+})
+
+export const ProjectGroupUpdatePayload = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  archived: Schema.optional(Schema.Boolean),
+})
+
+export const ProjectGroupFoldersPayload = Schema.Struct({
+  folders: Schema.mutable(Schema.Array(Schema.String)),
+})
+
+export const ProjectGroupMovePayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** A named project's id or a repository project's. Omitted puts them back in their directory's project. */
+  projectID: Schema.optional(Schema.String),
+})
+
+// XCOD-298: where a project's budgets stand, and the line the prompt shows before a turn.
+export const BudgetStatusItem = Schema.Struct({
+  id: Schema.String,
+  scope: Schema.Literals(["project", "organisation"]),
+  name: Schema.String,
+  locked: Schema.Boolean,
+  currency: Schema.Literals(["EUR", "USD"]),
+  amount: Schema.Finite,
+  spent: Schema.Finite,
+  remaining: Schema.Finite,
+  percent: Schema.Finite,
+  unknown: Schema.Finite,
+  forecast: Schema.optional(Schema.Finite),
+  on_limit: Schema.Literals(["warn", "ask", "stop"]),
+  period: Schema.Struct({ key: Schema.String, label: Schema.String }),
+}).annotate({ identifier: "BudgetStatusItem" })
+
+export const BudgetStatusResponse = Schema.Struct({
+  project: Schema.Struct({ id: Schema.String, name: Schema.String }),
+  budgets: Schema.mutable(Schema.Array(BudgetStatusItem)),
+  /** "est. €0.08–0.30 · €12.40 left of €50 (Oct)"; empty when there's nothing to show. */
+  line: Schema.String,
+}).annotate({ identifier: "BudgetStatus" })
+
+export const BudgetStatusQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  sessionID: Schema.optional(Schema.String),
+})
+
+// XCOD-250: what /claude and /codex show before anything starts.
+export const ExternalToolStatus = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  label: Schema.String,
+  installed: Schema.Boolean,
+  loggedIn: Schema.optional(Schema.Boolean),
+  /** What to do when it isn't usable (install, sign in, update). */
+  hint: Schema.optional(Schema.String),
+  refused: Schema.optional(
+    Schema.Struct({ reason: Schema.Literals(["disabled", "policy", "residency"]), message: Schema.String }),
+  ),
+  /** XCOD-256: Claude Code's `--permission-mode` choices, from this install's `--help`. */
+  permissionModes: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  /** XCOD-254: the answer to sharing Lunos's tools, skills and memory with it in this project, if given. */
+  consent: Schema.optional(Schema.Literals(["share", "never"])),
+}).annotate({ identifier: "ExternalToolStatus" })
+
+// XCOD-254: /settings → External sessions changes the answer; "ask" forgets it (asked next session).
+export const ExternalConsentPayload = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  answer: Schema.Literals(["share", "never", "ask"]),
+})
+
+// XCOD-285 §4: Settings › External sessions › Claude Code / Codex, each tool's configuration as it reports it.
+export const ExternalConfigSource = Schema.Struct({
+  scope: Schema.optional(Schema.String),
+  file: Schema.optional(Schema.String),
+  label: Schema.String,
+}).annotate({ identifier: "ExternalConfigSource" })
+
+export const ExternalConfigItem = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  value: Schema.optional(Schema.String),
+  detail: Schema.optional(Schema.String),
+  status: Schema.optional(Schema.String),
+  /** Missing: the tool doesn't say where it comes from ("source unknown"). */
+  source: Schema.optional(ExternalConfigSource),
+  /** An existing file to open in the user's editor. */
+  open: Schema.optional(Schema.String),
+  remove: Schema.optional(Schema.Struct({ scope: Schema.optional(Schema.String) })),
+}).annotate({ identifier: "ExternalConfigItem" })
+
+export const ExternalConfigSection = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  items: Schema.mutable(Schema.Array(ExternalConfigItem)),
+  note: Schema.optional(Schema.String),
+  add: Schema.optional(Schema.Struct({ scopes: Schema.mutable(Schema.Array(Schema.String)), url: Schema.Boolean })),
+}).annotate({ identifier: "ExternalConfigSection" })
+
+export const ExternalConfigView = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  label: Schema.String,
+  version: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+  sections: Schema.mutable(Schema.Array(ExternalConfigSection)),
+  notes: Schema.mutable(Schema.Array(Schema.String)),
+}).annotate({ identifier: "ExternalConfigView" })
+
+export const ExternalConfigCommandPayload = Schema.Struct({
+  action: Schema.Literals(["mcp.add", "mcp.remove"]),
+  name: Schema.String,
+  scope: Schema.optional(Schema.String),
+  /** For mcp.add: a URL, or the command that starts the server. */
+  target: Schema.optional(Schema.String),
+  /** false: only say what would run and which file it changes. true: run it (after the user confirmed). */
+  run: Schema.Boolean,
+})
+
+export const ExternalConfigCommandResult = Schema.Struct({
+  command: Schema.String,
+  file: Schema.optional(Schema.String),
+  ran: Schema.Boolean,
+  ok: Schema.optional(Schema.Boolean),
+  output: Schema.optional(Schema.String),
+}).annotate({ identifier: "ExternalConfigCommandResult" })
+
+// XCOD-254: /models in a Claude Code or Codex session lists the tool's models.
+export const ExternalModel = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  default: Schema.optional(Schema.Boolean),
+}).annotate({ identifier: "ExternalModel" })
+
+export const ExternalModels = Schema.Struct({
+  tool: Schema.Literals(["claude", "codex"]),
+  label: Schema.String,
+  /** The model chosen for this session, if one was. */
+  current: Schema.optional(Schema.String),
+  models: Schema.mutable(Schema.Array(ExternalModel)),
+  /** The tool didn't list its models; these are its aliases. */
+  fallback: Schema.Boolean,
+  /** Why the tool's models can't be listed (not installed, refused by policy, no answer). */
+  error: Schema.optional(Schema.String),
+}).annotate({ identifier: "ExternalModels" })
+
+export const ExternalModelPayload = Schema.Struct({
+  /** Omitted goes back to the tool's default. */
+  model: Schema.optional(Schema.String),
+})
+
+// XCOD-285: Shift+Tab in a Claude Code session, as in the tool.
+export const ExternalModePayload = Schema.Struct({
+  /** Omitted goes back to external.claude.permission_mode. */
+  mode: Schema.optional(Schema.String),
+})
+
+// XCOD-205: one row of the Sessions window.
+export const SessionOverviewItem = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.Literals(["session", "subagent", "scheduled", "external"]),
+  title: Schema.String,
+  directory: Schema.String,
+  project: Schema.optional(Session.ProjectInfo),
+  parentID: Schema.optional(Schema.String),
+  agent: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  tool: Schema.optional(Schema.String),
+  cost: Schema.Finite,
+  created: Schema.Finite,
+  updated: Schema.Finite,
+  state: Schema.Literals(["running", "waiting", "idle", "finished", "failed"]),
+  elsewhere: Schema.optional(Schema.Boolean),
+  stale: Schema.optional(Schema.Boolean),
+  permissions: NonNegativeInt,
+  questions: NonNegativeInt,
+  queued: Schema.optional(NonNegativeInt),
+  ownerClosed: Schema.optional(Schema.Boolean),
+  groupID: Schema.optional(Schema.String),
+  /** XCOD-298: the project it counts in (named, or its repository's). */
+  projectGroupID: Schema.optional(Schema.String),
+  archived: Schema.optional(Schema.Finite),
+}).annotate({ identifier: "SessionOverviewItem" })
+
+// XCOD-265: "Show archived" lists only the sessions cleared from the list.
+export const SessionOverviewQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  archived: Schema.optional(QueryBoolean),
+})
+
+export const SessionOverviewResponse = Schema.Struct({
+  groups: Schema.mutable(Schema.Array(SessionGroupInfo)),
+  sessions: Schema.mutable(Schema.Array(SessionOverviewItem)),
+}).annotate({ identifier: "SessionOverview" })
+
+export const SessionGroupCreatePayload = Schema.Struct({
+  name: Schema.String,
+  color: Schema.optional(Schema.String),
+})
+
+export const SessionGroupUpdatePayload = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  /** An empty string clears the colour. */
+  color: Schema.optional(Schema.String),
+  collapsed: Schema.optional(Schema.Boolean),
+})
+
+export const SessionGroupMovePayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** Omitted moves the sessions back to Ungrouped. */
+  groupID: Schema.optional(Schema.String),
+})
+
+// XCOD-265: Stop all, Clear list (archive), Unarchive and Delete archived.
+export const SessionBulkPayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+})
+export const SessionBulkStopPayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** What the sessions' pending approvals are rejected with. Defaults to "Stopped from /sessions". */
+  reason: Schema.optional(Schema.String),
+})
+export const SessionBulkArchivePayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** "Stop all & clear": stop the running and waiting ones first, then archive everything stopped. */
+  stop: Schema.optional(Schema.Boolean),
+  reason: Schema.optional(Schema.String),
+})
+const SessionBulkFailure = Schema.Struct({ id: Schema.String, reason: Schema.String }).annotate({
+  identifier: "SessionBulkFailure",
+})
+export const SessionBulkStopResult = Schema.Struct({
+  stopped: Schema.mutable(Schema.Array(Schema.String)),
+  failed: Schema.mutable(Schema.Array(SessionBulkFailure)),
+}).annotate({ identifier: "SessionBulkStopResult" })
+export const SessionBulkArchiveResult = Schema.Struct({
+  archived: Schema.mutable(Schema.Array(Schema.String)),
+  skipped: Schema.mutable(Schema.Array(SessionBulkFailure)),
+  stopped: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  failed: Schema.optional(Schema.mutable(Schema.Array(SessionBulkFailure))),
+}).annotate({ identifier: "SessionBulkArchiveResult" })
+export const SessionBulkDeleteResult = Schema.Struct({
+  deleted: Schema.mutable(Schema.Array(Schema.String)),
+  skipped: Schema.mutable(Schema.Array(SessionBulkFailure)),
+  /** XCOD-284: the running ones `stop` stopped before deleting them. */
+  stopped: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  /** Console shares (`lunos share`) made from the deleted sessions, revoked first. */
+  sharesRevoked: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+}).annotate({ identifier: "SessionBulkDeleteResult" })
+// XCOD-284: Delete in /sessions and the Agent Monitor (any session, not only archived ones).
+export const SessionBulkDeletePayload = Schema.Struct({
+  sessionIDs: Schema.mutable(Schema.Array(Schema.String)),
+  /** false deletes sessions that are still listed too. Defaults to true: only archived sessions (Delete archived). */
+  archivedOnly: Schema.optional(Schema.Boolean),
+  /** Stop the running and waiting ones first; otherwise they are skipped. */
+  stop: Schema.optional(Schema.Boolean),
+  /** false deletes the synced copy on Lunos Cloud too. Defaults to true: synced copies are left. */
+  keepCloud: Schema.optional(Schema.Boolean),
+  /** For the audit log: one session, or many at once (the default). */
+  origin: Schema.optional(Schema.Literals(["single", "bulk"])),
+})
+export const SessionBulkPreviewItem = Schema.Struct({
+  id: Schema.String,
+  messages: Schema.Finite,
+  children: Schema.Finite,
+  queued: Schema.Finite,
+  shared: Schema.Boolean,
+  tool: Schema.optional(Schema.String),
+  /** Console shares made from it or its subagents (`lunos share`): revoked when it's deleted. */
+  consoleShares: Schema.optional(
+    Schema.mutable(Schema.Array(Schema.Struct({ id: Schema.String, url: Schema.optional(Schema.String) }))),
+  ),
+}).annotate({ identifier: "SessionBulkPreviewItem" })
+export const SessionBulkPreviewResult = Schema.Struct({
+  items: Schema.mutable(Schema.Array(SessionBulkPreviewItem)),
+  /** This device syncs sessions to Lunos Cloud, so a synced copy may exist. */
+  sync: Schema.Boolean,
+  /** The organisation console configured here (its host), where console shares go. */
+  console: Schema.optional(Schema.String),
+}).annotate({ identifier: "SessionBulkPreviewResult" })
+
 export const ExperimentalPaths = {
   capabilities: "/experimental/capabilities",
   console: "/experimental/console",
@@ -98,8 +433,98 @@ export const ExperimentalPaths = {
   worktreeReset: "/experimental/worktree/reset",
   session: "/experimental/session",
   sessionBackground: "/experimental/session/:sessionID/background",
+  backgroundJobs: "/experimental/background",
+  artifacts: "/experimental/artifact",
+  backgroundJobCancel: "/experimental/background/:jobID/cancel",
   resource: "/experimental/resource",
+  sessionOverview: "/experimental/session-overview",
+  sessionGroups: "/experimental/session-group",
+  sessionGroup: "/experimental/session-group/:groupID",
+  sessionGroupMove: "/experimental/session-group/move",
+  projectGroups: "/experimental/project-group",
+  budgetStatus: "/experimental/budget",
+  projectGroup: "/experimental/project-group/:groupID",
+  projectGroupFolders: "/experimental/project-group/:groupID/folders",
+  projectGroupFoldersRemove: "/experimental/project-group/:groupID/folders/remove",
+  projectGroupMove: "/experimental/project-group/move",
+  sessionBulkStop: "/experimental/session-bulk/stop",
+  sessionBulkArchive: "/experimental/session-bulk/archive",
+  sessionBulkUnarchive: "/experimental/session-bulk/unarchive",
+  sessionBulkDelete: "/experimental/session-bulk/delete",
+  sessionBulkPreview: "/experimental/session-bulk/preview",
+  externalStop: "/experimental/external/:sessionID/stop",
+  externalTools: "/experimental/external/tools",
+  externalModels: "/experimental/external/:sessionID/models",
+  externalModel: "/experimental/external/:sessionID/model",
+  externalMode: "/experimental/external/:sessionID/mode",
+  externalConsent: "/experimental/external/consent",
+  externalConfig: "/experimental/external/config/:tool",
+  externalConfigCommand: "/experimental/external/config/:tool/command",
+  peerStop: "/experimental/peer/:sessionID/stop",
+  peerAsks: "/experimental/peer/:sessionID/asks",
+  peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
+  peerQuestionReply: "/experimental/peer/:sessionID/question/:requestID/reply",
+  peerQuestionReject: "/experimental/peer/:sessionID/question/:requestID/reject",
+  sessionEnqueue: "/experimental/session/:sessionID/enqueue",
+  sessionTakeover: "/experimental/session/:sessionID/takeover",
+  sessionQueued: "/experimental/session/:sessionID/queued",
+  peerPrompt: "/experimental/peer/:sessionID/prompt",
 } as const
+
+// XCOD-234: what another Lunos process's session is waiting for.
+export const PeerAsks = Schema.Struct({
+  permissions: Schema.mutable(Schema.Array(PermissionV1.Request)),
+  questions: Schema.mutable(Schema.Array(Question.Request)),
+}).annotate({ identifier: "SessionPeerAsks" })
+
+// XCOD-262: a prompt from the Agent Monitor to an existing session. Text only.
+export const SessionEnqueuePayload = Schema.Struct({
+  text: Schema.String,
+  interrupt: Schema.optional(Schema.Boolean),
+  via: Schema.optional(Schema.Literals(["local", "peer"])),
+  /** A session the monitor just started: the model picked there. Not forwarded by peer.prompt. */
+  model: Schema.optional(Schema.Struct({ providerID: Schema.String, modelID: Schema.String })),
+  variant: Schema.optional(Schema.String),
+})
+
+export const SessionEnqueueResult = Schema.Struct({
+  delivery: Schema.Literals(["now", "queued", "interrupted", "answered"]),
+  position: Schema.optional(NonNegativeInt),
+}).annotate({ identifier: "SessionEnqueueResult" })
+
+// XCOD-262: taking over a session whose Lunos stopped, with what to do with the prompts it queued.
+export const SessionTakeoverPayload = Schema.Struct({
+  queued: Schema.Literals(["send", "discard"]),
+  /** The prompt being sent, run after the queued ones. */
+  text: Schema.optional(Schema.String),
+  /** XCOD-267: "session" when the full session view asked; audited as such. */
+  origin: Schema.optional(Schema.Literals(["monitor", "session"])),
+  /**
+   * XCOD-267: the request the session view would have sent for `text` (a prompt with its files and
+   * agent, a command, a shell command), sent once the queued ones have run. `text` is its readable text.
+   */
+  request: Schema.optional(
+    Schema.Struct({
+      kind: Schema.Literals(["prompt", "command", "shell"]),
+      body: Schema.Record(Schema.String, Schema.Unknown),
+    }),
+  ),
+})
+
+/** XCOD-267 / XCOD-269: prompts held for a session that haven't been sent. Counts only. */
+export const SessionQueued = Schema.Struct({
+  /** Held by a Lunos that stopped: sent or discarded only by a take-over. */
+  orphaned: NonNegativeInt,
+  /** XCOD-269: held by any Lunos, this one included: what deleting the session also deletes. */
+  held: NonNegativeInt,
+}).annotate({ identifier: "SessionQueued" })
+
+export const SessionTakeoverResult = Schema.Struct({
+  sent: NonNegativeInt,
+  discarded: NonNegativeInt,
+  delivery: Schema.optional(Schema.Literals(["now", "queued", "interrupted", "answered"])),
+  position: Schema.optional(NonNegativeInt),
+}).annotate({ identifier: "SessionTakeoverResult" })
 
 export const ExperimentalApi = HttpApi.make("experimental")
   .add(
@@ -243,6 +668,482 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Background subagents",
             description:
               "Detach any synchronous subagents currently blocking the session and continue them in the background.",
+          }),
+        ),
+        HttpApiEndpoint.get("artifacts", ExperimentalPaths.artifacts, {
+          query: Schema.Struct({
+            ...WorkspaceRoutingQueryFields,
+            kind: Schema.optional(Schema.Literals(["plan", "research", "dev-cycle"])),
+          }),
+          success: described(Schema.Array(ArtifactItem), "Plans, research notes and dev-cycle records"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.artifact.list",
+            summary: "List artifacts",
+            description:
+              "List this project's plans, research notes and dev-cycle records, newest first. Pass kind to list one kind.",
+          }),
+        ),
+        HttpApiEndpoint.get("backgroundJobs", ExperimentalPaths.backgroundJobs, {
+          query: Schema.Struct({ ...WorkspaceRoutingQueryFields, sessionID: Schema.optional(Schema.String) }),
+          success: described(Schema.Array(BackgroundJobItem), "Background subagent jobs"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.background.list",
+            summary: "List background subagents",
+            description:
+              "List subagent jobs with status, elapsed time, agent and resolved model. Pass sessionID to list only that session's jobs.",
+          }),
+        ),
+        HttpApiEndpoint.post("backgroundJobCancel", ExperimentalPaths.backgroundJobCancel, {
+          params: { jobID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Whether a running job was cancelled"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.background.cancel",
+            summary: "Cancel a background subagent",
+            description: "Cancel a running background subagent job and its child session.",
+          }),
+        ),
+        HttpApiEndpoint.get("sessionOverview", ExperimentalPaths.sessionOverview, {
+          query: SessionOverviewQuery,
+          success: described(SessionOverviewResponse, "Sessions on this machine, with their groups"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.overview",
+            summary: "Sessions overview",
+            description:
+              "Every session on this machine that is running, waiting for an answer or was active in the last week, across all projects, with its state, kind and group, plus the session groups. Archived sessions are left out; with archived=true only they are listed, however old.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkStop", ExperimentalPaths.sessionBulkStop, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkStopPayload,
+          success: described(SessionBulkStopResult, "Which sessions stopped, and why the others didn't"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.stop",
+            summary: "Stop sessions",
+            description:
+              "Stop several sessions at once: Lunos sessions here or in another Lunos on this machine, and Claude Code / Codex sessions. Pending approvals are rejected with the reason first. Audited as session.stop.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkArchive", ExperimentalPaths.sessionBulkArchive, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkArchivePayload,
+          success: described(SessionBulkArchiveResult, "Which sessions were archived"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.archive",
+            summary: "Archive sessions",
+            description:
+              "Hide sessions from every list without deleting anything. Running and waiting sessions are skipped unless stop is set, which stops them first. Audited as session.archive.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkUnarchive", ExperimentalPaths.sessionBulkUnarchive, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkPayload,
+          success: described(SessionBulkArchiveResult, "Which sessions were restored"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.unarchive",
+            summary: "Unarchive sessions",
+            description: "Put archived sessions back in the lists. Audited as session.archive (unarchive).",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkDelete", ExperimentalPaths.sessionBulkDelete, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkDeletePayload,
+          success: described(SessionBulkDeleteResult, "Which sessions were deleted, and why the others weren't"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.delete",
+            summary: "Delete sessions",
+            description:
+              "Delete sessions and their history for good: messages, subagent sessions and queued prompts. By default only archived sessions (others are skipped); archivedOnly false reaches listed ones too. Running ones are stopped first with stop, or skipped. A share link is removed first, and the synced copy on Lunos Cloud is deleted unless keepCloud. Audited as session.delete.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionBulkPreview", ExperimentalPaths.sessionBulkPreview, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionBulkPayload,
+          success: described(SessionBulkPreviewResult, "What deleting the sessions removes"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionBulk.preview",
+            summary: "Preview deleting sessions",
+            description:
+              "For each session: its message, subagent and queued-prompt counts, whether it's shared, the console shares made from it (revoked when it's deleted), and the external tool that keeps its own history. Changes nothing.",
+          }),
+        ),
+        HttpApiEndpoint.get("sessionGroupList", ExperimentalPaths.sessionGroups, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.mutable(Schema.Array(SessionGroupInfo)), "Session groups"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.list",
+            summary: "List session groups",
+            description: "List the session groups on this machine.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionGroupCreate", ExperimentalPaths.sessionGroups, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionGroupCreatePayload,
+          success: described(SessionGroupInfo, "Created session group"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.create",
+            summary: "Create session group",
+            description: "Create a session group, with an optional colour (#rrggbb).",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionGroupMove", ExperimentalPaths.sessionGroupMove, {
+          query: WorkspaceRoutingQuery,
+          payload: SessionGroupMovePayload,
+          success: described(Schema.Boolean, "Sessions moved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.move",
+            summary: "Move sessions to a group",
+            description:
+              "Put sessions in a group, taking them out of any other group. Without a groupID they go back to Ungrouped.",
+          }),
+        ),
+        HttpApiEndpoint.patch("sessionGroupUpdate", ExperimentalPaths.sessionGroup, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionGroupUpdatePayload,
+          success: described(SessionGroupInfo, "Updated session group"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.update",
+            summary: "Update session group",
+            description: "Rename, recolour (an empty colour clears it), collapse or expand a session group.",
+          }),
+        ),
+        HttpApiEndpoint.delete("sessionGroupDelete", ExperimentalPaths.sessionGroup, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Session group deleted"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sessionGroup.delete",
+            summary: "Delete session group",
+            description: "Delete a session group. Its sessions are not deleted or stopped; they go back to Ungrouped.",
+          }),
+        ),
+        HttpApiEndpoint.get("budgetStatus", ExperimentalPaths.budgetStatus, {
+          query: BudgetStatusQuery,
+          success: described(BudgetStatusResponse, "Budget status"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.budget.status",
+            summary: "Budget status",
+            description:
+              "Where the budgets of this directory's (or the session's) project stand, and, for a session, the estimate of its next turn as the prompt shows it.",
+          }),
+        ),
+        HttpApiEndpoint.get("projectGroupList", ExperimentalPaths.projectGroups, {
+          query: WorkspaceRoutingQuery,
+          success: described(ProjectGroupListResponse, "Projects"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.list",
+            summary: "List projects",
+            description:
+              "The named projects on this computer (archived ones marked), and the project this directory belongs to: a named project, or its repository project.",
+          }),
+        ),
+        HttpApiEndpoint.post("projectGroupCreate", ExperimentalPaths.projectGroups, {
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupCreatePayload,
+          success: described(ProjectGroupInfo, "Created project"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.create",
+            summary: "Create project",
+            description: "Create a named project grouping folders (absolute paths), kept on this computer only.",
+          }),
+        ),
+        HttpApiEndpoint.post("projectGroupMove", ExperimentalPaths.projectGroupMove, {
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupMovePayload,
+          success: described(Schema.Boolean, "Sessions moved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.move",
+            summary: "Move sessions to a project",
+            description:
+              "Count sessions in another project. Without a projectID they go back to the project of their directory.",
+          }),
+        ),
+        HttpApiEndpoint.patch("projectGroupUpdate", ExperimentalPaths.projectGroup, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupUpdatePayload,
+          success: described(ProjectGroupInfo, "Updated project"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.update",
+            summary: "Update project",
+            description: "Rename a named project, or archive it (archived: true) or bring it back (archived: false).",
+          }),
+        ),
+        HttpApiEndpoint.post("projectGroupAdd", ExperimentalPaths.projectGroupFolders, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupFoldersPayload,
+          success: described(ProjectGroupInfo, "Updated project"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.add",
+            summary: "Add folders to a project",
+            description:
+              "Add folders (absolute paths) to a named project. A folder another live project has is refused.",
+          }),
+        ),
+        HttpApiEndpoint.post("projectGroupRemove", ExperimentalPaths.projectGroupFoldersRemove, {
+          params: { groupID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ProjectGroupFoldersPayload,
+          success: described(ProjectGroupInfo, "Updated project"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.projectGroup.remove",
+            summary: "Remove folders from a project",
+            description:
+              "Remove folders from a named project. Its sessions there go back to their repository's project.",
+          }),
+        ),
+        HttpApiEndpoint.get("externalTools", ExperimentalPaths.externalTools, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.mutable(Schema.Array(ExternalToolStatus)), "External tools"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.tools",
+            summary: "External tools",
+            description:
+              "Whether Claude Code and Codex CLI can be started from Lunos here: installed, signed in, and allowed by external.enabled and the residency policy. Asking doesn't audit anything.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalStop", ExperimentalPaths.externalStop, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "External session stopped"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.stop",
+            summary: "Stop an external session",
+            description:
+              "Stop a running Claude Code or Codex session Lunos started (as lunos external stop), from any Lunos process on this machine.",
+          }),
+        ),
+        HttpApiEndpoint.get("externalModels", ExperimentalPaths.externalModels, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(ExternalModels, "The tool's models"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.models",
+            summary: "External session models",
+            description:
+              "The models Claude Code or Codex offers for an external session, asked from the tool without a prompt (no model is called), and the one chosen for the session.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalModel", ExperimentalPaths.externalModel, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ExternalModelPayload,
+          success: described(Schema.Boolean, "Model saved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.model",
+            summary: "Choose an external session's model",
+            description:
+              "Save the model Claude Code or Codex uses in an external session from its next turn on (resumes included). Omit it to go back to the tool's default.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalMode", ExperimentalPaths.externalMode, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: ExternalModePayload,
+          success: described(Schema.Boolean, "Mode saved"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.mode",
+            summary: "Switch an external session's permission mode",
+            description:
+              "Claude Code's permission mode for an external session, as Shift+Tab cycles it in the tool: the running turn switches now (set_permission_mode) and later turns start in it. Modes that skip approvals are refused. Omit it to go back to external.claude.permission_mode.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalConsent", ExperimentalPaths.externalConsent, {
+          query: WorkspaceRoutingQuery,
+          payload: ExternalConsentPayload,
+          success: described(Schema.Boolean, "Answer saved"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.consent",
+            summary: "Share Lunos with Claude Code or Codex",
+            description:
+              "Whether Lunos's MCP servers, skills and memory are offered to Claude Code or Codex sessions in this project (share), never offered without asking (never), or asked about in the next session (ask). Kept on this machine, never in config. Audited as external.consent.",
+          }),
+        ),
+        HttpApiEndpoint.get("externalConfig", ExperimentalPaths.externalConfig, {
+          params: { tool: Schema.Literals(["claude", "codex"]) },
+          query: WorkspaceRoutingQuery,
+          success: described(ExternalConfigView, "The tool's configuration"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.config",
+            summary: "Claude Code or Codex configuration",
+            description:
+              "Claude Code's or Codex's own configuration as the installed tool reports it (model, permissions, instruction files, MCP servers, hooks, agents or profiles), with the layer and file each comes from where the tool says. No prompt is sent and the user's hooks don't run. Refused like starting a session under external.enabled and the residency policy. Secrets are never returned.",
+          }),
+        ),
+        HttpApiEndpoint.post("externalConfigCommand", ExperimentalPaths.externalConfigCommand, {
+          params: { tool: Schema.Literals(["claude", "codex"]) },
+          query: WorkspaceRoutingQuery,
+          payload: ExternalConfigCommandPayload,
+          success: described(ExternalConfigCommandResult, "The tool's command"),
+          error: [InvalidRequestError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.configCommand",
+            summary: "Change Claude Code or Codex configuration with its own command",
+            description:
+              "Add or remove an MCP server with the tool's own command (claude mcp add -s …, codex mcp remove …). With run false, returns the exact command and the file it changes, and runs nothing; with run true, runs it and returns the tool's output. Lunos never writes the tool's files itself. Audited as external.config.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerStop", ExperimentalPaths.peerStop, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Stopped"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.stop",
+            summary: "Stop a session another Lunos runs",
+            description: "Stop a session that another Lunos process on this machine is running, through that process.",
+          }),
+        ),
+        HttpApiEndpoint.get("peerAsks", ExperimentalPaths.peerAsks, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(PeerAsks, "Pending permissions and questions"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.asks",
+            summary: "What a session another Lunos runs is waiting for",
+            description:
+              "The pending permission requests and questions of a session another Lunos process on this machine runs.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerPermissionReply", ExperimentalPaths.peerPermissionReply, {
+          params: { sessionID: Schema.String, requestID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({ reply: PermissionV1.Reply, message: Schema.optional(Schema.String) }),
+          success: described(Schema.Boolean, "Answered"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.permissionReply",
+            summary: "Answer a permission request in another Lunos",
+            description:
+              "Answer a permission request of a session another Lunos process on this machine runs. That process checks and audits the answer.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerQuestionReply", ExperimentalPaths.peerQuestionReply, {
+          params: { sessionID: Schema.String, requestID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({ answers: Schema.Array(Question.Answer) }),
+          success: described(Schema.Boolean, "Answered"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.questionReply",
+            summary: "Answer a question in another Lunos",
+            description: "Answer a question of a session another Lunos process on this machine runs.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerQuestionReject", ExperimentalPaths.peerQuestionReject, {
+          params: { sessionID: Schema.String, requestID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Dismissed"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.questionReject",
+            summary: "Dismiss a question in another Lunos",
+            description: "Dismiss a question of a session another Lunos process on this machine runs.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionEnqueue", ExperimentalPaths.sessionEnqueue, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionEnqueuePayload,
+          success: described(SessionEnqueueResult, "How the prompt was delivered"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.enqueue",
+            summary: "Send a prompt to a session from the Agent Monitor",
+            description:
+              "Run a prompt as the session's next turn: now when it is idle, after the current turn when it is busy (or now, stopping the turn, with interrupt), or as the answer to its one open question. A prompt never answers a permission request. Refused when another Lunos process runs the session; use experimental.peer.prompt.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionTakeover", ExperimentalPaths.sessionTakeover, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionTakeoverPayload,
+          success: described(SessionTakeoverResult, "What was sent and discarded"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.takeover",
+            summary: "Take over a session whose Lunos stopped",
+            description:
+              "Run a session here whose Lunos process stopped, after the user confirmed it. The prompts that process had queued for it are sent first, in order (queued: send), or dropped (queued: discard); then text, if given. Refused while another Lunos runs the session, or while the process that queued them still exists. Audited as session.takeover, without the text.",
+          }),
+        ),
+        HttpApiEndpoint.get("sessionQueued", ExperimentalPaths.sessionQueued, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(SessionQueued, "Unsent prompts held for the session"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.queued",
+            summary: "Prompts held for a session",
+            description:
+              "How many prompts a Lunos process that stopped still holds for the session (orphaned), and how many any Lunos holds (held, which deleting the session also deletes); never their text. While any are orphaned, a prompt typed in the session asks to take it over first (experimental.session.takeover).",
+          }),
+        ),
+        HttpApiEndpoint.post("peerPrompt", ExperimentalPaths.peerPrompt, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({ text: Schema.String, interrupt: Schema.optional(Schema.Boolean) }),
+          success: described(SessionEnqueueResult, "How the prompt was delivered"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.prompt",
+            summary: "Send a prompt to a session another Lunos runs",
+            description:
+              "Send a prompt to a session that another Lunos process on this machine runs. That process runs it, with its own agent, policy and audit, as experimental.session.enqueue does.",
           }),
         ),
         HttpApiEndpoint.get("resource", ExperimentalPaths.resource, {

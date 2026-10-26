@@ -1,0 +1,54 @@
+---
+title: Data residency
+description: Restrict Lunos to model providers that process data in the EU, and audit every model call.
+---
+
+Lunos can refuse any model provider that doesn't process data in the EU, and record every model call in a local audit log. The policy is enforced before a connection is opened, in the TUI, `lunos run` and subagents, from v1.18.39.
+
+## Turn it on
+
+Add a `residency` policy to `opencode.json`, in your project or global config directory:
+
+```json title="opencode.json"
+{
+  "$schema": "https://lunos.tech/config.json",
+  "residency": {
+    "allow": ["eu"],
+    "audit": true
+  },
+  "enabled_providers": ["mistral"],
+  "provider": {
+    "mistral": {
+      "options": {
+        "apiKey": "{env:MISTRAL_API_KEY}"
+      }
+    }
+  },
+  "model": "mistral/mistral-large-latest",
+  "small_model": "mistral/mistral-small-latest"
+}
+```
+
+Run `lunos debug config` to check that the policy is active: the output includes `"residency": { "allow": ["eu"], "audit": true }`.
+
+## What it does
+
+- **Only providers that process data in the EU may be used.** Others are refused before a request is made.
+- **Providers whose region can't be verified are refused**, including ones that could be EU, such as Azure, AWS Bedrock and Google Vertex. You can allow them explicitly once you've checked the region yourself.
+- **Providers with no recorded jurisdiction are always refused.**
+- **Every model call, and every refused one, is recorded** with time, provider, jurisdiction and destination host. The log never contains prompts or file contents.
+
+## EU providers
+
+| Provider | Country | API key variable   |
+| -------- | ------- | ------------------ |
+| Mistral  | France  | `MISTRAL_API_KEY`  |
+| Scaleway | France  | `SCALEWAY_API_KEY` |
+| OVHcloud | France  | `OVHCLOUD_API_KEY` |
+| Hetzner  | Germany | `HETZNER_API_KEY`  |
+
+## More
+
+- [Self-hosted deployment guide](https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md): where data goes, the organisation policy, and what the sovereignty claim does and doesn't cover
+- [Data residency controls](https://github.com/AxsionDev/Lunos/blob/dev/docs/data-residency.md): the full reference, including the audit log format
+- [Model provider jurisdictions](https://github.com/AxsionDev/Lunos/blob/dev/docs/provider-jurisdictions.md): what "EU" rests on for each provider

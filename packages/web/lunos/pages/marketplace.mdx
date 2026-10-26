@@ -1,0 +1,34 @@
+---
+title: Marketplace
+description: Find and install plugins, MCP servers, skills and hooks from reviewed Lunos marketplaces.
+---
+
+A marketplace is a list of plugins, MCP servers, skill sources and hooks you can install by name. Lunos includes one, `lunos-community`, published at `https://lunos.tech/marketplace.json`, and you can add others.
+
+## Find and install
+
+```bash
+lunos marketplace search <query> [--kind plugin|skill|hook|mcp]
+lunos marketplace install <name>
+lunos plugin add <name>          # plugins only
+```
+
+In the TUI, the **Discover** view lists every marketplace's entries, with a tab per kind (`ctrl+o` switches). Hooks and MCP servers show exactly what they will run, and Lunos asks before anything is written to your global config.
+
+Add another marketplace with `lunos marketplace add`, and refresh one with `lunos marketplace update <name>`. Manifests are cached for a day.
+
+## Verified and community entries
+
+Every entry carries a review status:
+
+- **Verified**: a named reviewer checked it at one exact version, against the [review criteria](https://github.com/AxsionDev/Lunos/blob/dev/docs/marketplace-review.md). They include an OSI licence, public source, no undisclosed telemetry, and every network host it contacts declared. Lunos installs that version and nothing else. For npm plugins, it refuses the install if the package's integrity hash doesn't match the reviewed one.
+- **Community**: listed so you can find it, but not reviewed. Installing one needs `--allow-unreviewed`. An organisation can forbid that with `"marketplace_unreviewed": false` in managed config.
+
+"Verified" is a claim by whoever publishes the marketplace. The install preview says whose (`verified by lunos-community`), so a badge from a third-party marketplace reads as that party's claim, not Lunos's.
+
+## Turning it off
+
+- `"marketplace_default": false` stops Lunos using `lunos-community`.
+- With `LUNOS_OFFLINE=1`, no marketplace is fetched ([Offline mode](/docs/offline-mode)).
+
+The marketplace is only contacted when you use these commands or the Discover view, never at startup. The request carries nothing from your project.

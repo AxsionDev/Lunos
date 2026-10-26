@@ -17,4 +17,14 @@ export const UpdateAvailable = Event.define({
   },
 })
 
-export const Definitions = Event.inventory(Updated, UpdateAvailable)
+// XCOD-247: the step an update started from the TUI or desktop is on, so they can show it while the
+// install runs. `version` is empty while the latest version is still being looked up.
+export const UpgradeProgress = Event.define({
+  type: "installation.upgrade-progress",
+  schema: {
+    step: Schema.Literals(["checking", "installing", "verifying"]),
+    version: Schema.String,
+  },
+})
+
+export const Definitions = Event.inventory(Updated, UpdateAvailable, UpgradeProgress)

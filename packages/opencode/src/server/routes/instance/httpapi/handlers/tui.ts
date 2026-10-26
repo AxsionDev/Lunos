@@ -21,7 +21,10 @@ const commandAliases = {
   messages_half_page_down: "session.half.page.down",
   messages_first: "session.first",
   messages_last: "session.last",
-  agent_cycle: "agent.cycle",
+  // agent_cycle is XCOD-40's deprecated wire alias, kept resolving to the
+  // renamed command so existing external callers don't silently break.
+  agent_cycle: "mode.cycle",
+  mode_cycle: "mode.cycle",
 } as const
 
 export const tuiHandlers = HttpApiBuilder.group(InstanceHttpApi, "tui", (handlers) =>

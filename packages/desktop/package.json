@@ -1,16 +1,17 @@
 {
   "name": "@opencode-ai/desktop",
   "private": true,
-  "version": "1.19.4",
+  "version": "1.18.55",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://opencode.ai",
+  "homepage": "https://lunos.tech",
   "author": {
-    "name": "OpenCode",
-    "email": "hello@opencode.ai"
+    "name": "Axsion",
+    "email": "admin@axsion.net"
   },
   "scripts": {
     "typecheck": "tsgo -b",
+    "test": "bun test",
     "predev": "bun ./scripts/predev.ts",
     "dev": "electron-vite dev",
     "prebuild": "bun ./scripts/prebuild.ts",

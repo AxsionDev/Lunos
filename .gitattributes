@@ -1,2 +1,6 @@
 packages/core/migration/**/snapshot.json linguist-generated
 packages/core/src/database/migration.gen.ts linguist-generated
+packages/opencode/test/fixture/memory-import/** -text
+# XCOD-174: the published schemas are byte-for-byte what script/schemas.ts writes (LF), on every OS,
+# so `schemas.ts --check` passes on Windows checkouts too.
+schemas/*.json text eol=lf

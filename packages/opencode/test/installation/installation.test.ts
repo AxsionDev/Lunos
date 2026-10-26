@@ -2,23 +2,18 @@ import { describe, expect, test } from "bun:test"
 import { makeGlobalNode } from "@opencode-ai/core/effect/app-node"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
-import { Effect, Exit, Fiber, Layer, Stream } from "effect"
-import * as TestClock from "effect/testing/TestClock"
+import { Effect, Layer, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { Installation } from "../../src/installation"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationChannel } from "@opencode-ai/core/installation/version"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { testEffect } from "../lib/effect"
 
 const encoder = new TextEncoder()
 
-// A handler that returns undefined never responds.
-function mockHttpClient(handler: (request: HttpClientRequest.HttpClientRequest) => Response | undefined) {
-  const client = HttpClient.make((request) => {
-    const response = handler(request)
-    return response ? Effect.succeed(HttpClientResponse.fromWeb(request, response)) : Effect.never
-  })
+function mockHttpClient(handler: (request: HttpClientRequest.HttpClientRequest) => Response) {
+  const client = HttpClient.make((request) => Effect.succeed(HttpClientResponse.fromWeb(request, handler(request))))
   return Layer.succeed(HttpClient.HttpClient, client)
 }
 
@@ -57,7 +52,7 @@ function jsonResponse(body: unknown) {
 }
 
 function testLayer(
-  httpHandler: (request: HttpClientRequest.HttpClientRequest) => Response | undefined,
+  httpHandler: (request: HttpClientRequest.HttpClientRequest) => Response,
   spawnHandler?: (cmd: string, args: readonly string[]) => string | { code: number; stdout?: string; stderr?: string },
 ) {
   const spawnerNode = makeGlobalNode({
@@ -72,131 +67,103 @@ function testLayer(
 }
 
 describe("installation", () => {
-  describe("isUpdate", () => {
-    test("only counts newer releases in the installed major version", () => {
-      expect(Installation.isUpdate("1.19.0", "1.19.1")).toBe(true)
-      expect(Installation.isUpdate("1.19.0", "1.20.0")).toBe(true)
-      expect(Installation.isUpdate("1.19.0", "1.19.0")).toBe(false)
-      expect(Installation.isUpdate("1.19.0", "1.18.35")).toBe(false)
-      expect(Installation.isUpdate("1.19.0", "2.0.0")).toBe(false)
-      expect(Installation.isUpdate("1.9.0", "1.10.0")).toBe(true)
-    })
-
-    test("compares preview builds within their channel", () => {
-      expect(Installation.isUpdate("0.0.0-dev-202610110139", "0.0.0-dev-202610120000")).toBe(true)
-      expect(Installation.isUpdate("0.0.0-dev-202610120000", "0.0.0-dev-202610110139")).toBe(false)
-    })
-
-    test("source builds only accept OpenCode 1 releases", () => {
-      expect(Installation.isUpdate("local", "1.19.0")).toBe(true)
-      expect(Installation.isUpdate("local", "2.0.0")).toBe(false)
-      expect(Installation.isUpdate("1.19.0", "not-a-version")).toBe(false)
-    })
-  })
-
   describe("latest", () => {
-    const npm = "https://registry.npmjs.org/opencode-ai/latest"
-    const choco = "https://community.chocolatey.org/api/v2/Packages"
-    const tap = (cmd: string, args: readonly string[]) =>
-      cmd === "brew" && args.join(" ") === "list --formula anomalyco/tap/opencode" ? "opencode" : ""
-    const core = (cmd: string, args: readonly string[]) =>
-      cmd === "brew" && args.join(" ") === "list --formula opencode" ? "opencode" : ""
-    const registry = (version: string, calls: string[], feed: string[] = [version]) =>
-      testLayer((request) => {
-        calls.push(request.url)
-        if (request.url.startsWith(choco))
-          return jsonResponse({
-            d: { results: feed.filter((v) => request.url.includes(`%27${v}%27`)).map((Version) => ({ Version })) },
-          })
-        return jsonResponse({ version })
-      })
-
-    const methods = ["curl", "yarn", "unknown", "npm", "bun", "pnpm", "scoop", "choco"] as const
-    for (const method of methods) {
+    for (const method of ["npm", "pnpm", "bun", "yarn", "curl", "brew", "scoop", "choco", "unknown"] as const) {
       const calls: string[] = []
-      testEffect(registry("1.19.2", calls)).effect(`reads ${method} versions from the opencode-ai npm package`, () =>
-        Effect.gen(function* () {
-          calls.length = 0
-          expect(yield* Installation.use.latest(method)).toBe("1.19.2")
-          expect(calls[0]).toBe(npm)
-          expect(calls.slice(1).every((url) => url.startsWith(choco))).toBe(true)
+      testEffect(
+        testLayer((request) => {
+          calls.push(request.url)
+          return jsonResponse({ version: "1.5.0" })
         }),
-      )
-
-      testEffect(registry("2.0.27", [])).effect(`ignores OpenCode 2 versions for ${method}`, () =>
+      ).effect(`reads the lunos-ai npm registry entry for ${method} installs`, () =>
         Effect.gen(function* () {
-          expect(yield* Installation.use.latest(method)).toBe(InstallationVersion)
+          const result = yield* Installation.use.latest(method)
+          expect(result).toBe("1.5.0")
+          expect(calls).toEqual([`https://registry.npmjs.org/lunos-ai/${InstallationChannel}`])
         }),
       )
     }
+  })
 
-    const tapCalls: string[] = []
+  describe("method", () => {
     testEffect(
-      testLayer((request) => {
-        tapCalls.push(request.url)
-        return jsonResponse({ version: "1.19.2" })
-      }, tap),
-    ).effect("reads Homebrew tap versions from the opencode-ai npm package", () =>
+      testLayer(
+        () => jsonResponse({}),
+        (cmd) => (cmd === "npm" ? "/usr/lib\n├── lunos-ai@1.18.38\n" : ""),
+      ),
+    ).effect("detects a global npm install of lunos-ai", () =>
       Effect.gen(function* () {
-        tapCalls.length = 0
-        expect(yield* Installation.use.latest("brew")).toBe("1.19.2")
-        expect(tapCalls).toEqual([npm])
+        expect(yield* Installation.use.method()).toBe("npm")
       }),
     )
 
-    const coreCalls: string[] = []
     testEffect(
-      testLayer((request) => {
-        coreCalls.push(request.url)
-        return jsonResponse({ version: "1.19.2" })
-      }, core),
-    ).effect("never offers an OpenCode 1 update Homebrew Core can't install", () =>
+      testLayer(
+        () => jsonResponse({}),
+        (cmd) => {
+          if (cmd === "npm") return "/usr/lib\n├── opencode-ai@1.18.30\n"
+          if (cmd === "brew" || cmd === "scoop" || cmd === "choco") return "opencode"
+          return ""
+        },
+      ),
+    ).effect("does not mistake an upstream opencode install for Lunos", () =>
       Effect.gen(function* () {
-        coreCalls.length = 0
-        expect(yield* Installation.use.latest("brew")).toBe(InstallationVersion)
-        expect(coreCalls).toEqual([])
-      }),
-    )
-
-    testEffect(registry("1.19.2", [], ["1.19.1"])).effect("waits until Chocolatey has published the npm version", () =>
-      Effect.gen(function* () {
-        expect(yield* Installation.use.latest("choco")).toBe(InstallationVersion)
-      }),
-    )
-
-    const errorCalls: string[] = []
-    testEffect(
-      testLayer((request) => {
-        errorCalls.push(request.url)
-        return new Response("unavailable", { status: 503 })
-      }),
-    ).live("fails when the npm registry fails, without consulting GitHub", () =>
-      Effect.gen(function* () {
-        errorCalls.length = 0
-        expect(Exit.isFailure(yield* Installation.use.latest("curl").pipe(Effect.exit))).toBe(true)
-        expect(errorCalls.length).toBeGreaterThan(0)
-        expect(errorCalls.every((url) => url === npm)).toBe(true)
-      }),
-    )
-
-    testEffect(testLayer(() => jsonResponse({ name: "opencode-ai" }))).effect(
-      "fails when the npm registry returns no version",
-      () =>
-        Effect.gen(function* () {
-          expect(Exit.isFailure(yield* Installation.use.latest("npm").pipe(Effect.exit))).toBe(true)
-        }),
-    )
-
-    testEffect(testLayer(() => undefined)).effect("gives up when the npm registry doesn't answer in time", () =>
-      Effect.gen(function* () {
-        const fiber = yield* Installation.use.latest("curl").pipe(Effect.exit, Effect.forkChild)
-        yield* TestClock.adjust("10 seconds")
-        expect(Exit.isFailure(yield* Fiber.join(fiber))).toBe(true)
+        expect(yield* Installation.use.method()).toBe("unknown")
       }),
     )
   })
 
   describe("upgrade", () => {
+    const installs: string[][] = []
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        (cmd, args) => {
+          installs.push([cmd, ...args])
+          return ""
+        },
+      ),
+    ).effect("installs lunos-ai for npm, pnpm and bun", () =>
+      Effect.gen(function* () {
+        yield* Installation.use.upgrade("npm", "9.9.9")
+        yield* Installation.use.upgrade("pnpm", "9.9.9")
+        yield* Installation.use.upgrade("bun", "9.9.9")
+        const managers = installs.filter((cmd) => cmd.some((arg) => arg.includes("@9.9.9")))
+        expect(managers).toEqual([
+          // npm 12 skips lunos-ai's postinstall (the binary download) without the flag.
+          ["npm", "install", "-g", "lunos-ai@9.9.9", "--allow-scripts=lunos-ai"],
+          ["pnpm", "install", "-g", "lunos-ai@9.9.9"],
+          ["bun", "install", "-g", "lunos-ai@9.9.9"],
+        ])
+      }),
+    )
+
+    for (const method of ["curl", "brew", "scoop", "choco", "yarn", "unknown"] as const) {
+      const spawned: string[] = []
+      const fetched: string[] = []
+      testEffect(
+        testLayer(
+          (request) => {
+            fetched.push(request.url)
+            return new Response("install script", { status: 200 })
+          },
+          (cmd) => {
+            spawned.push(cmd)
+            return ""
+          },
+        ),
+      ).effect(`refuses ${method} without running or fetching anything`, () =>
+        Effect.gen(function* () {
+          const error = yield* Effect.flip(Installation.use.upgrade(method, "9.9.9"))
+          expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
+          expect(error.stderr).toContain("Lunos isn't published on")
+          expect(error.stderr).toContain("npm i -g lunos-ai --allow-scripts=lunos-ai")
+          expect(spawned).toEqual([])
+          expect(fetched).toEqual([])
+        }),
+      )
+    }
+
     testEffect(
       testLayer(
         () => jsonResponse({}),
@@ -207,7 +174,7 @@ describe("installation", () => {
       ),
     ).effect("returns sanitized typed errors for failed package upgrades", () =>
       Effect.gen(function* () {
-        const error = yield* Effect.flip(Installation.use.upgrade("npm", "1.99.9"))
+        const error = yield* Effect.flip(Installation.use.upgrade("npm", "9.9.9"))
         expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
         expect(error.stderr).toBe("Upgrade failed for npm (exit code 1).")
         expect(error.message).toBe(error.stderr)
@@ -216,232 +183,109 @@ describe("installation", () => {
       }),
     )
 
-    testEffect(
-      testLayer(
-        () => new Response("install script with token=secret", { status: 200 }),
-        (cmd, args) => {
-          if (cmd === "bash" && args[0] === "--version") return "GNU bash"
-          if (cmd === "bash" || cmd === "sh") return { code: 1, stderr: "script output with token=secret" }
-          return ""
-        },
-      ),
-    ).effect("returns sanitized typed errors when the curl install script fails", () =>
-      Effect.gen(function* () {
-        const error = yield* Effect.flip(Installation.use.upgrade("curl", "1.99.9"))
-        expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
-        expect(error.stderr).toBe("Upgrade failed for curl (exit code 1).")
-        expect(error.message).toBe(error.stderr)
-        expect(error.stderr).not.toContain("secret")
-        expect(error.stderr).not.toContain("script output")
-      }),
-    )
-
-    testEffect(
-      testLayer(
-        () => new Response("install script", { status: 200 }),
-        (cmd, args) => {
-          if (cmd === "bash" && args[0] === "--version") return { code: 1, stderr: "missing" }
-          if (cmd === "bash") return { code: 1, stderr: "should not execute installer with bash" }
-          if (cmd === "sh") return "ok"
-          return ""
-        },
-      ),
-    ).effect("falls back to sh when bash is unavailable during curl upgrade", () =>
-      Effect.gen(function* () {
-        yield* Installation.use.upgrade("curl", "1.99.9")
-      }),
-    )
-  })
-
-  describe("upgrade per method", () => {
-    const packageCalls: string[] = []
-    testEffect(
-      testLayer(
-        () => jsonResponse({}),
-        (cmd, args) => {
-          packageCalls.push([cmd, ...args].join(" "))
-          return ""
-        },
-      ),
-    ).effect("installs the OpenCode 1 package with each package manager", () =>
-      Effect.gen(function* () {
-        for (const method of ["npm", "pnpm", "bun", "yarn"] as const) {
-          packageCalls.length = 0
-          yield* Installation.use.upgrade(method, "1.19.2")
-          expect(packageCalls[0]).toContain("opencode-ai@1.19.2")
-        }
-      }),
-    )
-
-    const majorCalls: string[] = []
-    testEffect(
-      testLayer(
-        () => jsonResponse({}),
-        (cmd, args) => {
-          majorCalls.push([cmd, ...args].join(" "))
-          return ""
-        },
-      ),
-    ).effect("refuses OpenCode 2 targets for every method", () =>
-      Effect.gen(function* () {
-        for (const method of ["curl", "npm", "pnpm", "bun", "yarn", "brew", "choco", "scoop"] as const) {
-          majorCalls.length = 0
-          const error = yield* Effect.flip(Installation.use.upgrade(method, "2.0.27"))
-          expect(error.stderr).toContain("opencode upgrade --major")
-          expect(majorCalls).toEqual([])
-        }
-      }),
-    )
-
-    const coreCalls: string[] = []
-    testEffect(
-      testLayer(
-        () => jsonResponse({}),
-        (cmd, args) => {
-          coreCalls.push([cmd, ...args].join(" "))
-          if (args.join(" ") === "list --formula opencode") return "opencode"
-          return ""
-        },
-      ),
-    ).effect("never runs brew upgrade for Homebrew Core, whose formula is OpenCode 2", () =>
-      Effect.gen(function* () {
-        coreCalls.length = 0
-        const error = yield* Effect.flip(Installation.use.upgrade("brew", "1.19.2"))
-        expect(error.stderr).toContain("Homebrew Core")
-        expect(coreCalls.some((call) => call.startsWith("brew upgrade"))).toBe(false)
-      }),
-    )
-
-    const tap = (stable: string, calls: string[]) =>
-      testLayer(
-        () => jsonResponse({}),
-        (cmd, args) => {
-          calls.push([cmd, ...args].join(" "))
-          if (args.join(" ") === "list --formula anomalyco/tap/opencode") return "opencode"
-          if (args.join(" ") === "--repo anomalyco/tap") return "/tmp/opencode-test-tap"
-          if (args.includes("--json=v2")) return JSON.stringify({ formulae: [{ versions: { stable } }] })
-          return ""
-        },
-      )
-
-    const tapCalls: string[] = []
-    testEffect(tap("1.19.2", tapCalls)).effect("upgrades the Homebrew tap once it has the version", () =>
-      Effect.gen(function* () {
-        tapCalls.length = 0
-        yield* Installation.use.upgrade("brew", "1.19.2")
-        expect(tapCalls).toContain("git pull --ff-only")
-        expect(tapCalls).toContain("brew upgrade anomalyco/tap/opencode")
-      }),
-    )
-
-    for (const stable of ["1.19.1", "2.0.0"]) {
-      const calls: string[] = []
-      testEffect(tap(stable, calls)).effect(`asks to retry when the Homebrew tap is at ${stable}`, () =>
-        Effect.gen(function* () {
-          calls.length = 0
-          const error = yield* Effect.flip(Installation.use.upgrade("brew", "1.19.2"))
-          expect(error.stderr).toContain("Try again in a few minutes")
-          expect(calls.some((call) => call.startsWith("brew upgrade"))).toBe(false)
-        }),
-      )
-    }
-  })
-
-  describe("upgradeMajor", () => {
-    const calls: string[] = []
-    testEffect(
-      testLayer(
-        () => jsonResponse({}),
-        (cmd, args) => {
-          calls.push([cmd, ...args].join(" "))
-          return ""
-        },
-      ),
-    ).effect("replaces the npm package with OpenCode 2", () =>
-      Effect.gen(function* () {
-        calls.length = 0
-        yield* Installation.use.upgradeMajor("npm")
-        expect(calls.slice(0, 2)).toEqual(["npm uninstall -g opencode-ai", "npm install -g @opencode/cli"])
-      }),
-    )
-
-    const restoreCalls: string[] = []
-    testEffect(
-      testLayer(
-        () => jsonResponse({}),
-        (cmd, args) => {
-          restoreCalls.push([cmd, ...args].join(" "))
-          if (args.includes("@opencode/cli")) return { code: 1, stderr: "install failed" }
-          return ""
-        },
-      ),
-    ).effect("restores OpenCode 1 when the OpenCode 2 install fails", () =>
-      Effect.gen(function* () {
-        restoreCalls.length = 0
-        const error = yield* Effect.flip(Installation.use.upgradeMajor("npm"))
-        expect(error.stderr).toBe("Upgrade failed for npm (exit code 1).")
-        expect(restoreCalls[2]).toMatch(/^npm install -g opencode-ai@/)
-      }),
-    )
-
-    const brewCalls: string[] = []
-    testEffect(
-      testLayer(
-        () => jsonResponse({}),
-        (cmd, args) => {
-          brewCalls.push([cmd, ...args].join(" "))
-          if (args.join(" ") === "list --formula anomalyco/tap/opencode") return "opencode"
-          return ""
-        },
-      ),
-    ).effect("replaces the brew formula with the OpenCode 2 formula", () =>
-      Effect.gen(function* () {
-        brewCalls.length = 0
-        yield* Installation.use.upgradeMajor("brew")
-        expect(brewCalls).toContain("brew uninstall anomalyco/tap/opencode")
-        expect(brewCalls).toContain("brew install anomalyco/tap/opencode-v2")
-      }),
-    )
-
-    const curlCalls: string[] = []
-    const curlUrls: string[] = []
-    testEffect(
-      testLayer(
-        (request) => {
-          curlUrls.push(request.url)
-          return new Response("echo v2", { status: 200 })
-        },
-        (cmd, args) => {
-          curlCalls.push(cmd)
-          if (cmd === "bash" && args[0] === "--version") return "GNU bash"
-          return ""
-        },
-      ),
-    ).effect("runs the OpenCode 2 install script for curl installs", () =>
-      Effect.gen(function* () {
-        curlUrls.length = 0
-        yield* Installation.use.upgradeMajor("curl")
-        expect(curlUrls).toEqual(["https://opencode.ai/v2/install"])
-        expect(curlCalls).toContain("bash")
-      }),
-    )
-
-    const chocoCalls: string[] = []
+    // A user saw only "Upgrade failed for npm (exit code 14)" (v1.18.43) and had nothing to act on.
     testEffect(
       testLayer(
         () => jsonResponse({}),
         (cmd) => {
-          chocoCalls.push(cmd)
+          if (cmd === "npm")
+            return {
+              code: 14,
+              stderr: [
+                "npm error code EBUSY",
+                "npm error syscall rename",
+                "npm error path C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\lunos-ai",
+                "npm error //registry.example.com/:_authToken=secret",
+                "npm error A complete log of this run can be found in: C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-04T12_06_15_180Z-debug-0.log",
+              ].join("\n"),
+            }
           return ""
         },
       ),
-    ).effect("leaves package managers without OpenCode 2 untouched", () =>
+    ).effect("names npm's error code and debug log, and nothing else from its output", () =>
       Effect.gen(function* () {
-        chocoCalls.length = 0
-        const error = yield* Effect.flip(Installation.use.upgradeMajor("choco"))
-        expect(error.stderr).toContain(Installation.MAJOR_INSTRUCTIONS)
-        expect(chocoCalls).toEqual([])
+        const error = yield* Effect.flip(Installation.use.upgrade("npm", "9.9.9"))
+        expect(error.stderr).toBe(
+          "Upgrade failed for npm (exit code 14, npm error EBUSY).\n" +
+            "npm's log: C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-04T12_06_15_180Z-debug-0.log",
+        )
+        expect(error.stderr).not.toContain("secret")
+        expect(error.stderr).not.toContain("syscall")
       }),
     )
+  })
+
+  // XCOD-247: steps reported while it runs, and a check of what the package manager installed.
+  describe("upgrade progress", () => {
+    const steps: string[] = []
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        (cmd, args) => (args[0] === "list" ? "/usr/lib\n├── lunos-ai@9.9.9\n" : ""),
+      ),
+    ).effect("reports installing then verifying, and passes when the listing shows the target", () =>
+      Effect.gen(function* () {
+        yield* Installation.use.upgrade("npm", "9.9.9", (step) => steps.push(step))
+        expect(steps).toEqual(["installing", "verifying"])
+      }),
+    )
+
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        (cmd, args) => (args[0] === "list" ? "/usr/lib\n├── lunos-ai@1.0.0\n" : ""),
+      ),
+    ).effect("fails when the package manager lists another version afterwards", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(Installation.use.upgrade("npm", "9.9.9"))
+        expect(error.stderr).toContain("npm reports lunos-ai 1.0.0 after installing 9.9.9")
+      }),
+    )
+
+    testEffect(
+      testLayer(
+        () => jsonResponse({}),
+        () => "",
+      ),
+    ).effect("passes when the listing can't be read (the install itself succeeded)", () =>
+      Effect.gen(function* () {
+        yield* Installation.use.upgrade("bun", "9.9.9")
+      }),
+    )
+
+    test("reads the version from npm, pnpm and bun listings", () => {
+      expect(Installation.listedVersion("/usr/lib\n├── lunos-ai@1.18.48\n└── npm@12.0.0")).toBe("1.18.48")
+      expect(Installation.listedVersion("dependencies:\nlunos-ai 1.18.48\n")).toBe("1.18.48")
+      expect(Installation.listedVersion("/home/u/.bun/install/global node_modules\n└── lunos-ai@1.18.48")).toBe(
+        "1.18.48",
+      )
+      expect(Installation.listedVersion("├── lunos-ai-extra@2.0.0")).toBeUndefined()
+      expect(Installation.listedVersion("")).toBeUndefined()
+    })
+  })
+
+  describe("failureDetail", () => {
+    test("reads npm 10 (ERR!) and npm 12 (error) output", () => {
+      expect(Installation.failureDetail("npm ERR! code EACCES\n").code).toBe("EACCES")
+      expect(Installation.failureDetail("npm error code E403").code).toBe("E403")
+    })
+
+    test("reads pnpm's error codes", () => {
+      expect(Installation.failureDetail(" ERR_PNPM_EACCES  permission denied").code).toBe("ERR_PNPM_EACCES")
+    })
+
+    test("never takes free text as a code", () => {
+      expect(Installation.failureDetail("npm error code token=abc123").code).toBeUndefined()
+      expect(Installation.failureDetail("something went wrong").code).toBeUndefined()
+    })
+
+    test("takes the log path only from npm's own log line", () => {
+      expect(
+        Installation.failureDetail(
+          "npm error A complete log of this run can be found in: /home/u/.npm/_logs/x-debug-0.log",
+        ).log,
+      ).toBe("/home/u/.npm/_logs/x-debug-0.log")
+      expect(Installation.failureDetail("see /tmp/secret.log").log).toBeUndefined()
+    })
   })
 })

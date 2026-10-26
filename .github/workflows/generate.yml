@@ -3,11 +3,11 @@ name: generate
 on:
   push:
     branches:
-      - v1
+      - dev
 
 jobs:
   generate:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write

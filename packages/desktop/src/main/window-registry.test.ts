@@ -78,6 +78,25 @@ describe("window registry", () => {
     expect(app.registry.lastFocused()).toBeUndefined()
   })
 
+  test("XCOD-235: finds the most recently focused window that isn't the Sessions window", () => {
+    const app = setup()
+    const notSessions = (id: string) => id !== "sessions"
+    app.registry.register("a", { name: "a" })
+    app.registry.register("b", { name: "b" })
+    app.registry.register("sessions", { name: "sessions" })
+    // Nothing focused yet: any window but the Sessions window.
+    expect(app.registry.lastFocusedWhere(notSessions)).toEqual({ name: "a" })
+    app.registry.focused("b")
+    app.registry.focused("a")
+    app.registry.focused("sessions")
+    expect(app.registry.lastFocused()).toEqual({ name: "sessions" })
+    expect(app.registry.lastFocusedWhere(notSessions)).toEqual({ name: "a" })
+    app.registry.closed("a")
+    expect(app.registry.lastFocusedWhere(notSessions)).toEqual({ name: "b" })
+    app.registry.closed("b")
+    expect(app.registry.lastFocusedWhere(notSessions)).toBeUndefined()
+  })
+
   test("resumes forgetting closed windows after the quit flag resets", () => {
     const app = setup()
     app.registry.register("a", { name: "a" })

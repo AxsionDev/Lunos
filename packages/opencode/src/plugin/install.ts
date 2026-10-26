@@ -43,6 +43,10 @@ export type PatchInput = {
   worktree: string
   directory: string
   config?: string
+  /** JSON array field to patch. Defaults to "plugin". */
+  field?: string
+  /** Identity used to detect duplicate entries for the non-exact-match case. Defaults to the npm package name. */
+  identity?: (spec: string) => string
 }
 
 type Ok<T> = {
@@ -95,11 +99,11 @@ function pluginSpec(item: unknown) {
   return item[0]
 }
 
-function pluginList(data: unknown) {
+function readArrayField(data: unknown, field: string) {
   if (!data || typeof data !== "object" || Array.isArray(data)) return
-  const item = data as { plugin?: unknown }
-  if (!Array.isArray(item.plugin)) return
-  return item.plugin
+  const item = data as Record<string, unknown>
+  if (!Array.isArray(item[field])) return
+  return item[field] as unknown[]
 }
 
 function exportValue(value: unknown): string | undefined {
@@ -178,14 +182,16 @@ function patch(text: string, path: Array<string | number>, value: unknown, inser
   )
 }
 
-function patchPluginList(
+function patchList(
   text: string,
+  field: string,
   list: unknown[] | undefined,
   spec: string,
   next: unknown,
+  identity: (spec: string) => string,
   force = false,
 ): { mode: Mode; text: string } {
-  const pkg = parsePluginSpecifier(spec).pkg
+  const id = identity(spec)
   const rows = (list ?? []).map((item, i) => ({
     item,
     i,
@@ -195,19 +201,19 @@ function patchPluginList(
     if (!item.spec) return false
     if (item.spec === spec) return true
     if (item.spec.startsWith("file://")) return false
-    return parsePluginSpecifier(item.spec).pkg === pkg
+    return identity(item.spec) === id
   })
 
   if (!dup.length) {
     if (!list) {
       return {
         mode: "add",
-        text: patch(text, ["plugin"], [next]),
+        text: patch(text, [field], [next]),
       }
     }
     return {
       mode: "add",
-      text: patch(text, ["plugin", list.length], next, true),
+      text: patch(text, [field, list.length], next, true),
     }
   }
 
@@ -235,10 +241,10 @@ function patchPluginList(
 
   let out = text
   if (typeof keep.item === "string") {
-    out = patch(out, ["plugin", keep.i], next)
+    out = patch(out, [field, keep.i], next)
   }
   if (Array.isArray(keep.item) && typeof keep.item[0] === "string") {
-    out = patch(out, ["plugin", keep.i, 0], spec)
+    out = patch(out, [field, keep.i, 0], spec)
   }
 
   const del = dup
@@ -247,7 +253,7 @@ function patchPluginList(
     .sort((a, b) => b - a)
 
   for (const i of del) {
-    out = patch(out, ["plugin", i], undefined)
+    out = patch(out, [field, i], undefined)
   }
 
   return {
@@ -330,7 +336,7 @@ export async function readPluginManifest(target: string): Promise<ManifestResult
   }
 }
 
-function patchDir(input: PatchInput) {
+export function patchDir(input: PatchInput) {
   if (input.global) return input.config ?? Global.Path.config
   const git = input.vcs === "git" && input.worktree !== "/"
   const root = git ? input.worktree : input.directory
@@ -342,7 +348,15 @@ function patchName(kind: Kind): "opencode" | "tui" {
   return "tui"
 }
 
-async function patchOne(dir: string, target: Target, spec: string, force: boolean, dep: PatchDeps): Promise<PatchOne> {
+async function patchOne(
+  dir: string,
+  target: Target,
+  spec: string,
+  force: boolean,
+  dep: PatchDeps,
+  field: string,
+  identity: (spec: string) => string,
+): Promise<PatchOne> {
   const name = patchName(target.kind)
   await using _ = await Flock.acquire(`plug-config:${Filesystem.resolve(path.join(dir, name))}`)
 
@@ -384,9 +398,9 @@ async function patchOne(dir: string, target: Target, spec: string, force: boolea
     }
   }
 
-  const list = pluginList(data)
+  const list = readArrayField(data, field)
   const item = target.opts ? ([spec, target.opts] as const) : spec
-  const out = patchPluginList(text, list, spec, item, force)
+  const out = patchList(text, field, list, spec, item, identity, force)
   if (out.mode === "noop") {
     return {
       ok: true,
@@ -420,9 +434,11 @@ async function patchOne(dir: string, target: Target, spec: string, force: boolea
 
 export async function patchPluginConfig(input: PatchInput, dep: PatchDeps = defaultPatchDeps): Promise<PatchResult> {
   const dir = patchDir(input)
+  const field = input.field ?? "plugin"
+  const identity = input.identity ?? ((spec: string) => parsePluginSpecifier(spec).pkg)
   const items: PatchItem[] = []
   for (const target of input.targets) {
-    const hit = await patchOne(dir, target, input.spec, Boolean(input.force), dep)
+    const hit = await patchOne(dir, target, input.spec, Boolean(input.force), dep, field, identity)
     if (!hit.ok) {
       return {
         ...hit,

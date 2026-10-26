@@ -18,6 +18,7 @@ import { errorMessage } from "../util/error"
 import { DialogSessionDeleteFailed } from "./dialog-session-delete-failed"
 import { useCommandShortcut } from "../keymap"
 import { useEvent } from "../context/event"
+import { listed, queuedDeleteNote } from "../util/sessions-overview"
 
 type SessionListFilter = { scope?: "project"; path?: string }
 
@@ -53,6 +54,8 @@ export function DialogSessionList() {
   const local = useLocal()
   const toast = useToast()
   const [toDelete, setToDelete] = createSignal<string>()
+  // XCOD-269: prompts queued for the session about to be deleted, which go with it.
+  const [toDeleteQueued, setToDeleteQueued] = createSignal(0)
   const [deleted, setDeleted] = createSignal(new Set<string>())
   const [search, setSearch] = createDebouncedSignal("", 150)
   const deleteHint = useCommandShortcut("session.delete")
@@ -87,9 +90,13 @@ export function DialogSessionList() {
       return session ? [session] : []
     })
     const query = search().trim().toLowerCase()
-    return [...result.map((session) => synced.get(session.id) ?? session), ...extra]
-      .filter((session) => !deleted().has(session.id))
-      .filter((session) => !query || session.title.toLowerCase().includes(query))
+    return (
+      [...result.map((session) => synced.get(session.id) ?? session), ...extra]
+        .filter((session) => !deleted().has(session.id))
+        // XCOD-265: cleared from /sessions; the session open right now stays reachable.
+        .filter((session) => listed(session) || session.id === currentSessionID())
+        .filter((session) => !query || session.title.toLowerCase().includes(query))
+    )
   })
 
   onCleanup(
@@ -243,7 +250,9 @@ export function DialogSessionList() {
           ? () => <text fg={theme.accent}>{slot}</text>
           : undefined
       return {
-        title: isDeleting ? `Press ${deleteHint()} again to confirm` : x.title,
+        title: isDeleting
+          ? [`Press ${deleteHint()} again to confirm`, queuedDeleteNote(toDeleteQueued())].filter(Boolean).join(" · ")
+          : x.title,
         bg: isDeleting ? theme.error : undefined,
         value: x.id,
         category,
@@ -341,7 +350,18 @@ export function DialogSessionList() {
               setToDelete(undefined)
               return
             }
+            setToDeleteQueued(0)
             setToDelete(option.value)
+            const asked = option.value
+            void sdk.client.experimental.session
+              .queued({ sessionID: asked }, { throwOnError: true })
+              .then((response) => {
+                if (toDelete() !== asked || !response.data.held) return
+                setToDeleteQueued(response.data.held)
+                // The row is cut to the dialog's width: the whole sentence is here.
+                toast.show({ variant: "warning", message: queuedDeleteNote(response.data.held)! })
+              })
+              .catch(() => {})
           },
         },
         {

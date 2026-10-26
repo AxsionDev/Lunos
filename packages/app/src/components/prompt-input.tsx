@@ -46,7 +46,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ModelSelectorPopover, ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
-import { useCommand } from "@/context/command"
+import { formatKeybind, useCommand } from "@/context/command"
 import { usePermission } from "@/context/permission"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
@@ -73,11 +73,13 @@ import {
   type PromptInputSubmission,
 } from "./prompt-input/contracts"
 import { createPromptSubmit } from "./prompt-input/submit"
+import { useSessionTakeover } from "./prompt-input/takeover"
 import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
+import { useAccount } from "@/context/account"
 import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
@@ -127,6 +129,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  const account = useAccount()
   const tabs = () => props.controls.session.tabs
   let editorRef!: HTMLDivElement
   let fileInputRef: HTMLInputElement | undefined
@@ -326,6 +329,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       commentCount: commentCount(),
       example: suggest() ? (store.mode === "shell" ? "git status" : language.t(EXAMPLES[store.placeholder])) : "",
       suggest: suggest(),
+      // XCOD-312: a disabled Lunos account's prompt says why it can't be used.
+      accountDisabled: !!account?.disabled(),
       t: (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
     }),
   )
@@ -417,6 +422,47 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const escBlur = () => platform.platform === "desktop" && platform.os === "macos"
+
+  // XCOD-255: Esc twice clears the prompt while the agent is idle (busy, Esc stops it and the text
+  // stays). The cleared prompt goes to history, and mod+Z right after brings it back, comments too.
+  const DOUBLE_ESCAPE_MS = 1000
+  const [escapeArmed, setEscapeArmed] = createSignal(false)
+  let escapeTimer: ReturnType<typeof setTimeout> | undefined
+  let cleared: (PromptHistoryEntry & { mode: "normal" | "shell" }) | undefined
+  onCleanup(() => clearTimeout(escapeTimer))
+
+  const disarmEscape = () => {
+    clearTimeout(escapeTimer)
+    setEscapeArmed(false)
+  }
+
+  const escapeClear = () => {
+    if (!escapeArmed()) {
+      setEscapeArmed(true)
+      escapeTimer = setTimeout(() => setEscapeArmed(false), DOUBLE_ESCAPE_MS)
+      return
+    }
+    disarmEscape()
+    const entry = { prompt: prompt.current(), comments: historyComments(), mode: store.mode }
+    addToHistory(entry.prompt, entry.mode)
+    resetHistoryNavigation()
+    applyHistoryComments([])
+    prompt.set(DEFAULT_PROMPT, 0)
+    cleared = entry
+    // After this keydown has finished: the same Esc reaching the toast region would dismiss it.
+    setTimeout(() =>
+      showToast({ title: language.t("prompt.toast.cleared", { key: formatKeybind("mod+z", language.t) }) }),
+    )
+  }
+
+  const restoreCleared = () => {
+    const entry = cleared
+    if (!entry) return false
+    cleared = undefined
+    setStore("mode", entry.mode)
+    applyHistoryPrompt(entry, "end")
+    return true
+  }
 
   const pick = () => {
     pickAttachmentFiles({
@@ -1192,6 +1238,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const variants = createMemo(() => ["default", ...props.controls.model.selection.variant.list()])
   // Check provider variants directly: `variants` also includes the UI-only default option.
   const showVariantControl = createMemo(() => props.controls.model.selection.variant.list().length > 0)
+  const takeover = useSessionTakeover()
   const accepting = createMemo(() => {
     const id = props.controls.session.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk().directory)
@@ -1227,6 +1274,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       onAbort: props.onAbort,
       onSubmit: props.onSubmit,
       model: props.controls.model.selection,
+      takeover,
     })
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -1265,6 +1313,21 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       }
     }
 
+    if (event.key !== "Escape") disarmEscape()
+
+    if (
+      cleared &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === "z" &&
+      blank() &&
+      restoreCleared()
+    ) {
+      event.preventDefault()
+      return
+    }
+
     if (event.key === "Escape") {
       if (store.popover) {
         closePopover()
@@ -1282,6 +1345,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
       if (working()) {
         void abort()
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+
+      // A selection is the innermost thing Esc undoes: collapse it, and don't count the press.
+      const selection = window.getSelection()
+      if (selection && !selection.isCollapsed && editorRef.contains(selection.anchorNode)) {
+        selection.collapseToEnd()
+        disarmEscape()
+        event.preventDefault()
+        return
+      }
+
+      if (!blank()) {
+        escapeClear()
         event.preventDefault()
         event.stopPropagation()
         return
@@ -1574,6 +1653,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               }}
             />
 
+            <Show when={escapeArmed()}>
+              <span class="text-12-regular text-text-weak" role="status">
+                {language.t("prompt.escape.again")}
+              </span>
+            </Show>
             <div class="flex items-center gap-1 pointer-events-auto">
               <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
                 <IconButton
@@ -1655,7 +1739,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       placement="top"
                       gutter={4}
                       title={language.t("command.agent.cycle")}
-                      keybind={command.keybind("agent.cycle")}
+                      keybind={command.keybind("mode.cycle")}
                     >
                       <Select
                         size="normal"

@@ -57,6 +57,19 @@ const replacements = [
 ] as const
 
 const it = testEffect(LayerNode.compile(root, replacements))
+// XCOD-287: background subagents turned off in config.
+const backgroundOff = testEffect(
+  LayerNode.compile(root, [
+    [
+      Config.node,
+      TestConfig.layer({
+        get: () => Effect.succeed({ subagent: { background: false } }),
+        directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
+      }),
+    ],
+    [RuntimeFlags.node, RuntimeFlags.layer()],
+  ] as const),
+)
 const withCodeMode = testEffect(
   LayerNode.compile(root, [
     [Config.node, configLayer],
@@ -150,7 +163,29 @@ describe("tool.registry", () => {
     }),
   )
 
-  it.instance("hides task background parameter unless experimental background subagents are enabled", () =>
+  // XCOD-287: background subagents are on by default, so the parameter is offered unless turned off.
+  backgroundOff.instance(
+    "hides task background parameter when subagent.background is false",
+    () =>
+      Effect.gen(function* () {
+        const registry = yield* ToolRegistry.Service
+        const agent = yield* Agent.Service
+        const build = yield* agent.get("build")
+        if (!build) throw new Error("build agent not found")
+        const task = (yield* registry.tools({
+          providerID: ProviderV2.ID.opencode,
+          modelID: ModelV2.ID.make("test"),
+          agent: build,
+        })).find((tool) => tool.id === "task")
+
+        expect(task?.jsonSchema).toBeDefined()
+        expect((task?.jsonSchema?.properties as Record<string, unknown> | undefined)?.background).toBeUndefined()
+        expect(task?.description).not.toContain("Background mode")
+      }),
+    { config: { subagent: { background: false } } },
+  )
+
+  it.instance("offers the task background parameter by default", () =>
     Effect.gen(function* () {
       const registry = yield* ToolRegistry.Service
       const agent = yield* Agent.Service
@@ -161,9 +196,8 @@ describe("tool.registry", () => {
         modelID: ModelV2.ID.make("test"),
         agent: build,
       })).find((tool) => tool.id === "task")
-
-      expect(task?.jsonSchema).toBeDefined()
-      expect((task?.jsonSchema?.properties as Record<string, unknown> | undefined)?.background).toBeUndefined()
+      const schema = task?.jsonSchema ?? (task ? ToolJsonSchema.fromTool(task as never) : undefined)
+      expect((schema?.properties as Record<string, unknown> | undefined)?.background).toBeDefined()
     }),
   )
 

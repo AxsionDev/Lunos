@@ -36,6 +36,7 @@ import { BuiltInTools } from "./tool/builtins"
 import { ReadToolFileSystem } from "./tool/read-filesystem"
 import { ToolRegistry } from "./tool/registry"
 import { ToolOutputStore } from "./tool-output-store"
+import { ToolHooks } from "./tool-hooks"
 
 export { LocationServiceMap } from "./location-service-map"
 
@@ -49,6 +50,7 @@ export const locationServices = LayerNode.group([
   Integration.node,
   Catalog.node,
   AISDK.node,
+  ToolHooks.node,
   PluginV2.node,
   PluginInternal.node,
   ProjectCopy.node,

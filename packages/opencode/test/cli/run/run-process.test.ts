@@ -1,3 +1,4 @@
+import fs from "node:fs"
 // Subprocess integration tests for `opencode run` (non-interactive mode).
 // These exercise the real CLI binary against a TestLLMServer running in the
 // same process. See `test/lib/cli-process.ts` for the harness — each test uses
@@ -7,6 +8,12 @@ import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
+import { testProviderConfig } from "../../lib/test-provider"
+
+// Concurrent tests share a capped pool of CLI child slots (see cli-process.ts),
+// so a test may wait for a slot before its child starts. The per-child kill
+// timeout still bounds the child; this bounds the test including that wait.
+const CONCURRENT_TIMEOUT = 120_000
 
 describe("opencode run (non-interactive subprocess)", () => {
   // Happy path: prompt completes, output reaches stdout, process exits 0.
@@ -20,7 +27,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("hello from the test llm\n")
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -42,7 +49,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("before tool\nafter tool\n")
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -59,27 +66,47 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(plain, 0)
         expect(plain.stdout).toBe("visible\n")
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
-  // Regression for #27371: an unknown model used to hang the process forever
-  // waiting on a session.status === idle event that never arrived. The fix
-  // makes the SDK call surface an error promptly so the process exits nonzero.
-  // We assert nonzero exit AND wall-clock under the harness timeout — a hang
-  // would expire the timeout and produce a different (signal-killed) failure.
+  // Regression for #27371: an unknown model used to hang the process forever waiting on a
+  // session.status === idle event that never arrived. XCOD-214 (PO, 2026-10-07): an unknown model is
+  // now a warning, and the next best one is used, so the run succeeds, promptly, and says so.
   // Keep competing CLI startups out of this wall-clock assertion on busy CI runners.
   cliIt.live(
-    "exits nonzero promptly when the model is unknown (regression for #27371)",
-    ({ opencode }) =>
+    "an unknown --model is replaced by the next best one, with a warning (XCOD-214, #27371)",
+    ({ llm, opencode }) =>
       Effect.gen(function* () {
+        yield* llm.text("hi")
         const result = yield* opencode.run("say hi", {
           model: "test/nonexistent-model",
           timeoutMs: 15_000,
         })
-        expect(result.exitCode).not.toBe(0)
+        opencode.expectExit(result, 0)
         expect(result.durationMs).toBeLessThan(15_000)
+        expect(result.stdout).toBe("hi\n")
+        expect(result.stderr).toContain(`"test/nonexistent-model" isn't available here, so test/test-model is used`)
+        expect(yield* llm.calls).toBeGreaterThanOrEqual(1)
       }),
-    30_000,
+    CONCURRENT_TIMEOUT,
+  )
+
+  cliIt.live(
+    "an unknown model in config is replaced by the next best one, with a warning (XCOD-214)",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("hi")
+        const result = yield* opencode.spawn(["run", "say hi"], {
+          timeoutMs: 15_000,
+          env: {
+            OPENCODE_CONFIG_CONTENT: JSON.stringify({ ...testProviderConfig(llm.url), model: "test/test-modle" }),
+          },
+        })
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toContain("hi")
+        expect(result.stderr).toContain(`"test/test-modle" isn't available here, so test/test-model is used`)
+      }),
+    CONCURRENT_TIMEOUT,
   )
 
   // The test provider's SSE error item is interpreted by the SDK as an unknown
@@ -102,7 +129,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.stdout).toBe("partial response\nrecovered\n")
         expect(result.stderr).not.toContain("upstream provider exploded mid-stream")
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   // --format json puts one JSON object per line on stdout for each emitted
@@ -139,15 +166,43 @@ describe("opencode run (non-interactive subprocess)", () => {
             .every((line) => line.length > 0),
         ).toBe(true)
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
+  )
+
+  // XCOD-150: the child inherited the test process's $PWD, so its project was the repo checkout.
+  cliIt.concurrent(
+    "runs in the fixture directory, not the repo checkout",
+    ({ llm, home, opencode }) =>
+      Effect.gen(function* () {
+        // Not `pwd -P`: on Windows the bash tool runs PowerShell, where `-P` is ambiguous.
+        const command = `bun -e "console.log(process.cwd())"`
+        yield* llm.push(reply().tool("bash", { command, description: "Print the directory" }))
+        yield* llm.text("done")
+
+        const result = yield* opencode.run("where am I", {
+          format: "json",
+          extraArgs: ["--dangerously-skip-permissions"],
+        })
+
+        opencode.expectExit(result, 0)
+        const tool = opencode.parseJsonEvents(result.stdout).find((e: any) => e.type === "tool_use")
+        const cwd = String((tool as any)?.part?.state?.output ?? "").trim()
+        // Windows can name the same directory by its short (RUNNER~1) or long form, in any case.
+        const same = (p: string) => p.toLowerCase()
+        const fixture = [home, fs.realpathSync(home), fs.realpathSync.native(home)].map(same)
+        expect(fixture).toContain(same(fs.existsSync(cwd) ? fs.realpathSync.native(cwd) : cwd))
+      }),
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
     "--format json emits a pure error record for a rejected prompt request",
     ({ opencode }) =>
       Effect.gen(function* () {
-        const result = yield* opencode.run("use an unknown model", {
-          model: "test/nonexistent-model",
+        // An unknown model is no longer rejected (XCOD-214: replaced with a warning); an unknown
+        // command still is.
+        const result = yield* opencode.run("args", {
+          command: "no-such-command",
           format: "json",
         })
 
@@ -162,7 +217,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         })
         expect(result.stdout.split("\n").filter(Boolean)).toHaveLength(1)
       }),
-    30_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -211,7 +266,7 @@ describe("opencode run (non-interactive subprocess)", () => {
             .every((line) => line.startsWith("{")),
         ).toBe(true)
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -246,7 +301,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(events[7]?.part).toEqual(expect.objectContaining({ type: "text", text: "recovered" }))
         expect(events.at(-1)?.part).toEqual(expect.objectContaining({ type: "step-finish", reason: "stop" }))
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.concurrent(
@@ -282,7 +337,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(explicitlyDenied.stdout).toContain("continued after explicit denial")
         expect(yield* Effect.promise(() => Bun.file(`${home}/explicitly-denied`).exists())).toBe(false)
       }),
-    60_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.live(
@@ -307,6 +362,28 @@ describe("opencode run (non-interactive subprocess)", () => {
     60_000,
   )
 
+  // XCOD-236: an attached run whose session ends in an error exited 0, unlike a local one.
+  cliIt.live(
+    "attach mode exits non-zero when the session ends in an error, as a local run does",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("must never be asked")
+        const env = {
+          OPENCODE_CONFIG_CONTENT: JSON.stringify({ ...testProviderConfig(llm.url), residency: { allow: ["eu"] } }),
+        }
+        const local = yield* opencode.run("say hi", { env })
+        const server = yield* opencode.serve({ env })
+        const attached = yield* opencode.run("say hi", { env, extraArgs: ["--attach", server.url] })
+
+        for (const result of [local, attached]) {
+          expect(result.exitCode).toBe(1)
+          expect(result.stderr).toContain("Blocked by data-residency policy")
+        }
+        expect(yield* llm.calls).toBe(0)
+      }),
+    60_000,
+  )
+
   cliIt.concurrent(
     "attach mode rejects local directories before prompt admission",
     ({ home, opencode }) =>
@@ -318,7 +395,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("Cannot attach local directory without a shared filesystem")
       }),
-    30_000,
+    CONCURRENT_TIMEOUT,
   )
 
   cliIt.live(

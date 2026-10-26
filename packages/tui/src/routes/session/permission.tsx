@@ -16,6 +16,8 @@ import { getScrollAcceleration } from "../../util/scroll"
 import { useTuiConfig } from "../../config"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
+import { selectionMarker } from "../../util/status-glyph"
+import { externalChoices, type ExternalChoice } from "../../util/external-permission"
 
 type PermissionStage = "permission" | "always" | "reject"
 
@@ -115,6 +117,26 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
   const [store, setStore] = createStore({
     stage: "permission" as PermissionStage,
   })
+  // XCOD-285: a Claude Code / Codex approval offers the tool's own choices, in its wording.
+  const choices = createMemo(() =>
+    props.request.permission === "external" ? externalChoices(props.request.metadata) : undefined,
+  )
+  const feedbackHint = createMemo(() => {
+    const meta = props.request.metadata ?? {}
+    return meta["tool"] === "claude" ? "Tell Claude what to do differently" : undefined
+  })
+  const send = (reply: "once" | "always" | "reject", message?: string) =>
+    void sdk.client.permission.reply({
+      reply,
+      requestID: props.request.id,
+      directory: props.directory,
+      ...(message ? { message } : {}),
+      workspace: project.workspace.current(),
+    })
+  const choose = (choice: ExternalChoice) => {
+    if (choice.feedback) return setStore("stage", "reject")
+    send(choice.reply, choice.message)
+  }
   const pathFormatter = usePathFormatter()
 
   const session = createMemo(() => sync.data.session.find((s) => s.id === props.request.sessionID))
@@ -141,11 +163,11 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
           body={
             <Switch>
               <Match when={props.request.always.length === 1 && props.request.always[0] === "*"}>
-                <TextBody title={"This will allow " + props.request.permission + " until OpenCode is restarted."} />
+                <TextBody title={"This will allow " + props.request.permission + " until Lunos is restarted."} />
               </Match>
               <Match when={true}>
                 <box paddingLeft={1} gap={1}>
-                  <text fg={theme.textMuted}>This will allow the following patterns until OpenCode is restarted</text>
+                  <text fg={theme.textMuted}>This will allow the following patterns until Lunos is restarted</text>
                   <box>
                     <For each={props.request.always}>
                       {(pattern) => (
@@ -176,6 +198,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
       </Match>
       <Match when={store.stage === "reject"}>
         <RejectPrompt
+          hint={feedbackHint()}
           onConfirm={(message) => {
             void sdk.client.permission.reply({
               reply: "reject",
@@ -357,6 +380,67 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
               }
             }
 
+            // XCOD-94 / XCOD-136: what would be remembered, and the fact it contradicts, if any.
+            if (permission === "memory") {
+              const meta = props.request.metadata ?? {}
+              const fact = typeof meta["fact"] === "string" ? meta["fact"] : ""
+              const source = typeof meta["source"] === "string" ? meta["source"] : ""
+              const scope = typeof meta["scope"] === "string" ? meta["scope"] : ""
+              const kind = typeof meta["kind"] === "string" ? meta["kind"] : ""
+              const raw = meta["contradicts"]
+              const contradicts =
+                raw && typeof raw === "object" && typeof (raw as { text?: unknown }).text === "string"
+                  ? (raw as { id?: string; text: string })
+                  : undefined
+              return {
+                icon: "◆",
+                title: `Remember in ${scope || "project"} memory`,
+                body: (
+                  <box paddingLeft={1} gap={1}>
+                    <text fg={theme.text}>{fact}</text>
+                    <text fg={theme.textMuted}>{`From ${source}${kind ? ` · ${kind}` : ""}`}</text>
+                    <Show when={contradicts}>
+                      {(item) => (
+                        <box>
+                          <text fg={theme.warning}>{`Contradicts ${item().id ?? "a remembered fact"}:`}</text>
+                          <text fg={theme.text}>{item().text}</text>
+                          <text fg={theme.textMuted}>
+                            If you allow it, you'll be asked whether to replace the old fact or keep both.
+                          </text>
+                        </box>
+                      )}
+                    </Show>
+                  </box>
+                ),
+              }
+            }
+
+            // XCOD-204 / XCOD-218: Claude Code or Codex asking to use one of its tools, or Lunos asking
+            // to hand a task to it. The pattern ("claude:Write <file>") is what "always" would allow.
+            if (permission === "external") {
+              const meta = props.request.metadata ?? {}
+              const label =
+                typeof meta["label"] === "string"
+                  ? meta["label"]
+                  : meta["tool"] === "codex"
+                    ? "Codex CLI"
+                    : "Claude Code"
+              const action = typeof meta["action"] === "string" ? meta["action"] : undefined
+              const task = typeof meta["task"] === "string" ? meta["task"] : undefined
+              const pattern = props.request.patterns?.[0] ?? ""
+              const target = action ? pattern.slice(pattern.indexOf(" ") + 1) : ""
+              const description = typeof meta["description"] === "string" ? meta["description"] : undefined
+              return {
+                icon: "⇄",
+                title: action ? `${label}: ${action} ${target}` : `Hand a task to ${label}`,
+                body: (
+                  <box paddingLeft={1}>
+                    <text fg={theme.textMuted}>{task ?? description ?? pattern}</text>
+                  </box>
+                ),
+              }
+            }
+
             if (permission === "doom_loop") {
               return {
                 icon: "⟳",
@@ -396,6 +480,26 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
               </box>
             </box>
           )
+
+          const native = choices()
+          if (native)
+            return (
+              <Prompt
+                title="Permission required"
+                header={header()}
+                body={current.body}
+                options={Object.fromEntries(native.map((choice) => [choice.id, choice.label]))}
+                // Esc refuses and stops the tool's turn, as Esc does in the tool (no feedback asked).
+                escapeKey={native.find((choice) => choice.reply === "reject")?.id}
+                onEscape={() => send("reject")}
+                vertical
+                fullscreen
+                onSelect={(option) => {
+                  const choice = native.find((item) => item.id === option)
+                  if (choice) choose(choice)
+                }}
+              />
+            )
 
           const body = (
             <Prompt
@@ -440,7 +544,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
   )
 }
 
-function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: () => void }) {
+function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: () => void; hint?: string }) {
   let input: TextareaRenderable
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
@@ -483,7 +587,7 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
           <text fg={theme.text}>Reject permission</text>
         </box>
         <box paddingLeft={1}>
-          <text fg={theme.textMuted}>Tell OpenCode what to do differently</text>
+          <text fg={theme.textMuted}>{props.hint ?? "Tell Lunos what to do differently"}</text>
         </box>
       </box>
       <box
@@ -528,9 +632,18 @@ function Prompt<const T extends Record<string, string>>(props: {
   body: JSX.Element
   options: T
   escapeKey?: keyof T
+  /** XCOD-285: what Esc does, when it isn't choosing `escapeKey`. */
+  onEscape?: () => void
+  /** XCOD-285: the choices one per line (the tool's own, which are sentences), moved with ↑/↓ too. */
+  vertical?: boolean
   fullscreen?: boolean
   onSelect: (option: keyof T) => void
 }) {
+  const escape = () => {
+    if (!props.escapeKey) return
+    if (props.onEscape) return props.onEscape()
+    props.onSelect(props.escapeKey)
+  }
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
   const dimensions = useTerminalDimensions()
@@ -550,8 +663,7 @@ function Prompt<const T extends Record<string, string>>(props: {
         title: "Reject permission",
         category: "Permission",
         run() {
-          if (!props.escapeKey) return
-          props.onSelect(props.escapeKey)
+          escape()
         },
       },
       {
@@ -565,6 +677,28 @@ function Prompt<const T extends Record<string, string>>(props: {
       },
     ],
     bindings: [
+      ...(props.vertical
+        ? [
+            {
+              key: "up",
+              desc: "Previous permission option",
+              group: "Permission",
+              cmd: () => {
+                const idx = keys.indexOf(store.selected)
+                setStore("selected", keys[(idx - 1 + keys.length) % keys.length])
+              },
+            },
+            {
+              key: "down",
+              desc: "Next permission option",
+              group: "Permission",
+              cmd: () => {
+                const idx = keys.indexOf(store.selected)
+                setStore("selected", keys[(idx + 1) % keys.length])
+              },
+            },
+          ]
+        : []),
       {
         key: "left",
         desc: "Previous permission option",
@@ -617,7 +751,7 @@ function Prompt<const T extends Record<string, string>>(props: {
               key: "escape",
               desc: "Reject permission",
               group: "Permission",
-              cmd: () => props.onSelect(props.escapeKey!),
+              cmd: () => escape(),
             },
           ]
         : []),
@@ -663,7 +797,7 @@ function Prompt<const T extends Record<string, string>>(props: {
         {props.body}
       </box>
       <box
-        flexDirection={narrow() ? "column" : "row"}
+        flexDirection={narrow() || props.vertical ? "column" : "row"}
         flexShrink={0}
         gap={1}
         paddingTop={1}
@@ -671,10 +805,10 @@ function Prompt<const T extends Record<string, string>>(props: {
         paddingRight={3}
         paddingBottom={1}
         backgroundColor={theme.backgroundElement}
-        justifyContent={narrow() ? "flex-start" : "space-between"}
-        alignItems={narrow() ? "flex-start" : "center"}
+        justifyContent={narrow() || props.vertical ? "flex-start" : "space-between"}
+        alignItems={narrow() || props.vertical ? "flex-start" : "center"}
       >
-        <box flexDirection="row" gap={1} flexShrink={0}>
+        <box flexDirection={props.vertical ? "column" : "row"} gap={props.vertical ? 0 : 1} flexShrink={0}>
           <For each={keys}>
             {(option) => (
               <box
@@ -688,6 +822,8 @@ function Prompt<const T extends Record<string, string>>(props: {
                 }}
               >
                 <text fg={option === store.selected ? selectedForeground(theme, theme.warning) : theme.textMuted}>
+                  {/* XCOD-141: a marker as well as the highlight, so the choice doesn't rely on colour alone. */}
+                  {selectionMarker(option === store.selected)}
                   {props.options[option]}
                 </text>
               </box>
@@ -701,7 +837,7 @@ function Prompt<const T extends Record<string, string>>(props: {
             </text>
           </Show>
           <text fg={theme.text}>
-            {"⇆"} <span style={{ fg: theme.textMuted }}>select</span>
+            {props.vertical ? "↑↓" : "⇆"} <span style={{ fg: theme.textMuted }}>select</span>
           </text>
           <text fg={theme.text}>
             enter <span style={{ fg: theme.textMuted }}>confirm</span>

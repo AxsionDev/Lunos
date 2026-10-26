@@ -62,6 +62,9 @@ const lsp = Layer.succeed(
   LSP.Service.of({
     init: () => Effect.void,
     status: () => Effect.succeed([]),
+    overview: () => Effect.succeed({ enabled: true, downloads: true, servers: [] }),
+    stop: () => Effect.void,
+    log: () => Effect.succeed([]),
     hasClients: () => Effect.succeed(false),
     touchFile: () => Effect.void,
     diagnostics: () => Effect.succeed({}),
@@ -133,6 +136,8 @@ it.live("tool execution produces non-empty session diff (snapshot race)", () =>
       const session = yield* sessions.create({
         title: "snapshot race test",
         permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        // XCOD-303: the main agent runs bash itself only with Dynamic workflows off (`/workflows off`).
+        metadata: { workflows: { dynamic: false } },
       })
 
       // Use bash tool (always registered) to create a file

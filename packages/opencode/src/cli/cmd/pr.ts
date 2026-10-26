@@ -4,6 +4,18 @@ import { effectCmd, fail } from "../effect-cmd"
 import { Git } from "@/git"
 import { InstanceRef } from "@/effect/instance-ref"
 import { Process } from "@/util/process"
+import { DISCONTINUED_MESSAGE, isDiscontinuedShareUrl } from "./import"
+
+/**
+ * The shared session a PR links to: the "[Lunos session](<url>)" link the GitHub action writes, or
+ * a bare link to upstream's closed share service from before XCOD-266, so it can say why it's skipped.
+ */
+export function findSessionUrl(body: string) {
+  return (
+    body.match(/\[Lunos session\]\((https?:\/\/[^\s)]+)\)/)?.[1] ??
+    body.match(/https:\/\/(?:[\w-]+\.)*opncd\.ai\/s\/[a-zA-Z0-9_-]+/)?.[0]
+  )
+}
 
 export const PrCommand = effectCmd({
   command: "pr <number>",
@@ -43,11 +55,13 @@ export const PrCommand = effectCmd({
           "view",
           `${prNumber}`,
           "--json",
-          "headRepository,headRepositoryOwner,isCrossRepository,headRefName",
+          "headRepository,headRepositoryOwner,isCrossRepository,headRefName,body",
         ],
         { nothrow: true },
       ),
     )
+
+    let sessionId: string | undefined
 
     if (prInfoResult.code === 0 && prInfoResult.text.trim()) {
       const prInfo = JSON.parse(prInfoResult.text)
@@ -69,16 +83,39 @@ export const PrCommand = effectCmd({
           cwd: worktree,
         })
       }
+
+      if (prInfo?.body) {
+        const sessionUrl = findSessionUrl(prInfo.body)
+        if (sessionUrl && isDiscontinuedShareUrl(sessionUrl)) {
+          UI.println(`Found Lunos session: ${sessionUrl}`)
+          UI.println(DISCONTINUED_MESSAGE)
+        } else if (sessionUrl) {
+          UI.println(`Found Lunos session: ${sessionUrl}`)
+          UI.println(`Importing session...`)
+
+          const importResult = yield* Effect.promise(() =>
+            Process.text(["opencode", "import", sessionUrl], { nothrow: true }),
+          )
+          if (importResult.code === 0) {
+            const sessionIdMatch = importResult.text.trim().match(/Imported session: ([a-zA-Z0-9_-]+)/)
+            if (sessionIdMatch) {
+              sessionId = sessionIdMatch[1]
+              UI.println(`Session imported: ${sessionId}`)
+            }
+          }
+        }
+      }
     }
 
     UI.println(`Successfully checked out PR #${prNumber} as branch '${localBranchName}'`)
     UI.println()
-    UI.println("Starting opencode...")
+    UI.println("Starting Lunos...")
     UI.println()
 
+    const opencodeArgs = sessionId ? ["-s", sessionId] : []
     const code = yield* Effect.promise(
       () =>
-        Process.spawn(["opencode"], {
+        Process.spawn(["opencode", ...opencodeArgs], {
           stdin: "inherit",
           stdout: "inherit",
           stderr: "inherit",

@@ -1,0 +1,29 @@
+{
+  "name": "@lunos/session-embed",
+  "version": "1.18.55",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "vite build",
+    "test": "bun test",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "workspace:*",
+    "@opencode-ai/session-ui": "workspace:*",
+    "@opencode-ai/ui": "workspace:*",
+    "@solidjs/meta": "catalog:",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "@tsconfig/bun": "catalog:",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "tailwindcss": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-solid": "catalog:"
+  }
+}

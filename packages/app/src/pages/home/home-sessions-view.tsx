@@ -282,6 +282,7 @@ function HomeSessionSearch(props: HomeSessionsViewProps) {
             `}
             value={props.searchValue()}
             placeholder={props.searchPlaceholder()}
+            role="combobox"
             aria-label={props.searchPlaceholder()}
             aria-expanded={props.searchOpen()}
             aria-controls={HOME_SESSION_SEARCH_RESULTS_ID}

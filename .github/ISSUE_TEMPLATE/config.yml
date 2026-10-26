@@ -1,5 +1,10 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Discord Community
-    url: https://discord.gg/opencode
-    about: For support, troubleshooting, how-to questions, and real-time discussion.
+  # XCOD-126: upstream's template pointed at upstream's Discord. Lunos's community channel
+  # (XCOD-125) replaces the first link once it exists.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/AxsionDev/Lunos/blob/dev/SECURITY.md
+    about: Report vulnerabilities privately, as described in SECURITY.md. Never in a public issue.
+  - name: 📖 Self-hosted deployment guide
+    url: https://github.com/AxsionDev/Lunos/blob/dev/docs/deployment/self-hosted.md
+    about: Data residency, offline mode, and where your data goes.

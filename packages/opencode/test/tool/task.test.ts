@@ -1,4 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
+import * as BackgroundList from "@/background/list"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Database } from "@opencode-ai/core/database/database"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -652,35 +653,66 @@ describe("tool.task", () => {
     },
   )
 
-  it.instance("rejects background execution when the experiment is disabled", () =>
+  // XCOD-287: background subagents are on by default, without the env flag or any config.
+  it.instance("background execution is on by default", () =>
     Effect.gen(function* () {
       const { chat, assistant } = yield* seed()
       const tool = yield* TaskTool
       const def = yield* tool.init()
-
-      const exit = yield* def
-        .execute(
-          {
-            description: "inspect bug",
-            prompt: "look into the cache key path",
-            subagent_type: "general",
-            background: true,
-          },
-          {
-            sessionID: chat.id,
-            messageID: assistant.id,
-            agent: "build",
-            abort: new AbortController().signal,
-            extra: { promptOps: stubOps() },
-            messages: [],
-            metadata: () => Effect.void,
-            ask: () => Effect.void,
-          },
-        )
-        .pipe(Effect.exit)
-
-      expect(Exit.isFailure(exit)).toBe(true)
+      const result = yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+          background: true,
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps: { ...stubOps(), prompt: () => Effect.never } satisfies TaskPromptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+      expect(result.metadata).toMatchObject({ background: true })
     }),
+  )
+
+  it.instance(
+    "rejects background execution when subagent.background is false",
+    () =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+
+        const exit = yield* def
+          .execute(
+            {
+              description: "inspect bug",
+              prompt: "look into the cache key path",
+              subagent_type: "general",
+              background: true,
+            },
+            {
+              sessionID: chat.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { promptOps: stubOps() },
+              messages: [],
+              metadata: () => Effect.void,
+              ask: () => Effect.void,
+            },
+          )
+          .pipe(Effect.exit)
+
+        expect(Exit.isFailure(exit)).toBe(true)
+      }),
+    { config: { subagent: { background: false } } },
   )
 
   it.instance("promotes a running foreground task without restarting it", () =>
@@ -971,6 +1003,48 @@ describe("tool.task", () => {
     }),
   )
 
+  // XCOD-82: what the monitoring route lists for a running job, and cancelling it through the
+  // same run-state path the cancel route uses.
+  background.instance("lists a running background task with agent and resolved model, then cancels it", () =>
+    Effect.gen(function* () {
+      const jobs = yield* BackgroundJob.Service
+      const runState = yield* SessionRunState.Service
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      const result = yield* def.execute(
+        { description: "inspect bug", prompt: "look", subagent_type: "general", background: true },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps: { ...stubOps(), prompt: () => Effect.never } satisfies TaskPromptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+      const listed = BackgroundList.list(yield* jobs.list(), chat.id)
+      expect(listed).toHaveLength(1)
+      expect(listed[0]).toMatchObject({
+        id: result.metadata.sessionId,
+        title: "inspect bug",
+        status: "running",
+        agent: "general",
+        modelRule: "inherit",
+        parentSessionID: chat.id,
+      })
+      expect(listed[0].model).toContain("/")
+      expect(BackgroundList.list(yield* jobs.list(), "ses_other")).toEqual([])
+
+      yield* runState.cancel(SessionID.make(result.metadata.sessionId))
+      const waited = yield* jobs.wait({ id: result.metadata.sessionId, timeout: 1_000 })
+      expect(waited.info?.status).toBe("cancelled")
+      expect(BackgroundList.list(yield* jobs.list(), chat.id)[0].status).toBe("cancelled")
+    }),
+  )
+
   background.instance("removing the child task session cancels its running background task", () =>
     Effect.gen(function* () {
       const jobs = yield* BackgroundJob.Service
@@ -1097,5 +1171,58 @@ describe("tool.task", () => {
       expect((yield* jobs.get(child.id))?.status).toBe("cancelled")
       expect((yield* jobs.get(grandchild.id))?.status).toBe("cancelled")
     }),
+  )
+
+  // XCOD-287: at most subagent.max_parallel subagents of one session run at once; the rest are queued.
+  it.instance(
+    "queues subagents past subagent.max_parallel and marks them queued until a slot frees",
+    () =>
+      Effect.gen(function* () {
+        const jobs = yield* BackgroundJob.Service
+        const sessions = yield* Session.Service
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        const release = yield* Deferred.make<void>()
+        const started: string[] = []
+        const ops: TaskPromptOps = {
+          ...stubOps(),
+          prompt: (input) =>
+            Effect.gen(function* () {
+              if (input.sessionID === chat.id) return reply(input, "integrated")
+              started.push(input.sessionID)
+              yield* Deferred.await(release)
+              return reply(input, "done")
+            }),
+        }
+        const launch = (description: string) =>
+          def.execute(
+            { description, prompt: description, subagent_type: "general", background: true },
+            {
+              sessionID: chat.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { promptOps: ops },
+              messages: [],
+              metadata: () => Effect.void,
+              ask: () => Effect.void,
+            },
+          )
+
+        const first = yield* launch("first")
+        const second = yield* launch("second")
+        yield* Effect.sleep("20 millis")
+        expect(started).toEqual([first.metadata.sessionId])
+        expect((yield* sessions.get(SessionID.make(second.metadata.sessionId))).metadata).toMatchObject({
+          subagent: { queued: true },
+        })
+
+        yield* Deferred.succeed(release, undefined)
+        yield* jobs.wait({ id: second.metadata.sessionId })
+        expect(started).toEqual([first.metadata.sessionId, second.metadata.sessionId])
+        expect((yield* sessions.get(SessionID.make(second.metadata.sessionId))).metadata?.subagent).toBeUndefined()
+      }),
+    { config: { subagent: { max_parallel: 1 } } },
   )
 })

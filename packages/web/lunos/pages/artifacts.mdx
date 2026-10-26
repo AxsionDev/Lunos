@@ -1,0 +1,27 @@
+---
+title: Artifacts
+description: Find and open the plans, research notes and dev-cycle records agents write, and share work without uploading it.
+---
+
+Agents write their longer-lived output as plain Markdown files: **plans** from the plan agent, **research notes** from research mode, and **dev-cycle records** from dev-cycle mode. In a Git project they live in the worktree, so you can commit and review them like any other document:
+
+| Kind              | Directory              |
+| ----------------- | ---------------------- |
+| Plans             | `.opencode/plans/`     |
+| Research notes    | `.opencode/research/`  |
+| Dev-cycle records | `.opencode/dev-cycle/` |
+
+Outside a Git project, they go to the same directories under the Lunos data directory. Each file is named `<created-ms>-<slug>.md` and titled by its first heading.
+
+## Find and open them
+
+In the TUI, run **`/artifacts`** (or `/plans`). It lists this project's artifacts grouped by kind, newest first. Press Enter to open the file itself in `$EDITOR`; your edits are saved to that file. Without `$EDITOR` set, Lunos copies the file's path instead.
+
+## Sharing without uploading
+
+Session sharing is off in Lunos by default, because a shared session contains the whole transcript. To share work inside your organisation, share files you already control:
+
+- **Plans, research and dev-cycle records:** commit them and review them in a pull request.
+- **A session:** run `/export` in the TUI, or `lunos export <session-id>` for JSON. Add `--sanitize` to redact file contents and tool output. Then send the file through whatever channel your organisation already uses.
+
+Nothing is uploaded in either case.

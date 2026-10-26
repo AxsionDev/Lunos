@@ -46,6 +46,8 @@ export function hints(template: string) {
 export const Default = {
   INIT: "init",
   REVIEW: "review",
+  MEMORY: "memory",
+  WORKFLOWS: "workflows",
 } as const
 
 export interface Interface {
@@ -85,6 +87,25 @@ const layer = Layer.effect(
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      }
+
+      // Handled by SessionPrompt.command itself: it switches memory for the session and never
+      // reaches a model, so the template is only a placeholder.
+      commands[Default.MEMORY] = {
+        name: Default.MEMORY,
+        description:
+          "long-term memory: /memory off | on for this session; /memory sources [off | on <name>] for external sources; /memory alone opens the browser in the TUI",
+        source: "command",
+        template: "",
+        hints: [],
+      }
+      // XCOD-303: handled by SessionPrompt.command too; switches Dynamic workflows for the session.
+      commands[Default.WORKFLOWS] = {
+        name: Default.WORKFLOWS,
+        description: "Dynamic workflows: /workflows off | on for this session; /workflows alone says which applies",
+        source: "command",
+        template: "",
+        hints: [],
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {

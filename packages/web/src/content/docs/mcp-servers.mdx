@@ -3,7 +3,7 @@ title: MCP servers
 description: Add local and remote MCP tools.
 ---
 
-You can add external tools to OpenCode using the _Model Context Protocol_, or MCP. OpenCode supports both local and remote servers.
+You can add external tools to Lunos using the _Model Context Protocol_, or MCP. Lunos supports both local and remote servers.
 
 Once added, MCP tools are automatically available to the LLM alongside built-in tools.
 
@@ -23,7 +23,7 @@ Certain MCP servers, like the GitHub MCP server, tend to add a lot of tokens and
 
 ## Enable
 
-You can define MCP servers in your [OpenCode Config](https://opencode.ai/docs/config/) under `mcp`. Add each MCP with a unique name. You can refer to that MCP by name when prompting the LLM.
+You can define MCP servers in your [Lunos Config](https://opencode.ai/docs/config/) under `mcp`. Add each MCP with a unique name. You can refer to that MCP by name when prompting the LLM.
 
 ```jsonc title="opencode.jsonc" {6}
 {
@@ -64,6 +64,22 @@ To enable a specific server from your organization's remote config, add it to yo
 ```
 
 Your local config values override the remote defaults. See [config precedence](/docs/config#precedence-order) for more details.
+
+---
+
+## Discover
+
+Marketplaces can list MCP servers alongside plugins, so you can find a server without already knowing its connection details. The Lunos community marketplace ships a starter set, including the official reference servers.
+
+```bash
+lunos marketplace add AxsionDev/Lunos
+lunos mcp search docs
+lunos mcp add context7
+```
+
+`lunos mcp add <name>` shows the command it will run (or the URL it will connect to) and the config file it will write, then asks for confirmation. Pass `--yes` to skip the prompt. If two marketplaces list the same name, qualify it as `<marketplace>/<name>`.
+
+A marketplace entry only declares the _names_ of the environment variables or headers a server needs. Lunos writes them as `{env:NAME}` references, so the generated config holds no secrets. A header is read from the variable named after it, upper-cased with `-` replaced by `_`: the `X-Api-Key` header reads `$X_API_KEY`. The install preview shows each mapping. Export the variable before starting Lunos.
 
 ---
 
@@ -166,7 +182,7 @@ The `url` is the URL of the remote MCP server and with the `headers` option you 
 
 ## OAuth
 
-OpenCode automatically handles OAuth authentication for remote MCP servers. When a server requires authentication, OpenCode will:
+Lunos automatically handles OAuth authentication for remote MCP servers. When a server requires authentication, Lunos will:
 
 1. Detect the 401 response and initiate the OAuth flow
 2. Use **Dynamic Client Registration (RFC 7591)** if supported by the server
@@ -190,7 +206,7 @@ For most OAuth-enabled MCP servers, no special configuration is needed. Just con
 }
 ```
 
-If the server requires authentication, OpenCode will prompt you to authenticate when you first try to use it. If not, you can [manually trigger the flow](#authenticating) with `opencode mcp auth <server-name>`.
+If the server requires authentication, Lunos will prompt you to authenticate when you first try to use it. If not, you can [manually trigger the flow](#authenticating) with `opencode mcp auth <server-name>`.
 
 ---
 
@@ -239,7 +255,7 @@ Remove stored credentials:
 opencode mcp logout my-oauth-server
 ```
 
-The `mcp auth` command will open your browser for authorization. After you authorize, OpenCode will store the tokens securely in `~/.local/share/opencode/mcp-auth.json`.
+The `mcp auth` command will open your browser for authorization. After you authorize, Lunos will store the tokens securely in `~/.local/share/opencode/mcp-auth.json`.
 
 ---
 
@@ -292,7 +308,7 @@ The `mcp debug` command shows the current auth status, tests HTTP connectivity, 
 
 ## Manage
 
-Your MCPs are available as tools in OpenCode, alongside built-in tools. So you can manage them through the OpenCode config like any other tool.
+Your MCPs are available as tools in Lunos, alongside built-in tools. So you can manage them through the Lunos config like any other tool.
 
 ---
 
@@ -424,7 +440,7 @@ After adding the configuration, authenticate with Sentry:
 opencode mcp auth sentry
 ```
 
-This will open a browser window to complete the OAuth flow and connect OpenCode to your Sentry account.
+This will open a browser window to complete the OAuth flow and connect Lunos to your Sentry account.
 
 Once authenticated, you can use Sentry tools in your prompts to query issues, projects, and error data.
 

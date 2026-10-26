@@ -1,6 +1,7 @@
 import {
   createEffect,
   createMemo,
+  createResource,
   createSignal,
   For,
   Index,
@@ -77,6 +78,7 @@ import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { createTimelineProjection } from "./projection"
 import { MessageComment, SummaryDiff, TimelineRow, TimelineRowMap } from "./rows"
 import { filterVirtualIndexes } from "./virtual-items"
+import { shareRefusalKey } from "../share-refusal"
 
 const emptyMessages: MessageType[] = []
 const emptyParts: PartType[] = []
@@ -299,8 +301,7 @@ export function MessageTimeline(props: {
   const titleValue = createMemo(() => info()?.title)
   const titleLabel = createMemo(() => sessionTitle(titleValue()))
   const shareUrl = createMemo(() => info()?.share?.url)
-  // Session sharing was discontinued; keep the share menu and popover hidden.
-  const shareEnabled = () => false
+  const shareEnabled = createMemo(() => sync().data.config.share !== "disabled" && sync().data.config.share !== "cloud")
   const parentID = createMemo(() => info()?.parentID)
   const parent = createMemo(() => {
     const id = parentID()
@@ -663,6 +664,14 @@ export function MessageTimeline(props: {
     mutationFn: (id: string) => serverSDK().client.session.share({ sessionID: id }),
     onError: (err) => {
       console.error("Failed to share session", err)
+      // XCOD-266: nowhere to share to is something the user can fix, so say what to set up.
+      const key = shareRefusalKey(err)
+      if (key)
+        showToast({
+          title: language.t("toast.session.share.failed.title"),
+          description: language.t(key),
+          variant: "error",
+        })
     },
   }))
 
@@ -895,6 +904,15 @@ export function MessageTimeline(props: {
       await deleteSession(props.sessionID)
       dialog.close()
     }
+    // XCOD-269: prompts queued for it and never sent are deleted with it: say so.
+    const [queued] = createResource(
+      () => props.sessionID,
+      (sessionID) =>
+        sdk()
+          .client.experimental.session.queued({ sessionID }, { throwOnError: true })
+          .then((response) => response.data.held)
+          .catch(() => 0),
+    )
 
     if (settings.general.newLayoutDesigns())
       return (
@@ -902,7 +920,10 @@ export function MessageTimeline(props: {
           <DialogHeader hideClose>
             <DialogTitleGroup
               title={language.t("session.delete.title")}
-              description={language.t("session.delete.confirm", { name: name() })}
+              description={[
+                language.t("session.delete.confirm", { name: name() }),
+                ...(queued() ? [language.t("session.delete.queued", { count: queued()! })] : []),
+              ].join(" ")}
             />
           </DialogHeader>
           <DialogFooter>
@@ -923,6 +944,13 @@ export function MessageTimeline(props: {
             <span class="text-14-regular text-text-strong">
               {language.t("session.delete.confirm", { name: name() })}
             </span>
+            <Show when={queued()}>
+              {(count) => (
+                <span class="text-14-regular text-text-strong" data-slot="delete-queued">
+                  {language.t("session.delete.queued", { count: count() })}
+                </span>
+              )}
+            </Show>
           </div>
           <div class="flex justify-end gap-2">
             <Button variant="ghost" size="large" onClick={() => dialog.close()}>

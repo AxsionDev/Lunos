@@ -6,6 +6,7 @@ import type { Plugin as PluginRuntime } from "@opencode-ai/plugin/v2/effect"
 import { Plugin } from "@opencode-ai/schema/plugin"
 import { AgentV2 } from "./agent"
 import { AISDK } from "./aisdk"
+import { ToolHooks } from "./tool-hooks"
 import { Catalog } from "./catalog"
 import { CommandV2 } from "./command"
 import { EventV2 } from "./event"
@@ -145,6 +146,7 @@ const layer = Layer.effect(
 export const locationLayer = layer.pipe(
   Layer.provideMerge(AgentV2.locationLayer),
   Layer.provideMerge(AISDK.locationLayer),
+  Layer.provideMerge(ToolHooks.locationLayer),
   Layer.provideMerge(Catalog.locationLayer),
   Layer.provideMerge(CommandV2.locationLayer),
   Layer.provideMerge(Integration.locationLayer),
@@ -158,6 +160,7 @@ export const node = makeLocationNode({
     EventV2.node,
     AgentV2.node,
     AISDK.node,
+    ToolHooks.node,
     Catalog.node,
     CommandV2.node,
     Integration.node,

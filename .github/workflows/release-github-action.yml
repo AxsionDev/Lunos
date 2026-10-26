@@ -14,6 +14,9 @@ permissions:
 
 jobs:
   release:
+    # Upstream's publishing job. Lunos doesn't publish this, and upstream-sync merges into dev
+    # would otherwise trigger it (XCOD-118); skipped here rather than queued on a Blacksmith runner.
+    if: github.repository == 'anomalyco/opencode'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1

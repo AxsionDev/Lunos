@@ -248,7 +248,7 @@ export const ProvidersCommand = cmd({
 export const ProvidersListCommand = effectCmd({
   command: "list",
   aliases: ["ls"],
-  describe: "list providers and credentials",
+  describe: "list configured providers",
   // Lists global credentials + provider env vars; no project instance needed.
   instance: false,
   handler: Effect.fn("Cli.providers.list")(function* (_args) {
@@ -298,7 +298,7 @@ export const ProvidersListCommand = effectCmd({
 
 export const ProvidersLoginCommand = effectCmd({
   command: "login [url]",
-  describe: "log in to a provider",
+  describe: "add provider (API key or OAuth login)",
   // URL login skips instance bootstrap, which would load remote config with the stale token and crash before re-auth.
   instance: (args) => !args.url,
   builder: (yargs: Argv) =>
@@ -456,15 +456,11 @@ export const ProvidersLoginCommand = effectCmd({
     if (provider === "amazon-bedrock") {
       yield* Prompt.log.info(
         "Amazon Bedrock authentication priority:\n" +
-          "  1. Bearer token (AWS_BEARER_TOKEN_BEDROCK or /connect)\n" +
+          "  1. Bearer token (AWS_BEARER_TOKEN_BEDROCK or /providers in the TUI)\n" +
           "  2. AWS credential chain (profile, access keys, IAM roles, EKS IRSA)\n\n" +
           "Configure via opencode.json options (profile, region, endpoint) or\n" +
           "AWS environment variables (AWS_PROFILE, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_WEB_IDENTITY_TOKEN_FILE).",
       )
-    }
-
-    if (provider === "opencode") {
-      yield* Prompt.log.info("Create an api key at https://opencode.ai/auth")
     }
 
     if (provider === "vercel") {
@@ -473,7 +469,7 @@ export const ProvidersLoginCommand = effectCmd({
 
     if (["cloudflare", "cloudflare-ai-gateway"].includes(provider)) {
       yield* Prompt.log.info(
-        "Cloudflare AI Gateway can be configured with CLOUDFLARE_GATEWAY_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN environment variables. Read more: https://opencode.ai/docs/providers/#cloudflare-ai-gateway",
+        "Cloudflare AI Gateway can be configured with CLOUDFLARE_GATEWAY_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN environment variables. Read more: https://docs.lunos.tech/docs/providers/#cloudflare-ai-gateway",
       )
     }
 
@@ -490,7 +486,7 @@ export const ProvidersLoginCommand = effectCmd({
 
 export const ProvidersLogoutCommand = effectCmd({
   command: "logout [provider]",
-  describe: "log out from a configured provider",
+  describe: "log out of a configured provider",
   builder: (yargs) =>
     yargs.positional("provider", {
       describe: "provider id or name to log out from",

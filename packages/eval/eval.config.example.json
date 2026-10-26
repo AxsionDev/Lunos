@@ -1,0 +1,38 @@
+{
+  "lunosVersion": "1.18.40",
+  "seed": 20260927,
+  "budget": {
+    "name": "pilot",
+    "total": 100,
+    "classes": {
+      "eu-api": 45,
+      "frontier": 45
+    }
+  },
+  "usdToEur": {
+    "rate": 0,
+    "date": "YYYY-MM-DD"
+  },
+  "estimate": {
+    "inputTokensPerTask": 60000,
+    "outputTokensPerTask": 6000
+  },
+  "models": [
+    {
+      "id": "mistral",
+      "model": "mistral/devstral-medium-latest",
+      "cls": "eu-api",
+      "upstream": "https://api.mistral.ai/v1",
+      "keyEnv": "MISTRAL_API_KEY",
+      "trials": 1,
+      "residency": ["eu"]
+    }
+  ],
+  "prices": {},
+  "datasets": [
+    {
+      "name": "lunos",
+      "harbor": "./packages/eval/tasks"
+    }
+  ]
+}

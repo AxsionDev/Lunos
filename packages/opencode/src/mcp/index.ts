@@ -1,4 +1,5 @@
 import path from "node:path"
+import { AuditLog } from "@/audit/log"
 import { pathToFileURL } from "node:url"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
@@ -314,7 +315,7 @@ const layer = Layer.effect(
                 return events
                   .publish(TuiEvent.ToastShow, {
                     title: "MCP Authentication Required",
-                    message: `Server "${key}" requires authentication. Run: opencode mcp auth ${key}`,
+                    message: `Server "${key}" requires authentication. Run: lunos mcp auth ${key}`,
                     variant: "warning",
                     duration: 8000,
                   })
@@ -379,6 +380,25 @@ const layer = Layer.effect(
           mcp.type === "remote"
             ? yield* connectRemote(key, mcp as ConfigMCPV1.Info & { type: "remote" })
             : yield* connectLocal(key, mcp as ConfigMCPV1.Info & { type: "local" })
+        // XCOD-103: the server's name, transport and where it runs (host or command), never its
+        // environment or headers.
+        AuditLog.emit("mcp.connect", {
+          server: key,
+          transport: mcp.type,
+          host:
+            mcp.type === "remote"
+              ? (() => {
+                  try {
+                    return new URL((mcp as { url: string }).url).host
+                  } catch {
+                    return "unknown"
+                  }
+                })()
+              : undefined,
+          command: mcp.type === "local" ? ((mcp as { command?: string[] }).command ?? []).join(" ") : undefined,
+          allowed: status.status === "connected",
+          reason: status.status,
+        })
 
         if (!mcpClient) {
           if (status.status !== "connected" && status.status !== "disabled") {
@@ -518,6 +538,18 @@ const layer = Layer.effect(
 
               const result = yield* create(key, mcp)
               s.status[key] = result.status
+              // XCOD-280: a server that didn't start says so, with its details in the run log.
+              if (result.status.status === "failed") {
+                yield* Effect.logError("MCP server failed to start", { key, error: result.status.error })
+                yield* events
+                  .publish(TuiEvent.ToastShow, {
+                    title: "MCP server failed",
+                    message: `"${key}" didn't start: ${result.status.error}`,
+                    variant: "error",
+                    duration: 10000,
+                  })
+                  .pipe(Effect.ignore)
+              }
               if (result.mcpClient) {
                 s.clients[key] = result.mcpClient
                 s.defs[key] = result.defs!

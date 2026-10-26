@@ -1,6 +1,6 @@
 {
   "name": "@opencode-ai/ui",
-  "version": "1.19.4",
+  "version": "1.18.55",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -51,6 +51,7 @@
     "./icons/app": "./src/components/app-icons/types.ts",
     "./fonts/*": "./src/assets/fonts/*",
     "./audio/*": "./src/assets/audio/*",
+    "./sounds": "./src/sounds.ts",
     "./v2/*.css": "./src/v2/components/*.css",
     "./v2/*": "./src/v2/components/*.tsx",
     "./v2/styles/*": "./src/v2/styles/*"

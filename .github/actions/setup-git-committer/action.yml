@@ -1,24 +1,40 @@
 name: "Setup Git Committer"
-description: "Create app token and configure git user"
+description: "Configure git user and an auth token, via a GitHub App when one is configured"
+# Upstream always mints a token from its own GitHub App. The Lunos fork has no
+# equivalent App, so app-id interpolated to an empty string and
+# actions/create-github-app-token failed with "[@octokit/auth-app] appId option
+# is required" — the first real failure of the first release attempt.
+#
+# The App inputs are now optional. Without them this falls back to the built-in
+# GITHUB_TOKEN, committing as github-actions[bot]. Provide the inputs to restore
+# App-based auth unchanged.
+#
+# Known limitation of the fallback: pushes made with GITHUB_TOKEN do not trigger
+# further workflow runs (GitHub blocks that to prevent recursion). That is fine
+# for the version-bump commit here, but a workflow expected to fire *because of*
+# such a push will not run. Use a GitHub App if that is ever needed.
 inputs:
   opencode-app-id:
-    description: "OpenCode GitHub App ID"
-    required: true
+    description: "GitHub App ID. Optional — falls back to GITHUB_TOKEN when empty."
+    required: false
+    default: ""
   opencode-app-secret:
-    description: "OpenCode GitHub App private key"
-    required: true
+    description: "GitHub App private key. Optional — falls back to GITHUB_TOKEN when empty."
+    required: false
+    default: ""
 outputs:
   token:
-    description: "GitHub App token"
-    value: ${{ steps.apptoken.outputs.token }}
+    description: "GitHub App token when an App is configured, otherwise GITHUB_TOKEN"
+    value: ${{ steps.apptoken.outputs.token || github.token }}
   app-slug:
-    description: "GitHub App slug"
-    value: ${{ steps.apptoken.outputs.app-slug }}
+    description: "GitHub App slug when an App is configured, otherwise github-actions"
+    value: ${{ steps.apptoken.outputs.app-slug || 'github-actions' }}
 runs:
   using: "composite"
   steps:
     - name: Create app token
       id: apptoken
+      if: inputs.opencode-app-id != '' && inputs.opencode-app-secret != ''
       uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
       with:
         app-id: ${{ inputs.opencode-app-id }}
@@ -27,7 +43,7 @@ runs:
 
     - name: Configure git user
       run: |
-        slug="${{ steps.apptoken.outputs.app-slug }}"
+        slug="${{ steps.apptoken.outputs.app-slug || 'github-actions' }}"
         git config --global user.name "${slug}[bot]"
         git config --global user.email "${slug}[bot]@users.noreply.github.com"
       shell: bash
@@ -39,5 +55,5 @@ runs:
 
     - name: Configure git remote
       run: |
-        git remote set-url origin https://x-access-token:${{ steps.apptoken.outputs.token }}@github.com/${{ github.repository }}
+        git remote set-url origin https://x-access-token:${{ steps.apptoken.outputs.token || github.token }}@github.com/${{ github.repository }}
       shell: bash
