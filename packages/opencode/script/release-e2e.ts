@@ -383,11 +383,21 @@ try {
   ] as const)
     await step(tool, async () => {
       if (!installed || !tuiHome) return skip("not signed in (the signin step didn't pass)")
-      const tui = await Pty.launch({ binary: installed, home: tuiHome, config: tuiConfig(), env: tuiEnv() })
+      // The prompt can drop the first keys typed just after it shows ("/claude Cr" arrived as "eate…",
+      // which went to the model as a plain prompt): send Enter only once the whole command is there,
+      // and start again (once) if it isn't.
+      let tui = await Pty.launch({ binary: installed, home: tuiHome, config: tuiConfig(), env: tuiEnv() })
       try {
-        await tui.waitFor("Ask anything", 90_000)
-        await tui.type(`/${tool} ${task}`)
-        await Bun.sleep(400)
+        for (let attempt = 1; ; attempt++) {
+          await tui.waitFor("Ask anything", 90_000)
+          await Bun.sleep(1_000)
+          await tui.type(`/${tool} ${task}`)
+          await Bun.sleep(400)
+          if (tui.screen.text().includes(`/${tool} ${task}`)) break
+          if (attempt === 2) return fail(`the prompt didn't take "/${tool} ${task}" as typed${lastScreen(tui)}`)
+          await tui.stop()
+          tui = await Pty.launch({ binary: installed, home: tuiHome, config: tuiConfig(), env: tuiEnv() })
+        }
         tui.press(KEY.enter)
         const target = path.join(tui.dirs.project, file)
         const until = Date.now() + 60_000
