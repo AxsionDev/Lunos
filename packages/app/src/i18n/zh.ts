@@ -1339,6 +1339,8 @@ export const dict = {
   "sessions.bulk.unarchive": "取消归档",
   "sessions.bulk.deleteArchived": "删除已归档",
   "sessions.bulk.failed": "无法停止：{{reason}}",
+  "sessions.rename.failed": "无法重命名：{{reason}}",
+  "sessions.rename.deleted": "会话已被删除",
   "sessions.bulk.stop.question.one": "要停止 {{count}} 个会话吗？",
   "sessions.bulk.stop.question.other": "要停止 {{count}} 个会话吗？",
   "sessions.bulk.stop.running": "{{count}} 个运行中",

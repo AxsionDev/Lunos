@@ -1254,6 +1254,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Врати од архива",
   "sessions.bulk.deleteArchived": "Избриши архивирани",
   "sessions.bulk.failed": "Не може да се запре: {{reason}}",
+  "sessions.rename.failed": "Неуспешно преименување: {{reason}}",
+  "sessions.rename.deleted": "сесијата е избришана",
   "sessions.bulk.stop.question.one": "Да се запре {{count}} сесија?",
   "sessions.bulk.stop.question.other": "Да се запрат {{count}} сесии?",
   "sessions.bulk.stop.running": "Се извршуваат: {{count}}",

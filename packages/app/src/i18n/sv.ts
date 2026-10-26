@@ -1250,6 +1250,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Återställ från arkiv",
   "sessions.bulk.deleteArchived": "Ta bort arkiverade",
   "sessions.bulk.failed": "Kunde inte stoppa: {{reason}}",
+  "sessions.rename.failed": "Kunde inte byta namn: {{reason}}",
+  "sessions.rename.deleted": "sessionen har tagits bort",
   "sessions.bulk.stop.question.one": "Stoppa {{count}} session?",
   "sessions.bulk.stop.question.other": "Stoppa {{count}} sessioner?",
   "sessions.bulk.stop.running": "{{count}} körs",

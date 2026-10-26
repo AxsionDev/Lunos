@@ -1346,6 +1346,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Vrati iz arhive",
   "sessions.bulk.deleteArchived": "Izbriši arhivirane",
   "sessions.bulk.failed": "Zaustavljanje nije uspjelo: {{reason}}",
+  "sessions.rename.failed": "Preimenovanje nije uspjelo: {{reason}}",
+  "sessions.rename.deleted": "sesija je izbrisana",
   "sessions.bulk.stop.question.one": "Zaustaviti {{count}} sesiju?",
   "sessions.bulk.stop.question.few": "Zaustaviti {{count}} sesije?",
   "sessions.bulk.stop.question.other": "Zaustaviti {{count}} sesija?",

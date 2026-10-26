@@ -1262,6 +1262,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Desarxiva",
   "sessions.bulk.deleteArchived": "Suprimeix les arxivades",
   "sessions.bulk.failed": "No s'ha pogut aturar: {{reason}}",
+  "sessions.rename.failed": "No s'ha pogut canviar el nom: {{reason}}",
+  "sessions.rename.deleted": "la sessió s'ha suprimit",
   "sessions.bulk.stop.question.one": "Vols aturar {{count}} sessió?",
   "sessions.bulk.stop.question.many": "Vols aturar {{count}} sessions?",
   "sessions.bulk.stop.question.other": "Vols aturar {{count}} sessions?",

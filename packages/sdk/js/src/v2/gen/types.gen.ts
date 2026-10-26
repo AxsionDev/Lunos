@@ -10323,6 +10323,43 @@ export type ExperimentalExternalStopResponses = {
 export type ExperimentalExternalStopResponse =
   ExperimentalExternalStopResponses[keyof ExperimentalExternalStopResponses]
 
+export type ExperimentalExternalRenameData = {
+  body?: {
+    title: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/external/{sessionID}/rename"
+}
+
+export type ExperimentalExternalRenameErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalExternalRenameError = ExperimentalExternalRenameErrors[keyof ExperimentalExternalRenameErrors]
+
+export type ExperimentalExternalRenameResponses = {
+  /**
+   * Renamed
+   */
+  200: boolean
+}
+
+export type ExperimentalExternalRenameResponse =
+  ExperimentalExternalRenameResponses[keyof ExperimentalExternalRenameResponses]
+
 export type ExperimentalExternalModelsData = {
   body?: never
   path: {
@@ -10567,6 +10604,42 @@ export type ExperimentalPeerStopResponses = {
 }
 
 export type ExperimentalPeerStopResponse = ExperimentalPeerStopResponses[keyof ExperimentalPeerStopResponses]
+
+export type ExperimentalPeerRenameData = {
+  body?: {
+    title: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/peer/{sessionID}/rename"
+}
+
+export type ExperimentalPeerRenameErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalPeerRenameError = ExperimentalPeerRenameErrors[keyof ExperimentalPeerRenameErrors]
+
+export type ExperimentalPeerRenameResponses = {
+  /**
+   * Renamed
+   */
+  200: boolean
+}
+
+export type ExperimentalPeerRenameResponse = ExperimentalPeerRenameResponses[keyof ExperimentalPeerRenameResponses]
 
 export type ExperimentalPeerAsksData = {
   body?: never

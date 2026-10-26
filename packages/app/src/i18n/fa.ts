@@ -1244,6 +1244,8 @@ export const dict = {
   "sessions.bulk.unarchive": "خارج کردن از بایگانی",
   "sessions.bulk.deleteArchived": "حذف بایگانی‌شده‌ها",
   "sessions.bulk.failed": "توقف ممکن نشد: {{reason}}",
+  "sessions.rename.failed": "تغییر نام انجام نشد: {{reason}}",
+  "sessions.rename.deleted": "نشست حذف شده است",
   "sessions.bulk.stop.question.one": "{{count}} جلسه متوقف شود؟",
   "sessions.bulk.stop.question.other": "{{count}} جلسه متوقف شود؟",
   "sessions.bulk.stop.running": "در حال اجرا: {{count}}",

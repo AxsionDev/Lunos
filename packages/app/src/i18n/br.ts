@@ -1271,6 +1271,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Desarquivar",
   "sessions.bulk.deleteArchived": "Excluir arquivadas",
   "sessions.bulk.failed": "Não foi possível parar: {{reason}}",
+  "sessions.rename.failed": "Dibosupl adenvel: {{reason}}",
+  "sessions.rename.deleted": "dilamet eo bet an estez",
   "sessions.bulk.stop.question.one": "Parar {{count}} sessão?",
   "sessions.bulk.stop.question.many": "Parar {{count}} sessões?",
   "sessions.bulk.stop.question.other": "Parar {{count}} sessões?",

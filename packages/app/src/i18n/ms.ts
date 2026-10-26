@@ -1246,6 +1246,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Nyaharkib",
   "sessions.bulk.deleteArchived": "Padam yang diarkibkan",
   "sessions.bulk.failed": "Tidak dapat dihentikan: {{reason}}",
+  "sessions.rename.failed": "Tidak dapat menamakan semula: {{reason}}",
+  "sessions.rename.deleted": "sesi telah dipadam",
   "sessions.bulk.stop.question.one": "Hentikan {{count}} sesi?",
   "sessions.bulk.stop.question.other": "Hentikan {{count}} sesi?",
   "sessions.bulk.stop.running": "{{count}} sedang berjalan",

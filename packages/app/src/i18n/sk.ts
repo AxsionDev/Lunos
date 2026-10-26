@@ -1247,6 +1247,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Zrušiť archiváciu",
   "sessions.bulk.deleteArchived": "Odstrániť archivované",
   "sessions.bulk.failed": "Nepodarilo sa zastaviť: {{reason}}",
+  "sessions.rename.failed": "Premenovanie zlyhalo: {{reason}}",
+  "sessions.rename.deleted": "relácia bola odstránená",
   "sessions.bulk.stop.question.one": "Zastaviť {{count}} reláciu?",
   "sessions.bulk.stop.question.few": "Zastaviť {{count}} relácie?",
   "sessions.bulk.stop.question.many": "Zastaviť {{count}} relácie?",

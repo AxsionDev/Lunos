@@ -1250,6 +1250,8 @@ export const dict = {
   "sessions.bulk.unarchive": "آرکائیو توں کڈھو",
   "sessions.bulk.deleteArchived": "آرکائیو کیتے مٹاؤ",
   "sessions.bulk.failed": "روکیا نئیں جا سکیا: {{reason}}",
+  "sessions.rename.failed": "ਨਾਂ ਨਹੀਂ ਬਦਲਿਆ ਜਾ ਸਕਿਆ: {{reason}}",
+  "sessions.rename.deleted": "ਸੈਸ਼ਨ ਮਿਟਾ ਦਿੱਤਾ ਗਿਆ",
   "sessions.bulk.stop.question.one": "{{count}} سیشن روکو؟",
   "sessions.bulk.stop.question.other": "{{count}} سیشن روکو؟",
   "sessions.bulk.stop.running": "چل رہے: {{count}}",

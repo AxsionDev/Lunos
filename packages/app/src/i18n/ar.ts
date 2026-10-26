@@ -1259,6 +1259,8 @@ export const dict = {
   "sessions.bulk.unarchive": "إلغاء الأرشفة",
   "sessions.bulk.deleteArchived": "حذف المؤرشفة",
   "sessions.bulk.failed": "تعذّر الإيقاف: {{reason}}",
+  "sessions.rename.failed": "تعذّرت إعادة التسمية: {{reason}}",
+  "sessions.rename.deleted": "حُذفت الجلسة",
   "sessions.bulk.stop.question.one": "إيقاف جلسة واحدة؟ العدد: {{count}}",
   "sessions.bulk.stop.question.zero": "إيقاف الجلسات؟ العدد: {{count}}",
   "sessions.bulk.stop.question.two": "إيقاف جلستين؟ العدد: {{count}}",

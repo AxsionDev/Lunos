@@ -1245,6 +1245,8 @@ export const dict = {
   "sessions.bulk.unarchive": "არქივიდან ამოღება",
   "sessions.bulk.deleteArchived": "დაარქივებულის წაშლა",
   "sessions.bulk.failed": "ვერ შეჩერდა: {{reason}}",
+  "sessions.rename.failed": "სახელის შეცვლა ვერ მოხერხდა: {{reason}}",
+  "sessions.rename.deleted": "სესია წაიშალა",
   "sessions.bulk.stop.question.one": "შეჩერდეს {{count}} სესია?",
   "sessions.bulk.stop.question.other": "შეჩერდეს {{count}} სესია?",
   "sessions.bulk.stop.running": "მიმდინარეობს: {{count}}",

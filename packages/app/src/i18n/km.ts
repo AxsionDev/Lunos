@@ -1240,6 +1240,8 @@ export const dict = {
   "sessions.bulk.unarchive": "យកចេញពីបណ្ណសារ",
   "sessions.bulk.deleteArchived": "លុបបណ្ណសារ",
   "sessions.bulk.failed": "មិនអាចបញ្ឈប់បាន: {{reason}}",
+  "sessions.rename.failed": "មិនអាចប្ដូរឈ្មោះបានទេ៖ {{reason}}",
+  "sessions.rename.deleted": "វគ្គត្រូវបានលុប",
   "sessions.bulk.stop.question.one": "បញ្ឈប់ {{count}} សម័យ?",
   "sessions.bulk.stop.question.other": "បញ្ឈប់ {{count}} សម័យ?",
   "sessions.bulk.stop.running": "កំពុងដំណើរការ: {{count}}",

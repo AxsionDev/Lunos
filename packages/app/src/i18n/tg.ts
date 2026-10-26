@@ -1254,6 +1254,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Аз бойгонӣ баровардан",
   "sessions.bulk.deleteArchived": "Нест кардани бойгонӣ",
   "sessions.bulk.failed": "Қатъ кардан нашуд: {{reason}}",
+  "sessions.rename.failed": "Номро иваз карда нашуд: {{reason}}",
+  "sessions.rename.deleted": "сеанс нест карда шуд",
   "sessions.bulk.stop.question.one": "{{count}} сеансро қатъ мекунед?",
   "sessions.bulk.stop.question.other": "{{count}} сеансро қатъ мекунед?",
   "sessions.bulk.stop.running": "Иҷро мешавад: {{count}}",

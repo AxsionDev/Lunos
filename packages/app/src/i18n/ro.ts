@@ -1251,6 +1251,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Dezarhivează",
   "sessions.bulk.deleteArchived": "Șterge arhivatele",
   "sessions.bulk.failed": "Nu s-a putut opri: {{reason}}",
+  "sessions.rename.failed": "Nu s-a putut redenumi: {{reason}}",
+  "sessions.rename.deleted": "sesiunea a fost ștearsă",
   "sessions.bulk.stop.question.one": "Oprești {{count}} sesiune?",
   "sessions.bulk.stop.question.few": "Oprești {{count}} sesiuni?",
   "sessions.bulk.stop.question.other": "Oprești {{count}} de sesiuni?",

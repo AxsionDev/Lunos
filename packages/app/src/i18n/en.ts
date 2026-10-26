@@ -1237,6 +1237,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Unarchive",
   "sessions.bulk.deleteArchived": "Delete archived",
   "sessions.bulk.failed": "Couldn't stop: {{reason}}",
+  "sessions.rename.failed": "Couldn't rename: {{reason}}",
+  "sessions.rename.deleted": "the session was deleted",
   "sessions.bulk.stop.question.one": "Stop {{count}} session?",
   "sessions.bulk.stop.question.other": "Stop {{count}} sessions?",
   "sessions.bulk.stop.running": "{{count}} running",

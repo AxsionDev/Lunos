@@ -1266,6 +1266,8 @@ export const dict = {
   "sessions.bulk.unarchive": "မှတ်တမ်းမှ ပြန်ထုတ်ရန်",
   "sessions.bulk.deleteArchived": "မှတ်တမ်းတင်ထားသည်များ ဖျက်ရန်",
   "sessions.bulk.failed": "ရပ်၍ မရပါ: {{reason}}",
+  "sessions.rename.failed": "အမည်ပြောင်း၍ မရပါ- {{reason}}",
+  "sessions.rename.deleted": "ဆက်ရှင်ကို ဖျက်ပြီးပါပြီ",
   "sessions.bulk.stop.question.one": "စက်ရှင် {{count}} ခုကို ရပ်မလား။",
   "sessions.bulk.stop.question.other": "စက်ရှင် {{count}} ခုကို ရပ်မလား။",
   "sessions.bulk.stop.running": "လုပ်ဆောင်နေသည်: {{count}}",

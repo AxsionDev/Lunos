@@ -51,7 +51,7 @@ import { PANE_KEY, pane } from "../util/right-pane"
 import { PaneChip, PaneHide } from "../component/right-pane"
 import { externalAccent, type ExternalTool } from "../util/external"
 import { Locale } from "../util/locale"
-import { RENAME_HINT, renameValue } from "../util/session"
+import { RENAME_HINT, renameFailure, renameSession, renameValue } from "../util/session"
 import { loadProjectBudgets, projectBudgets } from "../util/project-budgets"
 import { DialogProject, DialogProjects } from "../component/dialog-projects"
 import {
@@ -783,12 +783,11 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     refresh()
   }
 
-  /** XCOD-308: r renames the selected session, as ctrl+r does in /sessions (empty: the automatic name). */
+  /**
+   * XCOD-308: r renames the selected session, as ctrl+r does in /sessions (empty: the automatic name).
+   * XCOD-325: any row: a Claude Code / Codex session gets a Lunos name; another Lunos's is renamed there.
+   */
   async function rename(item: SessionOverviewItem) {
-    if (toolOnly(item)) {
-      toast.show({ variant: "info", message: `That session runs in ${kindLabel(item) ?? "its tool"}: rename it there` })
-      return
-    }
     const typed = await DialogPrompt.show(dialog, "Rename session", {
       value: item.title,
       description: () => <text fg={theme.textMuted}>{RENAME_HINT}</text>,
@@ -796,9 +795,9 @@ export function AgentMonitor(props: { params?: Record<string, unknown> }) {
     dialog.clear()
     const title = renameValue(typed, item.title)
     if (title === undefined) return
-    await sdk.client.session
-      .update({ sessionID: item.id, directory: item.directory, title }, { throwOnError: true })
-      .catch(fail)
+    await renameSession(sdk.client, item, title).catch((cause) =>
+      toast.show({ variant: "error", message: `Couldn't rename: ${renameFailure(cause)}` }),
+    )
     refresh()
   }
 

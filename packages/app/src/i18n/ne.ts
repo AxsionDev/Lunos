@@ -1246,6 +1246,8 @@ export const dict: Record<string, string> = {
   "sessions.bulk.unarchive": "अभिलेखबाट निकाल्नुहोस्",
   "sessions.bulk.deleteArchived": "अभिलेखित मेट्नुहोस्",
   "sessions.bulk.failed": "रोक्न सकिएन: {{reason}}",
+  "sessions.rename.failed": "नाम बदल्न सकिएन: {{reason}}",
+  "sessions.rename.deleted": "सत्र मेटाइयो",
   "sessions.bulk.stop.question.one": "{{count}} सत्र रोक्ने हो?",
   "sessions.bulk.stop.question.other": "{{count}} सत्रहरू रोक्ने हो?",
   "sessions.bulk.stop.running": "चलिरहेको: {{count}}",

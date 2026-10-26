@@ -1356,6 +1356,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Повернути з архіву",
   "sessions.bulk.deleteArchived": "Видалити архівні",
   "sessions.bulk.failed": "Не вдалося зупинити: {{reason}}",
+  "sessions.rename.failed": "Не вдалося перейменувати: {{reason}}",
+  "sessions.rename.deleted": "сеанс видалено",
   "sessions.bulk.stop.question.one": "Зупинити {{count}} сесію?",
   "sessions.bulk.stop.question.few": "Зупинити {{count}} сесії?",
   "sessions.bulk.stop.question.many": "Зупинити {{count}} сесій?",

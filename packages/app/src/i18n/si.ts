@@ -1242,6 +1242,8 @@ export const dict: Record<string, string> = {
   "sessions.bulk.unarchive": "සංරක්ෂණයෙන් ඉවත් කරන්න",
   "sessions.bulk.deleteArchived": "සංරක්ෂිත මකන්න",
   "sessions.bulk.failed": "නැවැත්විය නොහැකි විය: {{reason}}",
+  "sessions.rename.failed": "නම වෙනස් කළ නොහැකි විය: {{reason}}",
+  "sessions.rename.deleted": "සැසිය මකා දමා ඇත",
   "sessions.bulk.stop.question.one": "සැසි නවත්වන්නද? ගණන: {{count}}",
   "sessions.bulk.stop.question.other": "සැසි නවත්වන්නද? ගණන: {{count}}",
   "sessions.bulk.stop.running": "ක්‍රියාත්මක වෙමින්: {{count}}",

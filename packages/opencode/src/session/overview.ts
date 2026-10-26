@@ -247,7 +247,8 @@ export const build = Effect.fn("SessionOverview.build")(function* (input?: { now
     items.push({
       id,
       kind: "external",
-      title: externalTitle(entry),
+      // XCOD-325: the name the user gave it in Lunos, else the automatic one.
+      title: entry.title ?? externalTitle(entry),
       directory: entry.cwd,
       tool: entry.tool,
       cost: entry.costUSD ?? 0,

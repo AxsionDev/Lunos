@@ -1248,6 +1248,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Arhiwden çykar",
   "sessions.bulk.deleteArchived": "Arhiwlenenleri poz",
   "sessions.bulk.failed": "Duruzyp bolmady: {{reason}}",
+  "sessions.rename.failed": "Adyny üýtgedip bolmady: {{reason}}",
+  "sessions.rename.deleted": "sessiýa öçürildi",
   "sessions.bulk.stop.question.one": "Sessiýalar duruzylsynmy? Sany: {{count}}",
   "sessions.bulk.stop.question.other": "Sessiýalar duruzylsynmy? Sany: {{count}}",
   "sessions.bulk.stop.running": "Işleýär: {{count}}",

@@ -1244,6 +1244,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Tak úr arkivi",
   "sessions.bulk.deleteArchived": "Strika arkiveraðar",
   "sessions.bulk.failed": "Kundi ikki steðga: {{reason}}",
+  "sessions.rename.failed": "Kundi ikki umdoypa: {{reason}}",
+  "sessions.rename.deleted": "setan er strikað",
   "sessions.bulk.stop.question.one": "Steðga {{count}} setu?",
   "sessions.bulk.stop.question.other": "Steðga {{count}} setum?",
   "sessions.bulk.stop.running": "Koyrir: {{count}}",

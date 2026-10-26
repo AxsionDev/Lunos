@@ -70,6 +70,8 @@ import type {
   ExperimentalExternalModelsErrors,
   ExperimentalExternalModelsResponses,
   ExperimentalExternalModeResponses,
+  ExperimentalExternalRenameErrors,
+  ExperimentalExternalRenameResponses,
   ExperimentalExternalStopErrors,
   ExperimentalExternalStopResponses,
   ExperimentalExternalToolsErrors,
@@ -84,6 +86,8 @@ import type {
   ExperimentalPeerQuestionRejectResponses,
   ExperimentalPeerQuestionReplyErrors,
   ExperimentalPeerQuestionReplyResponses,
+  ExperimentalPeerRenameErrors,
+  ExperimentalPeerRenameResponses,
   ExperimentalPeerStopErrors,
   ExperimentalPeerStopResponses,
   ExperimentalProjectCopyGenerateNameErrors,
@@ -2119,6 +2123,49 @@ export class External extends HeyApiClient {
   }
 
   /**
+   * Rename an external session
+   *
+   * Give a Claude Code or Codex session Lunos started a name in Lunos's lists: one line of at most 80 characters; empty goes back to the automatic name. Stored in Lunos's own record of the session; the tool's session id and files are untouched. Audited as session.rename.
+   */
+  public rename<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      title?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "title" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalExternalRenameResponses,
+      ExperimentalExternalRenameErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/external/{sessionID}/rename",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
    * External session models
    *
    * The models Claude Code or Codex offers for an external session, asked from the tool without a prompt (no model is called), and the one chosen for the session.
@@ -2405,6 +2452,49 @@ export class Peer extends HeyApiClient {
       url: "/experimental/peer/{sessionID}/stop",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Rename a session another Lunos runs
+   *
+   * Rename a session that another Lunos process on this machine is running, through that process, which stores and audits it (the last rename wins). When no Lunos runs it any more, it is renamed here.
+   */
+  public rename<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      title?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "title" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalPeerRenameResponses,
+      ExperimentalPeerRenameErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/peer/{sessionID}/rename",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

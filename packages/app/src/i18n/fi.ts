@@ -1257,6 +1257,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Palauta arkistosta",
   "sessions.bulk.deleteArchived": "Poista arkistoidut",
   "sessions.bulk.failed": "Pysäytys epäonnistui: {{reason}}",
+  "sessions.rename.failed": "Nimeäminen epäonnistui: {{reason}}",
+  "sessions.rename.deleted": "istunto on poistettu",
   "sessions.bulk.stop.question.one": "Pysäytetäänkö {{count}} istunto?",
   "sessions.bulk.stop.question.other": "Pysäytetäänkö {{count}} istuntoa?",
   "sessions.bulk.stop.running": "Käynnissä: {{count}}",

@@ -1260,6 +1260,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Visszaállítás az archívumból",
   "sessions.bulk.deleteArchived": "Archiváltak törlése",
   "sessions.bulk.failed": "Nem sikerült leállítani: {{reason}}",
+  "sessions.rename.failed": "Nem sikerült átnevezni: {{reason}}",
+  "sessions.rename.deleted": "a munkamenetet törölték",
   "sessions.bulk.stop.question.one": "{{count}} munkamenet leállítása?",
   "sessions.bulk.stop.question.other": "{{count}} munkamenet leállítása?",
   "sessions.bulk.stop.running": "Fut: {{count}}",

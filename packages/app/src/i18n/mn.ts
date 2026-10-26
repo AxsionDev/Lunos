@@ -1257,6 +1257,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Архиваас гаргах",
   "sessions.bulk.deleteArchived": "Архивласныг устгах",
   "sessions.bulk.failed": "Зогсоож чадсангүй: {{reason}}",
+  "sessions.rename.failed": "Нэр өөрчилж чадсангүй: {{reason}}",
+  "sessions.rename.deleted": "сешн устгагдсан",
   "sessions.bulk.stop.question.one": "Сессүүдийг зогсоох уу? Тоо: {{count}}",
   "sessions.bulk.stop.question.other": "Сессүүдийг зогсоох уу? Тоо: {{count}}",
   "sessions.bulk.stop.running": "Ажиллаж байна: {{count}}",
