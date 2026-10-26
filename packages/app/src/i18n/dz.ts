@@ -209,6 +209,8 @@ export const dict: Record<string, string> = {
   "dialog.model.select.title": "དཔེ་ཚད་སེལ་འཐུ་འབད།",
   "dialog.model.search.placeholder": "དཔེ་ཚད་འཚོལ་ཞིབ་འབད།",
   "dialog.model.empty": "དཔེ་ཚད་གྲུབ་འབྲས་མེད།",
+  "dialog.model.recommended.noEu":
+    "ད་ཚུན EU ནང་ བཞུགས་སའི་ མོ་ཌེལ་ ག་ཅི་ཡང་ Lunos གི་ དབྱེ་ཞིབ་ལས་ མ་ཐར་བས་ EU རྐྱངམ་གི་ སྲིད་བྱུས་འོག་ ག་ཅི་ཡང་ འོས་སྦྱོར་ མེད།",
   "dialog.model.manage": "དཔེ་ཚད་ཚུ་འཛིན་སྐྱོང་འཐབ།",
   "dialog.model.manage.description": "དཔེ་ཚད་སེལ་འཐུ་འབད་མི་ནང་ དཔེ་ཚད་ག་འདི་འབྱུངམ་ཨིན་ན་ སྲོལ་སྒྲིག་འབད།",
   "dialog.model.manage.provider.toggle": "{{provider}} དཔེ་ཚད་ཚུ་ཆ་མཉམ་སོར་སྟོན་འབད།",

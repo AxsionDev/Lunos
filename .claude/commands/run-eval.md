@@ -18,7 +18,9 @@ money, so it **stops for the owner's approval before any paid request**. Read
 
 ## Steps
 
-1. **Config.** `packages/eval/eval.config.json` is gitignored. If it's missing, copy
+1. **Config.** For the EU campaign (XCOD-320) use the committed `packages/eval/eval.eu.json`
+   (Mistral at `api.eu.mistral.ai`, STACKIT; €60 total, a class per model): refresh its prices
+   and `usdToEur` first. Otherwise, `packages/eval/eval.config.json` is gitignored. If it's missing, copy
    `eval.config.example.json` and fill in:
    - the models
    - a new `budget.name` per campaign (the ledger accumulates under that name)
@@ -59,5 +61,9 @@ money, so it **stops for the owner's approval before any paid request**. Read
      limit or never started counts as "did not run" (the model is INCOMPLETE); code that doesn't
      compile is the agent's failure.
    - Update the docs page `packages/web/lunos/pages/models-tested.mdx` with the date and result.
+   - Copy each model's result into `packages/opencode/src/provider/eval-results.json` (XCOD-320;
+     `test/provider/curation.test.ts` checks it matches `specs/eval/*.results.json`). Under an
+     EU-only policy this decides Recommended and the default model, so say in the PR when it
+     changes them.
 
 Example: `specs/eval/2026-10-04.md` (openai/gpt-5.3-codex, 21 of 33).

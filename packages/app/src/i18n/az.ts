@@ -208,6 +208,8 @@ export const dict = {
   "dialog.model.select.title": "Model seç",
   "dialog.model.search.placeholder": "Modelləri axtar",
   "dialog.model.empty": "Model nəticəsi yoxdur",
+  "dialog.model.recommended.noEu":
+    "Hələ heç bir AB-də yerləşdirilmiş model Lunos qiymətləndirməsindən keçməyib, ona görə də yalnız AB siyasətinizdə heç nə tövsiyə olunmur.",
   "dialog.model.manage": "Modelləri idarə et",
   "dialog.model.manage.description": "Model seçicisində hansı modellərin görünəcəyini fərdiləşdir.",
   "dialog.model.manage.provider.toggle": "Bütün {{provider}} modellərini aç/bağla",

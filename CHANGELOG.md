@@ -100,6 +100,12 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
 
 ### Changed
 
+- **Under an EU-only residency policy, Recommended now shows only an EU model that passed our
+  evaluation.** The model pickers and `lunos models --recommended` list the best EU-hosted model from
+  Lunos's published results if it passed at least half the tasks, and it becomes the default model
+  when you haven't chosen one. No EU model has a published result yet, so for now Recommended is
+  empty under an EU-only policy, and the pickers say why. Without a policy, nothing changes. STACKIT
+  AI Model Serving (Germany) is now recognised as an EU provider.
 - **Quitting Lunos with the sandbox gives you the shell back at once.** Handing the results back and
   removing the container now happen in a background helper (`lunos sandbox conclude <id>`), which
   carries on after Lunos has exited; the last line says so, and `lunos sandbox status <id>` follows

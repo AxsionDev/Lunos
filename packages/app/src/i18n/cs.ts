@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Vyberte model",
   "dialog.model.search.placeholder": "Hledat modely",
   "dialog.model.empty": "Žádné výsledky modelu",
+  "dialog.model.recommended.noEu":
+    "Žádný model hostovaný v EU zatím neprošel hodnocením Lunos, takže při zásadě „pouze EU“ se nic nedoporučuje.",
   "dialog.model.manage": "Správa modelů",
   "dialog.model.manage.description": "Upravte, které modely se zobrazí ve voliči modelů.",
   "dialog.model.manage.provider.toggle": "Přepnout všechny modely {{provider}}",

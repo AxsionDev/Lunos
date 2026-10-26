@@ -207,6 +207,8 @@ export const dict = {
   "dialog.model.select.title": "မော်ဒယ်ကို ရွေးပါ။",
   "dialog.model.search.placeholder": "မော်ဒယ်များကို ရှာဖွေပါ။",
   "dialog.model.empty": "မော်ဒယ်ရလဒ်များ မရှိပါ။",
+  "dialog.model.recommended.noEu":
+    "EU တွင် လက်ခံထားသော မော်ဒယ် တစ်ခုမျှ Lunos ၏ အကဲဖြတ်ချက်ကို မအောင်သေးသဖြင့် EU သီးသန့် မူဝါဒအောက်တွင် အကြံပြုထားသည့် မော်ဒယ် မရှိပါ။",
   "dialog.model.manage": "မော်ဒယ်များကို စီမံပါ။",
   "dialog.model.manage.description": "မော်ဒယ်ရွေးချယ်မှုတွင် မည်သည့်မော်ဒယ်များကို စိတ်ကြိုက်ပြင်ဆင်ပါ။",
   "dialog.model.manage.provider.toggle": "{{provider}} မော်ဒယ်အားလုံးကို ပြောင်းရန်",

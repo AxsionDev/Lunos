@@ -212,6 +212,8 @@ export const dict = {
   "dialog.model.select.title": "تحديد نموذج",
   "dialog.model.search.placeholder": "البحث عن نماذج",
   "dialog.model.empty": "لا توجد نتائج للنماذج",
+  "dialog.model.recommended.noEu":
+    "لم يجتز أي نموذج مستضاف في الاتحاد الأوروبي تقييم Lunos بعد، لذا لا يوجد نموذج موصى به ضمن سياستك المقتصرة على الاتحاد الأوروبي.",
   "dialog.model.manage": "إدارة النماذج",
   "dialog.model.manage.description": "تخصيص النماذج التي تظهر في محدد النماذج.",
   "dialog.model.manage.provider.toggle": "تبديل جميع نماذج {{provider}}",

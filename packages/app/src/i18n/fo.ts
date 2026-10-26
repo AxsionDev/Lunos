@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Vel modell",
   "dialog.model.search.placeholder": "Leitimodell",
   "dialog.model.empty": "Eingi modellúrslit",
+  "dialog.model.recommended.noEu":
+    "Eingin ES-hýst fyrimynd hevur enn staðið Lunos-mettingina, so einki verður mælt til undir tínum bert-ES politikki.",
   "dialog.model.manage": "Umsita modellir",
   "dialog.model.manage.description": "Tillaga hvørji modell síggjast í modellveljaranum.",
   "dialog.model.manage.provider.toggle": "Skift øll {{provider}} modellini",

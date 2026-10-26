@@ -94,6 +94,7 @@ const body = [
     "export SCALEWAY_API_KEY=...   # Scaleway (France)",
     "export OVHCLOUD_API_KEY=...   # OVHcloud (France)",
     "export HETZNER_API_KEY=...    # Hetzner (Germany)",
+    "export STACKIT_API_KEY=...    # STACKIT (Germany)",
     "export MISTRAL_API_KEY=...    # Mistral (France)",
     "```",
     "",

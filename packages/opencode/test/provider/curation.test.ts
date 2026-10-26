@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { readdirSync, readFileSync } from "fs"
+import path from "path"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
 import { ModelCuration } from "../../src/provider/curation"
 
 describe("ModelCuration.size (XCOD-213)", () => {
@@ -47,5 +50,78 @@ describe("ModelCuration.recommended (XCOD-213)", () => {
     const org = { "mistral/mistral-small-latest": "Our default" }
     expect(ModelCuration.recommended(org)).toEqual(org)
     expect(ModelCuration.recommended(undefined)).toBe(ModelCuration.RECOMMENDED)
+  })
+})
+
+// XCOD-320: under an EU-only policy, Recommended and the default come from the published eval results.
+describe("ModelCuration EU pick (XCOD-320)", () => {
+  const eu = { allow: ["eu"] }
+  const fixture = (file: string) =>
+    JSON.parse(readFileSync(path.join(import.meta.dir, "fixtures", file), "utf8")) as ModelCuration.EvalResult[]
+
+  test("picks the best EU result at 50% or more, never a US, incomplete or global-host one", () => {
+    const results = fixture("eval-results-eu.json")
+    // The US model scored higher, and Mistral at api.mistral.ai higher still: neither ran in the EU.
+    expect(ModelCuration.euPick(results)?.model).toBe("scaleway/qwen3-coder-30b-a3b-instruct")
+    expect(ModelCuration.recommended(undefined, eu, results)).toEqual({
+      "scaleway/qwen3-coder-30b-a3b-instruct": "Best EU eval: passed 60% of 33 tasks",
+    })
+    expect(ModelCuration.euDefault(eu, results)).toBe("scaleway/qwen3-coder-30b-a3b-instruct")
+    // Exactly 50% is enough.
+    const rest = results.filter((result) => !result.model.startsWith("scaleway/"))
+    expect(ModelCuration.euPick(rest)?.model).toBe("ovhcloud/qwen3-coder-30b-a3b-instruct")
+  })
+
+  test("only a model's latest result counts", () => {
+    const results = fixture("eval-results-eu.json")
+    const rerun = { ...results[1], date: "2026-12-01", passRate: 0.3 }
+    expect(ModelCuration.euPick([...results, rerun])?.model).toBe("ovhcloud/qwen3-coder-30b-a3b-instruct")
+  })
+
+  test("no EU model at 50%: Recommended is empty and there's no EU default", () => {
+    const results = fixture("eval-results-eu-none.json")
+    expect(ModelCuration.euPick(results)).toBeUndefined()
+    expect(ModelCuration.recommended(undefined, eu, results)).toEqual({})
+    expect(ModelCuration.euDefault(eu, results)).toBeUndefined()
+  })
+
+  test("the shipped results have no EU model yet, so EU-only Recommended is empty", () => {
+    expect(ModelCuration.recommended(undefined, eu)).toEqual({})
+  })
+
+  test("without an EU-only policy, or with an organisation's list, nothing changes", () => {
+    const results = fixture("eval-results-eu.json")
+    expect(ModelCuration.recommended(undefined, undefined, results)).toBe(ModelCuration.RECOMMENDED)
+    expect(ModelCuration.recommended(undefined, { allow: ["eu", "us"] }, results)).toBe(ModelCuration.RECOMMENDED)
+    expect(ModelCuration.euDefault({ allow: ["eu", "us"] }, results)).toBeUndefined()
+    const org = { "mistral/mistral-small-latest": "Our default" }
+    expect(ModelCuration.recommended(org, eu, results)).toBe(org)
+    // "unknown" alongside "eu" (a self-hosted model) is still EU-only: US providers stay refused.
+    expect(Jurisdiction.euOnly({ allow: ["eu", "unknown"] })).toBe(true)
+    expect(Jurisdiction.euOnly({ allow: ["us"] })).toBe(false)
+  })
+
+  // The shipped summary must be what specs/eval actually published.
+  test("eval-results.json matches the published specs/eval/*.results.json", () => {
+    const dir = path.join(import.meta.dir, "../../../../specs/eval")
+    const published = readdirSync(dir)
+      .filter((file) => file.endsWith(".results.json"))
+      .flatMap((file) => {
+        const { report } = JSON.parse(readFileSync(path.join(dir, file), "utf8"))
+        return (report.models as any[]).map((model) => ({
+          model: model.model,
+          date: report.date,
+          report: `specs/eval/${report.date}.md`,
+          status: model.status,
+          tasks: model.trials[0]?.total ?? 0,
+          ...(model.passRate ? { passRate: model.passRate.mean } : {}),
+          ...(model.costPerSolved !== undefined ? { costPerSolved: model.costPerSolved } : {}),
+          upstreamHosts: model.upstreamHosts,
+        }))
+      })
+    const key = (result: { model: string; date: string }) => `${result.date} ${result.model}`
+    expect([...ModelCuration.published()].sort((a, b) => key(a).localeCompare(key(b)))).toEqual(
+      published.sort((a, b) => key(a).localeCompare(key(b))),
+    )
   })
 })

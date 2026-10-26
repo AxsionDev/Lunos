@@ -207,6 +207,8 @@ export const dict = {
   "dialog.model.select.title": "Seleccioneu el model",
   "dialog.model.search.placeholder": "Cerca models",
   "dialog.model.empty": "No hi ha resultats del model",
+  "dialog.model.recommended.noEu":
+    "Encara cap model allotjat a la UE no ha superat l'avaluació del Lunos, així que amb la vostra política només UE no es recomana res.",
   "dialog.model.manage": "Gestionar models",
   "dialog.model.manage.description": "Personalitza quins models apareixen al selector de models.",
   "dialog.model.manage.provider.toggle": "Canvia tots els {{provider}} models",

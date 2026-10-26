@@ -3,7 +3,7 @@
 The model picker in the TUI, desktop and web apps has four filters: **All**, **Recommended**, **Large** and **Small**. In the TUI, `ctrl+l` cycles through them. In desktop and web, they are buttons under the search box. Lunos remembers your choice across restarts. The same filters work on the command line:
 
 ```sh
-lunos models --recommended        # curated models, each with why
+lunos models --recommended        # recommended models, each with why
 lunos models --size small         # small models only (also: large, medium)
 lunos models --recommended --size large
 ```
@@ -12,7 +12,7 @@ Filters don't override [data residency](data-residency.md). A model your policy 
 
 ## What "Recommended" means
 
-Recommended is a **curated list**, maintained by Lunos and shipped with each release. It is **not an evaluation or a benchmark**. No eval results for these models have been published yet. When they exist, the list will be updated from them and this page will link the results.
+Without a residency policy, Recommended is a **curated list**, maintained by Lunos and shipped with each release. It is **not an evaluation or a benchmark**. Under an EU-only policy, Recommended comes from published eval results instead: see [Under an EU-only policy](#under-an-eu-only-policy).
 
 The built-in list has only EU-hosted and local models, to match the residency defaults Lunos is built around. "EU-hosted" means what [model provider jurisdictions](provider-jurisdictions.md) records for that provider. Each entry comes with a one-line reason. In the TUI it shows under the model's name, and in desktop and web it shows in the tooltip.
 
@@ -27,6 +27,17 @@ The built-in list has only EU-hosted and local models, to match the residency de
 | `ollama/qwen3:4b`                       | Runs on your machine, offline; for simple edits |
 
 A model shows up only if you have its provider set up.
+
+### Under an EU-only policy
+
+With a [residency policy](data-residency.md) that allows `eu` and not `us` (for example `"residency": { "allow": ["eu"] }`), Recommended lists **only the best EU-hosted model from Lunos's published evaluation**, and only if it passed **at least half** of the tasks. That model is also the default model when you haven't chosen one (no `model` in config and nothing recently used).
+
+- "EU-hosted" means every request of the eval run went to a host whose [jurisdiction](provider-jurisdictions.md) is EU. A Mistral run against the global `api.mistral.ai` doesn't count.
+- Only a model's latest result counts, and only a complete run.
+- If no EU model has passed half the tasks, **Recommended is empty**, and the pickers and `lunos models --recommended` say so. That is the case today: the only published result is `openai/gpt-5.3-codex`, a US model ([results](https://github.com/AxsionDev/Lunos/blob/dev/specs/eval/2026-10-04.md)).
+- Your organisation's `recommended` key still replaces this, as below.
+
+The results ship with each release in `packages/opencode/src/provider/eval-results.json`, which a test keeps identical to `specs/eval/*.results.json`.
 
 ### Your organisation's list
 

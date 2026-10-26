@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "აირჩიეთ მოდელი",
   "dialog.model.search.placeholder": "მოდელების ძიება",
   "dialog.model.empty": "მოდელის შედეგები არ არის",
+  "dialog.model.recommended.noEu":
+    "ევროკავშირში განთავსებულ არცერთ მოდელს ჯერ არ გაუვლია Lunos-ის შეფასება, ამიტომ მხოლოდ ევროკავშირის პოლიტიკით არაფერია რეკომენდებული.",
   "dialog.model.manage": "მოდელების მართვა",
   "dialog.model.manage.description": "მოარგეთ რომელი მოდელები გამოჩნდება მოდელის ამომრჩეველში.",
   "dialog.model.manage.provider.toggle": "ყველა {{provider}} მოდელის გადართვა",

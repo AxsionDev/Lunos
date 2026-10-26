@@ -208,6 +208,8 @@ export const dict = {
   "dialog.model.select.title": "Загвар сонгох",
   "dialog.model.search.placeholder": "Загвар хайх",
   "dialog.model.empty": "Загварын үр дүн алга",
+  "dialog.model.recommended.noEu":
+    "ЕХ-нд байршсан ямар ч загвар Lunos-ийн үнэлгээг одоогоор давж амжаагүй тул зөвхөн ЕХ бодлогын дагуу санал болгох загвар алга.",
   "dialog.model.manage": "Загваруудыг удирдах",
   "dialog.model.manage.description": "Загвар сонгогч дээр ямар загвар гарч ирэхийг тохируулна уу.",
   "dialog.model.manage.provider.toggle": "Бүх {{provider}} загварыг сэлгэх",

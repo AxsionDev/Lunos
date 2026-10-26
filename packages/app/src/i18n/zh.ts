@@ -248,6 +248,7 @@ export const dict = {
   "dialog.model.select.title": "选择模型",
   "dialog.model.search.placeholder": "搜索模型",
   "dialog.model.empty": "未找到模型",
+  "dialog.model.recommended.noEu": "目前还没有托管在欧盟的模型通过 Lunos 评估，因此在仅限欧盟的策略下没有推荐模型。",
   "dialog.model.manage": "管理模型",
   "dialog.model.manage.description": "自定义模型选择器中显示的模型。",
   "dialog.model.manage.provider.toggle": "切换所有 {{provider}} 模型",

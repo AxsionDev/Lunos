@@ -223,6 +223,8 @@ export const dict = {
   "dialog.model.select.title": "Pilih model",
   "dialog.model.search.placeholder": "Cari model",
   "dialog.model.empty": "Tidak ada hasil model",
+  "dialog.model.recommended.noEu":
+    "Belum ada model yang di-host di UE yang lulus evaluasi Lunos, jadi tidak ada yang direkomendasikan dengan kebijakan khusus UE Anda.",
   "dialog.model.manage": "Kelola model",
   "dialog.model.manage.description": "Sesuaikan model mana yang muncul di pemilih model.",
   "dialog.model.manage.provider.toggle": "Alihkan semua model {{provider}}",

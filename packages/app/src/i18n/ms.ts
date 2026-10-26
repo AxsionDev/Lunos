@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Pilih model",
   "dialog.model.search.placeholder": "Cari model",
   "dialog.model.empty": "Tiada hasil model",
+  "dialog.model.recommended.noEu":
+    "Belum ada model yang dihoskan di EU lulus penilaian Lunos, jadi tiada apa yang disyorkan di bawah dasar EU sahaja anda.",
   "dialog.model.manage": "Urus model",
   "dialog.model.manage.description": "Sesuaikan model yang dipaparkan dalam pemilih model.",
   "dialog.model.manage.provider.toggle": "Togol semua model {{provider}}",

@@ -213,6 +213,8 @@ export const dict = {
   "dialog.model.select.title": "मॉडल चुनें",
   "dialog.model.search.placeholder": "मॉडल खोजें",
   "dialog.model.empty": "कोई मॉडल परिणाम नहीं",
+  "dialog.model.recommended.noEu":
+    "अभी तक किसी भी EU-होस्टेड मॉडल ने Lunos का मूल्यांकन पास नहीं किया है, इसलिए आपकी केवल-EU नीति में कुछ भी अनुशंसित नहीं है।",
   "dialog.model.manage": "मॉडल प्रबंधित करें",
   "dialog.model.manage.description": "तय करें कि मॉडल चयनकर्ता में कौन-से मॉडल दिखाई दें।",
   "dialog.model.manage.provider.toggle": "सभी {{provider}} मॉडल को टॉगल करें",

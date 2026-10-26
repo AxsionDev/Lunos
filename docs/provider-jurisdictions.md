@@ -27,6 +27,7 @@ Only providers where **both** hold are listed as EU below. Where a provider rest
 | `mistral`  | EU     | Entity and processing | Mistral AI is a French company. Only its EU endpoint, api.eu.mistral.ai, serves EU-hosted inference; the default api.mistral.ai is global, with no committed inference location. Mistral models served via Azure or Bedrock inherit that platform's region instead, and are covered by the `azure` / `amazon-bedrock` rows. |
 | `ovhcloud` | EU     | Entity and processing | OVHcloud is a French company; AI Endpoints run in its EU data centres. Reached through the generic openai-compatible plugin.                                                                                                                                                                                                |
 | `scaleway` | EU     | Entity and processing | Scaleway is a French company (Iliad group); its Generative APIs run in French data centres. Reached through the generic openai-compatible plugin, not a dedicated one.                                                                                                                                                      |
+| `stackit`  | EU     | Entity and processing | STACKIT is run by Schwarz Digits Cloud GmbH & Co. KG, a German company. AI Model Serving's OpenAI-compatible API is in its eu01 region, Germany, and STACKIT says queries are neither stored nor used for training. Reached through the generic openai-compatible plugin.                                                   |
 
 ### Using one of these
 
@@ -36,6 +37,7 @@ No plugin or extra configuration is needed — these providers ship in the defau
 export SCALEWAY_API_KEY=...   # Scaleway (France)
 export OVHCLOUD_API_KEY=...   # OVHcloud (France)
 export HETZNER_API_KEY=...    # Hetzner (Germany)
+export STACKIT_API_KEY=...    # STACKIT (Germany)
 export MISTRAL_API_KEY=...    # Mistral (France)
 ```
 

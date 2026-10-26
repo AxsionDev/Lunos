@@ -223,6 +223,8 @@ export const dict = {
   "dialog.model.select.title": "Seleccionar modelo",
   "dialog.model.search.placeholder": "Buscar modelos",
   "dialog.model.empty": "Sin resultados de modelos",
+  "dialog.model.recommended.noEu":
+    "Ningún modelo alojado en la UE ha superado aún la evaluación de Lunos, así que no se recomienda nada con tu política solo UE.",
   "dialog.model.manage": "Gestionar modelos",
   "dialog.model.manage.description": "Personalizar qué modelos aparecen en el selector de modelos.",
   "dialog.model.manage.provider.toggle": "Mostrar u ocultar todos los modelos de {{provider}}",

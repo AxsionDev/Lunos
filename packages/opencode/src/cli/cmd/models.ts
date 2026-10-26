@@ -4,6 +4,8 @@ import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
+import { Config } from "@/config/config"
 
 export const ModelsCommand = effectCmd({
   command: "models [provider]",
@@ -85,5 +87,12 @@ export const ModelsCommand = effectCmd({
     })
 
     for (const providerID of ids) print(ProviderV2.ID.make(providerID), args.verbose)
+
+    // XCOD-320: an EU-only policy recommends only an EU model with a published eval result.
+    const none = !Object.values(providers).some((p) => Object.values(p.models).some((model) => model.recommended))
+    if (args.recommended && none) {
+      const config = yield* Config.Service.use((cfg) => cfg.get())
+      if (Jurisdiction.euOnly(config.residency)) UI.println(Jurisdiction.NO_EU_RECOMMENDATION)
+    }
   }),
 })

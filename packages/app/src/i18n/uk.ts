@@ -223,6 +223,8 @@ export const dict = {
   "dialog.model.select.title": "Вибрати модель",
   "dialog.model.search.placeholder": "Пошук моделей",
   "dialog.model.empty": "Моделей не знайдено",
+  "dialog.model.recommended.noEu":
+    "Жодна модель, розміщена в ЄС, ще не пройшла оцінювання Lunos, тож за політики «лише ЄС» нічого не рекомендовано.",
   "dialog.model.manage": "Керувати моделями",
   "dialog.model.manage.description": "Налаштуйте, які моделі відображатимуться у виборі моделей.",
   "dialog.model.manage.provider.toggle": "Перемкнути всі моделі {{provider}}",

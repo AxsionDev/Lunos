@@ -207,6 +207,8 @@ export const dict = {
   "dialog.model.select.title": "Ընտրել մոդել",
   "dialog.model.search.placeholder": "Որոնել մոդելներ",
   "dialog.model.empty": "Մոդելի արդյունքներ չկա",
+  "dialog.model.recommended.noEu":
+    "ԵՄ-ում տեղակայված ոչ մի մոդել դեռ չի անցել Lunos-ի գնահատումը, ուստի միայն ԵՄ քաղաքականության դեպքում ոչինչ խորհուրդ չի տրվում։",
   "dialog.model.manage": "Կառավարել մոդելները",
   "dialog.model.manage.description": "Անհատականացրեք, թե որ մոդելները կհայտնվեն մոդելի ընտրիչում:",
   "dialog.model.manage.provider.toggle": "Փոխարկել բոլոր {{provider}} մոդելները",

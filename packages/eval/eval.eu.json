@@ -1,0 +1,136 @@
+{
+  "lunosVersion": "1.18.55",
+  "seed": 20261101,
+  "budget": {
+    "name": "eu-2026-11",
+    "total": 60,
+    "classes": {
+      "mistral-devstral": 15,
+      "mistral-medium": 15,
+      "stackit-qwen": 10,
+      "stackit-gpt-oss": 10
+    }
+  },
+  "usdToEur": {
+    "rate": 0.8909,
+    "date": "2026-10-02"
+  },
+  "estimate": {
+    "inputTokensPerTask": 60000,
+    "outputTokensPerTask": 6000
+  },
+  "models": [
+    {
+      "id": "mistral-devstral",
+      "model": "mistral/devstral-medium-latest",
+      "cls": "mistral-devstral",
+      "upstream": "https://api.eu.mistral.ai/v1",
+      "keyEnv": "MISTRAL_API_KEY",
+      "trials": 1,
+      "residency": ["eu"]
+    },
+    {
+      "id": "mistral-medium",
+      "model": "mistral/mistral-medium-latest",
+      "cls": "mistral-medium",
+      "upstream": "https://api.eu.mistral.ai/v1",
+      "keyEnv": "MISTRAL_API_KEY",
+      "trials": 1,
+      "residency": ["eu"]
+    },
+    {
+      "id": "stackit-qwen",
+      "model": "stackit/Qwen/Qwen3.8-27B",
+      "cls": "stackit-qwen",
+      "upstream": "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1",
+      "keyEnv": "STACKIT_API_KEY",
+      "trials": 1,
+      "residency": ["eu"]
+    },
+    {
+      "id": "stackit-gpt-oss",
+      "model": "stackit/openai/gpt-oss-120b",
+      "cls": "stackit-gpt-oss",
+      "upstream": "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1",
+      "keyEnv": "STACKIT_API_KEY",
+      "trials": 1,
+      "residency": ["eu"]
+    }
+  ],
+  "prices": {
+    "mistral/devstral-medium-latest": {
+      "kind": "api",
+      "input": 0.392,
+      "output": 1.96,
+      "maxOutputTokens": 32000,
+      "source": "https://docs.mistral.ai/getting-started/models/ (prices via the models.dev catalogue: re-check on mistral.ai/pricing, x1.1 for the EU endpoint, before the run)",
+      "checked": "2026-10-26"
+    },
+    "mistral/mistral-medium-latest": {
+      "kind": "api",
+      "input": 1.47,
+      "output": 7.3499,
+      "maxOutputTokens": 32000,
+      "source": "https://docs.mistral.ai/getting-started/models/ (prices via the models.dev catalogue: re-check on mistral.ai/pricing, x1.1 for the EU endpoint, before the run)",
+      "checked": "2026-10-26"
+    },
+    "stackit/Qwen/Qwen3.8-27B": {
+      "kind": "api",
+      "input": 0.45,
+      "output": 0.65,
+      "maxOutputTokens": 16384,
+      "source": "https://stackit.com/en/products/data-ai/stackit-ai-model-serving (EUR, region EU01; max generation from docs.stackit.cloud .../available-shared-models)",
+      "checked": "2026-10-26"
+    },
+    "stackit/openai/gpt-oss-120b": {
+      "kind": "api",
+      "input": 0.45,
+      "output": 0.65,
+      "maxOutputTokens": 8192,
+      "source": "https://stackit.com/en/products/data-ai/stackit-ai-model-serving (EUR, region EU01; max generation from docs.stackit.cloud .../available-shared-models)",
+      "checked": "2026-10-26"
+    }
+  },
+  "datasets": [
+    {
+      "name": "lunos",
+      "harbor": "./packages/eval/tasks"
+    },
+    {
+      "name": "aider-polyglot",
+      "harbor": "aider/aider-polyglot",
+      "tasks": [
+        "aider/polyglot_cpp_bank-account",
+        "aider/polyglot_cpp_binary-search-tree",
+        "aider/polyglot_cpp_crypto-square",
+        "aider/polyglot_cpp_gigasecond",
+        "aider/polyglot_cpp_meetup",
+        "aider/polyglot_go_bowling",
+        "aider/polyglot_go_counter",
+        "aider/polyglot_go_pov",
+        "aider/polyglot_go_react",
+        "aider/polyglot_go_transpose",
+        "aider/polyglot_java_book-store",
+        "aider/polyglot_java_dominoes",
+        "aider/polyglot_java_mazy-mice",
+        "aider/polyglot_java_rational-numbers",
+        "aider/polyglot_java_variable-length-quantity",
+        "aider/polyglot_javascript_affine-cipher",
+        "aider/polyglot_javascript_connect",
+        "aider/polyglot_javascript_ledger",
+        "aider/polyglot_javascript_meetup",
+        "aider/polyglot_javascript_phone-number",
+        "aider/polyglot_python_affine-cipher",
+        "aider/polyglot_python_forth",
+        "aider/polyglot_python_grep",
+        "aider/polyglot_python_zebra-puzzle",
+        "aider/polyglot_python_zipper",
+        "aider/polyglot_rust_alphametics",
+        "aider/polyglot_rust_dot-dsl",
+        "aider/polyglot_rust_forth",
+        "aider/polyglot_rust_wordy",
+        "aider/polyglot_rust_xorcism"
+      ]
+    }
+  ]
+}

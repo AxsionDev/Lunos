@@ -1,11 +1,15 @@
 export * as ModelCuration from "./curation"
 
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
+import shipped from "./eval-results.json" with { type: "json" }
+
 /**
- * Model size tags and the curated "Recommended" list (XCOD-213).
+ * Model size tags and the "Recommended" list (XCOD-213).
  *
- * "Recommended" is a curated choice maintained by Lunos and shipped with each release. It is
- * not an evaluation or a benchmark: there are no published eval results for these models yet
- * (XCOD-200 ran one US model). Say so wherever the list is shown, and update it when there are.
+ * Without a residency policy, "Recommended" is a curated choice maintained by Lunos and shipped
+ * with each release, not an evaluation or a benchmark. Under an EU-only policy (XCOD-320) it is
+ * data-driven instead: the best EU model in the published eval results (`eval-results.json`, from
+ * specs/eval/), if it passed at least half the tasks, and nothing otherwise.
  */
 
 export type Size = "large" | "medium" | "small"
@@ -76,7 +80,92 @@ export function size(providerID: string, modelID: string, name?: string): Size |
   return undefined
 }
 
-/** The recommended list in effect: the organisation's, when config sets one, else the built-in. */
-export function recommended(configured: Readonly<Record<string, string>> | undefined) {
-  return configured ?? RECOMMENDED
+/** One model's published result (specs/eval/<date>.results.json), as shipped in eval-results.json. */
+export type EvalResult = {
+  model: string
+  date: string
+  report: string
+  status: "complete" | "incomplete"
+  tasks: number
+  /** Mean pass rate over the trials. Absent for an incomplete run, which has no result. */
+  passRate?: number
+  costPerSolved?: number
+  /** Where the eval proxy actually sent the model's requests. */
+  upstreamHosts: string[]
+}
+
+/** The published results this release ships. A function, so it reads the import's live binding. */
+export function published(): readonly EvalResult[] {
+  return shipped as EvalResult[]
+}
+
+/** A model has to pass at least this share of the tasks to be recommended under an EU-only policy. */
+export const EU_MIN_PASS_RATE = 0.5
+
+/** Whether every request of the run went to a host whose built-in claim is EU. */
+function ranInEu(result: EvalResult) {
+  const providerID = result.model.split("/")[0]
+  return (
+    result.upstreamHosts.length > 0 &&
+    result.upstreamHosts.every(
+      (host) => Jurisdiction.resolve(providerID, `https://${host}`, undefined).claim.region === "eu",
+    )
+  )
+}
+
+/**
+ * The best EU model in the published results, or undefined when none passed `EU_MIN_PASS_RATE`.
+ * Only a model's latest result counts, only complete runs, and only runs whose traffic went to an
+ * EU host (a Mistral run against the global api.mistral.ai isn't an EU result).
+ */
+export function euPick(results: readonly EvalResult[] = published()) {
+  const latest = new Map<string, EvalResult>()
+  for (const result of results) {
+    const seen = latest.get(result.model)
+    if (!seen || result.date > seen.date) latest.set(result.model, result)
+  }
+  const eligible = [...latest.values()].filter(
+    (result) =>
+      result.status === "complete" &&
+      result.passRate !== undefined &&
+      result.passRate >= EU_MIN_PASS_RATE &&
+      ranInEu(result),
+  )
+  // Highest pass rate; then the cheaper per solved task; then the newer result.
+  eligible.sort(
+    (a, b) =>
+      b.passRate! - a.passRate! ||
+      (a.costPerSolved ?? Infinity) - (b.costPerSolved ?? Infinity) ||
+      b.date.localeCompare(a.date),
+  )
+  return eligible[0]
+}
+
+/** What the pickers show next to the EU pick, under ~50 characters. */
+export function euReason(result: EvalResult) {
+  return `Best EU eval: passed ${Math.round(result.passRate! * 100)}% of ${result.tasks} tasks`
+}
+
+/**
+ * The recommended list in effect: the organisation's, when config sets one; under an EU-only
+ * residency policy, the EU pick or nothing (XCOD-320); else the built-in.
+ */
+export function recommended(
+  configured: Readonly<Record<string, string>> | undefined,
+  residency?: { readonly allow?: readonly string[] },
+  results: readonly EvalResult[] = published(),
+): Readonly<Record<string, string>> {
+  if (configured) return configured
+  if (!Jurisdiction.euOnly(residency)) return RECOMMENDED
+  const pick = euPick(results)
+  return pick ? { [pick.model]: euReason(pick) } : {}
+}
+
+/** XCOD-320: the default model under an EU-only policy when nothing else chose one, as "provider/model". */
+export function euDefault(
+  residency: { readonly allow?: readonly string[] } | undefined,
+  results: readonly EvalResult[] = published(),
+) {
+  if (!Jurisdiction.euOnly(residency)) return undefined
+  return euPick(results)?.model
 }

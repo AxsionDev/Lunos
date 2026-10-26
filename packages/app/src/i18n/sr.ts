@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Изаберите модел",
   "dialog.model.search.placeholder": "Претражите моделе",
   "dialog.model.empty": "Нема резултата модела",
+  "dialog.model.recommended.noEu":
+    "Ниједан модел хостован у ЕУ још није прошао Lunos процену, па се уз политику само за ЕУ ништа не препоручује.",
   "dialog.model.manage": "Управљајте моделима",
   "dialog.model.manage.description": "Прилагодите који се модели појављују у бирачу модела.",
   "dialog.model.manage.provider.toggle": "Укључите све {{provider}} моделе",

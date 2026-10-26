@@ -209,6 +209,8 @@ export const dict = {
   "dialog.model.select.title": "މޮޑެލް ހޮވުން",
   "dialog.model.search.placeholder": "ސަރޗް މޮޑެލްސް",
   "dialog.model.empty": "މޮޑެލް ނަތީޖާއެއް ނެތެވެ",
+  "dialog.model.recommended.noEu":
+    "އަދި އެއްވެސް EU ގައި ހޯސްޓްކުރާ މޮޑެލެއް Lunos ގެ ވަޒަން ފާސްކޮށްފައެއް ނުވާތީ، EU އަށް ޚާއްޞަ ސިޔާސަތުގެ ދަށުން އެއްވެސް އެއްޗެއް ރިކޮމެންޑް ނުކުރެވޭ.",
   "dialog.model.manage": "މޮޑެލްތައް މެނޭޖްކުރުން",
   "dialog.model.manage.description": "މޮޑެލް ސެލެކްޓަރގައި ފެންނަނީ ކޮން މޮޑެލްތަކެއްކަން ކަސްޓަމައިޒް ކުރުން.",
   "dialog.model.manage.provider.toggle": "ހުރިހާ {{provider}} މޮޑެލްތަކެއް ޓޮގްލް ކުރާށެވެ",
