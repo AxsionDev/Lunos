@@ -63,8 +63,10 @@ console.log(`throwaway root ${root}`)
 
 const platform = { darwin: "darwin", linux: "linux", win32: "windows" }[process.platform as string] ?? process.platform
 // The platform packages this machine can run: the plain one first (postinstall.mjs's preference).
+// Only folders with a package.json: a release build leaves its .zip and .tar.gz archives beside them.
 const packages = (await fs.readdir(dist).catch(() => [] as string[]))
-  .filter((name) => name.startsWith(`lunos-${platform}-${process.arch}`) && !name.endsWith(".zip"))
+  .filter((name) => name.startsWith(`lunos-${platform}-${process.arch}`))
+  .filter((name) => Bun.file(path.join(dist, name, "package.json")).size > 0)
   .sort((a, b) => a.length - b.length)
 if (!packages.length) throw new Error(`no dist/lunos-${platform}-${process.arch}* package in ${dist}`)
 const manifest = (await Bun.file(path.join(dist, packages[0]!, "package.json")).json()) as { version: string }
@@ -453,6 +455,9 @@ try {
       (await fetch("https://registry.npmjs.org/lunos-ai/latest", { signal: AbortSignal.timeout(20_000) })
         .then((res) => res.json() as Promise<{ version: string }>)
         .then((data) => data.version))
+    // A rerun after this version already reached npm (a release that failed after publishing).
+    if (published === next)
+      return skip(`${next} is already npm's latest; update from the version before it with --from`)
     if (!semver.valid(next) || !semver.gt(next, published))
       return fail(`the build under test (${next}) isn't newer than ${published}: nothing to update to`)
     const prefix = path.join(root, "npm-from")
