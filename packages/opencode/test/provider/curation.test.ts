@@ -72,6 +72,14 @@ describe("ModelCuration EU pick (XCOD-320)", () => {
     expect(ModelCuration.euPick(rest)?.model).toBe("ovhcloud/qwen3-coder-30b-a3b-instruct")
   })
 
+  test("a Mistral pick says to use its EU endpoint, which an EU-only policy needs", () => {
+    const mistral = { ...fixture("eval-results-eu.json")[4], upstreamHosts: ["api.eu.mistral.ai"] }
+    expect(ModelCuration.euPick([mistral])?.model).toBe("mistral/devstral-medium-latest")
+    expect(ModelCuration.euReason(mistral)).toBe(
+      "Best EU eval: passed 95% of 33 tasks; set baseURL to api.eu.mistral.ai",
+    )
+  })
+
   test("only a model's latest result counts", () => {
     const results = fixture("eval-results-eu.json")
     const rerun = { ...results[1], date: "2026-12-01", passRate: 0.3 }

@@ -20,7 +20,7 @@ export function lunosConfig(model: ModelConfig, proxyURL: string, auditPath: str
         // the generic OpenAI-compatible client doesn't call (XCOD-200).
         npm: provider === "openai" ? "@ai-sdk/openai" : "@ai-sdk/openai-compatible",
         options: { baseURL: `${proxyURL}/${model.id}/v1`, apiKey: "via-lunos-eval-proxy" },
-        models: { [id]: { name: id, tool_call: true } },
+        models: { [id]: { name: id, tool_call: true, ...(model.limit ? { limit: model.limit } : {}) } },
       },
     },
     residency: {

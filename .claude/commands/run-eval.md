@@ -20,7 +20,8 @@ money, so it **stops for the owner's approval before any paid request**. Read
 
 1. **Config.** For the EU campaign (XCOD-320) use the committed `packages/eval/eval.eu.json`
    (Mistral at `api.eu.mistral.ai`, STACKIT; €60 total, a class per model): refresh its prices
-   and `usdToEur` first. Otherwise, `packages/eval/eval.config.json` is gitignored. If it's missing, copy
+   and `usdToEur` first. Its smoke run (step 6) keeps `budget.name: "eu-2026-11"`, so it counts
+   against the same €60: don't give it a separate budget. Otherwise, `packages/eval/eval.config.json` is gitignored. If it's missing, copy
    `eval.config.example.json` and fill in:
    - the models
    - a new `budget.name` per campaign (the ledger accumulates under that name)

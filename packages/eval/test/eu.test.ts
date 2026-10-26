@@ -38,6 +38,12 @@ describe("EU campaign config", () => {
     const lunos = lunosConfig(model, "http://proxy", "/logs/audit.log")
     expect(lunos.model).toBe("stackit/Qwen/Qwen3.8-27B")
     expect(Object.keys(lunos.provider.stackit.models)).toEqual(["Qwen/Qwen3.8-27B"])
+    // STACKIT caps generation below Lunos's 32000 default; the limit has to reach Lunos's config.
+    expect(lunos.provider.stackit.models["Qwen/Qwen3.8-27B"]).toMatchObject({ limit: { output: 16384 } })
+    for (const item of (await load()).models.filter((m) => m.model.startsWith("stackit/"))) {
+      const price = (await load()).prices[item.model]
+      expect(item.limit?.output).toBe(price.kind === "api" ? price.maxOutputTokens : -1)
+    }
     expect(lunos.residency.endpoints.stackit).toEqual({
       region: "eu",
       note: "Lunos eval metering proxy, forwarding to api.openai-compat.model-serving.eu01.onstackit.cloud",

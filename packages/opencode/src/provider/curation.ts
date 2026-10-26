@@ -143,7 +143,12 @@ export function euPick(results: readonly EvalResult[] = published()) {
 
 /** What the pickers show next to the EU pick, under ~50 characters. */
 export function euReason(result: EvalResult) {
-  return `Best EU eval: passed ${Math.round(result.passRate! * 100)}% of ${result.tasks} tasks`
+  const reason = `Best EU eval: passed ${Math.round(result.passRate! * 100)}% of ${result.tasks} tasks`
+  // A provider whose SDK default isn't its EU host (Mistral) is blocked until baseURL points there.
+  const claim = Jurisdiction.lookup(result.model.split("/")[0])
+  if (claim.defaultHost && claim.hosts && !claim.hosts.includes(claim.defaultHost))
+    return `${reason}; set baseURL to ${result.upstreamHosts[0]}`
+  return reason
 }
 
 /**

@@ -45,7 +45,11 @@
       "upstream": "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1",
       "keyEnv": "STACKIT_API_KEY",
       "trials": 1,
-      "residency": ["eu"]
+      "residency": ["eu"],
+      "limit": {
+        "context": 262144,
+        "output": 16384
+      }
     },
     {
       "id": "stackit-gpt-oss",
@@ -54,7 +58,11 @@
       "upstream": "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1",
       "keyEnv": "STACKIT_API_KEY",
       "trials": 1,
-      "residency": ["eu"]
+      "residency": ["eu"],
+      "limit": {
+        "context": 131072,
+        "output": 8192
+      }
     }
   ],
   "prices": {

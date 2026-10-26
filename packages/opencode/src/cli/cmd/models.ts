@@ -26,7 +26,8 @@ export const ModelsCommand = effectCmd({
         type: "boolean",
       })
       .option("recommended", {
-        describe: "only the curated Recommended models, each with why (a curated choice, not a benchmark)",
+        describe:
+          "only the Recommended models, each with why (curated; under an EU-only policy, from published eval results)",
         type: "boolean",
       })
       .option("size", {

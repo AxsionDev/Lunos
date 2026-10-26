@@ -1,5 +1,5 @@
 import { Popover as Kobalte } from "@kobalte/core/popover"
-import { Component, ComponentProps, createEffect, createMemo, For, JSX, Show } from "solid-js"
+import { Component, ComponentProps, createEffect, createMemo, createSignal, For, JSX, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -111,6 +111,7 @@ const ModelList: Component<{
   const filter = useModelFilter()
   const sizeLabel = useModelFilterLabels()
   const emptyMessage = useEmptyModelMessage()
+  const [search, setSearch] = createSignal("")
 
   const models = createMemo(() =>
     filterModels(model.list(), model, filter.get()).filter((m) =>
@@ -131,7 +132,8 @@ const ModelList: Component<{
           </>
         ),
       }}
-      emptyMessage={emptyMessage(filter.get(), "")}
+      emptyMessage={emptyMessage(filter.get(), search())}
+      onFilter={setSearch}
       key={(x) => `${x.provider.id}:${x.id}`}
       items={models}
       current={model.current()}
