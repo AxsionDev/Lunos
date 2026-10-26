@@ -300,6 +300,15 @@ async function waitForFile(file: string, timeout: number) {
   return undefined
 }
 
+/**
+ * The prompt is drawn ("Ask anything") before start-up ends; until then it says "Starting…", drops
+ * the first keys typed and holds a prompt. Ready is the footer's "Build · Manual · m" line.
+ */
+async function ready(tui: Awaited<ReturnType<typeof Pty.launch>>) {
+  await tui.waitFor(/Build · \w+ · m\b/, 90_000)
+  await Bun.sleep(500)
+}
+
 const lastScreen = (tui: { screen: { text(): string } } | undefined) =>
   tui ? `\nScreen:\n${tui.screen.text().split("\n").filter(Boolean).slice(-25).join("\n")}` : ""
 
@@ -361,7 +370,7 @@ try {
     if (!installed || !tuiHome) return skip("not signed in (the signin step didn't pass)")
     const tui = await Pty.launch({ binary: installed, home: tuiHome, config: tuiConfig(), env: tuiEnv() })
     try {
-      await tui.waitFor("Ask anything", 90_000)
+      await ready(tui)
       const before = modelRequests
       await tui.type("Say hello")
       await Bun.sleep(300)
@@ -383,14 +392,12 @@ try {
   ] as const)
     await step(tool, async () => {
       if (!installed || !tuiHome) return skip("not signed in (the signin step didn't pass)")
-      // The prompt can drop the first keys typed just after it shows ("/claude Cr" arrived as "eate…",
-      // which went to the model as a plain prompt): send Enter only once the whole command is there,
-      // and start again (once) if it isn't.
+      // Enter only once the whole command is in the prompt (a dropped "/claude Cr" goes to the model
+      // as a plain prompt), starting again once if it isn't.
       let tui = await Pty.launch({ binary: installed, home: tuiHome, config: tuiConfig(), env: tuiEnv() })
       try {
         for (let attempt = 1; ; attempt++) {
-          await tui.waitFor("Ask anything", 90_000)
-          await Bun.sleep(1_000)
+          await ready(tui)
           await tui.type(`/${tool} ${task}`)
           await Bun.sleep(400)
           if (tui.screen.text().includes(`/${tool} ${task}`)) break
