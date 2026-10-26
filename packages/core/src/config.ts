@@ -155,7 +155,8 @@ export class Info extends Schema.Class<Info>("Config.Info")({
     description: "Dev-Cycle mode: whether it continues by itself between gates (XCOD-302)",
   }),
   workflows: ConfigWorkflows.Info.pipe(Schema.optional).annotate({
-    description: "Dynamic workflows: whether Build and Dev-Cycle dispatch subagents to do the work (XCOD-303)",
+    description:
+      "Dynamic workflows: whether the main agent of a working session dispatches subagents to do the work, and how much it reads itself (XCOD-303, XCOD-326)",
   }),
   memory: ConfigMemory.Info.pipe(Schema.optional).annotate({
     description: "Graph-based long-term memory, off by default",

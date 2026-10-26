@@ -937,7 +937,13 @@
       "properties": {
         "dynamic": {
           "type": "boolean",
-          "description": "Build and Dev-Cycle plan the work and dispatch subagents to do it; the main agent keeps only read, search, todo and question tools (on by default; false has the main agent do the work itself, with subagents encouraged by subagent.delegate). /workflows on|off switches it for one session"
+          "description": "The main agent of every working session (Build, Dev-Cycle, Research, custom primary agents; not Plan) plans the work and dispatches subagents to do it; it keeps only todo, question, task and a few read tools (on by default; false has the main agent do the work itself, with subagents encouraged by subagent.delegate). /workflows on|off switches it for one session; an agent opts out with \"dynamic\": false"
+        },
+        "main_reads": {
+          "minimum": 0,
+          "type": "integer",
+          "maximum": 9007199254740991,
+          "description": "With Dynamic workflows on, how many read, glob, grep, list, lsp and resource reads the main agent makes per turn before they refuse and it dispatches an explore subagent (default 5)"
         }
       },
       "additionalProperties": false
@@ -1107,6 +1113,10 @@
         "auto_continue": {
           "type": "boolean",
           "description": "Build agent: continue automatically when a turn ends by announcing its next step instead of doing it (default true). Dev-Cycle uses dev_cycle.auto_continue; Plan never continues (XCOD-302)"
+        },
+        "dynamic": {
+          "type": "boolean",
+          "description": "Primary agents: run as a Dynamic workflow, the main agent dispatching subagents to do the work (default true, as workflows.dynamic). false has this agent do the work itself (XCOD-326)"
         }
       }
     },
@@ -2323,7 +2333,7 @@
         },
         "workflows": {
           "$ref": "#/$defs/WorkflowsConfig",
-          "description": "Dynamic workflows: whether Build and Dev-Cycle dispatch subagents to do the work (XCOD-303)"
+          "description": "Dynamic workflows: whether the main agent of a working session dispatches subagents to do the work, and how much it reads itself (XCOD-303, XCOD-326)"
         },
         "subagent_depth": {
           "minimum": 0,

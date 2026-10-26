@@ -47,6 +47,10 @@ const AgentFields = Schema.Struct({
     description:
       "Build agent: continue automatically when a turn ends by announcing its next step instead of doing it (default true). Dev-Cycle uses dev_cycle.auto_continue; Plan never continues (XCOD-302)",
   }),
+  dynamic: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Primary agents: run as a Dynamic workflow, the main agent dispatching subagents to do the work (default true, as workflows.dynamic). false has this agent do the work itself (XCOD-326)",
+  }),
 })
 
 const AgentSchema = Schema.StructWithRest(AgentFields, [Schema.Record(Schema.String, Schema.Any)])

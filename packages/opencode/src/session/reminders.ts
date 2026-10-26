@@ -45,12 +45,25 @@ export function delegateReminder(background: boolean) {
 }
 
 /**
- * XCOD-303: the orchestrator reminder for a Build turn running as a Dynamic workflow (it replaces
- * the delegation reminder). qa gets the project's pinned checks itself (`qaProof`, prompt.ts).
+ * XCOD-303: the orchestrator reminder for a turn running as a Dynamic workflow (it replaces the
+ * delegation reminder). qa gets the project's pinned checks itself (`qaProof`, prompt.ts). XCOD-326:
+ * every working agent but Dev-Cycle gets it (Dev-Cycle's phases carry their own); `ownFile` names
+ * the one file the main agent still edits (Research's research file).
  */
-export function dynamicReminder(input: { background: boolean; maxParallel: number }) {
+export function dynamicReminder(input: {
+  background: boolean
+  maxParallel: number
+  mainReads?: number
+  ownFile?: "research"
+}) {
   return DYNAMIC_WORKFLOW.replace("${maxParallel}", () => String(input.maxParallel))
     .replace("${maxRedispatch}", () => String(DynamicWorkflows.MAX_REDISPATCH))
+    .replace("${mainReads}", () => String(input.mainReads ?? DynamicWorkflows.MAIN_READS))
+    .replace("${ownFile}", () =>
+      input.ownFile
+        ? " The one exception is your research file: subagents gather the evidence, and you write it up there."
+        : "",
+    )
     .replace("${backgroundInfo}", () =>
       input.background
         ? "Launch them with background: true; you are notified as each one finishes, so never sleep, poll or ask for status. When nothing is left to do until they report, end your turn saying you are waiting for them."
@@ -68,7 +81,7 @@ export function devCycleSteps(dynamic: boolean) {
     }
   return {
     buildStep:
-      "Dynamic workflows are on, so you don't write the code: dispatch a builder subagent (`general`, or a project agent whose description fits better) to implement the approved plan. Paste the approved plan and the context it needs into its prompt; it can't see this conversation and may not be able to read the cycle file. Parts of the plan that touch different files may go to separate builders in parallel. Then dispatch the `qa` subagent to review and test what the builder wrote -- it must be a different agent from the one that wrote the code, because the point is fresh eyes. Your own edit tools work on the cycle file only, and you can't run commands.",
+      "Dynamic workflows are on, so you don't write the code: dispatch a builder subagent (`general`, or a project agent whose description fits better) to implement the approved plan. Paste the approved plan and the context it needs into its prompt; it can't see this conversation and may not be able to read the cycle file. Parts of the plan that touch different files may go to separate builders in parallel. Then dispatch the `qa` subagent to review and test what the builder wrote -- it must be a different agent from the one that wrote the code, because the point is fresh eyes. Your own edit tools work on the cycle file only, you can't run commands, and your reads are for orchestration only (a few per turn): dispatch `explore` to read the code.",
     fixStep: "dispatch a builder subagent to fix it (pass its task_id so the same one continues).",
   }
 }

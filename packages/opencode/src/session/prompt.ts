@@ -1585,7 +1585,7 @@ const layer = Layer.effect(
           const subagents = (yield* agents.list()).filter((item) => item.mode !== "primary")
           const stepBackground = backgroundEnabled(flags.experimentalBackgroundSubagents, stepConfig)
           // XCOD-303: Dynamic workflows, read every step so `/workflows on|off` applies to the next one.
-          const dynamic = DynamicWorkflows.decide({
+          const decision = DynamicWorkflows.decide({
             config: stepConfig,
             agent,
             session: {
@@ -1593,12 +1593,49 @@ const layer = Layer.effect(
               metadata: (yield* sessions.get(sessionID).pipe(Effect.orDie)).metadata,
             },
             subagents,
-          }).on
+          })
+          const dynamic = decision.on
+          // XCOD-326: on but unable to run (no subagent that can write): said at the start of the turn,
+          // on the user's message (shown, never sent to the model) and as a toast, once per message.
+          const notice = DynamicWorkflows.notice(decision)
+          const noticeUser = msgs.findLast(
+            (m) =>
+              m.info.role === "user" &&
+              m.parts.some((part) => part.type === "text" && !part.synthetic && !part.ignored),
+          )
+          if (
+            notice &&
+            noticeUser &&
+            !noticeUser.parts.some((part) => part.type === "text" && part.metadata?.[DynamicWorkflows.NOTICE])
+          ) {
+            const part = yield* sessions.updatePart({
+              id: PartID.ascending(),
+              messageID: noticeUser.info.id,
+              sessionID,
+              type: "text",
+              text: notice,
+              ignored: true,
+              metadata: { [DynamicWorkflows.NOTICE]: true },
+              time: { start: Date.now(), end: Date.now() },
+            })
+            noticeUser.parts.push(part)
+            yield* events
+              .publish(TuiEvent.ToastShow, {
+                title: "Dynamic workflows are off",
+                message: notice,
+                variant: "warning",
+                duration: 10000,
+              })
+              .pipe(Effect.ignore)
+            yield* Effect.logInfo("dynamic workflow off", { "session.id": sessionID, reason: decision.reason })
+          }
           const delegate =
-            dynamic && agent.name === "build"
+            dynamic && agent.name !== "dev-cycle"
               ? SessionReminders.dynamicReminder({
                   background: stepBackground,
                   maxParallel: stepConfig.subagent?.max_parallel ?? DEFAULT_MAX_PARALLEL,
+                  mainReads: DynamicWorkflows.mainReads(stepConfig),
+                  ownFile: agent.name === "research" ? "research" : undefined,
                 })
               : !dynamic && SessionReminders.delegates({ agent, session, config: stepConfig, subagents })
                 ? SessionReminders.delegateReminder(stepBackground)
@@ -1613,7 +1650,7 @@ const layer = Layer.effect(
           const memoryUser = msgs.findLast((m) => m.info.role === "user")
           if (memoryUser && !Permission.disabled(["memory_search"], agent.permission).size) {
             const query = memoryUser.parts
-              .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+              .flatMap((part) => (part.type === "text" && !part.synthetic && !part.ignored ? [part.text] : []))
               .join("\n")
               .trim()
             const recalled = query
@@ -1639,7 +1676,7 @@ const layer = Layer.effect(
           let mentionedTokens = 0
           if (memoryUser) {
             const typed = memoryUser.parts
-              .flatMap((part) => (part.type === "text" && !part.synthetic ? [part.text] : []))
+              .flatMap((part) => (part.type === "text" && !part.synthetic && !part.ignored ? [part.text] : []))
               .join("\n")
             const mentioned = typed.includes("@")
               ? yield* resources
@@ -1735,11 +1772,16 @@ const layer = Layer.effect(
             // XCOD-157: with sandbox.required, no tool runs outside a sandbox, whatever started this session.
             SandboxGuard.guard(tools, (yield* config.get()).sandbox, sessionID)
             // XCOD-303: in a Dynamic workflow the main agent coordinates and subagents do the work: no
-            // edit, write or command tool reaches the model. Dev-Cycle keeps editing its own cycle file.
+            // edit, write or command tool reaches the model. Dev-Cycle keeps editing its own cycle file,
+            // Research its research file (XCOD-326), and its reads are budgeted per turn.
             if (dynamic) {
               const dropped = DynamicWorkflows.gate(tools, {
                 directory: ctx.directory,
                 ...(agent.name === "dev-cycle" ? { allowFile: Session.devcycle(session, ctx) } : {}),
+                ...(agent.name === "research" ? { allowFile: Session.research(session, ctx) } : {}),
+                reads: { used: DynamicWorkflows.readsUsed(msgs), limit: DynamicWorkflows.mainReads(stepConfig) },
+                session: sessionID,
+                agent: agent.name,
               })
               if (step === 1) yield* Effect.logInfo("dynamic workflow", { "session.id": sessionID, dropped })
             }
@@ -1979,7 +2021,7 @@ const layer = Layer.effect(
         })
         const status = `${refusal}Dynamic workflows: ${after.on ? "on" : "off"} (${after.reason}).${
           after.on
-            ? " Build and Dev-Cycle plan the work and dispatch subagents to do it; the main agent doesn't edit, write or run commands itself."
+            ? " The main agent of a working session (Build, Dev-Cycle, Research, your own primary agents) plans the work and dispatches subagents to do it; it doesn't edit, write or run commands itself. Plan mode is unchanged."
             : " The main agent does the work itself; subagents stay available."
         }`
         return yield* prompt({

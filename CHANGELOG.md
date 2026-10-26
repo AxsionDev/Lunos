@@ -138,6 +138,18 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
   main agent works directly as before; the footer shows "Dynamic workflows: on/off". An
   organisation can lock it on or off. <!-- XCOD-303 -->
 
+- **Every working session now orchestrates by default, and the main agent only oversees.** Research,
+  your own primary agents and your `default_agent` now hand the work to subagents too, not just
+  Build and Dev-Cycle; Plan mode, Claude Code and Codex sessions are unchanged. The main agent keeps
+  its todo list current, retries or narrows a step that went off track, and makes at most 5 reads
+  per turn (`workflows.main_reads`, lockable by an organisation); past that it dispatches an
+  `explore` subagent to read the code. An edit or command it attempts anyway is refused and recorded
+  in the audit log. When no subagent that can edit may be dispatched (for example
+  `subagent_depth: 0`), the turn says "Dynamic workflows are off for this session" with the reason
+  and the fix, instead of switching off silently. One agent of your own can opt out with
+  `"dynamic": false`. The footer reads "Dynamic workflows: on · main agent orchestrating".
+  <!-- XCOD-326 -->
+
 ### Fixed
 
 - **Quitting a TUI connected over HTTP (a sandbox, `lunos attach`) can no longer end in "Lunos

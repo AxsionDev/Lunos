@@ -28,4 +28,6 @@ export class Info extends Schema.Class<Info>("ConfigV2.Agent")({
   permission_mode: Schema.Literals(["manual", "auto"]).pipe(Schema.optional),
   /** XCOD-302: Build continues by itself after announcing a next step unless this is false. */
   auto_continue: Schema.Boolean.pipe(Schema.optional),
+  /** XCOD-326: a primary agent runs as a Dynamic workflow unless this is false. */
+  dynamic: Schema.Boolean.pipe(Schema.optional),
 }) {}

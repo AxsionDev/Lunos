@@ -234,6 +234,8 @@ const DEFAULTS: Record<string, unknown> = {
   "subagent.mascots": true,
   // XCOD-303: Dynamic workflows on by default.
   "workflows.dynamic": true,
+  // XCOD-326: the main agent's reads per turn.
+  "workflows.main_reads": 5,
   marketplace_default: true,
   "memory.enabled": false,
   "sandbox.enabled": false,

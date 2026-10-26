@@ -2,6 +2,11 @@
 import { describe, expect, test } from "bun:test"
 import { DynamicWorkflows } from "@/session/workflows"
 import { Permission } from "@/permission"
+import { AuditLog } from "@/audit/log"
+import { Audit } from "@opencode-ai/core/audit"
+import fs from "fs/promises"
+import os from "os"
+import path from "path"
 
 const allow = Permission.fromConfig({ "*": "allow" })
 const build = { name: "build", permission: allow }
@@ -41,6 +46,66 @@ describe("DynamicWorkflows.setting / decide", () => {
     expect(DynamicWorkflows.decide({ ...base, agent: { ...build, name: "dev-cycle" }, session: {} }).on).toBe(true)
     expect(DynamicWorkflows.decide({ ...base, agent: { ...build, name: "plan" }, session: {} }).by).toBe("mode")
     expect(DynamicWorkflows.decide({ ...base, agent: build, session: { parentID: "ses_parent" } }).by).toBe("mode")
+  })
+
+  test("XCOD-326: every top-level primary agent but Plan runs it; an agent opts out with dynamic: false", () => {
+    const base = { config: {}, subagents: [general], session: {} }
+    for (const agent of [
+      { ...build, name: "research", mode: "primary" },
+      { ...build, name: "reviewer", mode: "primary" },
+      { ...build, name: "mine", mode: "all" },
+    ])
+      expect(DynamicWorkflows.decide({ ...base, agent }).on).toBe(true)
+    expect(DynamicWorkflows.decide({ ...base, agent: { ...build, name: "helper", mode: "subagent" } }).by).toBe("mode")
+    expect(DynamicWorkflows.decide({ ...base, agent: { ...build, name: "title", hidden: true } }).by).toBe("mode")
+    const optOut = { agent: { reviewer: { dynamic: false } } }
+    const reviewer = { ...build, name: "reviewer", mode: "primary" }
+    expect(DynamicWorkflows.decide({ ...base, config: optOut, agent: reviewer })).toMatchObject({
+      on: false,
+      by: "agent",
+    })
+    // /workflows on in the session, and an organisation lock, still win over the agent's opt-out.
+    expect(
+      DynamicWorkflows.decide({
+        ...base,
+        config: optOut,
+        agent: reviewer,
+        session: { metadata: { workflows: { dynamic: true } } },
+      }).on,
+    ).toBe(true)
+    expect(
+      DynamicWorkflows.decide({ ...base, config: { ...optOut, $locked: ["workflows.dynamic"] }, agent: reviewer }).on,
+    ).toBe(true)
+    // Opting out is per agent: Build stays on.
+    expect(DynamicWorkflows.decide({ ...base, config: optOut, agent: build }).on).toBe(true)
+  })
+
+  test("XCOD-326: off for want of a writing subagent says why and how to fix it", () => {
+    const depth = DynamicWorkflows.decide({
+      config: { subagent_depth: 0 },
+      agent: build,
+      session: {},
+      subagents: [general],
+    })
+    expect(DynamicWorkflows.notice(depth)).toBe(
+      `Dynamic workflows are off for this session: "subagent_depth" is 0, so no subagent can be dispatched. Fix: set "subagent_depth" to 1 or more. The main agent does the work itself until then. See ${DynamicWorkflows.DOCS}`,
+    )
+    const denied = { name: "build", permission: Permission.merge(allow, Permission.fromConfig({ task: "deny" })) }
+    expect(
+      DynamicWorkflows.notice(
+        DynamicWorkflows.decide({ config: {}, agent: denied, session: {}, subagents: [general] }),
+      ),
+    ).toContain('Fix: allow "task"')
+    expect(
+      DynamicWorkflows.notice(DynamicWorkflows.decide({ config: {}, agent: build, session: {}, subagents: [explore] })),
+    ).toContain("every subagent it may dispatch has edit turned off")
+    // Off by choice, or on: no notice.
+    expect(
+      DynamicWorkflows.notice(DynamicWorkflows.setting({ config: { workflows: { dynamic: false } } })),
+    ).toBeUndefined()
+    expect(
+      DynamicWorkflows.notice(DynamicWorkflows.decide({ config: {}, agent: build, session: {}, subagents: [general] })),
+    ).toBeUndefined()
   })
 
   test("falls back to off when no subagent that can edit may be dispatched", () => {
@@ -92,6 +157,85 @@ describe("DynamicWorkflows.gate", () => {
         {},
       ),
     ).toThrow(DynamicWorkflows.REFUSAL)
+  })
+})
+
+describe("DynamicWorkflows read budget and refusals (XCOD-326)", () => {
+  const tools = () =>
+    Object.fromEntries(
+      [
+        "read",
+        "grep",
+        "glob",
+        "lsp",
+        "read_mcp_resource",
+        "task",
+        "todowrite",
+        "question",
+        "invalid",
+        "bash",
+        "edit",
+      ].map((name) => [name, { execute: async (_args: unknown, _options: unknown) => name }]),
+    )
+
+  test("reads, searches, lsp and resource reads share one budget; coordination tools are unlimited", async () => {
+    const set = tools()
+    DynamicWorkflows.gate(set, { directory: "/work", reads: { used: 2, limit: 5 } })
+    expect(await set.read!.execute!({}, {})).toBe("read")
+    expect(await set.grep!.execute!({}, {})).toBe("grep")
+    expect(await set.lsp!.execute!({}, {})).toBe("lsp")
+    expect(() => set.read_mcp_resource!.execute!({}, {})).toThrow("dispatch an explore subagent")
+    expect(() => set.glob!.execute!({}, {})).toThrow("dispatch an explore subagent")
+    for (let i = 0; i < 10; i++) {
+      expect(await set.task!.execute!({}, {})).toBe("task")
+      expect(await set.todowrite!.execute!({}, {})).toBe("todowrite")
+    }
+  })
+
+  test("the turn starts at the last message the user typed", () => {
+    const tool = (name: string) => ({ type: "tool", tool: name })
+    const messages = [
+      { info: { role: "user" }, parts: [{ type: "text", text: "old" }] },
+      { info: { role: "assistant" }, parts: [tool("read"), tool("read")] },
+      { info: { role: "user" }, parts: [{ type: "text", text: "now" }] },
+      { info: { role: "assistant" }, parts: [tool("grep"), tool("task"), tool("lsp")] },
+      // An auto-continue is synthetic: still the same turn.
+      { info: { role: "user" }, parts: [{ type: "text", text: "Continue.", synthetic: true }] },
+      { info: { role: "assistant" }, parts: [tool("read"), tool("todowrite")] },
+    ]
+    expect(DynamicWorkflows.readsUsed(messages)).toBe(3)
+  })
+
+  test("a call to a dropped tool is refused and audited", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-workflows-"))
+    const file = path.join(dir, "audit.log")
+    AuditLog.activate({ enabled: true, file, redact: [] })
+    try {
+      const set = tools()
+      DynamicWorkflows.gate(set, { directory: "/work", session: "ses_main", agent: "build" })
+      expect(Object.keys(set)).not.toContain("bash")
+      expect(() => set.invalid!.execute!({ tool: "Bash", error: "There is no tool named" }, {})).toThrow(
+        DynamicWorkflows.REFUSAL,
+      )
+      // A made-up tool name is no refusal: it still gets the usual answer.
+      expect(await set.invalid!.execute!({ tool: "frobnicate", error: "There is no tool named" }, {})).toBe("invalid")
+      await AuditLog.flush()
+      const lines = (await fs.readFile(file, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .filter((line) => line.event === "workflows.main_tool_refused" && line.session === "ses_main")
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toMatchObject({
+        tool: "bash",
+        agent: "build",
+        session: "ses_main",
+      })
+    } finally {
+      AuditLog.activate({ enabled: false, file, redact: [] })
+      await fs.rm(dir, { recursive: true, force: true })
+    }
+    expect(Audit.EVENTS as readonly string[]).toContain("workflows.main_tool_refused")
   })
 })
 

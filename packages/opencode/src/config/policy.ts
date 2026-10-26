@@ -89,6 +89,8 @@ export const KNOWN = [
   // XCOD-303: an organisation can lock Dynamic workflows on (review by a separate agent) or off (cost).
   "workflows",
   "workflows.dynamic",
+  // XCOD-326: the main agent's reads per turn (plus `agent.<name>.dynamic`).
+  "workflows.main_reads",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */
@@ -96,7 +98,7 @@ export function isKnown(key: string) {
   return (
     (KNOWN as ReadonlyArray<string>).includes(key) ||
     /^permission\.[^.]+$/.test(key) ||
-    /^agent\.[^.]+\.(model|verify|auto_continue|permission_mode)$/.test(key)
+    /^agent\.[^.]+\.(model|verify|auto_continue|permission_mode|dynamic)$/.test(key)
   )
 }
 
