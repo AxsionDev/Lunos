@@ -521,6 +521,26 @@ describe("open work (Dynamic workflows)", () => {
     expect(dyn([u, own, main]).kind).toBe("stalled")
   })
 
+  test("open work belongs to its request: a new message from the human starts over", () => {
+    const u = user("Approved.")
+    const failed = calls(u, [task("qa", "verify", { output: failedQa })], STATUS)
+    const leave = user("Leave those gaps, I'll fix them myself.")
+    expect(dyn([u, failed, leave, assistant(leave, { text: "Understood: the gaps are yours." })]).kind).toBe("finished")
+    // An exhausted step earlier doesn't block a plain stall in a new request.
+    const refused = calls(u, [task("general", "fix", { error: 'The step "fix" was re-dispatched 3 times.' })], STATUS)
+    const next = user("Now add the login page.")
+    expect(dyn([u, refused, next, assistant(next, { text: "Next I'll implement it." })]).kind).toBe("stalled")
+    // Lunos's continuation, a background result landing, or Continue keep the request going.
+    const resume = user("Continue.", { [AutoContinue.RESUME]: true })
+    expect(dyn([u, failed, resume, assistant(resume, { text: STATUS })]).kind).toBe("stalled")
+    const landed = user(
+      '<task id="ses_x" state="completed">\n<task_result>\nok\n</task_result>\n</task>',
+      undefined,
+      true,
+    )
+    expect(dyn([u, failed, landed, assistant(landed, { text: STATUS })]).kind).toBe("stalled")
+  })
+
   describe("human-needed stops, each with its one line", () => {
     const u = user("Approved.")
     const end = (parts: unknown[], text = STATUS) => [u, calls(u, parts, text)]

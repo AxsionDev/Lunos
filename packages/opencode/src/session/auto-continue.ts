@@ -328,6 +328,22 @@ const firstLine = (text: string) =>
     .map((line) => line.trim())
     .find(Boolean) ?? ""
 
+/**
+ * The current request: the messages from the last one the human wrote. Lunos's continuations, a
+ * background result landing and the "Continue" button carry the request on; anything else the
+ * human writes ("leave those, I'll fix them") starts a new one, and earlier open work is theirs.
+ */
+export function request(messages: readonly SessionV1.WithParts[]) {
+  const start = messages.findLastIndex(
+    (message) =>
+      message.info.role === "user" &&
+      !isContinuation(message) &&
+      !marked(message, RESUME) &&
+      message.parts.some((part) => part.type === "text" && !part.synthetic),
+  )
+  return start === -1 ? messages : messages.slice(start)
+}
+
 /** Whether the work is still open: what makes a Dynamic workflow's turn a stall. */
 export const open = (work: Work) =>
   work.gaps.some((gap) => !needsSecret(gap)) ||
@@ -431,7 +447,7 @@ export function classify(input: Input): Stop {
   if (input.position.done) return { kind: "done" }
 
   // XCOD-324: the open work, in a Dynamic workflow only, and the stops it needs the human for.
-  const found = input.dynamic ? work(input.messages, last.info.agent) : undefined
+  const found = input.dynamic ? work(request(input.messages), last.info.agent) : undefined
   if (found) {
     const secret =
       found.failed.find((step) => needsSecret(step.error))?.error ??

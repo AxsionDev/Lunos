@@ -664,23 +664,25 @@ describe("Dynamic workflows on the live loop (XCOD-303)", () => {
         }),
       )
 
-    it.instance("the opt-outs keep today's behaviour: the status report ends the turn", () =>
-      Effect.gen(function* () {
-        for (const config of [
-          { workflows: { dynamic: false } },
-          { dev_cycle: { auto_continue: false } },
-        ] as Partial<ConfigV1.Info>[]) {
-          const llm = yield* TestLLMServer
-          yield* llm.reset
-          const { session } = yield* setup({ agent: "dev-cycle", cursor: { phase: "build", gate: "approved" }, config })
-          yield* say(session.id, "dev-cycle", "Approved.")
+    for (const { agent, config } of [
+      { agent: "dev-cycle", config: { workflows: { dynamic: false } } },
+      { agent: "dev-cycle", config: { dev_cycle: { auto_continue: false } } },
+      { agent: "build", config: { agent: { build: { auto_continue: false } } } },
+    ] as { agent: string; config: Partial<ConfigV1.Info> }[])
+      it.instance(`opt-out ${JSON.stringify(config)} keeps today's behaviour: the status report ends the turn`, () =>
+        Effect.gen(function* () {
+          const { session, llm } = yield* setup({
+            agent,
+            config,
+            ...(agent === "dev-cycle" ? { cursor: { phase: "build", gate: "approved" } } : {}),
+          })
+          yield* say(session.id, agent, "Approved.")
           yield* recorded(llm)
           yield* run(session.id)
           expect(continuations(yield* MessageV2.filterCompactedEffect(session.id))).toHaveLength(0)
           expect(yield* modelCalls()).toHaveLength(5)
-        }
-      }),
-    )
+        }),
+      )
 
     it.instance("a missing secret is left to the human", () =>
       Effect.gen(function* () {
