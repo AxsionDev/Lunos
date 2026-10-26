@@ -624,9 +624,10 @@ describe("Dynamic workflows on the live loop (XCOD-303)", () => {
     }),
   )
 
-  it.instance("XCOD-326: Research orchestrates by default", () =>
+  it.instance("XCOD-326: Research orchestrates by default, its subagents only gathering evidence", () =>
     Effect.gen(function* () {
       yield* coding("research", undefined, false)
+      expect(JSON.stringify((yield* modelCalls())[0])).toContain("they never change project files")
     }),
   )
 
@@ -660,6 +661,11 @@ describe("Dynamic workflows on the live loop (XCOD-303)", () => {
       const [first] = yield* modelCalls()
       expect(offered(first)).toContain("bash")
       expect(JSON.stringify(first)).not.toContain("You are the orchestrator")
+      const result = yield* SessionPrompt.Service.use((prompt) =>
+        prompt.command({ sessionID: session.id, agent: "solo", command: "workflows", arguments: "" }),
+      )
+      const text = result.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+      expect(text).toContain('Not in this session: "agent": { "solo": { "dynamic": false } }')
     }),
   )
 
@@ -755,6 +761,10 @@ describe("Dynamic workflows on the live loop (XCOD-303)", () => {
       const calls = yield* modelCalls()
       expect(JSON.stringify(calls)).not.toContain("Dynamic workflows are off")
       expect(offered(calls[0])).toContain("bash")
+      // /workflows says so too, rather than "on".
+      const result = yield* command(session.id, "")
+      const text = result.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+      expect(text).toContain('Dynamic workflows are off for this session: "subagent_depth" is 0')
     }),
   )
 

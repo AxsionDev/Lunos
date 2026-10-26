@@ -61,7 +61,7 @@ export function dynamicReminder(input: {
     .replace("${mainReads}", () => String(input.mainReads ?? DynamicWorkflows.MAIN_READS))
     .replace("${ownFile}", () =>
       input.ownFile
-        ? " The one exception is your research file: subagents gather the evidence, and you write it up there."
+        ? " The one exception is your research file. This is research mode: subagents only gather evidence (`explore` to read the code, `general` for the web or anything else that reads), they never change project files, and you write the findings up in the research file yourself. A request to build something still produces a how-to document there, not a change. Where the research-mode instructions say to read and search yourself, dispatch `explore` instead."
         : "",
     )
     .replace("${backgroundInfo}", () =>

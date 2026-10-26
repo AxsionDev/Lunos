@@ -2019,10 +2019,28 @@ const layer = Layer.effect(
           config: cfg,
           session: arg === "off" || arg === "on" ? arg === "on" : DynamicWorkflows.sessionValue(current.metadata),
         })
+        // XCOD-326: what this session's agent will actually do, so an "on" that can't run isn't silent.
+        const agent = yield* agents.get(input.agent ?? (yield* agents.defaultAgent()))
+        const decided = agent
+          ? DynamicWorkflows.decide({
+              config: cfg,
+              agent,
+              session: {
+                ...current,
+                metadata: DynamicWorkflows.withSessionValue(
+                  current.metadata,
+                  after.by === "session" ? after.on : undefined,
+                ),
+              },
+              subagents: (yield* agents.list()).filter((item) => item.mode !== "primary"),
+            })
+          : after
         const status = `${refusal}Dynamic workflows: ${after.on ? "on" : "off"} (${after.reason}).${
-          after.on
-            ? " The main agent of a working session (Build, Dev-Cycle, Research, your own primary agents) plans the work and dispatches subagents to do it; it doesn't edit, write or run commands itself. Plan mode is unchanged."
-            : " The main agent does the work itself; subagents stay available."
+          after.on && !decided.on
+            ? ` ${DynamicWorkflows.notice(decided) ?? `Not in this session: ${decided.reason}.`}`
+            : after.on
+              ? " The main agent of a working session (Build, Dev-Cycle, Research, your own primary agents) plans the work and dispatches subagents to do it; it doesn't edit, write or run commands itself. Plan mode is unchanged."
+              : " The main agent does the work itself; subagents stay available."
         }`
         return yield* prompt({
           sessionID: input.sessionID,
