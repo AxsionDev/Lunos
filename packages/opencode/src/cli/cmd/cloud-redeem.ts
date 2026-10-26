@@ -1,6 +1,5 @@
 import { EOL } from "os"
 import { Effect } from "effect"
-import { CloudBeta } from "@/cloud/beta"
 import { effectCmd, fail } from "../effect-cmd"
 import { writeStdoutEffect } from "../stdout"
 
@@ -19,6 +18,8 @@ export const CloudRedeemCommand = effectCmd({
       describe: "the beta code you were sent, e.g. LUNOS-7K2M-…",
     }),
   handler: Effect.fn("Cli.cloud.redeem")(function* (args) {
+    // Loaded here, not at the top: cloud-git-token.ts registers this on every CLI start.
+    const { CloudBeta } = yield* Effect.promise(() => import("@/cloud/beta"))
     const result = yield* Effect.tryPromise({
       try: () => CloudBeta.redeem(String(args.code)),
       catch: (error) => error,
