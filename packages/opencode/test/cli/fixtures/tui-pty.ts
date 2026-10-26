@@ -169,6 +169,35 @@ export type Options = {
 
 const opencode = path.resolve(import.meta.dir, "../../..")
 
+/**
+ * XCOD-321: what a Windows child needs to start at all (SystemRoot, ComSpec, PATHEXT, the system
+ * PATH), with the user's profile and app-data folders moved into the throwaway home. There's no
+ * stand-in browser here: the `open`/`xdg-open` stubs are POSIX scripts.
+ */
+function windowsEnv(home: string, bin: string): Record<string, string> {
+  const keep = [
+    "SystemRoot",
+    "SystemDrive",
+    "windir",
+    "ComSpec",
+    "PATHEXT",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
+  ]
+  const env: Record<string, string> = {}
+  for (const key of keep) if (process.env[key]) env[key] = process.env[key]!
+  const temp = path.join(home, "temp")
+  return {
+    ...env,
+    PATH: [bin, path.dirname(process.execPath), process.env.PATH ?? process.env.Path ?? ""].join(path.delimiter),
+    USERPROFILE: home,
+    APPDATA: path.join(home, "AppData", "Roaming"),
+    LOCALAPPDATA: path.join(home, "AppData", "Local"),
+    TEMP: temp,
+    TMP: temp,
+  }
+}
+
 /** A throwaway HOME, its XDG and project directories, and the isolated environment to run `lunos` in. */
 export async function prepare(options: Options = {}) {
   const home = options.home ?? (await fs.mkdtemp(path.join(os.tmpdir(), "lunos-tui-pty-")))
@@ -195,6 +224,7 @@ export async function prepare(options: Options = {}) {
   }
   const env: Record<string, string> = {
     PATH: `${dirs.bin}:${path.dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`,
+    ...(process.platform === "win32" ? windowsEnv(home, dirs.bin) : {}),
     HOME: home,
     XDG_CONFIG_HOME: dirs.config,
     XDG_DATA_HOME: dirs.data,
@@ -226,6 +256,8 @@ export async function prepare(options: Options = {}) {
     NO_PROXY: "127.0.0.1,localhost,.invalid",
     ...options.env,
   }
+  if (process.platform === "win32")
+    for (const dir of [env.TEMP, env.APPDATA, env.LOCALAPPDATA]) await fs.mkdir(dir!, { recursive: true })
   await Bun.$`git init -q .`.cwd(dirs.project).quiet()
   return { home, dirs, env, opened }
 }

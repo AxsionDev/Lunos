@@ -1,0 +1,207 @@
+name: e2e-matrix
+
+# XCOD-321: the release end-to-end matrix on Linux, macOS (arm64) and Windows. Each leg installs the
+# build with npm from a fake registry, signs in with the device flow against a fake OpenID provider,
+# runs a first TUI turn on a scripted model, gives /claude and /codex a task (stand-ins replaying
+# recorded sessions), runs the sandbox fast-exit checks where Linux containers exist, and updates the
+# published `latest` (N) to this build (N+1) with `lunos update`. See packages/opencode/script/release-e2e.ts.
+# No API key, no hosted model, no Lunos production host.
+#
+# GitHub-hosted runners: the inherited workflows' Blacksmith runners never pick up jobs on this fork.
+#
+# - pull_request / workflow_dispatch: each leg builds its own platform natively (`build.ts --single`,
+#   as an official build) with version <latest>+1 patch, `-e2e.<run>`.
+# - workflow_call with `release: true`: publish.yml's build-cli artifacts (the macOS leg takes the
+#   re-signed ones), so the check runs on the bytes that ship. publish.yml's release-gate needs this.
+#
+# A step that can't run on a runner (the sandbox on macOS: no Docker; on Windows: Windows containers
+# only) is reported as skipped with its reason, in the job summary; it never counts as passed.
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - ".github/workflows/e2e-matrix.yml"
+      - "packages/opencode/script/release-e2e.ts"
+      - "packages/opencode/script/sandbox-e2e.ts"
+      - "packages/opencode/script/build.ts"
+      - "packages/opencode/script/postinstall.mjs"
+      - "packages/opencode/src/installation/**"
+      - "packages/opencode/src/cli/cmd/upgrade.ts"
+      - "packages/opencode/src/cloud/signin.ts"
+      - "packages/opencode/test/cli/fixtures/tui-pty.ts"
+      - "packages/opencode/test/cloud/fixtures/**"
+      - "packages/opencode/test/external/fixtures/**"
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "Version to update from (N); default: lunos-ai's latest on npm"
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      release:
+        description: "Test publish.yml's build-cli artifacts instead of building"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: e2e (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            host: ubuntu-24.04
+            artifact: opencode-cli
+          - name: macos
+            host: macos-latest
+            artifact: opencode-cli-signed-macos
+          - name: windows
+            host: windows-2025
+            artifact: opencode-cli-windows
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      # Before the build: sandbox-image.ts builds its own binary into dist/ (and clears it first).
+      - name: Build the sandbox image (Linux)
+        if: runner.os == 'Linux'
+        timeout-minutes: 20
+        working-directory: packages/opencode
+        run: bun run script/sandbox-image.ts --tag lunos-sandbox:local
+
+      - name: Version under test
+        if: ${{ !inputs.release }}
+        id: version
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          latest=$(curl -fsS --max-time 30 https://registry.npmjs.org/lunos-ai/latest | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')
+          IFS=. read -r major minor patch <<<"$latest"
+          echo "version=$major.$minor.$((patch + 1))-e2e.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "lunos-ai latest on npm: $latest"
+
+      - name: Build (official, this platform)
+        if: ${{ !inputs.release }}
+        timeout-minutes: 20
+        working-directory: packages/opencode
+        run: bun run script/build.ts --single
+        env:
+          OPENCODE_VERSION: ${{ steps.version.outputs.version }}
+          OPENCODE_CHANNEL: latest
+          LUNOS_OFFICIAL_BUILD: "1"
+
+      - name: Download the release build
+        if: ${{ inputs.release }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ matrix.artifact }}
+          path: packages/opencode/dist
+
+      # Artifact downloads drop the executable bit.
+      - name: Make the downloaded binaries executable
+        if: ${{ inputs.release && runner.os != 'Windows' }}
+        run: chmod +x packages/opencode/dist/lunos-*/bin/opencode
+
+      - name: Release E2E
+        timeout-minutes: 30
+        working-directory: packages/opencode
+        shell: bash
+        env:
+          FROM: ${{ inputs.from }}
+          SANDBOX_IMAGE: ${{ runner.os == 'Linux' && 'lunos-sandbox:local' || '' }}
+        run: |
+          bun run script/release-e2e.ts --results "e2e-${{ matrix.name }}.json" \
+            ${FROM:+--from "$FROM"} ${SANDBOX_IMAGE:+--sandbox-image "$SANDBOX_IMAGE"}
+
+      # The adapters against Claude Code's and Codex's recorded traffic (XCOD-270), on this OS.
+      - name: Claude Code and Codex contract replays
+        if: ${{ !cancelled() }}
+        timeout-minutes: 15
+        working-directory: packages/opencode
+        run: bun test test/external/contract
+
+      - name: Upload the results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-results-${{ matrix.name }}
+          path: packages/opencode/e2e-${{ matrix.name }}.json
+          if-no-files-found: warn
+
+  # `lunos run --cloud` against a Lunos Cloud staging environment. It needs a signed-in test account
+  # there, so it runs only when the staging secrets exist, and otherwise says loudly that it was
+  # skipped (a warning annotation and the job summary). It refuses Lunos's production hosts outright.
+  #   LUNOS_STAGING_ISSUER    cloud.issuer of staging's OpenID provider
+  #   LUNOS_STAGING_ENDPOINT  cloud.endpoint of staging's Lunos Cloud
+  #   LUNOS_STAGING_SESSION   the test account's session: a test-keychain.json from `lunos login`
+  #                           run with LUNOS_CLOUD_STORE=test-keychain against staging
+  #   LUNOS_STAGING_CONFIG    optional extra opencode.json for the run (the model the worker uses)
+  cloud-staging:
+    name: e2e (cloud staging)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Detect the staging secrets
+        id: check
+        env:
+          ISSUER: ${{ secrets.LUNOS_STAGING_ISSUER }}
+          ENDPOINT: ${{ secrets.LUNOS_STAGING_ENDPOINT }}
+          SESSION: ${{ secrets.LUNOS_STAGING_SESSION }}
+        run: |
+          if [ -z "$ISSUER" ] || [ -z "$ENDPOINT" ] || [ -z "$SESSION" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Cloud E2E skipped::LUNOS_STAGING_ISSUER, LUNOS_STAGING_ENDPOINT and LUNOS_STAGING_SESSION aren't all set; lunos run --cloud was NOT tested."
+            echo "### ⏭️ lunos run --cloud: SKIPPED (no staging secrets), not tested" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          for url in "$ISSUER" "$ENDPOINT"; do
+            if printf '%s' "$url" | grep -Eiq '(^|//|\.)(cloud|auth|app)\.lunos\.tech(:|/|$)'; then
+              echo "::error::$url is a Lunos production host; this job only runs against staging."
+              exit 1
+            fi
+          done
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        if: steps.check.outputs.run == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        if: steps.check.outputs.run == 'true'
+        uses: ./.github/actions/setup-bun
+
+      - name: lunos run --cloud
+        if: steps.check.outputs.run == 'true'
+        timeout-minutes: 20
+        env:
+          ISSUER: ${{ secrets.LUNOS_STAGING_ISSUER }}
+          ENDPOINT: ${{ secrets.LUNOS_STAGING_ENDPOINT }}
+          SESSION: ${{ secrets.LUNOS_STAGING_SESSION }}
+          EXTRA: ${{ secrets.LUNOS_STAGING_CONFIG }}
+        run: |
+          home="$RUNNER_TEMP/lunos-cloud-home"
+          mkdir -p "$home/.config/opencode" "$home/.local/share/opencode/cloud"
+          printf '%s' "$SESSION" > "$home/.local/share/opencode/cloud/test-keychain.json"
+          node -e 'const [i, e, x] = process.argv.slice(1); console.log(JSON.stringify({ ...(x ? JSON.parse(x) : {}), cloud: { issuer: i, endpoint: e } }))' \
+            "$ISSUER" "$ENDPOINT" "$EXTRA" > "$home/.config/opencode/opencode.json"
+          export HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" \
+            XDG_STATE_HOME="$home/.local/state" XDG_CACHE_HOME="$home/.cache" LUNOS_CLOUD_STORE=test-keychain
+          # The worker clones this commit; the results come back as a lunos/cloud/<id> branch.
+          bun run packages/opencode/src/index.ts run --cloud "Create e2e-cloud.txt containing ok, then stop."
+          git fetch -q origin 'refs/heads/lunos/cloud/*:refs/remotes/origin/lunos/cloud/*' || true
+          branch=$(git branch -a --list '*lunos/cloud/*' --sort=-committerdate | head -1 | tr -d ' *')
+          test -n "$branch" || { echo "::error::no lunos/cloud/<id> branch came back"; exit 1; }
+          test "$(git show "$branch:e2e-cloud.txt")" = "ok" || { echo "::error::$branch has no e2e-cloud.txt with ok"; exit 1; }
+          echo "### ✅ lunos run --cloud: results came back as $branch" >> "$GITHUB_STEP_SUMMARY"
