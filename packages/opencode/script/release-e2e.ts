@@ -309,7 +309,10 @@ const idp = FakeIdp.start({ pendingPolls: 2 })
 let tuiHome: string | undefined
 let externals: Awaited<ReturnType<typeof externalShims>> | undefined
 const tuiConfig = () => ({ cloud: { issuer: idp.origin, endpoint: idp.origin }, external: externals })
+// bun-pty adds this environment to the one it inherits, so a runner's CI=true would reach the TUI and
+// exempt it from signing in (a user's terminal never has it).
 const tuiEnv = () => ({
+  CI: "",
   HTTPS_PROXY: proxy.url,
   HTTP_PROXY: proxy.url,
   OPENCODE_CONFIG_CONTENT: JSON.stringify(modelConfig),
@@ -334,7 +337,6 @@ try {
     if (!installed) return skip("nothing installed (the install step didn't pass)")
     externals = await externalShims()
     const tui = await Pty.launch({ binary: installed, config: tuiConfig(), env: tuiEnv() })
-    tuiHome = tui.home
     try {
       await tui.waitFor("Welcome to Lunos", 90_000)
       tui.press(KEY.space)
@@ -342,6 +344,7 @@ try {
       await choose(tui, "Sign in")
       await tui.waitFor("Signed in as pat@lunos.test", 60_000)
       await tui.waitFor("Ask anything", 30_000)
+      tuiHome = tui.home
       if (!idp.requests.some((request) => request.path === "/device")) return fail("no device authorization request")
       return "Welcome screen → device flow against the fake provider → Signed in as pat@lunos.test → home"
     } catch (error) {
