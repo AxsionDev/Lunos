@@ -1364,24 +1364,39 @@ const layer = Layer.effect(
 
       let position: AutoContinue.Position = { unknown: false, done: false, pending: false }
       let file: string | undefined
+      let started = false
       if (cycle) {
         file = Session.devcycle(input.session, yield* InstanceState.context)
-        const exists = yield* fsys.existsSafe(file)
-        const contents = exists
+        started = yield* fsys.existsSafe(file)
+        const contents = started
           ? yield* fsys.readFileStringSafe(file).pipe(Effect.orElseSucceed(() => undefined))
           : undefined
-        position = DevCycle.position({ exists, contents })
+        position = DevCycle.position({ exists: started, contents })
       }
+      // XCOD-324: in a Dynamic workflow the open work decides (qa's checks, todos, the phase, failed
+      // steps), read the same way the loop decides it for the step.
+      const dynamic = DynamicWorkflows.decide({
+        config: cfg,
+        agent,
+        session: { ...input.session, metadata: (yield* sessions.get(input.sessionID).pipe(Effect.orDie)).metadata },
+        subagents: (yield* agents.list()).filter((item) => item.mode !== "primary"),
+      }).on
       // Continuations count against the step limit like any step; at the limit the turn stops.
       const stop = AutoContinue.classify({
         messages: input.msgs,
         position,
         emptyStalls: cycle,
         limit: input.step >= (agent.steps ?? Infinity) ? "step limit" : undefined,
+        dynamic,
+        midPhase: started && !position.done && !position.pending,
       })
       if (stop.kind !== "stalled") {
         if (stop.kind !== "finished")
-          yield* Effect.logInfo("auto-continue: stopped", { "session.id": input.sessionID, stop: stop.kind })
+          yield* Effect.logInfo("auto-continue: stopped", {
+            "session.id": input.sessionID,
+            stop: stop.kind,
+            why: AutoContinue.why(title, stop),
+          })
         return false
       }
 
@@ -1442,9 +1457,16 @@ const layer = Layer.effect(
         return true
       }
 
-      const line = AutoContinue.line(title, stop.label)
+      // XCOD-324: with open work, its quiet status goes in the line: "Working on 5 gaps · check: 0/5 passing".
+      const progress = stop.work ? AutoContinue.status(stop.work) : ""
+      const line = AutoContinue.line(title, [stop.label, progress].filter(Boolean).join(" · ") || undefined)
       yield* send(
-        AutoContinue.prompt({ gated: cycle, note: stop.note }),
+        AutoContinue.prompt({
+          gated: cycle,
+          note: stop.note,
+          work: stop.work,
+          maxParallel: cfg.subagent?.max_parallel ?? DEFAULT_MAX_PARALLEL,
+        }),
         { [AutoContinue.METADATA]: { label: line, attempt: attempt + 1 } },
         true,
       )

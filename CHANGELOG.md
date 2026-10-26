@@ -140,6 +140,16 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
 
 ### Fixed
 
+- **Build and Dev-Cycle keep going when qa finds gaps, instead of stopping at a status report.**
+  With Dynamic workflows on, a turn that ends while qa's checks fail, todos are still open, a
+  subagent step failed and can be retried, or a phase's work hasn't been checked yet now carries on
+  by itself: each gap becomes a todo, fix subagents are dispatched (in parallel where they don't
+  touch the same files) and qa runs again. The dim line shows where it stands, for example "Build
+  continued automatically (Working on 5 gaps · check: 1/6 passing)". It still stops for you at a
+  gate, a question, a permission, a missing secret or `.env` value, a budget or step limit, a step
+  that failed after 3 re-dispatches, or 3 tries without progress. Turning off auto-continue or
+  Dynamic workflows keeps the previous behaviour. <!-- XCOD-324 -->
+
 - **Quitting a TUI connected over HTTP (a sandbox, `lunos attach`) can no longer end in "Lunos
   stopped because of an unexpected error: AbortError".** The cancelled event stream could be
   reported as an unhandled error, which stopped Lunos before it handed a sandbox's results back and
