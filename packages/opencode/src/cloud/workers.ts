@@ -6,6 +6,7 @@ import { Audit } from "@opencode-ai/core/audit"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Offline } from "@opencode-ai/core/offline"
 import { AuditLog } from "@/audit/log"
+import { CloudAccountApi } from "./account-api"
 import { CloudAuth } from "./auth"
 import { CloudContract } from "./contract"
 
@@ -27,8 +28,12 @@ export class ServiceError extends Error {
   override name = "CloudServiceError"
   constructor(
     readonly status: number,
+    /** Contract v1's code (the nested `error.code`): `forbidden`, `spending_cap`, … */
     readonly code: string,
     message: string,
+    /** XCOD-317: lunoshq's stable top-level code where it sends one (`unverified`, `not_admitted`, …), and its `details`. */
+    readonly stable?: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message)
   }
@@ -120,20 +125,37 @@ async function call<A>(
         ? parsed.value.error.code
         : (CloudContract.ERRORS[response.status as keyof typeof CloudContract.ERRORS] ?? "error")
     const detail = parsed._tag === "Some" ? parsed.value.error.message.trim() || undefined : undefined
-    throw new ServiceError(response.status, code, explain(response.status, detail))
+    // XCOD-275/317: the top-level `{ code, details }` lunoshq adds, read as the account calls read it.
+    const found = parsed._tag === "Some" ? CloudAccountApi.refusal(json) : {}
+    throw new ServiceError(
+      response.status,
+      code,
+      explain(response.status, detail, found.code, found.details),
+      found.code,
+      found.details,
+    )
   }
   return Schema.decodeUnknownSync(schema)(json)
 }
 
-/** The service's own message, with what to do about the cases a user can act on. */
-export function explain(status: number, message: string | undefined) {
+/**
+ * The service's own message, with what to do about the cases a user can act on. XCOD-317: where the
+ * control plane sends a stable code (and `details.reason`), the next step is chosen by it, never by
+ * the message's words.
+ */
+export function explain(status: number, message: string | undefined, code?: string, details?: Record<string, unknown>) {
   // XCOD-237: a 402 is any billing refusal (no plan, payment failed, seats full, spending cap);
   // the control plane's message says which, so it is shown as is. Only without one is it guessed.
-  if (status === 402)
-    return (
+  if (status === 402) {
+    const said =
       message ??
       "Lunos Cloud refused the run for billing reasons (HTTP 402): check your plan, payment details and spending cap."
-    )
+    // No plan: the trial starts from here (the message names a web page).
+    return details?.reason === "no_plan" ? `${said} To start the trial from here, run lunos cloud quickstart.` : said
+  }
+  // Unverified, suspended, not admitted, Lunos Cloud full: plain words for the next step.
+  const next = status === 403 || status === 429 ? CloudAccountApi.explain(code, details) : undefined
+  if (next) return next
   const text = message ?? `HTTP ${status}`
   if (status === 401) return `${text} Run lunos login.`
   if (status === 429) return `${text} (too many cloud runs at once for your plan; wait for one to finish)`

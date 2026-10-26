@@ -1,0 +1,97 @@
+---
+title: Your first cloud run
+description: From a new Lunos account to a finished task on Lunos Cloud, in about ten minutes.
+# A draft until Lunos Cloud is open: production builds leave it out. Publishing it is an owner step.
+draft: true
+---
+
+Lunos Cloud runs a task on a cloud worker instead of your machine. The worker clones your repository, runs the agent and pushes what it changed to a new branch, `lunos/cloud/<id>`. It never touches your default branch.
+
+This page takes you from signing up to your first results branch. One command does most of it:
+
+```bash
+lunos cloud quickstart
+```
+
+:::note[Draft]
+Lunos Cloud is in beta. Until it's open to everyone, `cloud.endpoint` has no default: set it to the address you were given (`lunos settings set cloud.endpoint https://…`) before you start.
+:::
+
+---
+
+## What you need
+
+- Lunos, signed in or not. Quickstart signs you in if needed.
+- A git repository whose current commit is pushed. The worker starts from what's on your remote; Lunos never uploads your working tree.
+- For a private repository, or to get your results back, a git token for its host (quickstart asks for it).
+
+No repository at hand? Use the sample: [lunos-tech/cloud-hello](https://github.com/lunos-tech/cloud-hello). Fork it, clone your fork and run quickstart there.
+
+---
+
+## What quickstart does
+
+Run it in your repository:
+
+```bash
+cd my-repo
+lunos cloud quickstart
+```
+
+It goes through the same five steps as the checklist on the [console's](https://cloud.lunos.tech/console/) home page, and stops at the first one that needs you, saying what to do next.
+
+1. **Sign in.** Without a stored sign-in it opens the sign-in page. A new account is free; no card needed. Confirm your e-mail address from the e-mail Lunos sends you.
+2. **Choose a plan.** Cloud runs need a plan. Without one, quickstart offers the 14-day Pro trial and opens the checkout; it continues once the trial has started. If you're a member of an organisation, an owner can choose the Team plan for everyone instead.
+3. **Store a git token.** The worker clones and pushes with your own token for the repository's host. If none is stored yet, quickstart asks for it at a hidden prompt. For GitHub, a fine-grained token with **Contents** and **Pull requests** (read and write) on the repository is enough. It's stored encrypted on Lunos Cloud and never shown again.
+4. **Run a first task.** Quickstart proposes a safe one: it adds a single file, `LUNOS_CLOUD_HELLO.md`, that summarises the repository, and changes nothing else. Press enter to run it, or type your own task. Output streams to your terminal, as in a local run.
+5. **See the results branch.** When the run finishes, quickstart prints the branch, with a link to it on GitHub, GitLab or Codeberg, and how to fetch it:
+
+   ```bash
+   git fetch origin lunos/cloud/<id> && git diff HEAD..FETCH_HEAD
+   ```
+
+You can also give the task straight away:
+
+```bash
+lunos cloud quickstart "Add a farewell(name) function next to greet, with a test"
+```
+
+| Option                | What it does                                                                  |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `--yes`               | Run the proposed first task without asking.                                   |
+| `--dir <path>`        | The repository, if it isn't the current directory.                            |
+| `--no-browser`        | Print the sign-in and checkout links instead of opening them.                 |
+| `--model`             | As `lunos run --model`: the model the run uses.                               |
+| `--cloud-secret NAME` | As `lunos run --cloud-secret`: send this environment variable, such as a key. |
+
+In the TUI, after you sign in, the home screen offers **Try Lunos Cloud** once. `/cloud` runs quickstart in the same terminal and brings you back when it's done; `/cloud-hide` hides the offer. Either way it isn't shown again.
+
+---
+
+## When it stops
+
+Every refusal says what to do next. The common ones:
+
+| What you see                                                           | What to do                                                                                      |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Confirm your e-mail address first                                      | Open the link in the e-mail Lunos sent you. The console can send it again.                      |
+| Cloud runs need a plan                                                 | Start the trial (quickstart offers it), or ask an owner of your organisation for the Team plan. |
+| No git token is stored for `<host>`                                    | `lunos cloud git-token set <host>`, or let quickstart ask for it.                               |
+| Your commit isn't on the remote yet                                    | `git push`, then run quickstart again.                                                          |
+| Lunos Cloud has too many cloud runs at once right now                  | Try again in a few minutes. Nothing was started or billed.                                      |
+| Your plan already has as many cloud runs at once as it allows          | Wait for one of your runs to finish.                                                            |
+| Your last payment failed                                               | Update your payment details in the billing portal.                                              |
+| This organisation or account is suspended, or your account is disabled | Contact Lunos support. Local Lunos keeps working.                                               |
+| Lunos Cloud isn't open to your account yet                             | Lunos Cloud is in beta; you'll be able to run once it is. Local Lunos is unaffected.            |
+
+---
+
+## After the first run
+
+Any task runs the same way:
+
+```bash
+lunos run --cloud "Add input validation to parse.ts"
+```
+
+See [Cloud workers](https://github.com/AxsionDev/Lunos/blob/dev/docs/cloud-workers.md) for worker sizes, secrets, what leaves your machine and what doesn't, and data residency.
