@@ -214,6 +214,8 @@ export const dict = {
   "dialog.model.select.title": "Sélectionner un modèle",
   "dialog.model.search.placeholder": "Rechercher des modèles",
   "dialog.model.empty": "Aucun résultat de modèle",
+  "dialog.model.recommended.noEu":
+    "Aucun modèle hébergé dans l'UE n'a encore réussi l'évaluation de Lunos : rien n'est donc recommandé avec votre politique UE uniquement.",
   "dialog.model.manage": "Gérer les modèles",
   "dialog.model.manage.description": "Personnalisez les modèles qui apparaissent dans le sélecteur.",
   "dialog.model.manage.provider.toggle": "Activer ou désactiver tous les modèles {{provider}}",

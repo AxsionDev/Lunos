@@ -204,6 +204,7 @@ export const dict = {
   "dialog.model.select.title": "ሞዴል ምረጥ",
   "dialog.model.search.placeholder": "የፍለጋ ሞዴሎች",
   "dialog.model.empty": "ምንም የሞዴል ውጤቶች የሉም",
+  "dialog.model.recommended.noEu": "እስካሁን በአውሮፓ ህብረት የተስተናገደ ሞዴል የLunos ግምገማን አላለፈም፣ ስለዚህ በEU-ብቻ ፖሊሲዎ ስር የሚመከር የለም።",
   "dialog.model.manage": "ሞዴሎችን አስተዳድር",
   "dialog.model.manage.description": "በሞዴል መራጭ ውስጥ የትኞቹ ሞዴሎች እንደሚታዩ አብጅ።",
   "dialog.model.manage.provider.toggle": "ሁሉንም {{provider}} ሞዴሎች ቀያይር",

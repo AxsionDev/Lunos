@@ -37,6 +37,15 @@ tasks on EU, self-hosted and frontier models, and what that costs. Results are p
 4. `bun src/cli.ts run --config eval.config.json --tasks <n>` shows the estimate and stops. Add
    `--yes` to spend.
 
+The estimate is checked against what's **left** of each cap after earlier runs under the same
+`budget.name` (the ledger), so a run that the remaining budget can't pay for doesn't start.
+
+`eval.eu.json` is the committed config for the EU campaign (XCOD-320): Mistral through its EU
+endpoint (`api.eu.mistral.ai`; the global `api.mistral.ai` isn't EU) and STACKIT AI Model Serving
+(eu01, Germany), each model in its own budget class, €60 in total. Its prices need re-checking
+before a paid run. Smoke runs use a one-model copy of it that keeps `budget.name` `eu-2026-11`, so
+their spend counts against the same €60.
+
 Needs Docker and [uv](https://docs.astral.sh/uv/) (Harbor runs with `uvx --from harbor`).
 `--agent oracle` runs the whole pipeline with Harbor's reference-solution agent instead of Lunos,
 at no cost; `--report <file>` writes the report somewhere other than `specs/eval/`. Its report is

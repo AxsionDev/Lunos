@@ -1,5 +1,5 @@
 import { Popover as Kobalte } from "@kobalte/core/popover"
-import { Component, ComponentProps, createEffect, createMemo, For, JSX, Show } from "solid-js"
+import { Component, ComponentProps, createEffect, createMemo, createSignal, For, JSX, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -23,7 +23,15 @@ import { createMenuDismissController } from "@/utils/menu-dismiss-controller"
 import { createEventListener } from "@solid-primitives/event-listener"
 import { matchesModelSearch } from "./dialog-select-model-search"
 import { showToast } from "@/utils/toast"
-import { matchesModelFilter, ModelFilterChips, useModelFilter, useModelFilterLabels } from "./model-filter"
+import {
+  matchesModelFilter,
+  ModelFilterChips,
+  useModelFilter,
+  useModelFilterLabels,
+  type ModelFilter,
+} from "./model-filter"
+import { useServerSync } from "@/context/server-sync"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
 
 const isFree = (provider: string, cost: { input: number } | undefined) =>
   provider === "opencode" && (!cost || cost.input === 0)
@@ -68,6 +76,16 @@ const filterModels = (
     .filter((m) => matchesModelFilter(m, filter))
 const manageKey = "action:manage"
 
+/** XCOD-320: an empty Recommended list under an EU-only policy says why, not just "no results". */
+function useEmptyModelMessage() {
+  const language = useLanguage()
+  const serverSync = useServerSync()
+  return (filter: ModelFilter, search: string) =>
+    filter === "recommended" && !search.trim() && Jurisdiction.euOnly(serverSync().data.config.residency)
+      ? language.t("dialog.model.recommended.noEu")
+      : language.t("dialog.model.empty")
+}
+
 const sortModelGroups = (a: { category: string; items: ModelItem[] }, b: { category: string; items: ModelItem[] }) => {
   if (hasBlocked(a.items) !== hasBlocked(b.items)) return hasBlocked(a.items) ? 1 : -1
   const aIndex = popularProviders.indexOf(a.category)
@@ -92,6 +110,8 @@ const ModelList: Component<{
   const language = useLanguage()
   const filter = useModelFilter()
   const sizeLabel = useModelFilterLabels()
+  const emptyMessage = useEmptyModelMessage()
+  const [search, setSearch] = createSignal("")
 
   const models = createMemo(() =>
     filterModels(model.list(), model, filter.get()).filter((m) =>
@@ -112,7 +132,8 @@ const ModelList: Component<{
           </>
         ),
       }}
-      emptyMessage={language.t("dialog.model.empty")}
+      emptyMessage={emptyMessage(filter.get(), search())}
+      onFilter={setSearch}
       key={(x) => `${x.provider.id}:${x.id}`}
       items={models}
       current={model.current()}
@@ -358,6 +379,7 @@ function ModelSelectorPopoverV2View(props: {
 }) {
   const language = useLanguage()
   const sizeLabel = useModelFilterLabels()
+  const emptyMessage = useEmptyModelMessage()
   const [store, setStore] = createStore({ open: false, search: "", active: "" })
   let searchRef: HTMLInputElement | undefined
   let contentRef: HTMLDivElement | undefined
@@ -500,8 +522,8 @@ function ModelSelectorPopoverV2View(props: {
               <Show
                 when={models().length > 0}
                 fallback={
-                  <div class="flex h-12 items-center px-3 text-[13px] font-[440] leading-5 tracking-[-0.04px] text-v2-text-text-faint">
-                    {language.t("dialog.model.empty")}
+                  <div class="flex min-h-12 items-center px-3 py-2 text-[13px] font-[440] leading-5 tracking-[-0.04px] text-v2-text-text-faint">
+                    {emptyMessage(props.filter.get(), store.search)}
                   </div>
                 }
               >

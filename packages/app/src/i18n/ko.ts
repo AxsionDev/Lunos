@@ -107,6 +107,8 @@ export const dict = {
   "dialog.model.select.title": "모델 선택",
   "dialog.model.search.placeholder": "모델 검색",
   "dialog.model.empty": "모델 결과 없음",
+  "dialog.model.recommended.noEu":
+    "아직 Lunos 평가를 통과한 EU 호스팅 모델이 없어 EU 전용 정책에서는 추천 모델이 없습니다.",
   "dialog.model.manage": "모델 관리",
   "dialog.model.manage.description": "모델 선택기에 표시할 모델 사용자 지정",
   "dialog.model.manage.provider.toggle": "모든 {{provider}} 모델 토글",

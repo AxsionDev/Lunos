@@ -115,6 +115,8 @@ export const dict = {
   "dialog.model.select.title": "Modell auswählen",
   "dialog.model.search.placeholder": "Modelle durchsuchen",
   "dialog.model.empty": "Keine Modellergebnisse",
+  "dialog.model.recommended.noEu":
+    "Noch kein in der EU gehostetes Modell hat die Lunos-Evaluierung bestanden, daher wird unter deiner Nur-EU-Richtlinie nichts empfohlen.",
   "dialog.model.manage": "Modelle verwalten",
   "dialog.model.manage.description": "Anpassen, welche Modelle in der Modellauswahl erscheinen.",
   "dialog.model.manage.provider.toggle": "Alle {{provider}}-Modelle umschalten",

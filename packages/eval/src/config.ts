@@ -16,6 +16,12 @@ export type ModelConfig = {
   trials: number
   /** Residency policy for this model's runs (XCOD-119 §6). EU models allow only "eu". */
   residency: string[]
+  /**
+   * XCOD-320: the model's token limits, for a model Lunos's catalogue doesn't know. Without them Lunos
+   * asks for up to 32000 output tokens, which a provider with a lower cap (STACKIT: 8192–16384)
+   * rejects on every request.
+   */
+  limit?: { context: number; output: number }
 }
 
 export type EvalConfig = {

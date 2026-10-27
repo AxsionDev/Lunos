@@ -212,6 +212,8 @@ export const dict = {
   "dialog.model.select.title": "ماڈل چنو",
   "dialog.model.search.placeholder": "ماڈل لبھو",
   "dialog.model.empty": "کوئی ماڈل نئیں لبھیا",
+  "dialog.model.recommended.noEu":
+    "ਹਾਲੇ ਤੱਕ ਕਿਸੇ ਵੀ EU-ਹੋਸਟ ਕੀਤੇ ਮਾਡਲ ਨੇ Lunos ਦਾ ਮੁਲਾਂਕਣ ਪਾਸ ਨਹੀਂ ਕੀਤਾ, ਇਸ ਲਈ ਤੁਹਾਡੀ ਸਿਰਫ਼-EU ਨੀਤੀ ਹੇਠ ਕੁਝ ਵੀ ਸਿਫ਼ਾਰਸ਼ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।",
   "dialog.model.manage": "ماڈل دا انتظام کرو",
   "dialog.model.manage.description": "ماڈل سلیکٹر وچ کیہڑے ماڈل دکھائی دیندے نیں، اپنی مرضی دے مطابق بناؤ۔",
   "dialog.model.manage.provider.toggle": "{{provider}} دے سارے ماڈل ٹوگل کرو",

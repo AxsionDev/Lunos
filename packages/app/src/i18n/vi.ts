@@ -213,6 +213,8 @@ export const dict = {
   "dialog.model.select.title": "Chọn mô hình",
   "dialog.model.search.placeholder": "Tìm kiếm mô hình",
   "dialog.model.empty": "Không có kết quả mô hình",
+  "dialog.model.recommended.noEu":
+    "Chưa có mô hình nào lưu trữ tại EU vượt qua đánh giá của Lunos, nên không có mô hình được đề xuất theo chính sách chỉ EU của bạn.",
   "dialog.model.manage": "Quản lý mô hình",
   "dialog.model.manage.description": "Tùy chỉnh mô hình nào xuất hiện trong bộ chọn mô hình.",
   "dialog.model.manage.provider.toggle": "Bật/tắt tất cả mô hình {{provider}}",

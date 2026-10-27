@@ -120,6 +120,8 @@ export const dict = {
   "dialog.model.select.title": "Vælg model",
   "dialog.model.search.placeholder": "Søg modeller",
   "dialog.model.empty": "Ingen modeller fundet",
+  "dialog.model.recommended.noEu":
+    "Ingen EU-hostet model har bestået Lunos' evaluering endnu, så intet anbefales under din politik om kun EU.",
   "dialog.model.manage": "Administrer modeller",
   "dialog.model.manage.description": "Tilpas hvilke modeller der vises i modelvælgeren.",
   "dialog.model.manage.provider.toggle": "Skift alle {{provider}}-modeller",

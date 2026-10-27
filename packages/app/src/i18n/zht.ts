@@ -225,6 +225,7 @@ export const dict = {
   "dialog.model.select.title": "選擇模型",
   "dialog.model.search.placeholder": "搜尋模型",
   "dialog.model.empty": "找不到模型",
+  "dialog.model.recommended.noEu": "目前還沒有託管在歐盟的模型通過 Lunos 評估，因此在僅限歐盟的政策下沒有推薦模型。",
   "dialog.model.manage": "管理模型",
   "dialog.model.manage.description": "自訂模型選擇器中顯示的模型。",
   "dialog.model.manage.provider.toggle": "切換所有 {{provider}} 模型",

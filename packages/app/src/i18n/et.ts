@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Valige mudel",
   "dialog.model.search.placeholder": "Otsige mudeleid",
   "dialog.model.empty": "Mudelitulemusi pole",
+  "dialog.model.recommended.noEu":
+    "Ükski EL-is majutatud mudel pole veel Lunose hindamist läbinud, seega ainult EL-i poliitika korral ei soovitata midagi.",
   "dialog.model.manage": "Hallake mudeleid",
   "dialog.model.manage.description": "Kohandage, millised mudelid mudelivalijas kuvatakse.",
   "dialog.model.manage.provider.toggle": "Lülitab kõik {{provider}} mudelid sisse",

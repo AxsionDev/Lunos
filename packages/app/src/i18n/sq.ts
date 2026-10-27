@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Zgjidhni modelin",
   "dialog.model.search.placeholder": "Kërko modele",
   "dialog.model.empty": "Asnjë rezultat modeli",
+  "dialog.model.recommended.noEu":
+    "Asnjë model i strehuar në BE nuk e ka kaluar ende vlerësimin e Lunos, prandaj me politikën vetëm BE nuk rekomandohet asgjë.",
   "dialog.model.manage": "Menaxhoni modelet",
   "dialog.model.manage.description": "Personalizo cilat modele shfaqen në përzgjedhësin e modelit.",
   "dialog.model.manage.provider.toggle": "Ndrysho të gjitha modelet {{provider}}",

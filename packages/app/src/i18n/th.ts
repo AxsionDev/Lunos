@@ -221,6 +221,8 @@ export const dict = {
   "dialog.model.select.title": "เลือกโมเดล",
   "dialog.model.search.placeholder": "ค้นหาโมเดล",
   "dialog.model.empty": "ไม่พบผลลัพธ์โมเดล",
+  "dialog.model.recommended.noEu":
+    "ยังไม่มีโมเดลที่โฮสต์ใน EU ผ่านการประเมินของ Lunos จึงไม่มีโมเดลแนะนำภายใต้นโยบายเฉพาะ EU ของคุณ",
   "dialog.model.manage": "จัดการโมเดล",
   "dialog.model.manage.description": "ปรับแต่งโมเดลที่จะปรากฏในตัวเลือกโมเดล",
   "dialog.model.manage.provider.toggle": "สลับโมเดลทั้งหมดของ {{provider}}",

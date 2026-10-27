@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Model saýlaň",
   "dialog.model.search.placeholder": "Gözleg modelleri",
   "dialog.model.empty": "Hiç hili model netijesi ýok",
+  "dialog.model.recommended.noEu":
+    "Entek ÝB-de ýerleşdirilen hiç bir model Lunos bahalandyrmasyndan geçmedi, şonuň üçin diňe ÝB syýasatyňyzda hiç zat maslahat berilmeýär.",
   "dialog.model.manage": "Modelleri dolandyryň",
   "dialog.model.manage.description": "Model saýlaýjysynda haýsy modelleriň peýda bolýandygyny düzüň.",
   "dialog.model.manage.provider.toggle": "Zhli {{provider}} modellerini üýtgediň",

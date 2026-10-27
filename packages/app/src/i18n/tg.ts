@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Модели интихоб кунед",
   "dialog.model.search.placeholder": "Ҷустуҷӯи моделҳо",
   "dialog.model.empty": "Натоиҷи модел нест",
+  "dialog.model.recommended.noEu":
+    "Ҳоло ягон модели дар ИА ҷойгиршуда аз арзёбии Lunos нагузаштааст, бинобар ин дар сиёсати танҳо ИА чизе тавсия дода намешавад.",
   "dialog.model.manage": "Моделҳоро идора кунед",
   "dialog.model.manage.description": "Муайян кунед, ки кадом моделҳо дар интихоби модел пайдо мешаванд.",
   "dialog.model.manage.provider.toggle": "Ҳама моделҳои {{provider}}-ро иваз кунед",

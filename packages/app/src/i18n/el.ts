@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Επιλογή μοντέλου",
   "dialog.model.search.placeholder": "Αναζήτηση μοντέλων",
   "dialog.model.empty": "Δεν υπάρχουν αποτελέσματα μοντέλου",
+  "dialog.model.recommended.noEu":
+    "Κανένα μοντέλο που φιλοξενείται στην ΕΕ δεν έχει περάσει ακόμη την αξιολόγηση του Lunos, οπότε με την πολιτική «μόνο ΕΕ» δεν προτείνεται τίποτα.",
   "dialog.model.manage": "Διαχείριση μοντέλων",
   "dialog.model.manage.description": "Προσαρμογή των μοντέλων που εμφανίζονται στον επιλογέα μοντέλων.",
   "dialog.model.manage.provider.toggle": "Εναλλαγή όλων των {{provider}} μοντέλων",

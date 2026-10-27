@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Selectează modelul",
   "dialog.model.search.placeholder": "Caută modele",
   "dialog.model.empty": "Niciun model găsit",
+  "dialog.model.recommended.noEu":
+    "Niciun model găzduit în UE nu a trecut încă evaluarea Lunos, așa că, cu politica doar UE, nu este recomandat nimic.",
   "dialog.model.manage": "Gestionează modelele",
   "dialog.model.manage.description": "Personalizează ce modele apar în selectorul de modele.",
   "dialog.model.manage.provider.toggle": "Activează toate modelele {{provider}}",

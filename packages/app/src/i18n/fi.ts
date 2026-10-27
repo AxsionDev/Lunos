@@ -111,6 +111,8 @@ export const dict = {
   "dialog.model.select.title": "Valitse malli",
   "dialog.model.search.placeholder": "Hae malleja",
   "dialog.model.empty": "Ei mallituloksia",
+  "dialog.model.recommended.noEu":
+    "Mikään EU:ssa isännöity malli ei ole vielä läpäissyt Lunosin arviointia, joten vain EU -käytännölläsi mitään ei suositella.",
   "dialog.model.manage": "Hallitse malleja",
   "dialog.model.manage.description": "Mukauta, mitkä mallit näkyvät mallivalitsimessa.",
   "dialog.model.manage.provider.toggle": "Ota kaikki palveluntarjoajan {{provider}} mallit käyttöön tai pois käytöstä",

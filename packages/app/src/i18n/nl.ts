@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Selecteer model",
   "dialog.model.search.placeholder": "Zoek modellen",
   "dialog.model.empty": "Geen modelresultaten",
+  "dialog.model.recommended.noEu":
+    "Nog geen in de EU gehost model is door de evaluatie van Lunos gekomen, dus onder je EU-only-beleid wordt niets aanbevolen.",
   "dialog.model.manage": "Beheer modellen",
   "dialog.model.manage.description": "Pas aan welke modellen in de modelkiezer verschijnen.",
   "dialog.model.manage.provider.toggle": "Alle {{provider}}-modellen in- of uitschakelen",

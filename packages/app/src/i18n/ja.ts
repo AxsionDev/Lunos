@@ -212,6 +212,8 @@ export const dict = {
   "dialog.model.select.title": "モデルを選択",
   "dialog.model.search.placeholder": "モデルを検索",
   "dialog.model.empty": "モデルが見つかりません",
+  "dialog.model.recommended.noEu":
+    "Lunos の評価に合格した EU ホストのモデルはまだないため、EU 限定ポリシーでは推奨モデルはありません。",
   "dialog.model.manage": "モデルを管理",
   "dialog.model.manage.description": "モデルセレクターに表示するモデルをカスタマイズします。",
   "dialog.model.manage.provider.toggle": "すべての{{provider}}モデルを切り替え",
