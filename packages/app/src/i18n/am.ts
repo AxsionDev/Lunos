@@ -1216,6 +1216,8 @@ export const dict = {
   "sessions.bulk.unarchive": "ከማህደር አውጣ",
   "sessions.bulk.deleteArchived": "በማህደር የተቀመጡትን ሰርዝ",
   "sessions.bulk.failed": "ማቆም አልተቻለም: {{reason}}",
+  "sessions.rename.failed": "ስሙን መቀየር አልተቻለም፦ {{reason}}",
+  "sessions.rename.deleted": "ክፍለ-ጊዜው ተሰርዟል",
   "sessions.bulk.stop.question.one": "{{count}} ክፍለ ጊዜ ይቁም?",
   "sessions.bulk.stop.question.other": "{{count}} ክፍለ ጊዜ ይቁም?",
   "sessions.bulk.stop.running": "በመሄድ ላይ: {{count}}",

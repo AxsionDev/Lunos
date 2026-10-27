@@ -1257,6 +1257,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Arxivdən çıxar",
   "sessions.bulk.deleteArchived": "Arxivləşdirilmişləri sil",
   "sessions.bulk.failed": "Dayandırmaq mümkün olmadı: {{reason}}",
+  "sessions.rename.failed": "Adı dəyişmək mümkün olmadı: {{reason}}",
+  "sessions.rename.deleted": "sessiya silinib",
   "sessions.bulk.stop.question.one": "{{count}} sessiya dayandırılsın?",
   "sessions.bulk.stop.question.other": "{{count}} sessiya dayandırılsın?",
   "sessions.bulk.stop.running": "İşləyir: {{count}}",

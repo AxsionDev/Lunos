@@ -1269,6 +1269,8 @@ export const dict = {
   "sessions.bulk.unarchive": "އާކައިވުން ނަގާ",
   "sessions.bulk.deleteArchived": "އާކައިވްކުރެވިފައިވާ ތަކެތި ފޮހެލާ",
   "sessions.bulk.failed": "ހުއްޓާނުލެވުނު: {{reason}}",
+  "sessions.rename.failed": "ނަން ބަދަލުކުރެވޭނެތް: {{reason}}",
+  "sessions.rename.deleted": "ސެޝަން ފޮހެވިއްޖެ",
   "sessions.bulk.stop.question.one": "ސެޝަންތައް ހުއްޓާލަންވީތަ؟ ({{count}})",
   "sessions.bulk.stop.question.other": "ސެޝަންތައް ހުއްޓާލަންވީތަ؟ ({{count}})",
   "sessions.bulk.stop.running": "ދުވަނީ: {{count}}",

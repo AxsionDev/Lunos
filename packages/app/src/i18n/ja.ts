@@ -1260,6 +1260,8 @@ export const dict = {
   "sessions.bulk.unarchive": "アーカイブ解除",
   "sessions.bulk.deleteArchived": "アーカイブ済みを削除",
   "sessions.bulk.failed": "停止できませんでした: {{reason}}",
+  "sessions.rename.failed": "名前を変更できませんでした: {{reason}}",
+  "sessions.rename.deleted": "セッションは削除されました",
   "sessions.bulk.stop.question.one": "{{count}} 件のセッションを停止しますか?",
   "sessions.bulk.stop.question.other": "{{count}} 件のセッションを停止しますか?",
   "sessions.bulk.stop.running": "実行中 {{count}} 件",

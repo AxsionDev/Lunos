@@ -1253,6 +1253,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Hiq nga arkivi",
   "sessions.bulk.deleteArchived": "Fshi të arkivuarat",
   "sessions.bulk.failed": "Nuk u ndal dot: {{reason}}",
+  "sessions.rename.failed": "Riemërtimi dështoi: {{reason}}",
+  "sessions.rename.deleted": "seanca u fshi",
   "sessions.bulk.stop.question.one": "Të ndalohet {{count}} sesion?",
   "sessions.bulk.stop.question.other": "Të ndalohen {{count}} sesione?",
   "sessions.bulk.stop.running": "Në ekzekutim: {{count}}",

@@ -1252,6 +1252,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Atarhivēt",
   "sessions.bulk.deleteArchived": "Dzēst arhivētās",
   "sessions.bulk.failed": "Neizdevās apturēt: {{reason}}",
+  "sessions.rename.failed": "Neizdevās pārdēvēt: {{reason}}",
+  "sessions.rename.deleted": "sesija ir izdzēsta",
   "sessions.bulk.stop.question.one": "Apturēt {{count}} sesiju?",
   "sessions.bulk.stop.question.zero": "Apturēt {{count}} sesiju?",
   "sessions.bulk.stop.question.other": "Apturēt {{count}} sesijas?",

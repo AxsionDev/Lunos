@@ -1239,6 +1239,8 @@ export const dict = {
   "sessions.bulk.unarchive": "ເອົາອອກຈາກການຈັດເກັບ",
   "sessions.bulk.deleteArchived": "ລຶບທີ່ຈັດເກັບແລ້ວ",
   "sessions.bulk.failed": "ບໍ່ສາມາດຢຸດໄດ້: {{reason}}",
+  "sessions.rename.failed": "ປ່ຽນຊື່ບໍ່ໄດ້: {{reason}}",
+  "sessions.rename.deleted": "ເຊດຊັນຖືກລຶບແລ້ວ",
   "sessions.bulk.stop.question.one": "ຢຸດ {{count}} ເຊດຊັນບໍ?",
   "sessions.bulk.stop.question.other": "ຢຸດ {{count}} ເຊດຊັນບໍ?",
   "sessions.bulk.stop.running": "ກຳລັງເຮັດວຽກ: {{count}}",

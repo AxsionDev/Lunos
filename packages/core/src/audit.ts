@@ -109,6 +109,10 @@ export const EVENTS = [
   "session.stop",
   "session.archive",
   "session.delete",
+  // XCOD-325: a session renamed (or its name cleared, back to the automatic title) from any view:
+  // origin, session id, kind ("session", "external") and whether it was cleared. Never the name.
+  // The Lunos that stores it audits it, so a rename of another Lunos's session is audited there.
+  "session.rename",
   // XCOD-288: a background command (dev server, watcher) the agent started, and why it stopped
   // (agent, turn_end, session_deleted, instance_disposed, expired). Id, session, pid and the command
   // line, like `tool.run`; never its output.

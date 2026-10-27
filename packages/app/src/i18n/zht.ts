@@ -1312,6 +1312,8 @@ export const dict = {
   "sessions.bulk.unarchive": "取消封存",
   "sessions.bulk.deleteArchived": "刪除已封存",
   "sessions.bulk.failed": "無法停止：{{reason}}",
+  "sessions.rename.failed": "無法重新命名：{{reason}}",
+  "sessions.rename.deleted": "工作階段已被刪除",
   "sessions.bulk.stop.question.one": "要停止 {{count}} 個工作階段嗎？",
   "sessions.bulk.stop.question.other": "要停止 {{count}} 個工作階段嗎？",
   "sessions.bulk.stop.running": "{{count}} 個執行中",

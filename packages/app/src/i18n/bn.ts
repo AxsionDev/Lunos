@@ -1241,6 +1241,8 @@ export const dict: Record<string, string> = {
   "sessions.bulk.unarchive": "আর্কাইভ থেকে সরান",
   "sessions.bulk.deleteArchived": "আর্কাইভ করা মুছুন",
   "sessions.bulk.failed": "থামানো যায়নি: {{reason}}",
+  "sessions.rename.failed": "নাম বদলানো যায়নি: {{reason}}",
+  "sessions.rename.deleted": "সেশনটি মুছে ফেলা হয়েছে",
   "sessions.bulk.stop.question.one": "{{count}} সেশন থামাবেন?",
   "sessions.bulk.stop.question.other": "{{count}} সেশন থামাবেন?",
   "sessions.bulk.stop.running": "চলছে: {{count}}",

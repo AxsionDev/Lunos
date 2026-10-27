@@ -70,6 +70,15 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
   Lunos name. <!-- XCOD-308 -->
 
+- **Rename any session in "Sessions on this computer", including Claude Code and Codex ones.** Every
+  row of `/sessions`, the Agent Monitor and the Sessions window (desktop and web) can be renamed now,
+  archived ones too: a session running in another Lunos window (that window shows the new name right
+  away), and a Claude Code or Codex session Lunos started (only its name in Lunos changes; the tool's
+  own session is left alone). In the Sessions window, use the row's Rename button, double-click its
+  title, or right-click the row; Enter saves and Esc cancels. If a name can't be saved, because the
+  session was deleted or the other Lunos window isn't responding, the row says why and keeps its old
+  name. <!-- XCOD-325 -->
+
 - **See your sessions by project.** `/sessions` and the Agent Monitor's list switch between their
   usual layout and one section per project with `ctrl+y` or a click on the view switch in the
   header; the desktop and web Sessions window gains **By project** next to By status and By group.

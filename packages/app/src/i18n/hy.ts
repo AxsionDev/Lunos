@@ -1258,6 +1258,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Հանել արխիվից",
   "sessions.bulk.deleteArchived": "Ջնջել արխիվացվածները",
   "sessions.bulk.failed": "Չհաջողվեց կանգնեցնել՝ {{reason}}",
+  "sessions.rename.failed": "Չհաջողվեց վերանվանել՝ {{reason}}",
+  "sessions.rename.deleted": "աշխատաշրջանը ջնջվել է",
   "sessions.bulk.stop.question.one": "Կանգնեցնե՞լ {{count}} նիստ",
   "sessions.bulk.stop.question.other": "Կանգնեցնե՞լ {{count}} նիստ",
   "sessions.bulk.stop.running": "Աշխատում է՝ {{count}}",

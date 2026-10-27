@@ -1253,6 +1253,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Obnovit z archivu",
   "sessions.bulk.deleteArchived": "Odstranit archivované",
   "sessions.bulk.failed": "Nelze zastavit: {{reason}}",
+  "sessions.rename.failed": "Přejmenování se nezdařilo: {{reason}}",
+  "sessions.rename.deleted": "relace byla smazána",
   "sessions.bulk.stop.question.one": "Zastavit {{count}} relaci?",
   "sessions.bulk.stop.question.few": "Zastavit {{count}} relace?",
   "sessions.bulk.stop.question.many": "Zastavit {{count}} relace?",

@@ -1248,6 +1248,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Taka úr geymslu",
   "sessions.bulk.deleteArchived": "Eyða geymdum",
   "sessions.bulk.failed": "Ekki tókst að stöðva: {{reason}}",
+  "sessions.rename.failed": "Ekki tókst að endurnefna: {{reason}}",
+  "sessions.rename.deleted": "lotunni var eytt",
   "sessions.bulk.stop.question.one": "Stöðva {{count}} setu?",
   "sessions.bulk.stop.question.other": "Stöðva {{count}} setur?",
   "sessions.bulk.stop.running": "Í gangi: {{count}}",

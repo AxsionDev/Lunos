@@ -1260,6 +1260,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Bỏ lưu trữ",
   "sessions.bulk.deleteArchived": "Xóa mục đã lưu trữ",
   "sessions.bulk.failed": "Không thể dừng: {{reason}}",
+  "sessions.rename.failed": "Không thể đổi tên: {{reason}}",
+  "sessions.rename.deleted": "phiên đã bị xóa",
   "sessions.bulk.stop.question.one": "Dừng {{count}} phiên?",
   "sessions.bulk.stop.question.other": "Dừng {{count}} phiên?",
   "sessions.bulk.stop.running": "{{count}} đang chạy",

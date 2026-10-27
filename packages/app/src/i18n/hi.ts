@@ -1254,6 +1254,8 @@ export const dict = {
   "sessions.bulk.unarchive": "संग्रह से निकालें",
   "sessions.bulk.deleteArchived": "संग्रहीत हटाएँ",
   "sessions.bulk.failed": "रोका नहीं जा सका: {{reason}}",
+  "sessions.rename.failed": "नाम नहीं बदला जा सका: {{reason}}",
+  "sessions.rename.deleted": "सत्र हटा दिया गया",
   "sessions.bulk.stop.question.one": "{{count}} सेशन रोकें?",
   "sessions.bulk.stop.question.other": "{{count}} सेशन रोकें?",
   "sessions.bulk.stop.running": "चल रहे: {{count}}",

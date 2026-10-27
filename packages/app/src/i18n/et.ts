@@ -1242,6 +1242,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Taasta arhiivist",
   "sessions.bulk.deleteArchived": "Kustuta arhiveeritud",
   "sessions.bulk.failed": "Peatamine ebaõnnestus: {{reason}}",
+  "sessions.rename.failed": "Ümbernimetamine ebaõnnestus: {{reason}}",
+  "sessions.rename.deleted": "seanss on kustutatud",
   "sessions.bulk.stop.question.one": "Kas peatada {{count}} seanss?",
   "sessions.bulk.stop.question.other": "Kas peatada {{count}} seanssi?",
   "sessions.bulk.stop.running": "Töötab: {{count}}",

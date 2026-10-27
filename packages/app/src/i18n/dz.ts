@@ -1271,6 +1271,8 @@ export const dict: Record<string, string> = {
   "sessions.bulk.unarchive": "གཏན་མཛོད་ནང་ལས་ཕྱིར་འཐེན",
   "sessions.bulk.deleteArchived": "གཏན་མཛོད་བཏོན་གཏང",
   "sessions.bulk.failed": "བཀག་མ་ཚུགས: {{reason}}",
+  "sessions.rename.failed": "མིང་སོར་མ་ཚུགས། {{reason}}",
+  "sessions.rename.deleted": "ལཱ་ཡུན་བཏོན་བཏང་ཡོདཔ།",
   "sessions.bulk.stop.question.one": "ལཱ་ཡུན་བཀག་ནི་ཨིན་ན? ({{count}})",
   "sessions.bulk.stop.question.other": "ལཱ་ཡུན་བཀག་ནི་ཨིན་ན? ({{count}})",
   "sessions.bulk.stop.running": "གཡོག་བཀོལ་དོ: {{count}}",

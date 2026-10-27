@@ -20,7 +20,7 @@ beforeAll(async () => {
     const { SessionPeerControl } = await import(${src("peer-control.ts")})
     SessionPeerControl.useHandler(async (request) => {
       const url = new URL(request.url)
-      const body = request.method === "POST" ? await request.text() : ""
+      const body = request.method !== "GET" ? await request.text() : ""
       console.log(JSON.stringify({ method: request.method, path: url.pathname, directory: url.searchParams.get("directory"), body }))
       if (url.pathname === "/permission")
         return Response.json([{ id: "per_1", sessionID: "ses_a" }, { id: "per_other", sessionID: "ses_b" }])
@@ -138,6 +138,31 @@ describe("SessionPeerControl (XCOD-234)", () => {
     // A session the other process doesn't run is never driven from there.
     await expect(
       SessionPeerControl.call("ses_nobody", "/prompt", { method: "POST", body: { text: "hi" } }),
+    ).rejects.toMatchObject({ status: 404 })
+  })
+
+  test("XCOD-325: a rename is stored by the process that runs the session, through its own session route", async () => {
+    expect(
+      await SessionPeerControl.call("ses_a", "/rename", {
+        method: "POST",
+        body: { title: "Named in the other window" },
+      }),
+    ).toBe(true)
+    expect(last()).toEqual({
+      method: "PATCH",
+      path: "/session/ses_a",
+      directory: "/work/a",
+      body: JSON.stringify({ title: "Named in the other window" }),
+    })
+    // Empty is a rename too (the automatic name comes back); anything but text isn't.
+    await SessionPeerControl.call("ses_a", "/rename", { method: "POST", body: { title: "" } })
+    expect(last()).toMatchObject({ method: "PATCH", body: JSON.stringify({ title: "" }) })
+    for (const body of [{}, { title: 42 }, { title: "x".repeat(1_001) }])
+      await expect(SessionPeerControl.call("ses_a", "/rename", { method: "POST", body })).rejects.toMatchObject({
+        status: 400,
+      })
+    await expect(
+      SessionPeerControl.call("ses_nobody", "/rename", { method: "POST", body: { title: "x" } }),
     ).rejects.toMatchObject({ status: 404 })
   })
 

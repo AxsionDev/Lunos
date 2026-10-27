@@ -1,5 +1,6 @@
 export * as ExternalRegistry from "./registry"
 
+import { mkdirSync, watch, type FSWatcher } from "fs"
 import fs from "fs/promises"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
@@ -24,14 +25,28 @@ export interface Entry {
   turns?: number
   /** XCOD-265: when it was cleared from /sessions (hidden, restorable). */
   archived?: string
+  /**
+   * XCOD-325: the name the user gave it in Lunos (/sessions, the Sessions window). Lunos's own; the
+   * tool's session id and files are untouched. None: the automatic "Claude Code · folder".
+   */
+  title?: string
 }
 
 const dir = () => path.join(Global.Path.data, "external")
 const file = (id: string) => path.join(dir(), `${id.replace(/[^A-Za-z0-9_-]/g, "_")}.json`)
 
-export async function save(entry: Entry) {
+async function write(entry: Entry) {
   await fs.mkdir(dir(), { recursive: true })
   await fs.writeFile(file(entry.sessionID), JSON.stringify(entry, null, 2))
+}
+
+/**
+ * Writes the whole entry, as the tool runners do on every turn. XCOD-325: a name the user gave is
+ * kept: the runners don't know it, and their next save must not take it away.
+ */
+export async function save(entry: Entry) {
+  const title = "title" in entry ? entry.title : (await get(entry.sessionID))?.title
+  await write(title ? { ...entry, title } : entry)
 }
 
 export async function get(id: string) {
@@ -84,7 +99,58 @@ export async function setArchived(id: string, time: Date | undefined) {
   return true
 }
 
+/**
+ * XCOD-325: names an entry (`title` already cleaned, see Session.cleanTitle) or, with "", un-names
+ * it, so it goes back to the automatic title. False when there is none.
+ */
+export async function rename(id: string, title: string) {
+  const entry = await get(id)
+  if (!entry) return false
+  const { title: _, ...rest } = entry
+  await write(title ? { ...rest, title } : rest)
+  return true
+}
+
 /** XCOD-265: forgets an entry. The tool's own transcript (e.g. under ~/.claude) is left alone. */
 export async function remove(id: string) {
   await fs.rm(file(id), { force: true })
+}
+
+let watcher: FSWatcher | undefined
+let timer: ReturnType<typeof setTimeout> | undefined
+const listeners = new Set<() => void>()
+
+/**
+ * XCOD-325: calls `listener` when an entry changes, in this process or another one (a rename, a
+ * turn starting or ending), so every Sessions view re-reads at once. Returns the unsubscribe.
+ */
+export function subscribe(listener: () => void) {
+  listeners.add(listener)
+  if (!watcher) {
+    try {
+      mkdirSync(dir(), { recursive: true })
+      watcher = watch(dir(), () => {
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => {
+          for (const each of listeners) each()
+        }, 100)
+        timer.unref?.()
+      })
+      watcher.on("error", () => {
+        watcher?.close()
+        watcher = undefined
+      })
+      watcher.unref()
+    } catch {
+      watcher = undefined
+    }
+  }
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size > 0) return
+    watcher?.close()
+    watcher = undefined
+    if (timer) clearTimeout(timer)
+    timer = undefined
+  }
 }

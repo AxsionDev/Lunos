@@ -1341,6 +1341,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Batalkan arsip",
   "sessions.bulk.deleteArchived": "Hapus yang diarsipkan",
   "sessions.bulk.failed": "Tidak dapat menghentikan: {{reason}}",
+  "sessions.rename.failed": "Tidak dapat mengganti nama: {{reason}}",
+  "sessions.rename.deleted": "sesi telah dihapus",
   "sessions.bulk.stop.question.one": "Hentikan {{count}} sesi?",
   "sessions.bulk.stop.question.other": "Hentikan {{count}} sesi?",
   "sessions.bulk.stop.running": "{{count}} berjalan",

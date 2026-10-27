@@ -1359,6 +1359,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Hent fra arkivet",
   "sessions.bulk.deleteArchived": "Slett arkiverte",
   "sessions.bulk.failed": "Kunne ikke stoppe: {{reason}}",
+  "sessions.rename.failed": "Kunne ikke gi nytt navn: {{reason}}",
+  "sessions.rename.deleted": "økten er slettet",
   "sessions.bulk.stop.question.one": "Stoppe {{count}} sesjon?",
   "sessions.bulk.stop.question.other": "Stoppe {{count}} sesjoner?",
   "sessions.bulk.stop.running": "{{count}} kjører",

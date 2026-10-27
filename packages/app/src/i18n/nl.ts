@@ -1263,6 +1263,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Dearchiveren",
   "sessions.bulk.deleteArchived": "Gearchiveerde verwijderen",
   "sessions.bulk.failed": "Kan niet stoppen: {{reason}}",
+  "sessions.rename.failed": "Naam wijzigen mislukt: {{reason}}",
+  "sessions.rename.deleted": "de sessie is verwijderd",
   "sessions.bulk.stop.question.one": "{{count}} sessie stoppen?",
   "sessions.bulk.stop.question.other": "{{count}} sessies stoppen?",
   "sessions.bulk.stop.running": "{{count}} actief",

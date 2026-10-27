@@ -1329,6 +1329,8 @@ export const dict = {
   "sessions.bulk.unarchive": "เลิกจัดเก็บ",
   "sessions.bulk.deleteArchived": "ลบที่จัดเก็บแล้ว",
   "sessions.bulk.failed": "หยุดไม่ได้: {{reason}}",
+  "sessions.rename.failed": "เปลี่ยนชื่อไม่ได้: {{reason}}",
+  "sessions.rename.deleted": "เซสชันถูกลบแล้ว",
   "sessions.bulk.stop.question.one": "หยุด {{count}} เซสชันหรือไม่",
   "sessions.bulk.stop.question.other": "หยุด {{count}} เซสชันหรือไม่",
   "sessions.bulk.stop.running": "กำลังทำงาน {{count}}",

@@ -1263,6 +1263,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Grąžinti iš archyvo",
   "sessions.bulk.deleteArchived": "Ištrinti archyvuotus",
   "sessions.bulk.failed": "Nepavyko sustabdyti: {{reason}}",
+  "sessions.rename.failed": "Nepavyko pervadinti: {{reason}}",
+  "sessions.rename.deleted": "seansas ištrintas",
   "sessions.bulk.stop.question.one": "Sustabdyti {{count}} seansą?",
   "sessions.bulk.stop.question.few": "Sustabdyti {{count}} seansus?",
   "sessions.bulk.stop.question.many": "Sustabdyti {{count}} seanso?",

@@ -1254,6 +1254,8 @@ export const dict = {
   "sessions.bulk.unarchive": "آرکائیو سے نکالیں",
   "sessions.bulk.deleteArchived": "آرکائیو شدہ حذف کریں",
   "sessions.bulk.failed": "روکا نہیں جا سکا: {{reason}}",
+  "sessions.rename.failed": "نام تبدیل نہیں ہو سکا: {{reason}}",
+  "sessions.rename.deleted": "سیشن حذف کر دیا گیا",
   "sessions.bulk.stop.question.one": "{{count}} سیشن روکیں؟",
   "sessions.bulk.stop.question.other": "{{count}} سیشن روکیں؟",
   "sessions.bulk.stop.running": "چل رہے ہیں: {{count}}",
