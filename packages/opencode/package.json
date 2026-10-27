@@ -2,10 +2,10 @@
   "$schema": "https://json.schemastore.org/package.json",
   "version": "1.18.55",
   "lunos": {
-    "upstreamVersion": "1.19.3",
+    "upstreamVersion": "1.19.4",
     "upstreamSync": {
-      "commit": "e3c4eb242585dcd77be1a867391b7c25fd47ce52",
-      "measuredAt": "2026-10-19",
+      "commit": "148842ef7cb1bc34192b3fff57d0f9721ab9c801",
+      "measuredAt": "2026-10-26",
       "daysBehind": 0,
       "commitsBehind": 0
     }
@@ -88,7 +88,7 @@
     "@clack/prompts": "1.0.0-alpha.1",
     "@effect/opentelemetry": "catalog:",
     "@effect/platform-node": "catalog:",
-    "@ff-labs/fff-bun": "0.9.4",
+    "@ff-labs/fff-bun": "0.10.5",
     "@gitlab/opencode-gitlab-auth": "1.3.3",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@octokit/graphql": "9.0.2",
