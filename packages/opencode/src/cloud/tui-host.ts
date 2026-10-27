@@ -15,8 +15,10 @@ import {
   type Pending,
   type SignedIn,
   type TermsCheck,
+  type TerminalCommand,
   type Versions,
 } from "@opencode-ai/tui/util/account"
+import { Offline } from "@opencode-ai/core/offline"
 import { CloudAccountApi } from "./account-api"
 import { CloudAuth } from "./auth"
 import { CloudBeta } from "./beta"
@@ -366,4 +368,21 @@ export function create(input: { gate: Gate; issuer: string; clientID: string }):
       })
     },
   }
+}
+
+/**
+ * XCOD-317: the TUI's "Try Lunos Cloud": `lunos cloud quickstart` for `directory`, on the terminal.
+ * Offered to a Lunos account (or one a configured control plane may receive), signed in, online, and
+ * only where cloud runs have somewhere to go: `cloud.endpoint` set in user or managed config, as
+ * `lunos run --cloud` needs. Only for a TUI on this machine (tui.ts), never through `lunos attach`.
+ */
+export async function quickstart(directory: string): Promise<TerminalCommand | undefined> {
+  if (Offline.enabled()) return
+  const session = await CloudStore.load()
+  if (!session) return
+  if (!(await CloudSyncApi.configured())) return
+  if (await CloudAccountApi.allowed(session.issuer)) return
+  const { selfCommand } = await import("../cli/restart")
+  const self = selfCommand(["cloud", "quickstart", "--dir", directory])
+  return { argv: self.argv, env: self.env, verbatim: self.verbatim }
 }

@@ -494,7 +494,8 @@ export const TuiThreadCommand = cmd({
             headers: transport.headers,
             events: transport.events,
             // XCOD-273: the Lunos account, run here in the CLI process (the Welcome screen's sign-in).
-            account: CloudTuiHost.create(gate),
+            // XCOD-317: and "Try Lunos Cloud", which runs `lunos cloud quickstart` here.
+            account: { ...CloudTuiHost.create(gate), quickstart: CloudTuiHost.quickstart },
             args: {
               continue: args.continue,
               sessionID: args.session,

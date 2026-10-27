@@ -10,6 +10,8 @@ import { useConnected } from "./use-connected"
 import { useSync } from "../context/sync"
 import { useToast } from "../ui/toast"
 import { useKV } from "../context/kv"
+import { useTheme } from "../context/theme"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
 
 /** XCOD-212: shown on models the residency policy would refuse. */
 const BLOCKED = "blocked by policy"
@@ -55,6 +57,7 @@ export function DialogModel(props: {
   const dialog = useDialog()
   const toast = useToast()
   const kv = useKV()
+  const { theme } = useTheme()
   const activeFilter = (): ModelFilter => {
     const value = kv.get("model_filter", "all")
     return MODEL_FILTERS.includes(value) ? value : "all"
@@ -279,6 +282,14 @@ export function DialogModel(props: {
         },
       ]}
       onFilter={setQuery}
+      // XCOD-320: say why Recommended is empty under an EU-only policy instead of "No results found".
+      emptyView={
+        activeFilter() === "recommended" && !query().trim() && Jurisdiction.euOnly(sync.data.config.residency) ? (
+          <box paddingLeft={4} paddingRight={4} paddingTop={1}>
+            <text fg={theme.textMuted}>{Jurisdiction.NO_EU_RECOMMENDATION}</text>
+          </box>
+        ) : undefined
+      }
       flat={true}
       skipFilter={true}
       title={title()}

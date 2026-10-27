@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "ជ្រើសរើសម៉ូដែល",
   "dialog.model.search.placeholder": "ស្វែងរកម៉ូដែល",
   "dialog.model.empty": "រកមិនឃើញម៉ូដែល",
+  "dialog.model.recommended.noEu":
+    "មិនទាន់មានម៉ូដែលដែលបង្ហោះនៅ EU ណាមួយឆ្លងការវាយតម្លៃរបស់ Lunos នៅឡើយទេ ដូច្នេះគ្មានអ្វីត្រូវបានណែនាំក្រោមគោលការណ៍តែ EU របស់អ្នកទេ។",
   "dialog.model.manage": "គ្រប់គ្រងម៉ូដែល",
   "dialog.model.manage.description": "ប្ដូរម៉ូដែលដែលបង្ហាញក្នុងឧបករណ៍ជ្រើសរើសម៉ូដែលតាមបំណង។",
   "dialog.model.manage.provider.toggle": "បិទ/បើកម៉ូដែល {{provider}} ទាំងអស់។",
@@ -1240,6 +1242,8 @@ export const dict = {
   "sessions.bulk.unarchive": "យកចេញពីបណ្ណសារ",
   "sessions.bulk.deleteArchived": "លុបបណ្ណសារ",
   "sessions.bulk.failed": "មិនអាចបញ្ឈប់បាន: {{reason}}",
+  "sessions.rename.failed": "មិនអាចប្ដូរឈ្មោះបានទេ៖ {{reason}}",
+  "sessions.rename.deleted": "វគ្គត្រូវបានលុប",
   "sessions.bulk.stop.question.one": "បញ្ឈប់ {{count}} សម័យ?",
   "sessions.bulk.stop.question.other": "បញ្ឈប់ {{count}} សម័យ?",
   "sessions.bulk.stop.running": "កំពុងដំណើរការ: {{count}}",

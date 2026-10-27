@@ -115,6 +115,8 @@ export const dict = {
   "dialog.model.select.title": "Modell auswählen",
   "dialog.model.search.placeholder": "Modelle durchsuchen",
   "dialog.model.empty": "Keine Modellergebnisse",
+  "dialog.model.recommended.noEu":
+    "Noch kein in der EU gehostetes Modell hat die Lunos-Evaluierung bestanden, daher wird unter deiner Nur-EU-Richtlinie nichts empfohlen.",
   "dialog.model.manage": "Modelle verwalten",
   "dialog.model.manage.description": "Anpassen, welche Modelle in der Modellauswahl erscheinen.",
   "dialog.model.manage.provider.toggle": "Alle {{provider}}-Modelle umschalten",
@@ -1275,6 +1277,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Aus dem Archiv holen",
   "sessions.bulk.deleteArchived": "Archivierte löschen",
   "sessions.bulk.failed": "Stoppen fehlgeschlagen: {{reason}}",
+  "sessions.rename.failed": "Umbenennen fehlgeschlagen: {{reason}}",
+  "sessions.rename.deleted": "die Sitzung wurde gelöscht",
   "sessions.bulk.stop.question.one": "{{count}} Sitzung stoppen?",
   "sessions.bulk.stop.question.other": "{{count}} Sitzungen stoppen?",
   "sessions.bulk.stop.running": "{{count}} laufend",

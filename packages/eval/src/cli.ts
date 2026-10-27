@@ -83,10 +83,17 @@ async function load(args: string[]) {
   return validate((await Bun.file(flag(args, "config")).json()) as EvalConfig)
 }
 
+/** The budget's ledger, with what earlier runs under the same name already spent. */
+function ledgerFor(config: EvalConfig) {
+  return new Ledger(config.budget, path.join(repo, "packages/eval/runs", `ledger-${config.budget.name}.jsonl`))
+}
+
 async function run(args: string[]) {
   const config = await load(args)
   const tasks = Number(flag(args, "tasks"))
-  const expected = estimate(config, tasks)
+  // XCOD-320: against what's left of the caps, so no run starts that the budget can't finish.
+  const ledger = ledgerFor(config)
+  const expected = estimate(config, tasks, ledger.spentSoFar())
   console.log(describe(expected, config))
   if (!expected.fits) process.exit(1)
   if (!args.includes("--yes")) {
@@ -101,7 +108,6 @@ async function run(args: string[]) {
   const date = new Date().toISOString().slice(0, 10)
   const out = path.resolve(flag(args, "out", path.join(repo, "packages/eval/runs", date)))
   await fs.mkdir(out, { recursive: true })
-  const ledger = new Ledger(config.budget, path.join(repo, "packages/eval/runs", `ledger-${config.budget.name}.jsonl`))
   if (ledger.spentTotal() > 0)
     console.log(`budget "${config.budget.name}": €${ledger.spentTotal().toFixed(2)} already spent in earlier runs`)
   const token = crypto.randomUUID()
@@ -184,7 +190,7 @@ if (import.meta.main) {
   const [command, ...args] = process.argv.slice(2)
   if (command === "estimate") {
     const config = await load(args)
-    console.log(describe(estimate(config, Number(flag(args, "tasks"))), config))
+    console.log(describe(estimate(config, Number(flag(args, "tasks")), ledgerFor(config).spentSoFar()), config))
   } else if (command === "run") await run(args)
   else {
     console.error("usage: cli.ts estimate|run --config <file> --tasks <n> [--yes]")

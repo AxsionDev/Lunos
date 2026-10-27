@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Izberite model",
   "dialog.model.search.placeholder": "Iskanje modelov",
   "dialog.model.empty": "Ni rezultatov modela",
+  "dialog.model.recommended.noEu":
+    "Noben model, gostovan v EU, še ni prestal Lunosovega vrednotenja, zato pri pravilniku samo za EU ni priporočenega ničesar.",
   "dialog.model.manage": "Upravljanje modelov",
   "dialog.model.manage.description": "Prilagodite, kateri modeli se prikažejo v izbirniku modelov.",
   "dialog.model.manage.provider.toggle": "Preklopi vse modele {{provider}}",
@@ -1252,6 +1254,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Odarhiviraj",
   "sessions.bulk.deleteArchived": "Izbriši arhivirane",
   "sessions.bulk.failed": "Ustavitev ni uspela: {{reason}}",
+  "sessions.rename.failed": "Preimenovanje ni uspelo: {{reason}}",
+  "sessions.rename.deleted": "seja je bila izbrisana",
   "sessions.bulk.stop.question.one": "Želite ustaviti {{count}} sejo?",
   "sessions.bulk.stop.question.two": "Želite ustaviti {{count}} seji?",
   "sessions.bulk.stop.question.few": "Želite ustaviti {{count}} seje?",

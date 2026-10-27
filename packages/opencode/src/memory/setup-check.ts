@@ -88,7 +88,7 @@ export async function run(input: {
  * The check printed no result: it crashed, or was stopped. The last stderr line is the error and the
  * lines before it the cause, so nothing it said is dropped; with no stderr, the exit code says it.
  */
-export function unparsed(input: { code: number | null; signal?: string | null; stderr: string }): Result {
+export function unparsed(input: { code: number | null; signal?: string | number | null; stderr: string }): Result {
   const lines = input.stderr
     .split("\n")
     .map((line) => line.trimEnd())

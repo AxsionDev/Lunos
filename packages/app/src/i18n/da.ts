@@ -120,6 +120,8 @@ export const dict = {
   "dialog.model.select.title": "Vælg model",
   "dialog.model.search.placeholder": "Søg modeller",
   "dialog.model.empty": "Ingen modeller fundet",
+  "dialog.model.recommended.noEu":
+    "Ingen EU-hostet model har bestået Lunos' evaluering endnu, så intet anbefales under din politik om kun EU.",
   "dialog.model.manage": "Administrer modeller",
   "dialog.model.manage.description": "Tilpas hvilke modeller der vises i modelvælgeren.",
   "dialog.model.manage.provider.toggle": "Skift alle {{provider}}-modeller",
@@ -1338,6 +1340,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Fjern fra arkiv",
   "sessions.bulk.deleteArchived": "Slet arkiverede",
   "sessions.bulk.failed": "Kunne ikke stoppe: {{reason}}",
+  "sessions.rename.failed": "Kunne ikke omdøbe: {{reason}}",
+  "sessions.rename.deleted": "sessionen er slettet",
   "sessions.bulk.stop.question.one": "Stop {{count}} session?",
   "sessions.bulk.stop.question.other": "Stop {{count}} sessioner?",
   "sessions.bulk.stop.running": "{{count}} kører",

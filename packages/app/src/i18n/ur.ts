@@ -214,6 +214,8 @@ export const dict = {
   "dialog.model.select.title": "ماڈل منتخب کریں۔",
   "dialog.model.search.placeholder": "ماڈلز تلاش کریں۔",
   "dialog.model.empty": "کوئی ماڈل نہیں ملا",
+  "dialog.model.recommended.noEu":
+    "ابھی تک کسی EU میں ہوسٹ کیے گئے ماڈل نے Lunos کی جانچ پاس نہیں کی، اس لیے آپ کی صرف-EU پالیسی کے تحت کچھ بھی تجویز نہیں کیا گیا۔",
   "dialog.model.manage": "ماڈلز کا نظم کریں۔",
   "dialog.model.manage.description": "اپنی مرضی کے مطابق بنائیں کہ کون سے ماڈل ماڈل سلیکٹر میں نظر آتے ہیں۔",
   "dialog.model.manage.provider.toggle": "تمام {{provider}} ماڈلز کو ٹوگل کریں۔",
@@ -1252,6 +1254,8 @@ export const dict = {
   "sessions.bulk.unarchive": "آرکائیو سے نکالیں",
   "sessions.bulk.deleteArchived": "آرکائیو شدہ حذف کریں",
   "sessions.bulk.failed": "روکا نہیں جا سکا: {{reason}}",
+  "sessions.rename.failed": "نام تبدیل نہیں ہو سکا: {{reason}}",
+  "sessions.rename.deleted": "سیشن حذف کر دیا گیا",
   "sessions.bulk.stop.question.one": "{{count}} سیشن روکیں؟",
   "sessions.bulk.stop.question.other": "{{count}} سیشن روکیں؟",
   "sessions.bulk.stop.running": "چل رہے ہیں: {{count}}",

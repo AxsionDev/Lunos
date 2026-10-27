@@ -221,6 +221,8 @@ export const dict = {
   "dialog.model.select.title": "เลือกโมเดล",
   "dialog.model.search.placeholder": "ค้นหาโมเดล",
   "dialog.model.empty": "ไม่พบผลลัพธ์โมเดล",
+  "dialog.model.recommended.noEu":
+    "ยังไม่มีโมเดลที่โฮสต์ใน EU ผ่านการประเมินของ Lunos จึงไม่มีโมเดลแนะนำภายใต้นโยบายเฉพาะ EU ของคุณ",
   "dialog.model.manage": "จัดการโมเดล",
   "dialog.model.manage.description": "ปรับแต่งโมเดลที่จะปรากฏในตัวเลือกโมเดล",
   "dialog.model.manage.provider.toggle": "สลับโมเดลทั้งหมดของ {{provider}}",
@@ -1327,6 +1329,8 @@ export const dict = {
   "sessions.bulk.unarchive": "เลิกจัดเก็บ",
   "sessions.bulk.deleteArchived": "ลบที่จัดเก็บแล้ว",
   "sessions.bulk.failed": "หยุดไม่ได้: {{reason}}",
+  "sessions.rename.failed": "เปลี่ยนชื่อไม่ได้: {{reason}}",
+  "sessions.rename.deleted": "เซสชันถูกลบแล้ว",
   "sessions.bulk.stop.question.one": "หยุด {{count}} เซสชันหรือไม่",
   "sessions.bulk.stop.question.other": "หยุด {{count}} เซสชันหรือไม่",
   "sessions.bulk.stop.running": "กำลังทำงาน {{count}}",

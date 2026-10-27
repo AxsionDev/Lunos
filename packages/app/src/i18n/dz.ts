@@ -209,6 +209,8 @@ export const dict: Record<string, string> = {
   "dialog.model.select.title": "དཔེ་ཚད་སེལ་འཐུ་འབད།",
   "dialog.model.search.placeholder": "དཔེ་ཚད་འཚོལ་ཞིབ་འབད།",
   "dialog.model.empty": "དཔེ་ཚད་གྲུབ་འབྲས་མེད།",
+  "dialog.model.recommended.noEu":
+    "ད་ཚུན EU ནང་ བཞུགས་སའི་ མོ་ཌེལ་ ག་ཅི་ཡང་ Lunos གི་ དབྱེ་ཞིབ་ལས་ མ་ཐར་བས་ EU རྐྱངམ་གི་ སྲིད་བྱུས་འོག་ ག་ཅི་ཡང་ འོས་སྦྱོར་ མེད།",
   "dialog.model.manage": "དཔེ་ཚད་ཚུ་འཛིན་སྐྱོང་འཐབ།",
   "dialog.model.manage.description": "དཔེ་ཚད་སེལ་འཐུ་འབད་མི་ནང་ དཔེ་ཚད་ག་འདི་འབྱུངམ་ཨིན་ན་ སྲོལ་སྒྲིག་འབད།",
   "dialog.model.manage.provider.toggle": "{{provider}} དཔེ་ཚད་ཚུ་ཆ་མཉམ་སོར་སྟོན་འབད།",
@@ -1269,6 +1271,8 @@ export const dict: Record<string, string> = {
   "sessions.bulk.unarchive": "གཏན་མཛོད་ནང་ལས་ཕྱིར་འཐེན",
   "sessions.bulk.deleteArchived": "གཏན་མཛོད་བཏོན་གཏང",
   "sessions.bulk.failed": "བཀག་མ་ཚུགས: {{reason}}",
+  "sessions.rename.failed": "མིང་སོར་མ་ཚུགས། {{reason}}",
+  "sessions.rename.deleted": "ལཱ་ཡུན་བཏོན་བཏང་ཡོདཔ།",
   "sessions.bulk.stop.question.one": "ལཱ་ཡུན་བཀག་ནི་ཨིན་ན? ({{count}})",
   "sessions.bulk.stop.question.other": "ལཱ་ཡུན་བཀག་ནི་ཨིན་ན? ({{count}})",
   "sessions.bulk.stop.running": "གཡོག་བཀོལ་དོ: {{count}}",

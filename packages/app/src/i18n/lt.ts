@@ -209,6 +209,8 @@ export const dict = {
   "dialog.model.select.title": "Pasirinkite modelį",
   "dialog.model.search.placeholder": "Ieškoti modelių",
   "dialog.model.empty": "Nėra modelio rezultatų",
+  "dialog.model.recommended.noEu":
+    "Dar nė vienas ES talpinamas modelis neišlaikė Lunos vertinimo, todėl taikant tik ES politiką nieko nerekomenduojama.",
   "dialog.model.manage": "Tvarkyti modelius",
   "dialog.model.manage.description": "Tinkinkite, kurie modeliai rodomi modelio parinkiklyje.",
   "dialog.model.manage.provider.toggle": "Perjungti visus {{provider}} modelius",
@@ -1261,6 +1263,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Grąžinti iš archyvo",
   "sessions.bulk.deleteArchived": "Ištrinti archyvuotus",
   "sessions.bulk.failed": "Nepavyko sustabdyti: {{reason}}",
+  "sessions.rename.failed": "Nepavyko pervadinti: {{reason}}",
+  "sessions.rename.deleted": "seansas ištrintas",
   "sessions.bulk.stop.question.one": "Sustabdyti {{count}} seansą?",
   "sessions.bulk.stop.question.few": "Sustabdyti {{count}} seansus?",
   "sessions.bulk.stop.question.many": "Sustabdyti {{count}} seanso?",

@@ -1064,6 +1064,52 @@ test("XCOD-284: x on the rail deletes the selected session after the same confir
   }
 })
 
+test("XCOD-325: r renames a Claude Code row through its own route; a rename that fails says why on the row", async () => {
+  const sessions = [
+    row("external:cc", { kind: "external", tool: "claude", title: "Claude Code · api", updated: NOW - 1000 }),
+    row("p9", { state: "finished", elsewhere: true, updated: NOW - 7000 }),
+  ]
+  const renames: Call[] = []
+  const server = fakeServer({
+    sessions,
+    extra: async (url, request) => {
+      const match = /^\/experimental\/(external|peer)\/([^/]+)\/rename$/.exec(url.pathname)
+      if (!match) return undefined
+      const body = await request.clone().json()
+      renames.push({ path: url.pathname, body })
+      if (match[1] === "peer") return json({ message: "the Lunos running it isn't responding" }, { status: 400 })
+      sessions[0]!.title = body.title
+      return json(true)
+    },
+  })
+  const ui = await mount({ server, view: "monitor", ready: (frame) => frame.includes("title p9") })
+  const rename = async (name: string) => {
+    await ui.key("r")
+    await wait(() => ui.frame().includes("Rename session"))
+    for (let i = 0; i < 30; i++) ui.app.mockInput.pressBackspace()
+    await Bun.sleep(40)
+    await ui.app.mockInput.typeText(name)
+    await ui.enter()
+  }
+  try {
+    await ui.tab()
+    await wait(() => ui.frame().includes("↑↓ move · enter"))
+    // The rail opens on its first row: the Claude Code one (newest first under Completed).
+    await rename("API work")
+    await wait(() => ui.frame().includes("API work"))
+    expect(renames[0]).toEqual({ path: "/experimental/external/cc/rename", body: { title: "API work" } })
+
+    await ui.arrow("down")
+    await rename("Theirs")
+    // (Cut at the rail's width.)
+    await wait(() => ui.frame().includes("Couldn't rename: the Lunos running"))
+    expect(renames[1]!.path).toBe("/experimental/peer/p9/rename")
+    expect(ui.frame()).toContain("title p9")
+  } finally {
+    await ui.cleanup()
+  }
+}, 20_000)
+
 // XCOD-307: hiding the right pane. The session view's pane (`useRightPane`, the » and « controls)
 // in a host beside a stand-in conversation that prints its width, and the Agent Monitor's list.
 async function paneHost(input: { width: number; kv?: Record<string, unknown>; waiting?: () => number }) {

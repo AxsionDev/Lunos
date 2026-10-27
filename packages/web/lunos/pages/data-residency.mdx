@@ -20,6 +20,7 @@ Add a `residency` policy to `opencode.json`, in your project or global config di
   "provider": {
     "mistral": {
       "options": {
+        "baseURL": "https://api.eu.mistral.ai/v1",
         "apiKey": "{env:MISTRAL_API_KEY}"
       }
     }
@@ -28,6 +29,8 @@ Add a `residency` policy to `opencode.json`, in your project or global config di
   "small_model": "mistral/mistral-small-latest"
 }
 ```
+
+Mistral needs its EU endpoint, `api.eu.mistral.ai`, as above: its default `api.mistral.ai` is global, so the policy refuses it.
 
 Run `lunos debug config` to check that the policy is active: the output includes `"residency": { "allow": ["eu"], "audit": true }`.
 
@@ -46,6 +49,11 @@ Run `lunos debug config` to check that the policy is active: the output includes
 | Scaleway | France  | `SCALEWAY_API_KEY` |
 | OVHcloud | France  | `OVHCLOUD_API_KEY` |
 | Hetzner  | Germany | `HETZNER_API_KEY`  |
+| STACKIT  | Germany | `STACKIT_API_KEY`  |
+
+## Recommended models
+
+Under an EU-only policy, the model pickers' **Recommended** filter, and the default model when you haven't chosen one, come from Lunos's published evaluation: the best EU-hosted model, if it passed at least half the tasks. **No EU model has a published result yet, so Recommended is empty under an EU-only policy for now.** See [Models we tested](/docs/models-tested/).
 
 ## More
 

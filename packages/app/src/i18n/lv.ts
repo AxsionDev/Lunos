@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Izvēlieties modeli",
   "dialog.model.search.placeholder": "Meklēt modeļus",
   "dialog.model.empty": "Modeļi nav atrasti",
+  "dialog.model.recommended.noEu":
+    "Neviens ES mitināts modelis vēl nav izturējis Lunos novērtējumu, tāpēc ar politiku “tikai ES” nekas netiek ieteikts.",
   "dialog.model.manage": "Pārvaldīt modeļus",
   "dialog.model.manage.description": "Pielāgojiet, kuri modeļi tiek rādīti modeļu atlasītājā.",
   "dialog.model.manage.provider.toggle": "Pārslēgt visus {{provider}} modeļus",
@@ -1250,6 +1252,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Atarhivēt",
   "sessions.bulk.deleteArchived": "Dzēst arhivētās",
   "sessions.bulk.failed": "Neizdevās apturēt: {{reason}}",
+  "sessions.rename.failed": "Neizdevās pārdēvēt: {{reason}}",
+  "sessions.rename.deleted": "sesija ir izdzēsta",
   "sessions.bulk.stop.question.one": "Apturēt {{count}} sesiju?",
   "sessions.bulk.stop.question.zero": "Apturēt {{count}} sesiju?",
   "sessions.bulk.stop.question.other": "Apturēt {{count}} sesijas?",

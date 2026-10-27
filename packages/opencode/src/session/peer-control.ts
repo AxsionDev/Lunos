@@ -12,8 +12,9 @@ import { SessionPeers } from "./peers"
  * under the user's data directory (SessionPeers), so only the same OS user can reach it.
  *
  * Every action is handed to the process's own HTTP API (`session.abort`, `permission.reply`,
- * `question.reply` / `reject`), the same calls its own window makes: a permission answered from
- * another window is checked and audited (`permission.decision`) by the process that asked.
+ * `question.reply` / `reject`, `session.update` for a rename), the same calls its own window makes:
+ * a permission answered from another window is checked and audited (`permission.decision`) by the
+ * process that asked.
  *
  * Requests that carry an `Origin` header (a web page in a browser) are refused, the response has no
  * CORS headers, and only requests addressed to 127.0.0.1 are served.
@@ -183,6 +184,16 @@ export async function serve(request: Request): Promise<Response> {
         method: "POST",
         body: JSON.stringify({ text: body.text, interrupt: body.interrupt === true, via: "peer" }),
       }),
+    )
+  }
+  // XCOD-325: a rename from another process's Sessions view. Stored once, by this process, through
+  // its own session route: its views get the new name at once, and the rename is audited here.
+  if (rest === "/rename" && request.method === "POST") {
+    const body = (await request.json().catch(() => undefined)) as { title?: unknown } | undefined
+    if (typeof body?.title !== "string" || body.title.length > 1_000)
+      return json(400, { error: "A name is text (empty: the automatic name)." })
+    return forward(
+      await inner(`/session/${sessionID}`, directory, { method: "PATCH", body: JSON.stringify({ title: body.title }) }),
     )
   }
   // XCOD-269: the session was deleted in another process: its prompts queued here go too.

@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Pilih model",
   "dialog.model.search.placeholder": "Cari model",
   "dialog.model.empty": "Tiada hasil model",
+  "dialog.model.recommended.noEu":
+    "Belum ada model yang dihoskan di EU lulus penilaian Lunos, jadi tiada apa yang disyorkan di bawah dasar EU sahaja anda.",
   "dialog.model.manage": "Urus model",
   "dialog.model.manage.description": "Sesuaikan model yang dipaparkan dalam pemilih model.",
   "dialog.model.manage.provider.toggle": "Togol semua model {{provider}}",
@@ -1246,6 +1248,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Nyaharkib",
   "sessions.bulk.deleteArchived": "Padam yang diarkibkan",
   "sessions.bulk.failed": "Tidak dapat dihentikan: {{reason}}",
+  "sessions.rename.failed": "Tidak dapat menamakan semula: {{reason}}",
+  "sessions.rename.deleted": "sesi telah dipadam",
   "sessions.bulk.stop.question.one": "Hentikan {{count}} sesi?",
   "sessions.bulk.stop.question.other": "Hentikan {{count}} sesi?",
   "sessions.bulk.stop.running": "{{count}} sedang berjalan",

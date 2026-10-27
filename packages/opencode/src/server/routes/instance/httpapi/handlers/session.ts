@@ -229,6 +229,13 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
           source: "user",
           fallback: external ? ExternalSession.title(external.tool, external.session) : undefined,
         })
+        // XCOD-325: audited by the Lunos that stores it (a peer's rename arrives here through its own API).
+        AuditLog.emit("session.rename", {
+          origin: "api",
+          ids: [ctx.params.sessionID],
+          kind: "session",
+          cleared: !Session.cleanTitle(ctx.payload.title) || undefined,
+        })
       }
       if (ctx.payload.metadata !== undefined) {
         yield* session.setMetadata({ sessionID: ctx.params.sessionID, metadata: ctx.payload.metadata })

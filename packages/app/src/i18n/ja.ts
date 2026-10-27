@@ -212,6 +212,8 @@ export const dict = {
   "dialog.model.select.title": "モデルを選択",
   "dialog.model.search.placeholder": "モデルを検索",
   "dialog.model.empty": "モデルが見つかりません",
+  "dialog.model.recommended.noEu":
+    "Lunos の評価に合格した EU ホストのモデルはまだないため、EU 限定ポリシーでは推奨モデルはありません。",
   "dialog.model.manage": "モデルを管理",
   "dialog.model.manage.description": "モデルセレクターに表示するモデルをカスタマイズします。",
   "dialog.model.manage.provider.toggle": "すべての{{provider}}モデルを切り替え",
@@ -1258,6 +1260,8 @@ export const dict = {
   "sessions.bulk.unarchive": "アーカイブ解除",
   "sessions.bulk.deleteArchived": "アーカイブ済みを削除",
   "sessions.bulk.failed": "停止できませんでした: {{reason}}",
+  "sessions.rename.failed": "名前を変更できませんでした: {{reason}}",
+  "sessions.rename.deleted": "セッションは削除されました",
   "sessions.bulk.stop.question.one": "{{count}} 件のセッションを停止しますか?",
   "sessions.bulk.stop.question.other": "{{count}} 件のセッションを停止しますか?",
   "sessions.bulk.stop.running": "実行中 {{count}} 件",

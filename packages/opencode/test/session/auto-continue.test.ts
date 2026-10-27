@@ -348,3 +348,293 @@ describe("prompt hardening and settings", () => {
     expect(resolved.agent).toEqual({ build: { auto_continue: false } })
   })
 })
+
+// XCOD-324: in a Dynamic workflow the open work decides, not the wording of the turn's last line.
+describe("open work (Dynamic workflows)", () => {
+  const STATUS = "QA found 5 blocking gaps. The cycle remains in the build phase while I address them."
+  const failedQa =
+    "Verification\n✓ npm run build (4 s)\n✗ empty email accepted\n✗ 500 on /signup\n✗ no error text\n✗ missing aria-label\n✗ npm test: 2 failed"
+  const passedQa = "Verification\n✓ npm run build (4 s)\n✓ npm test: 12 passed\n✓ POST /signup → 400 on empty email"
+
+  /** An assistant message carrying the given tool parts, finished like a real turn. */
+  function calls(parent: SessionV1.WithParts, parts: unknown[], text?: string): SessionV1.WithParts {
+    const message = assistant(parent, { text })
+    return { ...message, parts: [...parts, ...message.parts] } as unknown as SessionV1.WithParts
+  }
+  let sub = 0
+  const task = (
+    agent: string,
+    description: string,
+    result: { output?: string; error?: string; task_id?: string; background?: boolean },
+  ) => ({
+    type: "tool",
+    tool: "task",
+    state: {
+      status: result.error !== undefined ? "error" : "completed",
+      input: { subagent_type: agent, description, prompt: "…", ...(result.task_id ? { task_id: result.task_id } : {}) },
+      metadata: { sessionId: result.task_id ?? `ses_sub_${++sub}`, ...(result.background ? { background: true } : {}) },
+      ...(result.error !== undefined
+        ? { error: result.error }
+        : {
+            output: result.background
+              ? `<task id="ses_sub_${sub}" state="running">\n<task_result>\nworking\n</task_result>\n</task>`
+              : `<task id="ses_sub_${sub}" state="completed">\n<task_result>\n${result.output ?? ""}\n</task_result>\n</task>`,
+          }),
+    },
+  })
+  const todos = (...statuses: string[]) => ({
+    type: "tool",
+    tool: "todowrite",
+    state: {
+      status: "completed",
+      input: { todos: statuses.map((status, i) => ({ content: `step ${i}`, status, priority: "high" })) },
+    },
+  })
+  const dyn = (messages: SessionV1.WithParts[], extra: Partial<AutoContinue.Input> = {}) =>
+    AutoContinue.classify({ messages, position: open, emptyStalls: false, dynamic: true, ...extra })
+
+  test("the reported bug: qa failed, the turn ends with a status report, and it continues", () => {
+    const u = user("Approved.")
+    const msgs = [
+      u,
+      calls(u, [task("general", "build", { output: "Done." }), task("qa", "verify", { output: failedQa })], STATUS),
+    ]
+    expect(AutoContinue.announces(STATUS)).toBe(false)
+    const stop = dyn(msgs)
+    expect(stop.kind).toBe("stalled")
+    if (stop.kind !== "stalled") return
+    expect(stop.work?.gaps).toHaveLength(5)
+    expect(stop.work?.check).toEqual({ passing: 1, total: 6 })
+    expect(AutoContinue.status(stop.work!)).toBe("Working on 5 gaps · check: 1/6 passing")
+    const text = AutoContinue.prompt({ gated: true, work: stop.work, maxParallel: 2 })
+    expect(text).toContain("qa reported 5 blocking gaps")
+    expect(text).toContain("- ✗ 500 on /signup")
+    expect(text).toContain("Turn each gap into an item in the todo list")
+    expect(text).toContain("at most 2 at once")
+    expect(text).toContain("dispatch qa again")
+    // Without Dynamic workflows (the opt-out) it's today's behaviour: a status report finishes.
+    expect(classify(msgs, open, false).kind).toBe("finished")
+  })
+
+  test("the main agent's own Verification block never counts: only qa's", () => {
+    const u = user("Build it.")
+    expect(dyn([u, calls(u, [], `Here is where it stands.\n\n${failedQa}`)]).kind).toBe("finished")
+  })
+
+  test("a later passing qa report clears the gaps", () => {
+    const u = user("Approved.")
+    const msgs = [
+      u,
+      calls(
+        u,
+        [
+          task("qa", "verify", { output: failedQa }),
+          task("general", "fix", { output: "Fixed." }),
+          task("qa", "verify", { output: passedQa }),
+        ],
+        "All checks pass.",
+      ),
+    ]
+    expect(dyn(msgs).kind).toBe("finished")
+  })
+
+  test("a background qa result, landing as a message of its own, counts", () => {
+    const u = user("Approved.")
+    const dispatched = calls(u, [task("qa", "verify", { background: true })], "qa is running.")
+    const id = (dispatched.parts[0] as unknown as { state: { metadata: { sessionId: string } } }).state.metadata
+      .sessionId
+    const landed = user(
+      `<task id="${id}" state="completed">\n<summary>Background task completed: verify</summary>\n<task_result>\n${failedQa}\n</task_result>\n</task>`,
+      undefined,
+      true,
+    )
+    const stop = dyn([u, dispatched, landed, assistant(landed, { text: STATUS })])
+    expect(stop.kind === "stalled" && stop.work?.gaps.length).toBe(5)
+  })
+
+  test("open todos continue; all done or cancelled finishes", () => {
+    const u = user("Build it.")
+    const stop = dyn([u, calls(u, [todos("completed", "in_progress", "pending")], "Step 1 is done.")])
+    expect(stop.kind === "stalled" && stop.work?.todos).toBe(2)
+    expect(AutoContinue.prompt({ gated: false, work: stop.kind === "stalled" ? stop.work : undefined })).toContain(
+      "2 items in the todo list aren't done",
+    )
+    expect(dyn([u, calls(u, [todos("completed", "cancelled")], "Done.")]).kind).toBe("finished")
+  })
+
+  test("mid-phase continues only while a subagent's work hasn't passed qa", () => {
+    const u = user("Approved.")
+    const built = [u, calls(u, [task("general", "build", { output: "Built." })], "Step 1 is built.")]
+    expect(dyn(built, { midPhase: true }).kind).toBe("stalled")
+    expect(
+      AutoContinue.prompt({ gated: true, work: (dyn(built, { midPhase: true }) as { work: AutoContinue.Work }).work }),
+    ).toContain("Dispatch the `qa` subagent")
+    expect(dyn(built, { midPhase: false }).kind).toBe("finished")
+    // A plain answer in the build phase finishes; so does work qa has passed.
+    expect(dyn([u, assistant(u, { text: "It returns false." })], { midPhase: true }).kind).toBe("finished")
+    const checked = [
+      u,
+      calls(
+        u,
+        [task("general", "build", { output: "Built." }), task("qa", "verify", { output: passedQa })],
+        "Built and verified.",
+      ),
+    ]
+    expect(dyn(checked, { midPhase: true }).kind).toBe("finished")
+  })
+
+  test("a failed subagent step continues while it may be re-dispatched", () => {
+    const u = user("Build it.")
+    const stop = dyn([
+      u,
+      calls(
+        u,
+        [task("general", "build", { error: "Subagent failed (task_id: x): tsc exited 2" })],
+        "The build step failed.",
+      ),
+    ])
+    expect(stop.kind).toBe("stalled")
+    if (stop.kind !== "stalled") return
+    expect(stop.work?.failed).toEqual([
+      { description: "build", error: "Subagent failed (task_id: x): tsc exited 2", exhausted: false },
+    ])
+    expect(AutoContinue.prompt({ gated: false, work: stop.work })).toContain("pass its task_id")
+    // Retried and passed: nothing open.
+    const retried = [
+      u,
+      calls(
+        u,
+        [task("general", "build", { error: "tsc exited 2" }), task("general", "build", { output: "Fixed." })],
+        "Built.",
+      ),
+    ]
+    expect(dyn(retried).kind).toBe("finished")
+  })
+
+  test("a subtask a command started isn't the main agent's step: its failure doesn't continue", () => {
+    const u = user("/review")
+    const subtask = calls(u, [task("general", "review", { error: "subtask failed" })])
+    const sub = { ...subtask, info: { ...subtask.info, agent: "general" } } as SessionV1.WithParts
+    const main = assistant(u, { text: "The review failed." }, { agent: "build" })
+    expect(dyn([u, sub, main]).kind).toBe("finished")
+    const own = { ...subtask, info: { ...subtask.info, agent: "build" } } as SessionV1.WithParts
+    expect(dyn([u, own, main]).kind).toBe("stalled")
+  })
+
+  test("open work belongs to its request: a new message from the human starts over", () => {
+    const u = user("Approved.")
+    const failed = calls(u, [task("qa", "verify", { output: failedQa })], STATUS)
+    const leave = user("Leave those gaps, I'll fix them myself.")
+    expect(dyn([u, failed, leave, assistant(leave, { text: "Understood: the gaps are yours." })]).kind).toBe("finished")
+    // An exhausted step earlier doesn't block a plain stall in a new request.
+    const refused = calls(u, [task("general", "fix", { error: 'The step "fix" was re-dispatched 3 times.' })], STATUS)
+    const next = user("Now add the login page.")
+    expect(dyn([u, refused, next, assistant(next, { text: "Next I'll implement it." })]).kind).toBe("stalled")
+    // Lunos's continuation, a background result landing, or Continue keep the request going.
+    const resume = user("Continue.", { [AutoContinue.RESUME]: true })
+    expect(dyn([u, failed, resume, assistant(resume, { text: STATUS })]).kind).toBe("stalled")
+    const landed = user(
+      '<task id="ses_x" state="completed">\n<task_result>\nok\n</task_result>\n</task>',
+      undefined,
+      true,
+    )
+    expect(dyn([u, failed, landed, assistant(landed, { text: STATUS })]).kind).toBe("stalled")
+  })
+
+  describe("human-needed stops, each with its one line", () => {
+    const u = user("Approved.")
+    const end = (parts: unknown[], text = STATUS) => [u, calls(u, parts, text)]
+
+    test("a missing secret or .env value reported by a subagent", () => {
+      const secret = dyn(
+        end([
+          task("qa", "verify", {
+            output: "Verification\n✓ build\n✗ Couldn't start the worker: REDIS_URL isn't set (.env.example has it)",
+          }),
+        ]),
+      )
+      expect(secret).toEqual({
+        kind: "secret",
+        reason: "Couldn't start the worker: REDIS_URL isn't set (.env.example has it)",
+      })
+      expect(AutoContinue.why("Dev-Cycle", secret)).toBe(
+        "Dev-Cycle needs a value only you have: Couldn't start the worker: REDIS_URL isn't set (.env.example has it)",
+      )
+      expect(dyn(end([task("general", "deploy", { error: "STRIPE_SECRET_KEY is not set" })])).kind).toBe("secret")
+      // Mixed with gaps it can fix, it fixes those and leaves the secret to the user.
+      const mixed = dyn(
+        end([task("qa", "verify", { output: "Verification\n✗ 500 on /signup\n✗ the API key is missing from .env" })]),
+      )
+      expect(mixed.kind).toBe("stalled")
+      const text = AutoContinue.prompt({ gated: true, work: mixed.kind === "stalled" ? mixed.work : undefined })
+      expect(text).toContain("qa reported 1 blocking gap;")
+      expect(text).toContain("Leave these for the user")
+    })
+
+    test("a failed check that only mentions a token isn't a missing secret", () => {
+      expect(AutoContinue.needsSecret("POST /token returns 401: no Authorization header")).toBe(false)
+      expect(AutoContinue.needsSecret("the password field accepts an empty value")).toBe(false)
+      expect(AutoContinue.needsSecret("OPENAI_API_KEY isn't set")).toBe(true)
+      expect(AutoContinue.needsSecret("no API key in .env")).toBe(true)
+    })
+
+    test("a step re-dispatched MAX_REDISPATCH times, or qa failing round after round", () => {
+      const refused = 'The step "fix" was re-dispatched 3 times; don\'t dispatch it again.'
+      const exhausted = dyn(end([task("general", "fix", { error: refused })]))
+      expect(exhausted).toEqual({ kind: "exhausted", reason: '"fix" failed after 3 re-dispatches' })
+      expect(AutoContinue.why("Build", exhausted)).toBe('Build needs you: "fix" failed after 3 re-dispatches.')
+      const fails = Array.from({ length: 4 }, () => task("qa", "verify", { output: failedQa }))
+      expect(dyn(end(fails))).toEqual({ kind: "exhausted", reason: "qa still fails after 3 rounds of fixes" })
+      expect(dyn(end(fails.slice(1))).kind).toBe("stalled")
+    })
+
+    test("a gate, a question, a pending permission or question, a limit, an error", () => {
+      const failing = [task("qa", "verify", { output: failedQa })]
+      const gated: AutoContinue.Position = { unknown: false, done: false, pending: true, label: "verify" }
+      const gate = dyn(end(failing), { position: gated })
+      expect(gate.kind).toBe("gate")
+      expect(AutoContinue.why("Dev-Cycle", gate)).toBe("Dev-Cycle is waiting for your approval.")
+      const question = dyn(end(failing, "Two gaps need a design decision. Should the API return 400 or 422?"))
+      expect(question.kind).toBe("question")
+      expect(AutoContinue.why("Build", question)).toBe("Build is waiting for your answer.")
+      expect(
+        dyn(end([...failing, { type: "tool", tool: "question", state: { status: "running", input: {} } }])).kind,
+      ).toBe("question")
+      const limit = dyn(end(failing), { limit: "step limit" })
+      expect(limit).toEqual({ kind: "error", reason: "step limit" })
+      expect(AutoContinue.why("Build", limit)).toBe("Build stopped: step limit.")
+      const aborted = [u, assistant(u, { text: STATUS }, { error: { name: "MessageAbortedError" } })]
+      expect(dyn(aborted).kind).toBe("error")
+      expect(AutoContinue.why("Build", { kind: "finished" })).toBeUndefined()
+    })
+  })
+
+  test("progress: a changed check result counts, the same one doesn't", () => {
+    const cont = (n: number) =>
+      user("Continue the current phase now.", { [AutoContinue.METADATA]: { label: "x", attempt: n } }, true)
+    const u = user("Approved.")
+    const c1 = cont(1)
+    const c2 = cont(2)
+    const msgs = [
+      u,
+      calls(u, [task("qa", "verify", { output: failedQa })], STATUS),
+      c1,
+      assistant(c1, { text: STATUS }),
+      c2,
+      assistant(c2, { text: STATUS }),
+    ]
+    expect(AutoContinue.streak(msgs)).toBe(2)
+    // A qa result (or any tool call) in the continued turn is progress.
+    const c3 = cont(3)
+    const changed = [...msgs, c3, calls(c3, [task("qa", "verify", { output: passedQa })], "Passing now.")]
+    expect(AutoContinue.streak(changed)).toBe(0)
+  })
+
+  test("verification() reads the last block, with or without markdown", () => {
+    expect(AutoContinue.verification("**Verification**\n- ✓ build\n- ✗ test\n\nNotes after.")).toEqual([
+      { ok: true, text: "build" },
+      { ok: false, text: "test" },
+    ])
+    expect(AutoContinue.verification("No block here.")).toBeUndefined()
+  })
+})

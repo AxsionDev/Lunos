@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Επιλογή μοντέλου",
   "dialog.model.search.placeholder": "Αναζήτηση μοντέλων",
   "dialog.model.empty": "Δεν υπάρχουν αποτελέσματα μοντέλου",
+  "dialog.model.recommended.noEu":
+    "Κανένα μοντέλο που φιλοξενείται στην ΕΕ δεν έχει περάσει ακόμη την αξιολόγηση του Lunos, οπότε με την πολιτική «μόνο ΕΕ» δεν προτείνεται τίποτα.",
   "dialog.model.manage": "Διαχείριση μοντέλων",
   "dialog.model.manage.description": "Προσαρμογή των μοντέλων που εμφανίζονται στον επιλογέα μοντέλων.",
   "dialog.model.manage.provider.toggle": "Εναλλαγή όλων των {{provider}} μοντέλων",
@@ -1263,6 +1265,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Επαναφορά από το αρχείο",
   "sessions.bulk.deleteArchived": "Διαγραφή αρχειοθετημένων",
   "sessions.bulk.failed": "Δεν ήταν δυνατή η διακοπή: {{reason}}",
+  "sessions.rename.failed": "Δεν ήταν δυνατή η μετονομασία: {{reason}}",
+  "sessions.rename.deleted": "η συνεδρία διαγράφηκε",
   "sessions.bulk.stop.question.one": "Διακοπή {{count}} συνεδρίας;",
   "sessions.bulk.stop.question.other": "Διακοπή {{count}} συνεδριών;",
   "sessions.bulk.stop.running": "{{count}} σε εκτέλεση",

@@ -214,6 +214,8 @@ export const dict = {
   "dialog.model.select.title": "Selecionar modelo",
   "dialog.model.search.placeholder": "Buscar modelos",
   "dialog.model.empty": "Nenhum resultado de modelo",
+  "dialog.model.recommended.noEu":
+    "Nenhum modelo hospedado na UE passou na avaliação do Lunos ainda, então nada é recomendado com sua política somente UE.",
   "dialog.model.manage": "Gerenciar modelos",
   "dialog.model.manage.description": "Personalizar quais modelos aparecem no seletor de modelos.",
   "dialog.model.manage.provider.toggle": "Alternar todos os modelos {{provider}}",
@@ -1271,6 +1273,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Desarquivar",
   "sessions.bulk.deleteArchived": "Excluir arquivadas",
   "sessions.bulk.failed": "Não foi possível parar: {{reason}}",
+  "sessions.rename.failed": "Dibosupl adenvel: {{reason}}",
+  "sessions.rename.deleted": "dilamet eo bet an estez",
   "sessions.bulk.stop.question.one": "Parar {{count}} sessão?",
   "sessions.bulk.stop.question.many": "Parar {{count}} sessões?",
   "sessions.bulk.stop.question.other": "Parar {{count}} sessões?",

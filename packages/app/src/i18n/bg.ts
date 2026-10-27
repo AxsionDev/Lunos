@@ -208,6 +208,8 @@ export const dict = {
   "dialog.model.select.title": "Изберете модел",
   "dialog.model.search.placeholder": "Търсене на модели",
   "dialog.model.empty": "Няма резултати за модели",
+  "dialog.model.recommended.noEu":
+    "Все още нито един модел, хостван в ЕС, не е преминал оценката на Lunos, затова при политика „само ЕС“ нищо не се препоръчва.",
   "dialog.model.manage": "Управление на модели",
   "dialog.model.manage.description": "Персонализирайте кои модели да се показват в селектора на модели.",
   "dialog.model.manage.provider.toggle": "Превключване на всички {{provider}} модели",
@@ -1259,6 +1261,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Разархивирай",
   "sessions.bulk.deleteArchived": "Изтрий архивираните",
   "sessions.bulk.failed": "Неуспешно спиране: {{reason}}",
+  "sessions.rename.failed": "Неуспешно преименуване: {{reason}}",
+  "sessions.rename.deleted": "сесията е изтрита",
   "sessions.bulk.stop.question.one": "Да се спре ли {{count}} сесия?",
   "sessions.bulk.stop.question.other": "Да се спрат ли {{count}} сесии?",
   "sessions.bulk.stop.running": "Изпълняват се: {{count}}",

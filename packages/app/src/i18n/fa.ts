@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "مدل را انتخاب کنید",
   "dialog.model.search.placeholder": "جستجوی مدل ها",
   "dialog.model.empty": "نتیجه مدلی وجود ندارد",
+  "dialog.model.recommended.noEu":
+    "هنوز هیچ مدل میزبانی‌شده در اتحادیه اروپا ارزیابی Lunos را پشت سر نگذاشته است، بنابراین با سیاست فقط اتحادیه اروپا چیزی پیشنهاد نمی‌شود.",
   "dialog.model.manage": "مدل ها را مدیریت کنید",
   "dialog.model.manage.description": "مدل‌هایی که در انتخابگر مدل ظاهر می‌شوند را سفارشی کنید.",
   "dialog.model.manage.provider.toggle": "همه مدل‌های {{provider}} را تغییر دهید",
@@ -1244,6 +1246,8 @@ export const dict = {
   "sessions.bulk.unarchive": "خارج کردن از بایگانی",
   "sessions.bulk.deleteArchived": "حذف بایگانی‌شده‌ها",
   "sessions.bulk.failed": "توقف ممکن نشد: {{reason}}",
+  "sessions.rename.failed": "تغییر نام انجام نشد: {{reason}}",
+  "sessions.rename.deleted": "نشست حذف شده است",
   "sessions.bulk.stop.question.one": "{{count}} جلسه متوقف شود؟",
   "sessions.bulk.stop.question.other": "{{count}} جلسه متوقف شود؟",
   "sessions.bulk.stop.running": "در حال اجرا: {{count}}",

@@ -5,7 +5,10 @@
 import type { EvalConfig, ModelConfig } from "./config"
 
 export function lunosConfig(model: ModelConfig, proxyURL: string, auditPath: string) {
-  const [provider, id] = model.model.split("/", 2)
+  // On the first "/" only: STACKIT's ids have their own ("stackit/Qwen/Qwen3.8-27B").
+  const slash = model.model.indexOf("/")
+  const provider = model.model.slice(0, slash)
+  const id = model.model.slice(slash + 1)
   return {
     $schema: "https://lunos.tech/config.json",
     model: model.model,
@@ -17,7 +20,7 @@ export function lunosConfig(model: ModelConfig, proxyURL: string, auditPath: str
         // the generic OpenAI-compatible client doesn't call (XCOD-200).
         npm: provider === "openai" ? "@ai-sdk/openai" : "@ai-sdk/openai-compatible",
         options: { baseURL: `${proxyURL}/${model.id}/v1`, apiKey: "via-lunos-eval-proxy" },
-        models: { [id]: { name: id, tool_call: true } },
+        models: { [id]: { name: id, tool_call: true, ...(model.limit ? { limit: model.limit } : {}) } },
       },
     },
     residency: {

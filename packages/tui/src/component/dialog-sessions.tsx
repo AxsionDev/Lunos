@@ -16,7 +16,7 @@ import { useToast } from "../ui/toast"
 import { useCommandShortcut } from "../keymap"
 import { errorMessage } from "../util/error"
 import { Locale } from "../util/locale"
-import { RENAME_HINT, renameValue } from "../util/session"
+import { RENAME_HINT, renameFailure, renameSession, renameValue } from "../util/session"
 import { useStartExternal } from "./dialog-external"
 import { useSessionDelete } from "./session-delete"
 import { useTuiConfig } from "../config"
@@ -87,6 +87,8 @@ const [failedStops, setFailedStops] = createSignal<Record<string, string>>({})
 // XCOD-284: the rows marked with space for Delete, and the ones a Delete couldn't delete (with why).
 const [marked, setMarked] = createSignal<ReadonlySet<string>>(new Set())
 const [failedDeletes, setFailedDeletes] = createSignal<Record<string, string>>({})
+// XCOD-325: the rows a rename couldn't be saved for (with why); they keep their old name.
+const [failedRenames, setFailedRenames] = createSignal<Record<string, string>>({})
 /** How long Undo stays offered after a Clear. */
 const UNDO_MS = 2 * 60 * 1000
 
@@ -324,6 +326,7 @@ export function DialogSessions(props: { select?: string }) {
           footer: [
             failedStops()[item.id] && stoppable(item) ? `couldn't stop: ${failedStops()[item.id]}` : undefined,
             failedDeletes()[item.id] ? `couldn't delete: ${failedDeletes()[item.id]}` : undefined,
+            failedRenames()[item.id] ? `Couldn't rename: ${failedRenames()[item.id]}` : undefined,
             item.archived ? `archived ${ago(item.archived, now())}` : stateLabel(item),
             item.agent,
             item.model ? Locale.truncateMiddle(item.model, 24) : undefined,
@@ -549,17 +552,21 @@ export function DialogSessions(props: { select?: string }) {
       return reopen(option.value)
     }
     const item = sessionOf(option)
-    if (!item || toolOnly(item)) return
+    if (!item) return
     // XCOD-308: the name sticks; empty goes back to the automatic name.
+    // XCOD-325: any row: a Claude Code / Codex one (its Lunos name), another Lunos's, an archived one.
     const typed = await DialogPrompt.show(dialog, "Rename session", {
       value: item.title,
       description: () => <text fg={theme.textMuted}>{RENAME_HINT}</text>,
     })
     const title = renameValue(typed, item.title)
-    if (title !== undefined)
-      await sdk.client.session
-        .update({ sessionID: item.id, directory: item.directory, title }, { throwOnError: true })
-        .catch(fail)
+    if (title !== undefined) {
+      const { [item.id]: _, ...rest } = failedRenames()
+      await renameSession(sdk.client, item, title).then(
+        () => setFailedRenames(rest),
+        (cause) => setFailedRenames({ ...rest, [item.id]: renameFailure(cause) }),
+      )
+    }
     reopen(option.value)
   }
 
@@ -903,12 +910,11 @@ export function DialogSessions(props: { select?: string }) {
         },
         {
           command: "dialog.sessions.rename",
-          hidden: archivedView(),
           title: "rename",
           disabled: (option) => {
             const entry = line(option)
             if (!entry || entry.type === "project") return true
-            return entry.type === "group" ? !entry.group : toolOnly(entry.item)
+            return entry.type === "group" && !entry.group
           },
           onTrigger: (option) => void rename(option),
         },

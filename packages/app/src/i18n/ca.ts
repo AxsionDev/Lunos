@@ -207,6 +207,8 @@ export const dict = {
   "dialog.model.select.title": "Seleccioneu el model",
   "dialog.model.search.placeholder": "Cerca models",
   "dialog.model.empty": "No hi ha resultats del model",
+  "dialog.model.recommended.noEu":
+    "Encara cap model allotjat a la UE no ha superat l'avaluació del Lunos, així que amb la vostra política només UE no es recomana res.",
   "dialog.model.manage": "Gestionar models",
   "dialog.model.manage.description": "Personalitza quins models apareixen al selector de models.",
   "dialog.model.manage.provider.toggle": "Canvia tots els {{provider}} models",
@@ -1262,6 +1264,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Desarxiva",
   "sessions.bulk.deleteArchived": "Suprimeix les arxivades",
   "sessions.bulk.failed": "No s'ha pogut aturar: {{reason}}",
+  "sessions.rename.failed": "No s'ha pogut canviar el nom: {{reason}}",
+  "sessions.rename.deleted": "la sessió s'ha suprimit",
   "sessions.bulk.stop.question.one": "Vols aturar {{count}} sessió?",
   "sessions.bulk.stop.question.many": "Vols aturar {{count}} sessions?",
   "sessions.bulk.stop.question.other": "Vols aturar {{count}} sessions?",

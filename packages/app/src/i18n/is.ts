@@ -209,6 +209,8 @@ export const dict = {
   "dialog.model.select.title": "Veldu líkan",
   "dialog.model.search.placeholder": "Leitaðu að gerðum",
   "dialog.model.empty": "Engar niðurstöður líkana",
+  "dialog.model.recommended.noEu":
+    "Ekkert líkan hýst í ESB hefur enn staðist mat Lunos, svo ekkert er mælt með undir stefnu þinni um aðeins ESB.",
   "dialog.model.manage": "Stjórna módelum",
   "dialog.model.manage.description": "Sérsníddu hvaða gerðir birtast í gerðavalinu.",
   "dialog.model.manage.provider.toggle": "Skiptu um allar {{provider}} gerðir",
@@ -1246,6 +1248,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Taka úr geymslu",
   "sessions.bulk.deleteArchived": "Eyða geymdum",
   "sessions.bulk.failed": "Ekki tókst að stöðva: {{reason}}",
+  "sessions.rename.failed": "Ekki tókst að endurnefna: {{reason}}",
+  "sessions.rename.deleted": "lotunni var eytt",
   "sessions.bulk.stop.question.one": "Stöðva {{count}} setu?",
   "sessions.bulk.stop.question.other": "Stöðva {{count}} setur?",
   "sessions.bulk.stop.running": "Í gangi: {{count}}",

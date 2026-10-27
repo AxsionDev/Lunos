@@ -227,6 +227,8 @@ export const dict = {
   "dialog.model.select.title": "Model seç",
   "dialog.model.search.placeholder": "Model ara",
   "dialog.model.empty": "Model sonucu yok",
+  "dialog.model.recommended.noEu":
+    "Henüz hiçbir AB'de barındırılan model Lunos değerlendirmesini geçmedi; bu yüzden yalnızca AB politikanızda önerilen bir şey yok.",
   "dialog.model.manage": "Modelleri yönet",
   "dialog.model.manage.description": "Model seçicide hangi modellerin görüneceğini özelleştirin.",
   "dialog.model.manage.provider.toggle": "Tüm {{provider}} modellerini aç/kapat",
@@ -1349,6 +1351,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Arşivden çıkar",
   "sessions.bulk.deleteArchived": "Arşivlenenleri sil",
   "sessions.bulk.failed": "Durdurulamadı: {{reason}}",
+  "sessions.rename.failed": "Yeniden adlandırılamadı: {{reason}}",
+  "sessions.rename.deleted": "oturum silindi",
   "sessions.bulk.stop.question.one": "{{count}} oturum durdurulsun mu?",
   "sessions.bulk.stop.question.other": "{{count}} oturum durdurulsun mu?",
   "sessions.bulk.stop.running": "{{count}} çalışıyor",
