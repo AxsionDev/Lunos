@@ -200,7 +200,16 @@ export type Host = {
   deleteAccount(): Promise<Deletion>
   /** XCOD-274: accepts or declines an invitation to an organisation; says what happened. */
   answerInvitation?(org: string, accept: boolean): Promise<string>
+  /**
+   * XCOD-317: the command "Try Lunos Cloud" runs on this terminal (`lunos cloud quickstart` for
+   * `directory`), or undefined where it doesn't apply: not signed in, an organisation's sign-in, no
+   * Lunos Cloud for runs, offline. No network. Only where the TUI runs on this machine.
+   */
+  quickstart?(directory: string): Promise<TerminalCommand | undefined>
 }
+
+/** A command to run on this terminal while the TUI steps aside. */
+export type TerminalCommand = { argv: string[]; env: Record<string, string | undefined>; verbatim: boolean }
 
 /** "p…@example.com": enough to recognise the address on a shared screen. */
 export function maskEmail(email: string | undefined) {

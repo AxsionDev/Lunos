@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Selecteer model",
   "dialog.model.search.placeholder": "Zoek modellen",
   "dialog.model.empty": "Geen modelresultaten",
+  "dialog.model.recommended.noEu":
+    "Nog geen in de EU gehost model is door de evaluatie van Lunos gekomen, dus onder je EU-only-beleid wordt niets aanbevolen.",
   "dialog.model.manage": "Beheer modellen",
   "dialog.model.manage.description": "Pas aan welke modellen in de modelkiezer verschijnen.",
   "dialog.model.manage.provider.toggle": "Alle {{provider}}-modellen in- of uitschakelen",
@@ -1261,6 +1263,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Dearchiveren",
   "sessions.bulk.deleteArchived": "Gearchiveerde verwijderen",
   "sessions.bulk.failed": "Kan niet stoppen: {{reason}}",
+  "sessions.rename.failed": "Naam wijzigen mislukt: {{reason}}",
+  "sessions.rename.deleted": "de sessie is verwijderd",
   "sessions.bulk.stop.question.one": "{{count}} sessie stoppen?",
   "sessions.bulk.stop.question.other": "{{count}} sessies stoppen?",
   "sessions.bulk.stop.running": "{{count}} actief",

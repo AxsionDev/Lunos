@@ -1781,7 +1781,7 @@ const layer = Layer.effect(
 
         const residency = AuditLog.residency(cfg)
         const locked = ConfigPolicy.sessionModels(cfg)
-        const recommended = ModelCuration.recommended(cfg.recommended)
+        const recommended = ModelCuration.recommended(cfg.recommended, cfg.residency)
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
           if (!isProviderAllowed(providerID)) {
@@ -2165,7 +2165,7 @@ const layer = Layer.effect(
 
     const fallbackModel = Effect.fn("Provider.fallbackModel")(function* (
       s: State,
-      cfg: { provider?: Record<string, unknown> },
+      cfg: { provider?: Record<string, unknown>; residency?: { allow?: readonly string[] } },
     ) {
       const recent = yield* fs.readJson(path.join(Global.Path.state, "model.json")).pipe(
         Effect.map((x): { providerID: ProviderV2.ID; modelID: ModelV2.ID }[] => {
@@ -2186,10 +2186,22 @@ const layer = Layer.effect(
         return { providerID: entry.providerID, modelID: entry.modelID }
       }
 
+      // XCOD-320: under an EU-only policy, the best EU model in the published eval results, when
+      // it's available here and not blocked.
+      const eu = ModelCuration.euDefault(cfg.residency)
+      if (eu) {
+        const pick = parseModel(eu)
+        const model = s.providers[pick.providerID]?.models[pick.modelID]
+        if (model && !model.blocked) return pick
+      }
+
       const configured = Object.keys(cfg.provider ?? {})
-      const provider = Object.values(s.providers).find((p) => configured.length === 0 || configured.includes(p.id))
+      const candidates = Object.values(s.providers).filter((p) => configured.length === 0 || configured.includes(p.id))
+      // XCOD-320: a model the residency policy refuses would only fail the first request.
+      const usable = (p: (typeof candidates)[number]) => Object.values(p.models).filter((m) => !m.blocked)
+      const provider = candidates.find((p) => usable(p).length > 0) ?? candidates[0]
       if (!provider) return yield* new NoProvidersError()
-      const [model] = sort(Object.values(provider.models))
+      const [model] = sort(usable(provider).length > 0 ? usable(provider) : Object.values(provider.models))
       if (!model) return yield* new NoModelsError({ providerID: provider.id })
       return {
         providerID: provider.id,

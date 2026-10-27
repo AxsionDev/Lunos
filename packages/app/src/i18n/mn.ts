@@ -208,6 +208,8 @@ export const dict = {
   "dialog.model.select.title": "Загвар сонгох",
   "dialog.model.search.placeholder": "Загвар хайх",
   "dialog.model.empty": "Загварын үр дүн алга",
+  "dialog.model.recommended.noEu":
+    "ЕХ-нд байршсан ямар ч загвар Lunos-ийн үнэлгээг одоогоор давж амжаагүй тул зөвхөн ЕХ бодлогын дагуу санал болгох загвар алга.",
   "dialog.model.manage": "Загваруудыг удирдах",
   "dialog.model.manage.description": "Загвар сонгогч дээр ямар загвар гарч ирэхийг тохируулна уу.",
   "dialog.model.manage.provider.toggle": "Бүх {{provider}} загварыг сэлгэх",
@@ -1257,6 +1259,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Архиваас гаргах",
   "sessions.bulk.deleteArchived": "Архивласныг устгах",
   "sessions.bulk.failed": "Зогсоож чадсангүй: {{reason}}",
+  "sessions.rename.failed": "Нэр өөрчилж чадсангүй: {{reason}}",
+  "sessions.rename.deleted": "сешн устгагдсан",
   "sessions.bulk.stop.question.one": "Сессүүдийг зогсоох уу? Тоо: {{count}}",
   "sessions.bulk.stop.question.other": "Сессүүдийг зогсоох уу? Тоо: {{count}}",
   "sessions.bulk.stop.running": "Ажиллаж байна: {{count}}",

@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "აირჩიეთ მოდელი",
   "dialog.model.search.placeholder": "მოდელების ძიება",
   "dialog.model.empty": "მოდელის შედეგები არ არის",
+  "dialog.model.recommended.noEu":
+    "ევროკავშირში განთავსებულ არცერთ მოდელს ჯერ არ გაუვლია Lunos-ის შეფასება, ამიტომ მხოლოდ ევროკავშირის პოლიტიკით არაფერია რეკომენდებული.",
   "dialog.model.manage": "მოდელების მართვა",
   "dialog.model.manage.description": "მოარგეთ რომელი მოდელები გამოჩნდება მოდელის ამომრჩეველში.",
   "dialog.model.manage.provider.toggle": "ყველა {{provider}} მოდელის გადართვა",
@@ -1245,6 +1247,8 @@ export const dict = {
   "sessions.bulk.unarchive": "არქივიდან ამოღება",
   "sessions.bulk.deleteArchived": "დაარქივებულის წაშლა",
   "sessions.bulk.failed": "ვერ შეჩერდა: {{reason}}",
+  "sessions.rename.failed": "სახელის შეცვლა ვერ მოხერხდა: {{reason}}",
+  "sessions.rename.deleted": "სესია წაიშალა",
   "sessions.bulk.stop.question.one": "შეჩერდეს {{count}} სესია?",
   "sessions.bulk.stop.question.other": "შეჩერდეს {{count}} სესია?",
   "sessions.bulk.stop.running": "მიმდინარეობს: {{count}}",

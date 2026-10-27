@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "ເລືອກຕົວແບບ",
   "dialog.model.search.placeholder": "ຄົ້ນຫາຕົວແບບ",
   "dialog.model.empty": "ບໍ່ພົບຕົວແບບ",
+  "dialog.model.recommended.noEu":
+    "ຍັງບໍ່ມີໂມເດວທີ່ໂຮສຢູ່ EU ໃດຜ່ານການປະເມີນຂອງ Lunos ເທື່ອ, ດັ່ງນັ້ນຈຶ່ງບໍ່ມີການແນະນຳພາຍໃຕ້ນະໂຍບາຍສະເພາະ EU ຂອງທ່ານ.",
   "dialog.model.manage": "ຈັດການຕົວແບບ",
   "dialog.model.manage.description": "ປັບແຕ່ງຕົວແບບທີ່ປາກົດຢູ່ໃນຕົວເລືອກຕົວແບບ.",
   "dialog.model.manage.provider.toggle": "ສະຫຼັບທຸກລຸ້ນ {{provider}}",
@@ -1237,6 +1239,8 @@ export const dict = {
   "sessions.bulk.unarchive": "ເອົາອອກຈາກການຈັດເກັບ",
   "sessions.bulk.deleteArchived": "ລຶບທີ່ຈັດເກັບແລ້ວ",
   "sessions.bulk.failed": "ບໍ່ສາມາດຢຸດໄດ້: {{reason}}",
+  "sessions.rename.failed": "ປ່ຽນຊື່ບໍ່ໄດ້: {{reason}}",
+  "sessions.rename.deleted": "ເຊດຊັນຖືກລຶບແລ້ວ",
   "sessions.bulk.stop.question.one": "ຢຸດ {{count}} ເຊດຊັນບໍ?",
   "sessions.bulk.stop.question.other": "ຢຸດ {{count}} ເຊດຊັນບໍ?",
   "sessions.bulk.stop.running": "ກຳລັງເຮັດວຽກ: {{count}}",

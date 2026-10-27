@@ -304,8 +304,8 @@ Options:
       --pure         run without external plugins                                          [boolean]
       --verbose      use more verbose model output (includes metadata like costs)          [boolean]
       --refresh      refresh the models cache from models.dev                              [boolean]
-      --recommended  only the curated Recommended models, each with why (a curated choice, not a
-                     benchmark)                                                            [boolean]
+      --recommended  only the Recommended models, each with why (curated; under an EU-only policy,
+                     from published eval results)                                          [boolean]
       --size         only models of this size (see the size rules in docs/models.md)
                                                                [choices: "large", "medium", "small"]"
 `;

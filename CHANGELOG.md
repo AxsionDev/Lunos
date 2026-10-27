@@ -23,6 +23,15 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Your first cloud run in one command.** `lunos cloud quickstart` takes you from a new account to a
+  finished task on Lunos Cloud: it signs you in if needed, offers the 14-day Pro trial when you have no
+  plan, asks for a git token for your repository's host if none is stored, proposes a safe first task
+  (it only adds one file) or runs yours, streams it, and prints the results branch with a link to it.
+  After you sign in, the TUI's home screen offers **Try Lunos Cloud** once: `/cloud` runs the same
+  steps in the terminal, `/cloud-hide` hides it. When Lunos Cloud refuses a run (no plan, Lunos Cloud
+  at capacity, an unconfirmed e-mail address, a failed payment), it says what to do next. See "Your
+  first cloud run" in the docs.
+
 - **See your project at a glance, and give each project its own theme.** When a session belongs to a
   project, the right sidebar shows a Project section. Collapsed, it's one line: the budget used
   ("€38 of €50 · Oct"), with ⚠ if a budget is past its warning line or a resource failed to index.
@@ -60,6 +69,15 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
   is still being generated. Names are one line of up to 80 characters; save an empty name to get the
   automatic title back on the next turn. Renaming a `/claude` or `/codex` session changes only its
   Lunos name. <!-- XCOD-308 -->
+
+- **Rename any session in "Sessions on this computer", including Claude Code and Codex ones.** Every
+  row of `/sessions`, the Agent Monitor and the Sessions window (desktop and web) can be renamed now,
+  archived ones too: a session running in another Lunos window (that window shows the new name right
+  away), and a Claude Code or Codex session Lunos started (only its name in Lunos changes; the tool's
+  own session is left alone). In the Sessions window, use the row's Rename button, double-click its
+  title, or right-click the row; Enter saves and Esc cancels. If a name can't be saved, because the
+  session was deleted or the other Lunos window isn't responding, the row says why and keeps its old
+  name. <!-- XCOD-325 -->
 
 - **See your sessions by project.** `/sessions` and the Agent Monitor's list switch between their
   usual layout and one section per project with `ctrl+y` or a click on the view switch in the
@@ -100,6 +118,12 @@ notifications`) picks a sound for each event (finished, subagent finished, needs
 
 ### Changed
 
+- **Under an EU-only residency policy, Recommended now shows only an EU model that passed our
+  evaluation.** The model pickers and `lunos models --recommended` list the best EU-hosted model from
+  Lunos's published results if it passed at least half the tasks, and it becomes the default model
+  when you haven't chosen one. No EU model has a published result yet, so for now Recommended is
+  empty under an EU-only policy, and the pickers say why. Without a policy, nothing changes. STACKIT
+  AI Model Serving (Germany) is now recognised as an EU provider.
 - **Quitting Lunos with the sandbox gives you the shell back at once.** Handing the results back and
   removing the container now happen in a background helper (`lunos sandbox conclude <id>`), which
   carries on after Lunos has exited; the last line says so, and `lunos sandbox status <id>` follows
@@ -151,6 +175,16 @@ sandbox conclude <id>` retries from the shell). A new start waits for a handoff 
   <!-- XCOD-326 -->
 
 ### Fixed
+
+- **Build and Dev-Cycle keep going when qa finds gaps, instead of stopping at a status report.**
+  With Dynamic workflows on, a turn that ends while qa's checks fail, todos are still open, a
+  subagent step failed and can be retried, or a phase's work hasn't been checked yet now carries on
+  by itself: each gap becomes a todo, fix subagents are dispatched (in parallel where they don't
+  touch the same files) and qa runs again. The dim line shows where it stands, for example "Build
+  continued automatically (Working on 5 gaps · check: 1/6 passing)". It still stops for you at a
+  gate, a question, a permission, a missing secret or `.env` value, a budget or step limit, a step
+  that failed after 3 re-dispatches, or 3 tries without progress. Turning off auto-continue or
+  Dynamic workflows keeps the previous behaviour. <!-- XCOD-324 -->
 
 - **Quitting a TUI connected over HTTP (a sandbox, `lunos attach`) can no longer end in "Lunos
   stopped because of an unexpected error: AbortError".** The cancelled event stream could be

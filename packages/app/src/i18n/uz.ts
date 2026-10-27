@@ -207,6 +207,8 @@ export const dict = {
   "dialog.model.select.title": "Modelni tanlang",
   "dialog.model.search.placeholder": "Modellarni qidirish",
   "dialog.model.empty": "Model natijalari yo'q",
+  "dialog.model.recommended.noEu":
+    "Hali hech bir YeIda joylashgan model Lunos baholashidan o‘tmagan, shuning uchun faqat YeI siyosatingizda hech narsa tavsiya etilmaydi.",
   "dialog.model.manage": "Modellarni boshqarish",
   "dialog.model.manage.description": "Model selektorida qaysi modellar ko'rinishini sozlang.",
   "dialog.model.manage.provider.toggle": "Barcha {{provider}} modellarini almashtiring",
@@ -1260,6 +1262,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Arxivdan chiqarish",
   "sessions.bulk.deleteArchived": "Arxivlanganlarni o'chirish",
   "sessions.bulk.failed": "To'xtatib bo'lmadi: {{reason}}",
+  "sessions.rename.failed": "Nomini oʻzgartirib boʻlmadi: {{reason}}",
+  "sessions.rename.deleted": "seans oʻchirildi",
   "sessions.bulk.stop.question.one": "Sessiyalar to'xtatilsinmi? Soni: {{count}}",
   "sessions.bulk.stop.question.other": "Sessiyalar to'xtatilsinmi? Soni: {{count}}",
   "sessions.bulk.stop.running": "Ishlamoqda: {{count}}",

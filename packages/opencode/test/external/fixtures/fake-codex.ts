@@ -58,8 +58,9 @@ const configView = JSON.parse(
     path.join(import.meta.dir, "..", "..", "fixtures", "external", "codex-0.160.1", "config-view.json"),
     "utf8",
   )
-    .replaceAll("<codex_home>", process.env.CODEX_HOME ?? "")
-    .replaceAll("<project>", process.cwd()),
+    // Escaped for the JSON text they go into: a Windows path's backslashes aren't valid JSON escapes.
+    .replaceAll("<codex_home>", JSON.stringify(process.env.CODEX_HOME ?? "").slice(1, -1))
+    .replaceAll("<project>", JSON.stringify(process.cwd()).slice(1, -1)),
 ).replies
 // XCOD-294: FAKE_CODEX_AUTH=<file> is a Codex whose sign-in is that file. Without it, `login status` says
 // "Not logged in" on stderr and exits 1, as 0.160.1 does in a fresh HOME; `login` makes up a token, writes it

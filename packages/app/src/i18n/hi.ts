@@ -213,6 +213,8 @@ export const dict = {
   "dialog.model.select.title": "मॉडल चुनें",
   "dialog.model.search.placeholder": "मॉडल खोजें",
   "dialog.model.empty": "कोई मॉडल परिणाम नहीं",
+  "dialog.model.recommended.noEu":
+    "अभी तक किसी भी EU-होस्टेड मॉडल ने Lunos का मूल्यांकन पास नहीं किया है, इसलिए आपकी केवल-EU नीति में कुछ भी अनुशंसित नहीं है।",
   "dialog.model.manage": "मॉडल प्रबंधित करें",
   "dialog.model.manage.description": "तय करें कि मॉडल चयनकर्ता में कौन-से मॉडल दिखाई दें।",
   "dialog.model.manage.provider.toggle": "सभी {{provider}} मॉडल को टॉगल करें",
@@ -1252,6 +1254,8 @@ export const dict = {
   "sessions.bulk.unarchive": "संग्रह से निकालें",
   "sessions.bulk.deleteArchived": "संग्रहीत हटाएँ",
   "sessions.bulk.failed": "रोका नहीं जा सका: {{reason}}",
+  "sessions.rename.failed": "नाम नहीं बदला जा सका: {{reason}}",
+  "sessions.rename.deleted": "सत्र हटा दिया गया",
   "sessions.bulk.stop.question.one": "{{count}} सेशन रोकें?",
   "sessions.bulk.stop.question.other": "{{count}} सेशन रोकें?",
   "sessions.bulk.stop.running": "चल रहे: {{count}}",

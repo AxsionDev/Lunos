@@ -2,6 +2,7 @@ import { EOL } from "os"
 import { Effect, Option } from "effect"
 import { Offline } from "@opencode-ai/core/offline"
 import { CloudGitToken } from "@/cloud/git-token"
+import { CloudQuickstartCommand } from "./cloud-quickstart"
 import { cmd } from "./cmd"
 import { effectCmd, fail } from "../effect-cmd"
 import * as Prompt from "../effect/prompt"
@@ -83,7 +84,7 @@ export const CloudGitTokenCommand = cmd({
 
 export const CloudCommand = cmd({
   command: "cloud",
-  describe: "Lunos Cloud account settings",
-  builder: (yargs) => yargs.command(CloudGitTokenCommand).demandCommand(),
+  describe: "Lunos Cloud: your first cloud run, and account settings",
+  builder: (yargs) => yargs.command(CloudGitTokenCommand).command(CloudQuickstartCommand).demandCommand(),
   async handler() {},
 })

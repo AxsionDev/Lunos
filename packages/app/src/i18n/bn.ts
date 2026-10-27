@@ -206,6 +206,8 @@ export const dict: Record<string, string> = {
   "dialog.model.select.title": "মডেল নির্বাচন করুন",
   "dialog.model.search.placeholder": "মডেল অনুসন্ধান করুন",
   "dialog.model.empty": "কোন মডেল ফলাফল নেই",
+  "dialog.model.recommended.noEu":
+    "এখনও কোনো EU-হোস্ট করা মডেল Lunos-এর মূল্যায়নে উত্তীর্ণ হয়নি, তাই আপনার শুধু-EU নীতিতে কিছুই সুপারিশ করা হয়নি।",
   "dialog.model.manage": "মডেল পরিচালনা করুন",
   "dialog.model.manage.description": "মডেল নির্বাচকের মধ্যে কোন মডেলগুলি উপস্থিত হবে তা কাস্টমাইজ করুন৷",
   "dialog.model.manage.provider.toggle": "সমস্ত {{provider}} মডেল টগল করুন",
@@ -1239,6 +1241,8 @@ export const dict: Record<string, string> = {
   "sessions.bulk.unarchive": "আর্কাইভ থেকে সরান",
   "sessions.bulk.deleteArchived": "আর্কাইভ করা মুছুন",
   "sessions.bulk.failed": "থামানো যায়নি: {{reason}}",
+  "sessions.rename.failed": "নাম বদলানো যায়নি: {{reason}}",
+  "sessions.rename.deleted": "সেশনটি মুছে ফেলা হয়েছে",
   "sessions.bulk.stop.question.one": "{{count}} সেশন থামাবেন?",
   "sessions.bulk.stop.question.other": "{{count}} সেশন থামাবেন?",
   "sessions.bulk.stop.running": "চলছে: {{count}}",

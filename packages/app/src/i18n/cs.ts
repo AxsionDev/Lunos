@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Vyberte model",
   "dialog.model.search.placeholder": "Hledat modely",
   "dialog.model.empty": "Žádné výsledky modelu",
+  "dialog.model.recommended.noEu":
+    "Žádný model hostovaný v EU zatím neprošel hodnocením Lunos, takže při zásadě „pouze EU“ se nic nedoporučuje.",
   "dialog.model.manage": "Správa modelů",
   "dialog.model.manage.description": "Upravte, které modely se zobrazí ve voliči modelů.",
   "dialog.model.manage.provider.toggle": "Přepnout všechny modely {{provider}}",
@@ -1251,6 +1253,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Obnovit z archivu",
   "sessions.bulk.deleteArchived": "Odstranit archivované",
   "sessions.bulk.failed": "Nelze zastavit: {{reason}}",
+  "sessions.rename.failed": "Přejmenování se nezdařilo: {{reason}}",
+  "sessions.rename.deleted": "relace byla smazána",
   "sessions.bulk.stop.question.one": "Zastavit {{count}} relaci?",
   "sessions.bulk.stop.question.few": "Zastavit {{count}} relace?",
   "sessions.bulk.stop.question.many": "Zastavit {{count}} relace?",

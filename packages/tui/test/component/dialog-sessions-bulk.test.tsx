@@ -60,6 +60,8 @@ const fixture = () => [
 function fakeServer(input: {
   sessions: SessionOverviewItem[]
   unreachable?: string[]
+  /** XCOD-325: listed, but deleted by the time they are renamed. */
+  deleted?: string[]
   /** XCOD-284: what experimental.sessionBulk.preview says per session, and whether sync is on. */
   preview?: Record<string, { messages?: number; children?: number; queued?: number; shared?: boolean; tool?: string }>
   sync?: boolean
@@ -93,7 +95,25 @@ function fakeServer(input: {
     }
     return result
   }
+  // XCOD-325: the three ways a row is renamed.
+  const rename = async (id: string, request: Request) => {
+    const body = await request.json()
+    calls.push({ path: `rename ${id}`, body })
+    const item = sessions.find((each) => each.id === id)
+    if (!item || input.deleted?.includes(id))
+      return json({ name: "NotFoundError", data: { message: "Session not found" } }, { status: 404 })
+    if (input.unreachable?.includes(id))
+      return json({ message: "the Lunos running it isn't responding" }, { status: 400 })
+    item.title = body.title || `automatic ${id}`
+    return json(id.startsWith("external:") ? true : item)
+  }
   const handler = async (url: URL, request?: Request) => {
+    const external = /^\/experimental\/external\/([^/]+)\/rename$/.exec(url.pathname)
+    if (external) return rename(`external:${external[1]}`, request!)
+    const peer = /^\/experimental\/peer\/([^/]+)\/rename$/.exec(url.pathname)
+    if (peer) return rename(peer[1]!, request!)
+    const own = /^\/session\/([^/]+)$/.exec(url.pathname)
+    if (own && request?.method === "PATCH") return rename(own[1]!, request)
     if (url.pathname === "/experimental/session-overview") {
       const archived = url.searchParams.get("archived") === "true"
       return json({ groups: [], sessions: sessions.filter((item) => !!item.archived === archived) })
@@ -753,6 +773,102 @@ test("XCOD-284: a session that couldn't be deleted stays, marked with why, and t
     await wait(() => ui.frame().includes("couldn't delete: another Lunos didn't respond"))
     expect(ui.frame()).toContain("title e1")
     expect(ui.frame()).not.toContain("title d1")
+  } finally {
+    ui.cleanup()
+  }
+})
+
+// XCOD-325: ctrl+r renames any row: this Lunos's, another Lunos's, a Claude Code one, an archived one.
+// Mounted afresh, the cursor is on the Ungrouped heading: `row` counts from 1 under it (newest first).
+async function renameRow(server: ReturnType<typeof fakeServer>, row: number, title: string, name: string) {
+  const ui = await mountList(server)
+  for (let i = 0; i < row; i++) ui.app.mockInput.pressArrow("down")
+  await Bun.sleep(80)
+  await ui.key("r", { ctrl: true })
+  await wait(() => ui.frame().includes("Rename session"))
+  expect(ui.frame()).toContain("Leave it empty to go back to the automatic name.")
+  // Prefilled with the current name: cleared, then the new one typed.
+  expect(ui.frame()).toContain(title)
+  for (let i = 0; i < title.length + 2; i++) ui.app.mockInput.pressBackspace()
+  await Bun.sleep(40)
+  await ui.app.mockInput.typeText(name)
+  await ui.enter()
+  return ui
+}
+
+test("XCOD-325: the footer shows the rename key, on a Claude Code row and in Show archived too", async () => {
+  const server = fakeServer({
+    sessions: [
+      row("external:cc", { kind: "external", tool: "claude", title: "Claude Code · api", updated: Date.now() }),
+      row("f9", { updated: Date.now() - 1000 }),
+      row("a1", { archived: Date.now() - 1000 }),
+    ],
+  })
+  const ui = await mountList(server)
+  try {
+    // On the Claude Code row (no longer dimmed: it can be renamed too).
+    ui.app.mockInput.pressArrow("down")
+    await wait(() => ui.frame().includes("rename ctrl+r"))
+    await ui.press("dialog.sessions.archived")
+    await wait(() => ui.frame().includes("title a1"))
+    expect(ui.frame()).toContain("rename ctrl+r")
+    await ui.press("dialog.sessions.archived")
+    await wait(() => ui.frame().includes("Sessions — all projects"))
+  } finally {
+    ui.cleanup()
+  }
+})
+
+test("XCOD-325: a Lunos session, another Lunos's and a Claude Code session are each renamed the right way", async () => {
+  const server = fakeServer({
+    sessions: [
+      row("own", { updated: Date.now() }),
+      row("e1", { state: "running", elsewhere: true, updated: Date.now() - 1000 }),
+      row("external:cc", { kind: "external", tool: "claude", title: "Claude Code · api", updated: Date.now() - 2000 }),
+      // Keeps its name: the view is ready once a "title …" row is listed.
+      row("keep", { updated: Date.now() - 3000 }),
+    ],
+  })
+  for (const [index, title, name] of [
+    [1, "title own", "Mine"],
+    [2, "title e1", "Theirs"],
+    [3, "Claude Code · api", "API work"],
+  ] as const) {
+    const ui = await renameRow(server, index, title, name)
+    try {
+      await wait(() => ui.frame().includes(name))
+    } finally {
+      ui.cleanup()
+    }
+  }
+  expect(server.calls).toEqual([
+    { path: "rename own", body: { title: "Mine" } },
+    { path: "rename e1", body: { title: "Theirs" } },
+    { path: "rename external:cc", body: { title: "API work" } },
+  ])
+})
+
+test("XCOD-325: a rename that can't be saved keeps the old name and the row says why", async () => {
+  const server = fakeServer({
+    sessions: [row("e2", { state: "running", elsewhere: true, updated: Date.now() })],
+    unreachable: ["e2"],
+  })
+  const ui = await renameRow(server, 1, "title e2", "Never saved")
+  try {
+    await wait(() => ui.frame().includes("Couldn't rename: the Lunos running it isn't responding"))
+    expect(ui.frame()).toContain("title e2")
+    expect(ui.frame()).not.toContain("Never saved")
+  } finally {
+    ui.cleanup()
+  }
+})
+
+test("XCOD-325: renaming a session deleted meanwhile says so", async () => {
+  const server = fakeServer({ sessions: [row("gone", { updated: Date.now() })], deleted: ["gone"] })
+  const ui = await renameRow(server, 1, "title gone", "Too late")
+  try {
+    await wait(() => ui.frame().includes("Couldn't rename: the session was deleted"))
+    expect(ui.frame()).toContain("title gone")
   } finally {
     ui.cleanup()
   }

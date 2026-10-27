@@ -206,6 +206,8 @@ export const dict: Record<string, string> = {
   "dialog.model.select.title": "मोडेल चयन गर्नुहोस्",
   "dialog.model.search.placeholder": "मोडेलहरू खोज्नुहोस्",
   "dialog.model.empty": "कुनै मोडेल परिणामहरू छैनन्",
+  "dialog.model.recommended.noEu":
+    "अहिलेसम्म कुनै पनि EU-होस्ट गरिएको मोडेलले Lunos को मूल्याङ्कन पास गरेको छैन, त्यसैले तपाईंको EU-मात्र नीतिमा केही पनि सिफारिस गरिएको छैन।",
   "dialog.model.manage": "मोडेलहरू प्रबन्ध गर्नुहोस्",
   "dialog.model.manage.description": "मोडेल चयनकर्तामा कुन मोडेलहरू देखा पर्दछ अनुकूलित गर्नुहोस्।",
   "dialog.model.manage.provider.toggle": "सबै {{provider}} मोडेलहरू टगल गर्नुहोस्",
@@ -1246,6 +1248,8 @@ export const dict: Record<string, string> = {
   "sessions.bulk.unarchive": "अभिलेखबाट निकाल्नुहोस्",
   "sessions.bulk.deleteArchived": "अभिलेखित मेट्नुहोस्",
   "sessions.bulk.failed": "रोक्न सकिएन: {{reason}}",
+  "sessions.rename.failed": "नाम बदल्न सकिएन: {{reason}}",
+  "sessions.rename.deleted": "सत्र मेटाइयो",
   "sessions.bulk.stop.question.one": "{{count}} सत्र रोक्ने हो?",
   "sessions.bulk.stop.question.other": "{{count}} सत्रहरू रोक्ने हो?",
   "sessions.bulk.stop.running": "चलिरहेको: {{count}}",

@@ -206,6 +206,8 @@ export const dict = {
   "dialog.model.select.title": "Model saýlaň",
   "dialog.model.search.placeholder": "Gözleg modelleri",
   "dialog.model.empty": "Hiç hili model netijesi ýok",
+  "dialog.model.recommended.noEu":
+    "Entek ÝB-de ýerleşdirilen hiç bir model Lunos bahalandyrmasyndan geçmedi, şonuň üçin diňe ÝB syýasatyňyzda hiç zat maslahat berilmeýär.",
   "dialog.model.manage": "Modelleri dolandyryň",
   "dialog.model.manage.description": "Model saýlaýjysynda haýsy modelleriň peýda bolýandygyny düzüň.",
   "dialog.model.manage.provider.toggle": "Zhli {{provider}} modellerini üýtgediň",
@@ -1248,6 +1250,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Arhiwden çykar",
   "sessions.bulk.deleteArchived": "Arhiwlenenleri poz",
   "sessions.bulk.failed": "Duruzyp bolmady: {{reason}}",
+  "sessions.rename.failed": "Adyny üýtgedip bolmady: {{reason}}",
+  "sessions.rename.deleted": "sessiýa öçürildi",
   "sessions.bulk.stop.question.one": "Sessiýalar duruzylsynmy? Sany: {{count}}",
   "sessions.bulk.stop.question.other": "Sessiýalar duruzylsynmy? Sany: {{count}}",
   "sessions.bulk.stop.running": "Işleýär: {{count}}",

@@ -38,6 +38,7 @@ import {
   SessionBulkPayload,
   SessionBulkStopPayload,
   SessionListQuery,
+  SessionRenamePayload,
   SessionOverviewQuery,
   ToolListQuery,
   WorktreeApiError,
@@ -65,6 +66,7 @@ import { ExternalConsent } from "@/external/consent"
 import { ExternalConfig } from "@/external/config"
 import { ConfigExternal } from "@opencode-ai/core/config/external"
 import { GlobalBus } from "@/bus/global"
+import { AuditLog } from "@/audit/log"
 import { SessionGroupEvent } from "@opencode-ai/schema/session-group-event"
 
 // XCOD-298: project store errors become the endpoint's declared errors.
@@ -95,6 +97,17 @@ let peerEvents: (() => void) | undefined
 // XCOD-234: other Lunos processes' sessions changed (or one stopped responding): every surface re-reads.
 function publishPeerChanges() {
   peerEvents ??= SessionPeers.subscribe(() =>
+    GlobalBus.emit("event", {
+      directory: "global",
+      payload: { type: SessionGroupEvent.LiveUpdated.type, properties: {} },
+    }),
+  )
+}
+
+let externalEvents: (() => void) | undefined
+// XCOD-325: a Claude Code / Codex session renamed (or a turn started or ended) here or in another process.
+function publishExternalChanges() {
+  externalEvents ??= ExternalRegistry.subscribe(() =>
     GlobalBus.emit("event", {
       directory: "global",
       payload: { type: SessionGroupEvent.LiveUpdated.type, properties: {} },
@@ -139,6 +152,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     SessionLive.withControl(SessionPeerControl.start)
     publishGroupChanges()
     publishPeerChanges()
+    publishExternalChanges()
 
     const capabilities = Effect.fn("ExperimentalHttpApi.capabilities")(function* () {
       return { backgroundSubagents: backgroundEnabled(flags.experimentalBackgroundSubagents, yield* config.get()) }
@@ -498,6 +512,23 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
         : Effect.fail(new InvalidRequestError({ message: result.reason }))
     })
 
+    // XCOD-325: a Claude Code / Codex session's name in Lunos, kept in its registry entry.
+    const externalRename = Effect.fn("ExperimentalHttpApi.externalRename")(function* (ctx: {
+      params: { sessionID: string }
+      payload: typeof SessionRenamePayload.Type
+    }) {
+      const title = Session.cleanTitle(ctx.payload.title)
+      if (!(yield* Effect.promise(() => ExternalRegistry.rename(ctx.params.sessionID, title))))
+        return yield* Effect.fail(notFound("That session was deleted."))
+      AuditLog.emit("session.rename", {
+        origin: "api",
+        ids: [`external:${ctx.params.sessionID}`],
+        kind: "external",
+        cleared: !title || undefined,
+      })
+      return true
+    })
+
     // XCOD-250: availability for /claude and /codex. Detection runs the tools' own --version/--help,
     // so it's asked when the commands are offered, not on every keystroke.
     const externalTools = Effect.fn("ExperimentalHttpApi.externalTools")(function* () {
@@ -687,6 +718,48 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const peerStop = Effect.fn("ExperimentalHttpApi.peerStop")(function* (ctx: { params: { sessionID: string } }) {
       return Boolean(yield* peer<boolean>(ctx.params.sessionID, "/stop", { method: "POST" }))
     })
+    // XCOD-325: the Lunos that runs it stores (and audits) the name, so its own views show it at once.
+    const peerRename = Effect.fn("ExperimentalHttpApi.peerRename")(function* (ctx: {
+      params: { sessionID: string }
+      payload: typeof SessionRenamePayload.Type
+    }) {
+      const sent = yield* Effect.tryPromise({
+        try: () =>
+          SessionPeerControl.call(ctx.params.sessionID, "/rename", {
+            method: "POST",
+            body: { title: ctx.payload.title },
+          }).then(() => true),
+        catch: (error) => error,
+      }).pipe(
+        Effect.catch((error) => {
+          // No Lunos runs it any more (its turn ended): renamed here, below.
+          if (error instanceof SessionPeerControl.PeerError && error.status === 404) return Effect.succeed(false)
+          if (error instanceof SessionPeerControl.PeerError && error.status === 502)
+            return Effect.fail(new InvalidRequestError({ message: "the Lunos running it isn't responding" }))
+          return Effect.fail(
+            new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
+          )
+        }),
+      )
+      if (sent) return true
+      const sessionID = SessionID.make(ctx.params.sessionID)
+      const current = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.succeed(undefined)))
+      if (!current) return yield* Effect.fail(notFound("That session was deleted."))
+      const external = ExternalSession.of(current)
+      yield* sessions.setTitle({
+        sessionID,
+        title: ctx.payload.title,
+        source: "user",
+        fallback: external ? ExternalSession.title(external.tool, external.session) : undefined,
+      })
+      AuditLog.emit("session.rename", {
+        origin: "api",
+        ids: [ctx.params.sessionID],
+        kind: "session",
+        cleared: !Session.cleanTitle(ctx.payload.title) || undefined,
+      })
+      return true
+    })
     const peerAsks = Effect.fn("ExperimentalHttpApi.peerAsks")(function* (ctx: { params: { sessionID: string } }) {
       return yield* peer<typeof PeerAsks.Type>(ctx.params.sessionID, "/asks")
     })
@@ -862,6 +935,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionGroupDelete", sessionGroupDelete)
       .handle("sessionGroupMove", sessionGroupMove)
       .handle("externalStop", externalStop)
+      .handle("externalRename", externalRename)
       .handle("externalTools", externalTools)
       .handle("externalModels", externalModels)
       .handle("externalModel", externalModel)
@@ -870,6 +944,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("externalConfig", externalConfig)
       .handle("externalConfigCommand", externalConfigCommand)
       .handle("peerStop", peerStop)
+      .handle("peerRename", peerRename)
       .handle("peerAsks", peerAsks)
       .handle("peerPermissionReply", peerPermissionReply)
       .handle("peerQuestionReply", peerQuestionReply)

@@ -9,7 +9,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { describe, expect } from "bun:test"
-import { Effect, Fiber, Layer } from "effect"
+import { Context, Effect, Fiber, Layer } from "effect"
 import fs from "fs/promises"
 import path from "path"
 import { Agent as AgentSvc } from "../../src/agent/agent"
@@ -52,6 +52,7 @@ import { testEffect } from "../lib/effect"
 import { reply, TestLLMServer } from "../lib/llm-server"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { DynamicWorkflows } from "@/session/workflows"
+import { AutoContinue } from "@/session/auto-continue"
 import { Budget } from "@/budget"
 import type { SessionID } from "../../src/session/schema"
 
@@ -285,6 +286,8 @@ const toolCallsByAgent = Effect.fn("test.toolCallsByAgent")(function* (rootID: S
 })
 
 const WRITERS = ["edit", "write", "apply_patch", "bash"]
+
+type Server = Context.Service.Shape<typeof TestLLMServer>
 
 describe("Dynamic workflows on the live loop (XCOD-303)", () => {
   it.instance("default config: the main agent dispatches; only subagents edit, write or run commands", () =>
@@ -575,6 +578,130 @@ describe("Dynamic workflows on the live loop (XCOD-303)", () => {
     }),
   )
 
+  // XCOD-324: a recorded session where qa fails on 5 gaps and the main agent ends its turn with a
+  // status report. Lunos carries on by the open work, not by the wording: the fixes are dispatched,
+  // qa runs again, and it stops once qa passes.
+  describe("open work continues the turn (XCOD-324)", () => {
+    const STATUS = "QA found 5 blocking gaps. The cycle remains in the build phase while I address them."
+    const GAPS = [
+      "npm test: signup.spec.ts accepts an empty email",
+      "POST /signup → 500 on a duplicate email",
+      "/signup shows no error text",
+      "the email input has no label",
+      "npm run lint: 2 errors in signup.ts",
+    ]
+    const FAILED = `Verification\n✓ npm run build (4 s)\n${GAPS.map((gap) => `✗ ${gap}`).join("\n")}`
+    const PASSED = `Verification\n✓ npm run build (4 s)\n${GAPS.map((gap) => `✓ ${gap.replace(/^.*?: /, "")}`).join("\n")}`
+    const todo = (status: string) => ({
+      todos: GAPS.map((content) => ({ content, status, priority: "high" })),
+    })
+
+    const continuations = (msgs: readonly { info: { role: string }; parts: readonly unknown[] }[]) =>
+      (msgs as Parameters<typeof AutoContinue.isContinuation>[0][]).filter(AutoContinue.isContinuation)
+    const label = (msg: Parameters<typeof AutoContinue.isContinuation>[0]) =>
+      msg.parts.flatMap((part) =>
+        part.type === "text" && part.metadata?.[AutoContinue.METADATA] ? [part.metadata[AutoContinue.METADATA]] : [],
+      )[0] as { label: string; attempt: number } | undefined
+
+    /** The recorded turn: build, qa fails on the 5 gaps, the main agent reports and ends its turn. */
+    const recorded = Effect.fn("test.recorded")(function* (llm: Server) {
+      yield* llm.tool("task", { description: "build signup", prompt: "Implement signup.ts.", subagent_type: "general" })
+      yield* llm.text("Implemented signup validation.")
+      yield* llm.tool("task", { description: "verify signup", prompt: "Verify signup.", subagent_type: "qa" })
+      yield* llm.text(FAILED)
+      yield* llm.text(STATUS)
+    })
+
+    for (const agent of ["dev-cycle", "build"] as const)
+      it.instance(`${agent}: continues, dispatches the fixes, re-runs qa and stops when it passes`, () =>
+        Effect.gen(function* () {
+          const { session, llm } = yield* setup({
+            agent,
+            ...(agent === "dev-cycle" ? { cursor: { phase: "build", gate: "approved" } } : {}),
+          })
+          yield* say(session.id, agent, agent === "dev-cycle" ? "Approved." : "Add validation to the signup form.")
+          yield* recorded(llm)
+          // Continued: each gap becomes a todo, fix subagents go out, qa runs again and passes.
+          yield* llm.tool("todowrite", todo("pending"))
+          yield* llm.tool("task", { description: "fix gaps 1-3", prompt: "Fix 1-3.", subagent_type: "general" })
+          yield* llm.text("Fixed gaps 1-3.")
+          yield* llm.tool("task", { description: "fix gaps 4-5", prompt: "Fix 4-5.", subagent_type: "general" })
+          yield* llm.text("Fixed gaps 4-5.")
+          yield* llm.tool("task", { description: "verify signup", prompt: "Verify signup again.", subagent_type: "qa" })
+          yield* llm.text(PASSED)
+          yield* llm.tool("todowrite", todo("completed"))
+          yield* llm.text(`All 5 gaps are fixed.\n\n${PASSED}`)
+
+          yield* run(session.id)
+
+          const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+          const sent = continuations(msgs)
+          expect(sent).toHaveLength(1)
+          const title = agent === "dev-cycle" ? "Dev-Cycle" : "Build"
+          expect(label(sent[0])?.label).toBe(
+            `${title} continued automatically (${agent === "dev-cycle" ? "plan approved → build · " : ""}Working on 5 gaps · check: 1/6 passing)`,
+          )
+          const requests = yield* modelCalls()
+          const told = JSON.stringify(requests[5])
+          expect(told).toContain("qa reported 5 blocking gaps")
+          expect(told).toContain("Turn each gap into an item in the todo list")
+          for (const gap of GAPS) expect(told).toContain(JSON.stringify(`- ✗ ${gap}`).slice(1, -1))
+
+          // The fixes were dispatched by the main agent, and qa ran again in a session of its own.
+          const mine = (yield* toolCallsByAgent(session.id)).filter((call) => call.session === session.id)
+          expect(mine.map((call) => call.tool)).toEqual([
+            "task",
+            "task",
+            "todowrite",
+            "task",
+            "task",
+            "task",
+            "todowrite",
+          ])
+          const sessions = yield* Session.Service
+          const children = yield* sessions.children(session.id)
+          expect(children.map((child) => child.agent).toSorted()).toEqual(["general", "general", "general", "qa", "qa"])
+          // Stopped once qa passed: nothing scripted is left, and no request beyond the script.
+          expect(requests).toHaveLength(14)
+          expect(yield* llm.pending).toBe(0)
+        }),
+      )
+
+    for (const { agent, config } of [
+      { agent: "dev-cycle", config: { workflows: { dynamic: false } } },
+      { agent: "dev-cycle", config: { dev_cycle: { auto_continue: false } } },
+      { agent: "build", config: { agent: { build: { auto_continue: false } } } },
+    ] as { agent: string; config: Partial<ConfigV1.Info> }[])
+      it.instance(`opt-out ${JSON.stringify(config)} keeps today's behaviour: the status report ends the turn`, () =>
+        Effect.gen(function* () {
+          const { session, llm } = yield* setup({
+            agent,
+            config,
+            ...(agent === "dev-cycle" ? { cursor: { phase: "build", gate: "approved" } } : {}),
+          })
+          yield* say(session.id, agent, "Approved.")
+          yield* recorded(llm)
+          yield* run(session.id)
+          expect(continuations(yield* MessageV2.filterCompactedEffect(session.id))).toHaveLength(0)
+          expect(yield* modelCalls()).toHaveLength(5)
+        }),
+      )
+
+    it.instance("a missing secret is left to the human", () =>
+      Effect.gen(function* () {
+        const { session, llm } = yield* setup({ agent: "build" })
+        yield* say(session.id, "build", "Start the worker.")
+        yield* llm.tool("task", { description: "verify worker", prompt: "Start it.", subagent_type: "qa" })
+        yield* llm.text(
+          "Verification\n✓ npm run build\n✗ Couldn't start the worker: REDIS_URL isn't set (.env.example has it)",
+        )
+        yield* llm.text("The worker can't start until REDIS_URL is set; it stays in the build phase until then.")
+        yield* run(session.id)
+        expect(continuations(yield* MessageV2.filterCompactedEffect(session.id))).toHaveLength(0)
+        expect(yield* modelCalls()).toHaveLength(3)
+      }),
+    )
+  })
   // XCOD-326: every working agent orchestrates by default, not only Build and Dev-Cycle.
   // With `tries`, the main agent first tries the edit itself. Research and Dev-Cycle keep a write tool
   // for their own file, so a refused write would still show as a write call: they only dispatch.

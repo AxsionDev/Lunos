@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Vel modell",
   "dialog.model.search.placeholder": "Leitimodell",
   "dialog.model.empty": "Eingi modellúrslit",
+  "dialog.model.recommended.noEu":
+    "Eingin ES-hýst fyrimynd hevur enn staðið Lunos-mettingina, so einki verður mælt til undir tínum bert-ES politikki.",
   "dialog.model.manage": "Umsita modellir",
   "dialog.model.manage.description": "Tillaga hvørji modell síggjast í modellveljaranum.",
   "dialog.model.manage.provider.toggle": "Skift øll {{provider}} modellini",
@@ -1244,6 +1246,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Tak úr arkivi",
   "sessions.bulk.deleteArchived": "Strika arkiveraðar",
   "sessions.bulk.failed": "Kundi ikki steðga: {{reason}}",
+  "sessions.rename.failed": "Kundi ikki umdoypa: {{reason}}",
+  "sessions.rename.deleted": "setan er strikað",
   "sessions.bulk.stop.question.one": "Steðga {{count}} setu?",
   "sessions.bulk.stop.question.other": "Steðga {{count}} setum?",
   "sessions.bulk.stop.running": "Koyrir: {{count}}",

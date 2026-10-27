@@ -110,6 +110,13 @@ const CLAIMS: Record<string, Claim> = {
     hosts: [".endpoints.kepler.ai.cloud.ovh.net"],
     note: "OVHcloud is a French company; AI Endpoints run in its EU data centres. Reached through the generic openai-compatible plugin.",
   },
+  stackit: {
+    region: "eu",
+    basis: "both",
+    // XCOD-320: region eu01 is Germany (docs.stackit.cloud/platform/regions, checked 2026-10-26).
+    hosts: ["api.openai-compat.model-serving.eu01.onstackit.cloud"],
+    note: "STACKIT is run by Schwarz Digits Cloud GmbH & Co. KG, a German company. AI Model Serving's OpenAI-compatible API is in its eu01 region, Germany, and STACKIT says queries are neither stored nor used for training. Reached through the generic openai-compatible plugin.",
+  },
   hetzner: {
     region: "eu",
     basis: "both",
@@ -416,3 +423,17 @@ export function taggedProviders(): string[] {
 export function euProviders(): string[] {
   return Object.keys(CLAIMS).filter((id) => CLAIMS[id]!.region === "eu")
 }
+
+/**
+ * XCOD-320: whether a residency policy is EU-only, for choosing what Lunos recommends: it allows
+ * "eu" and refuses US providers. Other regions may be allowed too (e.g. "unknown" for a
+ * self-hosted model). Here rather than in residency.ts so the web app can use it: no Node imports.
+ */
+export function euOnly(block: { readonly allow?: readonly string[] } | undefined) {
+  const allow = block?.allow ?? []
+  return allow.includes("eu") && !allow.includes("us")
+}
+
+/** XCOD-320: what the model pickers say when an EU-only policy leaves Recommended empty. */
+export const NO_EU_RECOMMENDATION =
+  "Nothing is recommended under your EU-only policy: no EU-hosted model has passed at least half of Lunos's evaluation tasks yet. See https://lunos.tech/docs/models-tested/"

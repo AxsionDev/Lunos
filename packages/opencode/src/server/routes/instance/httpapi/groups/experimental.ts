@@ -453,6 +453,7 @@ export const ExperimentalPaths = {
   sessionBulkDelete: "/experimental/session-bulk/delete",
   sessionBulkPreview: "/experimental/session-bulk/preview",
   externalStop: "/experimental/external/:sessionID/stop",
+  externalRename: "/experimental/external/:sessionID/rename",
   externalTools: "/experimental/external/tools",
   externalModels: "/experimental/external/:sessionID/models",
   externalModel: "/experimental/external/:sessionID/model",
@@ -461,6 +462,7 @@ export const ExperimentalPaths = {
   externalConfig: "/experimental/external/config/:tool",
   externalConfigCommand: "/experimental/external/config/:tool/command",
   peerStop: "/experimental/peer/:sessionID/stop",
+  peerRename: "/experimental/peer/:sessionID/rename",
   peerAsks: "/experimental/peer/:sessionID/asks",
   peerPermissionReply: "/experimental/peer/:sessionID/permission/:requestID/reply",
   peerQuestionReply: "/experimental/peer/:sessionID/question/:requestID/reply",
@@ -470,6 +472,9 @@ export const ExperimentalPaths = {
   sessionQueued: "/experimental/session/:sessionID/queued",
   peerPrompt: "/experimental/peer/:sessionID/prompt",
 } as const
+
+// XCOD-325: a session's new name; empty goes back to the automatic one.
+export const SessionRenamePayload = Schema.Struct({ title: Schema.String })
 
 // XCOD-234: what another Lunos process's session is waiting for.
 export const PeerAsks = Schema.Struct({
@@ -948,6 +953,20 @@ export const ExperimentalApi = HttpApi.make("experimental")
               "Stop a running Claude Code or Codex session Lunos started (as lunos external stop), from any Lunos process on this machine.",
           }),
         ),
+        HttpApiEndpoint.post("externalRename", ExperimentalPaths.externalRename, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionRenamePayload,
+          success: described(Schema.Boolean, "Renamed"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.external.rename",
+            summary: "Rename an external session",
+            description:
+              "Give a Claude Code or Codex session Lunos started a name in Lunos's lists: one line of at most 80 characters; empty goes back to the automatic name. Stored in Lunos's own record of the session; the tool's session id and files are untouched. Audited as session.rename.",
+          }),
+        ),
         HttpApiEndpoint.get("externalModels", ExperimentalPaths.externalModels, {
           params: { sessionID: Schema.String },
           query: WorkspaceRoutingQuery,
@@ -1037,6 +1056,20 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.peer.stop",
             summary: "Stop a session another Lunos runs",
             description: "Stop a session that another Lunos process on this machine is running, through that process.",
+          }),
+        ),
+        HttpApiEndpoint.post("peerRename", ExperimentalPaths.peerRename, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionRenamePayload,
+          success: described(Schema.Boolean, "Renamed"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.peer.rename",
+            summary: "Rename a session another Lunos runs",
+            description:
+              "Rename a session that another Lunos process on this machine is running, through that process, which stores and audits it (the last rename wins). When no Lunos runs it any more, it is renamed here.",
           }),
         ),
         HttpApiEndpoint.get("peerAsks", ExperimentalPaths.peerAsks, {

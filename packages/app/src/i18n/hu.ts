@@ -209,6 +209,8 @@ export const dict = {
   "dialog.model.select.title": "Válasszon modellt",
   "dialog.model.search.placeholder": "Modellek keresése",
   "dialog.model.empty": "Nincsenek modelleredmények",
+  "dialog.model.recommended.noEu":
+    "Még egyetlen EU-ban hosztolt modell sem ment át a Lunos értékelésén, ezért a csak EU-s szabályzat mellett nincs ajánlott modell.",
   "dialog.model.manage": "Modellek kezelése",
   "dialog.model.manage.description": "Testreszabhatja, hogy mely modellek jelenjenek meg a modellválasztóban.",
   "dialog.model.manage.provider.toggle": "Kapcsolja be az összes {{provider}} modellt",
@@ -1260,6 +1262,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Visszaállítás az archívumból",
   "sessions.bulk.deleteArchived": "Archiváltak törlése",
   "sessions.bulk.failed": "Nem sikerült leállítani: {{reason}}",
+  "sessions.rename.failed": "Nem sikerült átnevezni: {{reason}}",
+  "sessions.rename.deleted": "a munkamenetet törölték",
   "sessions.bulk.stop.question.one": "{{count}} munkamenet leállítása?",
   "sessions.bulk.stop.question.other": "{{count}} munkamenet leállítása?",
   "sessions.bulk.stop.running": "Fut: {{count}}",

@@ -223,6 +223,8 @@ export const dict = {
   "dialog.model.select.title": "Вибрати модель",
   "dialog.model.search.placeholder": "Пошук моделей",
   "dialog.model.empty": "Моделей не знайдено",
+  "dialog.model.recommended.noEu":
+    "Жодна модель, розміщена в ЄС, ще не пройшла оцінювання Lunos, тож за політики «лише ЄС» нічого не рекомендовано.",
   "dialog.model.manage": "Керувати моделями",
   "dialog.model.manage.description": "Налаштуйте, які моделі відображатимуться у виборі моделей.",
   "dialog.model.manage.provider.toggle": "Перемкнути всі моделі {{provider}}",
@@ -1356,6 +1358,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Повернути з архіву",
   "sessions.bulk.deleteArchived": "Видалити архівні",
   "sessions.bulk.failed": "Не вдалося зупинити: {{reason}}",
+  "sessions.rename.failed": "Не вдалося перейменувати: {{reason}}",
+  "sessions.rename.deleted": "сеанс видалено",
   "sessions.bulk.stop.question.one": "Зупинити {{count}} сесію?",
   "sessions.bulk.stop.question.few": "Зупинити {{count}} сесії?",
   "sessions.bulk.stop.question.many": "Зупинити {{count}} сесій?",

@@ -112,6 +112,8 @@ export const dict = {
   "dialog.model.select.title": "Seleziona modello",
   "dialog.model.search.placeholder": "Cerca modelli",
   "dialog.model.empty": "Nessun modello trovato",
+  "dialog.model.recommended.noEu":
+    "Nessun modello ospitato nell'UE ha ancora superato la valutazione di Lunos, quindi con la tua policy solo UE non c'è nulla di consigliato.",
   "dialog.model.manage": "Gestisci modelli",
   "dialog.model.manage.description": "Personalizza quali modelli appaiono nel selettore del modello.",
   "dialog.model.manage.provider.toggle": "Attiva o disattiva tutti i modelli {{provider}}",
@@ -1265,6 +1267,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Rimuovi dall'archivio",
   "sessions.bulk.deleteArchived": "Elimina archiviate",
   "sessions.bulk.failed": "Impossibile interrompere: {{reason}}",
+  "sessions.rename.failed": "Impossibile rinominare: {{reason}}",
+  "sessions.rename.deleted": "la sessione è stata eliminata",
   "sessions.bulk.stop.question.one": "Interrompere {{count}} sessione?",
   "sessions.bulk.stop.question.many": "Interrompere {{count}} sessioni?",
   "sessions.bulk.stop.question.other": "Interrompere {{count}} sessioni?",

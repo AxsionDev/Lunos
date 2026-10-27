@@ -6,6 +6,7 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
+import { ContextMenu } from "@opencode-ai/ui/context-menu"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
@@ -136,6 +137,8 @@ export function SessionsPage() {
   // XCOD-265: the last Clear, for Undo, and the rows Stop all couldn't stop (with why).
   const [lastClear, setLastClear] = createSignal<string[]>()
   const [failedStops, setFailedStops] = createSignal<Record<string, string>>({})
+  // XCOD-325: the rows a rename couldn't be saved for (with why); they keep their old name.
+  const [failedRenames, setFailedRenames] = createSignal<Record<string, string>>({})
   const archivedView = () => filter.state === "archived"
   const confirm = useBulkConfirm()
 
@@ -311,6 +314,8 @@ export function SessionsPage() {
       }
       openSession({ sessionID: item.id, directory: item.directory, worktree: item.project?.worktree })
     },
+    /** XCOD-325: every row: a double-click on its title, its Rename button or its context menu. */
+    startRename: (item: SessionOverviewItem) => setUi({ renamingSession: item.id, draft: item.title }),
     rename: async (item: SessionOverviewItem) => {
       // Enter, then the blur it causes: only the first saves.
       if (ui.renamingSession !== item.id) return
@@ -318,9 +323,30 @@ export function SessionsPage() {
       const title = ui.draft.replace(/\s+/g, " ").trim().slice(0, 80).trim()
       setUi("renamingSession", undefined)
       if (title === item.title) return
-      await client()
-        ?.session.update({ sessionID: item.id, directory: item.directory, title }, { throwOnError: true })
-        .catch(fail)
+      // XCOD-325: a Claude Code / Codex session gets a Lunos name (the tool's id is untouched); a
+      // session another Lunos runs is renamed by that Lunos, which stores and audits it.
+      const sdk = client()
+      if (!sdk) return
+      const options = { throwOnError: true } as const
+      const request = toolOnly(item)
+        ? sdk.experimental.external.rename({ sessionID: item.id.slice("external:".length), title }, options)
+        : item.elsewhere
+          ? sdk.experimental.peer.rename({ sessionID: item.id, directory: item.directory, title }, options)
+          : sdk.session.update({ sessionID: item.id, directory: item.directory, title }, options)
+      const { [item.id]: _, ...rest } = failedRenames()
+      await request.then(
+        () => setFailedRenames(rest),
+        (cause) =>
+          setFailedRenames({
+            ...rest,
+            [item.id]:
+              (cause as { cause?: { status?: number } })?.cause?.status === 404
+                ? language.t("sessions.rename.deleted")
+                : cause instanceof Error
+                  ? cause.message
+                  : String(cause),
+          }),
+      )
       refresh()
     },
     stop: async (item: SessionOverviewItem) => {
@@ -910,103 +936,162 @@ export function SessionsPage() {
   const SessionRow = (props: { item: SessionOverviewItem; child?: boolean }) => {
     const item = () => props.item
     const external = () => item().id.startsWith("external:")
-    return (
-      <li
-        class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-3 py-2 hover:bg-v2-background-bg-raised"
-        classList={{ "ml-6": props.child }}
-        data-session-id={item().id}
-        data-state={item().state}
-        draggable={!props.child}
-        onDragStart={(event) => {
-          event.dataTransfer?.setData(DRAG_TYPE, item().id)
-          event.dataTransfer?.setData("text/plain", item().title)
-        }}
+    const renameButton = () => (
+      <button
+        type="button"
+        class="rounded px-2 py-1 text-12-medium"
+        data-action="rename"
+        onClick={() => sessionActions.startRename(item())}
       >
-        {/* XCOD-262: the row's number, for `@n` tags; clicking it puts the tag in the prompt. */}
-        <Show when={!archivedView() ? numbers().get(item().id) : undefined}>
-          {(value) => (
-            <button
-              type="button"
-              class="w-6 shrink-0 rounded text-left text-12-medium tabular-nums text-v2-text-text-weak"
-              aria-label={t("sessions.monitor.tag", { session: tagLabel(item()) })}
-              title={t("sessions.monitor.tag", { session: tagLabel(item()) })}
-              onClick={() => monitorActions.tag(item())}
-            >
-              {value()}
-            </button>
-          )}
-        </Show>
-        <span
-          class="inline-block size-2 shrink-0 rounded-full"
-          classList={{
-            "bg-v2-state-fg-warning": item().state === "waiting",
-            "bg-v2-state-fg-success": item().state === "running",
-            "bg-v2-state-fg-danger": item().state === "failed",
-            "bg-v2-border-border-base": item().state === "idle" || item().state === "finished",
-          }}
-          aria-hidden="true"
-        />
-        <div class="flex min-w-0 flex-1 basis-40 flex-col">
-          <Show
-            when={ui.renamingSession === item().id}
-            fallback={
-              <span class="truncate text-14-medium text-v2-text-text-strong" title={item().title}>
-                {item().title}
-              </span>
-            }
-          >
-            <input
-              class="rounded border border-v2-border-border-base bg-transparent px-1 text-14-regular"
-              aria-label={language.t("sessions.session.name")}
-              maxLength={80}
-              value={ui.draft}
-              ref={(el) => queueMicrotask(() => el.focus())}
-              onInput={(event) => setUi("draft", event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void sessionActions.rename(item())
-                if (event.key === "Escape") setUi("renamingSession", undefined)
-              }}
-              onBlur={() => void sessionActions.rename(item())}
-            />
-          </Show>
-          <span class="truncate text-12-regular text-v2-text-text-weak">
-            {[
-              item().queued
-                ? t(item().ownerClosed ? "sessions.monitor.queuedOwnerClosed" : "sessions.monitor.queuedCount", {
-                    count: item().queued!,
-                  })
-                : undefined,
-              projectName(item()),
-              item().agent,
-              item().model,
-              item().tool,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        </div>
-        <Show when={item().kind !== "session"}>
-          <span class="rounded bg-v2-background-bg-raised px-1.5 py-0.5 text-11-medium text-v2-text-text-base">
-            {language.t(`sessions.kind.${item().kind as "subagent" | "scheduled" | "external"}`)}
-          </span>
-        </Show>
-        <span
-          class="text-12-medium"
-          classList={{
-            "text-v2-state-fg-warning": item().state === "waiting",
-            "text-v2-state-fg-success": item().state === "running",
-            "text-v2-state-fg-danger": item().state === "failed",
-            "text-v2-text-text-weak": item().state === "idle" || item().state === "finished",
+        {language.t("common.rename")}
+      </button>
+    )
+    // XCOD-325: right-click (or long-press) on a row offers Rename too.
+    return (
+      <ContextMenu>
+        <ContextMenu.Trigger
+          as="li"
+          class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-3 py-2 hover:bg-v2-background-bg-raised"
+          classList={{ "ml-6": props.child }}
+          data-session-id={item().id}
+          data-state={item().state}
+          draggable={!props.child}
+          onDragStart={(event: DragEvent) => {
+            event.dataTransfer?.setData(DRAG_TYPE, item().id)
+            event.dataTransfer?.setData("text/plain", item().title)
           }}
         >
-          {item().archived ? t("sessions.archived.at", { time: ago(item().archived!) }) : stateLabel(item())}
-        </span>
-        <span class="text-12-regular text-v2-text-text-weak tabular-nums">{ago(item().updated)}</span>
-        <span class="text-12-regular text-v2-text-text-weak tabular-nums">{money(item().cost)}</span>
-        <Show
-          when={!archivedView()}
-          fallback={
+          {/* XCOD-262: the row's number, for `@n` tags; clicking it puts the tag in the prompt. */}
+          <Show when={!archivedView() ? numbers().get(item().id) : undefined}>
+            {(value) => (
+              <button
+                type="button"
+                class="w-6 shrink-0 rounded text-left text-12-medium tabular-nums text-v2-text-text-weak"
+                aria-label={t("sessions.monitor.tag", { session: tagLabel(item()) })}
+                title={t("sessions.monitor.tag", { session: tagLabel(item()) })}
+                onClick={() => monitorActions.tag(item())}
+              >
+                {value()}
+              </button>
+            )}
+          </Show>
+          <span
+            class="inline-block size-2 shrink-0 rounded-full"
+            classList={{
+              "bg-v2-state-fg-warning": item().state === "waiting",
+              "bg-v2-state-fg-success": item().state === "running",
+              "bg-v2-state-fg-danger": item().state === "failed",
+              "bg-v2-border-border-base": item().state === "idle" || item().state === "finished",
+            }}
+            aria-hidden="true"
+          />
+          <div class="flex min-w-0 flex-1 basis-40 flex-col">
+            <Show
+              when={ui.renamingSession === item().id}
+              fallback={
+                <span
+                  class="truncate text-14-medium text-v2-text-text-strong"
+                  title={item().title}
+                  onDblClick={() => sessionActions.startRename(item())}
+                >
+                  {item().title}
+                </span>
+              }
+            >
+              <input
+                class="rounded border border-v2-border-border-base bg-transparent px-1 text-14-regular"
+                aria-label={language.t("sessions.session.name")}
+                maxLength={80}
+                value={ui.draft}
+                ref={(el) => queueMicrotask(() => el.focus())}
+                onInput={(event) => setUi("draft", event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void sessionActions.rename(item())
+                  if (event.key === "Escape") setUi("renamingSession", undefined)
+                }}
+                onBlur={() => void sessionActions.rename(item())}
+              />
+            </Show>
+            <span class="truncate text-12-regular text-v2-text-text-weak">
+              {[
+                item().queued
+                  ? t(item().ownerClosed ? "sessions.monitor.queuedOwnerClosed" : "sessions.monitor.queuedCount", {
+                      count: item().queued!,
+                    })
+                  : undefined,
+                projectName(item()),
+                item().agent,
+                item().model,
+                item().tool,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </div>
+          <Show when={item().kind !== "session"}>
+            <span class="rounded bg-v2-background-bg-raised px-1.5 py-0.5 text-11-medium text-v2-text-text-base">
+              {language.t(`sessions.kind.${item().kind as "subagent" | "scheduled" | "external"}`)}
+            </span>
+          </Show>
+          <span
+            class="text-12-medium"
+            classList={{
+              "text-v2-state-fg-warning": item().state === "waiting",
+              "text-v2-state-fg-success": item().state === "running",
+              "text-v2-state-fg-danger": item().state === "failed",
+              "text-v2-text-text-weak": item().state === "idle" || item().state === "finished",
+            }}
+          >
+            {item().archived ? t("sessions.archived.at", { time: ago(item().archived!) }) : stateLabel(item())}
+          </span>
+          <span class="text-12-regular text-v2-text-text-weak tabular-nums">{ago(item().updated)}</span>
+          <span class="text-12-regular text-v2-text-text-weak tabular-nums">{money(item().cost)}</span>
+          <Show
+            when={!archivedView()}
+            fallback={
+              <div class="flex items-center gap-1">
+                <Show when={!external()}>
+                  <button
+                    type="button"
+                    class="rounded px-2 py-1 text-12-medium"
+                    onClick={() => sessionActions.open(item())}
+                  >
+                    {language.t("common.open")}
+                  </button>
+                </Show>
+                {renameButton()}
+                <Show when={item().archived && !props.child}>
+                  <button
+                    type="button"
+                    class="rounded px-2 py-1 text-12-medium"
+                    onClick={() => void bulkActions.unarchive(item())}
+                  >
+                    {t("sessions.bulk.unarchive")}
+                  </button>
+                </Show>
+              </div>
+            }
+          >
             <div class="flex items-center gap-1">
+              <Show when={item().state === "waiting"}>
+                <button
+                  type="button"
+                  class="rounded border border-v2-state-border-warning bg-v2-state-bg-warning px-2 py-1 text-12-medium text-v2-state-fg-warning"
+                  onClick={() => (item().elsewhere ? void peerActions.load(item()) : sessionActions.open(item()))}
+                >
+                  {language.t("sessions.action.answer")}
+                </button>
+              </Show>
+              <Show when={canTakeOver(item())}>
+                <button
+                  type="button"
+                  class="rounded border border-v2-border-border-base px-2 py-1 text-12-medium"
+                  data-action="takeover"
+                  onClick={() => void monitorActions.takeOver(item())}
+                >
+                  {t("sessions.monitor.takeover.action")}
+                </button>
+              </Show>
               <Show when={!external()}>
                 <button
                   type="button"
@@ -1016,56 +1101,8 @@ export function SessionsPage() {
                   {language.t("common.open")}
                 </button>
               </Show>
-              <Show when={item().archived && !props.child}>
-                <button
-                  type="button"
-                  class="rounded px-2 py-1 text-12-medium"
-                  onClick={() => void bulkActions.unarchive(item())}
-                >
-                  {t("sessions.bulk.unarchive")}
-                </button>
-              </Show>
-            </div>
-          }
-        >
-          <div class="flex items-center gap-1">
-            <Show when={item().state === "waiting"}>
-              <button
-                type="button"
-                class="rounded border border-v2-state-border-warning bg-v2-state-bg-warning px-2 py-1 text-12-medium text-v2-state-fg-warning"
-                onClick={() => (item().elsewhere ? void peerActions.load(item()) : sessionActions.open(item()))}
-              >
-                {language.t("sessions.action.answer")}
-              </button>
-            </Show>
-            <Show when={canTakeOver(item())}>
-              <button
-                type="button"
-                class="rounded border border-v2-border-border-base px-2 py-1 text-12-medium"
-                data-action="takeover"
-                onClick={() => void monitorActions.takeOver(item())}
-              >
-                {t("sessions.monitor.takeover.action")}
-              </button>
-            </Show>
-            <Show when={!external()}>
-              <button
-                type="button"
-                class="rounded px-2 py-1 text-12-medium"
-                onClick={() => sessionActions.open(item())}
-              >
-                {language.t("common.open")}
-              </button>
-              <button
-                type="button"
-                class="rounded px-2 py-1 text-12-medium"
-                onClick={() => {
-                  setUi({ renamingSession: item().id, draft: item().title })
-                }}
-              >
-                {language.t("common.rename")}
-              </button>
-              <Show when={item().state === "running" || item().state === "waiting"}>
+              {renameButton()}
+              <Show when={!external() && (item().state === "running" || item().state === "waiting")}>
                 <button
                   type="button"
                   class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
@@ -1074,109 +1111,124 @@ export function SessionsPage() {
                   {language.t("sessions.action.stop")}
                 </button>
               </Show>
-            </Show>
-            <Show when={external() && item().state === "running"}>
-              <button
-                type="button"
-                class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
-                onClick={() => void sessionActions.stop(item())}
-              >
-                {language.t("sessions.action.stop")}
-              </button>
-            </Show>
-            <Show when={!props.child}>
-              <select
-                class="rounded border border-v2-border-border-base bg-transparent px-1 py-1 text-12-regular"
-                aria-label={language.t("sessions.action.moveTo")}
-                title={language.t("sessions.action.moveTo")}
-                value={item().groupID ?? UNGROUPED}
-                onChange={(event) => {
-                  const value = event.currentTarget.value
-                  void groupActions.move(item().id, value === UNGROUPED ? undefined : value)
-                }}
-              >
-                <option value={UNGROUPED}>{language.t("sessions.group.ungrouped")}</option>
-                <For each={data.groups}>{(group) => <option value={group.id}>{group.name}</option>}</For>
-              </select>
-            </Show>
-          </div>
-        </Show>
-        <Show when={!archivedView() && item().state === "waiting" ? askOf(asks[item().id]) : undefined}>
-          {(current) => (
-            <div class="flex w-full flex-wrap items-center gap-2 pl-9">
-              <span class="min-w-0 flex-1 truncate text-12-regular text-v2-state-fg-warning">
-                {current().type === "permission"
-                  ? t("sessions.monitor.ask.permission", { request: current().text })
-                  : t("sessions.monitor.ask.question", { question: current().text })}
-              </span>
-              <Show
-                when={current().type === "permission"}
-                fallback={
-                  <button
-                    type="button"
-                    class="rounded px-2 py-1 text-12-medium"
-                    onClick={() => void monitorActions.answer(item(), false)}
-                  >
-                    {language.t("common.dismiss")}
-                  </button>
-                }
-              >
-                <button
-                  type="button"
-                  class="rounded border border-v2-border-border-base px-2 py-1 text-12-medium"
-                  onClick={() => void monitorActions.answer(item(), true)}
-                >
-                  {t("sessions.monitor.approve")}
-                </button>
+              <Show when={external() && item().state === "running"}>
                 <button
                   type="button"
                   class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
-                  onClick={() => void monitorActions.answer(item(), false)}
+                  onClick={() => void sessionActions.stop(item())}
                 >
-                  {t("sessions.monitor.deny")}
+                  {language.t("sessions.action.stop")}
                 </button>
               </Show>
+              <Show when={!props.child}>
+                <select
+                  class="rounded border border-v2-border-border-base bg-transparent px-1 py-1 text-12-regular"
+                  aria-label={language.t("sessions.action.moveTo")}
+                  title={language.t("sessions.action.moveTo")}
+                  value={item().groupID ?? UNGROUPED}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value
+                    void groupActions.move(item().id, value === UNGROUPED ? undefined : value)
+                  }}
+                >
+                  <option value={UNGROUPED}>{language.t("sessions.group.ungrouped")}</option>
+                  <For each={data.groups}>{(group) => <option value={group.id}>{group.name}</option>}</For>
+                </select>
+              </Show>
             </div>
-          )}
-        </Show>
-        <Show when={failedStops()[item().id]}>
-          {(reason) => (
-            <p class="w-full text-12-regular text-v2-state-fg-danger" role="status">
-              {t("sessions.bulk.failed", { reason: reason() })}
-            </p>
-          )}
-        </Show>
-        <Show when={ui.peerAsks?.sessionID === item().id ? ui.peerAsks : undefined}>
-          {(peer) => (
-            <div class="w-full">
-              <For each={peer().asks.permissions}>
-                {(request) => (
-                  <SessionPermissionDock
-                    request={request}
-                    responding={ui.responding}
-                    onDecide={(reply) => void peerActions.permission(item(), request.id, reply)}
-                  />
-                )}
-              </For>
-              <For each={peer().asks.questions}>
-                {(question) => (
-                  <div class="flex items-center gap-2 py-1 text-12-regular">
-                    <span class="flex-1 truncate">{question.questions[0]?.question}</span>
+          </Show>
+          <Show when={!archivedView() && item().state === "waiting" ? askOf(asks[item().id]) : undefined}>
+            {(current) => (
+              <div class="flex w-full flex-wrap items-center gap-2 pl-9">
+                <span class="min-w-0 flex-1 truncate text-12-regular text-v2-state-fg-warning">
+                  {current().type === "permission"
+                    ? t("sessions.monitor.ask.permission", { request: current().text })
+                    : t("sessions.monitor.ask.question", { question: current().text })}
+                </span>
+                <Show
+                  when={current().type === "permission"}
+                  fallback={
                     <button
                       type="button"
                       class="rounded px-2 py-1 text-12-medium"
-                      disabled={ui.responding}
-                      onClick={() => void peerActions.dismiss(item(), question.id)}
+                      onClick={() => void monitorActions.answer(item(), false)}
                     >
                       {language.t("common.dismiss")}
                     </button>
-                  </div>
-                )}
-              </For>
-            </div>
-          )}
-        </Show>
-      </li>
+                  }
+                >
+                  <button
+                    type="button"
+                    class="rounded border border-v2-border-border-base px-2 py-1 text-12-medium"
+                    onClick={() => void monitorActions.answer(item(), true)}
+                  >
+                    {t("sessions.monitor.approve")}
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded px-2 py-1 text-12-medium text-v2-state-fg-danger"
+                    onClick={() => void monitorActions.answer(item(), false)}
+                  >
+                    {t("sessions.monitor.deny")}
+                  </button>
+                </Show>
+              </div>
+            )}
+          </Show>
+          <Show when={failedStops()[item().id]}>
+            {(reason) => (
+              <p class="w-full text-12-regular text-v2-state-fg-danger" role="status">
+                {t("sessions.bulk.failed", { reason: reason() })}
+              </p>
+            )}
+          </Show>
+          <Show when={failedRenames()[item().id]}>
+            {(reason) => (
+              <p class="w-full text-12-regular text-v2-state-fg-danger" role="status" data-rename-failed>
+                {t("sessions.rename.failed", { reason: reason() })}
+              </p>
+            )}
+          </Show>
+          <Show when={ui.peerAsks?.sessionID === item().id ? ui.peerAsks : undefined}>
+            {(peer) => (
+              <div class="w-full">
+                <For each={peer().asks.permissions}>
+                  {(request) => (
+                    <SessionPermissionDock
+                      request={request}
+                      responding={ui.responding}
+                      onDecide={(reply) => void peerActions.permission(item(), request.id, reply)}
+                    />
+                  )}
+                </For>
+                <For each={peer().asks.questions}>
+                  {(question) => (
+                    <div class="flex items-center gap-2 py-1 text-12-regular">
+                      <span class="flex-1 truncate">{question.questions[0]?.question}</span>
+                      <button
+                        type="button"
+                        class="rounded px-2 py-1 text-12-medium"
+                        disabled={ui.responding}
+                        onClick={() => void peerActions.dismiss(item(), question.id)}
+                      >
+                        {language.t("common.dismiss")}
+                      </button>
+                    </div>
+                  )}
+                </For>
+              </div>
+            )}
+          </Show>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          {/* Focus stays in the name field it opens, not back on the row. */}
+          <ContextMenu.Content onCloseAutoFocus={(event: Event) => event.preventDefault()}>
+            <ContextMenu.Item onSelect={() => sessionActions.startRename(item())}>
+              <ContextMenu.ItemLabel>{language.t("common.rename")}</ContextMenu.ItemLabel>
+            </ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu>
     )
   }
 

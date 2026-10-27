@@ -76,6 +76,11 @@ export class Ledger {
     return this.spent.get(cls) ?? 0
   }
 
+  /** What has been spent so far, per class and in total (XCOD-320: checked before a run starts). */
+  spentSoFar() {
+    return { total: this.spentTotal(), classes: Object.fromEntries(this.spent) }
+  }
+
   private heldTotal() {
     return [...this.held.values()].reduce((a, b) => a + b, 0)
   }

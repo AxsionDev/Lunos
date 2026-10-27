@@ -205,6 +205,8 @@ export const dict = {
   "dialog.model.select.title": "Valige mudel",
   "dialog.model.search.placeholder": "Otsige mudeleid",
   "dialog.model.empty": "Mudelitulemusi pole",
+  "dialog.model.recommended.noEu":
+    "Ükski EL-is majutatud mudel pole veel Lunose hindamist läbinud, seega ainult EL-i poliitika korral ei soovitata midagi.",
   "dialog.model.manage": "Hallake mudeleid",
   "dialog.model.manage.description": "Kohandage, millised mudelid mudelivalijas kuvatakse.",
   "dialog.model.manage.provider.toggle": "Lülitab kõik {{provider}} mudelid sisse",
@@ -1240,6 +1242,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Taasta arhiivist",
   "sessions.bulk.deleteArchived": "Kustuta arhiveeritud",
   "sessions.bulk.failed": "Peatamine ebaõnnestus: {{reason}}",
+  "sessions.rename.failed": "Ümbernimetamine ebaõnnestus: {{reason}}",
+  "sessions.rename.deleted": "seanss on kustutatud",
   "sessions.bulk.stop.question.one": "Kas peatada {{count}} seanss?",
   "sessions.bulk.stop.question.other": "Kas peatada {{count}} seanssi?",
   "sessions.bulk.stop.running": "Töötab: {{count}}",

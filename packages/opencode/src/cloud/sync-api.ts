@@ -70,7 +70,7 @@ export class NotPermittedError extends Error {
 }
 
 /** `cloud.endpoint` as managed, then global config set it; undefined when neither does. */
-async function configured() {
+export async function configured() {
   const managed = await SandboxConfig.managedDoc()
   return (
     (ConfigPolicy.get(managed, "cloud.endpoint") as string | undefined) ??

@@ -6,6 +6,8 @@
 
 ## Using it
 
+New to Lunos Cloud? `lunos cloud quickstart` does the steps below for you, from signing in to your first results branch: see [Your first cloud run](../packages/web/src/content/docs/cloud-first-run.mdx).
+
 ```sh
 lunos login                                   # once; see cloud-login.md
 lunos settings set cloud.endpoint https://cloud.lunos.tech

@@ -223,6 +223,8 @@ export const dict = {
   "dialog.model.select.title": "Seleccionar modelo",
   "dialog.model.search.placeholder": "Buscar modelos",
   "dialog.model.empty": "Sin resultados de modelos",
+  "dialog.model.recommended.noEu":
+    "Ningún modelo alojado en la UE ha superado aún la evaluación de Lunos, así que no se recomienda nada con tu política solo UE.",
   "dialog.model.manage": "Gestionar modelos",
   "dialog.model.manage.description": "Personalizar qué modelos aparecen en el selector de modelos.",
   "dialog.model.manage.provider.toggle": "Mostrar u ocultar todos los modelos de {{provider}}",
@@ -1355,6 +1357,8 @@ export const dict = {
   "sessions.bulk.unarchive": "Desarchivar",
   "sessions.bulk.deleteArchived": "Eliminar archivadas",
   "sessions.bulk.failed": "No se pudo detener: {{reason}}",
+  "sessions.rename.failed": "No se pudo renombrar: {{reason}}",
+  "sessions.rename.deleted": "la sesión se eliminó",
   "sessions.bulk.stop.question.one": "¿Detener {{count}} sesión?",
   "sessions.bulk.stop.question.many": "¿Detener {{count}} sesiones?",
   "sessions.bulk.stop.question.other": "¿Detener {{count}} sesiones?",

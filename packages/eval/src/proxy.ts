@@ -14,7 +14,7 @@ export type Route = {
   id: string
   model: string
   cls: string
-  /** e.g. https://api.mistral.ai/v1 */
+  /** e.g. https://api.eu.mistral.ai/v1 (Mistral's EU endpoint; api.mistral.ai is global) */
   upstream: string
   apiKey: string
   price: ApiPrice

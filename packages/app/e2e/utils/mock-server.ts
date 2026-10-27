@@ -77,6 +77,12 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
     if (path === "/api/health" && config.protocol === "v2")
       return json(route, { healthy: true, version: "2.0.0", pid: 1 })
     if (path === "/experimental/capabilities") return json(route, { backgroundSubagents: true })
+    // XCOD-309: the Sessions window reads the projects with its overview; none named here.
+    if (path === "/experimental/project-group")
+      return json(route, {
+        groups: [],
+        current: { id: "global", name: "global", folders: [], time: { created: 0, updated: 0 } },
+      })
     if (path === "/provider")
       return json(route, typeof config.provider === "function" ? config.provider() : config.provider)
     if (path === "/provider/auth") return json(route, config.integrationMethods ?? {})

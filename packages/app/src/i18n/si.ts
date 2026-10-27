@@ -205,6 +205,8 @@ export const dict: Record<string, string> = {
   "dialog.model.select.title": "ආකෘතිය තෝරන්න",
   "dialog.model.search.placeholder": "සෙවුම් ආකෘති",
   "dialog.model.empty": "ආදර්ශ ප්‍රතිඵල නැත",
+  "dialog.model.recommended.noEu":
+    "තවමත් EU තුළ සත්කාරක කළ කිසිදු මාදිලියක් Lunos ඇගයීම සමත් වී නැති නිසා, ඔබේ EU-පමණක් ප්‍රතිපත්තිය යටතේ කිසිවක් නිර්දේශ කර නැත.",
   "dialog.model.manage": "ආකෘති කළමනාකරණය කරන්න",
   "dialog.model.manage.description": "ආකෘති තේරීම්කාරකයේ දිස්වන මාදිලි අභිරුචිකරණය කරන්න.",
   "dialog.model.manage.provider.toggle": "සියලුම {{provider}} මාදිලි ටොගල් කරන්න",
@@ -1242,6 +1244,8 @@ export const dict: Record<string, string> = {
   "sessions.bulk.unarchive": "සංරක්ෂණයෙන් ඉවත් කරන්න",
   "sessions.bulk.deleteArchived": "සංරක්ෂිත මකන්න",
   "sessions.bulk.failed": "නැවැත්විය නොහැකි විය: {{reason}}",
+  "sessions.rename.failed": "නම වෙනස් කළ නොහැකි විය: {{reason}}",
+  "sessions.rename.deleted": "සැසිය මකා දමා ඇත",
   "sessions.bulk.stop.question.one": "සැසි නවත්වන්නද? ගණන: {{count}}",
   "sessions.bulk.stop.question.other": "සැසි නවත්වන්නද? ගණන: {{count}}",
   "sessions.bulk.stop.running": "ක්‍රියාත්මක වෙමින්: {{count}}",
