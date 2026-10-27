@@ -4,7 +4,7 @@
 // network is needed. Each scenario runs `lunos run --sandbox` from source, under a throwaway HOME
 // and XDG dirs, against a fresh git project, then checks what came back to the host.
 //
-//   bun run script/sandbox-e2e.ts [--runtime docker|podman] [--image lunos-sandbox:local] [--model-host <host>]
+//   bun run script/sandbox-e2e.ts [--runtime docker|podman] [--image lunos-sandbox:local] [--model-host <host>] [--lunos <binary>]
 //
 // Build the image first: `bun run script/sandbox-image.ts`. Used by .github/workflows/sandbox-e2e.yml
 // (Linux: Docker Engine and rootless Podman) and script/sandbox-e2e.ps1 (Windows: Docker Desktop).
@@ -25,6 +25,8 @@ const runtime = (arg("runtime") ?? "docker") as "docker" | "podman"
 const only = arg("only")?.split(",")
 const want = (name: string) => !only || only.includes(name)
 const image = arg("image") ?? "lunos-sandbox:local"
+// XCOD-321: `--lunos <binary>` runs an installed build on the host instead of the source.
+const lunos = arg("lunos") ? [arg("lunos")!] : ["bun", "run", path.join(dir, "src", "index.ts")]
 // How a container reaches this machine: Docker Desktop and Podman name it; Docker Engine on Linux
 // has no such name unless the container is started with --add-host=host.docker.internal:host-gateway.
 const modelHost = arg("model-host") ?? (runtime === "podman" ? "host.containers.internal" : "host.docker.internal")
@@ -117,6 +119,8 @@ async function project(name: string, sandbox: Record<string, unknown>) {
         },
       },
       model: "fake/m",
+      // The scripted model calls bash itself; with dynamic workflows (XCOD-303) Build has no bash.
+      workflows: { dynamic: false },
       sandbox: { image, runtime, ...sandbox },
     }),
   )
@@ -169,7 +173,7 @@ async function sandboxEnv(name: string, env: Record<string, string> = {}) {
 async function run(name: string, proj: string, steps: Step[], extra: Record<string, string> = {}) {
   script = steps
   const { home, env } = await sandboxEnv(name, extra)
-  const proc = Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "run", "--sandbox", "do the task"], {
+  const proc = Bun.spawn([...lunos, "run", "--sandbox", "do the task"], {
     cwd: proj,
     env,
     stdout: "pipe",
@@ -284,7 +288,7 @@ try {
     const port = 20_000 + Math.floor(Math.random() * 10_000)
     // Its output goes to a file: an unread pipe fills up and then the server can't even exit.
     const serverLog = path.join(root, "warp", "server.log")
-    const server = Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "serve", "--port", String(port)], {
+    const server = Bun.spawn([...lunos, "serve", "--port", String(port)], {
       cwd: proj,
       env,
       stdout: Bun.file(serverLog),
@@ -498,10 +502,13 @@ try {
         "---\ndescription: Night shift\nmode: all\npermission:\n  bash: allow\n---\nDo the job.\n",
       )
       const started = Date.now()
-      const proc = Bun.spawn(
-        ["bun", "run", path.join(dir, "src", "index.ts"), "agent", "run", "nightly", "--prompt", "go", ...limit],
-        { cwd: proj, env, stdout: "pipe", stderr: "pipe", timeout: 300_000 },
-      )
+      const proc = Bun.spawn([...lunos, "agent", "run", "nightly", "--prompt", "go", ...limit], {
+        cwd: proj,
+        env,
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 300_000,
+      })
       const [stdout, stderr, code] = await Promise.all([
         new Response(proc.stdout).text(),
         new Response(proc.stderr).text(),
@@ -535,16 +542,13 @@ try {
       args: { command: `sleep 1; echo tick${i}`, description: "tick" },
     }))
     const { env } = await sandboxEnv("interrupt")
-    const proc = Bun.spawn(
-      ["bun", "run", path.join(dir, "src", "index.ts"), "run", "--sandbox", "--format", "json", "go"],
-      {
-        cwd: proj,
-        env,
-        stdout: "pipe",
-        stderr: "pipe",
-        timeout: 300_000,
-      },
-    )
+    const proc = Bun.spawn([...lunos, "run", "--sandbox", "--format", "json", "go"], {
+      cwd: proj,
+      env,
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 300_000,
+    })
     const stderr = new Response(proc.stderr).text()
     let steps = 0
     let stepsAtInterrupt = 0
@@ -578,7 +582,7 @@ try {
         .quiet()
         .text()
       check("interrupt: the container stopped on SIGTERM, not SIGKILL", inspect.trim() === "143", inspect.trim())
-      const destroyed = await Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "sandbox", "destroy", id], {
+      const destroyed = await Bun.spawn([...lunos, "sandbox", "destroy", id], {
         cwd: proj,
         env,
         stdout: "pipe",
@@ -593,13 +597,13 @@ try {
   // follows it; nothing changed skips the handoff; a failed one keeps the sandbox and `lunos sandbox
   // conclude` tries again; a new start waits for a running one; Ctrl+C during "wait" leaves it running.
   if (want("fastexit")) {
-    const lunos = (args: string[], cwd: string, env: Record<string, string>) =>
-      $`bun run ${path.join(dir, "src", "index.ts")} ${args}`.cwd(cwd).env(env).nothrow().quiet()
+    const cli = (args: string[], cwd: string, env: Record<string, string>) =>
+      $`${lunos} ${args}`.cwd(cwd).env(env).nothrow().quiet()
     const statusDir = (home: string) => path.join(home, "state", "opencode", "sandbox", "conclude")
     const settled = async (id: string, cwd: string, env: Record<string, string>, timeout = 120_000) => {
       const deadline = Date.now() + timeout
       while (Date.now() < deadline) {
-        const out = (await lunos(["sandbox", "status", id], cwd, env)).text()
+        const out = (await cli(["sandbox", "status", id], cwd, env)).text()
         if (!out.includes("saving its results in the background")) return out
         await Bun.sleep(500)
       }
@@ -728,7 +732,7 @@ try {
         ).trim()
         check("exit failed: the sandbox is kept, stopped", running === "false", running)
         await fs.rm(path.join(proj, ".opencode", "sandbox"))
-        const retry = await lunos(["sandbox", "conclude", id], proj, env)
+        const retry = await cli(["sandbox", "conclude", id], proj, env)
         check(
           "exit failed: `lunos sandbox conclude` saves them",
           retry.exitCode === 0,
@@ -771,7 +775,7 @@ try {
       const proj = await project("exit-ctrlc", { on_exit: "wait" })
       script = [edit(), { text: "done" }]
       const { home, env } = await sandboxEnv("exit-ctrlc")
-      const proc = Bun.spawn(["bun", "run", path.join(dir, "src", "index.ts"), "run", "--sandbox", "do the task"], {
+      const proc = Bun.spawn([...lunos, "run", "--sandbox", "do the task"], {
         cwd: proj,
         env,
         stdout: "pipe",

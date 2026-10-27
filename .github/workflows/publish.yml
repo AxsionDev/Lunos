@@ -600,6 +600,21 @@ jobs:
           name: latest-yml-${{ matrix.settings.target }}
           path: packages/desktop/dist/latest*.yml
 
+  # XCOD-321: the release end-to-end matrix (e2e-matrix.yml) on the bytes that ship: install with npm,
+  # device-flow sign-in, a first TUI turn, /claude and /codex, the sandbox fast exit (Linux), and the
+  # update from npm's current `latest`. Windows tests the unsigned build-cli binaries, so this doesn't
+  # need sign-cli-windows: that one is skipped without Azure secrets, which would skip this job too.
+  e2e:
+    needs:
+      - version
+      - build-cli
+      - sign-cli-macos
+    if: github.repository == 'AxsionDev/Lunos'
+    uses: ./.github/workflows/e2e-matrix.yml
+    with:
+      release: true
+    secrets: inherit
+
   # XCOD-283: the one place that decides whether the release may go out. `publish` used to gate on
   # `always() && !failure() && !cancelled()`, but those only see the *run* being cancelled: when
   # GitHub never found a macOS arm64 runner (1.18.52, 1.18.53) the cancelled job counted as neither,
@@ -618,6 +633,8 @@ jobs:
       - build-electron
       # XCOD-106: the SBOM must be on the release before SHA256SUMS is computed and signed.
       - sbom
+      # XCOD-321: a failed end-to-end leg blocks the release like a failed build.
+      - e2e
     if: github.repository == 'AxsionDev/Lunos' && !cancelled()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
