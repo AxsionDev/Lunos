@@ -1376,5 +1376,13 @@ export const dict = {
   "account.disabled.category.payment": "Ödəniş problemi",
   "account.disabled.category.offboarding": "Təşkilatınız sizi çıxarıb",
   "account.disabled.category.other": "Digər",
+  "feedback.title": "Rəy göndər",
+  "feedback.description":
+    "Lunos komandasına nəyin işlədiyini, nəyin işləmədiyini və nəyin çatışmadığını deyin. Lunos versiyanız və əməliyyat sisteminiz də göndərilir, söhbətiniz heç vaxt.",
+  "feedback.screenshot": "Ekran görüntüsü əlavə et (istəyə bağlı: PNG, JPEG və ya WebP, 2 MB-a qədər)",
+  "feedback.screenshot.invalid": "Bu fayl 2 MB-a qədər PNG, JPEG və ya WebP şəkli deyil.",
+  "feedback.consent": "Bu sessiyanın ID-sini paylaş (onu jurnallarda tapmağımıza kömək edir)",
+  "feedback.sent": "Təşəkkürlər. Rəyiniz Lunos komandasına çatdı.",
+  "feedback.failed": "Rəyiniz göndərilmədi",
   "prompt.placeholder.accountDisabled": "Lunos hesabınız deaktiv edilib: yeni sorğular göndərilə bilməz",
 }

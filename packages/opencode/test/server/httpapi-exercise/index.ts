@@ -75,6 +75,13 @@ const scenarios: Scenario[] = [
       object(body)
       check(body.disabled === undefined, "no disabled-account record in the test home")
     }),
+  // XCOD-318: empty feedback is refused here, before any Lunos Cloud call.
+  http.protected
+    .post("/global/feedback", "global.feedback")
+    .global()
+    .probe({ path: "/global/feedback", body: { text: " ", source: "app", consent: false } })
+    .at(() => ({ path: "/global/feedback", body: { text: " ", source: "app", consent: false } }))
+    .status(400),
   http.protected
     .get("/global/event", "global.event")
     .global()

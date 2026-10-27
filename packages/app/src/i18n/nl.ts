@@ -1381,6 +1381,14 @@ export const dict = {
   "account.disabled.category.payment": "Een betalingsprobleem",
   "account.disabled.category.offboarding": "Je organisatie heeft je uitgeschreven",
   "account.disabled.category.other": "Overig",
+  "feedback.title": "Feedback sturen",
+  "feedback.description":
+    "Vertel het Lunos-team wat werkt, wat niet en wat je mist. Je Lunos-versie en besturingssysteem gaan mee, nooit je gesprek.",
+  "feedback.screenshot": "Schermafbeelding toevoegen (optioneel: PNG, JPEG of WebP, tot 2 MB)",
+  "feedback.screenshot.invalid": "Dat bestand is geen PNG-, JPEG- of WebP-afbeelding van maximaal 2 MB.",
+  "feedback.consent": "Het id van deze sessie meesturen (helpt ons haar in onze logs te vinden)",
+  "feedback.sent": "Bedankt. Je feedback is bij het Lunos-team aangekomen.",
+  "feedback.failed": "Je feedback is niet verstuurd",
   "prompt.placeholder.accountDisabled":
     "Je Lunos-account is uitgeschakeld: nieuwe prompts kunnen niet worden verzonden",
 }

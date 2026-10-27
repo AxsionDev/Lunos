@@ -1353,5 +1353,13 @@ export const dict = {
   "account.disabled.category.payment": "A payment issue",
   "account.disabled.category.offboarding": "Your organisation offboarded you",
   "account.disabled.category.other": "Other",
+  "feedback.title": "Send feedback",
+  "feedback.description":
+    "Tell the Lunos team what works, what doesn't and what you miss. Your Lunos version and OS go with it, never your conversation.",
+  "feedback.screenshot": "Attach a screenshot (optional: PNG, JPEG or WebP, up to 2 MB)",
+  "feedback.screenshot.invalid": "That file isn't a PNG, JPEG or WebP image of up to 2 MB.",
+  "feedback.consent": "Share this session's id with it (helps us find it in our logs)",
+  "feedback.sent": "Thank you. Your feedback went to the Lunos team.",
+  "feedback.failed": "Your feedback wasn't sent",
   "prompt.placeholder.accountDisabled": "Your Lunos account is disabled: new prompts can't be sent",
 }

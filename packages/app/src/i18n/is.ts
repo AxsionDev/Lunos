@@ -1364,5 +1364,13 @@ export const dict = {
   "account.disabled.category.payment": "Greiðsluvandamál",
   "account.disabled.category.offboarding": "Fyrirtækið þitt fjarlægði þig",
   "account.disabled.category.other": "Annað",
+  "feedback.title": "Senda ábendingu",
+  "feedback.description":
+    "Segðu Lunos-teyminu hvað virkar, hvað ekki og hvað vantar. Lunos-útgáfan þín og stýrikerfið fylgja með, aldrei samtalið þitt.",
+  "feedback.screenshot": "Hengja við skjámynd (valfrjálst: PNG, JPEG eða WebP, allt að 2 MB)",
+  "feedback.screenshot.invalid": "Skráin er ekki PNG-, JPEG- eða WebP-mynd allt að 2 MB.",
+  "feedback.consent": "Deila auðkenni þessarar lotu (hjálpar okkur að finna hana í annálum)",
+  "feedback.sent": "Takk. Ábendingin þín barst Lunos-teyminu.",
+  "feedback.failed": "Ábendingin þín var ekki send",
   "prompt.placeholder.accountDisabled": "Lunos-reikningurinn þinn er óvirkur: ekki er hægt að senda nýjar fyrirspurnir",
 }

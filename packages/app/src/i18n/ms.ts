@@ -1367,5 +1367,13 @@ export const dict = {
   "account.disabled.category.payment": "Masalah pembayaran",
   "account.disabled.category.offboarding": "Organisasi anda telah mengeluarkan anda",
   "account.disabled.category.other": "Lain-lain",
+  "feedback.title": "Hantar maklum balas",
+  "feedback.description":
+    "Beritahu pasukan Lunos apa yang berfungsi, apa yang tidak dan apa yang anda perlukan. Versi Lunos dan OS anda dihantar bersama, tidak sekali-kali perbualan anda.",
+  "feedback.screenshot": "Lampirkan tangkapan skrin (pilihan: PNG, JPEG atau WebP, sehingga 2 MB)",
+  "feedback.screenshot.invalid": "Fail itu bukan imej PNG, JPEG atau WebP sehingga 2 MB.",
+  "feedback.consent": "Kongsi id sesi ini (membantu kami mencarinya dalam log)",
+  "feedback.sent": "Terima kasih. Maklum balas anda telah sampai kepada pasukan Lunos.",
+  "feedback.failed": "Maklum balas anda tidak dihantar",
   "prompt.placeholder.accountDisabled": "Akaun Lunos anda telah dinyahdayakan: prompt baharu tidak boleh dihantar",
 }

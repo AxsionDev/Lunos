@@ -1397,5 +1397,13 @@ export const dict = {
   "account.disabled.category.payment": "Mokėjimo problema",
   "account.disabled.category.offboarding": "Jūsų organizacija jus pašalino",
   "account.disabled.category.other": "Kita",
+  "feedback.title": "Siųsti atsiliepimą",
+  "feedback.description":
+    "Papasakokite Lunos komandai, kas veikia, kas neveikia ir ko trūksta. Kartu siunčiama Lunos versija ir operacinė sistema, niekada jūsų pokalbis.",
+  "feedback.screenshot": "Pridėti ekrano kopiją (neprivaloma: PNG, JPEG arba WebP, iki 2 MB)",
+  "feedback.screenshot.invalid": "Šis failas nėra PNG, JPEG ar WebP vaizdas iki 2 MB.",
+  "feedback.consent": "Bendrinti šios sesijos ID (padeda mums ją rasti žurnaluose)",
+  "feedback.sent": "Ačiū. Jūsų atsiliepimas pasiekė Lunos komandą.",
+  "feedback.failed": "Jūsų atsiliepimas neišsiųstas",
   "prompt.placeholder.accountDisabled": "Jūsų Lunos paskyra išjungta: naujų užklausų siųsti negalima",
 }

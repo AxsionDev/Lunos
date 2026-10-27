@@ -1376,5 +1376,13 @@ export const dict = {
   "account.disabled.category.payment": "Վճարման խնդիր",
   "account.disabled.category.offboarding": "Ձեր կազմակերպությունը հեռացրել է ձեզ",
   "account.disabled.category.other": "Այլ",
+  "feedback.title": "Ուղարկել կարծիք",
+  "feedback.description":
+    "Ասեք Lunos-ի թիմին, թե ինչն է աշխատում, ինչը՝ ոչ, և ինչն է պակասում։ Ուղարկվում են Lunos-ի տարբերակը և օպերացիոն համակարգը, երբեք ձեր զրույցը։",
+  "feedback.screenshot": "Կցել էկրանի պատկեր (ըստ ցանկության՝ PNG, JPEG կամ WebP, մինչև 2 ՄԲ)",
+  "feedback.screenshot.invalid": "Այս ֆայլը մինչև 2 ՄԲ PNG, JPEG կամ WebP պատկեր չէ։",
+  "feedback.consent": "Կիսվել այս սեսիայի ID-ով (օգնում է գտնել այն մեր գրանցամատյաններում)",
+  "feedback.sent": "Շնորհակալություն։ Ձեր կարծիքը հասավ Lunos-ի թիմին։",
+  "feedback.failed": "Ձեր կարծիքը չուղարկվեց",
   "prompt.placeholder.accountDisabled": "Ձեր Lunos հաշիվն անջատված է․ նոր հարցումներ ուղարկել հնարավոր չէ",
 }

@@ -1370,5 +1370,13 @@ export const dict = {
   "account.disabled.category.payment": "ادائیگی کا مسئلہ",
   "account.disabled.category.offboarding": "آپ کی تنظیم نے آپ کو ہٹا دیا",
   "account.disabled.category.other": "دیگر",
+  "feedback.title": "رائے بھیجیں",
+  "feedback.description":
+    "Lunos ٹیم کو بتائیں کہ کیا کام کرتا ہے، کیا نہیں اور کیا کمی ہے۔ آپ کا Lunos ورژن اور OS ساتھ جاتے ہیں، آپ کی گفتگو کبھی نہیں۔",
+  "feedback.screenshot": "اسکرین شاٹ منسلک کریں (اختیاری: PNG، JPEG یا WebP، 2 MB تک)",
+  "feedback.screenshot.invalid": "یہ فائل 2 MB تک کی PNG، JPEG یا WebP تصویر نہیں ہے۔",
+  "feedback.consent": "اس سیشن کی ID شیئر کریں (لاگز میں اسے ڈھونڈنے میں مدد ملتی ہے)",
+  "feedback.sent": "شکریہ۔ آپ کی رائے Lunos ٹیم تک پہنچ گئی۔",
+  "feedback.failed": "آپ کی رائے نہیں بھیجی گئی",
   "prompt.placeholder.accountDisabled": "آپ کا Lunos اکاؤنٹ غیر فعال کر دیا گیا ہے: نئے پرامپٹ نہیں بھیجے جا سکتے",
 }

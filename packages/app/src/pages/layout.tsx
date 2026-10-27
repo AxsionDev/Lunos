@@ -1116,6 +1116,15 @@ export default function LegacyLayout(props: ParentProps) {
     })
   }
 
+  // XCOD-318: feedback to the Lunos team; the open session's id is offered, unticked.
+  function openFeedback() {
+    const run = ++dialogRun
+    void import("@/components/dialog-feedback").then((x) => {
+      if (dialogDead || dialogRun !== run) return
+      dialog.show(() => <x.DialogFeedback sessionID={params.id} />)
+    })
+  }
+
   function projectRoot(directory: string) {
     const key = pathKey(directory)
     const project = layout.projects
@@ -2245,6 +2254,8 @@ export default function LegacyLayout(props: ParentProps) {
       onOpenSettings={openSettings}
       helpLabel={() => language.t("sidebar.help")}
       onOpenHelp={() => platform.openExternal("https://github.com/AxsionDev/Lunos/issues")}
+      feedbackLabel={() => language.t("feedback.title")}
+      onOpenFeedback={openFeedback}
       renderPanel={() =>
         mobile ? <SidebarPanel project={currentProject} mobile /> : <SidebarPanel project={currentProject} merged />
       }

@@ -1382,5 +1382,13 @@ export const dict = {
   "account.disabled.category.payment": "Problém s platbou",
   "account.disabled.category.offboarding": "Vaša organizácia vás odhlásila",
   "account.disabled.category.other": "Iné",
+  "feedback.title": "Odoslať spätnú väzbu",
+  "feedback.description":
+    "Povedzte tímu Lunos, čo funguje, čo nie a čo vám chýba. Posiela sa verzia Lunos a operačný systém, nikdy vaša konverzácia.",
+  "feedback.screenshot": "Priložiť snímku obrazovky (voliteľné: PNG, JPEG alebo WebP, do 2 MB)",
+  "feedback.screenshot.invalid": "Tento súbor nie je obrázok PNG, JPEG ani WebP do 2 MB.",
+  "feedback.consent": "Zdieľať ID tejto relácie (pomôže nám ju nájsť v záznamoch)",
+  "feedback.sent": "Ďakujeme. Vaša spätná väzba sa dostala k tímu Lunos.",
+  "feedback.failed": "Vaša spätná väzba nebola odoslaná",
   "prompt.placeholder.accountDisabled": "Váš účet Lunos je deaktivovaný: nové prompty nie je možné odoslať",
 }

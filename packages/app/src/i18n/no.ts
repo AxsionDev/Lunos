@@ -1476,5 +1476,13 @@ export const dict = {
   "account.disabled.category.payment": "Et betalingsproblem",
   "account.disabled.category.offboarding": "Organisasjonen din har fjernet deg",
   "account.disabled.category.other": "Annet",
+  "feedback.title": "Send tilbakemelding",
+  "feedback.description":
+    "Fortell Lunos-teamet hva som fungerer, hva som ikke gjør det, og hva du savner. Lunos-versjonen og operativsystemet ditt sendes med, aldri samtalen din.",
+  "feedback.screenshot": "Legg ved et skjermbilde (valgfritt: PNG, JPEG eller WebP, opptil 2 MB)",
+  "feedback.screenshot.invalid": "Filen er ikke et PNG-, JPEG- eller WebP-bilde på opptil 2 MB.",
+  "feedback.consent": "Del ID-en til denne økten (hjelper oss å finne den i loggene våre)",
+  "feedback.sent": "Takk. Tilbakemeldingen din har nådd Lunos-teamet.",
+  "feedback.failed": "Tilbakemeldingen din ble ikke sendt",
   "prompt.placeholder.accountDisabled": "Lunos-kontoen din er deaktivert: nye prompter kan ikke sendes",
 } satisfies Partial<Record<Keys, string>>

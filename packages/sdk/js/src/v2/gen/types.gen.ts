@@ -2451,6 +2451,28 @@ export type GlobalAccount = {
   }
 }
 
+export type GlobalFeedbackInput = {
+  text: string
+  source: "app" | "desktop"
+  consent: boolean
+  sessionId?: string
+  os?: string
+  screenshot?: {
+    type: string
+    data: string
+  }
+}
+
+export type GlobalFeedbackResult =
+  | {
+      success: true
+      sessionShared: boolean
+    }
+  | {
+      success: false
+      error: string
+    }
+
 export type SettingRow = {
   key: string
   target: "config" | "tui"
@@ -8892,6 +8914,31 @@ export type GlobalAccountGetResponses = {
 }
 
 export type GlobalAccountGetResponse = GlobalAccountGetResponses[keyof GlobalAccountGetResponses]
+
+export type GlobalFeedbackData = {
+  body?: GlobalFeedbackInput
+  path?: never
+  query?: never
+  url: "/global/feedback"
+}
+
+export type GlobalFeedbackErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalFeedbackError = GlobalFeedbackErrors[keyof GlobalFeedbackErrors]
+
+export type GlobalFeedbackResponses = {
+  /**
+   * Whether Lunos Cloud took the feedback
+   */
+  200: GlobalFeedbackResult
+}
+
+export type GlobalFeedbackResponse = GlobalFeedbackResponses[keyof GlobalFeedbackResponses]
 
 export type GlobalUpgradeData = {
   body?: {

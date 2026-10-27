@@ -1375,5 +1375,13 @@ export const dict = {
   "account.disabled.category.payment": "Төлбөрийн асуудал",
   "account.disabled.category.offboarding": "Таны байгууллага таныг хассан",
   "account.disabled.category.other": "Бусад",
+  "feedback.title": "Санал хүсэлт илгээх",
+  "feedback.description":
+    "Lunos багт юу ажиллаж байгаа, юу ажиллахгүй байгаа, юу дутуу байгааг хэлээрэй. Lunos-ийн хувилбар, үйлдлийн систем хамт илгээгдэнэ, таны яриа хэзээ ч илгээгдэхгүй.",
+  "feedback.screenshot": "Дэлгэцийн зураг хавсаргах (заавал биш: PNG, JPEG эсвэл WebP, 2 MB хүртэл)",
+  "feedback.screenshot.invalid": "Энэ файл 2 MB хүртэлх PNG, JPEG эсвэл WebP зураг биш байна.",
+  "feedback.consent": "Энэ сешний ID-г хуваалцах (бүртгэлээс олоход тусална)",
+  "feedback.sent": "Баярлалаа. Таны санал Lunos багт хүрлээ.",
+  "feedback.failed": "Таны санал илгээгдсэнгүй",
   "prompt.placeholder.accountDisabled": "Таны Lunos бүртгэл идэвхгүй болсон: шинэ хүсэлт илгээх боломжгүй",
 }

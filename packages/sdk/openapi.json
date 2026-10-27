@@ -521,6 +521,59 @@
         ]
       }
     },
+    "/global/feedback": {
+      "post": {
+        "tags": ["global"],
+        "operationId": "global.feedback",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Whether Lunos Cloud took the feedback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalFeedbackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest | InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/effect_HttpApiError_BadRequest"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Sends feedback to Lunos Cloud with this machine's sign-in: the text, an optional screenshot, the Lunos version and OS, and the session id only when consent is true. Never a transcript.",
+        "summary": "Send feedback to the Lunos team",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlobalFeedbackInput"
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.global.feedback({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/global/upgrade": {
       "post": {
         "tags": ["global"],
@@ -28515,6 +28568,74 @@
           }
         },
         "additionalProperties": false
+      },
+      "GlobalFeedbackInput": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["app", "desktop"]
+          },
+          "consent": {
+            "type": "boolean"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "os": {
+            "type": "string"
+          },
+          "screenshot": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "data": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "data"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["text", "source", "consent"],
+        "additionalProperties": false
+      },
+      "GlobalFeedbackResult": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean",
+                "enum": [true]
+              },
+              "sessionShared": {
+                "type": "boolean"
+              }
+            },
+            "required": ["success", "sessionShared"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean",
+                "enum": [false]
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": ["success", "error"],
+            "additionalProperties": false
+          }
+        ]
       },
       "SettingRow": {
         "type": "object",

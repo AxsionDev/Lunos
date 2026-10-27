@@ -1408,5 +1408,13 @@ export const dict = {
   "account.disabled.category.payment": "مشكلة في الدفع",
   "account.disabled.category.offboarding": "أزالتك مؤسستك",
   "account.disabled.category.other": "أخرى",
+  "feedback.title": "إرسال ملاحظات",
+  "feedback.description":
+    "أخبر فريق Lunos بما يعمل وما لا يعمل وما ينقصك. يُرسَل معها إصدار Lunos ونظام التشغيل، ولا تُرسَل محادثتك أبدًا.",
+  "feedback.screenshot": "إرفاق لقطة شاشة (اختياري: PNG أو JPEG أو WebP، حتى 2 ميغابايت)",
+  "feedback.screenshot.invalid": "هذا الملف ليس صورة PNG أو JPEG أو WebP بحجم يصل إلى 2 ميغابايت.",
+  "feedback.consent": "مشاركة معرّف هذه الجلسة (يساعدنا في العثور عليها في سجلاتنا)",
+  "feedback.sent": "شكرًا لك. وصلت ملاحظاتك إلى فريق Lunos.",
+  "feedback.failed": "لم تُرسَل ملاحظاتك",
   "prompt.placeholder.accountDisabled": "تم تعطيل حسابك في Lunos: لا يمكن إرسال مطالبات جديدة",
 }

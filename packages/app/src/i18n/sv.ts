@@ -1369,5 +1369,13 @@ export const dict = {
   "account.disabled.category.payment": "Ett betalningsproblem",
   "account.disabled.category.offboarding": "Din organisation har avregistrerat dig",
   "account.disabled.category.other": "Annat",
+  "feedback.title": "Skicka feedback",
+  "feedback.description":
+    "Berätta för Lunos-teamet vad som fungerar, vad som inte gör det och vad du saknar. Din Lunos-version och ditt operativsystem skickas med, aldrig din konversation.",
+  "feedback.screenshot": "Bifoga en skärmbild (valfritt: PNG, JPEG eller WebP, upp till 2 MB)",
+  "feedback.screenshot.invalid": "Filen är inte en PNG-, JPEG- eller WebP-bild på högst 2 MB.",
+  "feedback.consent": "Dela den här sessionens id (hjälper oss att hitta den i våra loggar)",
+  "feedback.sent": "Tack. Din feedback har nått Lunos-teamet.",
+  "feedback.failed": "Din feedback skickades inte",
   "prompt.placeholder.accountDisabled": "Ditt Lunos-konto är inaktiverat: nya prompter kan inte skickas",
 }

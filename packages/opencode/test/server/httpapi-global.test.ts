@@ -60,6 +60,24 @@ describe("global HttpApi", () => {
     }),
   )
 
+  // XCOD-318: a screenshot of up to 2 MB (base64: ~2.7 MB) reaches the handler, which refuses empty
+  // feedback before any Lunos Cloud call.
+  it.live("takes feedback with a 2 MB screenshot as far as the handler", () =>
+    Effect.gen(function* () {
+      const response = yield* HttpClientRequest.post(GlobalPaths.feedback).pipe(
+        HttpClientRequest.bodyJsonUnsafe({
+          text: " ",
+          source: "app",
+          consent: false,
+          screenshot: { type: "image/png", data: Buffer.alloc(2 * 1024 * 1024).toString("base64") },
+        }),
+        HttpClient.execute,
+      )
+      expect(response.status).toBe(400)
+      expect(yield* response.json).toEqual({ success: false, error: "Write what you'd like to tell us first." })
+    }),
+  )
+
   it.live("rejects invalid upgrade payloads", () =>
     Effect.gen(function* () {
       const response = yield* HttpClientRequest.post(GlobalPaths.upgrade).pipe(

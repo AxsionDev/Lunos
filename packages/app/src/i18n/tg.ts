@@ -1377,6 +1377,14 @@ export const dict = {
   "account.disabled.category.payment": "Мушкилии пардохт",
   "account.disabled.category.offboarding": "Ташкилоти шумо шуморо хориҷ кард",
   "account.disabled.category.other": "Дигар",
+  "feedback.title": "Фиристодани фикр",
+  "feedback.description":
+    "Ба дастаи Lunos бигӯед, ки чӣ кор мекунад, чӣ кор намекунад ва чӣ намерасад. Версияи Lunos ва системаи амалиётии шумо низ фиристода мешаванд, сӯҳбати шумо ҳеҷ гоҳ.",
+  "feedback.screenshot": "Замима кардани акси экран (ихтиёрӣ: PNG, JPEG ё WebP, то 2 МБ)",
+  "feedback.screenshot.invalid": "Ин файл тасвири PNG, JPEG ё WebP то 2 МБ нест.",
+  "feedback.consent": "Мубодилаи ID-и ин ҷаласа (барои ёфтани он дар қайдҳо кӯмак мекунад)",
+  "feedback.sent": "Ташаккур. Фикри шумо ба дастаи Lunos расид.",
+  "feedback.failed": "Фикри шумо фиристода нашуд",
   "prompt.placeholder.accountDisabled":
     "Ҳисоби Lunos-и шумо ғайрифаъол шудааст: дархостҳои навро фиристодан мумкин нест",
 }

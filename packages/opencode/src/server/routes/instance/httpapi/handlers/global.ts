@@ -1,3 +1,4 @@
+import { CloudBeta } from "@/cloud/beta"
 import { CloudDisabled } from "@/cloud/disabled"
 import { Config } from "@/config/config"
 import { GlobalBus, type GlobalEvent as GlobalBusEvent } from "@/bus/global"
@@ -12,7 +13,7 @@ import { HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import * as Sse from "effect/unstable/encoding/Sse"
 import { RootHttpApi } from "../api"
-import { GlobalUpgradeInput } from "../groups/global"
+import { GlobalFeedbackInput, GlobalUpgradeInput } from "../groups/global"
 
 function eventData(data: unknown): Sse.Event {
   return {
@@ -131,6 +132,20 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return disabled ? { disabled } : {}
     })
 
+    // XCOD-318: the app's Feedback button, sent on with this machine's Lunos sign-in.
+    const feedback = Effect.fn("GlobalHttpApi.feedback")(function* (ctx: { payload: typeof GlobalFeedbackInput.Type }) {
+      const result = yield* Effect.promise(() =>
+        CloudBeta.feedback(ctx.payload).then(
+          (sent) => ({ success: true as const, sessionShared: sent.sessionShared }),
+          (error: unknown) => ({
+            success: false as const,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        ),
+      )
+      return result.success ? result : HttpServerResponse.jsonUnsafe(result, { status: 400 })
+    })
+
     return handlers
       .handle("health", health)
       .handleRaw("event", event)
@@ -139,5 +154,6 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("dispose", dispose)
       .handle("upgrade", upgrade)
       .handle("account", account)
+      .handle("feedback", feedback)
   }),
 )

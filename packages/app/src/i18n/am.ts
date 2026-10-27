@@ -1329,5 +1329,13 @@ export const dict = {
   "account.disabled.category.payment": "የክፍያ ችግር",
   "account.disabled.category.offboarding": "ድርጅትዎ አስወግዶዎታል",
   "account.disabled.category.other": "ሌላ",
+  "feedback.title": "አስተያየት ይላኩ",
+  "feedback.description":
+    "ምን እንደሚሰራ፣ ምን እንደማይሰራ እና ምን እንደሚጎድል ለLunos ቡድን ይንገሩ። የLunos ስሪትዎ እና ስርዓተ ክወናዎ አብረው ይላካሉ፣ ውይይትዎ በጭራሽ አይላክም።",
+  "feedback.screenshot": "የማያ ገጽ ቅጽበታዊ ፎቶ ያያይዙ (አማራጭ፦ PNG፣ JPEG ወይም WebP፣ እስከ 2 MB)",
+  "feedback.screenshot.invalid": "ይህ ፋይል እስከ 2 MB የሆነ PNG፣ JPEG ወይም WebP ምስል አይደለም።",
+  "feedback.consent": "የዚህን ክፍለ ጊዜ መለያ ያጋሩ (በመዝገቦቻችን ውስጥ እንድናገኘው ይረዳናል)",
+  "feedback.sent": "እናመሰግናለን። አስተያየትዎ ለLunos ቡድን ደርሷል።",
+  "feedback.failed": "አስተያየትዎ አልተላከም",
   "prompt.placeholder.accountDisabled": "የእርስዎ Lunos መለያ ተሰናክሏል፦ አዲስ ጥያቄዎችን መላክ አይቻልም",
 }

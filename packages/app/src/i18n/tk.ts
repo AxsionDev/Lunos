@@ -1366,5 +1366,13 @@ export const dict = {
   "account.disabled.category.payment": "Töleg meselesi",
   "account.disabled.category.offboarding": "Guramaňyz sizi aýyrdy",
   "account.disabled.category.other": "Başga",
+  "feedback.title": "Pikir iber",
+  "feedback.description":
+    "Lunos toparyna näme işleýändigini, nämäniň işlemeýändigini we näme ýetmezçilik edýändigini aýdyň. Lunos wersiýaňyz we operasion ulgamyňyz hem iberilýär, söhbetdeşligiňiz hiç haçan.",
+  "feedback.screenshot": "Ekran suratyny goş (hökman däl: PNG, JPEG ýa-da WebP, 2 MB çenli)",
+  "feedback.screenshot.invalid": "Bu faýl 2 MB çenli PNG, JPEG ýa-da WebP suraty däl.",
+  "feedback.consent": "Bu sessiýanyň ID-sini paýlaş (ony žurnallarda tapmaga kömek edýär)",
+  "feedback.sent": "Sag boluň. Pikiriňiz Lunos toparyna ýetdi.",
+  "feedback.failed": "Pikiriňiz iberilmedi",
   "prompt.placeholder.accountDisabled": "Lunos hasabyňyz öçürildi: täze haýyşlar iberilip bilinmeýär",
 }

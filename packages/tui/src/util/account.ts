@@ -206,6 +206,11 @@ export type Host = {
    * Lunos Cloud for runs, offline. No network. Only where the TUI runs on this machine.
    */
   quickstart?(directory: string): Promise<TerminalCommand | undefined>
+  /**
+   * XCOD-318: /feedback to the Lunos team. The text, this client's version and OS, and `sessionId`
+   * only when `consent` is true (the person ticked the box). Never a transcript.
+   */
+  feedback?(input: { text: string; consent: boolean; sessionId?: string }): Promise<void>
 }
 
 /** A command to run on this terminal while the TUI steps aside. */

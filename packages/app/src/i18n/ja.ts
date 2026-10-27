@@ -1378,5 +1378,13 @@ export const dict = {
   "account.disabled.category.payment": "支払いの問題",
   "account.disabled.category.offboarding": "所属組織によって削除されました",
   "account.disabled.category.other": "その他",
+  "feedback.title": "フィードバックを送信",
+  "feedback.description":
+    "うまくいっていること、いないこと、足りないものを Lunos チームに伝えてください。Lunos のバージョンと OS が一緒に送られます。会話は送られません。",
+  "feedback.screenshot": "スクリーンショットを添付（任意：PNG、JPEG、WebP、2 MB まで）",
+  "feedback.screenshot.invalid": "このファイルは 2 MB までの PNG、JPEG、WebP 画像ではありません。",
+  "feedback.consent": "このセッションの ID を共有する（ログで探すのに役立ちます）",
+  "feedback.sent": "ありがとうございます。フィードバックは Lunos チームに届きました。",
+  "feedback.failed": "フィードバックは送信されませんでした",
   "prompt.placeholder.accountDisabled": "Lunos アカウントは無効になっています: 新しいプロンプトは送信できません",
 }

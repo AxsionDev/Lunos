@@ -4,6 +4,7 @@ import { Offline } from "@opencode-ai/core/offline"
 import { CloudGitToken } from "@/cloud/git-token"
 import { CloudQuickstartCommand } from "./cloud-quickstart"
 import { cmd } from "./cmd"
+import { CloudRedeemCommand } from "./cloud-redeem"
 import { effectCmd, fail } from "../effect-cmd"
 import * as Prompt from "../effect/prompt"
 import { writeStdoutEffect } from "../stdout"
@@ -85,6 +86,7 @@ export const CloudGitTokenCommand = cmd({
 export const CloudCommand = cmd({
   command: "cloud",
   describe: "Lunos Cloud: your first cloud run, and account settings",
-  builder: (yargs) => yargs.command(CloudGitTokenCommand).command(CloudQuickstartCommand).demandCommand(),
+  builder: (yargs) =>
+    yargs.command(CloudGitTokenCommand).command(CloudQuickstartCommand).command(CloudRedeemCommand).demandCommand(),
   async handler() {},
 })

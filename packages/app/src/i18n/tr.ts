@@ -1470,5 +1470,13 @@ export const dict = {
   "account.disabled.category.payment": "Bir ödeme sorunu",
   "account.disabled.category.offboarding": "Kuruluşunuz sizi çıkardı",
   "account.disabled.category.other": "Diğer",
+  "feedback.title": "Geri bildirim gönder",
+  "feedback.description":
+    "Lunos ekibine neyin işe yaradığını, neyin yaramadığını ve neyi özlediğinizi anlatın. Lunos sürümünüz ve işletim sisteminiz de gönderilir, konuşmanız asla.",
+  "feedback.screenshot": "Ekran görüntüsü ekle (isteğe bağlı: PNG, JPEG veya WebP, en fazla 2 MB)",
+  "feedback.screenshot.invalid": "Bu dosya en fazla 2 MB'lık bir PNG, JPEG veya WebP görseli değil.",
+  "feedback.consent": "Bu oturumun kimliğini paylaş (günlüklerimizde bulmamıza yardımcı olur)",
+  "feedback.sent": "Teşekkürler. Geri bildiriminiz Lunos ekibine ulaştı.",
+  "feedback.failed": "Geri bildiriminiz gönderilmedi",
   "prompt.placeholder.accountDisabled": "Lunos hesabınız devre dışı bırakıldı: yeni istem gönderilemez",
 } satisfies Partial<Record<Keys, string>>

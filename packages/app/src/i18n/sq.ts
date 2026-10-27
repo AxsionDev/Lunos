@@ -1370,5 +1370,13 @@ export const dict = {
   "account.disabled.category.payment": "Një problem pagese",
   "account.disabled.category.offboarding": "Organizata jote të ka hequr",
   "account.disabled.category.other": "Tjetër",
+  "feedback.title": "Dërgo komente",
+  "feedback.description":
+    "Tregojini ekipit të Lunos çfarë funksionon, çfarë jo dhe çfarë ju mungon. Dërgohen versioni i Lunos dhe sistemi operativ, kurrë biseda juaj.",
+  "feedback.screenshot": "Bashkëngjit një pamje ekrani (opsionale: PNG, JPEG ose WebP, deri në 2 MB)",
+  "feedback.screenshot.invalid": "Ky skedar nuk është imazh PNG, JPEG ose WebP deri në 2 MB.",
+  "feedback.consent": "Ndaj ID-në e këtij sesioni (na ndihmon ta gjejmë në regjistra)",
+  "feedback.sent": "Faleminderit. Komentet tuaja arritën te ekipi i Lunos.",
+  "feedback.failed": "Komentet tuaja nuk u dërguan",
   "prompt.placeholder.accountDisabled": "Llogaria jote Lunos është çaktivizuar: nuk mund të dërgohen kërkesa të reja",
 }

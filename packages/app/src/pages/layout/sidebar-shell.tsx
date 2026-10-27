@@ -30,6 +30,9 @@ export const SidebarContent = (props: {
   onOpenSettings: () => void
   helpLabel: Accessor<string>
   onOpenHelp: () => void
+  /** XCOD-318: the Feedback button (to the Lunos team). */
+  feedbackLabel: Accessor<string>
+  onOpenFeedback: () => void
   renderPanel: () => JSX.Element
 }): JSX.Element => {
   const expanded = createMemo(() => !!props.mobile || props.opened())
@@ -106,6 +109,15 @@ export const SidebarContent = (props: {
               size="large"
               onClick={props.onOpenHelp}
               aria-label={props.helpLabel()}
+            />
+          </Tooltip>
+          <Tooltip placement={placement()} value={props.feedbackLabel()}>
+            <IconButton
+              icon="bubble-5"
+              variant="ghost"
+              size="large"
+              onClick={props.onOpenFeedback}
+              aria-label={props.feedbackLabel()}
             />
           </Tooltip>
         </div>

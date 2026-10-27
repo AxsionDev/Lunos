@@ -1358,5 +1358,13 @@ export const dict = {
   "account.disabled.category.payment": "Makseprobleem",
   "account.disabled.category.offboarding": "Sinu organisatsioon eemaldas sind",
   "account.disabled.category.other": "Muu",
+  "feedback.title": "Saada tagasisidet",
+  "feedback.description":
+    "Ütle Lunose meeskonnale, mis töötab, mis mitte ja mis sul puudu on. Kaasa lähevad sinu Lunose versioon ja operatsioonisüsteem, mitte kunagi sinu vestlus.",
+  "feedback.screenshot": "Lisa kuvatõmmis (valikuline: PNG, JPEG või WebP, kuni 2 MB)",
+  "feedback.screenshot.invalid": "See fail ei ole kuni 2 MB suurune PNG-, JPEG- või WebP-pilt.",
+  "feedback.consent": "Jaga selle seansi ID-d (aitab meil selle logidest üles leida)",
+  "feedback.sent": "Aitäh. Sinu tagasiside jõudis Lunose meeskonnani.",
+  "feedback.failed": "Sinu tagasisidet ei saadetud",
   "prompt.placeholder.accountDisabled": "Sinu Lunose konto on keelatud: uusi päringuid ei saa saata",
 }

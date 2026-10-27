@@ -1376,5 +1376,13 @@ export const dict = {
   "account.disabled.category.payment": "Một vấn đề thanh toán",
   "account.disabled.category.offboarding": "Tổ chức của bạn đã xóa bạn",
   "account.disabled.category.other": "Khác",
+  "feedback.title": "Gửi phản hồi",
+  "feedback.description":
+    "Cho nhóm Lunos biết điều gì ổn, điều gì chưa và bạn còn thiếu gì. Phiên bản Lunos và hệ điều hành của bạn được gửi kèm, không bao giờ gửi cuộc trò chuyện.",
+  "feedback.screenshot": "Đính kèm ảnh chụp màn hình (tùy chọn: PNG, JPEG hoặc WebP, tối đa 2 MB)",
+  "feedback.screenshot.invalid": "Tệp này không phải ảnh PNG, JPEG hoặc WebP tối đa 2 MB.",
+  "feedback.consent": "Chia sẻ id của phiên này (giúp chúng tôi tìm nó trong nhật ký)",
+  "feedback.sent": "Cảm ơn bạn. Phản hồi của bạn đã đến nhóm Lunos.",
+  "feedback.failed": "Phản hồi của bạn chưa được gửi",
   "prompt.placeholder.accountDisabled": "Tài khoản Lunos của bạn đã bị vô hiệu hóa: không thể gửi prompt mới",
 }

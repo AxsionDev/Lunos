@@ -1358,5 +1358,13 @@ export const dict = {
   "account.disabled.category.payment": "បញ្ហាការទូទាត់",
   "account.disabled.category.offboarding": "អង្គភាពរបស់អ្នកបានដកអ្នកចេញ",
   "account.disabled.category.other": "ផ្សេងៗ",
+  "feedback.title": "ផ្ញើមតិកែលម្អ",
+  "feedback.description":
+    "ប្រាប់ក្រុម Lunos ថាអ្វីដំណើរការ អ្វីមិនដំណើរការ និងអ្វីដែលខ្វះ។ កំណែ Lunos និង OS របស់អ្នកត្រូវបានផ្ញើជាមួយ មិនដែលផ្ញើការសន្ទនារបស់អ្នកទេ។",
+  "feedback.screenshot": "ភ្ជាប់រូបថតអេក្រង់ (ស្រេចចិត្ត៖ PNG, JPEG ឬ WebP រហូតដល់ 2 MB)",
+  "feedback.screenshot.invalid": "ឯកសារនេះមិនមែនជារូបភាព PNG, JPEG ឬ WebP ទំហំរហូតដល់ 2 MB ទេ។",
+  "feedback.consent": "ចែករំលែក ID នៃវគ្គនេះ (ជួយយើងរកវានៅក្នុងកំណត់ហេតុ)",
+  "feedback.sent": "អរគុណ។ មតិកែលម្អរបស់អ្នកបានទៅដល់ក្រុម Lunos ហើយ។",
+  "feedback.failed": "មតិកែលម្អរបស់អ្នកមិនត្រូវបានផ្ញើទេ",
   "prompt.placeholder.accountDisabled": "គណនី Lunos របស់អ្នកត្រូវបានបិទ៖ មិនអាចផ្ញើសំណើថ្មីបានទេ",
 }

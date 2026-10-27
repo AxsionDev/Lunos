@@ -1365,5 +1365,13 @@ export const dict: Record<string, string> = {
   "account.disabled.category.payment": "भुक्तानी समस्या",
   "account.disabled.category.offboarding": "तपाईंको संस्थाले तपाईंलाई हटायो",
   "account.disabled.category.other": "अन्य",
+  "feedback.title": "प्रतिक्रिया पठाउनुहोस्",
+  "feedback.description":
+    "Lunos टोलीलाई के काम गर्छ, के गर्दैन र के छुटेको छ भन्नुहोस्। तपाईंको Lunos संस्करण र OS साथमा जान्छ, तपाईंको कुराकानी कहिल्यै होइन।",
+  "feedback.screenshot": "स्क्रिनसट संलग्न गर्नुहोस् (ऐच्छिक: PNG, JPEG वा WebP, 2 MB सम्म)",
+  "feedback.screenshot.invalid": "यो फाइल 2 MB सम्मको PNG, JPEG वा WebP छवि होइन।",
+  "feedback.consent": "यो सत्रको ID साझा गर्नुहोस् (लगमा फेला पार्न मद्दत गर्छ)",
+  "feedback.sent": "धन्यवाद। तपाईंको प्रतिक्रिया Lunos टोलीमा पुग्यो।",
+  "feedback.failed": "तपाईंको प्रतिक्रिया पठाइएन",
   "prompt.placeholder.accountDisabled": "तपाईंको Lunos खाता निष्क्रिय गरिएको छ: नयाँ प्रम्प्ट पठाउन सकिँदैन",
 }

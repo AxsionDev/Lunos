@@ -1360,5 +1360,13 @@ export const dict: Record<string, string> = {
   "account.disabled.category.payment": "ගෙවීම් ගැටලුවක්",
   "account.disabled.category.offboarding": "ඔබගේ සංවිධානය ඔබව ඉවත් කළේය",
   "account.disabled.category.other": "වෙනත්",
+  "feedback.title": "ප්‍රතිචාර යවන්න",
+  "feedback.description":
+    "Lunos කණ්ඩායමට වැඩ කරන දේ, නොකරන දේ සහ අඩුපාඩු කියන්න. ඔබේ Lunos අනුවාදය සහ OS එක සමඟ යයි, ඔබේ සංවාදය කිසිදා නොවේ.",
+  "feedback.screenshot": "තිර රුවක් අමුණන්න (විකල්ප: PNG, JPEG හෝ WebP, 2 MB දක්වා)",
+  "feedback.screenshot.invalid": "මෙම ගොනුව 2 MB දක්වා PNG, JPEG හෝ WebP රූපයක් නොවේ.",
+  "feedback.consent": "මෙම සැසියේ ID බෙදාගන්න (ලොග් තුළ එය සොයා ගැනීමට උදව් වේ)",
+  "feedback.sent": "ස්තූතියි. ඔබේ ප්‍රතිචාරය Lunos කණ්ඩායමට ලැබුණා.",
+  "feedback.failed": "ඔබේ ප්‍රතිචාරය යැවුණේ නැත",
   "prompt.placeholder.accountDisabled": "ඔබගේ Lunos ගිණුම අක්‍රිය කර ඇත: නව විමසුම් යැවිය නොහැක",
 }

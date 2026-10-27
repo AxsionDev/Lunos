@@ -1363,5 +1363,13 @@ export const dict = {
   "account.disabled.category.payment": "Ein gjaldstrupulleiki",
   "account.disabled.category.offboarding": "Felagsskapurin hjá tær hevur strikað teg",
   "account.disabled.category.other": "Annað",
+  "feedback.title": "Send afturmelding",
+  "feedback.description":
+    "Sig Lunos-toyminum, hvat virkar, hvat ikki virkar, og hvat tú saknar. Lunos-útgávan og stýriskipanin verða sendar við, ongantíð samrøðan.",
+  "feedback.screenshot": "Viðheft eina skíggjamynd (valfrítt: PNG, JPEG ella WebP, upp til 2 MB)",
+  "feedback.screenshot.invalid": "Fílan er ikki ein PNG-, JPEG- ella WebP-mynd upp til 2 MB.",
+  "feedback.consent": "Deil ID fyri hesa setuna (hjálpir okkum at finna hana í loggunum)",
+  "feedback.sent": "Takk. Afturmeldingin er komin til Lunos-toymið.",
+  "feedback.failed": "Afturmeldingin varð ikki send",
   "prompt.placeholder.accountDisabled": "Lunos-kontan hjá tær er óvirkin: nýggjar fyrispurningar kunnu ikki sendast",
 }

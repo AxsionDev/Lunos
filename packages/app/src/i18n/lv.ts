@@ -1377,5 +1377,13 @@ export const dict = {
   "account.disabled.category.payment": "Maksājuma problēma",
   "account.disabled.category.offboarding": "Jūsu organizācija jūs noņēma",
   "account.disabled.category.other": "Cits",
+  "feedback.title": "Sūtīt atsauksmi",
+  "feedback.description":
+    "Pastāstiet Lunos komandai, kas darbojas, kas nedarbojas un kā pietrūkst. Līdzi tiek nosūtīta Lunos versija un operētājsistēma, nekad jūsu saruna.",
+  "feedback.screenshot": "Pievienot ekrānuzņēmumu (neobligāti: PNG, JPEG vai WebP, līdz 2 MB)",
+  "feedback.screenshot.invalid": "Šis fails nav PNG, JPEG vai WebP attēls līdz 2 MB.",
+  "feedback.consent": "Kopīgot šīs sesijas ID (palīdz mums to atrast žurnālos)",
+  "feedback.sent": "Paldies. Jūsu atsauksme nonāca pie Lunos komandas.",
+  "feedback.failed": "Jūsu atsauksme netika nosūtīta",
   "prompt.placeholder.accountDisabled": "Jūsu Lunos konts ir atspējots: jaunus vaicājumus nevar nosūtīt",
 }

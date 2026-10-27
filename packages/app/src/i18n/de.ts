@@ -1395,5 +1395,13 @@ export const dict = {
   "account.disabled.category.payment": "Ein Zahlungsproblem",
   "account.disabled.category.offboarding": "Ihre Organisation hat Sie abgemeldet",
   "account.disabled.category.other": "Sonstiges",
+  "feedback.title": "Feedback senden",
+  "feedback.description":
+    "Sagen Sie dem Lunos-Team, was funktioniert, was nicht und was Ihnen fehlt. Ihre Lunos-Version und Ihr Betriebssystem werden mitgesendet, nie Ihre Unterhaltung.",
+  "feedback.screenshot": "Screenshot anhängen (optional: PNG, JPEG oder WebP, bis 2 MB)",
+  "feedback.screenshot.invalid": "Diese Datei ist kein PNG-, JPEG- oder WebP-Bild bis 2 MB.",
+  "feedback.consent": "Die ID dieser Sitzung mitsenden (hilft uns, sie in unseren Logs zu finden)",
+  "feedback.sent": "Danke. Ihr Feedback ist beim Lunos-Team angekommen.",
+  "feedback.failed": "Ihr Feedback wurde nicht gesendet",
   "prompt.placeholder.accountDisabled": "Ihr Lunos-Konto ist deaktiviert: Neue Prompts können nicht gesendet werden",
 } satisfies Partial<Record<Keys, string>>
