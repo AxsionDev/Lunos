@@ -17,6 +17,12 @@
 // stops it mid-run (spending cap reached, subscription suspended): the Worker gains `ended`, then the
 // busy sessions on the worker's server are aborted. The worker itself stays up, so DELETE still
 // pushes the results.
+//
+// XCOD-317: `account` adds the account calls `lunos cloud quickstart` makes, in lunoshq's shapes:
+// GET /v1/account (plan, billing, gitCredentials, organizations), PUT /v1/account/git-credentials/{host}
+// and POST /v1/billing/checkout (which starts the trial at once, as its webhook would). A `fail` with
+// `details` answers in lunoshq's XCOD-275 shape, `{ code, message, details, error: { code, message } }`,
+// with `legacy` as the nested code.
 // Run standalone for a local end-to-end check (any bearer token is accepted):
 //
 //   bun test/cloud/fixtures/fake-control-plane.ts     # prints the endpoint to set as cloud.endpoint
@@ -41,7 +47,25 @@ export interface Options {
    * Answer every request to this path prefix with this status and error code. Without `message`
    * the body has none (`raw` sends a body that isn't the error shape at all).
    */
-  fail?: { path: string; status: number; code: string; message?: string; raw?: boolean }
+  fail?: {
+    path: string
+    status: number
+    code: string
+    message?: string
+    raw?: boolean
+    details?: Record<string, unknown>
+    /** The nested `error.code` (contract v1), where it differs from `code`. */
+    legacy?: string
+  }
+  /** XCOD-317: serve the account calls quickstart makes (see the header). */
+  account?: {
+    email?: string
+    plan?: string
+    /** Billing on (default): without a plan, no runs. */
+    billing?: boolean
+    gitCredentials?: string[]
+    organizations?: { org: string; name: string; role: string }[]
+  }
   /** Reports a different results branch, to check the client refuses it. */
   wrongBranch?: boolean
   /** Accept any bearer token, for standalone use with a real `lunos login`. */
@@ -140,7 +164,7 @@ export async function start(options: Options = {}) {
     idleTimeout: 120,
     async fetch(req): Promise<Response> {
       const url = new URL(req.url)
-      const body = req.method === "PUT" ? await req.json() : undefined
+      const body = req.method === "PUT" || req.method === "POST" ? await req.json().catch(() => undefined) : undefined
       requests.push({ method: req.method, path: url.pathname, auth: req.headers.get("authorization"), body })
       if (url.pathname === "/oidc/.well-known/openid-configuration")
         return Response.json({
@@ -150,12 +174,51 @@ export async function start(options: Options = {}) {
         })
       if (options.fail && url.pathname.startsWith(options.fail.path)) {
         if (options.fail.raw) return new Response("Payment Required", { status: options.fail.status })
+        if (options.fail.details) {
+          const message = options.fail.message ?? ""
+          return Response.json(
+            {
+              code: options.fail.code,
+              message,
+              details: options.fail.details,
+              error: { code: options.fail.legacy ?? options.fail.code, message },
+            },
+            { status: options.fail.status },
+          )
+        }
         return error(options.fail.status, options.fail.code, options.fail.message ?? "")
       }
       const auth = req.headers.get("authorization")
       if (options.anyToken ? !auth?.startsWith("Bearer ") : auth !== `Bearer ${TOKEN}`)
         return error(401, "unauthenticated", "Sign-in expired.")
       if (url.pathname === "/v1") return Response.json({ api: 1, region, name: "fake" })
+      const account = options.account
+      if (account && url.pathname === "/v1/account" && req.method === "GET")
+        return Response.json({
+          sub: "ada",
+          email: account.email ?? "ada@example.test",
+          plan: account.plan ?? "free",
+          plan_source: "personal",
+          organizations: account.organizations ?? [],
+          billing: account.billing === false ? null : { subject: "user:ada" },
+          gitCredentials: account.gitCredentials ?? [],
+        })
+      const credential = /^\/v1\/account\/git-credentials\/([^/]+)$/.exec(url.pathname)
+      if (account && credential && req.method === "PUT") {
+        const host = decodeURIComponent(credential[1]!)
+        account.gitCredentials = [...new Set([...(account.gitCredentials ?? []), host])]
+        return new Response(null, { status: 204 })
+      }
+      if (account && url.pathname === "/v1/billing/checkout" && req.method === "POST") {
+        account.plan = "pro"
+        return Response.json({
+          url: `${server.url.origin}/checkout/fake`,
+          trial: true,
+          plan: "pro",
+          interval: "month",
+          seats: 1,
+        })
+      }
       const match = /^\/v1\/workers\/([a-z0-9]+)$/.exec(url.pathname)
       if (!match) return error(404, "not_found", "No such route")
       const id = match[1]

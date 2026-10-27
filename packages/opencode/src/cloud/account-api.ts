@@ -196,6 +196,34 @@ export function explain(
       return retryAfter !== undefined
         ? `Too many requests. Try again in ${wait(retryAfter)}.`
         : "Too many requests. Try again later."
+    // XCOD-317: the refusals on the way to a first cloud run (lunoshq docs/errors.md, "Refused cloud runs").
+    case "not_admitted":
+      return "Lunos Cloud isn't open to your account yet. Local Lunos is unaffected."
+    case "no_git_token": {
+      const host = text(details?.host) ?? "your repository's host"
+      return `Lunos Cloud clones your repository and pushes the results with your own git token, and none is stored for ${host}. Store one with lunos cloud git-token set ${text(details?.host) ?? "<host>"} (or run lunos cloud quickstart, which asks for it).`
+    }
+    case "spending_cap":
+      return runRefusal(text(details?.reason))
+    case "concurrency_limit":
+      return runRefusal(text(details?.reason))
+  }
+}
+
+/** A refused cloud run's next step, by `details.reason`; undefined where the server's own words say it best. */
+function runRefusal(reason: string | undefined) {
+  switch (reason) {
+    case "no_plan":
+      return "Cloud runs need a plan. Run lunos cloud quickstart to start the 14-day Pro trial, or ask an owner of your organisation for the Team plan."
+    case "payment_failed":
+      return "Your last payment failed, so cloud runs are paused. Update your payment details in the billing portal, and they start again; local Lunos is unaffected."
+    case "capacity":
+      return "Lunos Cloud has too many cloud runs at once right now, so no worker is free. Try again in a few minutes."
+    case "hybrid_capacity":
+      return "Your organisation runs cloud tasks on its own workers, and too many cloud runs at once are on them (or they're offline). Wait for one to finish, or ask an admin to check them."
+    case "plan_concurrency":
+    case "trial_concurrency":
+      return "Your plan already has as many cloud runs at once as it allows (too many cloud runs at once for your plan). Wait for one to finish."
   }
 }
 

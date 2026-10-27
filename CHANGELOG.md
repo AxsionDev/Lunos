@@ -23,6 +23,15 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Your first cloud run in one command.** `lunos cloud quickstart` takes you from a new account to a
+  finished task on Lunos Cloud: it signs you in if needed, offers the 14-day Pro trial when you have no
+  plan, asks for a git token for your repository's host if none is stored, proposes a safe first task
+  (it only adds one file) or runs yours, streams it, and prints the results branch with a link to it.
+  After you sign in, the TUI's home screen offers **Try Lunos Cloud** once: `/cloud` runs the same
+  steps in the terminal, `/cloud-hide` hides it. When Lunos Cloud refuses a run (no plan, Lunos Cloud
+  at capacity, an unconfirmed e-mail address, a failed payment), it says what to do next. See "Your
+  first cloud run" in the docs.
+
 - **See your project at a glance, and give each project its own theme.** When a session belongs to a
   project, the right sidebar shows a Project section. Collapsed, it's one line: the budget used
   ("€38 of €50 · Oct"), with ⚠ if a budget is past its warning line or a resource failed to index.
