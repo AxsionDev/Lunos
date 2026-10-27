@@ -1896,6 +1896,7 @@ export type DevCycleConfig = {
 
 export type WorkflowsConfig = {
   dynamic?: boolean
+  main_reads?: number
 }
 
 export type PermissionActionConfig = "ask" | "allow" | "deny"
@@ -1953,6 +1954,7 @@ export type AgentConfig = {
   verify?: boolean
   permission_mode?: "manual" | "auto"
   auto_continue?: boolean
+  dynamic?: boolean
   [key: string]:
     | unknown
     | string

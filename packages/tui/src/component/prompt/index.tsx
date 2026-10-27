@@ -344,15 +344,17 @@ export function Prompt(props: PromptProps) {
 
   // XCOD-298: the next turn's estimate against what's left of the project's budget.
   const budget = useBudget(() => props.sessionID)
-  // XCOD-303: whether Build / Dev-Cycle dispatch subagents to do the work (/workflows on|off).
+  // XCOD-303: whether the main agent dispatches subagents to do the work (/workflows on|off).
   const workflows = createMemo(() => {
     if (external()) return
     const session = props.sessionID ? sync.session.get(props.sessionID) : undefined
     return workflowsLabel({
       agent: local.mode.current()?.name,
+      mode: local.mode.current()?.mode,
       config: sync.data.config as Parameters<typeof workflowsLabel>[0]["config"],
       metadata: session?.metadata as Record<string, unknown> | undefined,
       child: !!session?.parentID,
+      narrow: dimensions().width < 120,
     })
   })
   const usage = createMemo(() => {

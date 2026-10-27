@@ -40,6 +40,7 @@ import { useLocal } from "../../context/local"
 import { EXTERNAL_BADGE, externalAccent, externalCost, externalOf } from "../../util/external"
 import { Locale } from "../../util/locale"
 import { webSearchProviderLabel } from "../../util/tool-display"
+import { NOTICE as WORKFLOWS_NOTICE } from "../../util/workflows"
 import { Dynamic, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import { useSDK } from "../../context/sdk"
 import { useEditorContext } from "../../context/editor"
@@ -1570,7 +1571,7 @@ function UserMessage(props: {
   const text = createMemo(() => {
     const texts = props.parts
       .map((x) => {
-        if (x.type === "text" && !x.synthetic) {
+        if (x.type === "text" && !x.synthetic && !x.metadata?.[WORKFLOWS_NOTICE]) {
           return x.text
         }
         return null
@@ -1578,6 +1579,10 @@ function UserMessage(props: {
       .filter(Boolean)
     return texts.join("\n\n")
   })
+  // XCOD-326: "Dynamic workflows are off for this session: …", from the server, as a warning line.
+  const notice = createMemo(() =>
+    props.parts.flatMap((x) => (x.type === "text" && x.metadata?.[WORKFLOWS_NOTICE] ? [x.text] : [])).at(-1),
+  )
   const files = createMemo(() => props.parts.flatMap((x) => (x.type === "file" ? [x] : [])))
   const { theme } = useTheme()
   const [hover, setHover] = createSignal(false)
@@ -1655,6 +1660,11 @@ function UserMessage(props: {
               </text>
             </Show>
           </box>
+        </box>
+      </Show>
+      <Show when={notice()}>
+        <box paddingLeft={3} marginTop={1}>
+          <text fg={theme.warning}>⚠ {notice()}</text>
         </box>
       </Show>
       <Show when={compaction()}>

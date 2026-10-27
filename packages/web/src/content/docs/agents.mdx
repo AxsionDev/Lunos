@@ -54,7 +54,19 @@ Build is the **default** primary agent with all tools enabled. This is the stand
 
 #### Dynamic workflows
 
-By default Build (and Dev-Cycle) runs every task that needs work as a **Dynamic workflow**: the main agent plans the steps in its todo list, dispatches a subagent for each one (independent steps in parallel, at most `subagent.max_parallel` at once, default 3), integrates what they report, and has a separate `qa` subagent verify the result before it hands back with the Verification block. The main agent keeps only read, search, todo and question tools; editing files, writing files and running commands are done by the subagents. A plain question it can answer from what it already knows is answered directly.
+By default every working session runs each task that needs work as a **Dynamic workflow**: Build, Dev-Cycle, Research, your own primary agents and whichever one is your `default_agent`. The main agent plans the steps in its todo list, dispatches a subagent for each one (independent steps in parallel, at most `subagent.max_parallel` at once, default 3), keeps the todo list current as they report, retries or narrows a step that failed or went off track, and has a separate `qa` subagent verify the result before it hands back with the Verification block. Plan mode is not affected: it dispatches read-only subagents only, as before. Claude Code and Codex sessions run their own loop and are not affected either.
+
+The main agent oversees and doesn't do the work itself:
+
+- It can't edit files, write files or run commands; a call to one is refused, and recorded as `workflows.main_tool_refused` in the [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md). Dev-Cycle still edits its cycle file, and Research its research file.
+- Its reads (`read`, `glob`, `grep`, `list`, `lsp` and MCP resource reads) are for orchestration: at most 5 per turn. Past that they refuse and tell it to dispatch an `explore` subagent. The todo list, questions, `task` and memory are unlimited.
+- A plain question it can answer from what it already knows is answered directly.
+
+```json title="opencode.json"
+{
+  "workflows": { "main_reads": 5 }
+}
+```
 
 A task that fits in one step still goes to one subagent, which costs a little extra. A step is re-dispatched at most 3 times before you're asked how to go on, and once a budget with `on_limit: stop` is used up no new subagent starts. Every subagent inherits the session's permissions, residency rules, sandbox and hooks.
 
@@ -66,7 +78,9 @@ To have the main agent do the work itself, as before, type `/workflows off` (for
 }
 ```
 
-Subagents then stay available but optional, as `subagent.delegate` describes. The footer shows "Dynamic workflows: on" or "off". An organisation can lock `workflows.dynamic` on (to always have work reviewed by a separate agent) or off (to control cost) in managed config; `/workflows` then shows the reason and changes nothing.
+One agent of your own can opt out with `"dynamic": false` in its definition (`"agent": { "solo": { "dynamic": false } }`, or `dynamic: false` in its Markdown frontmatter).
+
+Subagents then stay available but optional, as `subagent.delegate` describes. The footer shows "Dynamic workflows: on · main agent orchestrating" or "off". When Dynamic workflows are on but no subagent that can edit files may be dispatched (`subagent_depth: 0`, a permission rule that denies `task`, or every subagent with `edit` turned off), the main agent works directly and the turn says so: "Dynamic workflows are off for this session", with the reason and what to change. An organisation can lock `workflows.dynamic` on (to always have work reviewed by a separate agent) or off (to control cost), and `workflows.main_reads`, in managed config; `/workflows` then shows the reason and changes nothing.
 
 #### Build checks its work
 

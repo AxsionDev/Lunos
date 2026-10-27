@@ -372,6 +372,9 @@ describe("Dynamic workflows on the live loop (XCOD-303)", () => {
       expect(yield* exists(marker)).toBe(false)
       const mine = (yield* toolCallsByAgent(session.id)).filter((call) => call.session === session.id)
       expect(mine.some((call) => call.tool === "bash" && call.status === "completed")).toBe(false)
+      // XCOD-326: refused, with the pointer to a subagent, rather than "no such tool".
+      expect(mine.map((call) => [call.tool, call.status])).toEqual([["invalid", "error"]])
+      expect(mine[0].error).toContain(DynamicWorkflows.REFUSAL)
     }),
   )
 
@@ -699,4 +702,211 @@ describe("Dynamic workflows on the live loop (XCOD-303)", () => {
       }),
     )
   })
+  // XCOD-326: every working agent orchestrates by default, not only Build and Dev-Cycle.
+  // With `tries`, the main agent first tries the edit itself. Research and Dev-Cycle keep a write tool
+  // for their own file, so a refused write would still show as a write call: they only dispatch.
+  const coding = (agent: string, extra?: Parameters<typeof setup>[0], tries = true) =>
+    Effect.gen(function* () {
+      const { session, llm, directory } = yield* setup({ agent, ...extra })
+      const source = path.join(directory, "signup.ts")
+      yield* say(session.id, agent, "Add input validation to the signup form.")
+      // The main agent tries to do it itself first (refused), then dispatches.
+      if (tries) yield* llm.tool("write", { filePath: source, content: "nope\n" })
+      yield* llm.tool("task", {
+        description: "implement validation",
+        prompt: "Add validation to signup.ts. Report what you changed.",
+        subagent_type: "general",
+      })
+      yield* llm.tool("write", { filePath: source, content: "export const valid = (s: string) => s.length > 0\n" })
+      yield* llm.text("Added validation in signup.ts.")
+      yield* llm.tool("task", { description: "verify", prompt: "Check signup.ts.", subagent_type: "qa" })
+      yield* llm.text("Verification\n✓ signup.ts validates input")
+      yield* llm.text("Done.\n\nVerification\n✓ signup.ts validates input")
+
+      yield* run(session.id)
+
+      const calls = yield* toolCallsByAgent(session.id)
+      const mine = calls.filter((call) => call.session === session.id)
+      expect(mine.filter((call) => WRITERS.includes(call.tool))).toEqual([])
+      expect(mine.filter((call) => call.tool === "task").map((call) => call.status)).toEqual(["completed", "completed"])
+      expect(calls.filter((call) => call.agent === "general").map((call) => [call.tool, call.status])).toEqual([
+        ["write", "completed"],
+      ])
+      expect(yield* Effect.promise(() => fs.readFile(source, "utf8"))).toContain("valid")
+      const [first] = yield* modelCalls()
+      // Research and Dev-Cycle are offered edit tools for their own file only; never bash.
+      for (const name of tries ? WRITERS : ["bash"]) expect(offered(first)).not.toContain(name)
+      // Dev-Cycle's phases carry their own instructions; every other agent gets the orchestrator's.
+      expect(JSON.stringify(first)).toContain(
+        agent === "dev-cycle" ? "dispatch a builder subagent" : "You are the orchestrator",
+      )
+      return { session, mine }
+    })
+
+  it.instance("XCOD-326: Build on a fresh config dispatches and never edits or runs a command itself", () =>
+    Effect.gen(function* () {
+      const { mine } = yield* coding("build")
+      expect(mine[0]).toMatchObject({ tool: "invalid", status: "error" })
+      expect(mine[0].error).toContain(DynamicWorkflows.REFUSAL)
+    }),
+  )
+
+  it.instance("XCOD-326: Research orchestrates by default, its subagents only gathering evidence", () =>
+    Effect.gen(function* () {
+      yield* coding("research", undefined, false)
+      expect(JSON.stringify((yield* modelCalls())[0])).toContain("they never change project files")
+    }),
+  )
+
+  it.instance("XCOD-326: a custom primary agent orchestrates by default", () =>
+    Effect.gen(function* () {
+      yield* coding("reviewer", {
+        agent: "reviewer",
+        config: { agent: { reviewer: { mode: "primary", description: "Reviews and fixes code" } } },
+      })
+    }),
+  )
+
+  it.instance("XCOD-326: Dev-Cycle's build phase never edits code or runs a command itself", () =>
+    Effect.gen(function* () {
+      yield* coding("dev-cycle", { agent: "dev-cycle", cursor: { phase: "build", gate: "approved" } }, false)
+    }),
+  )
+
+  it.instance('XCOD-326: a custom agent with "dynamic": false in its markdown definition works directly', () =>
+    Effect.gen(function* () {
+      const { directory } = yield* TestInstance
+      const fsys = yield* FSUtil.Service
+      yield* fsys.writeWithDirs(
+        path.join(directory, ".opencode", "agent", "solo.md"),
+        "---\ndescription: Works alone\nmode: primary\ndynamic: false\n---\nYou work alone.\n",
+      )
+      const { session, llm } = yield* setup({ agent: "solo" })
+      yield* say(session.id, "solo", "Hi")
+      yield* llm.text("Hello")
+      yield* run(session.id)
+      const [first] = yield* modelCalls()
+      expect(offered(first)).toContain("bash")
+      expect(JSON.stringify(first)).not.toContain("You are the orchestrator")
+      const result = yield* SessionPrompt.Service.use((prompt) =>
+        prompt.command({ sessionID: session.id, agent: "solo", command: "workflows", arguments: "" }),
+      )
+      const text = result.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+      expect(text).toContain('Not in this session: "agent": { "solo": { "dynamic": false } }')
+    }),
+  )
+
+  it.instance("XCOD-326: the main agent's 6th read in a turn is refused; the turn goes on through explore", () =>
+    Effect.gen(function* () {
+      const { session, llm, directory } = yield* setup({ agent: "build" })
+      const file = path.join(directory, "notes.txt")
+      yield* Effect.promise(() => fs.writeFile(file, "hello\n"))
+      yield* say(session.id, "build", "Where is the signup form validated?")
+      for (let i = 0; i < 6; i++) yield* llm.tool("read", { filePath: file })
+      yield* llm.tool("task", {
+        description: "find validation",
+        prompt: "Find where the signup form is validated. Report the file and function.",
+        subagent_type: "explore",
+      })
+      yield* llm.text("It's in signup.ts, valid().")
+      yield* llm.text("signup.ts, valid().")
+
+      yield* run(session.id)
+
+      const mine = (yield* toolCallsByAgent(session.id)).filter((call) => call.session === session.id)
+      expect(mine.map((call) => [call.tool, call.status])).toEqual([
+        ...Array.from({ length: 5 }, () => ["read", "completed"]),
+        ["read", "error"],
+        ["task", "completed"],
+      ])
+      expect(mine[5].error).toContain("dispatch an explore subagent")
+      const sessions = yield* Session.Service
+      expect((yield* sessions.children(session.id)).map((child) => child.agent)).toEqual(["explore"])
+      expect(yield* llm.pending).toBe(0)
+    }),
+  )
+
+  it.instance("XCOD-326: the next message the user types starts a fresh read budget", () =>
+    Effect.gen(function* () {
+      const { session, llm, directory } = yield* setup({ agent: "build", config: { workflows: { main_reads: 1 } } })
+      const file = path.join(directory, "notes.txt")
+      yield* Effect.promise(() => fs.writeFile(file, "hello\n"))
+      for (const text of ["First", "Second"]) {
+        yield* say(session.id, "build", text)
+        yield* llm.tool("read", { filePath: file })
+        yield* llm.tool("read", { filePath: file })
+        yield* llm.text("ok")
+        yield* run(session.id)
+      }
+      const mine = (yield* toolCallsByAgent(session.id)).filter((call) => call.session === session.id)
+      expect(mine.map((call) => call.status)).toEqual(["completed", "error", "completed", "error"])
+    }),
+  )
+
+  it.instance("XCOD-326: an organisation lock on workflows.main_reads holds over project config", () =>
+    Effect.gen(function* () {
+      const fsys = yield* FSUtil.Service
+      yield* fsys.writeWithDirs(
+        path.join(managedDir, "opencode.json"),
+        JSON.stringify({ $locked: ["workflows.main_reads"], workflows: { main_reads: 1 } }),
+      )
+      yield* Effect.addFinalizer(() => fsys.remove(path.join(managedDir, "opencode.json")).pipe(Effect.ignore))
+      const { session, llm, directory } = yield* setup({ agent: "build", config: { workflows: { main_reads: 10 } } })
+      const file = path.join(directory, "notes.txt")
+      yield* Effect.promise(() => fs.writeFile(file, "hello\n"))
+      yield* say(session.id, "build", "Look.")
+      yield* llm.tool("read", { filePath: file })
+      yield* llm.tool("read", { filePath: file })
+      yield* llm.text("ok")
+      yield* run(session.id)
+      const mine = (yield* toolCallsByAgent(session.id)).filter((call) => call.session === session.id)
+      expect(mine.map((call) => call.status)).toEqual(["completed", "error"])
+      expect(JSON.stringify((yield* modelCalls())[0])).toContain("at most 1 in this turn")
+    }),
+  )
+
+  it.instance("XCOD-326: subagent_depth 0 shows a visible notice with the reason and the fix", () =>
+    Effect.gen(function* () {
+      const { session, llm } = yield* setup({ agent: "build", config: { subagent_depth: 0 } })
+      yield* say(session.id, "build", "Add validation.")
+      yield* llm.text("Working on it myself.")
+      yield* run(session.id)
+      yield* say(session.id, "build", "And tests.")
+      yield* llm.text("Adding them.")
+      yield* run(session.id)
+
+      const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+      const notices = msgs.flatMap((msg) =>
+        msg.parts.filter((part) => part.type === "text" && part.metadata?.[DynamicWorkflows.NOTICE]),
+      )
+      // Once per message the user typed, shown (not synthetic) but never sent to the model.
+      expect(notices).toHaveLength(2)
+      expect(notices[0]).toMatchObject({ ignored: true })
+      expect(notices[0].type === "text" && notices[0].text).toBe(
+        `Dynamic workflows are off for this session: "subagent_depth" is 0, so no subagent can be dispatched. Fix: set "subagent_depth" to 1 or more. The main agent does the work itself until then. See ${DynamicWorkflows.DOCS}`,
+      )
+      const calls = yield* modelCalls()
+      expect(JSON.stringify(calls)).not.toContain("Dynamic workflows are off")
+      expect(offered(calls[0])).toContain("bash")
+      // /workflows says so too, rather than "on".
+      const result = yield* command(session.id, "")
+      const text = result.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+      expect(text).toContain('Dynamic workflows are off for this session: "subagent_depth" is 0')
+    }),
+  )
+
+  it.instance("XCOD-326: Plan mode is unchanged: no orchestrator prompt and no read budget", () =>
+    Effect.gen(function* () {
+      const { session, llm, directory } = yield* setup({ agent: "plan" })
+      const file = path.join(directory, "notes.txt")
+      yield* Effect.promise(() => fs.writeFile(file, "hello\n"))
+      yield* say(session.id, "plan", "Plan the validation.")
+      for (let i = 0; i < 7; i++) yield* llm.tool("read", { filePath: file })
+      yield* llm.text("Plan: validate in signup.ts.")
+      yield* run(session.id)
+      const mine = (yield* toolCallsByAgent(session.id)).filter((call) => call.session === session.id)
+      expect(mine.map((call) => call.status)).toEqual(Array.from({ length: 7 }, () => "completed"))
+      expect(JSON.stringify((yield* modelCalls())[0])).not.toContain("You are the orchestrator")
+    }),
+  )
 })

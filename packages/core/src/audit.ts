@@ -118,6 +118,9 @@ export const EVENTS = [
   // line, like `tool.run`; never its output.
   "process.start",
   "process.stop",
+  // XCOD-326: a tool the main agent may not use while Dynamic workflows are on (edit, write,
+  // apply_patch, bash, …), attempted and refused. Tool, agent and session; never the arguments.
+  "workflows.main_tool_refused",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

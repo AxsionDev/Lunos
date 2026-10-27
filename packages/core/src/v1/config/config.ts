@@ -190,7 +190,8 @@ export const Info = Schema.Struct({
     description: "Dev-Cycle mode: whether it continues by itself between gates (XCOD-302)",
   }),
   workflows: Schema.optional(ConfigWorkflows.Info).annotate({
-    description: "Dynamic workflows: whether Build and Dev-Cycle dispatch subagents to do the work (XCOD-303)",
+    description:
+      "Dynamic workflows: whether the main agent of a working session dispatches subagents to do the work, and how much it reads itself (XCOD-303, XCOD-326)",
   }),
   subagent_depth: Schema.optional(NonNegativeInt).annotate({
     description: "Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents.",

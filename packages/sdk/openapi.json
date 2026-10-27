@@ -27001,6 +27001,10 @@
         "properties": {
           "dynamic": {
             "type": "boolean"
+          },
+          "main_reads": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "additionalProperties": false
@@ -27157,6 +27161,9 @@
             "enum": ["manual", "auto"]
           },
           "auto_continue": {
+            "type": "boolean"
+          },
+          "dynamic": {
             "type": "boolean"
           }
         },
