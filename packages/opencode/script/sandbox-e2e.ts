@@ -152,6 +152,11 @@ async function podmanStore(home: string): Promise<Record<string, string>> {
 async function sandboxEnv(name: string, env: Record<string, string> = {}) {
   const home = path.join(root, name, "home")
   for (const sub of ["", "cfg", "data", "state", "cache"]) await fs.mkdir(path.join(home, sub), { recursive: true })
+  // The image under test is also the trusted one (volumes, egress proxy), which only your global config
+  // can choose. Without this, a released build (version x.y.z) pulls ghcr.io/axsiondev/lunos:x.y.z,
+  // which the release run hasn't pushed yet. A scenario that wrote its own global config keeps it.
+  const global = path.join(home, "cfg", "opencode", "opencode.json")
+  if (!(await fs.exists(global))) await Bun.write(global, JSON.stringify({ sandbox: { image } }))
   return {
     home,
     env: {
