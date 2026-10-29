@@ -21,7 +21,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
-## [1.18.56] - 2026-10-29
+## [1.18.57] - 2026-10-29
 
 ### Added
 
